@@ -41,8 +41,6 @@ struct receiver_state {
     struct rrdhost_system_info *system_info;
     time_t connected_since_s;
 
-    struct buffered_reader reader;
-
     struct {
         // The parser pointer is safe to read and use, only when having the host receiver lock.
         // Without this lock, the data pointed by the pointer may vanish randomly.
@@ -50,8 +48,8 @@ struct receiver_state {
         // an atomic read.
         struct parser *parser;
         struct plugind cd;
-        BUFFER *buffer;
 
+        // compressed data input
         struct {
             bool enabled;
             size_t start;
@@ -60,6 +58,12 @@ struct receiver_state {
             char *buf;
             struct decompressor_state decompressor;
         } compressed;
+
+        // uncompressed data input (either directly or via the decompressor)
+        struct buffered_reader uncompressed;
+
+        // a single line of input (composed via uncompressed buffer input)
+        BUFFER *line_buffer;
 
         struct {
             SPINLOCK spinlock;
@@ -73,13 +77,16 @@ struct receiver_state {
     } thread;
 
     struct {
+        size_t cmd_counter; // copy of the rrdhost version to detect replication progress
+        time_t first_time_s;
+    } replication;
+
+    struct {
         bool shutdown;      // signal the streaming parser to exit
         STREAM_HANDSHAKE reason;
     } exit;
 
     struct stream_receiver_config config;
-
-    time_t replication_first_time_t;
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     struct {

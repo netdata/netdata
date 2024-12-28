@@ -1135,6 +1135,7 @@ struct rrdhost {
                 STREAM_HANDSHAKE exit_reason;       // the last receiver exit reason
 
                 struct {
+                    size_t cmd_counter;             // counts the number of replication statements we have received
                     size_t charts;                  // the number of charts currently being replicated from a child
                     NETDATA_DOUBLE percent;         // the % of replication completion
                 } replication;

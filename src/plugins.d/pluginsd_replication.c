@@ -41,6 +41,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    host->stream.rcv.status.replication.cmd_counter++;
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, PLUGINSD_KEYWORD_CHART);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -113,6 +114,7 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) 
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    host->stream.rcv.status.replication.cmd_counter++;
 
     RRDSET *st;
     if (likely(!id || !*id))
@@ -217,6 +219,7 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARSER *parser) {
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_SET);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    host->stream.rcv.status.replication.cmd_counter++;
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -298,6 +301,7 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    host->stream.rcv.status.replication.cmd_counter++;
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -334,6 +338,7 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    host->stream.rcv.status.replication.cmd_counter++;
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE,
                                               PLUGINSD_KEYWORD_REPLAY_BEGIN);
@@ -387,6 +392,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_END);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    host->stream.rcv.status.replication.cmd_counter++;
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -406,7 +412,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
 
     if(parser->user.replay.rset_enabled && st->rrdhost->receiver) {
         time_t now = now_realtime_sec();
-        time_t started = st->rrdhost->receiver->replication_first_time_t;
+        time_t started = st->rrdhost->receiver->replication.first_time_s;
         time_t current = parser->user.replay.end_time;
 
         if(started && current > started) {

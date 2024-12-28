@@ -157,16 +157,16 @@ static inline ssize_t read_stream(struct receiver_state *r, char* buffer, size_t
 // --------------------------------------------------------------------------------------------------------------------
 
 static inline ssize_t receiver_read_uncompressed(struct receiver_state *r) {
-    internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
+    internal_fatal(r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
-    ssize_t bytes = read_stream(r, r->reader.read_buffer + r->reader.read_len, sizeof(r->reader.read_buffer) - r->reader.read_len - 1);
+    ssize_t bytes = read_stream(r, r->thread.uncompressed.read_buffer + r->thread.uncompressed.read_len, sizeof(r->thread.uncompressed.read_buffer) - r->thread.uncompressed.read_len - 1);
     if(bytes > 0) {
         worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes);
         worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes);
 
-        r->reader.read_len += bytes;
-        r->reader.read_buffer[r->reader.read_len] = '\0';
+        r->thread.uncompressed.read_len += bytes;
+        r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] = '\0';
     }
 
     return bytes;
@@ -251,20 +251,20 @@ static inline decompressor_status_t receiver_get_decompressed(struct receiver_st
     if (unlikely(!stream_decompressed_bytes_in_buffer(&r->thread.compressed.decompressor)))
         return DECOMPRESS_NEED_MORE_DATA;
 
-    size_t available = sizeof(r->reader.read_buffer) - r->reader.read_len - 1;
+    size_t available = sizeof(r->thread.uncompressed.read_buffer) - r->thread.uncompressed.read_len - 1;
     if (likely(available)) {
         size_t len = stream_decompressor_get(
-            &r->thread.compressed.decompressor, r->reader.read_buffer + r->reader.read_len, available);
+            &r->thread.compressed.decompressor, r->thread.uncompressed.read_buffer + r->thread.uncompressed.read_len, available);
         if (unlikely(!len)) {
             internal_error(true, "decompressor returned zero length #1");
             return DECOMPRESS_FAILED;
         }
 
-        r->reader.read_len += (int)len;
-        r->reader.read_buffer[r->reader.read_len] = '\0';
+        r->thread.uncompressed.read_len += (int)len;
+        r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] = '\0';
     }
     else {
-        internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", r->reader.read_len);
+        internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", r->thread.uncompressed.read_len);
         return DECOMPRESS_FAILED;
     }
 
@@ -273,7 +273,7 @@ static inline decompressor_status_t receiver_get_decompressed(struct receiver_st
 
 static inline ssize_t receiver_read_compressed(struct receiver_state *r) {
 
-    internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
+    internal_fatal(r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
     ssize_t bytes_read = read_stream(r, r->thread.compressed.buf + r->thread.compressed.used,
@@ -462,9 +462,9 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     rpt->thread.compressed.start = 0;
     rpt->thread.compressed.used = 0;
     rpt->thread.compressed.enabled = stream_decompression_initialize(rpt);
-    buffered_reader_init(&rpt->reader);
+    buffered_reader_init(&rpt->thread.uncompressed);
 
-    rpt->thread.buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
+    rpt->thread.line_buffer = buffer_create(sizeof(rpt->thread.uncompressed.read_buffer), NULL);
 
     // help preferred_sender_buffer() select the right buffer
     rpt->host->stream.snd.commit.receiver_tid = gettid_cached();
@@ -620,16 +620,16 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
                     if (likely(decompress_rc == DECOMPRESS_OK)) {
                         // loop through all the complete lines found in the uncompressed buffer
 
-                        while (buffered_reader_next_line(&rpt->reader, rpt->thread.buffer)) {
-                            if (unlikely(parser_action(parser, rpt->thread.buffer->buffer))) {
+                        while (buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
+                            if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
                                 receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
                                 stream_receiver_remove(sth, rpt, "parser action failed");
                                 *removed = true;
                                 return -1;
                             }
 
-                            rpt->thread.buffer->len = 0;
-                            rpt->thread.buffer->buffer[0] = '\0';
+                            rpt->thread.line_buffer->len = 0;
+                            rpt->thread.line_buffer->buffer[0] = '\0';
                         }
                     }
                     else if (decompress_rc == DECOMPRESS_NEED_MORE_DATA)
@@ -665,16 +665,16 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
         if(rc <= 0)
             return rc;
 
-        while(buffered_reader_next_line(&rpt->reader, rpt->thread.buffer)) {
-            if(unlikely(parser_action(parser, rpt->thread.buffer->buffer))) {
+        while(buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
+            if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
                 receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
                 stream_receiver_remove(sth, rpt, "parser action failed");
                 *removed = true;
                 return -1;
             }
 
-            rpt->thread.buffer->len = 0;
-            rpt->thread.buffer->buffer[0] = '\0';
+            rpt->thread.line_buffer->len = 0;
+            rpt->thread.line_buffer->buffer[0] = '\0';
         }
     }
 
@@ -954,6 +954,12 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
          m = META_NEXT(&sth->run.meta, &idx)) {
         if (m->type != POLLFD_TYPE_RECEIVER) continue;
         struct receiver_state *rpt = m->rpt;
+
+        if(rpt->replication.cmd_counter != rpt->host->stream.rcv.status.replication.cmd_counter) {
+            // there is progress, do not check yet
+            rpt->replication.cmd_counter = rpt->host->stream.rcv.status.replication.cmd_counter;
+            continue;
+        }
 
         size_t exceptions = 0;
         RRDSET *st;

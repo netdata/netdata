@@ -72,8 +72,8 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
     if(log)
         replicate_log_request(r, msg);
 
-    if(st->rrdhost->receiver && (!st->rrdhost->receiver->replication_first_time_t || r->wanted.after < st->rrdhost->receiver->replication_first_time_t))
-        st->rrdhost->receiver->replication_first_time_t = r->wanted.after;
+    if(st->rrdhost->receiver && (!st->rrdhost->receiver->replication.first_time_s || r->wanted.after < st->rrdhost->receiver->replication.first_time_s))
+        st->rrdhost->receiver->replication.first_time_s = r->wanted.after;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     st->replay.log_next_data_collection = true;

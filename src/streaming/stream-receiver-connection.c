@@ -62,8 +62,8 @@ void stream_receiver_free(struct receiver_state *rpt) {
     string_freez(rpt->config.send.parents);
     string_freez(rpt->config.send.charts_matching);
 
-    buffer_free(rpt->thread.buffer);
-    rpt->thread.buffer = NULL;
+    buffer_free(rpt->thread.line_buffer);
+    rpt->thread.line_buffer = NULL;
 
     freez(rpt->thread.compressed.buf);
     rpt->thread.compressed.buf = NULL;
