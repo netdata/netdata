@@ -557,7 +557,9 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
            , count
            , why ? why : "");
 
-    internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) == NULL, "Receiver to be removed is not found in the list of receivers");
+    internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) == NULL,
+                   "Receiver to be removed is not found in the list of receivers");
+
     META_DEL(&sth->run.meta, (Word_t)&rpt->thread.meta);
 
     if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd, &rpt->thread.meta))
@@ -565,30 +567,20 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 
     rpt->host->stream.rcv.status.tid = 0;
 
-    spinlock_lock(&rpt->thread.send_to_child.spinlock);
-    rpt->thread.send_to_child.msg.session = 0;
-    rpt->thread.send_to_child.msg.meta = NULL;
-    stream_circular_buffer_destroy(rpt->thread.send_to_child.scb);
-    rpt->thread.send_to_child.scb = NULL;
-    spinlock_unlock(&rpt->thread.send_to_child.spinlock);
-
-    stream_thread_node_removed(rpt->host);
-
-    buffer_free(rpt->thread.buffer);
-    rpt->thread.buffer = NULL;
-
+    // make sure send_to_plugin() will not write any data to the socket (or wait for it to finish)
     if(parser) {
-        parser->user.v2.stream_buffer.wb = NULL;
-
-        // make sure send_to_plugin() will not write any data to the socket
         spinlock_lock(&parser->writer.spinlock);
         parser->fd_input = -1;
         parser->fd_output = -1;
         parser->sock = NULL;
         spinlock_unlock(&parser->writer.spinlock);
+
+        parser->user.v2.stream_buffer.wb = NULL;
     }
 
-    // the parser stopped
+    stream_thread_node_removed(rpt->host);
+
+    // set a default exit reason, if not set
     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
 
     // in case we are connected to netdata cloud,

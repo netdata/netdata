@@ -99,6 +99,7 @@ inline usec_t stream_circular_buffer_last_sent_ut(STREAM_CIRCULAR_BUFFER *scb) {
 }
 
 void stream_circular_buffer_destroy(STREAM_CIRCULAR_BUFFER *scb) {
+    if(!scb) return;
     cbuffer_free(scb->cb);
     freez(scb);
 }

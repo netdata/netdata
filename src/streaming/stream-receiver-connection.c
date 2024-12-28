@@ -58,13 +58,21 @@ void stream_receiver_free(struct receiver_state *rpt) {
     freez(rpt->program_name);
     freez(rpt->program_version);
 
+    string_freez(rpt->config.send.api_key);
+    string_freez(rpt->config.send.parents);
+    string_freez(rpt->config.send.charts_matching);
+
+    buffer_free(rpt->thread.buffer);
+    rpt->thread.buffer = NULL;
+
     freez(rpt->thread.compressed.buf);
     rpt->thread.compressed.buf = NULL;
     rpt->thread.compressed.size = 0;
 
-    string_freez(rpt->config.send.api_key);
-    string_freez(rpt->config.send.parents);
-    string_freez(rpt->config.send.charts_matching);
+    rpt->thread.send_to_child.msg.session = 0;
+    rpt->thread.send_to_child.msg.meta = NULL;
+    stream_circular_buffer_destroy(rpt->thread.send_to_child.scb);
+    rpt->thread.send_to_child.scb = NULL;
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     if(rpt->log.fp)
