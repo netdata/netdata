@@ -610,6 +610,8 @@ static void netdata_systemd_journal_message_ids_init(void) {
     msgid_into_dict("6e2e3839067648968b646045dbf28d66", "Netdata connection to parent");
     msgid_into_dict("9ce0cb58ab8b44df82c4bf1ad9ee22de", "Netdata alert transition");
     msgid_into_dict("6db0018e83e34320ae2a659d78019fb7", "Netdata alert notification");
+    msgid_into_dict("23e93dfccbf64e11aac858b9410d8a82", "Netdata fatal message");
+
 }
 
 void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {

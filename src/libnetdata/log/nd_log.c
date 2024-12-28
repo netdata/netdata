@@ -412,6 +412,12 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 void netdata_logger_fatal( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     int saved_errno = errno;
 
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_fatal_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+    
     size_t saved_winerror = 0;
 #if defined(OS_WINDOWS)
     saved_winerror = GetLastError();
