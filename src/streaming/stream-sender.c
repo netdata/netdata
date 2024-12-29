@@ -576,7 +576,7 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
     }
 }
 
-bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes) {
+bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes_and_enable_removal) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
@@ -648,10 +648,30 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
                    sth->id, rrdhost_hostname(s->host), s->remote_ip, disconnect_reason, rc, s->sock.fd,
                    stats->bytes_sent, stats->sends);
 
-            stream_sender_move_running_to_connector_or_remove(sth, s, reason, true);
-            return false;
+            if(process_opcodes_and_enable_removal) {
+                // this is not executed from the opcode handling mechanism
+                // so we can safely remove the sender
+                stream_sender_move_running_to_connector_or_remove(sth, s, reason, true);
+            }
+            else {
+                // protection against this case:
+                //
+                // 1. sender gets a function request
+                // 2. sender executes the request
+                // 3. response is immediately available
+                // 4. sender_commit() appends the data to the sending circular buffer
+                // 5. sender_commit() sends opcode to enable sending
+                // 6. opcode bypasses the signal and runs this function inline to dispatch immediately
+                // 7. sending fails (remote disconnected)
+                // 8. sender is removed
+                //
+                // Point 2 above crashes. The sender is no longer there (freed at point 8)
+                // and there is no way for point 2 to know...
+            }
         }
-        else if(process_opcodes && status == EVLOOP_STATUS_CONTINUE && stream_thread_process_opcodes(sth, &s->thread.meta))
+        else if(process_opcodes_and_enable_removal &&
+                 status == EVLOOP_STATUS_CONTINUE &&
+                 stream_thread_process_opcodes(sth, &s->thread.meta))
             status = EVLOOP_STATUS_OPCODE_ON_ME;
     }
 

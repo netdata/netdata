@@ -683,7 +683,7 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
     return rc;
 }
 
-bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes) {
+bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes_and_enable_removal) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
@@ -753,9 +753,31 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
                    disconnect_reason, rc, rpt->sock.fd, stats->bytes_sent, stats->sends);
 
             receiver_set_exit_reason(rpt, reason, false);
-            stream_receiver_remove(sth, rpt, disconnect_reason);
+
+            if(process_opcodes_and_enable_removal) {
+                // this is not executed from the opcode handling mechanism
+                // so we can safely remove the receiver.
+                stream_receiver_remove(sth, rpt, disconnect_reason);
+            }
+            else {
+                 // protection against this case:
+                 //
+                 // 1. receiver gets a replication request
+                 // 2. parser processes the request
+                 // 3. parser decides to send back a message to the child (REPLAY_CHART)
+                 // 4. send_to_child appends the data to the sending circular buffer
+                 // 5. send_to_child sends opcode to enable sending
+                 // 6. opcode bypasses the signal and runs this function inline to dispatch immediately
+                 // 7. sending fails (child disconnected)
+                 // 8. receiver is removed
+                 //
+                 // Point 2 above crashes. The parser is no longer there (freed at point 7)
+                 // and there is no way for point 2 to know...
+            }
         }
-        else if(process_opcodes && status == EVLOOP_STATUS_CONTINUE && stream_thread_process_opcodes(sth, &rpt->thread.meta))
+        else if(process_opcodes_and_enable_removal &&
+                 status == EVLOOP_STATUS_CONTINUE &&
+                 stream_thread_process_opcodes(sth, &rpt->thread.meta))
             status = EVLOOP_STATUS_OPCODE_ON_ME;
     }
 
@@ -870,15 +892,15 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
         return false;
     }
 
-    if (events & ND_POLL_WRITE) {
-        worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
-        if(!stream_receiver_send_data(sth, rpt, now_ut, true))
-            return false;
-    }
-
     if (events & ND_POLL_READ) {
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
         if(!stream_receiver_receive_data(sth, rpt, now_ut, true))
+            return false;
+    }
+
+    if (events & ND_POLL_WRITE) {
+        worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
+        if(!stream_receiver_send_data(sth, rpt, now_ut, true))
             return false;
     }
 

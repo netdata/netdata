@@ -227,10 +227,10 @@ bool stream_thread_process_opcodes(struct stream_thread *sth, struct pollfd_meta
 void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct receiver_state *rpt);
 
 bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes);
-bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes);
+bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes_and_enable_removal);
 
 bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes);
-bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes);
+bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes_and_enable_removal);
 
 #include "stream-sender-internals.h"
 #include "stream-receiver-internals.h"
