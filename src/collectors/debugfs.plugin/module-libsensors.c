@@ -224,8 +224,8 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Voltage",
         .units = "Volts",
-        .context = "sensors.hw_voltage",
-        .family = "Voltages",
+        .context = "system.hw.sensor.voltage",
+        .family = "Voltage",
         .priority = 70002,
         .report_value = true,
         .report_state = true,
@@ -254,8 +254,8 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Fan Speed",
         .units = "rotations per minute",
-        .context = "sensors.hw_fan",
-        .family = "Fans",
+        .context = "system.hw.sensor.fan",
+        .family = "Fan",
         .priority = 70005,
         .report_value = true,
         .report_state = true,
@@ -284,8 +284,8 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Temperature",
         .units = "degrees Celsius",
-        .context = "sensors.hw_temperature",
-        .family = "Temperatures",
+        .context = "system.hw.sensor.temperature",
+        .family = "Temperature",
         .priority = 70000,
         .report_value = true,
         .report_state = true,
@@ -314,7 +314,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Power",
         .units = "Watts",
-        .context = "sensors.hw_power",
+        .context = "system.hw.sensor.power",
         .family = "Power",
         .priority = 70006,
         .report_value = true,
@@ -344,7 +344,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Energy",
         .units = "Joules",
-        .context = "sensors.hw_energy",
+        .context = "system.hw.sensor.energy",
         .family = "Energy",
         .priority = 70007,
         .report_value = true,
@@ -374,8 +374,8 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Current",
         .units = "Amperes",
-        .context = "sensors.hw_current",
-        .family = "Currents",
+        .context = "system.hw.sensor.current",
+        .family = "Current",
         .priority = 70003,
         .report_value = true,
         .report_state = true,
@@ -404,7 +404,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Humidity",
         .units = "percentage",
-        .context = "sensors.hw_humidity",
+        .context = "system.hw.sensor.humidity",
         .family = "Humidity",
         .priority = 70004,
         .report_value = true,
@@ -434,7 +434,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Intrusion",
         .units = "", // No specific unit, as this is a binary state
-        .context = "sensors.hw_intrusion",
+        .context = "system.hw.sensor.intrusion",
         .family = "Intrusion",
         .priority = 70008,
         .report_value = false, // there is not value in intrusion
@@ -921,14 +921,10 @@ static SENSOR *sensor_get_or_create(DICTIONARY *dict, const sensors_chip_name *c
 }
 
 static void sensor_labels(SENSOR *ft) {
+    printf(PLUGINSD_KEYWORD_CLABEL " feature '%s' 1\n", string2str(ft->feature.name));
     printf(PLUGINSD_KEYWORD_CLABEL " label '%s' 1\n", string2str(ft->feature.label));
-    printf(PLUGINSD_KEYWORD_CLABEL " adapter '%s' 1\n", string2str(ft->chip.adapter));
-    printf(PLUGINSD_KEYWORD_CLABEL " bus '%s' 1\n", SENSOR_BUS_TYPE_2str(ft->chip.bus));
-    printf(PLUGINSD_KEYWORD_CLABEL " driver '%s' 1\n", string2str(ft->chip.driver));
     printf(PLUGINSD_KEYWORD_CLABEL " chip_id '%s' 1\n", string2str(ft->chip.id));
     printf(PLUGINSD_KEYWORD_CLABEL " path '%s' 1\n", string2str(ft->chip.path));
-    printf(PLUGINSD_KEYWORD_CLABEL " device '%s' 1\n", string2str(ft->chip.device));
-    printf(PLUGINSD_KEYWORD_CLABEL " subsystem '%s' 1\n", string2str(ft->chip.subsystem));
 
 //    printf(
 //        PLUGINSD_KEYWORD_CLABEL " sensor '%s - %s' 1\n",
@@ -968,7 +964,7 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
     // send the feature data to netdata
     if(do_input && !s->exposed_input) {
         printf(
-            PLUGINSD_KEYWORD_CHART " 'sensors.%s' '' '%s' '%s' '%s' '%s' line %d %d '' debugfs %s\n",
+            PLUGINSD_KEYWORD_CHART " 'sensors.%s_input' '' '%s' '%s' '%s' '%s.input' line %d %d '' debugfs %s\n",
             string2str(s->id),
             s->config.title,
             s->config.units,
@@ -985,13 +981,13 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
 
     if(do_average && !s->exposed_average) {
         printf(
-            PLUGINSD_KEYWORD_CHART " 'sensors.%s_average' '' '%s Average' '%s' '%s' '%s_average' line %d %d '' debugfs %s\n",
+            PLUGINSD_KEYWORD_CHART " 'sensors.%s_average' '' '%s Average' '%s' '%s' '%s.average' line %d %d '' debugfs %s\n",
             string2str(s->id),
             s->config.title,
             s->config.units,
             s->config.family,
             s->config.context,
-            s->config.priority,
+            s->config.priority + 1,
             update_every,
             name);
 
@@ -1002,13 +998,13 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
 
     if(do_state && s->exposed_states != s->supported_states) {
         printf(
-            PLUGINSD_KEYWORD_CHART " 'sensors.%s_state' '' '%s State' '%s' '%s' '%s_states' line %d %d '' debugfs %s\n",
+            PLUGINSD_KEYWORD_CHART " 'sensors.%s_alarm_status' '' '%s Alarm Status' '%s' '%s' '%s.alarm_status' line %d %d '' debugfs %s\n",
             string2str(s->id),
             s->config.title,
             "status",
             s->config.family,
             s->config.context,
-            s->config.priority + 1,
+            s->config.priority + 2,
             update_every,
             name);
 
@@ -1076,18 +1072,14 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
     // send the data
 
     if(do_input) {
-        printf(
-            PLUGINSD_KEYWORD_BEGIN " 'sensors.%s'\n",
-            string2str(s->id));
+        printf(PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_input'\n", string2str(s->id));
 
         printf(PLUGINSD_KEYWORD_SET " input = %lld\n", (long long)(s->input * 10000.0));
         printf(PLUGINSD_KEYWORD_END "\n");
     }
 
     if(do_average) {
-        printf(
-            PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_average'\n",
-            string2str(s->id));
+        printf(PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_average'\n", string2str(s->id));
 
         printf(PLUGINSD_KEYWORD_SET " average = %lld\n", (long long)(s->average * 10000.0));
         printf(PLUGINSD_KEYWORD_END "\n");
@@ -1095,7 +1087,7 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
 
     if(do_state) {
         printf(
-            PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_state'\n",
+            PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_alarm_status'\n",
             string2str(s->id));
 
         if(s->supported_states & SENSOR_STATE_CLEAR)
