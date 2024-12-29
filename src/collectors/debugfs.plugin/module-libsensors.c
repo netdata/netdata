@@ -935,6 +935,8 @@ static void sensor_labels(SENSOR *ft) {
     printf(PLUGINSD_KEYWORD_CLABEL " label '%s' 1\n", string2str(ft->feature.label));
     printf(PLUGINSD_KEYWORD_CLABEL " chip_id '%s' 1\n", string2str(ft->chip.id));
     printf(PLUGINSD_KEYWORD_CLABEL " path '%s' 1\n", string2str(ft->chip.path));
+    printf(PLUGINSD_KEYWORD_CLABEL " subsystem '%s' 1\n", string2str(ft->chip.subsystem));
+    printf(PLUGINSD_KEYWORD_CLABEL " driver '%s' 1\n", string2str(ft->chip.device));
 
 //    printf(
 //        PLUGINSD_KEYWORD_CLABEL " sensor '%s - %s' 1\n",
