@@ -319,7 +319,8 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         internal_fatal(META_GET(&sth->run.meta, (Word_t)&s->thread.meta) != NULL, "Sender already exists in meta list");
         META_SET(&sth->run.meta, (Word_t)&s->thread.meta, &s->thread.meta);
 
-        if(!nd_poll_add(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
+        s->thread.wanted = ND_POLL_READ;
+        if(!nd_poll_add(sth->run.ndpl, s->sock.fd, s->thread.wanted, &s->thread.meta))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SND[%zu] '%s' [to %s]: failed to add sender socket to nd_poll()",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip);
@@ -387,6 +388,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     internal_fatal(META_GET(&sth->run.meta, (Word_t)&s->thread.meta) == NULL, "Sender to be removed is not in the list of senders");
     META_DEL(&sth->run.meta, (Word_t)&s->thread.meta);
 
+    s->thread.wanted = 0;
     if(!nd_poll_del(sth->run.ndpl, s->sock.fd, &s->thread.meta))
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND[%zu] '%s' [to %s]: failed to delete sender socket from nd_poll()",
@@ -482,7 +484,8 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         bytes_compressed += stats.bytes_added;
         bytes_uncompressed += stats.bytes_uncompressed;
 
-        if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0), &s->thread.meta))
+        s->thread.wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
+        if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted, &s->thread.meta))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip);
@@ -606,7 +609,8 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
 
             if (!stats->bytes_outstanding) {
                 // we sent them all - remove ND_POLL_WRITE
-                if (!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
+                s->thread.wanted = ND_POLL_READ;
+                if (!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted, &s->thread.meta))
                     nd_log(NDLS_DAEMON, NDLP_ERR,
                            "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
                            sth->id, rrdhost_hostname(s->host), s->remote_ip);

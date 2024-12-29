@@ -72,6 +72,7 @@ struct receiver_state {
             STREAM_CIRCULAR_BUFFER *scb;
         } send_to_child;
 
+        nd_poll_event_t wanted;
         usec_t last_traffic_ut;
         struct pollfd_meta meta;
     } thread;

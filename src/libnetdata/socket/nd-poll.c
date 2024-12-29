@@ -17,6 +17,7 @@ struct nd_poll_t {
     struct epoll_event ev[MAX_EVENTS_PER_CALL];
     size_t last_pos;
     size_t used;
+    size_t nfds;
 };
 
 // Initialize the event poll context
@@ -48,6 +49,7 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
         .data.ptr = data,
     };
     bool rc = epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_ADD, fd, &ev) == 0;
+    if(rc) ndpl->nfds++;
     internal_fatal(!rc, "epoll_ctl() failed");
     return rc;
 }
@@ -56,6 +58,7 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
 bool nd_poll_del(nd_poll_t *ndpl, int fd, void *data) {
     internal_fatal(!data, "nd_poll() does not support NULL data pointers");
 
+    ndpl->nfds--; // we can't check for success/failure here, because epoll() removes fds when they are closed
     bool rc = epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == 0;
     internal_error(!rc, "epoll_ctl() failed (is the socket already closed)"); // this is ok if the socket is already closed
 
@@ -128,7 +131,12 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
         errno_clear();
         ndpl->last_pos = 0;
         ndpl->used = 0;
-        int n = epoll_wait(ndpl->epoll_fd, &ndpl->ev[0], _countof(ndpl->ev), timeout_ms);
+
+        int maxevents = ndpl->nfds / 2;
+        if(maxevents > (int)_countof(ndpl->ev)) maxevents = (int)_countof(ndpl->ev);
+        if(maxevents < 2) maxevents = 2;
+
+        int n = epoll_wait(ndpl->epoll_fd, &ndpl->ev[0], maxevents, timeout_ms);
 
         if(unlikely(n <= 0)) {
             if(n == 0) {

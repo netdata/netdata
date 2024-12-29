@@ -436,7 +436,8 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) != NULL, "Receiver to be added is already in the list of receivers");
     META_SET(&sth->run.meta, (Word_t)&rpt->thread.meta, &rpt->thread.meta);
 
-    if(!nd_poll_add(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
+    rpt->thread.wanted = ND_POLL_READ;
+    if(!nd_poll_add(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted, &rpt->thread.meta))
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV[%zu] '%s' [from [%s]:%s]:"
                "Failed to add receiver socket to nd_poll()",
@@ -564,6 +565,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 
     META_DEL(&sth->run.meta, (Word_t)&rpt->thread.meta);
 
+    rpt->thread.wanted = 0;
     if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd, &rpt->thread.meta))
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to delete receiver socket from nd_poll()");
 
@@ -597,8 +599,26 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     // DO NOT USE rpt after this point
 }
 
+static bool stream_receiver_dequeue_senders(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
+
+    // re-check if we need to send data after reading - if we do, try now
+    if(rpt->thread.wanted & ND_POLL_WRITE) {
+        worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
+        if(!stream_receiver_send_data(sth, rpt, now_ut, true))
+            return false;
+    }
+
+    if(rpt->host->sender &&                                         // the host has a sender
+        rpt->host->stream.snd.status.tid == gettid_cached() &&      // the sender is mine
+        (rpt->host->sender->thread.wanted & ND_POLL_WRITE))         // the sender needs to send data
+        stream_sender_send_data(sth, rpt->host->sender, now_ut, true);
+
+    return true;
+}
+
 static ssize_t
-stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt, PARSER *parser, bool *removed) {
+stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt, PARSER *parser, usec_t now_ut __maybe_unused, bool *removed) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
     *removed = false;
 
@@ -709,7 +729,8 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
             rpt->thread.last_traffic_ut = now_ut;
             stream_circular_buffer_del_unsafe(scb, rc, now_ut);
             if (!stats->bytes_outstanding) {
-                if (!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
+                rpt->thread.wanted = ND_POLL_READ;
+                if (!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted, &rpt->thread.meta))
                     nd_log(NDLS_DAEMON, NDLP_ERR,
                            "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot update nd_poll()",
                            sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
@@ -800,16 +821,19 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
     while(status == EVLOOP_STATUS_CONTINUE) {
         bool removed = false;
-        ssize_t rc = stream_receive_and_process(sth, rpt, parser, &removed);
+        ssize_t rc = stream_receive_and_process(sth, rpt, parser, now_ut, &removed);
         if(unlikely(removed))
             status = EVLOOP_STATUS_PARSER_FAILED;
 
-        else if (likely(rc > 0))
+        else if (likely(rc > 0)) {
             rpt->thread.last_traffic_ut = now_ut;
 
-        else if (rc == 0 || errno == ECONNRESET)
+            if(!stream_receiver_dequeue_senders(sth, rpt, now_ut))
+                status = EVLOOP_STATUS_SOCKET_ERROR;
+        }
+        else if (rc == 0 || errno == ECONNRESET) {
             status = EVLOOP_STATUS_SOCKET_CLOSED;
-
+        }
         else if (rc < 0) {
             if ((errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
                 status = EVLOOP_STATUS_SOCKET_FULL;
@@ -892,15 +916,15 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
         return false;
     }
 
-    if (events & ND_POLL_READ) {
-        worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
-        if(!stream_receiver_receive_data(sth, rpt, now_ut, true))
-            return false;
-    }
-
     if (events & ND_POLL_WRITE) {
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
         if(!stream_receiver_send_data(sth, rpt, now_ut, true))
+            return false;
+    }
+
+    if (events & ND_POLL_READ) {
+        worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
+        if(!stream_receiver_receive_data(sth, rpt, now_ut, true))
             return false;
     }
 
@@ -961,7 +985,8 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             continue;
         }
 
-        if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0), &rpt->thread.meta))
+        rpt->thread.wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
+        if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted, &rpt->thread.meta))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM RCV[%zu] '%s' [from %s]: failed to update nd_poll().",
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);
@@ -1030,7 +1055,7 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
 
         if(exceptions && !stream_receiver_did_replication_progress(rpt)) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS SUMMARY: expecting %zu replication commands.",
+                   "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests - disconnecting it.",
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, exceptions);
 
             receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_REPLICATION_STALLED, false);

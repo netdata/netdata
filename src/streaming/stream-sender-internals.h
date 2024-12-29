@@ -47,6 +47,7 @@ struct sender_state {
         // DO NOT READ OR WRITE ANYWHERE
         uint32_t msg_slot;      // ensures a opcode queue that can never get full
 
+        nd_poll_event_t wanted;
         usec_t last_traffic_ut;
         struct pollfd_meta meta;
     } thread;

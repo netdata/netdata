@@ -625,6 +625,7 @@ static void replication_response_cancel_and_finalize(struct replication_query *q
 }
 
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
+static void replication_replied_add(void);
 
 bool replication_response_execute_finalize_and_send(struct replication_query *q, size_t max_msg_size, bool workers) {
     bool with_slots = (q->query.capabilities & STREAM_CAP_SLOTS) ? true : false;
@@ -691,6 +692,7 @@ bool replication_response_execute_finalize_and_send(struct replication_query *q,
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_REPLICATION);
     if(workers) worker_is_busy(WORKER_JOB_CLEANUP);
     __atomic_add_fetch(&host->stream.snd.status.replication.counter_out, 1, __ATOMIC_RELAXED);
+    replication_replied_add();
 
     if(enable_streaming) {
 #ifdef REPLICATION_TRACKING
@@ -796,6 +798,7 @@ static struct replication_thread {
         Word_t unique_id;               // the last unique id we gave to a request (auto-increment, starting from 1)
         size_t received;                // the number of replication requests received
         size_t executed;                // the number of replication requests executed
+        size_t replied;
         size_t error_not_found;         // the number of replication requests ignored because the chart was not found
         size_t error_duplicate;         // the number of replication requests found duplicate (same chart)
         size_t error_flushed;           // the number of replication requests deleted due to disconnections
@@ -807,6 +810,7 @@ static struct replication_thread {
         // same as the atomic versions, for finding the delta over time
         size_t last_received;
         size_t last_executed;
+        size_t last_replied;
         size_t last_error_flushed;
         size_t last_error_duplicate;
         size_t last_error_not_found;
@@ -1296,6 +1300,10 @@ void replication_sender_cleanup(struct sender_state *sender) {
     replication_recursive_unlock();
 }
 
+static void replication_replied_add(void) {
+    __atomic_add_fetch(&replication_globals.atomic.replied, 1, __ATOMIC_RELAXED);
+}
+
 void replication_sender_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
     size_t percentage = stream_sender_get_buffer_used_percent(s->scb);
 
@@ -1415,6 +1423,7 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     size_t not_found = __atomic_load_n(&replication_globals.atomic.error_not_found, __ATOMIC_RELAXED);
     size_t received = __atomic_load_n(&replication_globals.atomic.received, __ATOMIC_RELAXED);
     size_t executed = __atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED);
+    size_t replied = __atomic_load_n(&replication_globals.atomic.replied, __ATOMIC_RELAXED);
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
@@ -1445,10 +1454,11 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     }
 
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "REPLICATION SEND SUMMARY: all senders finished replication, "
-           "received %zu and executed %zu replication requests%s",
+           "REPLICATION SEND SUMMARY: all senders finished replication. "
+           "Received %zu, executed %zu and replied to %zu requests. %s",
            received - replication_globals.main_thread.last_received,
            executed - replication_globals.main_thread.last_executed,
+           replied - replication_globals.main_thread.last_replied,
            buffer_tostring(wb));
 
     replication_globals.main_thread.last_error_flushed = flushed;
@@ -1456,6 +1466,7 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     replication_globals.main_thread.last_error_not_found = not_found;
     replication_globals.main_thread.last_received = received;
     replication_globals.main_thread.last_executed = executed;
+    replication_globals.main_thread.last_replied = replied;
 }
 
 static void replication_initialize_workers(bool master) {
@@ -1571,7 +1582,7 @@ static int replication_pipeline_execute_next(void) {
         rq = &rtp.rqs[rtp.rqs_last_prepared];
 
         if(rq->found) {
-//            if(!rq->start_streaming) {
+            if(!rq->start_streaming) {
                 if (!rq->st) {
                     worker_is_busy(WORKER_JOB_FIND_CHART);
                     rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
@@ -1587,7 +1598,7 @@ static int replication_pipeline_execute_next(void) {
                         rq->sender->capabilities,
                         rtp.max_requests_ahead == 1);
                 }
-//            }
+            }
 
             rq->executed = false;
         }
