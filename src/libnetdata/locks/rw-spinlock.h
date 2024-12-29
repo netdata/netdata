@@ -7,8 +7,7 @@
 #include "spinlock.h"
 
 typedef struct netdata_rw_spinlock {
-    int32_t counter; // positive is readers, negative is a writer
-    int32_t writers_waiting;
+    REFCOUNT counter; // positive is readers, negative is a writer
 } RW_SPINLOCK;
 
 #define RW_SPINLOCK_INITIALIZER { .counter = 0, }

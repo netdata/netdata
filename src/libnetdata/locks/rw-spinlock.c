@@ -2,81 +2,75 @@
 
 #include "libnetdata/libnetdata.h"
 
-#define MAX_USEC 1024 // Maximum backoff limit in microseconds
-#define SPIN_THRESHOLD 10 // Spins before introducing sleep
-
-static __thread int32_t locks_held_by_thread = 0; // Thread-local counter for locks held
-
 // ----------------------------------------------------------------------------
 // rw_spinlock implementation
 
 void rw_spinlock_init_with_trace(RW_SPINLOCK *rw_spinlock, const char *func __maybe_unused) {
     rw_spinlock->counter = 0;
-    rw_spinlock->writers_waiting = false;
 }
 
 bool rw_spinlock_tryread_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func) {
     size_t spins = 0;
 
-    int32_t count = __atomic_load_n(&rw_spinlock->counter, __ATOMIC_RELAXED);
-    if (count == -1 || (!locks_held_by_thread && __atomic_load_n(&rw_spinlock->writers_waiting, __ATOMIC_RELAXED))) {
-        // Writer is active or waiting
-        return false;
+    REFCOUNT expected = rw_spinlock->counter;
+    while (true) {
+        if(expected < 0)
+            // writer is active
+            return false;
+
+        // increment reader count
+        if (__atomic_compare_exchange_n(
+                &rw_spinlock->counter,
+                &expected,
+                expected + 1,
+                false,              // Strong CAS
+                __ATOMIC_ACQUIRE,   // Success memory order
+                __ATOMIC_RELAXED    // Failure memory order
+                ))
+            break;
+
+        spins++;
     }
 
-    // Attempt to increment reader count
-    if (!__atomic_compare_exchange_n(
-            &rw_spinlock->counter,
-            &count,
-            count + 1,
-            false, // Strong CAS
-            __ATOMIC_ACQUIRE, // Success memory order
-            __ATOMIC_RELAXED  // Failure memory order
-            ))
-        return false;
-
-    locks_held_by_thread++;
     worker_spinlock_contention(func, spins);
     nd_thread_rwspinlock_read_locked();
-
     return true;
 }
 
 void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func) {
     size_t spins = 0;
-    usec_t usec = 1;
 
-    int32_t expected = rw_spinlock->counter;
+    REFCOUNT expected = rw_spinlock->counter;
+
+    // we should not increase it if it is negative (a writer holds the lock)
+    if(expected < 0) expected = 0;
+
     while (true) {
-        if(expected < 0)
-            // we should not increase it if it is negative (a writer holds the lock)
-            expected = 0;
-
         // Attempt to increment reader count
         if (__atomic_compare_exchange_n(
                 &rw_spinlock->counter,
                 &expected,
                 expected + 1,
-                false, // Strong CAS
-                __ATOMIC_ACQUIRE, // Success memory order
-                __ATOMIC_RELAXED  // Failure memory order
+                false,              // Strong CAS
+                __ATOMIC_ACQUIRE,   // Success memory order
+                __ATOMIC_RELAXED    // Failure memory order
                 ))
             break;
 
         spins++;
 
-        if (expected == -1 || (!locks_held_by_thread && __atomic_load_n(&rw_spinlock->writers_waiting, __ATOMIC_RELAXED))) {
-            // Writer is active or waiting
-            microsleep(usec);
-            usec = usec >= MAX_USEC ? MAX_USEC : usec * 2;
-        }
-        else if (spins > SPIN_THRESHOLD) {
-            // no writers, but the expected count was wrong
+        if (expected < 0) {
+            // writer is active
+
+            // we should not increase it if it is negative (a writer holds the lock)
+            expected = 0;
+
+            // wait a bit before retrying
             tinysleep();
+            yield_the_processor();
         }
     }
 
-    locks_held_by_thread++;
     worker_spinlock_contention(func, spins);
     nd_thread_rwspinlock_read_locked();
 }
@@ -85,26 +79,25 @@ void rw_spinlock_read_unlock_with_trace(RW_SPINLOCK *rw_spinlock, const char *fu
 #ifndef NETDATA_INTERNAL_CHECKS
     __atomic_sub_fetch(&rw_spinlock->counter, 1, __ATOMIC_RELEASE);
 #else
-    int32_t x = __atomic_sub_fetch(&rw_spinlock->counter, 1, __ATOMIC_RELEASE);
+    REFCOUNT x = __atomic_sub_fetch(&rw_spinlock->counter, 1, __ATOMIC_RELEASE);
     if (x < 0)
         fatal("RW_SPINLOCK: readers is negative %d", x);
 #endif
 
-    locks_held_by_thread--;
     nd_thread_rwspinlock_read_unlocked();
 }
 
 bool rw_spinlock_trywrite_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func) {
-    int32_t expected = 0;
+    REFCOUNT expected = 0;
 
     // Attempt to acquire writer lock when no readers or writers are active
     if (!__atomic_compare_exchange_n(
             &rw_spinlock->counter,
             &expected,
             -1,
-            false, // Strong CAS
-            __ATOMIC_ACQUIRE, // Success memory order
-            __ATOMIC_RELAXED  // Failure memory order
+            false,              // Strong CAS
+            __ATOMIC_ACQUIRE,   // Success memory order
+            __ATOMIC_RELAXED    // Failure memory order
             )) {
         return false;
     }
@@ -117,50 +110,25 @@ bool rw_spinlock_trywrite_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *
 void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func) {
     size_t spins = 0;
 
-    __atomic_add_fetch(&rw_spinlock->writers_waiting, 1, __ATOMIC_RELAXED);
-
     while (true) {
-        int32_t expected = 0;
+        REFCOUNT expected = 0;
 
         // Attempt to acquire writer lock when no readers or writers are active
         if (__atomic_compare_exchange_n(
                 &rw_spinlock->counter,
                 &expected,
                 -1,
-                false, // Strong CAS
-                __ATOMIC_ACQUIRE, // Success memory order
-                __ATOMIC_RELAXED  // Failure memory order
+                false,              // Strong CAS
+                __ATOMIC_ACQUIRE,   // Success memory order
+                __ATOMIC_RELAXED    // Failure memory order
                 )) {
             break;
         }
 
         spins++;
-
-        if (spins > SPIN_THRESHOLD) {
-            if(expected == -1) {
-                // another writer is holding the lock
-                tinysleep();
-                yield_the_processor();
-            }
-            else {
-                // readers are active
-                int32_t w = __atomic_load_n(&rw_spinlock->writers_waiting, __ATOMIC_RELAXED);
-                if (w > 1) {
-                    // multiple writers are waiting, while readers are holding the lock
-                    uint32_t r = 1 + (gettid_cached() % w);
-                    microsleep(r);
-                    if (r % 2 == 0)
-                        yield_the_processor();
-                }
-                else {
-                    // I am the only writer waiting, while readers are holding the lock
-                    tinysleep();
-                }
-            }
-        }
+        tinysleep();
     }
 
-    __atomic_sub_fetch(&rw_spinlock->writers_waiting, 1, __ATOMIC_RELAXED);
     worker_spinlock_contention(func, spins);
     nd_thread_rwspinlock_write_locked();
 }
