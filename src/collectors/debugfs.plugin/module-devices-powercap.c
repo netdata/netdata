@@ -126,7 +126,7 @@ static struct zone_t *get_main_rapl_zones(void) {
     return base;
 }
 
-int do_sys_devices_virtual_powercap(int update_every, const char *name __maybe_unused) {
+int do_module_devices_powercap(int update_every, const char *name __maybe_unused) {
 
     if (unlikely(!rapl_zones)) {
         rapl_zones = get_main_rapl_zones();
@@ -136,82 +136,76 @@ int do_sys_devices_virtual_powercap(int update_every, const char *name __maybe_u
         }
     }
 
+    netdata_mutex_lock(&stdout_mutex);
+
     for(struct zone_t *zone = rapl_zones; zone ; zone = zone->next) {
         if(!zone->zone_chart_id) {
             char id[1000 + 1];
             snprintf(id, 1000, "cpu.powercap_intel_rapl_zone_%s", zone->name);
             zone->zone_chart_id = strdupz(id);
 
-            fprintf(stdout,
-                    "CHART '%s' '' 'Intel RAPL Zone Power Consumption' 'Watts' 'powercap' '%s' '%s' %d %d '' 'debugfs.plugin' 'intel_rapl'\n",
+            printf(PLUGINSD_KEYWORD_CHART " '%s' '' 'Intel RAPL Zone Power Consumption' 'Watts' 'powercap' '%s' '%s' %d %d '' 'debugfs.plugin' 'intel_rapl'\n",
                     zone->zone_chart_id,
                     "cpu.powercap_intel_rapl_zone",
                     debugfs_rrdset_type_name(RRDSET_TYPE_LINE),
                     NETDATA_CHART_PRIO_POWERCAP,
                     update_every);
 
-            fprintf(stdout,
-                    "CLABEL 'zone' '%s' 1\n"
-                    "CLABEL_COMMIT\n",
+            printf(PLUGINSD_KEYWORD_CLABEL " 'zone' '%s' 1\n"
+                    PLUGINSD_KEYWORD_CLABEL_COMMIT "\n",
                     zone->name);
 
-            fprintf(stdout,
-                    "DIMENSION 'power' '' %s 1 1000000 ''\n",
+            printf(PLUGINSD_KEYWORD_DIMENSION " 'power' '' %s 1 1000000 ''\n",
                     debugfs_rrd_algorithm_name(RRD_ALGORITHM_INCREMENTAL));
 
-            // for the sub-zones
+            // the sub-zones
             snprintf(id, 1000, "cpu.powercap_intel_rapl_subzones_%s", zone->name);
             zone->subzone_chart_id = strdupz(id);
-            fprintf(stdout,
-                    "CHART '%s' '' 'Intel RAPL Subzones Power Consumption' 'Watts' 'powercap' '%s' '%s' %d %d '' 'debugfs.plugin' 'intel_rapl'\n",
+            printf(PLUGINSD_KEYWORD_CHART " '%s' '' 'Intel RAPL Subzones Power Consumption' 'Watts' 'powercap' '%s' '%s' %d %d '' 'debugfs.plugin' 'intel_rapl'\n",
                     zone->subzone_chart_id,
                     "cpu.powercap_intel_rapl_subzones",
                     debugfs_rrdset_type_name(RRDSET_TYPE_LINE),
                     NETDATA_CHART_PRIO_POWERCAP + 1,
                     update_every);
 
-            fprintf(stdout,
-                    "CLABEL 'zone' '%s' 1\n"
-                    "CLABEL_COMMIT\n",
+            printf(PLUGINSD_KEYWORD_CLABEL " 'zone' '%s' 1\n"
+                   PLUGINSD_KEYWORD_CLABEL_COMMIT "\n",
                     zone->name);
 
             for(struct zone_t *subzone = zone->subzones; subzone ; subzone = subzone->next) {
-                fprintf(stdout,
-                        "DIMENSION '%s' '' %s 1 1000000 ''\n",
+                printf(PLUGINSD_KEYWORD_DIMENSION " '%s' '' %s 1 1000000 ''\n",
                         subzone->name,
                         debugfs_rrd_algorithm_name(RRD_ALGORITHM_INCREMENTAL));
             }
         }
 
         if(get_measurement(zone->path, &zone->energy_uj)) {
-            fprintf(stdout,
-                    "BEGIN '%s'\n"
-                    "SET power = %llu\n"
-                    "END\n"
+            printf(PLUGINSD_KEYWORD_BEGIN " '%s'\n"
+                    PLUGINSD_KEYWORD_SET " power = %llu\n"
+                    PLUGINSD_KEYWORD_END "\n"
                     , zone->zone_chart_id
                     , zone->energy_uj);
         }
 
         if(zone->subzones) {
-            fprintf(stdout,
-                    "BEGIN '%s'\n",
+            printf(PLUGINSD_KEYWORD_BEGIN " '%s'\n",
                     zone->subzone_chart_id);
 
             for (struct zone_t *subzone = zone->subzones; subzone; subzone = subzone->next) {
                 if(get_measurement(subzone->path, &subzone->energy_uj)) {
-                    fprintf(stdout,
-                            "SET '%s' = %llu\n",
+                    printf(PLUGINSD_KEYWORD_SET " '%s' = %llu\n",
                             subzone->name,
                             subzone->energy_uj);
                 }
             }
 
-            fprintf(stdout, "END\n");
+            printf(PLUGINSD_KEYWORD_END "\n");
         }
 
     }
 
     fflush(stdout);
+    netdata_mutex_unlock(&stdout_mutex);
 
     return 0;
 }

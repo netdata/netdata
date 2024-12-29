@@ -51,15 +51,15 @@ static struct netdata_extrafrag *find_or_create_extrafrag(const char *name)
 static void extfrag_send_chart(char *chart_id, collected_number *values)
 {
     int i;
-    fprintf(stdout, "BEGIN mem.fragmentation_index_%s\n", chart_id);
-    for (i = 0; i < NETDATA_ORDER_FRAGMENTATION; i++) {
-        fprintf(stdout, "SET %s = %lld\n", orders[i], values[i]);
-    }
-    fprintf(stdout, "END\n");
-    fflush(stdout);
+    printf(PLUGINSD_KEYWORD_BEGIN " mem.fragmentation_index_%s\n", chart_id);
+
+    for (i = 0; i < NETDATA_ORDER_FRAGMENTATION; i++)
+        printf(PLUGINSD_KEYWORD_SET " %s = %lld\n", orders[i], values[i]);
+
+    printf(PLUGINSD_KEYWORD_END "\n");
 }
 
-int do_debugfs_extfrag(int update_every, const char *name) {
+int do_module_numa_extfrag(int update_every, const char *name) {
     static procfile *ff = NULL;;
 
     if (unlikely(!ff)) {
@@ -95,27 +95,31 @@ int do_debugfs_extfrag(int update_every, const char *name) {
             line_orders[j] = (collected_number) (value * 1000.0);
         }
 
+        netdata_mutex_lock(&stdout_mutex);
+
         if (unlikely(!extrafrag->id)) {
             extrafrag->id = extrafrag->node_zone;
-            fprintf(
-                stdout,
-                "CHART mem.fragmentation_index_%s '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.numa_node_zone_fragmentation_index' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
+                printf(
+                PLUGINSD_KEYWORD_CHART " mem.fragmentation_index_%s '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.numa_node_zone_fragmentation_index' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
                 extrafrag->node_zone,
                 NETDATA_CHART_PRIO_MEM_FRAGMENTATION,
                 update_every,
                 name);
-            for (i = 0; i < NETDATA_ORDER_FRAGMENTATION; i++) {
-                fprintf(stdout, "DIMENSION '%s' '%s' absolute 1 1000 ''\n", orders[i], orders[i]);
-            }
-            fprintf(
-                stdout,
-                "CLABEL 'numa_node' 'node%s' 1\n"
-                "CLABEL 'zone' '%s' 1\n"
-                "CLABEL_COMMIT\n",
+
+            for (i = 0; i < NETDATA_ORDER_FRAGMENTATION; i++)
+                printf(PLUGINSD_KEYWORD_DIMENSION " '%s' '%s' absolute 1 1000 ''\n", orders[i], orders[i]);
+
+            printf(
+                PLUGINSD_KEYWORD_CLABEL " 'numa_node' 'node%s' 1\n"
+                PLUGINSD_KEYWORD_CLABEL " 'zone' '%s' 1\n"
+                PLUGINSD_KEYWORD_CLABEL_COMMIT "\n",
                 id,
                 zone);
         }
         extfrag_send_chart(chart_id, line_orders);
+
+        fflush(stdout);
+        netdata_mutex_unlock(&stdout_mutex);
     }
 
     return 0;

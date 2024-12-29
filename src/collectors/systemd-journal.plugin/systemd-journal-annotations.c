@@ -612,6 +612,7 @@ static void netdata_systemd_journal_message_ids_init(void) {
     msgid_into_dict("6db0018e83e34320ae2a659d78019fb7", "Netdata alert notification");
     msgid_into_dict("23e93dfccbf64e11aac858b9410d8a82", "Netdata fatal message");
 
+    msgid_into_dict("8ddaf5ba33a74078b609250db1e951f3", "Sensor state transition");
 }
 
 void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
