@@ -10,3 +10,6 @@
 	path = src/web/server/h2o/libh2o
 	url = https://github.com/h2o/h2o.git
 	ignore = untracked
+[submodule "src/collectors/debugfs.plugin/libsensors/vendored"]
+	path = src/collectors/debugfs.plugin/libsensors/vendored
+	url = https://github.com/lm-sensors/lm-sensors.git
