@@ -60,7 +60,7 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
         }
     }
 
-    // fflush(rpt->log.fp);
+    fflush(rpt->log.fp);
     spinlock_unlock(&rpt->log.spinlock);
 }
 #endif
@@ -601,14 +601,15 @@ static bool stream_receiver_dequeue_senders(struct stream_thread *sth, struct re
     // re-check if we need to send data after reading - if we do, try now
     if(rpt->thread.wanted & ND_POLL_WRITE) {
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
-        if(!stream_receiver_send_data(sth, rpt, now_ut, true))
+        if(!stream_receiver_send_data(sth, rpt, now_ut, false))
             return false;
     }
 
     if(rpt->host->sender &&                                         // the host has a sender
         rpt->host->stream.snd.status.tid == gettid_cached() &&      // the sender is mine
         (rpt->host->sender->thread.wanted & ND_POLL_WRITE))         // the sender needs to send data
-        stream_sender_send_data(sth, rpt->host->sender, now_ut, true);
+        if(!stream_sender_send_data(sth, rpt->host->sender, now_ut, false))
+            return false;
 
     return true;
 }
