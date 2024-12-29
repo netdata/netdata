@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- build\(deps\): add bison and flex [\#19292](https://github.com/netdata/netdata/pull/19292) ([ilyam8](https://github.com/ilyam8))
 - remove go.d/windows [\#19290](https://github.com/netdata/netdata/pull/19290) ([ilyam8](https://github.com/ilyam8))
 - fix\(netdata-updater.sh\): ensure tmpdir-path argument is always passed [\#19289](https://github.com/netdata/netdata/pull/19289) ([ilyam8](https://github.com/ilyam8))
 - fix\(netdata-updater.sh\): remove commit\_check\_file directory [\#19288](https://github.com/netdata/netdata/pull/19288) ([ilyam8](https://github.com/ilyam8))
@@ -463,7 +464,6 @@
 - Remove CR \(windows.plugin\) [\#18737](https://github.com/netdata/netdata/pull/18737) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add `ilert` cloud notification integration [\#18736](https://github.com/netdata/netdata/pull/18736) ([car12o](https://github.com/car12o))
 - fix\(go.d/sensors\): fix parsing power accuracy [\#18735](https://github.com/netdata/netdata/pull/18735) ([ilyam8](https://github.com/ilyam8))
-- apps.plugin; allow parents to identify the children [\#18734](https://github.com/netdata/netdata/pull/18734) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
