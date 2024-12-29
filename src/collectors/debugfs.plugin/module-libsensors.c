@@ -1008,7 +1008,7 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
 
     if(do_state && s->exposed_states != s->supported_states) {
         printf(
-            PLUGINSD_KEYWORD_CHART " 'sensors.%s_alarm_status' '' '%s Alarm Status' '%s' '%s' '%s.alarm_status' line %d %d '' debugfs %s\n",
+            PLUGINSD_KEYWORD_CHART " 'sensors.%s_alarm' '' '%s Alarm Status' '%s' '%s' '%s.alarm' line %d %d '' debugfs %s\n",
             string2str(s->id),
             s->config.title,
             "status",
@@ -1097,7 +1097,7 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
 
     if(do_state) {
         printf(
-            PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_alarm_status'\n",
+            PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_alarm'\n",
             string2str(s->id));
 
         if(s->supported_states & SENSOR_STATE_CLEAR)
