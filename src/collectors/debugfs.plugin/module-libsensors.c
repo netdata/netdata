@@ -496,7 +496,6 @@ typedef struct sensor {
         SENSOR_TYPE type;
         STRING *name;
         STRING *label;
-        STRING *label_sanitized;
     } feature;
 
     SENSOR_STATE state;
@@ -886,6 +885,7 @@ static SENSOR *sensor_get_or_create(DICTIONARY *dict, const sensors_chip_name *c
     s->state_logged = SENSOR_STATE_CLEAR;
     s->input = NAN;
     s->average = NAN;
+    s->feature.label = NULL;
 
     sensors_snprintf_chip_name(buf, sizeof(buf), chip);
     s->chip.id = string_strdupz(buf);
@@ -898,22 +898,32 @@ static SENSOR *sensor_get_or_create(DICTIONARY *dict, const sensors_chip_name *c
     s->chip.addr = chip->addr;
 
     s->feature.name = string_strdupz(feature->name);
-    const char *label = sensors_get_label(chip, feature);
-    s->feature.label = string_strdupz(label ? label : feature->name);
     s->feature.type = feature->type;
 
-    char *label_sanitized = strdupz(string2str(s->feature.label));
-    netdata_fix_chart_id(label_sanitized);
-    s->feature.label_sanitized = string_strdupz(label_sanitized);
-    freez(label_sanitized);
+    // returns feature->name if no label
+    // https://github.com/lm-sensors/lm-sensors/blob/master/lib/access.c#L199-L200
+    const char *label = sensors_get_label(chip, feature);
 
-    snprintfz(buf, sizeof(buf),
-              "%s_%s_%s_%s",
-              SENSOR_TYPE_2str(s->feature.type),
-              string2str(s->chip.id),
-              string2str(s->feature.name),
-              string2str(s->feature.label_sanitized)
-              );
+    if (label && strcmp(label, string2str(s->feature.name)) != 0) {
+        s->feature.label = string_strdupz(label);
+        snprintfz(
+            buf,
+            sizeof(buf),
+            "%s_%s_%s_%s",
+            SENSOR_TYPE_2str(s->feature.type),
+            string2str(s->chip.id),
+            string2str(s->feature.name),
+            string2str(s->feature.label));
+    } else {
+        snprintfz(
+            buf,
+            sizeof(buf),
+            "%s_%s_%s",
+            SENSOR_TYPE_2str(s->feature.type),
+            string2str(s->chip.id),
+            string2str(s->feature.name));
+    }
+
     netdata_fix_chart_id(buf);
     s->id = string_strdupz(buf);
 
