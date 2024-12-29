@@ -201,25 +201,25 @@ bool replicate_chart_request(send_command callback, struct parser *parser, RRDHO
     // The gap is now r.gap.from -> r.gap.to
 
     if (unlikely(!rrdhost_option_check(host, RRDHOST_OPTION_REPLICATION)))
-        return send_replay_chart_cmd(&r, "empty replication request, replication is disabled", false);
+        return send_replay_chart_cmd(&r, "sending empty replication request, replication is disabled", false);
 
     if (unlikely(!rrdset_number_of_dimensions(st)))
-        return send_replay_chart_cmd(&r, "empty replication request, chart has no dimensions", false);
+        return send_replay_chart_cmd(&r, "sending empty replication request, chart has no dimensions", false);
 
     if (unlikely(!r.child_db.first_entry_t || !r.child_db.last_entry_t))
-        return send_replay_chart_cmd(&r, "empty replication request, child has no stored data", false);
+        return send_replay_chart_cmd(&r, "sending empty replication request, child has no stored data", false);
 
     if (unlikely(r.child_db.first_entry_t < 0 || r.child_db.last_entry_t < 0))
-        return send_replay_chart_cmd(&r, "empty replication request, child db timestamps are invalid", true);
+        return send_replay_chart_cmd(&r, "sending empty replication request, child db timestamps are invalid", true);
 
     if (unlikely(r.child_db.first_entry_t > r.child_db.wall_clock_time))
-        return send_replay_chart_cmd(&r, "empty replication request, child db first entry is after its wall clock time", true);
+        return send_replay_chart_cmd(&r, "sending empty replication request, child db first entry is after its wall clock time", true);
 
     if (unlikely(r.child_db.first_entry_t > r.child_db.last_entry_t))
-        return send_replay_chart_cmd(&r, "empty replication request, child timings are invalid (first entry > last entry)", true);
+        return send_replay_chart_cmd(&r, "sending empty replication request, child timings are invalid (first entry > last entry)", true);
 
     if (unlikely(r.local_db.last_entry_t > r.child_db.last_entry_t))
-        return send_replay_chart_cmd(&r, "empty replication request, local last entry is later than the child one", false);
+        return send_replay_chart_cmd(&r, "sending empty replication request, local last entry is later than the child one", false);
 
     // let's find what the child can provide to fill that gap
 
@@ -245,7 +245,7 @@ bool replicate_chart_request(send_command callback, struct parser *parser, RRDHO
         r.wanted.after = 0;
         r.wanted.before = 0;
         r.wanted.start_streaming = true;
-        return send_replay_chart_cmd(&r, "empty replication request, wanted 'after' computed bigger than wanted 'before'", true);
+        return send_replay_chart_cmd(&r, "sending empty replication request, because wanted 'after' computed bigger than wanted 'before'", true);
     }
 
     // the child should start streaming immediately if the wanted duration is small, or we reached the last entry of the child
