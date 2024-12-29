@@ -100,8 +100,8 @@ void nd_profile_setup(void) {
 
     ND_PROFILE profile = nd_profile_detect_and_configure(true); (void)profile;
     if(netdata_conf_is_iot()) {
-        nd_profile.storage_tiers = 1;
-        nd_profile.update_every = 2;
+        nd_profile.storage_tiers = 3;       // MUST BE 1
+        nd_profile.update_every = 1;        // MUST BE 2
         nd_profile.malloc_arenas = 1;
         nd_profile.malloc_trim = 32 * 1024;
         // web server threads = 6
