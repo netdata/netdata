@@ -1100,9 +1100,9 @@ struct rrdhost {
                 uint32_t connections;               // the number of times this sender has connected
 
                 struct {
-                    size_t counter_in;              // counts the number of replication statements we have received
-                    size_t counter_out;             // counts the number of replication statements we have sent
-                    size_t charts;                  // the number of charts currently being replicated to a parent
+                    uint32_t counter_in;            // counts the number of replication statements we have received
+                    uint32_t counter_out;           // counts the number of replication statements we have sent
+                    uint32_t charts;                // the number of charts currently being replicated to a parent
                 } replication;
             } status;
 
@@ -1137,10 +1137,10 @@ struct rrdhost {
                 STREAM_HANDSHAKE exit_reason;       // the last receiver exit reason
 
                 struct {
-                    size_t counter_in;              // counts the number of replication statements we have received
-                    size_t counter_out;             // counts the number of replication statements we have sent
-                    size_t backfill_pending;        // the number of replication requests pending on us
-                    size_t charts;                  // the number of charts currently being replicated from a child
+                    uint32_t counter_in;            // counts the number of replication statements we have received
+                    uint32_t counter_out;           // counts the number of replication statements we have sent
+                    uint32_t backfill_pending;      // the number of replication requests pending on us
+                    uint32_t charts;                // the number of charts currently being replicated from a child
                     NETDATA_DOUBLE percent;         // the % of replication completion
                 } replication;
             } status;

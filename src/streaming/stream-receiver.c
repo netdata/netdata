@@ -470,7 +470,7 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     // help preferred_sender_buffer() select the right buffer
     rpt->host->stream.snd.commit.receiver_tid = gettid_cached();
 
-    rpt->replication.last_progress = now_monotonic_usec();
+    rpt->replication.last_progress_ut = now_monotonic_usec();
 
     PARSER *parser = NULL;
     {
@@ -1005,7 +1005,7 @@ static bool stream_receiver_did_replication_progress(struct receiver_state *rpt)
         // there has been some progress
         __atomic_store_n(&rpt->replication.last_counter_in, __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
         __atomic_store_n(&rpt->replication.last_counter_out, __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
-        rpt->replication.last_progress = now_monotonic_usec();
+        rpt->replication.last_progress_ut = now_monotonic_usec();
         return true;
     }
 
@@ -1017,7 +1017,7 @@ static bool stream_receiver_did_replication_progress(struct receiver_state *rpt)
         // we still have requests to execute
         return true;
 
-    return (now_monotonic_usec() - rpt->replication.last_progress < 5ULL * 60 * USEC_PER_SEC);
+    return (now_monotonic_usec() - rpt->replication.last_progress_ut < 5ULL * 60 * USEC_PER_SEC);
 }
 
 void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
@@ -1055,8 +1055,12 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
 
         if(exceptions && !stream_receiver_did_replication_progress(rpt)) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests - disconnecting it.",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, exceptions);
+                   "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests. "
+                   "We have received %u and sent %u replication commands. "
+                   "Disconnecting node to restore streaming.",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, exceptions,
+                   __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED),
+                   __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED));
 
             receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_REPLICATION_STALLED, false);
             stream_receiver_remove(sth, rpt, "replication reception stalled");
@@ -1091,12 +1095,15 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
 
     if(rrdhost_receiver_replicating_charts(host) != 0) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM REPLAY ERROR: receiver replication instances counter should be zero, but it is %zu"
+               "STREAM REPLAY ERROR: receiver replication instances counter should be zero, but it is %u"
                " - resetting it to zero",
                rrdhost_receiver_replicating_charts(host));
 
         rrdhost_receiver_replicating_charts_zero(host);
     }
+
+    __atomic_store_n(&host->stream.rcv.status.replication.counter_in, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&host->stream.rcv.status.replication.counter_out, 0, __ATOMIC_RELAXED);
 }
 
 bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {

@@ -96,7 +96,7 @@ static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
 
     if(rrdhost_sender_replicating_charts(s->host) != 0) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM REPLAY ERROR: sender replicating instances counter should be zero, but it is %zu"
+               "STREAM REPLAY ERROR: sender replicating instances counter should be zero, but it is %u"
                " - resetting it to zero",
                rrdhost_sender_replicating_charts(s->host));
 
@@ -104,6 +104,9 @@ static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     }
 
     stream_sender_replicating_charts_zero(s);
+
+    __atomic_store_n(&s->host->stream.snd.status.replication.counter_in, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&s->host->stream.snd.status.replication.counter_out, 0, __ATOMIC_RELAXED);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -310,7 +313,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         s->host->stream.snd.status.connections++;
         s->last_state_since_t = now_realtime_sec();
 
-        s->replication.last_progress = now_monotonic_usec();
+        s->replication.last_progress_ut = now_monotonic_usec();
 
         stream_circular_buffer_flush_unsafe(s->scb, stream_send.buffer_max_size);
         replication_sender_recalculate_buffer_used_ratio_unsafe(s);
@@ -512,7 +515,7 @@ static bool stream_sender_did_replication_progress(struct sender_state *s) {
         // there has been some progress
         __atomic_store_n(&s->replication.last_counter_in, __atomic_load_n(&host->stream.snd.status.replication.counter_in, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
         __atomic_store_n(&s->replication.last_counter_out, __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
-        s->replication.last_progress = now_monotonic_usec();
+        s->replication.last_progress_ut = now_monotonic_usec();
         return true;
     }
 
@@ -524,7 +527,7 @@ static bool stream_sender_did_replication_progress(struct sender_state *s) {
         // we still have requests to execute
         return true;
 
-    return (now_monotonic_usec() - s->replication.last_progress < 5ULL * 60 * USEC_PER_SEC);
+    return (now_monotonic_usec() - s->replication.last_progress_ut < 5ULL * 60 * USEC_PER_SEC);
 }
 
 void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
@@ -571,8 +574,12 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
 
         if(exceptions && !stream_sender_did_replication_progress(s)) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests - disconnecting it.",
-                   sth->id, rrdhost_hostname(s->host), s->remote_ip, exceptions);
+                   "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests."
+                   "We have received %u and sent %u replication commands. "
+                   "Disconnecting node to restore streaming.",
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip, exceptions,
+                   __atomic_load_n(&host->stream.snd.status.replication.counter_in, __ATOMIC_RELAXED),
+                   __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED));
 
             stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_REPLICATION_STALLED, true);
         }

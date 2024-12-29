@@ -78,9 +78,9 @@ struct receiver_state {
     } thread;
 
     struct {
-        size_t last_counter_in;
-        size_t last_counter_out;
-        usec_t last_progress;
+        uint32_t last_counter_in;   // copy from the host, to detect progress
+        uint32_t last_counter_out;  // copy from the host, to detect progress
+        usec_t last_progress_ut;    // last time we found some progress (monotonic)
 
         time_t first_time_s;
     } replication;
