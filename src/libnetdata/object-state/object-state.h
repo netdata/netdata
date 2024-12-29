@@ -17,9 +17,15 @@ typedef struct {
 #define OBJECT_STATE_INIT_ACTIVATED (OBJECT_STATE){ .state_id = 0, .state_refcount = 0, };
 #define OBJECT_STATE_INIT_DEACTIVATED (OBJECT_STATE){ .state_id = 0, .state_refcount = OBJECT_STATE_DEACTIVATED, };
 
+// get the current state id of the object
 OBJECT_STATE_ID object_state_id(OBJECT_STATE *os);
 
+// increments the object's state id
+// enables using the object - users may acquire and release the object
 void object_state_activate(OBJECT_STATE *os);
+
+// increments the object's state id
+// prevents users from acquiring it, and waits until all of its holders have released it
 void object_state_deactivate(OBJECT_STATE *os);
 
 bool object_state_acquire(OBJECT_STATE *os, OBJECT_STATE_ID wanted_state_id);

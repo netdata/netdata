@@ -510,7 +510,6 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
 #endif
 
     stream_receive_log_database_gap(rpt);
-    object_state_activate(&rpt->host->state_id);
 
     // keep this last - it needs everything ready since to sends data to the child
     stream_receiver_send_node_and_claim_id_to_child(rpt->host);
@@ -531,9 +530,6 @@ void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *s
 
 static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-
-    // this will wait until all workers finish
-    object_state_deactivate(&rpt->host->state_id);
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
@@ -1113,6 +1109,8 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     rrdhost_receiver_lock(host);
 
     if (!host->receiver) {
+        object_state_activate(&host->state_id);
+
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
         rrdhost_set_health_evloop_iteration(host);
 
@@ -1180,6 +1178,9 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
             rrdhost_receiver_unlock(host);
             {
+                // this will wait until all workers finish
+                object_state_deactivate(&host->state_id);
+
                 // run all these without having the receiver lock
 
                 rrdhost_set_health_evloop_iteration(host);
