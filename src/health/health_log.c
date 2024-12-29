@@ -66,7 +66,10 @@ void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int 
             break;
 
         case RRDCALC_STATUS_CLEAR:
-            priority = NDLP_INFO;
+            if(ae->old_status == RRDCALC_STATUS_UNINITIALIZED)
+                priority = NDLP_DEBUG;
+            else
+                priority = NDLP_INFO;
             break;
 
         case RRDCALC_STATUS_WARNING:
@@ -81,10 +84,13 @@ void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int 
     }
 
     netdata_logger(NDLS_HEALTH, priority, file, function, line,
-           "ALERT '%s' of instance '%s' on node '%s', transitioned from %s to %s",
-           string2str(ae->name), string2str(ae->chart), string2str(host->hostname),
-           rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status)
-           );
+                   "ALERT '%s' of instance '%s' on node '%s', transitioned from %s to %s.\n"
+                   "%s value got from %f %s, to %f %s.",
+                   string2str(ae->name), string2str(ae->chart), string2str(host->hostname),
+                   rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status),
+                   string2str(ae->name),
+                   ae->old_value, string2str(ae->units),
+                   ae->new_value, string2str(ae->units));
 }
 
 // ----------------------------------------------------------------------------
