@@ -43,7 +43,6 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
-    __atomic_add_fetch(&host->stream.rcv.status.replication.counter_in, 1, __ATOMIC_RELAXED);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, PLUGINSD_KEYWORD_CHART);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -58,6 +57,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
 
     if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
         rrdhost_receiver_replicating_charts_plus_one(st->rrdhost);
+        __atomic_add_fetch(&host->stream.rcv.status.replication.counter_in, 1, __ATOMIC_RELAXED);
 
 #ifdef REPLICATION_TRACKING
         st->stream.rcv.who = REPLAY_WHO_ME;
