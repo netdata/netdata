@@ -70,7 +70,10 @@ size_t stream_circular_buffer_get_max_size(STREAM_CIRCULAR_BUFFER *scb);
 size_t stream_sender_get_buffer_used_percent(STREAM_CIRCULAR_BUFFER *scb);
 
 // return the monotonic timestamp of the last time the buffer was created
-usec_t stream_circular_buffer_get_since_ut(STREAM_CIRCULAR_BUFFER *scb);
+usec_t stream_circular_buffer_last_flush_ut(STREAM_CIRCULAR_BUFFER *scb);
+
+// return the monotonic timestamp of the last time we removed data from the buffer
+usec_t stream_circular_buffer_last_sent_ut(STREAM_CIRCULAR_BUFFER *scb);
 
 // --------------------------------------------------------------------------------------------------------------------
 // data operations (add, get, remove data from/to the buffer)
@@ -86,7 +89,7 @@ size_t stream_circular_buffer_get_unsafe(STREAM_CIRCULAR_BUFFER *scb, char **chu
 
 // removes data from the beginning of circular buffer
 // it updates the statistics
-void stream_circular_buffer_del_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t bytes);
+void stream_circular_buffer_del_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t bytes, usec_t now_ut);
 
 #ifdef __cplusplus
 }

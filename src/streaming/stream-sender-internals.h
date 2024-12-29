@@ -40,8 +40,6 @@ struct sender_state {
     ND_SOCK sock;
 
     struct {
-        bool draining_input;        // used exclusively by the stream thread
-
         struct stream_opcode msg;   // the template for sending a message to the dispatcher - protected by sender_lock()
 
         // this is a property of stream_sender_send_msg_to_dispatcher()
@@ -49,8 +47,8 @@ struct sender_state {
         // DO NOT READ OR WRITE ANYWHERE
         uint32_t msg_slot;      // ensures a opcode queue that can never get full
 
+        nd_poll_event_t wanted;
         usec_t last_traffic_ut;
-
         struct pollfd_meta meta;
     } thread;
 
@@ -58,9 +56,10 @@ struct sender_state {
         int8_t id;                              // the connector id - protected by sender_lock()
     } connector;
 
-    char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
+    char remote_ip[CONNECTED_TO_SIZE + 1];      // We don't know which proxy we connect to, passed back from socket.c
     time_t last_state_since_t;                  // the timestamp of the last state (online/offline) change
 
+    WAITING_QUEUE *wait_queue;
     STREAM_CIRCULAR_BUFFER *scb;
 
     struct {
@@ -74,6 +73,7 @@ struct sender_state {
 #ifdef NETDATA_LOG_STREAM_SENDER
     struct {
         SPINLOCK spinlock;
+        struct timespec first_call;
         BUFFER *received;
         FILE *fp;
     } log;
@@ -85,6 +85,10 @@ struct sender_state {
     } exit;
 
     struct {
+        uint32_t last_counter_in;               // copy from the host, to detect progress
+        uint32_t last_counter_out;              // copy from the host, to detect progress
+        usec_t last_progress_ut;                // last time we found some progress (monotonic)
+
         DICTIONARY *requests;                   // de-duplication of replication requests, per chart
         time_t oldest_request_after_t;          // the timestamp of the oldest replication request
         time_t latest_completed_before_t;       // the timestamp of the latest replication request

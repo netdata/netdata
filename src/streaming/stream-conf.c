@@ -90,11 +90,12 @@ bool stream_conf_receiver_needs_dbengine(void) {
 }
 
 void stream_conf_load() {
-    static bool loaded = false;
-    if(loaded) return;
-    loaded = true;
+    static bool run = false;
+    if(run) return;
+    run = true;
 
     stream_conf_load_internal();
+    check_local_streaming_capabilities();
 
     stream_send.enabled =
         appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", stream_send.enabled);
@@ -199,6 +200,10 @@ bool stream_conf_is_parent(bool recheck) {
     return rc;
 }
 
+bool stream_conf_is_child(void) {
+    return stream_send.enabled;
+}
+
 void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_receiver_config *config, const char *api_key, const char *machine_guid) {
     config->mode = rrd_memory_mode_id(
         appconfig_get(&stream_config, machine_guid, "db",
@@ -209,8 +214,7 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
         netdata_log_error("STREAM RCV '%s' [from [%s]:%s]: "
                           "dbengine is not enabled, falling back to default."
                           , rpt->hostname
-                          , rpt->client_ip, rpt->client_port
-        );
+                          , rpt->remote_ip, rpt->remote_port);
         config->mode = default_rrd_memory_mode;
     }
 

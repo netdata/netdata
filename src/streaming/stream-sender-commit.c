@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "stream-thread.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 static __thread struct sender_buffer commit___thread = { 0 };
 
@@ -14,7 +14,7 @@ void sender_buffer_destroy(struct sender_buffer *commit) {
     commit->last_function = NULL;
 }
 
-void sender_commit_thread_buffer_free(void) {
+void sender_thread_buffer_free(void) {
     sender_buffer_destroy(&commit___thread);
 }
 
@@ -23,14 +23,14 @@ BUFFER *sender_commit_start_with_trace(struct sender_state *s __maybe_unused, st
     if(unlikely(commit->used))
         fatal("STREAM SND '%s' [to %s]: thread buffer is used multiple times concurrently (%u). "
               "It is already being used by '%s()', and now is called by '%s()'",
-              rrdhost_hostname(s->host), s->connected_to,
+              rrdhost_hostname(s->host), s->remote_ip,
               (unsigned)commit->used,
               commit->last_function ? commit->last_function : "(null)",
               func ? func : "(null)");
 
     if(unlikely(commit->receiver_tid && commit->receiver_tid != gettid_cached()))
         fatal("STREAM SND '%s' [to %s]: thread buffer is reserved for tid %d, but it used by thread %d function '%s()'.",
-              rrdhost_hostname(s->host), s->connected_to,
+              rrdhost_hostname(s->host), s->remote_ip,
               commit->receiver_tid, gettid_cached(), func ? func : "(null)");
 
     if(unlikely(commit->wb &&
@@ -68,6 +68,9 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     if (unlikely(!src || !src_len))
         return;
 
+    waiting_queue_wait(s->wait_queue, (s->host->stream.rcv.status.tid == gettid_cached()
+                                       || s->host->stream.snd.status.tid == gettid_cached()) ?
+                                          WAITING_QUEUE_PRIO_HIGH : WAITING_QUEUE_PRIO_NORMAL);
     stream_sender_lock(s);
 
     // copy the sequence number of sender buffer recreates, while having our lock
@@ -77,9 +80,12 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 
     if (!s->thread.msg.session) {
         // the dispatcher is not there anymore - ignore these data
-        stream_sender_unlock(s);
+
         if(commit)
             sender_buffer_destroy(commit);
+
+        stream_sender_unlock(s);
+        waiting_queue_done(s->wait_queue);
         return;
     }
 
@@ -88,10 +94,13 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
         // adaptive sizing of the circular buffer
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "STREAM SND '%s' [to %s]: Increased max buffer size to %u (message size %zu).",
-               rrdhost_hostname(s->host), s->connected_to, stats->bytes_max_size, src_len + 1);
+               rrdhost_hostname(s->host), s->remote_ip, stats->bytes_max_size, src_len + 1);
     }
 
     stream_sender_log_payload(s, wb, type, false);
+
+    // if there are data already in the buffer, we don't need to send an opcode
+    bool enable_sending = stats->bytes_outstanding == 0;
 
     if (s->compressor.initialized) {
         // compressed traffic
@@ -127,7 +136,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             if (!dst_len) {
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                     "STREAM SND '%s' [to %s]: COMPRESSION failed. Resetting compressor and re-trying",
-                    rrdhost_hostname(s->host), s->connected_to);
+                    rrdhost_hostname(s->host), s->remote_ip);
 
                 stream_compression_initialize(s);
                 dst_len = stream_compress(&s->compressor, src, size_to_compress, &dst);
@@ -144,7 +153,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
                 fatal(
                     "STREAM SND '%s' [to %s]: invalid signature, original payload %zu bytes, "
                     "compressed payload length %zu bytes, but signature says payload is %zu bytes",
-                    rrdhost_hostname(s->host), s->connected_to,
+                    rrdhost_hostname(s->host), s->remote_ip,
                     size_to_compress, dst_len, decoded_dst_len);
 #endif
 
@@ -166,13 +175,13 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             goto overflow_with_lock;
     }
 
-    bool enable_sending = stats->bytes_outstanding == 0;
-    replication_recalculate_buffer_used_ratio_unsafe(s);
+    replication_sender_recalculate_buffer_used_ratio_unsafe(s);
 
     if (enable_sending)
         msg = s->thread.msg;
 
     stream_sender_unlock(s);
+    waiting_queue_done(s->wait_queue);
 
     if (enable_sending) {
         msg.opcode = STREAM_OPCODE_SENDER_POLLOUT;
@@ -184,14 +193,15 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 overflow_with_lock: {
         msg = s->thread.msg;
         stream_sender_unlock(s);
+        waiting_queue_done(s->wait_queue);
         msg.opcode = STREAM_OPCODE_SENDER_BUFFER_OVERFLOW;
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "STREAM SND '%s' [to %s]: buffer overflow (buffer size %u, max size %u, used %u, available %u). "
+                     "STREAM SND '%s' [to %s]: buffer overflow (buffer size %u, max size %u, available %u). "
                      "Restarting connection.",
-                     rrdhost_hostname(s->host), s->connected_to,
-                     stats->bytes_size, stats->bytes_max_size, stats->bytes_outstanding, stats->bytes_available);
+                     rrdhost_hostname(s->host), s->remote_ip,
+                     stats->bytes_size, stats->bytes_max_size, stats->bytes_available);
         return;
     }
 
@@ -199,26 +209,27 @@ compression_failed_with_lock: {
         stream_compression_deactivate(s);
         msg = s->thread.msg;
         stream_sender_unlock(s);
+        waiting_queue_done(s->wait_queue);
         msg.opcode = STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION;
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                      "STREAM SND '%s' [to %s]: COMPRESSION failed (twice). "
                      "Deactivating compression and restarting connection.",
-                     rrdhost_hostname(s->host), s->connected_to);
+                     rrdhost_hostname(s->host), s->remote_ip);
     }
 }
 
-void sender_thread_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type, const char *func) {
-    struct sender_buffer *commit = (wb == commit___thread.wb) ? & commit___thread : &s->host->stream.snd.commit;
+void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type, const char *func) {
+    struct sender_buffer *commit = (wb == commit___thread.wb) ? &commit___thread : &s->host->stream.snd.commit;
 
     if (unlikely(wb != commit->wb))
         fatal("STREAM SND '%s' [to %s]: function '%s()' is trying to commit an unknown commit buffer.",
-              rrdhost_hostname(s->host), s->connected_to, func);
+              rrdhost_hostname(s->host), s->remote_ip, func);
 
     if (unlikely(!commit->used))
         fatal("STREAM SND '%s' [to %s]: function '%s()' is committing a sender buffer twice.",
-              rrdhost_hostname(s->host), s->connected_to, func);
+              rrdhost_hostname(s->host), s->remote_ip, func);
 
     commit->used = false;
     commit->last_function = NULL;

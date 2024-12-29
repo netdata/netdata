@@ -19,6 +19,21 @@
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
 
+static uint64_t health_evloop_iteration = 0;
+
+uint64_t health_evloop_current_iteration(void) {
+    return __atomic_load_n(&health_evloop_iteration, __ATOMIC_RELAXED);
+}
+
+uint64_t rrdhost_health_evloop_last_iteration(RRDHOST *host) {
+    return __atomic_load_n(&host->health.evloop_iteration, __ATOMIC_RELAXED);
+}
+
+void rrdhost_set_health_evloop_iteration(RRDHOST *host) {
+    __atomic_store_n(&host->health.evloop_iteration,
+                     health_evloop_current_iteration(), __ATOMIC_RELAXED);
+}
+
 // ----------------------------------------------------------------------------
 // health main thread and friends
 
@@ -90,18 +105,20 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     return 1;
 }
 
-static void health_sleep(time_t next_run, unsigned int loop __maybe_unused) {
+static void health_sleep(time_t next_run, uint64_t loop) {
     time_t now = now_realtime_sec();
     if(now < next_run) {
         worker_is_idle();
-        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs", loop, (int) (next_run - now));
+        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %llu done. Next iteration in %d secs",
+                          (unsigned long long)loop, (int) (next_run - now));
         while (now < next_run && service_running(SERVICE_HEALTH)) {
             sleep_usec(USEC_PER_SEC);
             now = now_realtime_sec();
         }
     }
     else {
-        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration now", loop);
+        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %llu done. Next iteration now",
+                          (unsigned long long)loop);
     }
 }
 
@@ -214,6 +231,8 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
     if(unlikely(!rrdhost_should_run_health(host)))
         return;
+
+    rrdhost_set_health_evloop_iteration(host);
 
     //#define rrdhost_pending_alert_transitions(host) (__atomic_load_n(&((host)->aclk_config.alert_transition.pending), __ATOMIC_RELAXED))
 
@@ -625,7 +644,6 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 }
 
 static void health_event_loop(void) {
-    unsigned int loop = 0;
 
     while(service_running(SERVICE_HEALTH)) {
         if(!stream_control_health_should_be_running()) {
@@ -633,9 +651,6 @@ static void health_event_loop(void) {
             stream_control_throttle();
             continue;
         }
-
-        loop++;
-        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
         time_t now = now_realtime_sec();
         bool apply_hibernation_delay = false;
@@ -661,14 +676,14 @@ static void health_event_loop(void) {
         }
 
         worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
+        uint64_t loop = __atomic_add_fetch(&health_evloop_iteration, 1, __ATOMIC_RELAXED);
+
         RRDHOST *host;
         dfe_start_reentrant(rrdhost_root_index, host) {
             if(unlikely(!service_running(SERVICE_HEALTH)))
                 break;
 
-            rrdhost_flag_set(host, RRDHOST_FLAG_HEALTH_RUNNING_NOW);
             health_event_loop_for_host(host, apply_hibernation_delay, now, &next_run);
-            rrdhost_flag_clear(host, RRDHOST_FLAG_HEALTH_RUNNING_NOW);
         }
         dfe_done(host);
 

@@ -9,15 +9,15 @@ extern "C" {
 
 #include "common.h"
 
-#define JUDYHS_INDEX_SIZE_ESTIMATE(key_bytes) (((key_bytes) + sizeof(Word_t) - 1) / sizeof(Word_t) * 4)
-
 // NETDATA_TRACE_ALLOCATIONS does not work under musl libc, so don't enable it
 //#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
 //#define NETDATA_TRACE_ALLOCATIONS 1
 //#endif
 
+#include "atomics/atomics.h"
 #include "libjudy/judy-malloc.h"
 
+#include "object-state/object-state.h"
 #include "storage-point.h"
 #include "paths/paths.h"
 
@@ -67,7 +67,7 @@ void posix_memfree(void *ptr);
 void json_escape_string(char *dst, const char *src, size_t size);
 void json_fix_string(char *s);
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, int *open_fd);
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, bool dont_dump, int *open_fd);
 int netdata_munmap(void *ptr, size_t size);
 int memory_file_save(const char *filename, void *mem, size_t size);
 
@@ -125,6 +125,7 @@ extern const char *netdata_configured_host_prefix;
 #include "locks/spinlock.h"
 #include "locks/rw-spinlock.h"
 #include "completion/completion.h"
+#include "waiting-queue/waiting-queue.h"
 #include "clocks/clocks.h"
 #include "simple_pattern/simple_pattern.h"
 #include "libnetdata/log/nd_log.h"

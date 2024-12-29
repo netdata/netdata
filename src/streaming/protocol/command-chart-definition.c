@@ -116,11 +116,10 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
                        (unsigned long long)db_last_time_t,
                        (unsigned long long)now);
 
-        if(!rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
-            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
-            rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+        RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+        if(!(old & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS))
             rrdhost_sender_replicating_charts_plus_one(st->rrdhost);
-        }
+
         replication_progress = true;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS

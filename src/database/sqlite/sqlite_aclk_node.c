@@ -105,13 +105,19 @@ void aclk_check_node_info_and_collectors(void)
         return;
 
     size_t context_loading = 0;
-    size_t replicating = 0;
+    size_t replicating_rcv = 0;
+    size_t replicating_snd = 0;
     size_t context_pp = 0;
 
     STRING *context_loading_host = NULL;
-    STRING *replicating_host = NULL;
+    STRING *replicating_rcv_host = NULL;
+    STRING *replicating_snd_host = NULL;
     STRING *context_pp_host = NULL;
-    
+
+#ifdef REPLICATION_TRACKING
+    struct replay_who_counters replay_counters = { 0 };
+#endif
+
     time_t now = now_realtime_sec();
     dfe_start_reentrant(rrdhost_root_index, host)
     {
@@ -129,12 +135,28 @@ void aclk_check_node_info_and_collectors(void)
         if (!wc->node_info_send_time && !wc->node_collectors_send)
             continue;
 
+        bool replicating = false;
+
         if (unlikely(rrdhost_receiver_replicating_charts(host))) {
-            internal_error(true, "ACLK SYNC: Host %s is still replicating", rrdhost_hostname(host));
-            replicating++;
-            replicating_host = host->hostname;
-            continue;
+            internal_error(true, "ACLK SYNC: Host %s is still replicating in", rrdhost_hostname(host));
+            replicating_rcv++;
+            replicating_rcv_host = host->hostname;
+            replicating = true;
         }
+
+        if (unlikely(rrdhost_sender_replicating_charts(host))) {
+            internal_error(true, "ACLK SYNC: Host %s is still replicating out", rrdhost_hostname(host));
+            replicating_snd++;
+            replicating_snd_host = host->hostname;
+            replicating = true;
+        }
+
+#ifdef REPLICATION_TRACKING
+        replication_tracking_counters(host, &replay_counters);
+#endif
+
+        if(replicating)
+            continue;
 
         bool pp_queue_empty = !(host->rrdctx.pp_queue && dictionary_entries(host->rrdctx.pp_queue));
 
@@ -158,31 +180,55 @@ void aclk_check_node_info_and_collectors(void)
     }
     dfe_done(host);
 
-    if (context_loading || replicating || context_pp) {
+    if (context_loading || replicating_rcv || replicating_snd || context_pp) {
+#ifdef REPLICATION_TRACKING
+        char replay_counters_txt[1024];
+        snprintfz(replay_counters_txt, sizeof(replay_counters_txt),
+                  " - REPLAY WHO RCV { %zu unknown, %zu me, %zu them, %zu finished } - "
+                  "REPLAY WHO SND { %zu unknown, %zu me, %zu them, %zu finished }",
+                  replay_counters.rcv[REPLAY_WHO_UNKNOWN], replay_counters.rcv[REPLAY_WHO_ME], replay_counters.rcv[REPLAY_WHO_THEM], replay_counters.rcv[REPLAY_WHO_FINISHED],
+                  replay_counters.snd[REPLAY_WHO_UNKNOWN], replay_counters.snd[REPLAY_WHO_ME], replay_counters.snd[REPLAY_WHO_THEM], replay_counters.snd[REPLAY_WHO_FINISHED]
+        );
+#else
+        char *replay_counters_txt = "";
+#endif
+
         const char *context_loading_pre = "", *context_loading_body = "", *context_loading_post = "";
         if(context_loading == 1) {
             context_loading_pre = " (host '";
             context_loading_body = string2str(context_loading_host);
             context_loading_post = "')";
         }
-        const char *replicating_pre = "", *replicating_body = "", *replicating_post = "";
-        if(replicating == 1) {
-            replicating_pre = " (host '";
-            replicating_body = string2str(replicating_host);
-            replicating_post = "')";
+        
+        const char *replicating_rcv_pre = "", *replicating_rcv_body = "", *replicating_rcv_post = "";
+        if(replicating_rcv == 1) {
+            replicating_rcv_pre = " (host '";
+            replicating_rcv_body = string2str(replicating_rcv_host);
+            replicating_rcv_post = "')";
         }
+        
+        const char *replicating_snd_pre = "", *replicating_snd_body = "", *replicating_snd_post = "";
+        if(replicating_snd == 1) {
+            replicating_snd_pre = " (host '";
+            replicating_snd_body = string2str(replicating_snd_host);
+            replicating_snd_post = "')";
+        }
+        
         const char *context_pp_pre = "", *context_pp_body = "", *context_pp_post = "";
         if(context_pp == 1) {
             context_pp_pre = " (host '";
             context_pp_body = string2str(context_pp_host);
             context_pp_post = "')";
         }
+
         nd_log_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                     "%zu nodes loading contexts%s%s%s, %zu replicating data%s%s%s, %zu pending context post processing%s%s%s",
+                     "NODES INFO: %zu nodes loading contexts%s%s%s, %zu receiving replication%s%s%s, %zu sending replication%s%s%s, %zu pending context post processing%s%s%s%s",
                      context_loading, context_loading_pre, context_loading_body, context_loading_post,
-                     replicating, replicating_pre, replicating_body, replicating_post,
-                     context_pp, context_pp_pre, context_pp_body, context_pp_post
+                     replicating_rcv, replicating_rcv_pre, replicating_rcv_body, replicating_rcv_post,
+                     replicating_snd, replicating_snd_pre, replicating_snd_body, replicating_snd_post,
+                     context_pp, context_pp_pre, context_pp_body, context_pp_post,
+                     replay_counters_txt
                      );
     }
 }

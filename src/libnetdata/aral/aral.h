@@ -9,22 +9,16 @@
 typedef struct aral ARAL;
 
 struct aral_page_type_stats {
-    CACHE_LINE_PADDING();
-    size_t allocations;
-    CACHE_LINE_PADDING();
-    size_t allocated_bytes;
-    CACHE_LINE_PADDING();
-    size_t used_bytes;
-    CACHE_LINE_PADDING();
-    size_t padding_bytes;
+    PAD64(size_t) allocations;
+    PAD64(size_t) allocated_bytes;
+    PAD64(size_t) used_bytes;
+    PAD64(size_t) padding_bytes;
 };
 
 struct aral_statistics {
     struct {
-        CACHE_LINE_PADDING();
-        size_t allocations;
-        CACHE_LINE_PADDING();
-        size_t allocated_bytes;
+        PAD64(size_t) allocations;
+        PAD64(size_t) allocated_bytes;
     } structures;
 
     struct aral_page_type_stats malloc;
@@ -36,7 +30,8 @@ struct aral_statistics {
 const char *aral_name(ARAL *ar);
 
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
-                  struct aral_statistics *stats, const char *filename, const char **cache_dir, bool mmap, bool lockless);
+                  struct aral_statistics *stats, const char *filename, const char **cache_dir,
+                  bool mmap, bool lockless, bool dont_dump);
 
 // --------------------------------------------------------------------------------------------------------------------
 

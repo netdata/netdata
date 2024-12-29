@@ -104,7 +104,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
         netdata_configured_utc_offset,
         program_name,
         NETDATA_VERSION,
-        default_rrd_update_every,
+        nd_profile.update_every,
         default_rrd_history_entries,
         RRD_MEMORY_MODE_DBENGINE,
         health_plugin_enabled(),

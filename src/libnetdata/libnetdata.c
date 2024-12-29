@@ -449,19 +449,11 @@ void posix_memfree(void *ptr) {
 #endif
 
 void mallocz_release_as_much_memory_to_the_system(void) {
-#if defined(HAVE_C_MALLOPT) || defined(HAVE_C_MALLOC_TRIM)
+#if defined(HAVE_C_MALLOC_TRIM)
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
 
-#ifdef HAVE_C_MALLOPT
-    // the default is 128KiB
-    size_t trim_threshold = 65ULL * 1024;
-    mallopt(M_TRIM_THRESHOLD, (int)trim_threshold);
-#endif
-
-#ifdef HAVE_C_MALLOC_TRIM
     malloc_trim(0);
-#endif
 
     spinlock_unlock(&spinlock);
 #endif
@@ -527,7 +519,7 @@ inline int madvise_sequential(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_SEQUENTIAL);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_SEQUENTIAL) failed.");
+        netdata_log_error("madvise(MADV_SEQUENTIAL) of size %zu, failed.", len);
     return ret;
 }
 
@@ -536,7 +528,7 @@ inline int madvise_random(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_RANDOM);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_RANDOM) failed.");
+        netdata_log_error("madvise(MADV_RANDOM) of size %zu, failed.", len);
     return ret;
 }
 
@@ -545,7 +537,7 @@ inline int madvise_dontfork(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_DONTFORK);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_DONTFORK) failed.");
+        netdata_log_error("madvise(MADV_DONTFORK) of size %zu, failed.", len);
     return ret;
 }
 
@@ -554,7 +546,7 @@ inline int madvise_willneed(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_WILLNEED);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_WILLNEED) failed.");
+        netdata_log_error("madvise(MADV_WILLNEED) of size %zu, failed.", len);
     return ret;
 }
 
@@ -563,7 +555,7 @@ inline int madvise_dontneed(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_DONTNEED);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_DONTNEED) failed.");
+        netdata_log_error("madvise(MADV_DONTNEED) of size %zu, failed.", len);
     return ret;
 }
 
@@ -573,7 +565,7 @@ inline int madvise_dontdump(void *mem __maybe_unused, size_t len __maybe_unused)
     int ret = madvise(mem, len, MADV_DONTDUMP);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_DONTDUMP) failed.");
+        netdata_log_error("madvise(MADV_DONTDUMP) of size %zu, failed.", len);
     return ret;
 #else
     return 0;
@@ -586,14 +578,14 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
     int ret = madvise(mem, len, MADV_MERGEABLE);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_MERGEABLE) failed.");
+        netdata_log_error("madvise(MADV_MERGEABLE) of size %zu, failed.", len);
     return ret;
 #else
     return 0;
 #endif
 }
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, int *open_fd)
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, bool dont_dump, int *open_fd)
 {
     // netdata_log_info("netdata_mmap('%s', %zu", filename, size);
 
@@ -651,8 +643,8 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool r
         }
 
         // madvise_sequential(mem, size);
-        madvise_dontfork(mem, size);
-        madvise_dontdump(mem, size);
+        // madvise_dontfork(mem, size); // aral is initialized before we daemonize
+        if(dont_dump) madvise_dontdump(mem, size);
         // if(flags & MAP_SHARED) madvise_willneed(mem, size);
         if(ksm) madvise_mergeable(mem, size);
     }

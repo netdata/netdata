@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "stream-sender-internals.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 #define TIME_TO_CONSIDER_PARENTS_SIMILAR 120
 
@@ -607,7 +607,7 @@ bool stream_parent_connect_to_one_unsafe(
                         d->since_ut = now_ut;
                         d->banned_permanently = true;
                         skipped_not_useful++;
-                        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                        nd_log(NDLS_DAEMON, NDLP_INFO,
                                "STREAM PARENTS '%s': destination '%s' is banned permanently because it is the origin server",
                                rrdhost_hostname(host), string2str(d->destination));
                         continue;
@@ -635,7 +635,7 @@ bool stream_parent_connect_to_one_unsafe(
                         d->since_ut = now_ut;
                         d->banned_for_this_session = true;
                         skipped_not_useful++;
-                        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                        nd_log(NDLS_DAEMON, NDLP_INFO,
                                "STREAM PARENTS '%s': destination '%s' is banned for this session, because it is in our path before us.",
                                rrdhost_hostname(host), string2str(d->destination));
                         continue;

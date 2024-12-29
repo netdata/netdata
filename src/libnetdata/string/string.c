@@ -32,7 +32,8 @@ static struct string_partition {
     size_t deletes;             // the number of successful deleted from the index
 
     long int entries;           // the number of entries in the index
-    long int memory;            // the memory used, with JudyHS (accurate)
+    long int memory;            // the memory used
+    long int memory_index;      // JudyHS (accurate)
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // internal statistics
@@ -63,13 +64,14 @@ static struct string_partition {
 #define string_internal_stats_add(partition, var, val) do {;} while(0)
 #endif
 
-void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory, size_t *duplications, size_t *releases) {
+void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory, size_t *memory_index, size_t *duplications, size_t *releases) {
     if (inserts) *inserts = 0;
     if (deletes) *deletes = 0;
     if (searches) *searches = 0;
     if (entries) *entries = 0;
     if (references) *references = 0;
     if (memory) *memory = 0;
+    if (memory_index) *memory_index = 0;
     if (duplications) *duplications = 0;
     if (releases) *releases = 0;
 
@@ -78,6 +80,7 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
         if (deletes)        *deletes        += string_base[i].deletes;
         if (entries)        *entries        += (size_t) string_base[i].entries;
         if (memory)         *memory         += (size_t) string_base[i].memory;
+        if (memory_index)   *memory_index   += (string_base[i].memory_index > 0) ? string_base[i].memory_index : 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
         if (searches)       *searches       += string_base[i].atomic.searches;
@@ -196,7 +199,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
 
     rw_spinlock_write_lock(&string_base[partition].spinlock);
 
-    int64_t mem = 0;
+    int64_t judy_mem = 0;
 
     STRING **ptr;
     {
@@ -206,7 +209,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
 
         Pvoid_t *Rc = JudyHSIns(&string_base[partition].JudyHSArray, (void *)str, length - 1, &J_Error);
 
-        mem = JudyAllocThreadPulseGetAndReset();
+        judy_mem = JudyAllocThreadPulseGetAndReset();
 
         if (unlikely(Rc == PJERR)) {
             fatal(
@@ -220,7 +223,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
 
     if (likely(*ptr == 0)) {
         // a new item added to the index
-        size_t mem_size = sizeof(STRING) + length;
+        long mem_size = (long)sizeof(STRING) + (long)length;
         string = mallocz(mem_size);
         strcpy((char *)string->str, str);
         string->length = length;
@@ -228,7 +231,8 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
         *ptr = string;
         string_base[partition].inserts++;
         string_base[partition].entries++;
-        string_base[partition].memory += (long)(mem_size + mem);
+        string_base[partition].memory += mem_size;
+        string_base[partition].memory_index += judy_mem;
     }
     else {
         // the item is already in the index
@@ -264,7 +268,7 @@ static inline void string_index_delete(STRING *string) {
 #endif
 
     bool deleted = false;
-    int64_t mem = 0;
+    int64_t judy_mem = 0;
 
     if (likely(string_base[partition].JudyHSArray)) {
         JError_t J_Error;
@@ -273,7 +277,7 @@ static inline void string_index_delete(STRING *string) {
 
         int ret = JudyHSDel(&string_base[partition].JudyHSArray, (void *)string->str, string->length - 1, &J_Error);
 
-        mem = JudyAllocThreadPulseGetAndReset();
+        judy_mem = JudyAllocThreadPulseGetAndReset();
 
         if (unlikely(ret == JERR)) {
             netdata_log_error(
@@ -288,10 +292,11 @@ static inline void string_index_delete(STRING *string) {
     if (unlikely(!deleted))
         netdata_log_error("STRING: tried to delete '%s' that is not in the index. Ignoring it.", string->str);
     else {
-        size_t mem_size = sizeof(STRING) + string->length;
+        long mem_size = (long)sizeof(STRING) + (long)string->length;
         string_base[partition].deletes++;
         string_base[partition].entries--;
-        string_base[partition].memory -= (long)(mem_size + mem);
+        string_base[partition].memory -= mem_size;
+        string_base[partition].memory_index += judy_mem;
         freez(string);
     }
 
@@ -683,8 +688,8 @@ int string_unittest(size_t entries) {
                ospins = unittest_string_spins();
 #endif
 
-        size_t oinserts, odeletes, osearches, oentries, oreferences, omemory, oduplications, oreleases;
-        string_statistics(&oinserts, &odeletes, &osearches, &oentries, &oreferences, &omemory, &oduplications, &oreleases);
+        size_t oinserts, odeletes, osearches, oentries, oreferences, omemory, omemory_index, oduplications, oreleases;
+        string_statistics(&oinserts, &odeletes, &osearches, &oentries, &oreferences, &omemory, &omemory_index, &oduplications, &oreleases);
 
         time_t seconds_to_run = 5;
         int threads_to_create = 2;
@@ -707,8 +712,8 @@ int string_unittest(size_t entries) {
         for (int i = 0; i < threads_to_create; i++)
             nd_thread_join(threads[i]);
 
-        size_t inserts, deletes, searches, sentries, references, memory, duplications, releases;
-        string_statistics(&inserts, &deletes, &searches, &sentries, &references, &memory, &duplications, &releases);
+        size_t inserts, deletes, searches, sentries, references, memory, memory_index, duplications, releases;
+        string_statistics(&inserts, &deletes, &searches, &sentries, &references, &memory, &memory_index, &duplications, &releases);
 
         fprintf(stderr, "inserts %zu, deletes %zu, searches %zu, entries %zu, references %zu, memory %zu, duplications %zu, releases %zu\n",
                 inserts - oinserts, deletes - odeletes, searches - osearches, sentries - oentries, references - oreferences, memory - omemory, duplications - oduplications, releases - oreleases);

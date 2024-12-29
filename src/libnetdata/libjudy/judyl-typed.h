@@ -5,7 +5,8 @@
 
 #include <Judy.h>
 
-#define DEFINE_JUDYL_TYPED(NAME, TYPE)                                           \
+// Advanced macro for types requiring conversion
+#define DEFINE_JUDYL_TYPED_ADVANCED(NAME, TYPE, PACK_MACRO, UNPACK_MACRO)        \
     _Static_assert(sizeof(TYPE) <= sizeof(Word_t),                               \
                    #NAME "_type_must_have_same_size_as_Word_t");                 \
     typedef struct {                                                             \
@@ -19,45 +20,37 @@
     static inline bool NAME##_SET(NAME##_JudyLSet *set, Word_t index, TYPE value) { \
         Pvoid_t *pValue = JudyLIns(&set->judyl, index, PJE0);                    \
         if (pValue == PJERR) return false;                                       \
-        *pValue = (void *)(uintptr_t)value;                                      \
+        *pValue = (void *)PACK_MACRO(value);                                     \
         return true;                                                             \
     }                                                                            \
                                                                                  \
     static inline TYPE NAME##_GET(NAME##_JudyLSet *set, Word_t index) {          \
         Pvoid_t *pValue = JudyLGet(set->judyl, index, PJE0);                     \
-        return (pValue != NULL) ? (TYPE)(uintptr_t)(*pValue) : (TYPE)0;          \
-    }                                                                            \
-                                                                                 \
-    static inline TYPE *NAME##_GETPTR(NAME##_JudyLSet *set, Word_t index) {      \
-        Pvoid_t *pValue = JudyLGet(set->judyl, index, PJE0);                     \
-        return (TYPE *)pValue;                                                   \
+        return (pValue != NULL) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};       \
     }                                                                            \
                                                                                  \
     static inline bool NAME##_DEL(NAME##_JudyLSet *set, Word_t index) {          \
-        int Rc;                                                                  \
-        PPvoid_t ppJudy = &set->judyl;                                           \
-        Rc = JudyLDel(ppJudy, index, PJE0);                                      \
-        return Rc == 1;                                                          \
+        return JudyLDel(&set->judyl, index, PJE0) == 1;                          \
     }                                                                            \
                                                                                  \
     static inline TYPE NAME##_FIRST(NAME##_JudyLSet *set, Word_t *index) {       \
         Pvoid_t *pValue = JudyLFirst(set->judyl, index, PJE0);                   \
-        return (pValue != NULL) ? (TYPE)(uintptr_t)(*pValue) : (TYPE)0;          \
+        return (pValue != NULL) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};       \
     }                                                                            \
                                                                                  \
     static inline TYPE NAME##_NEXT(NAME##_JudyLSet *set, Word_t *index) {        \
         Pvoid_t *pValue = JudyLNext(set->judyl, index, PJE0);                    \
-        return (pValue != NULL) ? (TYPE)(uintptr_t)(*pValue) : (TYPE)0;          \
+        return (pValue != NULL) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};       \
     }                                                                            \
                                                                                  \
     static inline TYPE NAME##_LAST(NAME##_JudyLSet *set, Word_t *index) {        \
         Pvoid_t *pValue = JudyLLast(set->judyl, index, PJE0);                    \
-        return (pValue != NULL) ? (TYPE)(uintptr_t)(*pValue) : (TYPE)0;          \
+        return (pValue != NULL) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};       \
     }                                                                            \
                                                                                  \
     static inline TYPE NAME##_PREV(NAME##_JudyLSet *set, Word_t *index) {        \
         Pvoid_t *pValue = JudyLPrev(set->judyl, index, PJE0);                    \
-        return (pValue != NULL) ? (TYPE)(uintptr_t)(*pValue) : (TYPE)0;          \
+        return (pValue != NULL) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};       \
     }                                                                            \
                                                                                  \
     static inline void NAME##_FREE(NAME##_JudyLSet *set, void (*callback)(Word_t, TYPE)) { \
@@ -67,12 +60,16 @@
             for (pValue = JudyLFirst(set->judyl, &index, PJE0);                  \
                  pValue != NULL;                                                 \
                  pValue = JudyLNext(set->judyl, &index, PJE0)) {                 \
-                callback(index, (TYPE)(uintptr_t)(*pValue));                     \
+                callback(index, (TYPE)UNPACK_MACRO(*pValue));                    \
             }                                                                    \
         }                                                                        \
         JudyLFreeArray(&set->judyl, PJE0);                                       \
     }
 
+// Basic macro for types with no conversion
+#define JUDYL_TYPED_NO_CONVERSION(value) (uintptr_t)(value)
 
+#define DEFINE_JUDYL_TYPED(NAME, TYPE)                                           \
+    DEFINE_JUDYL_TYPED_ADVANCED(NAME, TYPE, JUDYL_TYPED_NO_CONVERSION, JUDYL_TYPED_NO_CONVERSION)
 
 #endif //NETDATA_JUDYL_TYPED_H

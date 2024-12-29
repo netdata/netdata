@@ -946,6 +946,12 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/spinlock.h
         src/libnetdata/locks/rw-spinlock.c
         src/libnetdata/locks/rw-spinlock.h
+        src/libnetdata/atomics/atomic_flags.h
+        src/libnetdata/atomics/atomics.h
+        src/libnetdata/waiting-queue/waiting-queue.c
+        src/libnetdata/waiting-queue/waiting-queue.h
+        src/libnetdata/object-state/object-state.c
+        src/libnetdata/object-state/object-state.h
 )
 
 set(LIBH2O_FILES
@@ -1122,6 +1128,8 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-db-rrd.h
         src/daemon/config/netdata-conf-cloud.c
         src/daemon/config/netdata-conf-cloud.h
+        src/daemon/config/netdata-conf-profile.c
+        src/daemon/config/netdata-conf-profile.h
 )
 
 set(H2O_FILES
@@ -1439,8 +1447,6 @@ set(RRD_PLUGIN_FILES
         src/database/rrdcollector-internals.h
         src/database/rrd-database-mode.h
         src/database/rrd-database-mode.c
-        src/database/rrdhost-state-id.c
-        src/database/rrdhost-state-id.h
         src/database/rrdhost-system-info.c
         src/database/rrdhost-system-info.h
 )
@@ -1523,8 +1529,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-compression/zstd.h
         src/streaming/stream-receiver.c
         src/streaming/stream-sender.c
-        src/streaming/replication.c
-        src/streaming/replication.h
+        src/streaming/stream-replication-sender.c
+        src/streaming/stream-replication-sender.h
         src/streaming/h2o-common.h
         src/streaming/protocol/command-nodeid.c
         src/streaming/protocol/commands.c
@@ -1565,6 +1571,10 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-control.h
         src/streaming/stream-waiting-list.c
         src/streaming/stream-waiting-list.h
+        src/streaming/stream-replication-receiver.c
+        src/streaming/stream-replication-receiver.h
+        src/streaming/stream-replication-tracking.c
+        src/streaming/stream-replication-tracking.h
 )
 
 set(WEB_PLUGIN_FILES

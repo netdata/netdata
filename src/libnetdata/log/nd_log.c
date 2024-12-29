@@ -409,21 +409,40 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
     erl->count = 0;
 }
 
-void netdata_logger_fatal( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
-    int saved_errno = errno;
+void netdata_logger_fatal(const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
+    static size_t already_in_fatal = 0;
 
+    size_t recursion = __atomic_add_fetch(&already_in_fatal, 1, __ATOMIC_SEQ_CST);
+    if(recursion > 1) {
+        // exit immediately, nothing more to be done
+        fprintf(stderr, "RECURSIVE FATAL STATEMENTS, latest from %lu@%s() of %s, EXITING NOW!\n",
+                line, function, file);
+        fflush(stderr);
+        _exit(1);
+    }
+
+    int saved_errno = errno;
     size_t saved_winerror = 0;
 #if defined(OS_WINDOWS)
     saved_winerror = GetLastError();
 #endif
 
-    ND_LOG_SOURCES source = NDLS_DAEMON;
-    source = nd_log_validate_source(source);
+    // make sure the msg id does not leak
+    {
+        ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_fatal_msgid),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
 
-    va_list args;
-    va_start(args, fmt);
-    nd_logger(file, function, line, source, NDLP_ALERT, true, saved_errno, saved_winerror, fmt, args);
-    va_end(args);
+        ND_LOG_SOURCES source = NDLS_DAEMON;
+        source = nd_log_validate_source(source);
+
+        va_list args;
+        va_start(args, fmt);
+        nd_logger(file, function, line, source, NDLP_ALERT, true, saved_errno, saved_winerror, fmt, args);
+        va_end(args);
+    }
 
     char date[LOG_DATE_LENGTH];
     log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
@@ -462,4 +481,3 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
 
     netdata_cleanup_and_exit(1, "FATAL", action_result, action_data);
 }
-

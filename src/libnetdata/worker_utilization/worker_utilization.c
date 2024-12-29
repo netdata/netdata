@@ -118,7 +118,9 @@ void worker_register(const char *name) {
 
     workers_globals.memory += sizeof(struct worker) + strlen(worker->tag) + 1 + strlen(worker->workname) + 1;
 
+    JudyAllocThreadPulseReset();
     Pvoid_t *PValue = JudyHSIns(&workers_globals.worknames_JudyHS, (void *)name, name_size, PJE0);
+    int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
 
     struct workers_workname *workname = *PValue;
     if(!workname) {
@@ -127,7 +129,7 @@ void worker_register(const char *name) {
         workname->base = NULL;
         *PValue = workname;
 
-        workers_globals.memory += sizeof(struct workers_workname) + JUDYHS_INDEX_SIZE_ESTIMATE(name_size);
+        workers_globals.memory = (int64_t)workers_globals.memory + (int64_t)sizeof(struct workers_workname) + judy_mem;
     }
 
     spinlock_lock(&workname->spinlock);
@@ -176,9 +178,11 @@ void worker_unregister(void) {
         spinlock_unlock(&workname->spinlock);
 
         if(!workname->base) {
+            JudyAllocThreadPulseReset();
             JudyHSDel(&workers_globals.worknames_JudyHS, (void *) worker->workname, workname_size, PJE0);
+            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
             freez(workname);
-            workers_globals.memory -= sizeof(struct workers_workname) + JUDYHS_INDEX_SIZE_ESTIMATE(workname_size);
+            workers_globals.memory = (int64_t)workers_globals.memory - (int64_t)sizeof(struct workers_workname) + judy_mem;
         }
     }
     workers_globals.memory -= sizeof(struct worker) + strlen(worker->tag) + 1 + strlen(worker->workname) + 1;

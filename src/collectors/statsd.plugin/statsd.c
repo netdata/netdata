@@ -261,7 +261,7 @@ static struct statsd {
     size_t udp_packets_received;
     size_t udp_bytes_read;
 
-    int32_t update_every;
+    time_t update_every;
     bool enabled;
     bool private_charts_hidden;
     SIMPLE_PATTERN *charts_for;
@@ -873,12 +873,12 @@ struct statsd_udp {
 };
 
 // new TCP client connected
-static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
+static void *statsd_add_callback(POLLINFO *pi, nd_poll_event_t *events, void *data) {
     (void)pi;
     (void)data;
 
     worker_is_busy(WORKER_JOB_TYPE_TCP_CONNECTED);
-    *events = POLLIN;
+    *events = ND_POLL_READ;
 
     struct statsd_tcp *t = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);
     t->type = STATSD_SOCKET_DATA_TYPE_TCP;
@@ -916,11 +916,11 @@ static void statsd_del_callback(POLLINFO *pi) {
 }
 
 // Receive data
-static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
+static int statsd_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
     int retval = -1;
     worker_is_busy(WORKER_JOB_TYPE_RCV_DATA);
 
-    *events = POLLIN;
+    *events = ND_POLL_READ;
 
     int fd = pi->fd;
 
@@ -1064,10 +1064,7 @@ cleanup:
     return retval;
 }
 
-static int statsd_snd_callback(POLLINFO *pi, short int *events) {
-    (void)pi;
-    (void)events;
-
+static int statsd_snd_callback(POLLINFO *pi __maybe_unused, nd_poll_event_t *events __maybe_unused) {
     worker_is_busy(WORKER_JOB_TYPE_SND_DATA);
     netdata_log_error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
     worker_is_idle();
@@ -2487,11 +2484,12 @@ void *statsd_main(void *ptr) {
 
     statsd.enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, "statsd", statsd.enabled);
 
-    statsd.update_every = default_rrd_update_every;
+    statsd.update_every = nd_profile.update_every;
     statsd.update_every = (int)config_get_duration_seconds(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
-    if(statsd.update_every < default_rrd_update_every) {
-        collector_error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d", statsd.update_every, default_rrd_update_every);
-        statsd.update_every = default_rrd_update_every;
+    if(statsd.update_every < nd_profile.update_every) {
+        collector_error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d",
+                        (int)statsd.update_every, (int)nd_profile.update_every);
+        statsd.update_every = nd_profile.update_every;
         config_set_duration_seconds(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
     }
 

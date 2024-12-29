@@ -1093,7 +1093,7 @@ static bool dimension_can_be_deleted(nd_uuid_t *dim_uuid __maybe_unused, sqlite3
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled) {
         bool no_retention = true;
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             if (!multidb_ctx[tier])
                 continue;
             time_t first_time_t = 0, last_time_t = 0;

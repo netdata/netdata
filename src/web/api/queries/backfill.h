@@ -7,7 +7,7 @@
 
 struct parser;
 struct backfill_request_data {
-    size_t rrdhost_receiver_state_id;
+    OBJECT_STATE_ID host_state_id;
     struct parser *parser;
     RRDHOST *host;
     RRDSET *st;
@@ -20,7 +20,5 @@ typedef bool (*backfill_callback_t)(size_t successful_dims, size_t failed_dims, 
 
 void *backfill_thread(void *ptr);
 bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_request_data *data);
-
-bool backfill_threads_detect_from_stream_conf(void);
 
 #endif //NETDATA_BACKFILL_H

@@ -957,7 +957,7 @@ static bool query_metric_is_valid_tier(QUERY_METRIC *qm, size_t tier) {
 }
 
 static size_t query_metric_first_working_tier(QUERY_METRIC *qm) {
-    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
 
         // find the db time-range for this tier for all metrics
         STORAGE_METRIC_HANDLE *smh = qm->tiers[tier].smh;
@@ -1002,7 +1002,7 @@ static long query_plan_points_coverage_weight(time_t db_first_time_s, time_t db_
 }
 
 static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
-    if(unlikely(storage_tiers < 2))
+    if(unlikely(nd_profile.storage_tiers < 2))
         return 0;
 
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0))
@@ -1015,7 +1015,7 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
     time_t min_first_time_s = 0;
     time_t max_last_time_s = 0;
 
-    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         time_t first_time_s = qm->tiers[tier].db_first_time_s;
         time_t last_time_s  = qm->tiers[tier].db_last_time_s;
 
@@ -1026,7 +1026,7 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
             max_last_time_s = last_time_s;
     }
 
-    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
 
         // find the db time-range for this tier for all metrics
         STORAGE_METRIC_HANDLE *smh = qm->tiers[tier].smh;
@@ -1053,7 +1053,7 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
     }
 
     size_t best_tier = 0;
-    for(size_t tier = 1; tier < storage_tiers ; tier++) {
+    for(size_t tier = 1; tier < nd_profile.storage_tiers; tier++) {
         if(qm->tiers[tier].weight >= qm->tiers[best_tier].weight)
             best_tier = tier;
     }
@@ -1062,7 +1062,7 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
 }
 
 static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
-    if(unlikely(storage_tiers < 2))
+    if(unlikely(nd_profile.storage_tiers < 2))
         return 0;
 
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0)) {
@@ -1070,9 +1070,9 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
         return 0;
     }
 
-    long weight[storage_tiers];
+    long weight[nd_profile.storage_tiers];
 
-    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
 
         time_t common_first_time_s = 0;
         time_t common_last_time_s = 0;
@@ -1109,7 +1109,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
     }
 
     size_t best_tier = 0;
-    for(size_t tier = 1; tier < storage_tiers ; tier++) {
+    for(size_t tier = 1; tier < nd_profile.storage_tiers; tier++) {
         if(weight[tier] >= weight[best_tier])
             best_tier = tier;
     }
@@ -1122,13 +1122,13 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
 
 static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted, RRDR_OPTIONS options, size_t tier) {
     size_t best_tier;
-    if((options & RRDR_OPTION_SELECTED_TIER) && tier < storage_tiers)
+    if((options & RRDR_OPTION_SELECTED_TIER) && tier < nd_profile.storage_tiers)
         best_tier = tier;
     else
         best_tier = rrddim_find_best_tier_for_timeframe(qt, after_wanted, before_wanted, points_wanted);
 
     // find the db minimum update every for this tier for all metrics
-    time_t common_update_every_s = default_rrd_update_every;
+    time_t common_update_every_s = nd_profile.update_every;
     for(size_t i = 0, used = qt->query.used; i < used ; i++) {
         QUERY_METRIC *qm = query_metric(qt, i);
 
@@ -1365,8 +1365,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     bool switch_tiers = true;
 
     if((ops->r->internal.qt->window.options & RRDR_OPTION_SELECTED_TIER)
-       && ops->r->internal.qt->window.tier < storage_tiers
-       && query_metric_is_valid_tier(qm, ops->r->internal.qt->window.tier)) {
+       && ops->r->internal.qt->window.tier < nd_profile.storage_tiers && query_metric_is_valid_tier(qm, ops->r->internal.qt->window.tier)) {
         selected_tier = ops->r->internal.qt->window.tier;
         switch_tiers = false;
     }
@@ -1396,7 +1395,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         // check if our selected tier can start the query
         if (selected_tier_first_time_s > after_wanted) {
             // we need some help from other tiers
-            for (size_t tr = (int)selected_tier + 1; tr < storage_tiers && qm->plan.used < QUERY_PLANS_MAX ; tr++) {
+            for (size_t tr = (int)selected_tier + 1; tr < nd_profile.storage_tiers && qm->plan.used < QUERY_PLANS_MAX ; tr++) {
                 if(!query_metric_is_valid_tier(qm, tr))
                     continue;
 
@@ -1955,7 +1954,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
     r->stats.result_points_generated += points_added;
     r->stats.db_points_read += ops->db_total_points_read;
-    for(size_t tr = 0; tr < storage_tiers ; tr++)
+    for(size_t tr = 0; tr < nd_profile.storage_tiers; tr++)
         qt->db.tiers[tr].points += ops->db_points_read_per_tier[tr];
 }
 
@@ -1965,7 +1964,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
 
 bool backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
-    if(unlikely(tier >= storage_tiers)) return false;
+    if(unlikely(tier >= nd_profile.storage_tiers)) return false;
 #ifdef ENABLE_DBENGINE
     if(default_backfill == RRD_BACKFILL_NONE) return false;
 #else
@@ -2232,7 +2231,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     rrdr_relative_window_to_absolute_query(&after_wanted, &before_wanted, NULL, unittest_running);
     query_debug_log(":relative2absolute after %ld, before %ld", after_wanted, before_wanted);
 
-    if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && storage_tiers > 1) {
+    if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && nd_profile.storage_tiers > 1) {
         update_every = rrdset_find_natural_update_every_for_timeframe(
                 qt, after_wanted, before_wanted, points_wanted, options, tier);
 
@@ -3498,7 +3497,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(qt->query.used)
         ops = onewayalloc_callocz(owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
 
-    size_t capacity = libuv_worker_threads * 10;
+    size_t capacity = MAX(netdata_conf_cpus() / 2, 4);
     size_t max_queries_to_prepare = (qt->query.used > (capacity - 1)) ? (capacity - 1) : qt->query.used;
     size_t queries_prepared = 0;
     while(queries_prepared < max_queries_to_prepare) {

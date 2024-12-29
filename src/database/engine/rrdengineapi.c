@@ -761,8 +761,8 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
 
         handle->dt_s = db_update_every_s;
         if (!handle->dt_s) {
-            handle->dt_s = default_rrd_update_every;
-            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, default_rrd_update_every);
+            handle->dt_s = nd_profile.update_every;
+            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, nd_profile.update_every);
         }
 
         seqh->handle = (STORAGE_QUERY_HANDLE *) handle;
@@ -773,7 +773,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
 
         pg_cache_preload(handle);
 
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut, __ATOMIC_RELAXED);
+        time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut);
     }
     else {
         handle->start_time_s = start_time_s;
@@ -1065,7 +1065,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    ssize_t cpus = (ssize_t)netdata_conf_cpus() / (ssize_t)storage_tiers;
+    ssize_t cpus = (ssize_t)netdata_conf_cpus() / (ssize_t)nd_profile.storage_tiers;
     if(cpus > (ssize_t)datafiles)
         cpus = (ssize_t)datafiles;
 
@@ -1293,7 +1293,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
             if(likely(points > 1))
                 update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
             else {
-                update_every_s = (time_t) (default_rrd_update_every * get_tier_grouping(datafile->ctx->config.tier));
+                update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile->ctx->config.tier));
                 stats->single_point_pages++;
             }
 
@@ -1375,7 +1375,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;
 
-    stats.default_granularity_secs = (size_t)default_rrd_update_every * get_tier_grouping(ctx->config.tier);
+    stats.default_granularity_secs = (size_t)nd_profile.update_every * get_tier_grouping(ctx->config.tier);
 
     return stats;
 }

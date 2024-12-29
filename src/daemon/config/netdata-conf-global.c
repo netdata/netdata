@@ -55,15 +55,33 @@ static int get_hostname(char *buf, size_t buf_size) {
     return rc;
 }
 
-static void glibc_initialize(void) {
-    const char *pmax = config_get(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", "1");
-    if(pmax && *pmax)
-        setenv("MALLOC_ARENA_MAX", pmax, 1);
+void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_threshold __maybe_unused) {
+    wanted_arenas = config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", wanted_arenas);
+    if(wanted_arenas < 1 || wanted_arenas > os_get_system_cpus_cached(true)) {
+        if(wanted_arenas < 1) wanted_arenas = 1;
+        else wanted_arenas = os_get_system_cpus_cached(true);
+        config_set_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", wanted_arenas);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "malloc arenas can be from 1 to %zu. Setting it to %zu",
+               os_get_system_cpus_cached(true), wanted_arenas);
+    }
+
+    char buf[32];
+    snprintfz(buf, sizeof(buf), "%zu", wanted_arenas);
+    setenv("MALLOC_ARENA_MAX", buf, true);
 
 #if defined(HAVE_C_MALLOPT)
-    int i = (int)config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", 1);
-    if(i > 0)
-        mallopt(M_ARENA_MAX, 1);
+    wanted_arenas = config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", wanted_arenas);
+    if(wanted_arenas < 1 || wanted_arenas > os_get_system_cpus_cached(true)) {
+        if(wanted_arenas < 1) wanted_arenas = 1;
+        else wanted_arenas = os_get_system_cpus_cached(true);
+        config_set_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", wanted_arenas);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "malloc arenas can be from 1 to %zu. Setting it to %zu",
+               os_get_system_cpus_cached(true), wanted_arenas);
+    }
+    mallopt(M_ARENA_MAX, (int)wanted_arenas);
+    mallopt(M_TRIM_THRESHOLD, (int)trim_threshold);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     mallopt(M_PERTURB, 0x5A);
@@ -108,6 +126,8 @@ void netdata_conf_section_global(void) {
     netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
 
     netdata_conf_section_directories();
+
+    nd_profile_setup(); // required for configuring the database
     netdata_conf_section_db();
 
     // --------------------------------------------------------------------
@@ -116,7 +136,6 @@ void netdata_conf_section_global(void) {
     os_get_system_cpus_uncached();
     os_get_system_pid_max();
 
-    glibc_initialize();
     libuv_initialize();
 }
 

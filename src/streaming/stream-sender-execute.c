@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "stream-thread.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 struct inflight_stream_function {
     struct sender_state *sender;
@@ -27,7 +27,7 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
         sender_commit_clean_buffer(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
 
         internal_error(true, "STREAM SND '%s' [to %s]: FUNCTION transaction %s sending back response (%zu bytes, %"PRIu64" usec).",
-                       rrdhost_hostname(s->host), s->connected_to,
+                       rrdhost_hostname(s->host), s->remote_ip,
                        string2str(tmp->transaction),
                        buffer_strlen(func_wb),
                        now_realtime_usec() - tmp->received_ut);
@@ -58,7 +58,7 @@ static void execute_commands_function(struct sender_state *s, const char *comman
 
     if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
         netdata_log_error("STREAM SND '%s' [to %s]: %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
-                          rrdhost_hostname(s->host), s->connected_to,
+                          rrdhost_hostname(s->host), s->remote_ip,
                           command,
                           transaction?transaction:"(unset)",
                           timeout_s?timeout_s:"(unset)",
@@ -112,7 +112,7 @@ static void execute_deferred_json(struct sender_state *s, void *data) {
     else
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND '%s' [to %s]: unknown JSON keyword '%s' with payload: %s",
-               rrdhost_hostname(s->host), s->connected_to,
+               rrdhost_hostname(s->host), s->remote_ip,
                keyword, buffer_tostring(s->defer.payload));
 }
 
@@ -268,6 +268,8 @@ void stream_sender_execute_commands(struct sender_state *s) {
             stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_REPLICATION, true);
 #endif
 
+            __atomic_add_fetch(&s->host->stream.snd.status.replication.counter_in, 1, __ATOMIC_RELAXED);
+
             // do not log replication commands received - way too many!
             // nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
@@ -277,9 +279,9 @@ void stream_sender_execute_commands(struct sender_state *s) {
             const char *before = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 4);
 
             if (!chart_id || !start_streaming || !after || !before) {
-                netdata_log_error("STREAM SND '%s' [to %s] %s command is incomplete"
+                netdata_log_error("STREAM REPLAY ERROR '%s' [send to %s] %s command is incomplete"
                                   " (chart=%s, start_streaming=%s, after=%s, before=%s)",
-                                  rrdhost_hostname(s->host), s->connected_to,
+                                  rrdhost_hostname(s->host), s->remote_ip,
                                   command,
                                   chart_id ? chart_id : "(unset)",
                                   start_streaming ? start_streaming : "(unset)",
@@ -287,11 +289,14 @@ void stream_sender_execute_commands(struct sender_state *s) {
                                   before ? before : "(unset)");
             }
             else {
-                replication_add_request(s, chart_id,
-                                        strtoll(after, NULL, 0),
-                                        strtoll(before, NULL, 0),
-                                        !strcmp(start_streaming, "true")
-                );
+#ifdef REPLICATION_TRACKING
+                RRDSET *st = rrdset_find(s->host, chart_id);
+                if(st)
+                    st->stream.snd.who = REPLAY_WHO_ME;
+#endif
+
+                replication_sender_request_add(
+                    s, chart_id, strtoll(after, NULL, 0), strtoll(before, NULL, 0), !strcmp(start_streaming, "true"));
             }
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_NODE_ID) == 0) {
@@ -314,7 +319,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
         }
         else {
             netdata_log_error("STREAM SND '%s' [to %s] received unknown command over connection: %s",
-                              rrdhost_hostname(s->host), s->connected_to, s->rbuf.line.words[0]?s->rbuf.line.words[0]:"(unset)");
+                              rrdhost_hostname(s->host), s->remote_ip, s->rbuf.line.words[0]?s->rbuf.line.words[0]:"(unset)");
         }
 
         line_splitter_reset(&s->rbuf.line);

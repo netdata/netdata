@@ -62,7 +62,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t entries = st->db.entries;
         if(!entries) entries = 5;
 
-        rd->db.data = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, NULL);
+        rd->db.data = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, true, NULL);
         if(rd->db.data) {
             rd->db.memsize = entries * sizeof(storage_number);
             pulse_db_rrd_memory_add(rd->db.memsize);
@@ -90,7 +90,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // initialize the db tiers
     {
         size_t initialized = 0;
-        for(size_t tier = 0; tier < storage_tiers ; tier++) {
+        for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
             rd->tiers[tier].seb = eng->seb;
             rd->tiers[tier].tier_grouping = host->db[tier].tier_grouping;
@@ -112,7 +112,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // initialize data collection for all tiers
     {
         size_t initialized = 0;
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             if (rd->tiers[tier].smh) {
                 rd->tiers[tier].sch =
                         storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
@@ -174,7 +174,7 @@ bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
 
     size_t tiers_available = 0, tiers_said_no_retention = 0;
 
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         spinlock_lock(&rd->tiers[tier].spinlock);
 
         if(rd->tiers[tier].sch) {
@@ -212,7 +212,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         metaqueue_delete_dimension_uuid(&rd->metric_uuid);
     }
 
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         spinlock_lock(&rd->tiers[tier].spinlock);
         if(rd->tiers[tier].smh) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
@@ -249,7 +249,7 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rc += rrddim_set_multiplier(st, rd, ctr->multiplier);
     rc += rrddim_set_divisor(st, rd, ctr->divisor);
 
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         if (!rd->tiers[tier].sch)
             rd->tiers[tier].sch =
                     storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
@@ -283,7 +283,7 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 }
 
 size_t rrddim_size(void) {
-    return sizeof(RRDDIM) + storage_tiers * sizeof(struct rrddim_tier);
+    return sizeof(RRDDIM) + nd_profile.storage_tiers * sizeof(struct rrddim_tier);
 }
 
 void rrddim_index_init(RRDSET *st) {
@@ -406,7 +406,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
 // ----------------------------------------------------------------------------
 
 time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier) {
-    if(unlikely(tier > storage_tiers || !rd->tiers[tier].smh))
+    if(unlikely(tier > nd_profile.storage_tiers || !rd->tiers[tier].smh))
         return 0;
 
     return storage_engine_latest_time_s(rd->tiers[tier].seb, rd->tiers[tier].smh);
@@ -416,7 +416,7 @@ time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier) {
 time_t rrddim_last_entry_s(RRDDIM *rd) {
     time_t latest_time_s = rrddim_last_entry_s_of_tier(rd, 0);
 
-    for(size_t tier = 1; tier < storage_tiers ;tier++) {
+    for(size_t tier = 1; tier < nd_profile.storage_tiers;tier++) {
         if(unlikely(!rd->tiers[tier].smh)) continue;
 
         time_t t = rrddim_last_entry_s_of_tier(rd, tier);
@@ -428,7 +428,7 @@ time_t rrddim_last_entry_s(RRDDIM *rd) {
 }
 
 time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier) {
-    if(unlikely(tier > storage_tiers || !rd->tiers[tier].smh))
+    if(unlikely(tier > nd_profile.storage_tiers || !rd->tiers[tier].smh))
         return 0;
 
     return storage_engine_oldest_time_s(rd->tiers[tier].seb, rd->tiers[tier].smh);
@@ -437,7 +437,7 @@ time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier) {
 time_t rrddim_first_entry_s(RRDDIM *rd) {
     time_t oldest_time_s = 0;
 
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         time_t t = rrddim_first_entry_s_of_tier(rd, tier);
         if(t != 0 && (oldest_time_s == 0 || t < oldest_time_s))
             oldest_time_s = t;

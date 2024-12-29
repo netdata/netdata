@@ -47,7 +47,7 @@ typedef enum __attribute__ ((__packed__)) item_flags {
 #define item_shared_flag_set(item, flag)   __atomic_or_fetch(&((item)->shared->flags), flag, __ATOMIC_RELAXED)
 #define item_shared_flag_clear(item, flag) __atomic_and_fetch(&((item)->shared->flags), ~(flag), __ATOMIC_RELAXED)
 
-#define REFCOUNT_DELETING         (-100)
+#define REFCOUNT_DICONNECTED (-100)
 
 #define ITEM_FLAGS_TYPE uint8_t
 #define KEY_LEN_TYPE    uint32_t

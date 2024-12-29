@@ -29,12 +29,18 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
     {
         if(m->type == POLLFD_TYPE_SENDER) {
             if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
-                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, m)) {
+                m->s->thread.wanted = ND_POLL_READ | ND_POLL_WRITE;
+                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, m->s->thread.wanted, m)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
                                  "STREAM SND[%zu] '%s' [to %s]: cannot enable output on sender socket %d.",
-                                 sth->id, rrdhost_hostname(m->s->host), m->s->connected_to, m->s->sock.fd);
+                                 sth->id, rrdhost_hostname(m->s->host), m->s->remote_ip, m->s->sock.fd);
                 }
+
+                if(!stream_sender_send_data(sth, m->s, now_monotonic_usec(), false))
+                    // sender has been removed
+                    return;
+
                 msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
             }
 
@@ -43,12 +49,18 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
         }
         else if(m->type == POLLFD_TYPE_RECEIVER) {
             if (msg->opcode & STREAM_OPCODE_RECEIVER_POLLOUT) {
-                if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, ND_POLL_READ | ND_POLL_WRITE, m)) {
+                m->rpt->thread.wanted = ND_POLL_READ | ND_POLL_WRITE;
+                if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, m->rpt->thread.wanted, m)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                                  "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot enable output on receiver socket %d.",
-                                 sth->id, rrdhost_hostname(m->rpt->host), m->rpt->client_ip, m->rpt->client_port, m->rpt->sock.fd);
+                                 sth->id, rrdhost_hostname(m->rpt->host), m->rpt->remote_ip, m->rpt->remote_port, m->rpt->sock.fd);
                 }
+
+                if(!stream_receiver_send_data(sth, m->rpt, now_monotonic_usec(), false))
+                    // receiver has been removed
+                    return;
+
                 msg->opcode &= ~(STREAM_OPCODE_RECEIVER_POLLOUT);
             }
 
@@ -84,19 +96,19 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
     if(msg.meta != &rpt->thread.meta) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV '%s' [from [%s]:%s]: the receiver in the opcode the message does not match this receiver. "
-               "Ignoring opcode.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+               "Ignoring opcode.", rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
         return;
     }
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV '%s' [from [%s]:%s]: the opcode (%u) message cannot be verified. Ignoring it.",
-               rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, msg.opcode);
+               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, msg.opcode);
         return;
     }
 
     // check if we can execute the message now
-    if(sth->tid == gettid_cached() && (!rpt->thread.draining_input || msg.opcode == STREAM_OPCODE_RECEIVER_POLLOUT)) {
+    if(sth->tid == gettid_cached() && msg.opcode == STREAM_OPCODE_RECEIVER_POLLOUT) {
         // we are running at the stream thread, and the request is about enabling POLLOUT,
         // we can do this synchronously.
         // IMPORTANT: DO NOT HANDLE FAILURES THAT REMOVE THE RECEIVER OR THE SENDER THIS WAY
@@ -138,7 +150,7 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
 #endif
 
                 fatal("STREAM RCV '%s' [from [%s]:%s]: The streaming opcode queue is full, but this should never happen...",
-                      rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+                      rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
             }
 
             // let's use a new slot
@@ -164,7 +176,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
     if(msg.meta != &s->thread.meta) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND '%s' [to %s]: the opcode message does not match this sender. "
-               "Ignoring opcode.", rrdhost_hostname(s->host), s->connected_to);
+               "Ignoring opcode.", rrdhost_hostname(s->host), s->remote_ip);
         return;
     }
 
@@ -172,12 +184,12 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
     if(!sth) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND[x] '%s' [to %s] the opcode (%u) message cannot be verified. Ignoring it.",
-               rrdhost_hostname(s->host), s->connected_to, msg.opcode);
+               rrdhost_hostname(s->host), s->remote_ip, msg.opcode);
         return;
     }
 
     // check if we can execute the message now
-    if(sth->tid == gettid_cached() && (!s->thread.draining_input || msg.opcode == STREAM_OPCODE_SENDER_POLLOUT)) {
+    if(sth->tid == gettid_cached() && msg.opcode == STREAM_OPCODE_SENDER_POLLOUT) {
         // we are running at the stream thread, and the request is about enabling POLLOUT,
         // we can do this synchronously.
         // IMPORTANT: DO NOT HANDLE FAILURES THAT REMOVE THE RECEIVER OR THE SENDER THIS WAY
@@ -219,7 +231,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
 #endif
 
                 fatal("STREAM SND '%s' [to %s]: The streaming opcode queue is full, but this should never happen...",
-                      rrdhost_hostname(s->host), s->connected_to);
+                      rrdhost_hostname(s->host), s->remote_ip);
             }
 
             // let's use a new slot
@@ -326,18 +338,19 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
     switch(m->type) {
         case POLLFD_TYPE_SENDER: {
             struct sender_state *s = m->s;
-            s->thread.draining_input = true;
-            if(stream_sender_process_poll_events(sth, s, ev->events, now_ut))
-                s->thread.draining_input = false;
-            *replay_entries += dictionary_entries(s->replication.requests);
+            if(stream_sender_process_poll_events(sth, s, ev->events, now_ut)) {
+                // the sender is still there
+                *replay_entries += dictionary_entries(s->replication.requests);
+            }
             break;
         }
 
         case POLLFD_TYPE_RECEIVER: {
             struct receiver_state *rpt = m->rpt;
-            rpt->thread.draining_input = true;
-            if(stream_receive_process_poll_events(sth, rpt, ev->events, now_ut))
-                rpt->thread.draining_input = false;
+            if(stream_receive_process_poll_events(sth, rpt, ev->events, now_ut)) {
+                // the receiver is still there
+                ;
+            }
             break;
         }
 
@@ -394,9 +407,9 @@ void *stream_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED, "disconnect remote closed");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
+    worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED, "disconnect remote closed");
+    worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
+    worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR, "disconnect compression error");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT, "disconnect receiver left");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP, "disconnect host cleanup");
@@ -471,8 +484,8 @@ void *stream_thread(void *ptr) {
     sth->pipe.size = set_pipe_size(sth->pipe.fds[PIPE_READ], 65536 * sizeof(*sth->pipe.buffer)) / sizeof(*sth->pipe.buffer);
     sth->pipe.buffer = mallocz(sth->pipe.size * sizeof(*sth->pipe.buffer));
 
-    usec_t last_check_all_nodes_ut = 0;
-    usec_t last_dequeue_ut = 0;
+    usec_t last_check_replication_ut, last_check_all_nodes_ut, last_dequeue_ut;
+    last_check_replication_ut = last_check_all_nodes_ut = last_dequeue_ut = now_monotonic_usec();
 
     sth->run.pipe = (struct pollfd_meta){
         .type = POLLFD_TYPE_PIPE,
@@ -515,12 +528,14 @@ void *stream_thread(void *ptr) {
             last_dequeue_ut = now_ut;
         }
 
-        if(now_ut - last_check_all_nodes_ut >= USEC_PER_SEC) {
+        if(now_ut - last_check_all_nodes_ut >= nd_profile.update_every * USEC_PER_SEC) {
             worker_is_busy(WORKER_STREAM_JOB_LIST);
 
             // periodically check the entire list of nodes
             // this detects unresponsive parents too (timeout)
             stream_sender_check_all_nodes_from_poll(sth, now_ut);
+            stream_receiver_check_all_nodes_from_poll(sth, now_ut);
+
             worker_set_metric(WORKER_SENDER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
             worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes_count);
 
@@ -535,6 +550,15 @@ void *stream_thread(void *ptr) {
             sth->snd.bytes_sent = 0;
 
             last_check_all_nodes_ut = now_ut;
+        }
+
+        if(now_ut - last_check_replication_ut >= 10 * 60 * USEC_PER_SEC) {
+            worker_is_busy(WORKER_STREAM_JOB_LIST);
+
+            stream_sender_replication_check_from_poll(sth, now_ut);
+            stream_receiver_replication_check_from_poll(sth, now_ut);
+
+            last_check_replication_ut = now_ut;
         }
 
         worker_is_idle();

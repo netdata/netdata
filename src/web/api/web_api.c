@@ -125,7 +125,7 @@ bool web_client_interrupt_callback(void *data) {
     if(w->interrupt.callback)
         ret = w->interrupt.callback(w, w->interrupt.callback_data);
     else
-        ret = is_socket_closed(w->ofd);
+        ret = is_socket_closed(w->fd);
 
     return ret;
 }

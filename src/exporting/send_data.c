@@ -289,7 +289,7 @@ void simple_connector_worker(void *instance_p)
 
             if (exporting_tls_is_enabled(instance->config.type, options) && sock != -1) {
                 if (netdata_ssl_exporting_ctx) {
-                    if (sock_delnonblock(sock) < 0)
+                    if (sock_setnonblock(sock, false) != 0)
                         netdata_log_error("Exporting cannot remove the non-blocking flag from socket %d", sock);
 
                     if(netdata_ssl_open(&connector_specific_data->ssl, netdata_ssl_exporting_ctx, sock)) {

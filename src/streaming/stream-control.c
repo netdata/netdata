@@ -2,26 +2,13 @@
 
 #include "stream-control.h"
 #include "stream.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 static struct {
-    CACHE_LINE_PADDING();
-
-    uint32_t backfill_runners;
-
-    CACHE_LINE_PADDING();
-
-    uint32_t replication_runners;
-
-    CACHE_LINE_PADDING();
-
-    uint32_t user_data_queries_runners;
-
-    CACHE_LINE_PADDING();
-
-    uint32_t user_weights_queries_runners;
-
-    CACHE_LINE_PADDING();
+    PAD64(uint32_t) backfill_runners;
+    PAD64(uint32_t) replication_runners;
+    PAD64(uint32_t) user_data_queries_runners;
+    PAD64(uint32_t) user_weights_queries_runners;
 } sc;
 
 // --------------------------------------------------------------------------------------------------------------------

@@ -81,7 +81,7 @@ void log_receiver_capabilities(struct receiver_state *rpt) {
     stream_capabilities_to_string(wb, rpt->capabilities);
 
     nd_log_daemon(NDLP_INFO, "STREAM RCV '%s' [from [%s]:%s]: established link with negotiated capabilities: %s",
-                  rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, buffer_tostring(wb));
+                  rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, buffer_tostring(wb));
 
     buffer_free(wb);
 }
@@ -91,7 +91,7 @@ void log_sender_capabilities(struct sender_state *s) {
     stream_capabilities_to_string(wb, s->capabilities);
 
     nd_log_daemon(NDLP_INFO, "STREAM SND '%s' [to %s]: established link with negotiated capabilities: %s",
-                  rrdhost_hostname(s->host), s->connected_to, buffer_tostring(wb));
+                  rrdhost_hostname(s->host), s->remote_ip, buffer_tostring(wb));
 
     buffer_free(wb);
 }
@@ -174,4 +174,6 @@ void check_local_streaming_capabilities(void) {
     ieee754_doubles = is_system_ieee754_double();
     if(!ieee754_doubles)
         globally_disabled_capabilities |= STREAM_CAP_IEEE754;
+    else
+        globally_disabled_capabilities &= ~STREAM_CAP_IEEE754;
 }

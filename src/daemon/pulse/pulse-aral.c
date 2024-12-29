@@ -167,7 +167,7 @@ void pulse_aral_do(bool extended) {
                 ai->rd_utilization = rrddim_add(ai->st_utilization, "utilization", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
             }
 
-            rrddim_set_by_pointer(ai->st_utilization, ai->rd_utilization, (collected_number)utilization * 1000LL);
+            rrddim_set_by_pointer(ai->st_utilization, ai->rd_utilization, (collected_number)(utilization * 1000.0));
             rrdset_done(ai->st_utilization);
         }
     }

@@ -662,8 +662,8 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
     if (cmsg == NULL || cmsg->cmsg_len != CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: Received invalid control message (expected %zu bytes, received %zu bytes)",
-            CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS), cmsg?cmsg->cmsg_len:0);
+               "SPAWN SERVER: Received invalid control message (expected %zu bytes, received %zu bytes)",
+               (size_t)(CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)), (size_t)(cmsg?cmsg->cmsg_len:0));
         close(sock);
         return;
     }
@@ -908,7 +908,7 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
             }
 
             // do not fork this socket
-            sock_setcloexec(sock);
+            sock_setcloexec(sock, true);
 
             // receive the request and process it
             spawn_server_receive_request(sock, server);
@@ -1091,7 +1091,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         };
         os_close_all_non_std_open_fds_except(fds_to_keep, _countof(fds_to_keep), 0);
         nd_log_reopen_log_files_for_spawn_server(buf);
-        exit(spawn_server_event_loop(server));
+        _exit(spawn_server_event_loop(server));
     }
     else if (pid > 0) {
         // the parent

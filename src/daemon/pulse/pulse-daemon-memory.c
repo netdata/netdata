@@ -2,7 +2,7 @@
 
 #define PULSE_INTERNALS 1
 #include "pulse-daemon-memory.h"
-#include "streaming/replication.h"
+#include "streaming/stream-replication-sender.h"
 
 #define dictionary_stats_memory_total(stats) \
     ((stats).memory.dict + (stats).memory.values + (stats).memory.index)
@@ -93,13 +93,13 @@ void pulse_daemon_memory_do(bool extended) {
             netdata_buffers_statistics.buffers_streaming +
             netdata_buffers_statistics.cbuffers_streaming +
             netdata_buffers_statistics.buffers_web +
-            replication_allocated_buffers() + aral_by_size_free_bytes() + judy_aral_free_bytes();
+                         replication_sender_allocated_buffers() + aral_by_size_free_bytes() + judy_aral_free_bytes();
 
         int sqlite3_memory_used_current = 0, sqlite3_memory_used_highwater = 0;
         sqlite3_status(SQLITE_STATUS_MEMORY_USED, &sqlite3_memory_used_current, &sqlite3_memory_used_highwater, 1);
 
-        size_t strings = 0;
-        string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
+        size_t strings_memory = 0, strings_index = 0;
+        string_statistics(NULL, NULL, NULL, NULL, NULL, &strings_memory, &strings_index, NULL, NULL);
 
         rrddim_set_by_pointer(st_memory, rd_db_dbengine, (collected_number)pulse_dbengine_total_memory);
         rrddim_set_by_pointer(st_memory, rd_db_rrd, (collected_number)pulse_rrd_memory_size);
@@ -128,7 +128,7 @@ void pulse_daemon_memory_do(bool extended) {
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions));
 
         rrddim_set_by_pointer(st_memory, rd_replication,
-                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_sender_allocated_memory());
 #else
         uint64_t metadata =
             aral_by_size_structures_bytes() + aral_by_size_used_bytes() +
@@ -140,7 +140,7 @@ void pulse_daemon_memory_do(bool extended) {
             dictionary_stats_category_functions.memory.dict + dictionary_stats_category_functions.memory.index +
             dictionary_stats_category_replication.memory.dict + dictionary_stats_category_replication.memory.index +
             netdata_buffers_statistics.rrdhost_allocations_size +
-            replication_allocated_memory();
+            replication_sender_allocated_memory();
 
         rrddim_set_by_pointer(st_memory, rd_metadata, (collected_number)metadata);
 #endif
@@ -153,7 +153,7 @@ void pulse_daemon_memory_do(bool extended) {
                               (collected_number)pulse_ml_get_current_memory_usage());
 
         rrddim_set_by_pointer(st_memory, rd_strings,
-                              (collected_number)strings);
+                              (collected_number)(strings_memory + strings_index));
 
         rrddim_set_by_pointer(st_memory, rd_streaming,
                               (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
@@ -243,7 +243,7 @@ void pulse_daemon_memory_do(bool extended) {
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_streaming, (collected_number)netdata_buffers_statistics.buffers_streaming);
         rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_allocated_buffers());
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_sender_allocated_buffers());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)aral_by_size_free_bytes());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_judy, (collected_number)judy_aral_free_bytes());
 

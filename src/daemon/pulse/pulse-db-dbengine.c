@@ -7,6 +7,13 @@ size_t pulse_dbengine_total_memory = 0;
 
 #if defined(ENABLE_DBENGINE)
 
+static usec_t time_and_count_delta_average(struct time_and_count *prev, struct time_and_count *latest) {
+    if(latest->count > prev->count && latest->usec > prev->usec)
+        return (latest->usec - prev->usec) / (latest->count - prev->count);
+
+    return 0;
+}
+
 struct dbengine2_cache_pointers {
     RRDSET *st_cache_hit_ratio;
     RRDDIM *rd_hit_ratio_closest;
@@ -573,18 +580,18 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_relocated, (collected_number)pgc_stats->waste_evict_relocated);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flushes_cancelled, (collected_number)pgc_stats->waste_flushes_cancelled);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_acquire_spins, (collected_number)pgc_stats->waste_acquire_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_release_spins, (collected_number)pgc_stats->waste_release_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_insert_spins, (collected_number)pgc_stats->waste_insert_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_delete_spins, (collected_number)pgc_stats->waste_delete_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_spins, (collected_number)pgc_stats->waste_evict_useless_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_thread_signals, (collected_number)pgc_stats->waste_evict_thread_signals);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_inline_on_add, (collected_number)pgc_stats->waste_evictions_inline_on_add);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_inline_on_release, (collected_number)pgc_stats->waste_evictions_inline_on_release);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_inline_on_add, (collected_number)pgc_stats->waste_flush_on_add);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_inline_on_release, (collected_number)pgc_stats->waste_flush_on_release);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_relocated, (collected_number)pgc_stats->p2_waste_evict_relocated);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flushes_cancelled, (collected_number)pgc_stats->p2_waste_flushes_cancelled);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_acquire_spins, (collected_number)pgc_stats->p2_waste_acquire_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_release_spins, (collected_number)pgc_stats->p2_waste_release_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_insert_spins, (collected_number)pgc_stats->p2_waste_insert_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_delete_spins, (collected_number)pgc_stats->p2_waste_delete_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_spins, (collected_number)pgc_stats->p2_waste_evict_useless_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_thread_signals, (collected_number)pgc_stats->p2_waste_evict_thread_signals);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_inline_on_add, (collected_number)pgc_stats->p2_waste_evictions_inline_on_add);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_inline_on_release, (collected_number)pgc_stats->p2_waste_evictions_inline_on_release);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_inline_on_add, (collected_number)pgc_stats->p2_waste_flush_on_add);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_inline_on_release, (collected_number)pgc_stats->p2_waste_flush_on_release);
 
         rrdset_done(ptrs->st_pgc_waste);
     }
@@ -627,12 +634,12 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_searchers, (collected_number)pgc_stats->workers_search);
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_adders, (collected_number)pgc_stats->workers_add);
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_evictors, (collected_number)pgc_stats->workers_evict);
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_flushers, (collected_number)pgc_stats->workers_flush);
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_hot2dirty, (collected_number)pgc_stats->workers_hot2dirty);
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_jv2_flushers, (collected_number)pgc_stats->workers_jv2_flush);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_searchers, (collected_number)pgc_stats->p2_workers_search);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_adders, (collected_number)pgc_stats->p2_workers_add);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_evictors, (collected_number)pgc_stats->p0_workers_evict);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_flushers, (collected_number)pgc_stats->p2_workers_flush);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_hot2dirty, (collected_number)pgc_stats->p2_workers_hot2dirty);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_jv2_flushers, (collected_number)pgc_stats->p2_workers_jv2_flush);
 
         rrdset_done(ptrs->st_pgc_workers);
     }
@@ -1012,9 +1019,9 @@ void pulse_dbengine_do(bool extended) {
         }
         priority++;
 
-        rrddim_set_by_pointer(st_queries, rd_total, (collected_number)cache_efficiency_stats.queries);
-        rrddim_set_by_pointer(st_queries, rd_open, (collected_number)cache_efficiency_stats.queries_open);
-        rrddim_set_by_pointer(st_queries, rd_jv2, (collected_number)cache_efficiency_stats.queries_journal_v2);
+        rrddim_set_by_pointer(st_queries, rd_total, (collected_number)cache_efficiency_stats.prep_time_in_main_cache_lookup.count);
+        rrddim_set_by_pointer(st_queries, rd_open, (collected_number)cache_efficiency_stats.prep_time_in_open_cache_lookup.count);
+        rrddim_set_by_pointer(st_queries, rd_jv2, (collected_number)cache_efficiency_stats.prep_time_in_journal_v2_lookup.count);
         rrddim_set_by_pointer(st_queries, rd_planned_with_gaps, (collected_number)cache_efficiency_stats.queries_planned_with_gaps);
         rrddim_set_by_pointer(st_queries, rd_executed_with_gaps, (collected_number)cache_efficiency_stats.queries_executed_with_gaps);
 
@@ -1303,7 +1310,9 @@ void pulse_dbengine_do(bool extended) {
 
     {
         static RRDSET *st_prep_timings = NULL;
-        static RRDDIM *rd_routing = NULL;
+        static RRDDIM *rd_routing_sync = NULL;
+        static RRDDIM *rd_routing_syncfirst = NULL;
+        static RRDDIM *rd_routing_async = NULL;
         static RRDDIM *rd_main_cache = NULL;
         static RRDDIM *rd_open_cache = NULL;
         static RRDDIM *rd_journal_v2 = NULL;
@@ -1316,7 +1325,7 @@ void pulse_dbengine_do(bool extended) {
                 NULL,
                 "dbengine query router",
                 NULL,
-                "Netdata Query Preparation Timings",
+                "Netdata Query Planning Timings",
                 "usec/s",
                 "netdata",
                 "pulse",
@@ -1324,7 +1333,9 @@ void pulse_dbengine_do(bool extended) {
                 localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 
-            rd_routing = rrddim_add(st_prep_timings, "routing", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_routing_sync = rrddim_add(st_prep_timings, "pdc sync", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_routing_syncfirst = rrddim_add(st_prep_timings, "pdc syncfirst", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_routing_async = rrddim_add(st_prep_timings, "pdc async", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_main_cache = rrddim_add(st_prep_timings, "main cache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_open_cache = rrddim_add(st_prep_timings, "open cache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_journal_v2 = rrddim_add(st_prep_timings, "journal v2", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1332,11 +1343,59 @@ void pulse_dbengine_do(bool extended) {
         }
         priority++;
 
-        rrddim_set_by_pointer(st_prep_timings, rd_routing, (collected_number)cache_efficiency_stats.prep_time_to_route);
-        rrddim_set_by_pointer(st_prep_timings, rd_main_cache, (collected_number)cache_efficiency_stats.prep_time_in_main_cache_lookup);
-        rrddim_set_by_pointer(st_prep_timings, rd_open_cache, (collected_number)cache_efficiency_stats.prep_time_in_open_cache_lookup);
-        rrddim_set_by_pointer(st_prep_timings, rd_journal_v2, (collected_number)cache_efficiency_stats.prep_time_in_journal_v2_lookup);
-        rrddim_set_by_pointer(st_prep_timings, rd_pass4, (collected_number)cache_efficiency_stats.prep_time_in_pass4_lookup);
+        rrddim_set_by_pointer(st_prep_timings, rd_routing_sync, (collected_number)cache_efficiency_stats.prep_time_to_route_sync.usec);
+        rrddim_set_by_pointer(st_prep_timings, rd_routing_syncfirst, (collected_number)cache_efficiency_stats.prep_time_to_route_syncfirst.usec);
+        rrddim_set_by_pointer(st_prep_timings, rd_routing_async, (collected_number)cache_efficiency_stats.prep_time_to_route_async.usec);
+        rrddim_set_by_pointer(st_prep_timings, rd_main_cache, (collected_number)cache_efficiency_stats.prep_time_in_main_cache_lookup.usec);
+        rrddim_set_by_pointer(st_prep_timings, rd_open_cache, (collected_number)cache_efficiency_stats.prep_time_in_open_cache_lookup.usec);
+        rrddim_set_by_pointer(st_prep_timings, rd_journal_v2, (collected_number)cache_efficiency_stats.prep_time_in_journal_v2_lookup.usec);
+        rrddim_set_by_pointer(st_prep_timings, rd_pass4, (collected_number)cache_efficiency_stats.prep_time_in_pass4_lookup.usec);
+
+        rrdset_done(st_prep_timings);
+    }
+
+    {
+        static RRDSET *st_prep_timings = NULL;
+        static RRDDIM *rd_routing_sync = NULL;
+        static RRDDIM *rd_routing_syncfirst = NULL;
+        static RRDDIM *rd_routing_async = NULL;
+        static RRDDIM *rd_main_cache = NULL;
+        static RRDDIM *rd_open_cache = NULL;
+        static RRDDIM *rd_journal_v2 = NULL;
+        static RRDDIM *rd_pass4 = NULL;
+
+        if (unlikely(!st_prep_timings)) {
+            st_prep_timings = rrdset_create_localhost(
+                "netdata",
+                "dbengine_prep_average_timings",
+                NULL,
+                "dbengine query router",
+                NULL,
+                "Netdata Query Planning Average Timings",
+                "usec/s",
+                "netdata",
+                "pulse",
+                priority + 1,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_STACKED);
+
+            rd_routing_sync = rrddim_add(st_prep_timings, "pdc sync", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_routing_syncfirst = rrddim_add(st_prep_timings, "pdc syncfirst", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_routing_async = rrddim_add(st_prep_timings, "pdc async", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_main_cache = rrddim_add(st_prep_timings, "main cache", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_open_cache = rrddim_add(st_prep_timings, "open cache", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_journal_v2 = rrddim_add(st_prep_timings, "journal v2", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pass4 = rrddim_add(st_prep_timings, "pass4", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_prep_timings,rd_routing_sync, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.prep_time_to_route_sync, &cache_efficiency_stats.prep_time_to_route_sync));
+        rrddim_set_by_pointer(st_prep_timings,rd_routing_syncfirst, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.prep_time_to_route_syncfirst, &cache_efficiency_stats.prep_time_to_route_syncfirst));
+        rrddim_set_by_pointer(st_prep_timings,rd_routing_async, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.prep_time_to_route_async, &cache_efficiency_stats.prep_time_to_route_async));
+        rrddim_set_by_pointer(st_prep_timings, rd_main_cache, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.prep_time_in_main_cache_lookup, &cache_efficiency_stats.prep_time_in_main_cache_lookup));
+        rrddim_set_by_pointer(st_prep_timings, rd_open_cache, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.prep_time_in_open_cache_lookup, &cache_efficiency_stats.prep_time_in_open_cache_lookup));
+        rrddim_set_by_pointer(st_prep_timings, rd_journal_v2, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.prep_time_in_journal_v2_lookup, &cache_efficiency_stats.prep_time_in_journal_v2_lookup));
+        rrddim_set_by_pointer(st_prep_timings, rd_pass4, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.prep_time_in_pass4_lookup, &cache_efficiency_stats.prep_time_in_pass4_lookup));
 
         rrdset_done(st_prep_timings);
     }
@@ -1365,8 +1424,8 @@ void pulse_dbengine_do(bool extended) {
                 localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 
-            rd_init = rrddim_add(st_query_timings, "init", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_prep_wait = rrddim_add(st_query_timings, "prep wait", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_init = rrddim_add(st_query_timings, "plan", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_prep_wait = rrddim_add(st_query_timings, "async wait", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_next_page_disk_fast = rrddim_add(st_query_timings, "next page disk fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_next_page_disk_slow = rrddim_add(st_query_timings, "next page disk slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_next_page_preload_fast = rrddim_add(st_query_timings, "next page preload fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1374,14 +1433,57 @@ void pulse_dbengine_do(bool extended) {
         }
         priority++;
 
-        rrddim_set_by_pointer(st_query_timings, rd_init, (collected_number)cache_efficiency_stats.query_time_init);
-        rrddim_set_by_pointer(st_query_timings, rd_prep_wait, (collected_number)cache_efficiency_stats.query_time_wait_for_prep);
-        rrddim_set_by_pointer(st_query_timings, rd_next_page_disk_fast, (collected_number)cache_efficiency_stats.query_time_to_fast_disk_next_page);
-        rrddim_set_by_pointer(st_query_timings, rd_next_page_disk_slow, (collected_number)cache_efficiency_stats.query_time_to_slow_disk_next_page);
-        rrddim_set_by_pointer(st_query_timings, rd_next_page_preload_fast, (collected_number)cache_efficiency_stats.query_time_to_fast_preload_next_page);
-        rrddim_set_by_pointer(st_query_timings, rd_next_page_preload_slow, (collected_number)cache_efficiency_stats.query_time_to_slow_preload_next_page);
+        rrddim_set_by_pointer(st_query_timings, rd_init, (collected_number)cache_efficiency_stats.query_time_init.usec);
+        rrddim_set_by_pointer(st_query_timings, rd_prep_wait, (collected_number)cache_efficiency_stats.query_time_wait_for_prep.usec);
+        rrddim_set_by_pointer(st_query_timings, rd_next_page_disk_fast, (collected_number)cache_efficiency_stats.query_time_to_fast_disk_next_page.usec);
+        rrddim_set_by_pointer(st_query_timings, rd_next_page_disk_slow, (collected_number)cache_efficiency_stats.query_time_to_slow_disk_next_page.usec);
+        rrddim_set_by_pointer(st_query_timings, rd_next_page_preload_fast, (collected_number)cache_efficiency_stats.query_time_to_fast_preload_next_page.usec);
+        rrddim_set_by_pointer(st_query_timings, rd_next_page_preload_slow, (collected_number)cache_efficiency_stats.query_time_to_slow_preload_next_page.usec);
 
         rrdset_done(st_query_timings);
+    }
+
+    {
+        static RRDSET *st_query_timings_average = NULL;
+        static RRDDIM *rd_init = NULL;
+        static RRDDIM *rd_prep_wait = NULL;
+        static RRDDIM *rd_next_page_disk_fast = NULL;
+        static RRDDIM *rd_next_page_disk_slow = NULL;
+        static RRDDIM *rd_next_page_preload_fast = NULL;
+        static RRDDIM *rd_next_page_preload_slow = NULL;
+
+        if (unlikely(!st_query_timings_average)) {
+            st_query_timings_average = rrdset_create_localhost(
+                "netdata",
+                "dbengine_query_timings_average",
+                NULL,
+                "dbengine query router",
+                NULL,
+                "Netdata Query Average Timings",
+                "usec/s",
+                "netdata",
+                "pulse",
+                priority + 1,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_STACKED);
+
+            rd_init = rrddim_add(st_query_timings_average, "plan", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_prep_wait = rrddim_add(st_query_timings_average, "async wait", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_next_page_disk_fast = rrddim_add(st_query_timings_average, "next page disk fast", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_next_page_disk_slow = rrddim_add(st_query_timings_average, "next page disk slow", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_next_page_preload_fast = rrddim_add(st_query_timings_average, "next page preload fast", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_next_page_preload_slow = rrddim_add(st_query_timings_average, "next page preload slow", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_query_timings_average, rd_init, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.query_time_init, &cache_efficiency_stats.query_time_init));
+        rrddim_set_by_pointer(st_query_timings_average, rd_prep_wait, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.query_time_wait_for_prep, &cache_efficiency_stats.query_time_wait_for_prep));
+        rrddim_set_by_pointer(st_query_timings_average, rd_next_page_disk_fast, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.query_time_to_fast_disk_next_page, &cache_efficiency_stats.query_time_to_fast_disk_next_page));
+        rrddim_set_by_pointer(st_query_timings_average, rd_next_page_disk_slow, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.query_time_to_slow_disk_next_page, &cache_efficiency_stats.query_time_to_slow_disk_next_page));
+        rrddim_set_by_pointer(st_query_timings_average, rd_next_page_preload_fast, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.query_time_to_fast_preload_next_page, &cache_efficiency_stats.query_time_to_fast_preload_next_page));
+        rrddim_set_by_pointer(st_query_timings_average, rd_next_page_preload_slow, (collected_number)time_and_count_delta_average(&cache_efficiency_stats_old.query_time_to_slow_preload_next_page, &cache_efficiency_stats.query_time_to_slow_preload_next_page));
+
+        rrdset_done(st_query_timings_average);
     }
 
     if(netdata_rwlock_tryrdlock(&rrd_rwlock) == 0) {
@@ -1396,7 +1498,7 @@ void pulse_dbengine_do(bool extended) {
             if (!rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
 
                 /* get localhost's DB engine's statistics for each tier */
-                for(size_t tier = 0; tier < storage_tiers ;tier++) {
+                for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
                     if(host->db[tier].mode != RRD_MEMORY_MODE_DBENGINE) continue;
                     if(!host->db[tier].si) continue;
 

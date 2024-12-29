@@ -11,7 +11,7 @@ extern "C" {
 #include "rrd-database-mode.h"
 #include "streaming/stream-traffic-types.h"
 #include "streaming/stream-sender-commit.h"
-#include "rrdhost-state-id.h"
+#include "streaming/stream-replication-tracking.h"
 #include "health/health-alert-log.h"
 #include "rrdhost-system-info.h"
 
@@ -115,11 +115,13 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
     RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 21), // the receiving side has replication in progress
     RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED    = (1 << 22), // the receiving side has completed replication
 
-    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 23), // a custom variable has been updated and needs to be exposed to parent
+    RRDSET_FLAG_BACKFILLED_HIGH_TIERS            = (1 << 23), // we have backfilled this chart
 
-    RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 24), // when set, data collection is not available for this chart
+    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 24), // a custom variable has been updated and needs to be exposed to parent
 
-    RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 25), // this chart has at least one rrdcal linked
+    RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 25), // when set, data collection is not available for this chart
+
+    RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 26), // this chart has at least one rrdcal linked
 } RRDSET_FLAGS;
 
 #include "daemon/common.h"
@@ -178,7 +180,7 @@ typedef enum __attribute__ ((__packed__)) {
     RRD_BACKFILL_NEW
 } RRD_BACKFILL;
 
-#define UPDATE_EVERY 1
+#define UPDATE_EVERY_MIN 1
 #define UPDATE_EVERY_MAX 3600
 
 #define RRD_DEFAULT_HISTORY_ENTRIES 3600
@@ -256,10 +258,11 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
     // this is 8 bit
 } RRDDIM_FLAGS;
 
-#define rrddim_flag_get(rd) __atomic_load_n(&((rd)->flags), __ATOMIC_ACQUIRE)
-#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_ACQUIRE) & (flag))
-#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_RELEASE)
-#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_RELEASE)
+#define rrddim_flag_get(rd)                         atomic_flags_get(&((rd)->flags))
+#define rrddim_flag_check(rd, flag)                 atomic_flags_check(&((rd)->flags), flag)
+#define rrddim_flag_set(rd, flag)                   atomic_flags_set(&((rd)->flags), flag)
+#define rrddim_flag_clear(rd, flag)                 atomic_flags_clear(&((rd)->flags), flag)
+#define rrddim_flag_set_and_clear(rd, set, clear)   atomic_flags_set_and_clear(&((rd)->flags), set, clear)
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
@@ -490,7 +493,7 @@ static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND s
         return rrdeng_global_first_time_s(si);
 #endif
 
-    return now_realtime_sec() - (time_t)(default_rrd_history_entries * default_rrd_update_every);
+    return now_realtime_sec() - (time_t)(default_rrd_history_entries * nd_profile.update_every);
 }
 
 size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *si);
@@ -679,10 +682,11 @@ STORAGE_ENGINE* storage_engine_find(const char* name);
 // ----------------------------------------------------------------------------
 // RRDSET - this is a chart
 
-#define rrdset_flag_get(st) __atomic_load_n(&((st)->flags), __ATOMIC_ACQUIRE)
-#define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_ACQUIRE) & (flag))
-#define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_RELEASE)
-#define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_RELEASE)
+#define rrdset_flag_get(st)                         atomic_flags_get(&((st)->flags))
+#define rrdset_flag_check(st, flag)                 atomic_flags_check(&((st)->flags), flag)
+#define rrdset_flag_set(st, flag)                   atomic_flags_set(&((st)->flags), flag)
+#define rrdset_flag_clear(st, flag)                 atomic_flags_clear(&((st)->flags), flag)
+#define rrdset_flag_set_and_clear(st, set, clear)   atomic_flags_set_and_clear(&((st)->flags), set, clear)
 
 #define rrdset_is_replicating(st) (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS|RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) \
     && !rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED|RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
@@ -772,9 +776,17 @@ struct rrdset {
             uint32_t sent_version;
             uint32_t chart_slot;
             uint32_t dim_last_slot_used;
-
+#ifdef REPLICATION_TRACKING
+            REPLAY_WHO who;
+#endif
             time_t resync_time_s;                   // the timestamp up to which we should resync clock upstream
         } snd;
+
+        struct {
+#ifdef REPLICATION_TRACKING
+            REPLAY_WHO who;
+#endif
+        } rcv;
     } stream;
 
     // ------------------------------------------------------------------------
@@ -953,30 +965,31 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     // Health
     RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 17), // contains charts and dims with uninitialized variables
     RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 18), // the host has initialized health structures
-    RRDHOST_FLAG_HEALTH_RUNNING_NOW             = (1 << 19), // health is currently executing health check on this host
 
     // Exporting
-    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 20), // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 21), // don't send it to external databases
+    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 19), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 20), // don't send it to external databases
 
     // ACLK
-    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 22), // when set, we should send ACLK stream context updates
-    RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 23), // Host should stream alerts
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 21), // when set, we should send ACLK stream context updates
+    RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 22), // Host should stream alerts
 
     // Metadata
-    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 24), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_LABELS                = (1 << 25), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_INFO                  = (1 << 26), // metadata needs to be stored in the database
-    RRDHOST_FLAG_PENDING_CONTEXT_LOAD           = (1 << 27), // Context needs to be loaded
+    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 23), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_LABELS                = (1 << 24), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_INFO                  = (1 << 25), // metadata needs to be stored in the database
+    RRDHOST_FLAG_PENDING_CONTEXT_LOAD           = (1 << 26), // Context needs to be loaded
 
-    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 27), // metadata needs to be stored in the database
 
-    RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 29), // set when the host has updated global functions
+    RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 28), // set when the host has updated global functions
 } RRDHOST_FLAGS;
 
-#define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
-#define rrdhost_flag_set(host, flag)   __atomic_or_fetch(&((host)->flags), flag, __ATOMIC_SEQ_CST)
-#define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~(flag), __ATOMIC_SEQ_CST)
+#define rrdhost_flag_get(host)                         atomic_flags_get(&((host)->flags))
+#define rrdhost_flag_check(host, flag)                 atomic_flags_check(&((host)->flags), flag)
+#define rrdhost_flag_set(host, flag)                   atomic_flags_set(&((host)->flags), flag)
+#define rrdhost_flag_clear(host, flag)                 atomic_flags_clear(&((host)->flags), flag)
+#define rrdhost_flag_set_and_clear(host, set, clear)   atomic_flags_set_and_clear(&((host)->flags), set, clear)
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
@@ -1030,8 +1043,7 @@ struct rrdhost {
     STRING *program_name;                           // the program name that collects metrics for this host
     STRING *program_version;                        // the program version that collects metrics for this host
 
-    REFCOUNT state_refcount;
-    RRDHOST_STATE state_id;                         // every time data collection (stream receiver) (dis)connects,
+    OBJECT_STATE state_id;                          // every time data collection (stream receiver) (dis)connects,
                                                     // this gets incremented - it is used to detect stale functions,
                                                     // stale backfilling requests, etc.
 
@@ -1088,7 +1100,9 @@ struct rrdhost {
                 uint32_t connections;               // the number of times this sender has connected
 
                 struct {
-                    size_t charts;                  // the number of charts currently being replicated to a parent
+                    uint32_t counter_in;            // counts the number of replication statements we have received
+                    uint32_t counter_out;           // counts the number of replication statements we have sent
+                    uint32_t charts;                // the number of charts currently being replicated to a parent
                 } replication;
             } status;
 
@@ -1123,7 +1137,10 @@ struct rrdhost {
                 STREAM_HANDSHAKE exit_reason;       // the last receiver exit reason
 
                 struct {
-                    size_t charts;                  // the number of charts currently being replicated from a child
+                    uint32_t counter_in;            // counts the number of replication statements we have received
+                    uint32_t counter_out;           // counts the number of replication statements we have sent
+                    uint32_t backfill_pending;      // the number of replication requests pending on us
+                    uint32_t charts;                // the number of charts currently being replicated from a child
                     NETDATA_DOUBLE percent;         // the % of replication completion
                 } replication;
             } status;

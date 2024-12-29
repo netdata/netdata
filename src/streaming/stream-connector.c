@@ -261,7 +261,7 @@ stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, ch
 
     nd_log(NDLS_DAEMON, priority,
            "STREAM CONNECT '%s' [to %s]: %s - will retry in %d secs, at %s",
-           rrdhost_hostname(host), s->connected_to, error, delay, buf);
+           rrdhost_hostname(host), s->remote_ip, error, delay, buf);
 
     return false;
 }
@@ -282,7 +282,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
     if(!stream_parent_connect_to_one(
             &s->sock, host, default_port, timeout,
-            s->connected_to, sizeof(s->connected_to) - 1,
+            s->remote_ip, sizeof(s->remote_ip) - 1,
             &host->stream.snd.parents.current)) {
 
         if(s->sock.error != ND_SOCK_ERR_NO_DESTINATION_AVAILABLE)
@@ -305,7 +305,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     buffer_key_value_urlencode(wb, "&hostname", rrdhost_hostname(host));
     buffer_key_value_urlencode(wb, "&registry_hostname", rrdhost_registry_hostname(host));
     buffer_key_value_urlencode(wb, "&machine_guid", host->machine_guid);
-    buffer_sprintf(wb, "&update_every=%d", default_rrd_update_every);
+    buffer_sprintf(wb, "&update_every=%d", (int)nd_profile.update_every);
     buffer_key_value_urlencode(wb, "&os", rrdhost_os(host));
     buffer_key_value_urlencode(wb, "&timezone", rrdhost_timezone(host));
     buffer_key_value_urlencode(wb, "&abbrev_timezone", rrdhost_abbrev_timezone(host));
@@ -346,7 +346,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM CONNECT '%s' [to %s]: failed to send HTTP header to remote netdata.",
-               rrdhost_hostname(host), s->connected_to);
+               rrdhost_hostname(host), s->remote_ip);
 
         stream_parent_set_reconnect_delay(
             host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, 60);
@@ -368,7 +368,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM CONNECT '%s' [to %s]: remote netdata does not respond.",
-               rrdhost_hostname(host), s->connected_to);
+               rrdhost_hostname(host), s->remote_ip);
 
         stream_parent_set_reconnect_delay(
             host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, 30);
@@ -376,18 +376,6 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         return false;
     }
     response[bytes] = '\0';
-
-    if(sock_setnonblock(s->sock.fd) < 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM CONNECT '%s' [to %s]: cannot set non-blocking mode for socket.",
-               rrdhost_hostname(host), s->connected_to);
-
-    sock_setcloexec(s->sock.fd);
-
-    if(sock_enlarge_out(s->sock.fd) < 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM CONNECT '%s' [to %s]: cannot enlarge the socket buffer.",
-               rrdhost_hostname(host), s->connected_to);
 
     if(!stream_connect_validate_first_response(host, s, response, bytes)) {
         nd_sock_close(&s->sock);
@@ -406,7 +394,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM CONNECT '%s' [to %s]: connected to parent...",
-           rrdhost_hostname(host), s->connected_to);
+           rrdhost_hostname(host), s->remote_ip);
 
     return true;
 }
@@ -511,6 +499,10 @@ void stream_connector_add(struct sender_state *s) {
 static void stream_connector_remove(struct sender_state *s) {
     struct connector *sc = stream_connector_get(s);
     __atomic_sub_fetch(&sc->nodes, 1, __ATOMIC_RELAXED);
+
+    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+           "STREAM CNT '%s' [to %s]: streaming connector removed host: %s (signaled to stop)",
+           rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(s->exit.reason));
 
     stream_sender_remove(s);
 }

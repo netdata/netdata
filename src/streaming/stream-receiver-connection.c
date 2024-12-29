@@ -4,7 +4,7 @@
 #include "stream-thread.h"
 #include "stream-receiver-internals.h"
 #include "web/server/h2o/http_server.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -12,8 +12,8 @@ void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, con
     // this function may be called BEFORE we spawn the receiver thread
     // so, we need to add the fields again (it does not harm)
     ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
-        ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
+        ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
+        ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
         ND_LOG_FIELD_TXT(NDF_NIDL_NODE, (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""),
         ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
         ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_from_child_msgid),
@@ -28,8 +28,7 @@ void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, con
 
     nd_log(NDLS_DAEMON, priority, "STREAM RCV '%s' [from [%s]:%s]: %s %s%s%s"
            , (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""
-           , rpt->client_ip, rpt->client_port
-           , msg
+           , rpt->remote_ip, rpt->remote_port, msg
            , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?" (":""
            , stream_handshake_error_to_string(rpt->exit.reason)
            , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?")":""
@@ -54,18 +53,31 @@ void stream_receiver_free(struct receiver_state *rpt) {
     freez(rpt->os);
     freez(rpt->timezone);
     freez(rpt->abbrev_timezone);
-    freez(rpt->client_ip);
-    freez(rpt->client_port);
+    freez(rpt->remote_ip);
+    freez(rpt->remote_port);
     freez(rpt->program_name);
     freez(rpt->program_version);
+
+    string_freez(rpt->config.send.api_key);
+    string_freez(rpt->config.send.parents);
+    string_freez(rpt->config.send.charts_matching);
+
+    buffer_free(rpt->thread.line_buffer);
+    rpt->thread.line_buffer = NULL;
 
     freez(rpt->thread.compressed.buf);
     rpt->thread.compressed.buf = NULL;
     rpt->thread.compressed.size = 0;
 
-    string_freez(rpt->config.send.api_key);
-    string_freez(rpt->config.send.parents);
-    string_freez(rpt->config.send.charts_matching);
+    rpt->thread.send_to_child.msg.session = 0;
+    rpt->thread.send_to_child.msg.meta = NULL;
+    stream_circular_buffer_destroy(rpt->thread.send_to_child.scb);
+    rpt->thread.send_to_child.scb = NULL;
+
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+    if(rpt->log.fp)
+        fclose(rpt->log.fp);
+#endif
 
     freez(rpt);
 }
@@ -89,7 +101,7 @@ static int stream_receiver_response_too_busy_now(struct web_client *w) {
 }
 
 static void stream_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
-    rpt->sock.fd = w->ifd;
+    rpt->sock.fd = w->fd;
     rpt->sock.ssl = w->ssl;
 
     w->ssl = NETDATA_SSL_UNSET_CONNECTION;
@@ -99,12 +111,8 @@ static void stream_receiver_takeover_web_connection(struct web_client *w, struct
     if(web_server_mode == WEB_SERVER_MODE_STATIC_THREADED) {
         web_client_flag_set(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET);
     }
-    else {
-        if(w->ifd == w->ofd)
-            w->ifd = w->ofd = -1;
-        else
-            w->ifd = -1;
-    }
+    else
+        w->fd = -1;
 
     buffer_flush(w->response.data);
 }
@@ -189,9 +197,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
                      "client willing to stream metrics for host '%s' with machine_guid '%s': "
                      "update every = %d, history = %d, memory mode = %s, health %s,%s"
                      , rpt->hostname
-                     , rpt->client_ip
-                     , rpt->client_port
-                     , rrdhost_hostname(rpt->host)
+                     , rpt->remote_ip, rpt->remote_port, rrdhost_hostname(rpt->host)
                          , rpt->host->machine_guid
                      , rpt->host->rrd_update_every
                      , rpt->host->rrd_history_entries
@@ -231,10 +237,10 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
 #endif
         {
             // remove the non-blocking flag from the socket
-            if(sock_delnonblock(rpt->sock.fd) < 0)
+            if(sock_setnonblock(rpt->sock.fd, false) != 0)
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "STREAM RCV '%s' [from [%s]:%s]: cannot remove the non-blocking flag from socket %d",
-                       rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
+                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
 
             struct timeval timeout;
             timeout.tv_sec = 600;
@@ -242,10 +248,10 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             if (unlikely(setsockopt(rpt->sock.fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) != 0))
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "STREAM RCV '%s' [from [%s]:%s]: cannot set timeout for socket %d",
-                       rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
+                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
         }
 
-        netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
+        netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->remote_ip, initial_response);
 #ifdef ENABLE_H2O
         if (is_h2o_rrdpush(rpt)) {
             h2o_stream_write(rpt->h2o_ctx, initial_response, strlen(initial_response));
@@ -279,7 +285,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     rpt->thread.compressed.size = COMPRESSION_MAX_CHUNK;
     rpt->thread.compressed.buf = mallocz(rpt->thread.compressed.size);
     rpt->connected_since_s = now_realtime_sec();
-    rpt->last_msg_t = now_monotonic_sec();
+    rpt->thread.last_traffic_ut = now_monotonic_usec();
     rpt->hops = 1;
 
     rpt->capabilities = STREAM_CAP_INVALID;
@@ -294,10 +300,10 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     rrdhost_system_info_hops_set(rpt->system_info, rpt->hops);
 
     nd_sock_init(&rpt->sock, netdata_ssl_web_server_ctx, false);
-    rpt->client_ip         = strdupz(w->client_ip);
-    rpt->client_port       = strdupz(w->client_port);
+    rpt->remote_ip = strdupz(w->client_ip);
+    rpt->remote_port = strdupz(w->client_port);
 
-    rpt->config.update_every = default_rrd_update_every;
+    rpt->config.update_every = nd_profile.update_every;
 
     // parse the parameters and fill rpt and rpt->system_info
 
@@ -380,8 +386,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
                 nd_log_daemon(NDLP_NOTICE, "STREAM RCV '%s' [from [%s]:%s]: "
                                            "request has parameter '%s' = '%s', which is not used."
                               , (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-"
-                              , rpt->client_ip, rpt->client_port
-                              , name, value);
+                              , rpt->remote_ip, rpt->remote_port, name, value);
             }
         }
     }
@@ -540,8 +545,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             (ssize_t)strlen(initial_response)) {
 
             nd_log_daemon(NDLP_ERR, "STREAM RCV '%s' [from [%s]:%s]: failed to reply.",
-                          rpt->hostname, rpt->client_ip, rpt->client_port
-            );
+                          rpt->hostname, rpt->remote_ip, rpt->remote_port);
         }
 
         stream_receiver_free(rpt);
@@ -598,7 +602,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         if (host) {
             rrdhost_receiver_lock(host);
             if (host->receiver) {
-                age = now_monotonic_sec() - host->receiver->last_msg_t;
+                age =(time_t)((now_monotonic_usec() - host->receiver->thread.last_traffic_ut) / USEC_PER_SEC);
 
                 if (age < 30)
                     receiver_working = true;
@@ -618,8 +622,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             nd_log_daemon(NDLP_NOTICE, "STREAM '%s' [receive from [%s]:%s]: "
                                        "stopped previous stale receiver to accept this one."
                           , rpt->hostname
-                          , rpt->client_ip, rpt->client_port
-            );
+                          , rpt->remote_ip, rpt->remote_port);
         }
 
         if (receiver_working || receiver_stale) {

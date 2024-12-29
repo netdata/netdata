@@ -2,25 +2,31 @@
 
 #include "libnetdata/libnetdata.h"
 
+static inline void poll_process_updated_events(POLLINFO *pi) {
+    if(pi->events != pi->events_we_wait_for) {
+        if(!nd_poll_upd(pi->p->ndpl, pi->fd, pi->events, pi))
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to update socket %d to nd_poll", pi->fd);
+        pi->events_we_wait_for = pi->events;
+    }
+}
+
 // poll() based listener
 // this should be the fastest possible listener for up to 100 sockets
 // above 100, an epoll() interface is needed on Linux
 
-#define POLL_FDS_INCREASE_STEP 10
-
-inline POLLINFO *poll_add_fd(POLLJOB *p
-                             , int fd
-                             , int socktype
-                             , HTTP_ACL port_acl
-                             , uint32_t flags
-                             , const char *client_ip
-                             , const char *client_port
-                             , const char *client_host
-                             , void *(*add_callback)(POLLINFO * /*pi*/, short int * /*events*/, void * /*data*/)
-                                 , void  (*del_callback)(POLLINFO * /*pi*/)
-                                 , int   (*rcv_callback)(POLLINFO * /*pi*/, short int * /*events*/)
-                                 , int   (*snd_callback)(POLLINFO * /*pi*/, short int * /*events*/)
-                                 , void *data
+POLLINFO *poll_add_fd(POLLJOB *p
+                      , int fd
+                      , int socktype
+                      , HTTP_ACL port_acl
+                      , uint32_t flags
+                      , const char *client_ip
+                      , const char *client_port
+                      , const char *client_host
+                      , poll_events_add_callback_t add_callback
+                      , poll_events_del_callback_t del_callback
+                      , poll_events_rcv_callback_t rcv_callback
+                      , poll_events_snd_callback_t snd_callback
+                      , void *data
 ) {
     if(unlikely(fd < 0)) return NULL;
 
@@ -30,56 +36,14 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     //    return NULL;
     //}
 
-    if(unlikely(!p->first_free)) {
-        size_t new_slots = p->slots + POLL_FDS_INCREASE_STEP;
-
-        p->fds = reallocz(p->fds, sizeof(struct pollfd) * new_slots);
-        p->inf = reallocz(p->inf, sizeof(POLLINFO) * new_slots);
-
-        // reset all the newly added slots
-        ssize_t i;
-        for(i = new_slots - 1; i >= (ssize_t)p->slots ; i--) {
-            p->fds[i].fd = -1;
-            p->fds[i].events = 0;
-            p->fds[i].revents = 0;
-
-            p->inf[i].p = p;
-            p->inf[i].slot = (size_t)i;
-            p->inf[i].flags = 0;
-            p->inf[i].socktype = -1;
-            p->inf[i].port_acl = -1;
-
-            p->inf[i].client_ip = NULL;
-            p->inf[i].client_port = NULL;
-            p->inf[i].client_host = NULL;
-            p->inf[i].del_callback = p->del_callback;
-            p->inf[i].rcv_callback = p->rcv_callback;
-            p->inf[i].snd_callback = p->snd_callback;
-            p->inf[i].data = NULL;
-
-            // link them so that the first free will be earlier in the array
-            // (we loop decrementing i)
-            p->inf[i].next = p->first_free;
-            p->first_free = &p->inf[i];
-        }
-
-        p->slots = new_slots;
-    }
-
-    POLLINFO *pi = p->first_free;
-    p->first_free = p->first_free->next;
-
-    struct pollfd *pf = &p->fds[pi->slot];
-    pf->fd = fd;
-    pf->events = POLLIN;
-    pf->revents = 0;
+    POLLINFO *pi = callocz(1, sizeof(*pi));
 
     pi->fd = fd;
+    pi->events = ND_POLL_READ;
     pi->p = p;
     pi->socktype = socktype;
     pi->port_acl = port_acl;
     pi->flags = flags;
-    pi->next = NULL;
     pi->client_ip   = strdupz(client_ip);
     pi->client_port = strdupz(client_port);
     pi->client_host = strdupz(client_host);
@@ -96,81 +60,48 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     pi->send_count = 0;
 
     p->used++;
-    if(unlikely(pi->slot > p->max))
-        p->max = pi->slot;
 
-    if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
-        pi->data = add_callback(pi, &pf->events, data);
-    }
+    if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)
+        pi->data = add_callback(pi, &pi->events, data);
 
-    if(pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
-        p->min = pi->slot;
-    }
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(p->ll, pi, prev, next);
+    pi->events_we_wait_for = pi->events;
+    if(!nd_poll_add(pi->p->ndpl, pi->fd, pi->events, pi))
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to add socket %d to nd_poll", pi->fd);
 
     return pi;
 }
 
-inline void poll_close_fd(POLLINFO *pi) {
+static inline void poll_close_fd(POLLINFO *pi, const char *func) {
     POLLJOB *p = pi->p;
 
-    struct pollfd *pf = &p->fds[pi->slot];
-
-    if(unlikely(pf->fd == -1)) return;
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->ll, pi, prev, next);
+    if(!nd_poll_del(p->ndpl, pi->fd, pi))
+        // this is ok, if the socket is already closed
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "Failed to delete socket %d from nd_poll() - called from %s() - is the socket already closed?",
+               pi->fd, func);
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
         pi->del_callback(pi);
 
         if(likely(!(pi->flags & POLLINFO_FLAG_DONT_CLOSE))) {
-            if(close(pf->fd) == -1)
+            if(close(pi->fd) == -1)
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "Failed to close() poll_events() socket %d",
-                       pf->fd);
+                       pi->fd);
         }
     }
-
-    pf->fd = -1;
-    pf->events = 0;
-    pf->revents = 0;
-
-    pi->fd = -1;
-    pi->socktype = -1;
-    pi->flags = 0;
-    pi->data = NULL;
-
-    pi->del_callback = NULL;
-    pi->rcv_callback = NULL;
-    pi->snd_callback = NULL;
 
     freez(pi->client_ip);
-    pi->client_ip = NULL;
-
     freez(pi->client_port);
-    pi->client_port = NULL;
-
     freez(pi->client_host);
-    pi->client_host = NULL;
-
-    pi->next = p->first_free;
-    p->first_free = pi;
+    freez(pi);
 
     p->used--;
-    if(unlikely(p->max == pi->slot)) {
-        p->max = p->min;
-        ssize_t i;
-        for(i = (ssize_t)pi->slot; i > (ssize_t)p->min ;i--) {
-            if (unlikely(p->fds[i].fd != -1)) {
-                p->max = (size_t)i;
-                break;
-            }
-        }
-    }
 }
 
-void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data) {
-    (void)pi;
-    (void)events;
-    (void)data;
-
+void *poll_default_add_callback(POLLINFO *pi __maybe_unused, nd_poll_event_t *events __maybe_unused, void *data __maybe_unused) {
     return NULL;
 }
 
@@ -180,8 +111,8 @@ void poll_default_del_callback(POLLINFO *pi) {
                "POLLFD: internal error: del_callback_default() called with data pointer - possible memory leak");
 }
 
-int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
-    *events |= POLLIN;
+int poll_default_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
+    *events |= ND_POLL_READ;
 
     char buffer[1024 + 1];
 
@@ -208,8 +139,8 @@ int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
     return 0;
 }
 
-int poll_default_snd_callback(POLLINFO *pi, short int *events) {
-    *events &= ~POLLOUT;
+int poll_default_snd_callback(POLLINFO *pi, nd_poll_event_t *events) {
+    *events &= ~ND_POLL_WRITE;
 
     nd_log(NDLS_DAEMON, NDLP_WARNING,
            "POLLFD: internal error: poll_default_snd_callback(): nothing to send on socket %d",
@@ -226,16 +157,17 @@ static void poll_events_cleanup(void *pptr) {
     POLLJOB *p = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!p) return;
 
-    for(size_t i = 0 ; i <= p->max ; i++) {
-        POLLINFO *pi = &p->inf[i];
-        poll_close_fd(pi);
+    while(p->ll) {
+        POLLINFO *pi = p->ll;
+        pi->flags &= ~(POLLINFO_FLAG_DONT_CLOSE);
+        poll_close_fd(pi, __FUNCTION__ );
     }
 
-    freez(p->fds);
-    freez(p->inf);
+    nd_poll_destroy(p->ndpl);
+    p->ndpl = NULL;
 }
 
-static int poll_process_error(POLLINFO *pi, struct pollfd *pf, short int revents) {
+static int poll_process_error(POLLINFO *pi, nd_poll_event_t revents) {
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_TXT(NDF_SRC_IP, pi->client_ip),
         ND_LOG_FIELD_TXT(NDF_SRC_PORT, pi->client_port),
@@ -244,62 +176,50 @@ static int poll_process_error(POLLINFO *pi, struct pollfd *pf, short int revents
     ND_LOG_STACK_PUSH(lgs);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "POLLFD: LISTENER: received %s %s %s on socket at slot %zu (fd %d) client '%s' port '%s' expecting %s %s %s, having %s %s %s"
-           , revents & POLLERR  ? "POLLERR" : ""
-           , revents & POLLHUP  ? "POLLHUP" : ""
-           , revents & POLLNVAL ? "POLLNVAL" : ""
-           , pi->slot
+           "POLLFD: LISTENER: received %s %s %s on socket %d client '%s' port '%s' expecting %s %s, having %s %s"
+           , revents & ND_POLL_ERROR  ? "ERROR" : ""
+           , revents & ND_POLL_HUP  ? "HUP" : ""
+           , revents & ND_POLL_INVALID ? "INVALID" : ""
            , pi->fd
            , pi->client_ip ? pi->client_ip : "<undefined-ip>"
            , pi->client_port ? pi->client_port : "<undefined-port>"
-           , pf->events & POLLIN ? "POLLIN" : "", pf->events & POLLOUT ? "POLLOUT" : "", pf->events & POLLPRI ? "POLLPRI" : ""
-           , revents & POLLIN ? "POLLIN" : "", revents & POLLOUT ? "POLLOUT" : "", revents & POLLPRI ? "POLLPRI" : ""
+           , pi->events & ND_POLL_READ ? "READ" : "", pi->events & ND_POLL_WRITE ? "WRITE" : ""
+           , revents & ND_POLL_READ ? "READ" : "", revents & ND_POLL_WRITE ? "WRITE" : ""
     );
 
-    pf->events = 0;
-    poll_close_fd(pi);
+    poll_close_fd(pi, __FUNCTION__ );
     return 1;
 }
 
-static inline int poll_process_send(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, time_t now) {
+static inline int poll_process_send(POLLINFO *pi, time_t now) {
     pi->last_sent_t = now;
     pi->send_count++;
 
-    pf->events = 0;
+    pi->events = 0;
 
-    // remember the slot, in case we need to close it later
-    // the callback may manipulate the socket list and our pf and pi pointers may be invalid after that call
-    size_t slot = pi->slot;
-
-    if (unlikely(pi->snd_callback(pi, &pf->events) == -1))
-        poll_close_fd(&p->inf[slot]);
-
-    // IMPORTANT:
-    // pf and pi may be invalid below this point, they may have been reallocated.
+    if (unlikely(pi->snd_callback(pi, &pi->events) == -1))
+        poll_close_fd(pi, __FUNCTION__ );
+    else
+        poll_process_updated_events(pi);
 
     return 1;
 }
 
-static inline int poll_process_tcp_read(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, time_t now) {
+static inline int poll_process_tcp_read(POLLINFO *pi, time_t now) {
     pi->last_received_t = now;
     pi->recv_count++;
 
-    pf->events = 0;
+    pi->events = 0;
 
-    // remember the slot, in case we need to close it later
-    // the callback may manipulate the socket list and our pf and pi pointers may be invalid after that call
-    size_t slot = pi->slot;
-
-    if (pi->rcv_callback(pi, &pf->events) == -1)
-        poll_close_fd(&p->inf[slot]);
-
-    // IMPORTANT:
-    // pf and pi may be invalid below this point, they may have been reallocated.
+    if (pi->rcv_callback(pi, &pi->events) == -1)
+        poll_close_fd(pi, __FUNCTION__ );
+    else
+        poll_process_updated_events(pi);
 
     return 1;
 }
 
-static inline int poll_process_udp_read(POLLINFO *pi, struct pollfd *pf, time_t now __maybe_unused) {
+static inline int poll_process_udp_read(POLLINFO *pi, time_t now __maybe_unused) {
     pi->last_received_t = now;
     pi->recv_count++;
 
@@ -307,17 +227,19 @@ static inline int poll_process_udp_read(POLLINFO *pi, struct pollfd *pf, time_t 
     // but checking the access list on every UDP packet will destroy
     // performance, especially for statsd.
 
-    pf->events = 0;
-    if(pi->rcv_callback(pi, &pf->events) == -1)
+    pi->events = 0;
+
+    if(pi->rcv_callback(pi, &pi->events) == -1)
         return 0;
-
-    // IMPORTANT:
-    // pf and pi may be invalid below this point, they may have been reallocated.
-
-    return 1;
+    else {
+        poll_process_updated_events(pi);
+        return 1;
+    }
 }
 
-static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, time_t now) {
+static int poll_process_new_tcp_connection(POLLINFO *pi, time_t now) {
+    POLLJOB *p = pi->p;
+
     pi->last_received_t = now;
     pi->recv_count++;
 
@@ -332,7 +254,7 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
 #endif
 
     int nfd = accept_socket(
-        pf->fd, flags,
+        pi->fd, flags,
         client_ip, INET6_ADDRSTRLEN, client_port,NI_MAXSERV, client_host, NI_MAXHOST,
         p->access_list, p->allow_dns
     );
@@ -358,6 +280,12 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
                    "POLLFD: LISTENER: accept() failed.");
 
     }
+    else if(is_socket_closed(nfd)) {
+        nd_log_limit_static_global_var(erl, 10, 1000);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                     "POLLFD: LISTENER: received client socket %d is closed on accept(), dropping connection", nfd);
+            close(nfd);
+    }
     else {
         // accept ok
 
@@ -376,9 +304,6 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
                     , NULL
         );
 
-        // IMPORTANT:
-        // pf and pi may be invalid below this point, they may have been reallocated.
-
         return 1;
     }
 
@@ -386,13 +311,13 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
 }
 
 void poll_events(LISTEN_SOCKETS *sockets
-                 , void *(*add_callback)(POLLINFO * /*pi*/, short int * /*events*/, void * /*data*/)
-                     , void  (*del_callback)(POLLINFO * /*pi*/)
-                     , int   (*rcv_callback)(POLLINFO * /*pi*/, short int * /*events*/)
-                     , int   (*snd_callback)(POLLINFO * /*pi*/, short int * /*events*/)
-                     , void  (*tmr_callback)(void * /*timer_data*/)
-                     , bool  (*check_to_stop_callback)(void)
-                     , SIMPLE_PATTERN *access_list
+                 , poll_events_add_callback_t add_callback
+                 , poll_events_del_callback_t del_callback
+                 , poll_events_rcv_callback_t rcv_callback
+                 , poll_events_snd_callback_t snd_callback
+                 , poll_events_tmr_callback_t tmr_callback
+                 , bool  (*check_to_stop_callback)(void)
+                 , SIMPLE_PATTERN *access_list
                  , int allow_dns
                  , void *data
                  , time_t tcp_request_timeout_seconds
@@ -412,13 +337,9 @@ void poll_events(LISTEN_SOCKETS *sockets
     int retval;
 
     POLLJOB p = {
-        .slots = 0,
+        .ndpl = nd_poll_create(),
         .used = 0,
-        .max = 0,
         .limit = max_tcp_sockets,
-        .fds = NULL,
-        .inf = NULL,
-        .first_free = NULL,
 
         .complete_request_timeout = tcp_request_timeout_seconds,
         .idle_timeout = tcp_idle_timeout_seconds,
@@ -496,21 +417,20 @@ void poll_events(LISTEN_SOCKETS *sockets
                    "%s listening sockets (used TCP sockets %zu, max allowed for this worker %zu)",
                    (listen_sockets_active)?"ENABLING":"DISABLING", p.used, p.limit);
 
-            for (i = 0; i <= p.max; i++) {
-                if(p.inf[i].flags & POLLINFO_FLAG_SERVER_SOCKET && p.inf[i].socktype == SOCK_STREAM) {
-                    p.fds[i].events = (short int) ((listen_sockets_active) ? POLLIN : 0);
+            for(POLLINFO *pi = p.ll; pi ; pi = pi->next) {
+                if((pi->flags & POLLINFO_FLAG_SERVER_SOCKET) && pi->socktype == SOCK_STREAM) {
+                    pi->events =  (short int) ((listen_sockets_active) ? ND_POLL_READ : 0);
+                    poll_process_updated_events(pi);
                 }
             }
         }
 
-        retval = poll(p.fds, p.max + 1, ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS);
+        nd_poll_result_t result;
+        retval = nd_poll_wait(p.ndpl, ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS, &result);
         time_t now = now_boottime_sec();
 
         if(unlikely(retval == -1)) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "POLLFD: LISTENER: poll() failed while waiting on %zu sockets.",
-                   p.max + 1);
-
+            nd_log(NDLS_DAEMON, NDLP_ERR, "POLLFD: LISTENER: nd_poll_wait() failed.");
             break;
         }
         else if(unlikely(!retval)) {
@@ -518,125 +438,61 @@ void poll_events(LISTEN_SOCKETS *sockets
             ;
         }
         else {
-            POLLINFO *pi;
-            struct pollfd *pf;
-            size_t idx, processed = 0;
-            short int revents;
+            POLLINFO *pi = result.data;
 
-            // keep fast lookup arrays per function
-            // to avoid looping through the entire list every time
-            size_t sends[p.max + 1], sends_max = 0;
-            size_t reads[p.max + 1], reads_max = 0;
-            size_t conns[p.max + 1], conns_max = 0;
-            size_t udprd[p.max + 1], udprd_max = 0;
+            if(result.events & (ND_POLL_HUP | ND_POLL_INVALID | ND_POLL_ERROR))
+                poll_process_error(pi, result.events);
 
-            for (i = 0; i <= p.max; i++) {
-                pi = &p.inf[i];
-                pf = &p.fds[i];
-                revents = pf->revents;
+            else if(result.events & ND_POLL_WRITE) {
+                poll_process_send(pi, now);
+            }
 
-                if(unlikely(revents == 0 || pf->fd == -1))
-                    continue;
-
-                if (unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
-                    // something is wrong to one of our sockets
-
-                    pf->revents = 0;
-                    processed += poll_process_error(pi, pf, revents);
-                }
-                else if (likely(revents & POLLOUT)) {
-                    // a client is ready to receive data
-
-                    sends[sends_max++] = i;
-                }
-                else if (likely(revents & (POLLIN|POLLPRI))) {
-                    if (pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
-                        // a client sent data to us
-
-                        reads[reads_max++] = i;
-                    }
-                    else if (pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
-                        // something is coming to our server sockets
-
-                        if(pi->socktype == SOCK_DGRAM) {
-                            // UDP receive, directly on our listening socket
-
-                            udprd[udprd_max++] = i;
-                        }
-                        else if(pi->socktype == SOCK_STREAM) {
-                            // new TCP connection
-
-                            conns[conns_max++] = i;
-                        }
-                        else
-                            nd_log(NDLS_DAEMON, NDLP_ERR,
-                                   "POLLFD: LISTENER: server slot %zu (fd %d) connection from %s port %s using unhandled socket type %d."
-                                   , i
-                                   , pi->fd
-                                   , pi->client_ip ? pi->client_ip : "<undefined-ip>"
-                                   , pi->client_port ? pi->client_port : "<undefined-port>"
-                                   , pi->socktype
-                            );
-                    }
-                    else
+            else if(result.events & ND_POLL_READ) {
+                if (pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
+                    if (pi->socktype == SOCK_DGRAM)
+                        poll_process_udp_read(pi, now);
+                    else if (pi->socktype == SOCK_STREAM)
+                        poll_process_tcp_read(pi, now);
+                    else {
                         nd_log(NDLS_DAEMON, NDLP_ERR,
-                               "POLLFD: LISTENER: client slot %zu (fd %d) data from %s port %s using flags %08X is neither client nor server."
-                               , i
-                               , pi->fd
-                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
-                               , pi->client_port ? pi->client_port : "<undefined-port>"
-                               , pi->flags
-                        );
+                               "POLLFD: LISTENER: server slot %zu (fd %d) connection from %s port %s using unhandled socket type %d.",
+                               i,
+                               pi->fd,
+                               pi->client_ip ? pi->client_ip : "<undefined-ip>",
+                               pi->client_port ? pi->client_port : "<undefined-port>",
+                               pi->socktype);
+
+                        poll_close_fd(pi, "poll_events1");
+                    }
                 }
-                else
+                else if (pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
+                    if(!p.limit || p.used < p.limit)
+                        poll_process_new_tcp_connection(pi, now);
+                }
+                else {
                     nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "POLLFD: LISTENER: socket slot %zu (fd %d) client %s port %s unhandled event id %d."
+                           "POLLFD: LISTENER: client slot %zu (fd %d) data from %s port %s using flags %08X is neither client nor server."
                            , i
                            , pi->fd
                            , pi->client_ip ? pi->client_ip : "<undefined-ip>"
                            , pi->client_port ? pi->client_port : "<undefined-port>"
-                           , revents
+                           , pi->flags
                     );
-            }
 
-            // process sends
-            for (idx = 0; idx < sends_max; idx++) {
-                i = sends[idx];
-                pi = &p.inf[i];
-                pf = &p.fds[i];
-                pf->revents = 0;
-                processed += poll_process_send(&p, pi, pf, now);
-            }
-
-            // process UDP reads
-            for (idx = 0; idx < udprd_max; idx++) {
-                i = udprd[idx];
-                pi = &p.inf[i];
-                pf = &p.fds[i];
-                pf->revents = 0;
-                processed += poll_process_udp_read(pi, pf, now);
-            }
-
-            // process TCP reads
-            for (idx = 0; idx < reads_max; idx++) {
-                i = reads[idx];
-                pi = &p.inf[i];
-                pf = &p.fds[i];
-                pf->revents = 0;
-                processed += poll_process_tcp_read(&p, pi, pf, now);
-            }
-
-            if(!processed && (!p.limit || p.used < p.limit)) {
-                // nothing processed above (rcv, snd) and we have room for another TCP connection
-                // so, accept one TCP connection
-                for (idx = 0; idx < conns_max; idx++) {
-                    i = conns[idx];
-                    pi = &p.inf[i];
-                    pf = &p.fds[i];
-                    pf->revents = 0;
-                    if (poll_process_new_tcp_connection(&p, pi, pf, now))
-                        break;
+                    poll_close_fd(pi, "poll_events2");
                 }
+            }
+            else {
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "POLLFD: LISTENER: socket slot %zu (fd %d) client %s port %s unhandled event id %d."
+                       , i
+                       , pi->fd
+                       , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+                       , pi->client_port ? pi->client_port : "<undefined-port>"
+                       , (int)result.events
+                );
+
+                poll_close_fd(pi, "poll_events3");
             }
         }
 
@@ -644,8 +500,9 @@ void poll_events(LISTEN_SOCKETS *sockets
             last_check = now;
 
             // cleanup old sockets
-            for(i = 0; i <= p.max; i++) {
-                POLLINFO *pi = &p.inf[i];
+            POLLINFO *pi, *next = NULL;
+            for(pi = p.ll; pi ; pi = next) {
+                next = pi->next;
 
                 if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
                     if (unlikely(pi->send_count == 0 && p.complete_request_timeout > 0 && (now - pi->connected_t) >= p.complete_request_timeout)) {
@@ -657,7 +514,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                                , pi->client_port ? pi->client_port : "<undefined-port>"
                                , (size_t) p.complete_request_timeout
                         );
-                        poll_close_fd(pi);
+                        poll_close_fd(pi, "poll_events4");
                     }
                     else if(unlikely(pi->recv_count && p.idle_timeout > 0 && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
                         nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -668,7 +525,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                                , pi->client_port ? pi->client_port : "<undefined-port>"
                                , (size_t) p.idle_timeout
                         );
-                        poll_close_fd(pi);
+                        poll_close_fd(pi, "poll_events5");
                     }
                 }
             }

@@ -3,11 +3,11 @@
 #include "backfill.h"
 
 struct backfill_request {
-    size_t rrdhost_receiver_state_id;
+    OBJECT_STATE_ID host_state_id;
     RRDSET_ACQUIRED *rsa;
-    uint32_t works;
-    uint32_t successful;
-    uint32_t failed;
+    int32_t works;
+    int32_t successful;
+    int32_t failed;
     backfill_callback_t cb;
     struct backfill_request_data data;
 };
@@ -28,6 +28,9 @@ static struct {
     size_t queue_size;
     BACKFILL_JudyLSet queue;
 
+    size_t charts_added;
+    size_t callbacks_executed;
+
     ARAL *ar_br;
     ARAL *ar_bdm;
 
@@ -46,9 +49,9 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
     struct backfill_dim_work *array[dimensions];
 
     if(backfill_globals.running) {
-        struct backfill_request *br = aral_mallocz(backfill_globals.ar_br);
+        struct backfill_request *br = aral_callocz(backfill_globals.ar_br);
         br->data = *data;
-        br->rrdhost_receiver_state_id = rrdhost_state_id(st->rrdhost);
+        br->host_state_id = object_state_id(&st->rrdhost->state_id);
         br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id));
         if(br->rsa) {
             br->cb = cb;
@@ -59,7 +62,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
                     break;
 
                 if (!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
-                    struct backfill_dim_work *bdm = aral_mallocz(backfill_globals.ar_bdm);
+                    struct backfill_dim_work *bdm = aral_callocz(backfill_globals.ar_bdm);
                     bdm->rda = (RRDDIM_ACQUIRED *)dictionary_acquired_item_dup(st->rrddim_root_index, rd_dfe.item);
                     bdm->br = br;
                     br->works++;
@@ -69,8 +72,12 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
             rrddim_foreach_done(rd);
         }
 
+        internal_fatal((size_t)br->works != added, "works and added are not the same");
+
         if(added) {
             spinlock_lock(&backfill_globals.spinlock);
+
+            __atomic_add_fetch(&backfill_globals.charts_added, 1, __ATOMIC_RELAXED);
 
             for(size_t i = 0; i < added ;i++) {
                 backfill_globals.queue_size++;
@@ -95,20 +102,20 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
 bool backfill_execute(struct backfill_dim_work *bdm) {
     RRDSET *st = rrdset_acquired_to_rrdset(bdm->br->rsa);
 
-    if(!rrdhost_state_acquire(st->rrdhost, bdm->br->rrdhost_receiver_state_id))
+    if(!object_state_acquire(&st->rrdhost->state_id, bdm->br->host_state_id))
         return false;
 
     size_t success = 0;
     RRDDIM *rd = rrddim_acquired_to_rrddim(bdm->rda);
 
-    for (size_t tier = 1; tier < storage_tiers; tier++)
+    for (size_t tier = 1; tier < nd_profile.storage_tiers; tier++)
         if (backfill_tier_from_smaller_tiers(rd, tier, now_realtime_sec()))
             success++;
 
     if (success > 0)
         rrddim_option_set(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS);
 
-    rrdhost_state_release(st->rrdhost);
+    object_state_release(&st->rrdhost->state_id);
     return success > 0;
 }
 
@@ -120,12 +127,20 @@ static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bd
     else
         __atomic_add_fetch(&br->failed, 1, __ATOMIC_RELAXED);
 
-    uint32_t works = __atomic_sub_fetch(&br->works, 1, __ATOMIC_RELAXED);
-    if(!works) {
-        if(br->cb)
-            br->cb(__atomic_load_n(&br->successful, __ATOMIC_RELAXED),
-                   __atomic_load_n(&br->failed, __ATOMIC_RELAXED),
-                   &br->data);
+    int32_t works = __atomic_sub_fetch(&br->works, 1, __ATOMIC_RELAXED);
+    internal_fatal(works < 0, "negative backfill jobs");
+
+    if(works == 0) {
+        // we are the last dimension of the chart
+
+        if(br->cb) {
+            __atomic_add_fetch(&backfill_globals.callbacks_executed, 1, __ATOMIC_RELAXED);
+
+            br->cb(
+                __atomic_load_n(&br->successful, __ATOMIC_RELAXED),
+                __atomic_load_n(&br->failed, __ATOMIC_RELAXED),
+                &br->data);
+        }
 
         rrdset_acquired_release(br->rsa);
         aral_freez(backfill_globals.ar_br, br);
@@ -135,7 +150,13 @@ static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bd
     aral_freez(backfill_globals.ar_bdm, bdm);
 }
 
-void *backfill_worker_thread(void *ptr __maybe_unused) {
+#define LOG_WARNING_EVERY 10
+
+void *backfill_worker_thread(void *ptr) {
+    bool main_thread = (ptr == (void *)0x01);
+    size_t warning = LOG_WARNING_EVERY;
+    bool timeout = false;
+
     worker_register("BACKFILL");
 
     worker_register_job_name(0, "get");
@@ -156,16 +177,31 @@ void *backfill_worker_thread(void *ptr __maybe_unused) {
         spinlock_unlock(&backfill_globals.spinlock);
 
         if(bdm) {
+            warning = LOG_WARNING_EVERY;
             worker_is_busy(1);
             bool success = backfill_execute(bdm);
             backfill_dim_work_free(success, bdm);
             continue;
         }
+        else if(main_thread && timeout) {
+            size_t added = __atomic_load_n(&backfill_globals.charts_added, __ATOMIC_RELAXED);
+            size_t executed = __atomic_load_n(&backfill_globals.callbacks_executed, __ATOMIC_RELAXED);
+
+            if(executed != added && --warning == 0) {
+                warning = LOG_WARNING_EVERY;
+
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "BACKFILL: the queue is empty, but the commands executed %zu is not equal to the commands added %zu",
+                       executed, added);
+            }
+        }
 
         worker_set_metric(2, (NETDATA_DOUBLE)queue_size);
 
         worker_is_idle();
-        job_id = completion_wait_for_a_job_with_timeout(&backfill_globals.completion, job_id, 1000);
+        size_t new_job_id = completion_wait_for_a_job_with_timeout(&backfill_globals.completion, job_id, 1000);
+        timeout = new_job_id == job_id;
+        job_id = new_job_id;
     }
 
     worker_unregister();
@@ -199,7 +235,7 @@ void *backfill_thread(void *ptr) {
         th[t] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, backfill_worker_thread, NULL);
     }
 
-    backfill_worker_thread(NULL);
+    backfill_worker_thread((void *)0x01);
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     for(size_t t = 0; t < threads - 1 ;t++) {
@@ -227,6 +263,3 @@ void *backfill_thread(void *ptr) {
     return NULL;
 }
 
-bool backfill_threads_detect_from_stream_conf(void) {
-    return stream_conf_is_parent(false);
-}

@@ -142,7 +142,7 @@ static void work_request_init(void) {
         0,
         0,
         NULL,
-        NULL, NULL, false, false
+        NULL, NULL, false, false, true
     );
 
     pulse_aral_register(rrdeng_main.work_cmd.ar, "workers");
@@ -263,7 +263,7 @@ void page_descriptors_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false);
+            NULL, NULL, false, false, true);
 
     pulse_aral_register(rrdeng_main.descriptors.ar, "descriptors");
 }
@@ -288,7 +288,7 @@ static void extent_io_descriptor_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false
+            NULL, NULL, false, false, true
             );
 
     pulse_aral_register(rrdeng_main.xt_io_descr.ar, "extent io");
@@ -314,7 +314,7 @@ void rrdeng_query_handle_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false);
+            NULL, NULL, false, false, true);
 
     pulse_aral_register(rrdeng_main.handles.ar, "query handles");
 }
@@ -359,7 +359,7 @@ static void wal_cleanup1(void) {
     if(!spinlock_trylock(&wal_globals.protected.spinlock))
         return;
 
-    if(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers) {
+    if(wal_globals.protected.available_items && wal_globals.protected.available > nd_profile.storage_tiers) {
         wal = wal_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
@@ -436,7 +436,7 @@ static void rrdeng_cmd_queue_init(void) {
                                            0,
                                            0,
                                            NULL,
-                                           NULL, NULL, false, false);
+                                           NULL, NULL, false, false, true);
 
     pulse_aral_register(rrdeng_main.cmd_queue.ar, "opcodes");
 }
@@ -1289,6 +1289,22 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         netdata_log_info("DBENGINE: deleted data file \"%s\".", path);
         deleted_bytes += datafile_bytes;
     }
+
+    {
+        rw_spinlock_write_lock(&datafile->extent_epdl.spinlock);
+        bool first = true;
+        Word_t idx = 0;
+        Pvoid_t *PValue;
+        while ((PValue = JudyLFirstThenNext(datafile->extent_epdl.epdl_per_extent, &idx, &first))) {
+            EPDL_EXTENT *e = *PValue;
+            internal_fatal(e->base, "The should not be any EPDLs ");
+            freez(e);
+            *PValue = NULL;
+        }
+        JudyLFreeArray(&datafile->extent_epdl.epdl_per_extent, PJE0);
+        rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
+    }
+
     freez(journal_file);
     freez(datafile);
 
@@ -1694,7 +1710,7 @@ static void retention_timer_cb(uv_timer_t *handle) {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
-    for (size_t tier = 0; tier < storage_tiers; tier++) {
+    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
         if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
             continue;
@@ -1831,7 +1847,7 @@ void calculate_tier_disk_space_percentage(void)
         return;
 
     uint64_t total_diskspace = 0;
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
         if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE) {
             tier_space[tier] = 0;
@@ -1845,7 +1861,7 @@ void calculate_tier_disk_space_percentage(void)
     }
 
     if (total_diskspace) {
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             multidb_ctx[tier]->config.disk_percentage = (100 * tier_space[tier] / total_diskspace);
         }
     }
@@ -1861,7 +1877,7 @@ void dbengine_retention_statistics(void)
 
     calculate_tier_disk_space_percentage();
 
-    for (size_t tier = 0; tier < storage_tiers; tier++) {
+    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
         if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
             continue;

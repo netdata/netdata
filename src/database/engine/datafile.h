@@ -38,6 +38,12 @@ typedef enum __attribute__ ((__packed__)) {
     DATAFILE_ACQUIRE_MAX,
 } DATAFILE_ACQUIRE_REASONS;
 
+struct extent_page_details_list;
+typedef struct {
+    SPINLOCK spinlock;
+    struct extent_page_details_list *base;
+} EPDL_EXTENT;
+
 /* only one event loop is supported for now */
 struct rrdengine_datafile {
     unsigned tier;
@@ -70,9 +76,9 @@ struct rrdengine_datafile {
     } users;
 
     struct {
-        SPINLOCK spinlock;
-        Pvoid_t pending_epdl_by_extent_offset_judyL;
-    } extent_queries;
+        RW_SPINLOCK spinlock;
+        Pvoid_t epdl_per_extent;
+    } extent_epdl;
 };
 
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);

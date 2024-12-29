@@ -2,11 +2,9 @@
 
 #include "netdata-conf-db.h"
 
-int default_rrd_update_every = UPDATE_EVERY;
 int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
-size_t storage_tiers = 3;
 bool dbengine_use_direct_io = true;
 static size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = {1, 60, 60, 60, 60};
 static double storage_tiers_retention_days[RRD_STORAGE_TIERS] = {14, 90, 2 * 365, 2 * 365, 2 * 365};
@@ -16,7 +14,7 @@ time_t rrdhost_free_orphan_time_s = 3600;
 time_t rrdhost_free_ephemeral_time_s = 86400;
 
 size_t get_tier_grouping(size_t tier) {
-    if(unlikely(tier >= storage_tiers)) tier = storage_tiers - 1;
+    if(unlikely(tier >= nd_profile.storage_tiers)) tier = nd_profile.storage_tiers - 1;
 
     size_t grouping = 1;
     // first tier is always 1 iteration of whatever update every the chart has
@@ -191,20 +189,20 @@ void netdata_conf_dbengine_init(const char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
     }
 
-    storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
-    if(storage_tiers < 1) {
+    nd_profile.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
+    if(nd_profile.storage_tiers < 1) {
         nd_log(NDLS_DAEMON, NDLP_WARNING, "At least 1 storage tier is required. Assuming 1.");
 
-        storage_tiers = 1;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
+        nd_profile.storage_tiers = 1;
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     }
-    if(storage_tiers > RRD_STORAGE_TIERS) {
+    if(nd_profile.storage_tiers > RRD_STORAGE_TIERS) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "Up to %d storage tier are supported. Assuming %d.",
                RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
 
-        storage_tiers = RRD_STORAGE_TIERS;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
+        nd_profile.storage_tiers = RRD_STORAGE_TIERS;
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     }
 
     new_dbengine_defaults =
@@ -221,10 +219,10 @@ void netdata_conf_dbengine_init(const char *hostname) {
     default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
     char dbengineconfig[200 + 1];
 
-    size_t grouping_iterations = default_rrd_update_every;
-    storage_tiers_grouping_iterations[0] = default_rrd_update_every;
+    size_t grouping_iterations = nd_profile.update_every;
+    storage_tiers_grouping_iterations[0] = nd_profile.update_every;
 
-    for (size_t tier = 1; tier < storage_tiers; tier++) {
+    for (size_t tier = 1; tier < nd_profile.storage_tiers; tier++) {
         grouping_iterations = storage_tiers_grouping_iterations[tier];
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
         grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
@@ -250,7 +248,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
     // fails on Windows.
     bool parallel_initialization = false;
 #else
-    bool parallel_initialization = (storage_tiers <= netdata_conf_cpus()) ? true : false;
+    bool parallel_initialization = (nd_profile.storage_tiers <= netdata_conf_cpus()) ? true : false;
 #endif
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
@@ -258,7 +256,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
 
-    for (size_t tier = 0; tier < storage_tiers; tier++) {
+    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
 
         if (tier == 0)
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
@@ -294,7 +292,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
             dbengine_tier_init(&tiers_init[tier]);
     }
 
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         if(parallel_initialization)
             nd_thread_join(tiers_init[tier].thread);
 
@@ -307,31 +305,32 @@ void netdata_conf_dbengine_init(const char *hostname) {
             created_tiers++;
     }
 
-    if(created_tiers && created_tiers < storage_tiers) {
+    if(created_tiers && created_tiers < nd_profile.storage_tiers) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "DBENGINE on '%s': Managed to create %zu tiers instead of %zu. Continuing with %zu available.",
-               hostname, created_tiers, storage_tiers, created_tiers);
+               hostname, created_tiers,
+            nd_profile.storage_tiers, created_tiers);
 
-        storage_tiers = created_tiers;
+        nd_profile.storage_tiers = created_tiers;
     }
     else if(!created_tiers)
         fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
 
-    for(size_t tier = 0; tier < storage_tiers ;tier++)
+    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++)
         rrdeng_readiness_wait(multidb_ctx[tier]);
 
     calculate_tier_disk_space_percentage();
 
     dbengine_enabled = true;
 #else
-    storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
-    if(storage_tiers != 1) {
+    nd_profile.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
+    if(nd_profile.storage_tiers != 1) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "DBENGINE is not available on '%s', so only 1 database tier can be supported.",
                hostname);
 
-        storage_tiers = 1;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
+        nd_profile.storage_tiers = 1;
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     }
     dbengine_enabled = false;
 #endif
@@ -350,11 +349,20 @@ void netdata_conf_section_db(void) {
     // ------------------------------------------------------------------------
     // get default database update frequency
 
-    default_rrd_update_every = (int) config_get_duration_seconds(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
-    if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
-        netdata_log_error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
-        default_rrd_update_every = UPDATE_EVERY;
-        config_set_duration_seconds(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
+    nd_profile.update_every = (int) config_get_duration_seconds(CONFIG_SECTION_DB, "update every", nd_profile.update_every);
+    if(nd_profile.update_every < UPDATE_EVERY_MIN) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Data collection frequency in netdata.conf ([" CONFIG_SECTION_DB "].update every), changed from %d to %d",
+               (int)nd_profile.update_every, UPDATE_EVERY_MIN);
+        nd_profile.update_every = UPDATE_EVERY_MIN;
+        config_set_duration_seconds(CONFIG_SECTION_DB, "update every", nd_profile.update_every);
+    }
+    if(nd_profile.update_every > UPDATE_EVERY_MAX) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Data collection frequency in netdata.conf ([" CONFIG_SECTION_DB "].update every), changed from %d to %d",
+               (int)nd_profile.update_every, UPDATE_EVERY_MIN);
+        nd_profile.update_every = UPDATE_EVERY_MAX;
+        config_set_duration_seconds(CONFIG_SECTION_DB, "update every", nd_profile.update_every);
     }
 
     // ------------------------------------------------------------------------

@@ -5,6 +5,10 @@
 
 #include "daemon/common.h"
 
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+#include "streaming/stream-receiver-internals.h"
+#endif
+
 #define WORKER_PARSER_FIRST_JOB 36
 
 // this has to be in-sync with the same at stream-thread.c
@@ -31,7 +35,9 @@ typedef enum __attribute__ ((__packed__)) parser_input_type {
 typedef enum __attribute__ ((__packed__)) {
     PARSER_INIT_PLUGINSD        = (1 << 1),
     PARSER_INIT_STREAMING       = (1 << 2),
-    PARSER_REP_METADATA         = (1 << 3),
+    PARSER_REP_REPLICATION      = (1 << 3),
+    PARSER_REP_METADATA         = (1 << 4),
+    PARSER_REP_DATA             = (1 << 5),
 } PARSER_REPERTOIRE;
 
 struct parser;
@@ -56,9 +62,8 @@ typedef struct parser_user_object {
     size_t data_collections_count;
     int enabled;
 
-#ifdef NETDATA_LOG_STREAM_RECEIVE
-    FILE *stream_log_fp;
-    PARSER_REPERTOIRE stream_log_repertoire;
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+    void *rpt;
 #endif
 
     STREAM_CAPABILITIES capabilities; // receiver capabilities
@@ -172,8 +177,8 @@ bool parser_reconstruct_instance(BUFFER *wb, void *ptr);
 bool parser_reconstruct_context(BUFFER *wb, void *ptr);
 
 static inline int parser_action(PARSER *parser, char *input) {
-#ifdef NETDATA_LOG_STREAM_RECEIVE
-    static __thread char line[PLUGINSD_LINE_MAX + 1];
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+    char line[1024];
     strncpyz(line, input, sizeof(line) - 1);
 #endif
 
@@ -222,11 +227,6 @@ static inline int parser_action(PARSER *parser, char *input) {
     if(likely(parser->keyword)) {
         worker_is_busy(parser->keyword->worker_job_id);
 
-#ifdef NETDATA_LOG_STREAM_RECEIVE
-        if(parser->user.stream_log_fp && parser->keyword->repertoire & parser->user.stream_log_repertoire)
-            fprintf(parser->user.stream_log_fp, "%s", line);
-#endif
-
         rc = parser_execute(parser, parser->keyword, parser->line.words, parser->line.num_words);
         // rc = (*t->func)(words, num_words, parser);
         worker_is_idle();
@@ -240,6 +240,11 @@ static inline int parser_action(PARSER *parser, char *input) {
         netdata_log_error("PLUGINSD: parser_action('%s') failed on line %zu: { %s } (quotes added to show parsing)",
                 command, parser->line.count, buffer_tostring(wb));
     }
+
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+    if((parser->keyword->repertoire & PARSER_REP_REPLICATION) && !(parser->keyword->repertoire & PARSER_REP_DATA))
+        stream_receiver_log_payload(parser->user.rpt, line, STREAM_TRAFFIC_TYPE_REPLICATION, true);
+#endif
 
     line_splitter_reset(&parser->line);
     return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);

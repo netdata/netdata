@@ -327,7 +327,7 @@ static RRDHOST *rrdhost_create(
     }
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
-    host->state_refcount = -1;
+    host->state_id = OBJECT_STATE_INIT_DEACTIVATED;
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
@@ -394,7 +394,7 @@ static RRDHOST *rrdhost_create(
                 return NULL;
         }
         else {
-            for(size_t tier = 0; tier < storage_tiers ; tier++) {
+            for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
                 host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
                 host->db[tier].eng = storage_engine_get(host->db[tier].mode);
                 host->db[tier].si = (STORAGE_INSTANCE *)multidb_ctx[tier];
@@ -413,7 +413,7 @@ static RRDHOST *rrdhost_create(
 
 #ifdef ENABLE_DBENGINE
         // the first tier is reserved for the non-dbengine modes
-        for(size_t tier = 1; tier < storage_tiers ; tier++) {
+        for(size_t tier = 1; tier < nd_profile.storage_tiers; tier++) {
             host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
             host->db[tier].eng = storage_engine_get(host->db[tier].mode);
             host->db[tier].si = (STORAGE_INSTANCE *) multidb_ctx[tier];
@@ -750,13 +750,14 @@ RRDHOST *rrdhost_find_or_create(
 
 bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s) {
     if(host != protected_host
-       && host != localhost
-       && rrdhost_receiver_replicating_charts(host) == 0
-       && rrdhost_sender_replicating_charts(host) == 0
-       && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
-       && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_HEALTH_RUNNING_NOW | RRDHOST_FLAG_COLLECTOR_ONLINE)
-       && host->stream.rcv.status.last_disconnected
-       && host->stream.rcv.status.last_disconnected + rrdhost_free_orphan_time_s < now_s)
+        && host != localhost
+        && rrdhost_receiver_replicating_charts(host) == 0
+        && rrdhost_sender_replicating_charts(host) == 0
+        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
+        && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_COLLECTOR_ONLINE)
+        && health_evloop_current_iteration() - rrdhost_health_evloop_last_iteration(host) > 10
+        && host->stream.rcv.status.last_disconnected
+        && host->stream.rcv.status.last_disconnected + rrdhost_free_orphan_time_s < now_s)
         return true;
 
     return false;
@@ -801,15 +802,15 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
             netdata_conf_dbengine_init(hostname);
         }
         else
-            storage_tiers = 1;
+            nd_profile.storage_tiers = 1;
 
         if (!dbengine_enabled) {
-            if (storage_tiers > 1) {
+            if (nd_profile.storage_tiers > 1) {
                 nd_log(NDLS_DAEMON, NDLP_WARNING,
                        "dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1",
-                       storage_tiers);
+                    nd_profile.storage_tiers);
 
-                storage_tiers = 1;
+                nd_profile.storage_tiers = 1;
             }
 
             if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
@@ -835,8 +836,8 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
             , netdata_configured_utc_offset
             , program_name
             , NETDATA_VERSION
-            , default_rrd_update_every
-            , default_rrd_history_entries
+            ,
+        nd_profile.update_every, default_rrd_history_entries
             , default_rrd_memory_mode
             , health_plugin_enabled()
             , stream_send.enabled
@@ -855,7 +856,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         return 1;
 
     rrdhost_flag_set(localhost, RRDHOST_FLAG_COLLECTOR_ONLINE);
-    rrdhost_state_connected(localhost);
+    object_state_activate(&localhost->state_id);
 
     ml_host_start(localhost);
     dyncfg_host_init(localhost);

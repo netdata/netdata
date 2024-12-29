@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "stream-sender-internals.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 bool stream_sender_has_capabilities(struct rrdhost *host, STREAM_CAPABILITIES capabilities) {
     return host && stream_has_capability(host->sender, capabilities);
@@ -34,6 +34,7 @@ void stream_sender_structures_init(RRDHOST *host, bool stream, STRING *parents, 
     host->sender->connector.id = -1;
     host->sender->host = host;
     host->sender->scb = stream_circular_buffer_create();
+    host->sender->wait_queue = waiting_queue_create();
     host->sender->capabilities = stream_our_capabilities(host, true);
 
     nd_sock_init(&host->sender->sock, netdata_ssl_streaming_sender_ctx, netdata_ssl_validate_certificate_sender);
@@ -64,9 +65,11 @@ void stream_sender_structures_free(struct rrdhost *host) {
     stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true);
     stream_circular_buffer_destroy(host->sender->scb);
     host->sender->scb = NULL;
+    waiting_queue_destroy(host->sender->wait_queue);
+    host->sender->wait_queue = NULL;
     stream_compressor_destroy(&host->sender->compressor);
 
-    replication_cleanup_sender(host->sender);
+    replication_sender_cleanup(host->sender);
 
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
 

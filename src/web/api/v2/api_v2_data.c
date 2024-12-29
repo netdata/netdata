@@ -180,7 +180,7 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
 
     if(tier_str && *tier_str) {
         tier = str2ul(tier_str);
-        if(tier < storage_tiers)
+        if(tier < nd_profile.storage_tiers)
             options |= RRDR_OPTION_SELECTED_TIER;
         else
             tier = 0;

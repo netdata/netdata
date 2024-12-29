@@ -99,6 +99,13 @@ static size_t aral_sizes[] = {
     // our structures
     sizeof(gorilla_writer_t),
     sizeof(PGD),
+
+    512, 1024, 1536, 2048, 5 * 512, 6 * 512, 7 * 512,
+    1 * 4096, 2 * 4096, 3 * 4096, 4 * 4096, 5 * 4096,
+    6 * 4096, 7 * 4096, 8 * 4096, 9 * 4096, 10 * 4096,
+    11 * 4096, 12 * 4096, 13 * 4096, 14 * 4096, 15 * 4096,
+    16 * 4096, 17 * 4096, 18 * 4096, 19 * 4096, 20 * 4096,
+    21 * 4096, 22 * 4096, 23 * 4096, 24 * 4096, 25 * 4096,
 };
 static ARAL **arals = NULL;
 
@@ -130,6 +137,15 @@ void pgd_init_arals(void) {
 
     for(size_t i = 0; i < RRD_STORAGE_TIERS ;i++)
         aral_sizes[i] = tier_page_size[i];
+
+    if(!netdata_conf_is_parent()) {
+        // this agent is not a parent
+        // do not use ARAL for sizes above 4KiB
+        for(size_t i = RRD_STORAGE_TIERS ; i < _countof(aral_sizes) ;i++) {
+            if(aral_sizes[i] > 4096)
+                aral_sizes[i] = 0;
+        }
+    }
 
     size_t max_delta = 0;
     for(size_t i = 0; i < aral_sizes_count ;i++) {
@@ -181,7 +197,7 @@ void pgd_init_arals(void) {
                 0,
                 0,
                 &pgd_aral_statistics,
-                NULL, NULL, false, false);
+                NULL, NULL, false, false, true);
         }
     }
 

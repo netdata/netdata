@@ -327,57 +327,38 @@ void wal_release(WAL *wal);
  * They only describe operations since DB engine instance load time.
  */
 struct rrdengine_statistics {
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t before_decompress_bytes;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t after_decompress_bytes;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t before_compress_bytes;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t after_compress_bytes;
+    PAD64(rrdeng_stats_t) before_decompress_bytes;
+    PAD64(rrdeng_stats_t) after_decompress_bytes;
+    PAD64(rrdeng_stats_t) before_compress_bytes;
+    PAD64(rrdeng_stats_t) after_compress_bytes;
 
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t io_write_bytes;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t io_write_requests;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t io_read_bytes;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t io_read_requests;
+    PAD64(rrdeng_stats_t) io_write_bytes;
+    PAD64(rrdeng_stats_t) io_write_requests;
+    PAD64(rrdeng_stats_t) io_read_bytes;
+    PAD64(rrdeng_stats_t) io_read_requests;
 
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t datafile_creations;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t datafile_deletions;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t journalfile_creations;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t journalfile_deletions;
+    PAD64(rrdeng_stats_t) datafile_creations;
+    PAD64(rrdeng_stats_t) datafile_deletions;
+    PAD64(rrdeng_stats_t) journalfile_creations;
+    PAD64(rrdeng_stats_t) journalfile_deletions;
 
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t io_errors;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t fs_errors;
+    PAD64(rrdeng_stats_t) io_errors;
+    PAD64(rrdeng_stats_t) fs_errors;
 };
 
 struct rrdeng_global_stats {
-    CACHE_LINE_PADDING();
     /* I/O errors global counter */
-    rrdeng_stats_t global_io_errors;
+    PAD64(rrdeng_stats_t) global_io_errors;
 
-    CACHE_LINE_PADDING();
     /* File-System errors global counter */
-    rrdeng_stats_t global_fs_errors;
+    PAD64(rrdeng_stats_t) global_fs_errors;
 
-    CACHE_LINE_PADDING();
     /* number of File-Descriptors that have been reserved by dbengine */
-    rrdeng_stats_t rrdeng_reserved_file_descriptors;
+    PAD64(rrdeng_stats_t) rrdeng_reserved_file_descriptors;
 
-    CACHE_LINE_PADDING();
     /* inability to flush global counters */
-    rrdeng_stats_t global_pg_cache_over_half_dirty_events;
-    CACHE_LINE_PADDING();
-    rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of deleted pages */
+    PAD64(rrdeng_stats_t) global_pg_cache_over_half_dirty_events;
+    PAD64(rrdeng_stats_t) global_flushing_pressure_page_deletions; /* number of deleted pages */
 };
 
 extern struct rrdeng_global_stats global_stats;
@@ -413,36 +394,23 @@ struct rrdengine_instance {
     } njfv2idx;
 
     struct {
-        CACHE_LINE_PADDING();
-        unsigned last_fileno;                       // newest index of datafile and journalfile
-        CACHE_LINE_PADDING();
-        unsigned last_flush_fileno;                 // newest index of datafile received data
+        PAD64(unsigned) last_fileno;                       // newest index of datafile and journalfile
+        PAD64(unsigned) last_flush_fileno;                 // newest index of datafile received data
 
-        CACHE_LINE_PADDING();
-        size_t collectors_running;
-        CACHE_LINE_PADDING();
-        size_t collectors_running_duplicate;
-        CACHE_LINE_PADDING();
-        size_t inflight_queries;                    // the number of queries currently running
-        CACHE_LINE_PADDING();
-        uint64_t current_disk_space;                // the current disk space size used
+        PAD64(size_t) collectors_running;
+        PAD64(size_t) collectors_running_duplicate;
+        PAD64(size_t) inflight_queries;                    // the number of queries currently running
+        PAD64(uint64_t) current_disk_space;                // the current disk space size used
 
-        CACHE_LINE_PADDING();
-        uint64_t transaction_id;                    // the transaction id of the next extent flushing
+        PAD64(uint64_t) transaction_id;                    // the transaction id of the next extent flushing
 
-        CACHE_LINE_PADDING();
-        bool migration_to_v2_running;
-        CACHE_LINE_PADDING();
-        bool now_deleting_files;
-        CACHE_LINE_PADDING();
-        unsigned extents_currently_being_flushed;   // non-zero until we commit data to disk (both datafile and journal file)
+        PAD64(bool) migration_to_v2_running;
+        PAD64(bool) now_deleting_files;
+        PAD64(unsigned) extents_currently_being_flushed;   // non-zero until we commit data to disk (both datafile and journal file)
 
-        CACHE_LINE_PADDING();
-        time_t first_time_s;
-        CACHE_LINE_PADDING();
-        uint64_t metrics;
-        CACHE_LINE_PADDING();
-        uint64_t samples;
+        PAD64(time_t) first_time_s;
+        PAD64(uint64_t) metrics;
+        PAD64(uint64_t) samples;
     } atomic;
 
     struct {

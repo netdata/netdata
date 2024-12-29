@@ -6,7 +6,6 @@ ENUM_STR_MAP_DEFINE(HTTP_REQUEST_MODE) =
 {
         { .name = "OPTIONS", .id = HTTP_REQUEST_MODE_OPTIONS },
         { .name = "GET", .id = HTTP_REQUEST_MODE_GET },
-        { .name = "FILECOPY", .id = HTTP_REQUEST_MODE_FILECOPY },
         { .name = "POST", .id = HTTP_REQUEST_MODE_POST },
         { .name = "PUT", .id = HTTP_REQUEST_MODE_PUT },
         { .name = "DELETE", .id = HTTP_REQUEST_MODE_DELETE },

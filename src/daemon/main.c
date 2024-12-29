@@ -212,10 +212,10 @@ int windows_perflib_dump(const char *key);
 int unittest_prepare_rrd(const char **user) {
     netdata_conf_section_global_run_as_user(user);
     netdata_conf_section_global();
-    default_rrd_update_every = 1;
+    nd_profile.update_every = 1;
     default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
     health_plugin_disable();
-    storage_tiers = 1;
+    nd_profile.storage_tiers = 1;
     registry_init();
     if(rrd_init("unittest", NULL, true)) {
         fprintf(stderr, "rrd_init failed for unittest\n");
@@ -383,6 +383,7 @@ int netdata_main(int argc, char **argv) {
                             if (ctx_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
+                            if (unittest_waiting_queue()) return 1;
                             sqlite_library_shutdown();
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
@@ -397,6 +398,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "araltest") == 0) {
                             unittest_running = true;
                             return aral_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "waitqtest") == 0) {
+                            unittest_running = true;
+                            return unittest_waiting_queue();
                         }
                         else if(strcmp(optarg, "stringtest") == 0)  {
                             unittest_running = true;
@@ -463,7 +468,7 @@ int netdata_main(int argc, char **argv) {
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
                             netdata_conf_section_global_run_as_user(&user);
                             netdata_conf_section_global();
-                            default_rrd_update_every = 1;
+                            nd_profile.update_every = 1;
                             registry_init();
                             if(rrd_init("dbengine-dataset", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
@@ -768,12 +773,14 @@ int netdata_main(int argc, char **argv) {
         workers_utilization_enable();
 
     // ----------------------------------------------------------------------------------------------------------------
-    // streaming, replication, backfilling
+    // profiles
 
-    stream_conf_load();
-    check_local_streaming_capabilities();
+    nd_profile_setup();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // streaming, replication, functions initialization
+
     replication_initialize();
-
     rrd_functions_inflight_init();
 
     {
@@ -967,7 +974,6 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("start the static threads");
 
     netdata_conf_section_web();
-    backfill_threads_detect_from_stream_conf();
 
     set_late_analytics_variables(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {

@@ -49,7 +49,7 @@ static inline void log_forwarder_wake_up_worker(LOG_FORWARDER *lf) {
     char ch = 0;
     ssize_t bytes_written = write(lf->pipe_fds[PIPE_WRITE], &ch, 1);
     if (bytes_written != 1)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to write to notification pipe");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to write to notification pipe");
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -65,7 +65,8 @@ LOG_FORWARDER *log_forwarder_start(void) {
     }
 
     // make sure read() will not block on this pipe
-    sock_setnonblock(lf->pipe_fds[PIPE_READ]);
+    if(sock_setnonblock(lf->pipe_fds[PIPE_READ], true) != 1)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to set non-blocking mode");
 
     lf->running = true;
     lf->thread = nd_thread_create("log-fw", NETDATA_THREAD_OPTION_JOINABLE, log_forwarder_thread_func, lf);

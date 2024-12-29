@@ -55,7 +55,7 @@ void pdc_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false
+            NULL, NULL, false, false, true
             );
 
     pulse_aral_register(pdc_globals.pdc.ar, "pdc");
@@ -85,7 +85,7 @@ void page_details_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false
+            NULL, NULL, false, false, true
     );
     pulse_aral_register(pdc_globals.pd.ar, "pd");
 }
@@ -114,7 +114,7 @@ void epdl_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false
+            NULL, NULL, false, false, true
     );
     pulse_aral_register(pdc_globals.epdl.ar, "epdl");
 }
@@ -143,7 +143,7 @@ void deol_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false
+            NULL, NULL, false, false, true
     );
 
     pulse_aral_register(pdc_globals.deol.ar, "deol");
@@ -455,50 +455,75 @@ void epdl_cmd_dequeued(void *epdl_ptr) {
     epdl->cmd = NULL;
 }
 
-static struct rrdeng_cmd *epdl_get_cmd(void *epdl_ptr) {
+static inline struct rrdeng_cmd *epdl_get_cmd(void *epdl_ptr) {
     EPDL *epdl = epdl_ptr;
     return epdl->cmd;
 }
 
+static EPDL_EXTENT *epdl_find_extent_base(EPDL *epdl) {
+    EPDL_EXTENT *e = NULL;
+    rw_spinlock_read_lock(&epdl->datafile->extent_epdl.spinlock);
+    Pvoid_t *PValue = JudyLGet(epdl->datafile->extent_epdl.epdl_per_extent, epdl->extent_offset, PJE0);
+    internal_fatal(PValue == PJERR, "DBENGINE: corrupted pending extent judy");
+    if(PValue)
+        e = *PValue;
+    rw_spinlock_read_unlock(&epdl->datafile->extent_epdl.spinlock);
+
+    if(!e) {
+        EPDL_EXTENT *e_to_free = NULL;
+        e = callocz(1, sizeof(*e));
+
+        rw_spinlock_write_lock(&epdl->datafile->extent_epdl.spinlock);
+        Pvoid_t *PValue = JudyLIns(&epdl->datafile->extent_epdl.epdl_per_extent, epdl->extent_offset, PJE0);
+        internal_fatal(!PValue || PValue == PJERR, "DBENGINE: corrupted pending extent judy");
+        if(!*PValue) {
+            *PValue = e;
+            spinlock_init(&e->spinlock);
+        }
+        else {
+            e_to_free = e;
+            e = *PValue;
+        }
+        rw_spinlock_write_unlock(&epdl->datafile->extent_epdl.spinlock);
+
+        freez(e_to_free);
+    }
+
+    return e;
+}
+
 static bool epdl_pending_add(EPDL *epdl) {
+    EPDL_EXTENT *e = epdl_find_extent_base(epdl);
+    spinlock_lock(&e->spinlock);
+
     bool added_new;
+    if(unlikely(e->base)) {
+        added_new = false;
+        epdl->head_to_datafile_extent_queries_pending_for_extent = false;
 
-    spinlock_lock(&epdl->datafile->extent_queries.spinlock);
-    Pvoid_t *PValue = JudyLIns(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
-    internal_fatal(!PValue || PValue == PJERR, "DBENGINE: corrupted pending extent judy");
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
 
-    EPDL *base = *PValue;
-
-    if(!base) {
+//        if(e->base->pdc->priority > epdl->pdc->priority) {
+//            e->base->pdc->priority = epdl->pdc->priority;
+//            rrdeng_req_cmd(epdl_get_cmd, e->base, epdl->pdc->priority);
+//        }
+    }
+    else {
         added_new = true;
         epdl->head_to_datafile_extent_queries_pending_for_extent = true;
     }
-    else {
-        added_new = false;
-        epdl->head_to_datafile_extent_queries_pending_for_extent = false;
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
 
-        if(base->pdc->priority > epdl->pdc->priority)
-            rrdeng_req_cmd(epdl_get_cmd, base, epdl->pdc->priority);
-    }
-
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, epdl, query.prev, query.next);
-    *PValue = base;
-
-    spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(e->base, epdl, query.prev, query.next);
+    spinlock_unlock(&e->spinlock);
 
     return added_new;
 }
 
 static void epdl_pending_del(EPDL *epdl) {
-    spinlock_lock(&epdl->datafile->extent_queries.spinlock);
-    if(epdl->head_to_datafile_extent_queries_pending_for_extent) {
-        epdl->head_to_datafile_extent_queries_pending_for_extent = false;
-        int rc = JudyLDel(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
-        (void) rc;
-        internal_fatal(!rc, "DBENGINE: epdl not found in pending list");
-    }
-    spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
+    EPDL_EXTENT *e = epdl_find_extent_base(epdl);
+    spinlock_lock(&e->spinlock);
+    e->base = NULL;
+    spinlock_unlock(&e->spinlock);
 }
 
 void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list)

@@ -227,7 +227,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
     uint32_t dt_s = mrg_metric_get_update_every_s(main_mrg, metric);
 
     if(!dt_s)
-        dt_s = default_rrd_update_every;
+        dt_s = nd_profile.update_every;
 
     time_t previous_page_end_time_s = now_s - dt_s;
     bool first = true;
@@ -402,7 +402,7 @@ static size_t list_has_time_gaps(
     time_t now_s = wanted_start_time_s;
     time_t dt_s = mrg_metric_get_update_every_s(main_mrg, metric);
     if(!dt_s)
-        dt_s = default_rrd_update_every;
+        dt_s = nd_profile.update_every;
 
     size_t pages_pass2 = 0, pages_pass3 = 0;
     while((pd = pdc_find_page_for_time(
@@ -656,7 +656,7 @@ static Pvoid_t get_page_list(
             pages_total = 0;
 
     size_t cache_gaps = 0, query_gaps = 0;
-    bool done_v2 = false, done_open = false;
+    bool done_v2 = false, done_open = false, done_pass4 = false;
 
     usec_t pass1_ut = 0, pass2_ut = 0, pass3_ut = 0, pass4_ut = 0, finish_ut = 0;
 
@@ -721,28 +721,36 @@ static Pvoid_t get_page_list(
     query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
                                     &pages_total, &pages_found_pass4, pages_to_load_from_disk, &pages_overlapping,
                                     optimal_end_time_s, true, common_status);
+    done_pass4 = true;
 
 we_are_done:
     finish_ut = now_monotonic_usec();
-    time_delta(finish_ut, pass4_ut);
-    time_delta(finish_ut, pass3_ut);
-    time_delta(finish_ut, pass2_ut);
-    time_delta(finish_ut, pass1_ut);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.prep_time_in_main_cache_lookup, pass1_ut, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.prep_time_in_open_cache_lookup, pass2_ut, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.prep_time_in_journal_v2_lookup, pass3_ut, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.prep_time_in_pass4_lookup, pass4_ut, __ATOMIC_RELAXED);
+    time_delta(finish_ut, pass4_ut); // do not change the order
+    time_delta(finish_ut, pass3_ut); // do not change the order
+    time_delta(finish_ut, pass2_ut); // do not change the order
+    time_delta(finish_ut, pass1_ut); // do not change the order
 
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries, 1, __ATOMIC_RELAXED);
+    time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_in_main_cache_lookup, pass1_ut);
+
+    if(done_open) {
+        time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_in_open_cache_lookup, pass2_ut);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_open_cache, pages_found_in_open_cache, __ATOMIC_RELAXED);
+    }
+
+    if(done_v2) {
+        time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_in_journal_v2_lookup, pass3_ut);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
+    }
+
+    if(done_pass4) {
+        time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_in_pass4_lookup, pass4_ut);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache_at_pass4, pages_found_pass4, __ATOMIC_RELAXED);
+    }
+
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_planned_with_gaps, (query_gaps) ? 1 : 0, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_open, done_open ? 1 : 0, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_journal_v2, done_v2 ? 1 : 0, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_total, pages_total, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_open_cache, pages_found_in_open_cache, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache_at_pass4, pages_found_pass4, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_to_load_from_disk, *pages_to_load_from_disk, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_overlapping_skipped, pages_overlapping, __ATOMIC_RELAXED);
 
@@ -754,7 +762,7 @@ inline void rrdeng_prep_wait(PDC *pdc) {
         usec_t started_ut = now_monotonic_usec();
         completion_wait_for(&pdc->prep_completion);
         pdc->prep_done = true;
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.query_time_wait_for_prep, now_monotonic_usec() - started_ut, __ATOMIC_RELAXED);
+        time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_wait_for_prep, now_monotonic_usec() - started_ut);
     }
 }
 
@@ -781,13 +789,18 @@ void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
     if (pdc->pages_to_load_from_disk && pdc->page_list_JudyL) {
         pdc_acquire(pdc); // we get 1 for the 1st worker in the chain: do_read_page_list_work()
         usec_t start_ut = now_monotonic_usec();
-        if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
+        if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS)) {
             pdc_route_synchronously(pdc->ctx, pdc);
-        else if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS_FIRST))
+            time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_to_route_sync, now_monotonic_usec() - start_ut);
+        }
+        else if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS_FIRST)) {
             pdc_route_synchronously_first(pdc->ctx, pdc);
-        else
+            time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_to_route_syncfirst, now_monotonic_usec() - start_ut);
+        }
+        else {
             pdc_route_asynchronously(pdc->ctx, pdc);
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.prep_time_to_route, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+            time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_to_route_async, now_monotonic_usec() - start_ut);
+        }
     }
     else
         completion_mark_complete(&pdc->page_completion);
@@ -973,15 +986,15 @@ struct pgc_page *pg_cache_lookup_next(
 
     if(waited) {
         if(preloaded)
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.query_time_to_slow_preload_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+            time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_to_slow_preload_next_page, now_monotonic_usec() - start_ut);
         else
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.query_time_to_slow_disk_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+            time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_to_slow_disk_next_page, now_monotonic_usec() - start_ut);
     }
     else {
         if(preloaded)
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.query_time_to_fast_preload_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+            time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_to_fast_preload_next_page, now_monotonic_usec() - start_ut);
         else
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.query_time_to_fast_disk_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+            time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_to_fast_disk_next_page, now_monotonic_usec() - start_ut);
     }
 
     return page;
