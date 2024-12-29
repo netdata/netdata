@@ -77,7 +77,10 @@ struct receiver_state {
     } thread;
 
     struct {
-        size_t cmd_counter; // copy of the rrdhost version to detect replication progress
+        size_t last_counter_in;
+        size_t last_counter_out;
+        usec_t last_progress;
+
         time_t first_time_s;
     } replication;
 

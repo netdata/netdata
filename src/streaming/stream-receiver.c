@@ -469,6 +469,8 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     // help preferred_sender_buffer() select the right buffer
     rpt->host->stream.snd.commit.receiver_tid = gettid_cached();
 
+    rpt->replication.last_progress = now_monotonic_usec();
+
     PARSER *parser = NULL;
     {
         rpt->thread.cd = (struct plugind){
@@ -945,6 +947,32 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
     }
 }
 
+static bool stream_receiver_did_replication_progress(struct receiver_state *rpt) {
+    RRDHOST *host = rpt->host;
+
+    size_t my_counter_in = __atomic_load_n(&rpt->replication.last_counter_in, __ATOMIC_RELAXED);
+    size_t my_counter_out = __atomic_load_n(&rpt->replication.last_counter_out, __ATOMIC_RELAXED);
+    size_t host_counter_in = __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED);
+    size_t host_counter_out = __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED);
+    if(my_counter_in != host_counter_in || my_counter_out != host_counter_out) {
+        // there has been some progress
+        __atomic_store_n(&rpt->replication.last_counter_in, __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
+        __atomic_store_n(&rpt->replication.last_counter_out, __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
+        rpt->replication.last_progress = now_monotonic_usec();
+        return true;
+    }
+
+    if(!my_counter_in || !my_counter_out)
+        // we have not started yet
+        return true;
+
+    if(__atomic_load_n(&host->stream.rcv.status.replication.backfill_pending, __ATOMIC_RELAXED))
+        // we still have requests to execute
+        return true;
+
+    return (now_monotonic_usec() - rpt->replication.last_progress < 5ULL * 60 * USEC_PER_SEC);
+}
+
 void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
 
@@ -954,12 +982,11 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
          m = META_NEXT(&sth->run.meta, &idx)) {
         if (m->type != POLLFD_TYPE_RECEIVER) continue;
         struct receiver_state *rpt = m->rpt;
+        RRDHOST *host = rpt->host;
 
-        if(rpt->replication.cmd_counter != rpt->host->stream.rcv.status.replication.cmd_counter) {
-            // there is progress, do not check yet
-            rpt->replication.cmd_counter = rpt->host->stream.rcv.status.replication.cmd_counter;
+
+        if(stream_receiver_did_replication_progress(rpt))
             continue;
-        }
 
         size_t exceptions = 0;
         RRDSET *st;
@@ -972,17 +999,21 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
 
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS: instance '%s' %s replication yet.",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip,
+                   sth->id, rrdhost_hostname(host), rpt->remote_ip,
                    rrdset_id(st), status);
 
             exceptions++;
         }
         rrdset_foreach_done(st);
 
-        if(exceptions)
+        if(exceptions && !stream_receiver_did_replication_progress(rpt)) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS SUMMARY: expecting %zu replication commands.",
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, exceptions);
+
+            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_REPLICATION_STALLED, false);
+            stream_receiver_remove(sth, rpt, "replication reception stalled");
+        }
     }
 }
 

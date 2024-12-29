@@ -84,6 +84,10 @@ struct sender_state {
     } exit;
 
     struct {
+        size_t last_counter_in;
+        size_t last_counter_out;
+        usec_t last_progress;
+
         DICTIONARY *requests;                   // de-duplication of replication requests, per chart
         time_t oldest_request_after_t;          // the timestamp of the oldest replication request
         time_t latest_completed_before_t;       // the timestamp of the latest replication request

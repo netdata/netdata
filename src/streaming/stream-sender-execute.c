@@ -268,6 +268,8 @@ void stream_sender_execute_commands(struct sender_state *s) {
             stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_REPLICATION, true);
 #endif
 
+            __atomic_add_fetch(&s->host->stream.snd.status.replication.counter_in, 1, __ATOMIC_RELAXED);
+
             // do not log replication commands received - way too many!
             // nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 

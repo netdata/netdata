@@ -310,6 +310,8 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         s->host->stream.snd.status.connections++;
         s->last_state_since_t = now_realtime_sec();
 
+        s->replication.last_progress = now_monotonic_usec();
+
         stream_circular_buffer_flush_unsafe(s->scb, stream_send.buffer_max_size);
         replication_sender_recalculate_buffer_used_ratio_unsafe(s);
         stream_sender_unlock(s);
@@ -496,6 +498,32 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
     worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, overall_buffer_ratio);
 }
 
+static bool stream_sender_did_replication_progress(struct sender_state *s) {
+    RRDHOST *host = s->host;
+
+    size_t my_counter_in = __atomic_load_n(&s->replication.last_counter_in, __ATOMIC_RELAXED);
+    size_t my_counter_out = __atomic_load_n(&s->replication.last_counter_out, __ATOMIC_RELAXED);
+    size_t host_counter_in = __atomic_load_n(&host->stream.snd.status.replication.counter_in, __ATOMIC_RELAXED);
+    size_t host_counter_out = __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED);
+    if(my_counter_in != host_counter_in || my_counter_out != host_counter_out) {
+        // there has been some progress
+        __atomic_store_n(&s->replication.last_counter_in, __atomic_load_n(&host->stream.snd.status.replication.counter_in, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
+        __atomic_store_n(&s->replication.last_counter_out, __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
+        s->replication.last_progress = now_monotonic_usec();
+        return true;
+    }
+
+    if(!my_counter_in || !my_counter_out)
+        // we have not started yet
+        return true;
+
+    if(dictionary_entries(s->replication.requests))
+        // we still have requests to execute
+        return true;
+
+    return (now_monotonic_usec() - s->replication.last_progress < 5ULL * 60 * USEC_PER_SEC);
+}
+
 void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
 
@@ -505,13 +533,13 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
          m = META_NEXT(&sth->run.meta, &idx)) {
         if (m->type != POLLFD_TYPE_SENDER) continue;
         struct sender_state *s = m->s;
+        RRDHOST *host = s->host;
 
-        if(dictionary_entries(s->replication.requests))
-            // we are still replicating
+        if(stream_sender_did_replication_progress(s))
             continue;
 
         ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+            ND_LOG_FIELD_STR(NDF_NIDL_NODE, host->hostname),
             ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
             ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
             ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
@@ -522,7 +550,7 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
 
         size_t exceptions = 0;
         RRDSET *st;
-        rrdset_foreach_read(st, s->host) {
+        rrdset_foreach_read(st, host) {
             RRDSET_FLAGS st_flags = rrdset_flag_get(st);
             if(st_flags & (RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_UPSTREAM_IGNORE | RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
                 continue;
@@ -530,19 +558,21 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
             const char *status = (st_flags & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS) ? "has not finished" : "has not started";
 
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS: instance '%s' %s replication yet, resending request.",
-                   sth->id, rrdhost_hostname(s->host), s->remote_ip,
+                   "STREAM SND[%zu] '%s' [to %s]: REPLICATION STALLED: instance '%s' %s replication yet.",
+                   sth->id, rrdhost_hostname(host), s->remote_ip,
                    rrdset_id(st), status);
 
-            stream_sender_send_rrdset_definition_now(st);
             exceptions++;
         }
         rrdset_foreach_done(st);
 
-        if(exceptions)
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS SUMMARY: completed %zu replication retransmits.",
+        if(exceptions && !stream_sender_did_replication_progress(s)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests - disconnecting it.",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip, exceptions);
+
+            stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_REPLICATION_STALLED, true);
+        }
     }
 }
 

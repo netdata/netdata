@@ -121,6 +121,8 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
         return false;
     }
 
+    __atomic_add_fetch(&st->rrdhost->stream.rcv.status.replication.counter_out, 1, __ATOMIC_RELAXED);
+
 #ifdef REPLICATION_TRACKING
     st->stream.rcv.who = REPLAY_WHO_THEM;
 #endif

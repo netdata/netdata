@@ -482,9 +482,8 @@ void *stream_thread(void *ptr) {
     sth->pipe.size = set_pipe_size(sth->pipe.fds[PIPE_READ], 65536 * sizeof(*sth->pipe.buffer)) / sizeof(*sth->pipe.buffer);
     sth->pipe.buffer = mallocz(sth->pipe.size * sizeof(*sth->pipe.buffer));
 
-    usec_t last_check_replication_ut = 0;
-    usec_t last_check_all_nodes_ut = 0;
-    usec_t last_dequeue_ut = 0;
+    usec_t last_check_replication_ut, last_check_all_nodes_ut, last_dequeue_ut;
+    last_check_replication_ut = last_check_all_nodes_ut = last_dequeue_ut = now_monotonic_usec();
 
     sth->run.pipe = (struct pollfd_meta){
         .type = POLLFD_TYPE_PIPE,

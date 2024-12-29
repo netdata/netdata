@@ -690,6 +690,7 @@ bool replication_response_execute_finalize_and_send(struct replication_query *q,
     if(workers) worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_REPLICATION);
     if(workers) worker_is_busy(WORKER_JOB_CLEANUP);
+    __atomic_add_fetch(&host->stream.snd.status.replication.counter_out, 1, __ATOMIC_RELAXED);
 
     if(enable_streaming) {
 #ifdef REPLICATION_TRACKING
