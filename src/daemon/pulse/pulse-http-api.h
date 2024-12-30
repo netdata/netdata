@@ -5,7 +5,7 @@
 
 #include "daemon/common.h"
 
-uint64_t pulse_web_client_connected(void);
+void pulse_web_client_connected(void);
 void pulse_web_client_disconnected(void);
 
 void pulse_web_request_completed(uint64_t dt,

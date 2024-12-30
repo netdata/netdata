@@ -17,6 +17,8 @@
 // the number of currently connected clients.
 
 static struct clients_cache {
+    unsigned long long client_id;
+
     struct {
         SPINLOCK spinlock;
         struct web_client *head;    // the structures of the currently connected clients
@@ -103,9 +105,11 @@ struct web_client *web_client_get_from_cache(void) {
         w = web_client_create(&netdata_buffers_statistics.buffers_web);
         spinlock_lock(&web_clients_cache.used.spinlock);
 
-        w->id = pulse_web_client_connected();
+        w->id = __atomic_add_fetch(&web_clients_cache.client_id, 1, __ATOMIC_RELAXED);
         web_clients_cache.used.allocated++;
     }
+
+    pulse_web_client_connected();
 
     // link it to used web clients
     DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(web_clients_cache.used.head, w, cache.prev, cache.next);

@@ -8,8 +8,7 @@
 static struct web_statistics {
     bool extended;
 
-    PAD64(uint16_t) connected_clients;
-    PAD64(uint64_t) web_client_count;  // oops! this is used for giving unique IDs to web_clients!
+    PAD64(int32_t) connected_clients;
 
     PAD64(uint64_t) web_requests;
     PAD64(uint64_t) web_usec;
@@ -19,15 +18,14 @@ static struct web_statistics {
 
     PAD64(uint64_t) content_size_uncompressed;
     PAD64(uint64_t) content_size_compressed;
-} web_statistics = { 0 };
+} live_stats = { 0 };
 
-uint64_t pulse_web_client_connected(void) {
-    __atomic_fetch_add(&web_statistics.connected_clients, 1, __ATOMIC_RELAXED);
-    return __atomic_fetch_add(&web_statistics.web_client_count, 1, __ATOMIC_RELAXED);
+void pulse_web_client_connected(void) {
+    __atomic_fetch_add(&live_stats.connected_clients, 1, __ATOMIC_RELAXED);
 }
 
 void pulse_web_client_disconnected(void) {
-    __atomic_fetch_sub(&web_statistics.connected_clients, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_sub(&live_stats.connected_clients, 1, __ATOMIC_RELAXED);
 }
 
 void pulse_web_request_completed(uint64_t dt,
@@ -35,32 +33,31 @@ void pulse_web_request_completed(uint64_t dt,
                                              uint64_t bytes_sent,
                                              uint64_t content_size,
                                              uint64_t compressed_content_size) {
-    uint64_t old_web_usec_max = web_statistics.web_usec_max;
+    uint64_t old_web_usec_max = live_stats.web_usec_max;
     while(dt > old_web_usec_max)
-        __atomic_compare_exchange(&web_statistics.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+        __atomic_compare_exchange(&live_stats.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 
-    __atomic_fetch_add(&web_statistics.web_requests, 1, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&web_statistics.web_usec, dt, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&web_statistics.bytes_received, bytes_received, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&web_statistics.bytes_sent, bytes_sent, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&web_statistics.content_size_uncompressed, content_size, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&web_statistics.content_size_compressed, compressed_content_size, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&live_stats.web_requests, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&live_stats.web_usec, dt, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&live_stats.bytes_received, bytes_received, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&live_stats.bytes_sent, bytes_sent, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&live_stats.content_size_uncompressed, content_size, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&live_stats.content_size_compressed, compressed_content_size, __ATOMIC_RELAXED);
 }
 
 static inline void pulse_web_copy(struct web_statistics *gs, uint8_t options) {
-    gs->connected_clients = __atomic_load_n(&web_statistics.connected_clients, __ATOMIC_RELAXED);
-    gs->web_requests = __atomic_load_n(&web_statistics.web_requests, __ATOMIC_RELAXED);
-    gs->web_usec = __atomic_load_n(&web_statistics.web_usec, __ATOMIC_RELAXED);
-    gs->web_usec_max = __atomic_load_n(&web_statistics.web_usec_max, __ATOMIC_RELAXED);
-    gs->bytes_received = __atomic_load_n(&web_statistics.bytes_received, __ATOMIC_RELAXED);
-    gs->bytes_sent = __atomic_load_n(&web_statistics.bytes_sent, __ATOMIC_RELAXED);
-    gs->content_size_uncompressed = __atomic_load_n(&web_statistics.content_size_uncompressed, __ATOMIC_RELAXED);
-    gs->content_size_compressed = __atomic_load_n(&web_statistics.content_size_compressed, __ATOMIC_RELAXED);
-    gs->web_client_count = __atomic_load_n(&web_statistics.web_client_count, __ATOMIC_RELAXED);
+    gs->connected_clients = __atomic_load_n(&live_stats.connected_clients, __ATOMIC_RELAXED);
+    gs->web_requests = __atomic_load_n(&live_stats.web_requests, __ATOMIC_RELAXED);
+    gs->web_usec = __atomic_load_n(&live_stats.web_usec, __ATOMIC_RELAXED);
+    gs->web_usec_max = __atomic_load_n(&live_stats.web_usec_max, __ATOMIC_RELAXED);
+    gs->bytes_received = __atomic_load_n(&live_stats.bytes_received, __ATOMIC_RELAXED);
+    gs->bytes_sent = __atomic_load_n(&live_stats.bytes_sent, __ATOMIC_RELAXED);
+    gs->content_size_uncompressed = __atomic_load_n(&live_stats.content_size_uncompressed, __ATOMIC_RELAXED);
+    gs->content_size_compressed = __atomic_load_n(&live_stats.content_size_compressed, __ATOMIC_RELAXED);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
         uint64_t n = 0;
-        __atomic_compare_exchange(&web_statistics.web_usec_max, (uint64_t *) &gs->web_usec_max, &n, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+        __atomic_compare_exchange(&live_stats.web_usec_max, (uint64_t *) &gs->web_usec_max, &n, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
     }
 }
 
