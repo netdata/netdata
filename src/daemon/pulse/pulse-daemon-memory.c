@@ -7,7 +7,7 @@
 #define dictionary_stats_memory_total(stats) \
     ((stats).memory.dict + (stats).memory.values + (stats).memory.index)
 
-struct netdata_buffers_statistics netdata_buffers_statistics = {};
+struct netdata_buffers_statistics netdata_buffers_statistics = { 0 };
 
 void pulse_daemon_memory_do(bool extended) {
     {

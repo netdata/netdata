@@ -4,7 +4,6 @@
 #define NETDATA_WAITING_QUEUE_H
 
 #include "libnetdata/libnetdata.h"
-#include <uv.h>
 
 /*
  * WAITING QUEUE
@@ -43,12 +42,15 @@ WAITING_QUEUE *waiting_queue_create(void);
 // Destroy a waiting queue - must be empty
 void waiting_queue_destroy(WAITING_QUEUE *wq);
 
+// Returns true when the queue is acquired
+bool waiting_queue_try_acquire(WAITING_QUEUE *wq);
+
 // Returns when it is our turn to run
 // Returns time spent waiting in microseconds
-usec_t waiting_queue_wait(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority);
+usec_t waiting_queue_acquire(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority);
 
 // Mark that we are done - wakes up the next in line
-void waiting_queue_done(WAITING_QUEUE *wq);
+void waiting_queue_release(WAITING_QUEUE *wq);
 
 // Return the number of threads currently waiting
 size_t waiting_queue_waiting(WAITING_QUEUE *wq);

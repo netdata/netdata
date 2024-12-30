@@ -168,14 +168,11 @@ static void delete_label(RRDLABEL *label)
         if (refcount == 0) {
             JudyAllocThreadPulseReset();
 
-            int ret = JudyHSDel(&global_labels.JudyHS, (void *)label, sizeof(*label), PJE0);
+            JudyHSDel(&global_labels.JudyHS, (void *)label, sizeof(*label), PJE0);
 
             int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
 
-            if (unlikely(ret == JERR))
-                STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, judy_mem, sizeof(*rrdlabel), 0);
-            else
-                STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, judy_mem, sizeof(*rrdlabel), 0);
+            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, judy_mem, sizeof(*rrdlabel), 0);
             string_freez(label->index.key);
             string_freez(label->index.value);
             freez(rrdlabel);

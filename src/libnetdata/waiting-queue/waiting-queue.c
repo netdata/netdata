@@ -2,19 +2,75 @@
 
 #include "waiting-queue.h"
 
+// #define WAITING_QUEUE_USE_FUTEX 1
+
+#if defined(WAITING_QUEUE_USE_FUTEX)
+#include <linux/futex.h>
+#include <sys/syscall.h>
+
+typedef int WQ_COND;
+typedef SPINLOCK WQ_MUTEX;
+
+static inline int futex_wait(int *uaddr, int val) {
+    return syscall(SYS_futex, uaddr, FUTEX_WAIT_PRIVATE, val, NULL, NULL, 0);
+}
+
+static inline int futex_wake(int *uaddr, int n) {
+    return syscall(SYS_futex, uaddr, FUTEX_WAKE_PRIVATE, n, NULL, NULL, 0);
+}
+
+static int WQ_COND_init(WQ_COND *cond) { *(cond) = 0; return 0; }
+#define WQ_COND_destroy(cond) debug_dummy()
+
+static inline int WQ_COND_wait(WQ_COND *cond, WQ_MUTEX *mutex) {
+    int value = *cond;
+    spinlock_unlock(mutex);
+    futex_wait(cond, value);
+    spinlock_lock(mutex);
+    return 0;
+}
+
+static inline int WQ_COND_signal(WQ_COND *cond) {
+    __atomic_add_fetch(cond, 1, __ATOMIC_SEQ_CST);
+    futex_wake(cond, 1);
+    return 0;
+}
+
+#define WQ_MUTEX_init(mutex) ({ spinlock_init(mutex) ; 0; })
+#define WQ_MUTEX_destroy(mutex) debug_dummy()
+#define WQ_MUTEX_lock(mutex) spinlock_lock(mutex)
+#define WQ_MUTEX_unlock(mutex) spinlock_unlock(mutex)
+
+#else // !USE_FUTEX
+
+typedef uv_cond_t WQ_COND;
+typedef uv_mutex_t WQ_MUTEX;
+
+#define WQ_COND_init(cond) uv_cond_init(cond)
+#define WQ_COND_destroy(cond) uv_cond_destroy(cond)
+#define WQ_COND_wait(cond, mutex) uv_cond_wait(cond, mutex)
+#define WQ_COND_signal(cond) uv_cond_signal(cond)
+
+#define WQ_MUTEX_init(mutex) uv_mutex_init(mutex)
+#define WQ_MUTEX_destroy(mutex) uv_mutex_destroy(mutex)
+#define WQ_MUTEX_lock(mutex) uv_mutex_lock(mutex)
+#define WQ_MUTEX_unlock(mutex) uv_mutex_unlock(mutex)
+
+#endif // USE_FUTEX
+
 typedef struct waiting_thread {
-    uv_cond_t cond;          // condition variable for this thread
+    WQ_COND cond;               // condition variable for this thread
     usec_t waiting_since_ut;    // when we started waiting
-    Word_t order;
+    Word_t priority;
     struct waiting_thread *prev, *next;
 } WAITING_THREAD;
 
 struct waiting_queue {
-    uv_mutex_t mutex;           // protect the queue structure
+    WQ_MUTEX mutex;             // ensure acquirers and releasers are synchronized
     Word_t last_seqno;          // incrementing sequence counter
-    WAITING_THREAD *list;
-    size_t running;             // number of threads currently running/waiting
-    SPINLOCK spinlock;
+    SPINLOCK spinlock;          // ensures there is only 1 runner at a time
+    REFCOUNT running;           // number of threads, including the one holding the lock
+    WAITING_THREAD *list;       // the list of threads waiting, not including the 1 holding the lock
 };
 
 // Determine available bits based on system word size
@@ -41,7 +97,7 @@ static inline Word_t key_get_seqno(Word_t key) {
 WAITING_QUEUE *waiting_queue_create(void) {
     WAITING_QUEUE *wq = callocz(1, sizeof(WAITING_QUEUE));
 
-    int ret = uv_mutex_init(&wq->mutex);
+    int ret = WQ_MUTEX_init(&wq->mutex);
     if(ret != 0) {
         freez(wq);
         return NULL;
@@ -57,15 +113,15 @@ void waiting_queue_destroy(WAITING_QUEUE *wq) {
     if(!wq) return;
 
     if(wq->running)
-        fatal("WAITING_QUEUE: destroying waiting queue that still has %zu threads running/waiting", wq->running);
+        fatal("WAITING_QUEUE: destroying waiting queue that still has %d threads running/waiting", wq->running);
 
-    uv_mutex_destroy(&wq->mutex);
+    WQ_MUTEX_destroy(&wq->mutex);
     freez(wq);
 }
 
 static inline void WAITERS_SET(WAITING_QUEUE *wq, WAITING_THREAD *wt) {
     for(WAITING_THREAD *t = wq->list ; t ;t = t->next) {
-        if(wt->order < t->order) {
+        if(wt->priority < t->priority) {
             DOUBLE_LINKED_LIST_INSERT_ITEM_BEFORE_UNSAFE(wq->list, t, wt, prev, next);
             return;
         }
@@ -83,24 +139,34 @@ static inline WAITING_THREAD *WAITERS_FIRST(WAITING_QUEUE *wq) {
 
 static inline void WAITING_THREAD_init(WAITING_QUEUE *wq, WAITING_THREAD *wt, WAITING_QUEUE_PRIORITY priority) {
     Word_t seqno = __atomic_add_fetch(&wq->last_seqno, 1, __ATOMIC_RELAXED);
-    wt->order = make_key(priority, seqno);
+    wt->priority = make_key(priority, seqno);
     wt->waiting_since_ut = now_monotonic_usec();
     wt->prev = wt->next = NULL;
 
-    int ret = uv_cond_init(&wt->cond);
+    int ret = WQ_COND_init(&wt->cond);
     if(ret != 0)
         fatal("WAITING_QUEUE: cannot initialize condition variable");
 }
 
-static inline void WAITING_THREAD_cleanup(WAITING_QUEUE *wq __maybe_unused, WAITING_THREAD *wt) {
-    uv_cond_destroy(&wt->cond);
+static inline void WAITING_THREAD_cleanup(WAITING_QUEUE *wq __maybe_unused, WAITING_THREAD *wt __maybe_unused) {
+    WQ_COND_destroy(&wt->cond);
 }
 
-usec_t waiting_queue_wait(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority) {
+bool waiting_queue_try_acquire(WAITING_QUEUE *wq) {
+    if(__atomic_add_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 1 &&
+        spinlock_trylock(&wq->spinlock)) {
+        return true;
+    }
+
+    __atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED);
+    return false;
+}
+
+usec_t waiting_queue_acquire(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority) {
     // Try fast path first - if we're the only one, just go
-    if(__atomic_add_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 1) {
-        if(spinlock_trylock(&wq->spinlock))
-            return 0;
+    if(__atomic_add_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 1 &&
+        spinlock_trylock(&wq->spinlock)) {
+        return 0;
     }
 
     // Slow path - need to wait
@@ -108,7 +174,7 @@ usec_t waiting_queue_wait(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority) {
     WAITING_THREAD wt;
     WAITING_THREAD_init(wq, &wt, priority);
 
-    uv_mutex_lock(&wq->mutex);
+    WQ_MUTEX_lock(&wq->mutex);
     WAITERS_SET(wq, &wt);
 
     // Wait for our turn
@@ -116,31 +182,32 @@ usec_t waiting_queue_wait(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority) {
         if (WAITERS_FIRST(wq) == &wt && spinlock_trylock(&wq->spinlock))
             break;
         else
-            uv_cond_wait(&wt.cond, &wq->mutex);
+            WQ_COND_wait(&wt.cond, &wq->mutex);
     } while(true);
 
     WAITERS_DEL(wq, &wt);
-    uv_mutex_unlock(&wq->mutex);
+    WQ_MUTEX_unlock(&wq->mutex);
     WAITING_THREAD_cleanup(wq, &wt);
 
     return now_monotonic_usec() - wt.waiting_since_ut;
 }
 
-void waiting_queue_done(WAITING_QUEUE *wq) {
-    spinlock_unlock(&wq->spinlock);
-
+void waiting_queue_release(WAITING_QUEUE *wq) {
     // Fast path if we're alone
-    if(__atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 0)
+    if(__atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 0) {
+        spinlock_unlock(&wq->spinlock);
         return;
+    }
 
     // Slow path - need to signal next in line
-    uv_mutex_lock(&wq->mutex);
+    WQ_MUTEX_lock(&wq->mutex);
 
     // Wake up next in line if any
     if(wq->list)
-        uv_cond_signal(&wq->list->cond);
+        WQ_COND_signal(&wq->list->cond);
 
-    uv_mutex_unlock(&wq->mutex);
+    spinlock_unlock(&wq->spinlock);
+    WQ_MUTEX_unlock(&wq->mutex);
 }
 
 size_t waiting_queue_waiting(WAITING_QUEUE *wq) {
@@ -183,8 +250,8 @@ static int unittest_functional(void) {
 
     // Test 1: Fast path should work with no contention
     fprintf(stderr, "  Test 1: Fast path - no contention: ");
-    usec_t wait_time = waiting_queue_wait(wq, WAITING_QUEUE_PRIO_NORMAL);
-    waiting_queue_done(wq);
+    usec_t wait_time = waiting_queue_acquire(wq, WAITING_QUEUE_PRIO_NORMAL);
+    waiting_queue_release(wq);
     if(wait_time != 0) {
         fprintf(stderr, "FAILED (waited %"PRIu64" usec)\n", wait_time);
         errors++;
@@ -210,8 +277,8 @@ static int unittest_functional(void) {
         WAITERS_DEL(wq, wt);
         __atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED);
 
-        WAITING_QUEUE_PRIORITY prio = key_get_priority(wt->order);
-        Word_t seqno = key_get_seqno(wt->order);
+        WAITING_QUEUE_PRIORITY prio = key_get_priority(wt->priority);
+        Word_t seqno = key_get_seqno(wt->priority);
 
         prio_counts[prio]++;
         if(prio < last_prio) {
@@ -265,7 +332,7 @@ static void *stress_thread(void *arg) {
     bool *stop_flag = args->stop_flag;
 
     while(!__atomic_load_n(stop_flag, __ATOMIC_ACQUIRE)) {
-        usec_t wait_time = waiting_queue_wait(wq, stats->priority);
+        usec_t wait_time = waiting_queue_acquire(wq, stats->priority);
         stats->executions++;
         stats->total_wait_time += wait_time;
         if(wait_time > stats->max_wait_time)
@@ -274,7 +341,7 @@ static void *stress_thread(void *arg) {
         if(with_sleep)
             tinysleep();
 
-        waiting_queue_done(wq);
+        waiting_queue_release(wq);
     }
 
     return NULL;

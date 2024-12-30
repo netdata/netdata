@@ -159,12 +159,14 @@ int sock_enlarge_rcv_buf(int fd) {
     if (getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &current_bs, &optlen) == 0) {
         // Set the buffer size only if it's smaller than the desired size
         if (current_bs < bs) {
-            setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bs, sizeof(bs));
+            if(setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bs, sizeof(bs)) != 0)
+                return -1;
 
             // Re-check the buffer size after attempting to set it
             if (getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &current_bs, &optlen) == 0)
                 ret = current_bs;
-        } else {
+        }
+        else {
             // Current buffer size is already large enough
             ret = current_bs;
         }
@@ -184,12 +186,14 @@ int sock_enlarge_snd_buf(int fd) {
     if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &current_bs, &optlen) == 0) {
         // Set the buffer size only if it's smaller than the desired size
         if (current_bs < bs) {
-            setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bs, sizeof(bs));
+            if(setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bs, sizeof(bs)) != 0)
+                return -1;
 
             // Re-check the buffer size after attempting to set it
             if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &current_bs, &optlen) == 0)
                 ret = current_bs;
-        } else {
+        }
+        else {
             // Current buffer size is already large enough
             ret = current_bs;
         }

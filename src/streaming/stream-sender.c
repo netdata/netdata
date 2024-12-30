@@ -371,7 +371,7 @@ static void stream_sender_log_disconnection(struct stream_thread *sth, struct se
     ND_LOG_STACK_PUSH(lgs);
 
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM SND[%zu] '%s' [to %s]: sender disconnected from parent, reason: %s (replication in: %u, out: %u, pending: %u)",
+           "STREAM SND[%zu] '%s' [to %s]: sender disconnected from parent, reason: %s (replication in: %u, out: %u, pending: %zu)",
            sth->id, rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(reason),
            s->host->stream.snd.status.replication.counter_in, s->host->stream.snd.status.replication.counter_out,
            dictionary_entries(s->replication.requests));

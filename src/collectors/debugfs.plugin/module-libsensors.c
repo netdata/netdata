@@ -924,6 +924,10 @@ static SENSOR *sensor_get_or_create(DICTIONARY *dict, const sensors_chip_name *c
             string2str(s->feature.name));
     }
 
+    // we have to free this, because it is malloced from libsensors
+    if(label)
+        free((void *)label); // do not use freez() here - libsensors uses malloc()
+
     netdata_fix_chart_id(buf);
     s->id = string_strdupz(buf);
 
