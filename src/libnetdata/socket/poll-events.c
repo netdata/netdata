@@ -466,8 +466,24 @@ void poll_events(LISTEN_SOCKETS *sockets
                     }
                 }
                 else if (pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
-                    if(!p.limit || p.used < p.limit)
-                        poll_process_new_tcp_connection(pi, now);
+                    if(pi->socktype == SOCK_DGRAM)
+                        poll_process_udp_read(pi, now);
+
+                    else if(pi->socktype == SOCK_STREAM) {
+                        if (!p.limit || p.used < p.limit)
+                            poll_process_new_tcp_connection(pi, now);
+                    }
+                    else {
+                        nd_log(NDLS_DAEMON, NDLP_ERR,
+                               "POLLFD: LISTENER: server slot %zu (fd %d) connection from %s port %s using unhandled socket type %d.",
+                               i,
+                               pi->fd,
+                               pi->client_ip ? pi->client_ip : "<undefined-ip>",
+                               pi->client_port ? pi->client_port : "<undefined-port>",
+                               pi->socktype);
+
+                        poll_close_fd(pi, "poll_events2");
+                    }
                 }
                 else {
                     nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -479,7 +495,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                            , pi->flags
                     );
 
-                    poll_close_fd(pi, "poll_events2");
+                    poll_close_fd(pi, "poll_events3");
                 }
             }
             else {
@@ -492,7 +508,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                        , (int)result.events
                 );
 
-                poll_close_fd(pi, "poll_events3");
+                poll_close_fd(pi, "poll_events4");
             }
         }
 
