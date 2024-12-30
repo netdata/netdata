@@ -182,7 +182,11 @@ void stream_conf_load() {
     stream_send.parents.ssl_ca_file = string_strdupz(appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL));
 
     if(stream_send.enabled && (!stream_send.parents.destination || !stream_send.api_key)) {
-        nd_log_daemon(NDLP_ERR, "STREAM [send]: cannot enable sending thread - information is missing.");
+        nd_log_daemon(
+            NDLP_ERR,
+            "STREAM [send]: cannot enable sending thread - missing required fields (destination: %s, api key: %s)",
+            stream_send.parents.destination ? "present" : "missing",
+            stream_send.api_key ? "present" : "missing");
         stream_send.enabled = false;
     }
 
