@@ -22,6 +22,9 @@ typedef int32_t REFCOUNT;
 #define PGC_WITH_ARAL 1
 #endif
 
+// unfortunately waiting queue is significantly slower than spinlock
+// #define PGC_QUEUE_LOCK_AS_WAITING_QUEUE 1
+
 typedef enum __attribute__ ((__packed__)) {
     // mutually exclusive flags
     PGC_PAGE_CLEAN                       = (1 << 0), // none of the following
@@ -71,7 +74,11 @@ struct pgc_page {
 };
 
 struct pgc_queue {
+#if defined(PGC_QUEUE_LOCK_AS_WAITING_QUEUE)
     WAITING_QUEUE *wq;
+#else
+    SPINLOCK spinlock;
+#endif
     union {
         PGC_PAGE *base;
         Pvoid_t sections_judy;
@@ -244,9 +251,15 @@ static inline size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
 #define PGC_QUEUE_LOCK_PRIO_FLUSHERS    WAITING_QUEUE_PRIO_NORMAL
 #define PGC_QUEUE_LOCK_PRIO_OTHERS      WAITING_QUEUE_PRIO_LOW
 
+#if defined(PGC_QUEUE_LOCK_AS_WAITING_QUEUE)
 #define pgc_queue_trylock(cache, ll) waiting_queue_try_acquire((ll)->wq)
 #define pgc_queue_lock(cache, ll, prio) waiting_queue_acquire((ll)->wq, prio)
 #define pgc_queue_unlock(cache, ll) waiting_queue_release((ll)->wq)
+#else
+#define pgc_queue_trylock(cache, ll) spinlock_trylock(&((ll)->spinlock))
+#define pgc_queue_lock(cache, ll, prio) spinlock_lock(&((ll)->spinlock))
+#define pgc_queue_unlock(cache, ll) spinlock_unlock(&((ll)->spinlock))
+#endif
 
 #define page_transition_trylock(cache, page) spinlock_trylock(&(page)->transition_spinlock)
 #define page_transition_lock(cache, page) spinlock_lock(&(page)->transition_spinlock)
@@ -595,7 +608,7 @@ static inline void pgc_stats_index_judy_change(PGC *cache, size_t mem_before_jud
     }
 }
 
-static void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PAGE *page, bool having_lock, WAITING_QUEUE_PRIORITY prio) {
+static void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PAGE *page, bool having_lock, WAITING_QUEUE_PRIORITY prio __maybe_unused) {
     if(!having_lock)
         pgc_queue_lock(cache, q, prio);
 
@@ -664,7 +677,7 @@ static void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PA
         pgc_size_histogram_add(cache, &q->stats->size_histogram, page);
 }
 
-static void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PAGE *page, bool having_lock, WAITING_QUEUE_PRIORITY prio) {
+static void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PAGE *page, bool having_lock, WAITING_QUEUE_PRIORITY prio __maybe_unused) {
     if(cache->config.stats)
         pgc_size_histogram_del(cache, &q->stats->size_histogram, page);
 
@@ -2086,9 +2099,15 @@ PGC *pgc_create(const char *name,
 #endif
 
 
+#if defined(PGC_QUEUE_LOCK_AS_WAITING_QUEUE)
     cache->hot.wq = waiting_queue_create();
     cache->dirty.wq = waiting_queue_create();
     cache->clean.wq = waiting_queue_create();
+#else
+    spinlock_init(&cache->hot.spinlock);
+    spinlock_init(&cache->dirty.spinlock);
+    spinlock_init(&cache->clean.spinlock);
+#endif
 
     cache->hot.flags = PGC_PAGE_HOT;
     cache->hot.linked_list_in_sections_judy = true;
@@ -2155,10 +2174,11 @@ void pgc_destroy(PGC *cache) {
 #endif
         }
 
+#if defined(PGC_QUEUE_LOCK_AS_WAITING_QUEUE)
         waiting_queue_destroy(cache->hot.wq);
         waiting_queue_destroy(cache->dirty.wq);
         waiting_queue_destroy(cache->clean.wq);
-
+#endif
         freez(cache->index);
         freez(cache);
     }
