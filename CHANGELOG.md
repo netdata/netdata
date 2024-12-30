@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix\(debugfs/sensors\): correct driver label value [\#19294](https://github.com/netdata/netdata/pull/19294) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): add bison and flex [\#19292](https://github.com/netdata/netdata/pull/19292) ([ilyam8](https://github.com/ilyam8))
 - remove go.d/windows [\#19290](https://github.com/netdata/netdata/pull/19290) ([ilyam8](https://github.com/ilyam8))
 - fix\(netdata-updater.sh\): ensure tmpdir-path argument is always passed [\#19289](https://github.com/netdata/netdata/pull/19289) ([ilyam8](https://github.com/ilyam8))
@@ -42,6 +43,8 @@
 - Regenerate integrations docs [\#19254](https://github.com/netdata/netdata/pull/19254) ([netdatabot](https://github.com/netdatabot))
 - docs: fix nats metadata suffix [\#19253](https://github.com/netdata/netdata/pull/19253) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d\): add  NATS collector [\#19252](https://github.com/netdata/netdata/pull/19252) ([ilyam8](https://github.com/ilyam8))
+- Monitor sensors using libsensors via debugfs.plugin [\#19251](https://github.com/netdata/netdata/pull/19251) ([ktsaou](https://github.com/ktsaou))
+- DBENGINE: pgc tuning, replication tuning [\#19237](https://github.com/netdata/netdata/pull/19237) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.0](https://github.com/netdata/netdata/tree/v2.1.0) (2024-12-19)
 
@@ -461,9 +464,6 @@
 - docs\(apps.plugin\): fix prefix/suffix pattern example [\#18742](https://github.com/netdata/netdata/pull/18742) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d/nvme\): add model\_number label [\#18741](https://github.com/netdata/netdata/pull/18741) ([ilyam8](https://github.com/ilyam8))
 - sanitizers should not remove trailing underscores [\#18738](https://github.com/netdata/netdata/pull/18738) ([ktsaou](https://github.com/ktsaou))
-- Remove CR \(windows.plugin\) [\#18737](https://github.com/netdata/netdata/pull/18737) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add `ilert` cloud notification integration [\#18736](https://github.com/netdata/netdata/pull/18736) ([car12o](https://github.com/car12o))
-- fix\(go.d/sensors\): fix parsing power accuracy [\#18735](https://github.com/netdata/netdata/pull/18735) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
