@@ -392,7 +392,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     META_DEL(&sth->run.meta, (Word_t)&s->thread.meta);
 
     s->thread.wanted = 0;
-    if(!nd_poll_del(sth->run.ndpl, s->sock.fd, &s->thread.meta))
+    if(!nd_poll_del(sth->run.ndpl, s->sock.fd))
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND[%zu] '%s' [to %s]: failed to delete sender socket from nd_poll()",
                sth->id, rrdhost_hostname(s->host), s->remote_ip);
@@ -488,7 +488,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         bytes_uncompressed += stats.bytes_uncompressed;
 
         s->thread.wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
-        if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted, &s->thread.meta))
+        if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip);
@@ -617,7 +617,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
             if (!stats->bytes_outstanding) {
                 // we sent them all - remove ND_POLL_WRITE
                 s->thread.wanted = ND_POLL_READ;
-                if (!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted, &s->thread.meta))
+                if (!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted))
                     nd_log(NDLS_DAEMON, NDLP_ERR,
                            "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
                            sth->id, rrdhost_hostname(s->host), s->remote_ip);

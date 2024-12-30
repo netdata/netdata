@@ -30,7 +30,7 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
         if(m->type == POLLFD_TYPE_SENDER) {
             if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
                 m->s->thread.wanted = ND_POLL_READ | ND_POLL_WRITE;
-                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, m->s->thread.wanted, m)) {
+                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, m->s->thread.wanted)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
                                  "STREAM SND[%zu] '%s' [to %s]: cannot enable output on sender socket %d.",
@@ -50,7 +50,7 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
         else if(m->type == POLLFD_TYPE_RECEIVER) {
             if (msg->opcode & STREAM_OPCODE_RECEIVER_POLLOUT) {
                 m->rpt->thread.wanted = ND_POLL_READ | ND_POLL_WRITE;
-                if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, m->rpt->thread.wanted, m)) {
+                if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, m->rpt->thread.wanted)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                                  "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot enable output on receiver socket %d.",

@@ -32,14 +32,11 @@ void nd_poll_destroy(nd_poll_t *ndpl);
 // the data pointer SHOULD NEVER be changed and cannot be NULL
 bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data);
 
-// give the same data pointer used in nd_poll_add()
-// otherwise, you may receive back invalid events
-bool nd_poll_del(nd_poll_t *ndpl, int fd, void *data);
+// delete an fd
+bool nd_poll_del(nd_poll_t *ndpl, int fd);
 
-// this is for updating events
-// the data pointer must be the same used in nd_poll_add()
-// to change the data pointer, delete and add the same fd again
-bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data);
+// update the expected events on an fd
+bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events);
 
 // returns -1 = error, 0 = timeout, 1 = event in result
 int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result);
