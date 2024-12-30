@@ -70,6 +70,7 @@ struct waiting_queue {
     Word_t last_seqno;          // incrementing sequence counter
     SPINLOCK spinlock;          // ensures there is only 1 runner at a time
     REFCOUNT running;           // number of threads, including the one holding the lock
+    pid_t writer;
     WAITING_THREAD *list;       // the list of threads waiting, not including the 1 holding the lock
 };
 
@@ -185,6 +186,7 @@ usec_t waiting_queue_acquire(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority)
             WQ_COND_wait(&wt.cond, &wq->mutex);
     } while(true);
 
+    wq->writer = gettid_cached();
     WAITERS_DEL(wq, &wt);
     WQ_MUTEX_unlock(&wq->mutex);
     WAITING_THREAD_cleanup(wq, &wt);
@@ -193,11 +195,12 @@ usec_t waiting_queue_acquire(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority)
 }
 
 void waiting_queue_release(WAITING_QUEUE *wq) {
+    wq->writer = 0;
+    spinlock_unlock(&wq->spinlock);
+
     // Fast path if we're alone
-    if(__atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 0) {
-        spinlock_unlock(&wq->spinlock);
+    if(__atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 0)
         return;
-    }
 
     // Slow path - need to signal next in line
     WQ_MUTEX_lock(&wq->mutex);
@@ -206,7 +209,6 @@ void waiting_queue_release(WAITING_QUEUE *wq) {
     if(wq->list)
         WQ_COND_signal(&wq->list->cond);
 
-    spinlock_unlock(&wq->spinlock);
     WQ_MUTEX_unlock(&wq->mutex);
 }
 
