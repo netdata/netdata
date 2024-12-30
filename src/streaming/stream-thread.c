@@ -328,7 +328,7 @@ static void stream_thread_messages_resize_unsafe(struct stream_thread *sth) {
 static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_result_t *ev, usec_t now_ut, size_t *replay_entries) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
-    struct pollfd_meta *m = ev->data;
+    struct pollfd_meta *m = (struct pollfd_meta *)ev->data;
     if(!m) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM THREAD[%zu]: cannot get meta from nd_poll() event. Ignoring event.", sth->id);

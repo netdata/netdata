@@ -438,7 +438,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             ;
         }
         else {
-            POLLINFO *pi = result.data;
+            POLLINFO *pi = (POLLINFO *)result.data;
 
             if(result.events & (ND_POLL_HUP | ND_POLL_INVALID | ND_POLL_ERROR))
                 poll_process_error(pi, result.events);

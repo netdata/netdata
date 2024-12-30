@@ -12,7 +12,7 @@
 struct fd_info {
     uint32_t events;
     uint32_t last_served;
-    void *data;
+    const void *data;
 };
 
 DEFINE_JUDYL_TYPED(POINTERS, struct fd_info *);
@@ -72,7 +72,7 @@ static inline nd_poll_event_t nd_poll_events_from_epoll_events(uint32_t events) 
 }
 
 // Add a file descriptor to the event poll
-bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
+bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, const void *data) {
     internal_fatal(!data, "nd_poll() does not support NULL data pointers");
 
     struct fd_info *fdi = mallocz(sizeof(*fdi));
@@ -186,7 +186,7 @@ static void sort_events(nd_poll_t *ndpl) {
         struct fd_info *fdi = POINTERS_GET(&ndpl->pointers, ndpl->ev[i].data.fd);
         sortable_array[i] = (sortable_event_t){
             .event = ndpl->ev[i],
-            .last_served = fdi ? fdi->last_served : SIZE_MAX,
+            .last_served = fdi ? fdi->last_served : UINT32_MAX,
         };
     }
 

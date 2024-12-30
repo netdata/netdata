@@ -20,17 +20,17 @@ typedef enum __attribute__((packed)) {
 
 typedef struct {
     nd_poll_event_t events;
-    void *data;
+    const void *data;
 } nd_poll_result_t;
 
 typedef struct nd_poll_t nd_poll_t;
 
-nd_poll_t *nd_poll_create();
+nd_poll_t *nd_poll_create() WARNUNUSED;
 void nd_poll_destroy(nd_poll_t *ndpl);
 
 // the events can be updated with nd_poll_upd
 // the data pointer SHOULD NEVER be changed and cannot be NULL
-bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data);
+bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, const void *data);
 
 // delete an fd
 bool nd_poll_del(nd_poll_t *ndpl, int fd);
