@@ -20,7 +20,7 @@ static struct sqlite3_statistics {
     PAD64(uint64_t) sqlite3_context_cache_spill;
     PAD64(uint64_t) sqlite3_metadata_cache_write;
     PAD64(uint64_t) sqlite3_context_cache_write;
-} sqlite3_statistics = { };
+} sqlite3_statistics = { 0 };
 
 void pulse_sqlite3_query_completed(bool success, bool busy, bool locked) {
     if(!sqlite3_statistics.enabled) return;

@@ -30,7 +30,7 @@ static struct query_statistics {
 
     PAD64(uint64_t) exporters_queries_made;
     PAD64(uint64_t) exporters_db_points_read;
-} query_statistics;
+} query_statistics = { 0 };
 
 void pulse_queries_ml_query_completed(size_t points_read) {
     __atomic_fetch_add(&query_statistics.ml_queries_made, 1, __ATOMIC_RELAXED);

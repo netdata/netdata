@@ -19,7 +19,7 @@ static struct web_statistics {
 
     PAD64(uint64_t) content_size_uncompressed;
     PAD64(uint64_t) content_size_compressed;
-} web_statistics;
+} web_statistics = { 0 };
 
 uint64_t pulse_web_client_connected(void) {
     __atomic_fetch_add(&web_statistics.connected_clients, 1, __ATOMIC_RELAXED);

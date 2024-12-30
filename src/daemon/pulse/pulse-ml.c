@@ -12,7 +12,7 @@ static struct ml_statistics {
     PAD64(uint64_t) ml_memory_consumption;
     PAD64(uint64_t) ml_memory_new;
     PAD64(uint64_t) ml_memory_delete;
-} ml_statistics = {0};
+} ml_statistics = { 0 };
 
 void pulse_ml_models_received()
 {
