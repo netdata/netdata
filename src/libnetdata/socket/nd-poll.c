@@ -10,6 +10,7 @@
 #include <sys/epoll.h>
 
 struct fd_info {
+    uint32_t events;
     uint32_t last_served;
     void *data;
 };
@@ -45,6 +46,31 @@ nd_poll_t *nd_poll_create() {
     return ndpl;
 }
 
+static inline uint32_t nd_poll_events_to_epoll_events(nd_poll_event_t events) {
+    uint32_t pevents = EPOLLERR | EPOLLHUP;
+    if (events & ND_POLL_READ) pevents |= EPOLLIN;
+    if (events & ND_POLL_WRITE) pevents |= EPOLLOUT;
+    return pevents;
+}
+
+static inline nd_poll_event_t nd_poll_events_from_epoll_events(uint32_t events) {
+    nd_poll_event_t nd_poll_events = ND_POLL_NONE;
+
+    if (events & (EPOLLIN|EPOLLPRI|EPOLLRDNORM|EPOLLRDBAND))
+        nd_poll_events |= ND_POLL_READ;
+
+    if (events & (EPOLLOUT|EPOLLWRNORM|EPOLLWRBAND))
+        nd_poll_events |= ND_POLL_WRITE;
+
+    if (events & EPOLLERR)
+        nd_poll_events |= ND_POLL_ERROR;
+
+    if (events & (EPOLLHUP|EPOLLRDHUP))
+        nd_poll_events |= ND_POLL_HUP;
+
+    return nd_poll_events;
+}
+
 // Add a file descriptor to the event poll
 bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
     internal_fatal(!data, "nd_poll() does not support NULL data pointers");
@@ -52,6 +78,7 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
     struct fd_info *fdi = mallocz(sizeof(*fdi));
     fdi->data = data;
     fdi->last_served = 0;
+    fdi->events = nd_poll_events_to_epoll_events(events);
 
     if(POINTERS_GET(&ndpl->pointers, fd) || !POINTERS_SET(&ndpl->pointers, fd, fdi)) {
         freez(fdi);
@@ -59,7 +86,7 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
     }
 
     struct epoll_event ev = {
-        .events = (events & ND_POLL_READ ? EPOLLIN : 0) | (events & ND_POLL_WRITE ? EPOLLOUT : 0),
+        .events = fdi->events,
         .data.fd = fd,
     };
 
@@ -92,31 +119,18 @@ bool nd_poll_del(nd_poll_t *ndpl, int fd) {
 
 // Update an existing file descriptor in the event poll
 bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events) {
+    struct fd_info *fdi = POINTERS_GET(&ndpl->pointers, fd);
+    if(!fdi) return false;
+
+    fdi->events = nd_poll_events_to_epoll_events(events);
+
     struct epoll_event ev = {
-        .events = (events & ND_POLL_READ ? EPOLLIN : 0) | (events & ND_POLL_WRITE ? EPOLLOUT : 0),
+        .events = fdi->events,
         .data.fd = fd,
     };
     bool rc = epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_MOD, fd, &ev) == 0;
-    internal_fatal(!rc, "epoll_ctl() failed");
+    internal_fatal(!rc, "epoll_ctl() failed"); // this may happen if fd is closed
     return rc;
-}
-
-static inline nd_poll_event_t nd_poll_events_from_epoll_events(uint32_t events) {
-    nd_poll_event_t nd_poll_events = ND_POLL_NONE;
-
-    if (events & (EPOLLIN|EPOLLPRI|EPOLLRDNORM|EPOLLRDBAND))
-        nd_poll_events |= ND_POLL_READ;
-
-    if (events & (EPOLLOUT|EPOLLWRNORM|EPOLLWRBAND))
-        nd_poll_events |= ND_POLL_WRITE;
-
-    if (events & EPOLLERR)
-        nd_poll_events |= ND_POLL_ERROR;
-
-    if (events & (EPOLLHUP|EPOLLRDHUP))
-        nd_poll_events |= ND_POLL_HUP;
-
-    return nd_poll_events;
 }
 
 static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *result) {
@@ -124,17 +138,21 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
         struct fd_info *fdi = POINTERS_GET(&ndpl->pointers, ndpl->ev[ndpl->last_pos].data.fd);
 
         // Skip events that have been invalidated by nd_poll_del()
-        if(!fdi) {
+        if(!fdi || !fdi->data) {
             ndpl->last_pos++;
             continue;
         }
 
         *result = (nd_poll_result_t){
-            .events = nd_poll_events_from_epoll_events(ndpl->ev[ndpl->last_pos].events),
+            .events = nd_poll_events_from_epoll_events(ndpl->ev[ndpl->last_pos].events & fdi->events),
             .data = fdi->data,
         };
 
         ndpl->last_pos++;
+
+        if(!result->events)
+            // nd_poll_upd() may have removed some flags since we got this
+            continue;
 
         fdi->last_served = ndpl->iteration_counter;
         return true;
@@ -232,7 +250,7 @@ void nd_poll_destroy(nd_poll_t *ndpl) {
 }
 #else
 
-DEFINE_JUDYL_TYPED(POINTERS, void *);
+DEFINE_JUDYL_TYPED(POINTERS, const void *);
 
 struct nd_poll_t {
     struct pollfd *fds;         // Array of file descriptors
@@ -267,7 +285,35 @@ static void ensure_capacity(nd_poll_t *ndpl) {
     ndpl->capacity = new_capacity;
 }
 
-bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
+static inline short int nd_poll_events_to_poll_events(nd_poll_event_t events) {
+    short int pevents = POLLERR | POLLHUP | POLLNVAL;
+    if (events & ND_POLL_READ) pevents |= POLLIN;
+    if (events & ND_POLL_WRITE) pevents |= POLLOUT;
+    return pevents;
+}
+
+static inline nd_poll_event_t nd_poll_events_from_poll_revents(short int events) {
+    nd_poll_event_t nd_poll_events = ND_POLL_NONE;
+
+    if (events & (POLLIN|POLLPRI|POLLRDNORM|POLLRDBAND))
+        nd_poll_events |= ND_POLL_READ;
+
+    if (events & (POLLOUT|POLLWRNORM|POLLWRBAND))
+        nd_poll_events |= ND_POLL_WRITE;
+
+    if (events & POLLERR)
+        nd_poll_events |= ND_POLL_ERROR;
+
+    if (events & (POLLHUP|POLLRDHUP))
+        nd_poll_events |= ND_POLL_HUP;
+
+    if (events & (POLLNVAL))
+        nd_poll_events |= ND_POLL_INVALID;
+
+    return nd_poll_events;
+}
+
+bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, const void *data) {
     internal_fatal(POINTERS_GET(&ndpl->pointers, fd) != NULL, "File descriptor %d is already served - cannot add", fd);
 
     if(POINTERS_GET(&ndpl->pointers, fd) || !POINTERS_SET(&ndpl->pointers, fd, data))
@@ -276,9 +322,7 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
     ensure_capacity(ndpl);
     struct pollfd *pfd = &ndpl->fds[ndpl->nfds++];
     pfd->fd = fd;
-    pfd->events = 0;
-    if (events & ND_POLL_READ) pfd->events |= POLLIN;
-    if (events & ND_POLL_WRITE) pfd->events |= POLLOUT;
+    pfd->events = nd_poll_events_to_poll_events(events);
     pfd->revents = 0;
 
     return true;
@@ -311,7 +355,7 @@ bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events) {
     for (nfds_t i = 0; i < ndpl->nfds; i++) {
         if (ndpl->fds[i].fd == fd) {
             struct pollfd *pfd = &ndpl->fds[i];
-            pfd->events = ((events & ND_POLL_READ) ? POLLIN : 0) | ((events & ND_POLL_WRITE) ? POLLOUT : 0);
+            pfd->events = nd_poll_events_to_poll_events(events);
             return true;
         }
     }
@@ -320,35 +364,19 @@ bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events) {
     return false;
 }
 
-static inline nd_poll_event_t nd_poll_events_from_poll_revents(short int events) {
-    nd_poll_event_t nd_poll_events = ND_POLL_NONE;
-
-    if (events & (POLLIN|POLLPRI|POLLRDNORM|POLLRDBAND))
-        nd_poll_events |= ND_POLL_READ;
-
-    if (events & (POLLOUT|POLLWRNORM|POLLWRBAND))
-        nd_poll_events |= ND_POLL_WRITE;
-
-    if (events & POLLERR)
-        nd_poll_events |= ND_POLL_ERROR;
-
-    if (events & (POLLHUP|POLLRDHUP))
-        nd_poll_events |= ND_POLL_HUP;
-
-    if (events & (POLLNVAL))
-        nd_poll_events |= ND_POLL_INVALID;
-
-    return nd_poll_events;
-}
-
 static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *result) {
     for (nfds_t i = ndpl->last_pos; i < ndpl->nfds; i++) {
         if (ndpl->fds[i].revents != 0) {
 
             result->data = POINTERS_GET(&ndpl->pointers, ndpl->fds[i].fd);
-            if(!result->data) continue;
+            if(!result->data)
+                continue;
 
-            result->events = nd_poll_events_from_poll_revents(ndpl->fds[i].revents);
+            result->events = nd_poll_events_from_poll_revents(ndpl->fds[i].revents & ndpl->fds[i].events);
+            if(!result->events)
+                // nd_poll_upd() may have removed some flags since we got this
+                continue;
+
             ndpl->fds[i].revents = 0;
 
             ndpl->last_pos = i + 1;
