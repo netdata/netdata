@@ -50,9 +50,12 @@ void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int 
     errno_clear();
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
+    const char *emoji = "🌀";
+    const char *transitioned = (ae->old_status < ae->new_status) ? "raised" : "lowered";
 
     switch(ae->new_status) {
         case RRDCALC_STATUS_UNDEFINED:
+            emoji = "❓";
             if(ae->old_status >= RRDCALC_STATUS_CLEAR)
                 priority = NDLP_NOTICE;
             else
@@ -61,34 +64,55 @@ void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int 
 
         default:
         case RRDCALC_STATUS_UNINITIALIZED:
+            emoji = "⏳";
+            priority = NDLP_DEBUG;
+            break;
+
         case RRDCALC_STATUS_REMOVED:
+            emoji = "🚫";
             priority = NDLP_DEBUG;
             break;
 
         case RRDCALC_STATUS_CLEAR:
-            if(ae->old_status == RRDCALC_STATUS_UNINITIALIZED)
+            if(ae->old_status == RRDCALC_STATUS_UNINITIALIZED) {
+                emoji = "💚";
                 priority = NDLP_DEBUG;
-            else
+            }
+            else if(ae->old_status <= RRDCALC_STATUS_CLEAR) {
+                emoji = "✅";
                 priority = NDLP_INFO;
+            }
+            else {
+                emoji = "💚";
+                priority = NDLP_NOTICE;
+            }
             break;
 
         case RRDCALC_STATUS_WARNING:
-            if(ae->old_status < RRDCALC_STATUS_WARNING)
+            if(ae->old_status <= RRDCALC_STATUS_WARNING) {
+                emoji = "⚠️";
                 priority = NDLP_WARNING;
+            }
+            else {
+                emoji = "🔶";
+                priority = NDLP_INFO;
+            }
             break;
 
         case RRDCALC_STATUS_CRITICAL:
-            if(ae->old_status < RRDCALC_STATUS_CRITICAL)
-                priority = NDLP_CRIT;
+            emoji = "🔴";
+            priority = NDLP_CRIT;
             break;
     }
 
     netdata_logger(NDLS_HEALTH, priority, file, function, line,
-                   "ALERT '%s' of instance '%s' on node '%s', transitioned from %s to %s.\n"
-                   "%s value got from %f %s, to %f %s.",
+                   "ALERT '%s' of '%s' on node '%s', %s from %s to %s.\n"
+                   "%s %s on %s.\n"
+                   "%s:%s:%s value got from %f %s, to %f %s.",
                    string2str(ae->name), string2str(ae->chart), string2str(host->hostname),
-                   rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status),
-                   string2str(ae->name),
+                   transitioned, rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status),
+                   emoji, string2str(ae->info), string2str(host->hostname),
+                   string2str(host->hostname), string2str(ae->chart), string2str(ae->name),
                    ae->old_value, string2str(ae->units),
                    ae->new_value, string2str(ae->units));
 }
