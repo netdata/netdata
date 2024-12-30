@@ -2,7 +2,9 @@
 
 #include "waiting-queue.h"
 
-#if defined(OS_LINUX)
+// #define WAITING_QUEUE_USE_FUTEX 1
+
+#if defined(WAITING_QUEUE_USE_FUTEX)
 #include <linux/futex.h>
 #include <sys/syscall.h>
 
@@ -67,7 +69,7 @@ struct waiting_queue {
     WQ_MUTEX mutex;             // ensure acquirers and releasers are synchronized
     Word_t last_seqno;          // incrementing sequence counter
     SPINLOCK spinlock;          // ensures there is only 1 runner at a time
-    uint32_t running;           // number of threads, including the one holding the lock
+    REFCOUNT running;           // number of threads, including the one holding the lock
     WAITING_THREAD *list;       // the list of threads waiting, not including the 1 holding the lock
 };
 
@@ -111,7 +113,7 @@ void waiting_queue_destroy(WAITING_QUEUE *wq) {
     if(!wq) return;
 
     if(wq->running)
-        fatal("WAITING_QUEUE: destroying waiting queue that still has %u threads running/waiting", wq->running);
+        fatal("WAITING_QUEUE: destroying waiting queue that still has %d threads running/waiting", wq->running);
 
     WQ_MUTEX_destroy(&wq->mutex);
     freez(wq);
@@ -191,11 +193,11 @@ usec_t waiting_queue_acquire(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority)
 }
 
 void waiting_queue_release(WAITING_QUEUE *wq) {
-    spinlock_unlock(&wq->spinlock);
-
     // Fast path if we're alone
-    if(__atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 0)
+    if(__atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 0) {
+        spinlock_unlock(&wq->spinlock);
         return;
+    }
 
     // Slow path - need to signal next in line
     WQ_MUTEX_lock(&wq->mutex);
@@ -204,6 +206,7 @@ void waiting_queue_release(WAITING_QUEUE *wq) {
     if(wq->list)
         WQ_COND_signal(&wq->list->cond);
 
+    spinlock_unlock(&wq->spinlock);
     WQ_MUTEX_unlock(&wq->mutex);
 }
 
