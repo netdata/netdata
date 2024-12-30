@@ -664,7 +664,7 @@ static inline void check_value_greater_than_zero(SENSOR *s, SENSOR_SUBFEATURE_TY
             s->state = state;
 
             string_freez(s->log_msg);
-            char buf[100];
+            char buf[1024];
             snprintf(buf, sizeof(buf), "%s == %f (kernel driver generated)",
                      SENSOR_SUBFEATURE_TYPE_2str(*config), status);
             s->log_msg = string_strdupz(buf);
@@ -674,7 +674,7 @@ static inline void check_value_greater_than_zero(SENSOR *s, SENSOR_SUBFEATURE_TY
 
 static void userspace_evaluation_log_msg(SENSOR *s, const char *reading_txt, const char *condition, const char *threshold_txt, double reading, double threshold) {
     string_freez(s->log_msg);
-    char buf[200];
+    char buf[1024];
     snprintf(buf, sizeof(buf), "%s %f %s %s %f (userspace evaluation using kernel provided thresholds)",
              reading_txt, reading, condition, threshold_txt, threshold);
     s->log_msg = string_strdupz(buf);
@@ -1210,7 +1210,7 @@ static int sensors_collect_data(void) {
 static bool libsensors_running = false;
 static int libsensors_update_every = 1;
 
-void *libsensors_thread(void *ptr) {
+void *libsensors_thread(void *ptr __maybe_unused) {
     int update_every = libsensors_update_every;
 
     // first try the default directory for libsensors

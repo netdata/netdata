@@ -562,7 +562,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     META_DEL(&sth->run.meta, (Word_t)&rpt->thread.meta);
 
     rpt->thread.wanted = 0;
-    if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd, &rpt->thread.meta))
+    if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd))
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to delete receiver socket from nd_poll()");
 
     rpt->host->stream.rcv.status.tid = 0;
@@ -727,7 +727,7 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
             stream_circular_buffer_del_unsafe(scb, rc, now_ut);
             if (!stats->bytes_outstanding) {
                 rpt->thread.wanted = ND_POLL_READ;
-                if (!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted, &rpt->thread.meta))
+                if (!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
                     nd_log(NDLS_DAEMON, NDLP_ERR,
                            "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot update nd_poll()",
                            sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
@@ -983,7 +983,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
         }
 
         rpt->thread.wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
-        if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted, &rpt->thread.meta))
+        if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM RCV[%zu] '%s' [from %s]: failed to update nd_poll().",
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);

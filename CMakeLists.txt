@@ -562,6 +562,7 @@ void my_function() { ; }
 " HAVE_FUNC_ATTRIBUTE_NOINLINE)
 
 check_c_source_compiles("
+#include <stdlib.h>
 void my_exit_function() __attribute__((noreturn));
 int main() {
         my_exit_function(); // Call the noreturn function

@@ -4,7 +4,7 @@
 
 static inline void poll_process_updated_events(POLLINFO *pi) {
     if(pi->events != pi->events_we_wait_for) {
-        if(!nd_poll_upd(pi->p->ndpl, pi->fd, pi->events, pi))
+        if(!nd_poll_upd(pi->p->ndpl, pi->fd, pi->events))
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to update socket %d to nd_poll", pi->fd);
         pi->events_we_wait_for = pi->events;
     }
@@ -76,7 +76,7 @@ static inline void poll_close_fd(POLLINFO *pi, const char *func) {
     POLLJOB *p = pi->p;
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->ll, pi, prev, next);
-    if(!nd_poll_del(p->ndpl, pi->fd, pi))
+    if(!nd_poll_del(p->ndpl, pi->fd))
         // this is ok, if the socket is already closed
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "Failed to delete socket %d from nd_poll() - called from %s() - is the socket already closed?",
@@ -438,7 +438,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             ;
         }
         else {
-            POLLINFO *pi = result.data;
+            POLLINFO *pi = (POLLINFO *)result.data;
 
             if(result.events & (ND_POLL_HUP | ND_POLL_INVALID | ND_POLL_ERROR))
                 poll_process_error(pi, result.events);
@@ -466,8 +466,24 @@ void poll_events(LISTEN_SOCKETS *sockets
                     }
                 }
                 else if (pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
-                    if(!p.limit || p.used < p.limit)
-                        poll_process_new_tcp_connection(pi, now);
+                    if(pi->socktype == SOCK_DGRAM)
+                        poll_process_udp_read(pi, now);
+
+                    else if(pi->socktype == SOCK_STREAM) {
+                        if (!p.limit || p.used < p.limit)
+                            poll_process_new_tcp_connection(pi, now);
+                    }
+                    else {
+                        nd_log(NDLS_DAEMON, NDLP_ERR,
+                               "POLLFD: LISTENER: server slot %zu (fd %d) connection from %s port %s using unhandled socket type %d.",
+                               i,
+                               pi->fd,
+                               pi->client_ip ? pi->client_ip : "<undefined-ip>",
+                               pi->client_port ? pi->client_port : "<undefined-port>",
+                               pi->socktype);
+
+                        poll_close_fd(pi, "poll_events2");
+                    }
                 }
                 else {
                     nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -479,7 +495,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                            , pi->flags
                     );
 
-                    poll_close_fd(pi, "poll_events2");
+                    poll_close_fd(pi, "poll_events3");
                 }
             }
             else {
@@ -492,7 +508,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                        , (int)result.events
                 );
 
-                poll_close_fd(pi, "poll_events3");
+                poll_close_fd(pi, "poll_events4");
             }
         }
 
