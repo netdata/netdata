@@ -706,7 +706,7 @@ static void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PA
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sp->base, page, link.prev, link.next);
 
         if(!sp->base) {
-            size_t mem_before_judyl, mem_after_judyl;
+            ssize_t mem_before_judyl, mem_after_judyl;
 
             mem_before_judyl = JudyLMemUsed(q->sections_judy);
             int rc = JudyLDel(&q->sections_judy, page->section, PJE0);
@@ -717,7 +717,6 @@ static void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PA
 
             // freez(sp);
             aral_freez(pgc_sections_aral, sp);
-            mem_after_judyl -= sizeof(struct section_pages);
             pgc_stats_queue_judy_change(cache, q, mem_before_judyl, mem_after_judyl);
         }
     }
@@ -1992,7 +1991,7 @@ static void *pgc_evict_thread(void *ptr) {
         job_id = new_job_id;
 
         if (nd_thread_signaled_to_cancel())
-            return NULL;
+            break;
 
         evict_pages(cache, 0, 0, true, false);
 

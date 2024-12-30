@@ -231,13 +231,13 @@ static CURLcode journal_remote_send_buffer(CURL* curl, BUFFER *msg) {
     if(verbose)
         log_message_to_stderr(msg, "REMOTE");
 
-    struct upload_data upload = {0};
-
     if (!curl || !buffer_strlen(msg))
         return CURLE_FAILED_INIT;
 
-    upload.data = (char *) buffer_tostring(msg);
-    upload.length = buffer_strlen(msg);
+    struct upload_data upload = {
+        .data = (char *) buffer_tostring(msg),
+        .length = buffer_strlen(msg),
+    };
 
     curl_easy_setopt(curl, CURLOPT_READDATA, &upload);
     curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)upload.length);
@@ -290,7 +290,7 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
         fprintf(stderr, "WARNING: cannot read '%s'. Will generate a random _MACHINE_ID.\n", MACHINE_ID_PATH);
         nd_uuid_t uuid;
         uuid_generate_random(uuid);
-        uuid_unparse_lower_compact(uuid, global_boot_id);
+        uuid_unparse_lower_compact(uuid, global_machine_id);
     }
 
     if(global_stream_id[0] == '\0') {

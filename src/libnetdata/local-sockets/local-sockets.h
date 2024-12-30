@@ -472,8 +472,8 @@ static inline const char *local_sockets_protocol_name(LOCAL_SOCKET *n) {
 static inline void local_listeners_print_socket(LS_STATE *ls __maybe_unused, const LOCAL_SOCKET *nn, void *data __maybe_unused) {
     LOCAL_SOCKET *n = (LOCAL_SOCKET *)nn;
 
-    char local_address[INET6_ADDRSTRLEN];
-    char remote_address[INET6_ADDRSTRLEN];
+    char local_address[INET6_ADDRSTRLEN] = "";
+    char remote_address[INET6_ADDRSTRLEN] = "";
 
     if(n->local.family == AF_INET) {
         ipv4_address_to_txt(n->local.ip.ipv4, local_address);
