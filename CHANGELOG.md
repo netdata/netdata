@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- nd\_poll\(\) fairness [\#19298](https://github.com/netdata/netdata/pull/19298) ([ktsaou](https://github.com/ktsaou))
+- more descriptive alert transition logs [\#19297](https://github.com/netdata/netdata/pull/19297) ([ktsaou](https://github.com/ktsaou))
 - fix\(debugfs/sensors\): correct driver label value [\#19294](https://github.com/netdata/netdata/pull/19294) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): add bison and flex [\#19292](https://github.com/netdata/netdata/pull/19292) ([ilyam8](https://github.com/ilyam8))
 - remove go.d/windows [\#19290](https://github.com/netdata/netdata/pull/19290) ([ilyam8](https://github.com/ilyam8))
@@ -462,8 +464,6 @@
 - Fix issues with Cloud Notification Integrations metadata [\#18745](https://github.com/netdata/netdata/pull/18745) ([Ancairon](https://github.com/Ancairon))
 - fix\(apps.plugin\): fix debug msg spam on macOS/freeBSD [\#18743](https://github.com/netdata/netdata/pull/18743) ([ilyam8](https://github.com/ilyam8))
 - docs\(apps.plugin\): fix prefix/suffix pattern example [\#18742](https://github.com/netdata/netdata/pull/18742) ([ilyam8](https://github.com/ilyam8))
-- feat\(go.d/nvme\): add model\_number label [\#18741](https://github.com/netdata/netdata/pull/18741) ([ilyam8](https://github.com/ilyam8))
-- sanitizers should not remove trailing underscores [\#18738](https://github.com/netdata/netdata/pull/18738) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
