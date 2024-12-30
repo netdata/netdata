@@ -7,10 +7,11 @@
 #include "spinlock.h"
 
 typedef struct netdata_rw_spinlock {
+    pid_t writer;
     REFCOUNT counter; // positive is readers, negative is a writer
 } RW_SPINLOCK;
 
-#define RW_SPINLOCK_INITIALIZER { .counter = 0, }
+#define RW_SPINLOCK_INITIALIZER { .counter = 0, .writer = 0, }
 
 void rw_spinlock_init_with_trace(RW_SPINLOCK *rw_spinlock, const char *func);
 void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func);
