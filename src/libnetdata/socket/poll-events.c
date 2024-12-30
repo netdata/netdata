@@ -280,12 +280,9 @@ static int poll_process_new_tcp_connection(POLLINFO *pi, time_t now) {
                    "POLLFD: LISTENER: accept() failed.");
 
     }
-    else if(is_socket_closed(nfd)) {
-        nd_log_limit_static_global_var(erl, 10, 1000);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "POLLFD: LISTENER: received client socket %d is closed on accept(), dropping connection", nfd);
-            close(nfd);
-    }
+    else if(is_socket_closed(nfd))
+        close(nfd);
+
     else {
         // accept ok
 
