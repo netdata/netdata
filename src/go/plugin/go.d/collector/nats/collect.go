@@ -15,12 +15,9 @@ import (
 
 func (c *Collector) collect() (map[string]int64, error) {
 	if c.srvMeta.id == "" {
-		id, name, err := c.getServerMeta()
-		if err != nil {
+		if err := c.getServerMeta(); err != nil {
 			return nil, err
 		}
-		c.srvMeta.id = id
-		c.srvMeta.name = name
 	}
 
 	mx := make(map[string]int64)
@@ -54,22 +51,29 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) getServerMeta() (srvId, srvName string, err error) {
+func (c *Collector) getServerMeta() error {
 	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathVarz)
 	if err != nil {
-		return "", "", err
+		return err
 	}
 
 	var resp struct {
-		ID   string `json:"server_id"`
-		Name string `json:"server_name"`
+		ID      string `json:"server_id"`
+		Name    string `json:"server_name"`
+		Cluster struct {
+			Name string `json:"name"`
+		} `json:"cluster"`
 	}
 
 	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
-		return "", "", err
+		return err
 	}
 
-	return resp.ID, resp.Name, nil
+	c.srvMeta.id = resp.ID
+	c.srvMeta.name = resp.Name
+	c.srvMeta.clusterName = resp.Cluster.Name
+
+	return nil
 }
 
 func (c *Collector) collectHealthz(mx map[string]int64) error {
@@ -274,6 +278,8 @@ func (c *Collector) collectJsz(mx map[string]int64) error {
 		return err
 	}
 
+	mx["jsz_disabled"] = metrix.Bool(resp.Disabled)
+	mx["jsz_enabled"] = metrix.Bool(!resp.Disabled)
 	mx["jsz_streams"] = int64(resp.Streams)
 	mx["jsz_consumers"] = int64(resp.Consumers)
 	mx["jsz_bytes"] = int64(resp.Bytes)

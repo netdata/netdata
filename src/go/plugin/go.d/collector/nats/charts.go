@@ -25,6 +25,7 @@ const (
 	prioServerMemoryUsage
 	prioServerUptime
 
+	prioJetStreamStatus
 	prioJetStreamStreams
 	prioJetStreamConsumers
 	prioJetStreamBytes
@@ -203,6 +204,7 @@ var httpEndpointRequestsChartTmpl = module.Chart{
 }
 
 var jetStreamCharts = module.Charts{
+	jetStreamStatus.Copy(),
 	jetStreamStreams.Copy(),
 	jetStreamStreamsStorageBytes.Copy(),
 	jetStreamStreamsStorageMessages.Copy(),
@@ -215,6 +217,18 @@ var jetStreamCharts = module.Charts{
 }
 
 var (
+	jetStreamStatus = module.Chart{
+		ID:       "jetstream_status",
+		Title:    "JetStream Status",
+		Units:    "status",
+		Fam:      "jstream streams",
+		Ctx:      "nats.jetstream_status",
+		Priority: prioJetStreamStatus,
+		Dims: module.Dims{
+			{ID: "jsz_enabled", Name: "enabled"},
+			{ID: "jsz_disabled", Name: "disabled"},
+		},
+	}
 	jetStreamStreams = module.Chart{
 		ID:       "jetstream_streams",
 		Title:    "JetStream Streams",
@@ -654,6 +668,8 @@ func (c *Collector) addServerCharts() {
 	for _, chart := range *charts {
 		chart.Labels = []module.Label{
 			{Key: "server_id", Value: c.srvMeta.id},
+			{Key: "server_name", Value: c.srvMeta.name},
+			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 		}
 	}
 
@@ -669,6 +685,8 @@ func (c *Collector) addAccountCharts(acc *accCacheEntry) {
 		chart.ID = fmt.Sprintf(chart.ID, acc.accName)
 		chart.Labels = []module.Label{
 			{Key: "server_id", Value: c.srvMeta.id},
+			{Key: "server_name", Value: c.srvMeta.name},
+			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "account", Value: acc.accName},
 		}
 		for _, dim := range chart.Dims {
@@ -693,6 +711,8 @@ func (c *Collector) addRouteCharts(route *routeCacheEntry) {
 		chart.ID = fmt.Sprintf(chart.ID, route.rid)
 		chart.Labels = []module.Label{
 			{Key: "server_id", Value: c.srvMeta.id},
+			{Key: "server_name", Value: c.srvMeta.name},
+			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "route_id", Value: strconv.FormatUint(route.rid, 10)},
 			{Key: "remote_id", Value: route.remoteId},
 		}
@@ -725,6 +745,8 @@ func (c *Collector) addGatewayConnCharts(gwConn *gwConnCacheEntry, isInbound boo
 		chart.Ctx = fmt.Sprintf(chart.Ctx, direction)
 		chart.Labels = []module.Label{
 			{Key: "server_id", Value: c.srvMeta.id},
+			{Key: "server_name", Value: c.srvMeta.name},
+			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "gateway", Value: gwConn.gwName},
 			{Key: "remote_gateway", Value: gwConn.rgwName},
 		}
@@ -755,6 +777,8 @@ func (c *Collector) addLeafCharts(leaf *leafCacheEntry) {
 		chart.ID = cleanChartID(chart.ID)
 		chart.Labels = []module.Label{
 			{Key: "server_id", Value: c.srvMeta.id},
+			{Key: "server_name", Value: c.srvMeta.name},
+			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "remote_name", Value: leaf.leafName},
 			{Key: "account", Value: leaf.account},
 			{Key: "ip", Value: leaf.ip},
