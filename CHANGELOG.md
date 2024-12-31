@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- revert waiting-queue optimization [\#19301](https://github.com/netdata/netdata/pull/19301) ([ktsaou](https://github.com/ktsaou))
+- Improve stream sending thread error message [\#19300](https://github.com/netdata/netdata/pull/19300) ([ilyam8](https://github.com/ilyam8))
+- Streaming improvements No 12 [\#19299](https://github.com/netdata/netdata/pull/19299) ([ktsaou](https://github.com/ktsaou))
 - nd\_poll\(\) fairness [\#19298](https://github.com/netdata/netdata/pull/19298) ([ktsaou](https://github.com/ktsaou))
 - more descriptive alert transition logs [\#19297](https://github.com/netdata/netdata/pull/19297) ([ktsaou](https://github.com/ktsaou))
 - fix\(debugfs/sensors\): correct driver label value [\#19294](https://github.com/netdata/netdata/pull/19294) ([ilyam8](https://github.com/ilyam8))
@@ -461,9 +464,6 @@
 - fix\(freebsd.plugin\): fix sysctl arcstats.p fails on FreeBSD 14 [\#18748](https://github.com/netdata/netdata/pull/18748) ([ilyam8](https://github.com/ilyam8))
 - fix\(python.d.plugin\): fix plugin exit if no python found [\#18747](https://github.com/netdata/netdata/pull/18747) ([ilyam8](https://github.com/ilyam8))
 - Fix crash on agent initialization [\#18746](https://github.com/netdata/netdata/pull/18746) ([stelfrag](https://github.com/stelfrag))
-- Fix issues with Cloud Notification Integrations metadata [\#18745](https://github.com/netdata/netdata/pull/18745) ([Ancairon](https://github.com/Ancairon))
-- fix\(apps.plugin\): fix debug msg spam on macOS/freeBSD [\#18743](https://github.com/netdata/netdata/pull/18743) ([ilyam8](https://github.com/ilyam8))
-- docs\(apps.plugin\): fix prefix/suffix pattern example [\#18742](https://github.com/netdata/netdata/pull/18742) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
