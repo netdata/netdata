@@ -30,7 +30,7 @@ static inline bool write_our_priority(WAITQ *waitq, uint64_t our_order) {
 
     do {
 
-        if(current > our_order)
+        if(current != NO_PRIORITY && current < our_order)
             return false;
 
     } while(!__atomic_compare_exchange_n(
@@ -206,7 +206,7 @@ static int unittest_stress(void) {
 
         // Initialize stats and create threads
         size_t thread_idx = 0;
-        for(int prio = WAITQ_PRIO_URGENT; prio >= WAITQ_PRIO_LOW; prio--) {
+        for(int prio = WAITQ_PRIO_URGENT; prio <= WAITQ_PRIO_LOW; prio++) {
             for(int t = 0; t < THREADS_PER_PRIORITY; t++) {
                 stats[thread_idx] = (THREAD_STATS){
                     .priority = prio,
