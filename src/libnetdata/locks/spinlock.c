@@ -28,7 +28,7 @@ void spinlock_lock_with_trace(SPINLOCK *spinlock, const char *func) {
         // Backoff strategy with exponential growth
         spins++;
         microsleep(usec);
-        usec = usec > MAX_USEC ? MAX_USEC : usec * 2;
+        usec = usec >= MAX_USEC ? MAX_USEC : usec * 2;
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS

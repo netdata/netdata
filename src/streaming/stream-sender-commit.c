@@ -68,11 +68,11 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     if (unlikely(!src || !src_len))
         return;
 
-    waiting_queue_acquire(
-        s->wait_queue,
+    waitq_acquire(
+        &s->waitq,
         (s->host->stream.rcv.status.tid == gettid_cached() || s->host->stream.snd.status.tid == gettid_cached()) ?
-            WAITING_QUEUE_PRIO_HIGH :
-            WAITING_QUEUE_PRIO_NORMAL);
+            WAITQ_PRIO_HIGH :
+            WAITQ_PRIO_NORMAL);
     stream_sender_lock(s);
 
     // copy the sequence number of sender buffer recreates, while having our lock
@@ -87,7 +87,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             sender_buffer_destroy(commit);
 
         stream_sender_unlock(s);
-        waiting_queue_release(s->wait_queue);
+        waitq_release(&s->waitq);
         return;
     }
 
@@ -183,7 +183,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
         msg = s->thread.msg;
 
     stream_sender_unlock(s);
-    waiting_queue_release(s->wait_queue);
+    waitq_release(&s->waitq);
 
     if (enable_sending) {
         msg.opcode = STREAM_OPCODE_SENDER_POLLOUT;
@@ -195,7 +195,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 overflow_with_lock: {
         msg = s->thread.msg;
         stream_sender_unlock(s);
-        waiting_queue_release(s->wait_queue);
+        waitq_release(&s->waitq);
         msg.opcode = STREAM_OPCODE_SENDER_BUFFER_OVERFLOW;
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
@@ -211,7 +211,7 @@ compression_failed_with_lock: {
         stream_compression_deactivate(s);
         msg = s->thread.msg;
         stream_sender_unlock(s);
-        waiting_queue_release(s->wait_queue);
+        waitq_release(&s->waitq);
         msg.opcode = STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION;
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
