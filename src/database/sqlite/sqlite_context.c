@@ -115,9 +115,9 @@ done:
 }
 
 // Dimension list
-#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END " \
-    "FROM dimension d WHERE d.chart_id = @id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
-void ctx_get_dimension_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
+#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END, c.type||'.'||c.id, c.context " \
+    "FROM dimension d, chart c WHERE c.host_id = @host_id AND d.chart_id = c.chart_id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
+void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     static __thread sqlite3_stmt *res = NULL;
 
@@ -125,7 +125,7 @@ void ctx_get_dimension_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
 
     SQL_DIMENSION_DATA dimension_data;
 
@@ -135,6 +135,8 @@ void ctx_get_dimension_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION
         dimension_data.id = (char *) sqlite3_column_text(res, 1);
         dimension_data.name = (char *) sqlite3_column_text(res, 2);
         dimension_data.hidden = sqlite3_column_int(res, 3);
+        dimension_data.chart_id = (char *) sqlite3_column_text(res, 4);
+        dimension_data.context = (char *) sqlite3_column_text(res, 5);
         dict_cb(&dimension_data, data);
     }
 

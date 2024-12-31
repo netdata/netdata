@@ -2,7 +2,7 @@
 
 #include "internal.h"
 
-static void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
+void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
 
 inline const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
