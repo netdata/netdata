@@ -60,7 +60,6 @@ typedef uv_mutex_t WQ_MUTEX;
 
 typedef struct waiting_thread {
     WQ_COND cond;               // condition variable for this thread
-    usec_t waiting_since_ut;    // when we started waiting
     Word_t priority;
     struct waiting_thread *prev, *next;
 } WAITING_THREAD;
@@ -70,7 +69,7 @@ struct waiting_queue {
     Word_t last_seqno;          // incrementing sequence counter
     SPINLOCK spinlock;          // ensures there is only 1 runner at a time
     REFCOUNT running;           // number of threads, including the one holding the lock
-    pid_t writer;
+    pid_t writer;               // the current holder of the lock
     WAITING_THREAD *list;       // the list of threads waiting, not including the 1 holding the lock
 };
 
@@ -141,7 +140,6 @@ static inline WAITING_THREAD *WAITERS_FIRST(WAITING_QUEUE *wq) {
 static inline void WAITING_THREAD_init(WAITING_QUEUE *wq, WAITING_THREAD *wt, WAITING_QUEUE_PRIORITY priority) {
     Word_t seqno = __atomic_add_fetch(&wq->last_seqno, 1, __ATOMIC_RELAXED);
     wt->priority = make_key(priority, seqno);
-    wt->waiting_since_ut = now_monotonic_usec();
     wt->prev = wt->next = NULL;
 
     int ret = WQ_COND_init(&wt->cond);
@@ -154,21 +152,26 @@ static inline void WAITING_THREAD_cleanup(WAITING_QUEUE *wq __maybe_unused, WAIT
 }
 
 bool waiting_queue_try_acquire(WAITING_QUEUE *wq) {
-    if(__atomic_add_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 1 &&
-        spinlock_trylock(&wq->spinlock)) {
+    REFCOUNT running = __atomic_add_fetch(&wq->running, 1, __ATOMIC_RELAXED);
+    if(running <= 0)
+        fatal("WAITING QUEUE: refcount is less or equal to zero %d, but it should be positive", running);
+
+    if(running == 1 && spinlock_trylock(&wq->spinlock))
         return true;
-    }
 
     __atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED);
     return false;
 }
 
-usec_t waiting_queue_acquire(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority) {
+void waiting_queue_acquire(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority) {
     // Try fast path first - if we're the only one, just go
-    if(__atomic_add_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 1 &&
-        spinlock_trylock(&wq->spinlock)) {
-        return 0;
-    }
+
+    REFCOUNT running = __atomic_add_fetch(&wq->running, 1, __ATOMIC_RELAXED);
+    if(running <= 0)
+        fatal("WAITING QUEUE: refcount is less or equal to zero %d, but it should be positive", running);
+
+    if(running == 1 && spinlock_trylock(&wq->spinlock))
+        return;
 
     // Slow path - need to wait
 
@@ -190,8 +193,6 @@ usec_t waiting_queue_acquire(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority)
     WAITERS_DEL(wq, &wt);
     WQ_MUTEX_unlock(&wq->mutex);
     WAITING_THREAD_cleanup(wq, &wt);
-
-    return now_monotonic_usec() - wt.waiting_since_ut;
 }
 
 void waiting_queue_release(WAITING_QUEUE *wq) {
@@ -199,8 +200,12 @@ void waiting_queue_release(WAITING_QUEUE *wq) {
     spinlock_unlock(&wq->spinlock);
 
     // Fast path if we're alone
-    if(__atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED) == 0)
+    REFCOUNT running = __atomic_sub_fetch(&wq->running, 1, __ATOMIC_RELAXED);
+    if(running == 0)
         return;
+
+    if(running < 0)
+        fatal("WAITING QUEUE: refcount is negative %d", running);
 
     // Slow path - need to signal next in line
     WQ_MUTEX_lock(&wq->mutex);
@@ -218,6 +223,9 @@ size_t waiting_queue_waiting(WAITING_QUEUE *wq) {
 
 
 // --------------------------------------------------------------------------------------------------------------------
+
+#define THREADS_PER_PRIORITY 2
+#define TEST_DURATION_SEC 2
 
 // For stress test statistics
 typedef struct thread_stats {
@@ -252,7 +260,9 @@ static int unittest_functional(void) {
 
     // Test 1: Fast path should work with no contention
     fprintf(stderr, "  Test 1: Fast path - no contention: ");
-    usec_t wait_time = waiting_queue_acquire(wq, WAITING_QUEUE_PRIO_NORMAL);
+    usec_t waiting_since_ut = now_monotonic_usec();
+    waiting_queue_acquire(wq, WAITING_QUEUE_PRIO_NORMAL);
+    usec_t wait_time = now_monotonic_usec() - waiting_since_ut;
     waiting_queue_release(wq);
     if(wait_time != 0) {
         fprintf(stderr, "FAILED (waited %"PRIu64" usec)\n", wait_time);
@@ -334,7 +344,9 @@ static void *stress_thread(void *arg) {
     bool *stop_flag = args->stop_flag;
 
     while(!__atomic_load_n(stop_flag, __ATOMIC_ACQUIRE)) {
-        usec_t wait_time = waiting_queue_acquire(wq, stats->priority);
+        usec_t waiting_since_ut = now_monotonic_usec();
+        waiting_queue_acquire(wq, stats->priority);
+        usec_t wait_time = now_monotonic_usec() - waiting_since_ut;
         stats->executions++;
         stats->total_wait_time += wait_time;
         if(wait_time > stats->max_wait_time)
@@ -373,9 +385,6 @@ static void print_thread_stats(THREAD_STATS *stats, size_t count, usec_t duratio
                 percent_waiting);
     }
 }
-
-#define THREADS_PER_PRIORITY 2
-#define TEST_DURATION_SEC 5
 
 static int unittest_stress(void) {
     int errors = 0;
@@ -451,26 +460,6 @@ static int unittest_stress(void) {
 
         // Print stats
         print_thread_stats(stats, total_threads, TEST_DURATION_SEC * USEC_PER_SEC);
-
-//        // Basic validation
-//        for(size_t i = 0; i < total_threads - THREADS_PER_PRIORITY; i++) {
-//            if(stats[i].executions < stats[i + THREADS_PER_PRIORITY].executions) {
-//                fprintf(stderr, "ERROR: Higher priority thread got fewer executions!\n");
-//                errors++;
-//            }
-//        }
-//
-//        // Check fairness within same priority
-//        for(size_t i = 0; i < total_threads; i += THREADS_PER_PRIORITY) {
-//            for(size_t j = i + 1; j < i + THREADS_PER_PRIORITY; j++) {
-//                double diff = (double)(stats[i].executions - stats[j].executions) /
-//                              (double)(stats[i].executions + stats[j].executions);
-//                if(fabs(diff) > 0.1) {  // allow 10% difference
-//                    fprintf(stderr, "ERROR: Unfair distribution within same priority!\n");
-//                    errors++;
-//                }
-//            }
-//        }
     }
 
     waiting_queue_destroy(wq);
@@ -479,6 +468,7 @@ static int unittest_stress(void) {
 
 int unittest_waiting_queue(void) {
    int errors = unittest_functional();
+
    errors += unittest_stress();
 
    return errors;

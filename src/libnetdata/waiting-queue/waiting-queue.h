@@ -47,7 +47,7 @@ bool waiting_queue_try_acquire(WAITING_QUEUE *wq);
 
 // Returns when it is our turn to run
 // Returns time spent waiting in microseconds
-usec_t waiting_queue_acquire(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority);
+void waiting_queue_acquire(WAITING_QUEUE *wq, WAITING_QUEUE_PRIORITY priority);
 
 // Mark that we are done - wakes up the next in line
 void waiting_queue_release(WAITING_QUEUE *wq);

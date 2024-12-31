@@ -415,8 +415,9 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     size_t recursion = __atomic_add_fetch(&already_in_fatal, 1, __ATOMIC_SEQ_CST);
     if(recursion > 1) {
         // exit immediately, nothing more to be done
-        fprintf(stderr, "RECURSIVE FATAL STATEMENTS, latest from %lu@%s() of %s, EXITING NOW!\n",
-                line, function, file);
+        sleep(2); // give the first fatal the chance to be written
+        fprintf(stderr, "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
+                function, line, file);
         fflush(stderr);
         _exit(1);
     }
