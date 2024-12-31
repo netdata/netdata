@@ -64,8 +64,9 @@ type Collector struct {
 	cache *cache
 
 	srvMeta struct {
-		id   string
-		name string
+		id          string
+		name        string
+		clusterName string
 	}
 	onceAddSrvCharts *sync.Once
 }

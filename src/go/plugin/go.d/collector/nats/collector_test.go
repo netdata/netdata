@@ -203,6 +203,8 @@ func TestCollector_Collect(t *testing.T) {
 				"jsz_api_total":                                936916,
 				"jsz_bytes":                                    114419224,
 				"jsz_consumers":                                9,
+				"jsz_disabled":                                 0,
+				"jsz_enabled":                                  1,
 				"jsz_memory_used":                              128,
 				"jsz_messages":                                 5670,
 				"jsz_store_used":                               114419224,
