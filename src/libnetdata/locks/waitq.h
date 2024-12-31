@@ -23,10 +23,10 @@
  */
 
 typedef enum __attribute__((packed)) {
-    WAITQ_PRIO_LOW = 0,     // will be last
-    WAITQ_PRIO_NORMAL,      // will be third
-    WAITQ_PRIO_HIGH,        // will be second
-    WAITQ_PRIO_URGENT,      // will be first
+    WAITQ_PRIO_URGENT = 0,      // will be first
+    WAITQ_PRIO_HIGH,            // will be second
+    WAITQ_PRIO_NORMAL,          // will be third
+    WAITQ_PRIO_LOW,             // will be last
 
     // terminator
     WAITQ_PRIO_MAX,
@@ -36,7 +36,7 @@ typedef struct waiting_queue {
     SPINLOCK spinlock;          // protects the actual resource
     pid_t writer;               // the pid the thread currently holding the lock
     uint64_t current_priority;  // current highest priority attempting to acquire
-    uint64_t last_seqno;        // for FIFO ordering within same priority
+    uint32_t last_seqno;        // for FIFO ordering within same priority
 } WAITQ;
 
 #define WAITQ_INITIALIZER (WAITQ){ .spinlock = SPINLOCK_INITIALIZER, .current_priority = 0, .last_seqno = 0, }
