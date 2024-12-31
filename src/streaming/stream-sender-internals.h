@@ -59,7 +59,7 @@ struct sender_state {
     char remote_ip[CONNECTED_TO_SIZE + 1];      // We don't know which proxy we connect to, passed back from socket.c
     time_t last_state_since_t;                  // the timestamp of the last state (online/offline) change
 
-    WAITING_QUEUE *wait_queue;
+    WAITQ waitq;
     STREAM_CIRCULAR_BUFFER *scb;
 
     struct {
