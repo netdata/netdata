@@ -2,7 +2,7 @@
 
 #include "internal.h"
 
-static void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
+void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
 
 inline const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
@@ -225,7 +225,7 @@ void rrdmetrics_destroy_from_rrdinstance(RRDINSTANCE *ri) {
 }
 
 // trigger post-processing of the rrdmetric, escalating changes to the rrdinstance it belongs
-static void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function) {
+void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function) {
     if(unlikely(rrd_flag_is_collected(rm)) && (!rm->rrddim || rrd_flag_check(rm, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD)))
         rrdmetric_set_archived(rm);
 

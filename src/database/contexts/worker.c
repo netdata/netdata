@@ -28,8 +28,26 @@ void load_instance_labels_on_demand(nd_uuid_t *uuid, void *data) {
     ctx_get_label_list(uuid, rrdinstance_load_clabel, data);
 }
 
-static void rrdinstance_load_dimension(SQL_DIMENSION_DATA *sd, void *data) {
-    RRDINSTANCE *ri = data;
+static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *data) {
+    RRDHOST *host = data;
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, sd->context);
+    if(!rca) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "RRDCONTEXT: context '%s' is not found in host '%s'",
+               sd->context, rrdhost_hostname(host));
+        return;
+    }
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+
+    RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_get_and_acquire_item(rc->rrdinstances, sd->chart_id);
+    if(!ria) {
+        rrdcontext_release(rca);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "RRDCONTEXT: instance '%s' of context '%s' is not found in host '%s'",
+               sd->chart_id, sd->context, rrdhost_hostname(host));
+        return;
+    }
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
 
     RRDMETRIC trm = {
             .id = string_strdupz(sd->id),
@@ -41,9 +59,12 @@ static void rrdinstance_load_dimension(SQL_DIMENSION_DATA *sd, void *data) {
     uuid_copy(trm.uuid, sd->dim_id);
 
     dictionary_set(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
+
+    rrdinstance_release(ria);
+    rrdcontext_release(rca);
 }
 
-static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
+static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
     RRDHOST *host = data;
 
     RRDCONTEXT tc = {
@@ -74,10 +95,7 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
     uuid_copy(tri.uuid, sc->chart_id);
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_set_and_acquire_item(rc->rrdinstances, sc->id, &tri, sizeof(tri));
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
 
-    ctx_get_dimension_list(&ri->uuid, rrdinstance_load_dimension, ri);
-    rrdinstance_trigger_updates(ri, __FUNCTION__ );
     rrdinstance_release(ria);
     rrdcontext_release(rca);
 }
@@ -106,12 +124,23 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
         return;
 
     ctx_get_context_list(&host->host_id.uuid, rrdcontext_load_context_callback, host);
-    ctx_get_chart_list(&host->host_id.uuid, rrdinstance_load_chart_callback, host);
+    ctx_get_chart_list(&host->host_id.uuid, rrdinstance_load_instance_callback, host);
+    ctx_get_dimension_list(&host->host_id.uuid, rrdinstance_load_dimension_callback, host);
 
     RRDCONTEXT *rc;
     dfe_start_read(host->rrdctx.contexts, rc) {
-                rrdcontext_trigger_updates(rc, __FUNCTION__ );
+        RRDINSTANCE *ri;
+        dfe_start_read(rc->rrdinstances, ri) {
+            RRDMETRIC *rm;
+            dfe_start_read(ri->rrdmetrics, rm) {
+                rrdmetric_trigger_updates(rm, __FUNCTION__ );
             }
+            dfe_done(rm);
+            rrdinstance_trigger_updates(ri, __FUNCTION__ );
+        }
+        dfe_done(ri);
+        rrdcontext_trigger_updates(rc, __FUNCTION__ );
+    }
     dfe_done(rc);
 
     rrdcontext_garbage_collect_single_host(host, false);
