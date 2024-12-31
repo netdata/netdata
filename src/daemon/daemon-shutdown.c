@@ -86,6 +86,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 
     struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
     size_t size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
+    size_t entries_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries;
     if(size_to_flush > starting_size_to_flush || !starting_size_to_flush)
         starting_size_to_flush = size_to_flush;
 
@@ -111,10 +112,11 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
     for(size_t iterations = 0; true ;iterations++) {
         pgc_main_stats = pgc_get_statistics(main_cache);
         size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
+        entries_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries;
         if(!starting_size_to_flush || size_to_flush > starting_size_to_flush)
             starting_size_to_flush = size_to_flush;
 
-        if(!size_to_flush)
+        if(!size_to_flush || !entries_to_flush)
             break;
 
         size_t flushed = starting_size_to_flush - size_to_flush;
