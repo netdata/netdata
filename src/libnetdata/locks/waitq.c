@@ -28,17 +28,20 @@ static inline bool write_our_priority(WAITQ *waitq, uint64_t our_order) {
     uint64_t current = __atomic_load_n(&waitq->current_priority, __ATOMIC_RELAXED);
     if(current == our_order) return true;
 
-    if(current == NO_PRIORITY || our_order >= current)
-        if(__atomic_compare_exchange_n(
+    do {
+
+        if(current > our_order)
+            return false;
+
+    } while(!__atomic_compare_exchange_n(
                 &waitq->current_priority,
                 &current,
                 our_order,
                 false,
                 __ATOMIC_RELAXED,
-                __ATOMIC_RELAXED))
-            return true;
+                __ATOMIC_RELAXED));
 
-    return false;
+    return true;
 }
 
 static inline bool clear_our_priority(WAITQ *waitq, uint64_t our_order) {

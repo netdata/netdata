@@ -248,7 +248,7 @@ static inline size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
 #define PGC_QUEUE_LOCK_PRIO_COLLECTORS WAITQ_PRIO_URGENT
 #define PGC_QUEUE_LOCK_PRIO_EVICTORS WAITQ_PRIO_HIGH
 #define PGC_QUEUE_LOCK_PRIO_FLUSHERS WAITQ_PRIO_NORMAL
-#define PGC_QUEUE_LOCK_PRIO_OTHERS WAITQ_PRIO_LOW
+#define PGC_QUEUE_LOCK_PRIO_LOW WAITQ_PRIO_LOW
 
 #if defined(PGC_QUEUE_LOCK_AS_WAITING_QUEUE)
 #define pgc_queue_trylock(cache, ll, prio) waitq_try_acquire(&((ll)->wq), prio)
@@ -607,8 +607,7 @@ static inline void pgc_stats_index_judy_change(PGC *cache, size_t mem_before_jud
     }
 }
 
-static void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PAGE *page, bool having_lock,
-    WAITQ_PRIORITY prio __maybe_unused) {
+static void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PAGE *page, bool having_lock, WAITQ_PRIORITY prio __maybe_unused) {
     if(!having_lock)
         pgc_queue_lock(cache, q, prio);
 
@@ -2454,7 +2453,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_indexing_started, 1, __ATOMIC_RELAXED);
     p2_add_fetch(&cache->stats.p2_workers_jv2_flush, 1);
 
-    pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_OTHERS);
+    pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
 
     Pvoid_t JudyL_metrics = NULL;
     Pvoid_t JudyL_extents_pos = NULL;
@@ -2585,7 +2584,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         }
 
         yield_the_processor(); // do not lock too aggressively
-        pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_OTHERS);
+        pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
     }
 
     spinlock_unlock(&sp->migration_to_v2_spinlock);
@@ -2609,7 +2608,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
                 // balance-parents: transition from hot to clean directly
                 yield_the_processor(); // do not lock too aggressively
-                page_set_clean(cache, pi->page, true, false, PGC_QUEUE_LOCK_PRIO_OTHERS);
+                page_set_clean(cache, pi->page, true, false, PGC_QUEUE_LOCK_PRIO_LOW);
                 page_transition_unlock(cache, pi->page);
                 page_release(cache, pi->page, true);
 
@@ -2660,7 +2659,7 @@ void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafil
 size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr) {
     size_t found = 0;
 
-    pgc_queue_lock(cache, &cache->clean, PGC_QUEUE_LOCK_PRIO_OTHERS);
+    pgc_queue_lock(cache, &cache->clean, PGC_QUEUE_LOCK_PRIO_LOW);
     for(PGC_PAGE *page = cache->clean.base; page ;page = page->link.next)
         found += (page->data == ptr && page->section == section) ? 1 : 0;
     pgc_queue_unlock(cache, &cache->clean);
@@ -2671,7 +2670,7 @@ size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *p
 size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr) {
     size_t found = 0;
 
-    pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_OTHERS);
+    pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
     Pvoid_t *section_pages_pptr = JudyLGet(cache->hot.sections_judy, section, PJE0);
     if(section_pages_pptr) {
         struct section_pages *sp = *section_pages_pptr;
