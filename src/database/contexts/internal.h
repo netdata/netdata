@@ -443,6 +443,7 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
 #define rrdcontext_lock(rc) spinlock_lock(&((rc)->spinlock))
 #define rrdcontext_unlock(rc) spinlock_unlock(&((rc)->spinlock))
 
+void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
 void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function);
 void rrdcontext_trigger_updates(RRDCONTEXT *rc, const char *function);
 

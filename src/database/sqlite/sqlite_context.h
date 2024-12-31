@@ -25,6 +25,9 @@ typedef struct ctx_dimension {
     char *id;
     char *name;
     bool hidden;
+
+    char *context;
+    char *chart_id;
 } SQL_DIMENSION_DATA;
 
 typedef struct ctx_label {
