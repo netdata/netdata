@@ -170,7 +170,11 @@ struct jv2_page_info {
 };
 
 typedef enum __attribute__ ((__packed__)) {
-    RRDENG_1ST_METRIC_WRITER    = (1 << 0),
+    RRDENG_COLLECT_HANDLE_OPTION_NONE   = 0,
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    RRDENG_1ST_METRIC_WRITER            = (1 << 0),
+#endif
 } RRDENG_COLLECT_HANDLE_OPTIONS;
 
 typedef enum __attribute__ ((__packed__)) {

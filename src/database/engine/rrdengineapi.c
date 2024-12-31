@@ -263,6 +263,8 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
     METRIC *metric = (METRIC *)smh;
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
 
+    RRDENG_COLLECT_HANDLE_OPTIONS options = 0;
+#ifdef NETDATA_INTERNAL_CHECKS
     bool is_1st_metric_writer = true;
     if(!mrg_metric_set_writer(main_mrg, metric)) {
         is_1st_metric_writer = false;
@@ -270,6 +272,12 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
         netdata_log_error("DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts", uuid);
     }
+    if(is_1st_metric_writer)
+        options = RRDENG_1ST_METRIC_WRITER;
+    else
+        __atomic_add_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
+
+#endif
 
     metric = mrg_metric_dup(main_mrg, metric);
 
@@ -285,11 +293,9 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
     handle->page_position = 0;
     handle->page_entries_max = 0;
     handle->update_every_ut = (usec_t)update_every * USEC_PER_SEC;
-    handle->options = is_1st_metric_writer ? RRDENG_1ST_METRIC_WRITER : 0;
+    handle->options = options;
 
     __atomic_add_fetch(&ctx->atomic.collectors_running, 1, __ATOMIC_RELAXED);
-    if(!is_1st_metric_writer)
-        __atomic_add_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
 
     mrg_metric_set_update_every(main_mrg, metric, update_every);
 
@@ -654,11 +660,14 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch) {
     rrdeng_page_alignment_release(handle->alignment);
 
     __atomic_sub_fetch(&ctx->atomic.collectors_running, 1, __ATOMIC_RELAXED);
+
+#ifdef NETDATA_INTERNAL_CHECKS
     if(!(handle->options & RRDENG_1ST_METRIC_WRITER))
         __atomic_sub_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
 
     if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_clear_writer(main_mrg, handle->metric))
         internal_fatal(true, "DBENGINE: metric is already released");
+#endif
 
     time_t first_time_s, last_time_s;
     mrg_metric_get_retention(main_mrg, handle->metric, &first_time_s, &last_time_s, NULL);

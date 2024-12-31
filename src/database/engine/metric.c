@@ -8,16 +8,18 @@ typedef int32_t REFCOUNT;
 #define REFCOUNT_DICONNECTED (-100)
 
 struct metric {
-    nd_uuid_t uuid;                    // never changes
+    nd_uuid_t uuid;                 // never changes
     Word_t section;                 // never changes
+    REFCOUNT refcount;
 
     time_t first_time_s;            // the timestamp of the oldest point in the database
     time_t latest_time_s_clean;     // the timestamp of the newest point in the database
     time_t latest_time_s_hot;       // the timestamp of the latest point that has been collected (not yet stored)
     uint32_t latest_update_every_s; // the latest data collection frequency
-    pid_t writer;
     uint8_t partition;
-    REFCOUNT refcount;
+#ifdef NETDATA_INTERNAL_CHECKS
+    pid_t writer;
+#endif
 
     // THIS IS allocated with malloc()
     // YOU HAVE TO INITIALIZE IT YOURSELF !
@@ -135,9 +137,11 @@ static void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const char *msg)
     uuid_unparse_lower(metric->uuid, uuid);
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "METRIC: %s on %s at tier %d, refcount %d, partition %u, "
-           "retention [%ld - %ld (hot), %ld (clean)], update every %"PRIu32", "
-           "writer pid %d "
-           "--- PLEASE OPEN A GITHUB ISSUE TO REPORT THIS LOG LINE TO NETDATA --- ",
+           "retention [%ld - %ld (hot), %ld (clean)], update every %"PRIu32
+#ifdef NETDATA_INTERNAL_CHECKS
+           ", writer pid %d "
+#endif
+           " --- PLEASE OPEN A GITHUB ISSUE TO REPORT THIS LOG LINE TO NETDATA --- ",
            msg,
            uuid,
            ctx->config.tier,
@@ -146,8 +150,10 @@ static void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const char *msg)
            metric->first_time_s,
            metric->latest_time_s_hot,
            metric->latest_time_s_clean,
-           metric->latest_update_every_s,
-           (int)metric->writer
+           metric->latest_update_every_s
+#ifdef NETDATA_INTERNAL_CHECKS
+           , (int)metric->writer
+#endif
     );
 }
 
@@ -318,7 +324,9 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     metric->latest_time_s_clean = MAX(0, entry->last_time_s);
     metric->latest_time_s_hot = 0;
     metric->latest_update_every_s = entry->latest_update_every_s;
+#ifdef NETDATA_INTERNAL_CHECKS
     metric->writer = 0;
+#endif
     metric->refcount = 1;
     metric->partition = partition;
     *PValue = metric;
@@ -609,6 +617,7 @@ inline uint32_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *m
     return __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
 inline bool mrg_metric_set_writer(MRG *mrg, METRIC *metric) {
     pid_t expected = __atomic_load_n(&metric->writer, __ATOMIC_RELAXED);
     pid_t wanted = gettid_cached();
@@ -648,6 +657,7 @@ inline bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
 
     return done;
 }
+#endif
 
 inline void mrg_update_metric_retention_and_granularity_by_uuid(
         MRG *mrg, Word_t section, nd_uuid_t *uuid,
