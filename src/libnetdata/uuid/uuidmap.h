@@ -23,4 +23,6 @@ ND_UUID uuidmap_get(UUIDMAP_ID id);
 
 struct aral_statistics *uuidmap_aral_statistics(void);
 
+int uuidmap_unittest(void);
+
 #endif //NETDATA_UUIDMAP_H
