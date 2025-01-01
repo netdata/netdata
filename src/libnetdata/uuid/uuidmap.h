@@ -21,6 +21,8 @@ nd_uuid_t *uuidmap_uuid_ptr(UUIDMAP_ID id);
 
 ND_UUID uuidmap_get(UUIDMAP_ID id);
 
+size_t uuidmap_memory(void);
+size_t uuidmap_free_bytes(void);
 struct aral_statistics *uuidmap_aral_statistics(void);
 
 int uuidmap_unittest(void);

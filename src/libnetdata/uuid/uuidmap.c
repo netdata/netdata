@@ -29,6 +29,19 @@ static struct {
 static struct aral_statistics uuidmap_stats = { 0 };
 struct aral_statistics *uuidmap_aral_statistics(void) { return &uuidmap_stats; }
 
+size_t uuidmap_memory(void) {
+    size_t memory = 0;
+
+    for(size_t i = 0; i < _countof(uuid_map.p) ;i++)
+        memory += uuid_map.p[i].memory;
+
+    return memory;
+}
+
+size_t uuidmap_free_bytes(void) {
+    return aral_free_bytes_from_stats(&uuidmap_stats);
+}
+
 static void uuidmap_init_aral(void) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
