@@ -17,6 +17,8 @@ void uuidmap_free(uuidmap_t id);
 // UUID is copied to out_uuid if found
 bool uuidmap_uuid(uuidmap_t id, nd_uuid_t out_uuid);
 
+nd_uuid_t *uuidmap_uuid_ptr(uuidmap_t id);
+
 ND_UUID uuidmap_get(uuidmap_t id);
 
 struct aral_statistics *uuidmap_aral_statistics(void);

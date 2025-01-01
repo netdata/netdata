@@ -4,19 +4,19 @@
 #include "libnetdata/locks/locks.h"
 #include "rrddiskprotocol.h"
 
-typedef int32_t REFCOUNT;
-#define REFCOUNT_DICONNECTED (-100)
-
 struct metric {
-    nd_uuid_t uuid;                 // never changes
     Word_t section;                 // never changes
+    uuidmap_t uuid;                 // never changes
+
     REFCOUNT refcount;
+    uint8_t partition;
+
+    uint32_t latest_update_every_s; // the latest data collection frequency
 
     time_t first_time_s;            // the timestamp of the oldest point in the database
     time_t latest_time_s_clean;     // the timestamp of the newest point in the database
     time_t latest_time_s_hot;       // the timestamp of the latest point that has been collected (not yet stored)
-    uint32_t latest_update_every_s; // the latest data collection frequency
-    uint8_t partition;
+
 #ifdef NETDATA_INTERNAL_CHECKS
     pid_t writer;
 #endif
@@ -53,7 +53,7 @@ struct mrg {
         ARAL *aral;                 // not protected by our spinlock - it has its own
 
         RW_SPINLOCK rw_spinlock;
-        Pvoid_t uuid_judy;          // JudyHS: each UUID has a JudyL of sections (tiers)
+        Pvoid_t uuid_judy;          // JudyL: each UUID has a JudyL of sections (tiers)
 
         struct mrg_statistics stats;
     } index[];
@@ -133,8 +133,10 @@ static inline time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, 
 static void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const char *msg) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)metric->section;
 
-    char uuid[UUID_STR_LEN];
-    uuid_unparse_lower(metric->uuid, uuid);
+    nd_uuid_t uuid;
+    uuidmap_uuid(metric->uuid, uuid);
+    char uuid_txt[UUID_STR_LEN];
+    uuid_unparse_lower(uuid, uuid_txt);
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "METRIC: %s on %s at tier %d, refcount %d, partition %u, "
            "retention [%ld - %ld (hot), %ld (clean)], update every %"PRIu32
@@ -143,7 +145,7 @@ static void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const char *msg)
 #endif
            " --- PLEASE OPEN A GITHUB ISSUE TO REPORT THIS LOG LINE TO NETDATA --- ",
            msg,
-           uuid,
+           uuid_txt,
            ctx->config.tier,
            metric->refcount,
            metric->partition,
@@ -175,7 +177,10 @@ static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric)
 
     mrg_index_write_lock(mrg, partition);
 
-    Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index[partition].uuid_judy, &metric->uuid, sizeof(nd_uuid_t));
+    Pvoid_t *sections_judy_pptr = JudyLGet(mrg->index[partition].uuid_judy, metric->uuid, PJE0);
+    if(unlikely(sections_judy_pptr == PJERR))
+        fatal("METRIC: corrupted JudyL");
+
     if(unlikely(!sections_judy_pptr || !*sections_judy_pptr)) {
         MRG_STATS_DELETE_MISS(mrg, partition);
         mrg_index_write_unlock(mrg, partition);
@@ -196,12 +201,13 @@ static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric)
     if(!*sections_judy_pptr) {
         JudyAllocThreadPulseReset();
 
-        rc = JudyHSDel(&mrg->index[partition].uuid_judy, &metric->uuid, sizeof(nd_uuid_t), PJE0);
+        rc = JudyLDel(&mrg->index[partition].uuid_judy, metric->uuid, PJE0);
 
         judy_mem = JudyAllocThreadPulseGetAndReset();
 
         if(unlikely(!rc))
-            fatal("DBENGINE METRIC: cannot delete UUID from JudyHS");
+            fatal("DBENGINE METRIC: cannot delete UUID from JudyL");
+
         mrg_stats_size_judyhs_removed_uuid(mrg, partition, judy_mem);
     }
 
@@ -248,27 +254,28 @@ static inline bool metric_release(MRG *mrg, METRIC *metric) {
         }
 
         if(expected == 1 && !acquired_metric_has_retention(mrg, metric))
-            desired = REFCOUNT_DICONNECTED;
+            desired = REFCOUNT_DELETED;
         else
             desired = expected - 1;
 
     } while(!__atomic_compare_exchange_n(&metric->refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
 
-    if(desired == 0 || desired == REFCOUNT_DICONNECTED) {
+    if(desired == 0 || desired == REFCOUNT_DELETED) {
         __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
 
-        if(desired == REFCOUNT_DICONNECTED)
+        if(desired == REFCOUNT_DELETED)
             acquired_for_deletion_metric_delete(mrg, metric);
     }
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
 
-    return desired == REFCOUNT_DICONNECTED;
+    return desired == REFCOUNT_DELETED;
 }
 
 static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     size_t partition = uuid_partition(mrg, entry->uuid);
 
+    uuidmap_t id = uuidmap_create(*entry->uuid);
     METRIC *allocation = aral_mallocz(mrg->index[partition].aral);
     Pvoid_t *PValue;
 
@@ -276,8 +283,7 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
         mrg_index_write_lock(mrg, partition);
 
         JudyAllocThreadPulseReset();
-
-        Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index[partition].uuid_judy, entry->uuid, sizeof(nd_uuid_t), PJE0);
+        Pvoid_t *sections_judy_pptr = JudyLIns(&mrg->index[partition].uuid_judy, id, PJE0);
 
         int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
 
@@ -309,6 +315,7 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
             if (ret)
                 *ret = false;
 
+            uuidmap_free(id);
             aral_freez(mrg->index[partition].aral, allocation);
 
             return metric;
@@ -318,7 +325,7 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     }
 
     METRIC *metric = allocation;
-    uuid_copy(metric->uuid, *entry->uuid);
+    metric->uuid = id;
     metric->section = entry->section;
     metric->first_time_s = MAX(0, entry->first_time_s);
     metric->latest_time_s_clean = MAX(0, entry->last_time_s);
@@ -445,7 +452,7 @@ inline Word_t mrg_metric_id(MRG *mrg __maybe_unused, METRIC *metric) {
 }
 
 inline nd_uuid_t *mrg_metric_uuid(MRG *mrg __maybe_unused, METRIC *metric) {
-    return &metric->uuid;
+    return uuidmap_uuid_ptr(metric->uuid);
 }
 
 inline Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {

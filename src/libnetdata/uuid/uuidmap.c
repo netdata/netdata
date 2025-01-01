@@ -45,7 +45,7 @@ uuidmap_t uuidmap_create(const nd_uuid_t uuid) {
     uuidmap_t id = 0;
 
     // Try to insert or get existing UUID
-    Pvoid_t *PValue = JudyHSIns(&uuid_map.uuid_to_id, &uuid, sizeof(nd_uuid_t), PJE0);
+    Pvoid_t *PValue = JudyHSIns(&uuid_map.uuid_to_id, (void *)uuid, sizeof(nd_uuid_t), PJE0);
     if(!PValue || PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyHS array");
 
@@ -104,7 +104,7 @@ void uuidmap_free(uuidmap_t id) {
     if(!ue->refcount) {
 
         int rc;
-        rc = JudyHSDel(&uuid_map.uuid_to_id, &ue->uuid, sizeof(nd_uuid_t), PJE0);
+        rc = JudyHSDel(&uuid_map.uuid_to_id, (void *)ue->uuid, sizeof(nd_uuid_t), PJE0);
         if(unlikely(!rc))
             fatal("UUIDMAP: cannot delete UUID from JudyHS");
 
@@ -122,8 +122,8 @@ void uuidmap_free(uuidmap_t id) {
     rw_spinlock_write_unlock(&uuid_map.spinlock);
 }
 
-bool uuidmap_uuid(uuidmap_t id, nd_uuid_t out_uuid) {
-    if (id == 0) return false;
+nd_uuid_t *uuidmap_uuid_ptr(uuidmap_t id) {
+    if (id == 0) return NULL;
 
     rw_spinlock_read_lock(&uuid_map.spinlock);
 
@@ -133,13 +133,23 @@ bool uuidmap_uuid(uuidmap_t id, nd_uuid_t out_uuid) {
 
     if(!PValue) {
         rw_spinlock_read_unlock(&uuid_map.spinlock);
+        return NULL;
+    }
+
+    struct uuidmap_entry *ue = *PValue;
+
+    rw_spinlock_read_unlock(&uuid_map.spinlock);
+    return &ue->uuid;
+}
+
+bool uuidmap_uuid(uuidmap_t id, nd_uuid_t out_uuid) {
+    nd_uuid_t *uuid = uuidmap_uuid_ptr(id);
+
+    if(!uuid) {
         nd_uuid_clear(out_uuid);
         return false;
     }
 
-    memcpy(out_uuid, *PValue, sizeof(nd_uuid_t));
-
-    rw_spinlock_read_unlock(&uuid_map.spinlock);
     return true;
 }
 

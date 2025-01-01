@@ -3,8 +3,6 @@
 #include "../libnetdata.h"
 #include <Judy.h>
 
-typedef int32_t REFCOUNT;
-
 // ----------------------------------------------------------------------------
 // STRING implementation - dedup all STRING
 
