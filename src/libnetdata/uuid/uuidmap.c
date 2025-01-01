@@ -19,10 +19,6 @@ struct uuidmap_partition {
 
 static struct {
     struct uuidmap_partition p[256];
-
-    int64_t memory;
-    int32_t entries;
-
     ARAL *ar;
 } uuid_map = { 0 };
 
@@ -32,8 +28,11 @@ struct aral_statistics *uuidmap_aral_statistics(void) { return &uuidmap_stats; }
 size_t uuidmap_memory(void) {
     size_t memory = 0;
 
-    for(size_t i = 0; i < _countof(uuid_map.p) ;i++)
+    for(size_t i = 0; i < _countof(uuid_map.p) ;i++) {
+        rw_spinlock_read_lock(&uuid_map.p[i].spinlock);
         memory += uuid_map.p[i].memory;
+        rw_spinlock_read_unlock(&uuid_map.p[i].spinlock);
+    }
 
     return memory;
 }
@@ -144,11 +143,11 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     ue->refcount = 1;
     *PValue = ue;
 
-    uuid_map.entries++;
-    uuid_map.memory += sizeof(*ue);
+    uuid_map.p[partition].entries++;
+    uuid_map.p[partition].memory += sizeof(*ue);
 
 done:
-    uuid_map.memory += JudyAllocThreadPulseGetAndReset();
+    uuid_map.p[partition].memory += JudyAllocThreadPulseGetAndReset();
     rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
     return id;
 }
@@ -181,13 +180,13 @@ void uuidmap_free(UUIDMAP_ID id) {
         if(unlikely(!rc))
             fatal("UUIDMAP: cannot delete ID from JudyL");
 
-        uuid_map.memory -= sizeof(*ue);
-        uuid_map.entries--;
+        uuid_map.p[partition].memory -= sizeof(*ue);
+        uuid_map.p[partition].entries--;
 
         aral_freez(uuid_map.ar, ue);
     }
 
-    uuid_map.memory += JudyAllocThreadPulseGetAndReset();
+    uuid_map.p[partition].memory += JudyAllocThreadPulseGetAndReset();
     rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
 }
 
