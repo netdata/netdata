@@ -7,29 +7,33 @@ struct uuidmap_entry {
     REFCOUNT refcount;
 };
 
-static struct {
+struct uuidmap_partition {
     Pvoid_t uuid_to_id;     // JudyL: UUID string -> ID
     Pvoid_t id_to_uuid;     // JudyL: ID -> UUID binary
-    UUIDMAP_ID next_id;
+    UUIDMAP_ID next_id;     // Only use lower 24 bits
     RW_SPINLOCK spinlock;
+
+    int64_t memory;
+    int32_t entries;
+};
+
+static struct {
+    struct uuidmap_partition p[256];
 
     int64_t memory;
     int32_t entries;
 
     ARAL *ar;
-} uuid_map = {
-    .uuid_to_id = NULL,
-    .id_to_uuid = NULL,
-    .next_id = 0,
-    .spinlock = RW_SPINLOCK_INITIALIZER,
-};
+} uuid_map = { 0 };
 
 static struct aral_statistics uuidmap_stats = { 0 };
 struct aral_statistics *uuidmap_aral_statistics(void) { return &uuidmap_stats; }
 
 static void uuidmap_init_aral(void) {
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+
     if(!uuid_map.ar) {
-        rw_spinlock_write_lock(&uuid_map.spinlock);
+        spinlock_lock(&spinlock);
         if(!uuid_map.ar) {
             uuid_map.ar = aral_create(
                 "uuidmap",
@@ -37,18 +41,32 @@ static void uuidmap_init_aral(void) {
                 0,
                 0,
                 &uuidmap_stats,
-                NULL, NULL, false, true, true);
+                NULL, NULL, false, false, true);
         }
-        rw_spinlock_write_unlock(&uuid_map.spinlock);
+        spinlock_unlock(&spinlock);
     }
+}
+
+static inline uint8_t uuid_to_partition(const nd_uuid_t uuid) {
+    return uuid[15];
+}
+
+static inline uint8_t id_to_partition(UUIDMAP_ID id) {
+    return (uint8_t)(id >> 24);
+}
+
+static inline UUIDMAP_ID make_id(uint8_t partition, uint32_t id) {
+    return ((UUIDMAP_ID)partition << 24) | (id & 0x00FFFFFF);
 }
 
 static inline UUIDMAP_ID uuidmap_get_by_uuid(const nd_uuid_t uuid) {
     UUIDMAP_ID id = 0;
 
+    uint8_t partition = uuid_to_partition(uuid);
+
     // try to find it in the JudyHS - we may have it already
-    rw_spinlock_read_lock(&uuid_map.spinlock);
-    Pvoid_t *PValue = JudyHSGet(uuid_map.uuid_to_id, (void *)uuid, sizeof(nd_uuid_t));
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+    Pvoid_t *PValue = JudyHSGet(uuid_map.p[partition].uuid_to_id, (void *)uuid, sizeof(nd_uuid_t));
     if(PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyHS array");
 
@@ -57,7 +75,7 @@ static inline UUIDMAP_ID uuidmap_get_by_uuid(const nd_uuid_t uuid) {
 
         id = (UUIDMAP_ID)(uintptr_t)*PValue;
 
-        PValue = JudyLGet(uuid_map.id_to_uuid, id, PJE0);
+        PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
         if (!PValue || PValue == PJERR)
             fatal("UUIDMAP: corrupted JudyL array");
 
@@ -65,7 +83,7 @@ static inline UUIDMAP_ID uuidmap_get_by_uuid(const nd_uuid_t uuid) {
         refcount_increment(&ue->refcount);
     }
 
-    rw_spinlock_read_unlock(&uuid_map.spinlock);
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
     return id;
 }
 
@@ -77,10 +95,12 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
 
     // we didn't find it - let's add it
 
-    JudyAllocThreadPulseReset();
-    rw_spinlock_write_lock(&uuid_map.spinlock);
+    uint8_t partition = uuid_to_partition(uuid);
 
-    Pvoid_t *PValue = JudyHSIns(&uuid_map.uuid_to_id, (void *)uuid, sizeof(nd_uuid_t), PJE0);
+    JudyAllocThreadPulseReset();
+    rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
+
+    Pvoid_t *PValue = JudyHSIns(&uuid_map.p[partition].uuid_to_id, (void *)uuid, sizeof(nd_uuid_t), PJE0);
     if(!PValue || PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyHS array");
 
@@ -88,7 +108,7 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     if (*PValue != 0) {
         id = (UUIDMAP_ID)(uintptr_t)*PValue;
 
-        PValue = JudyLGet(uuid_map.id_to_uuid, id, PJE0);
+        PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
         if (!PValue || PValue == PJERR)
             fatal("UUIDMAP: corrupted JudyL array");
 
@@ -98,11 +118,11 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
         goto done;
     }
 
-    id = ++uuid_map.next_id;
+    id = make_id(partition, ++uuid_map.p[partition].next_id);
     *(UUIDMAP_ID *)PValue = id;
 
     // Store ID -> UUID mapping
-    PValue = JudyLIns(&uuid_map.id_to_uuid, id, PJE0);
+    PValue = JudyLIns(&uuid_map.p[partition].id_to_uuid, id, PJE0);
     if (!PValue || PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyL array");
 
@@ -116,21 +136,23 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
 
 done:
     uuid_map.memory += JudyAllocThreadPulseGetAndReset();
-    rw_spinlock_write_unlock(&uuid_map.spinlock);
+    rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
     return id;
 }
 
 void uuidmap_free(UUIDMAP_ID id) {
     JudyAllocThreadPulseReset();
 
-    rw_spinlock_write_lock(&uuid_map.spinlock);
+    uint8_t partition = id_to_partition(id);
 
-    Pvoid_t *PValue = JudyLGet(uuid_map.id_to_uuid, id, PJE0);
+    rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
+
+    Pvoid_t *PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
     if (PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyL array");
 
     if (!PValue) {
-        rw_spinlock_write_unlock(&uuid_map.spinlock);
+        rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
         return;
     }
 
@@ -138,11 +160,11 @@ void uuidmap_free(UUIDMAP_ID id) {
     if(refcount_decrement(&ue->refcount) == 0) {
 
         int rc;
-        rc = JudyHSDel(&uuid_map.uuid_to_id, (void *)ue->uuid, sizeof(nd_uuid_t), PJE0);
+        rc = JudyHSDel(&uuid_map.p[partition].uuid_to_id, (void *)ue->uuid, sizeof(nd_uuid_t), PJE0);
         if(unlikely(!rc))
             fatal("UUIDMAP: cannot delete UUID from JudyHS");
 
-        rc = JudyLDel(&uuid_map.id_to_uuid, id, PJE0);
+        rc = JudyLDel(&uuid_map.p[partition].id_to_uuid, id, PJE0);
         if(unlikely(!rc))
             fatal("UUIDMAP: cannot delete ID from JudyL");
 
@@ -153,27 +175,29 @@ void uuidmap_free(UUIDMAP_ID id) {
     }
 
     uuid_map.memory += JudyAllocThreadPulseGetAndReset();
-    rw_spinlock_write_unlock(&uuid_map.spinlock);
+    rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
 }
 
 nd_uuid_t *uuidmap_uuid_ptr(UUIDMAP_ID id) {
     if (id == 0)
         return NULL;
 
-    rw_spinlock_read_lock(&uuid_map.spinlock);
+    uint8_t partition = id_to_partition(id);
 
-    Pvoid_t *PValue = JudyLGet(uuid_map.id_to_uuid, id, PJE0);
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+
+    Pvoid_t *PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
     if (PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyL array");
 
     if(!PValue) {
-        rw_spinlock_read_unlock(&uuid_map.spinlock);
+        rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
         return NULL;
     }
 
     struct uuidmap_entry *ue = *PValue;
 
-    rw_spinlock_read_unlock(&uuid_map.spinlock);
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
     return &ue->uuid;
 }
 
