@@ -114,11 +114,11 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
                    "RRDMETRIC: '%s' cannot change id to '%s'",
                    string2str(rm->id), string2str(rm_new->id));
 
-    if(!uuid_eq(rm->uuid, rm_new->uuid)) {
+    if(rm->uuid != rm_new->uuid) {
 #ifdef NETDATA_INTERNAL_CHECKS
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
-        uuid_unparse(rm->uuid, uuid1);
-        uuid_unparse(rm_new->uuid, uuid2);
+        uuid_unparse(*uuidmap_uuid_ptr(rm->uuid), uuid1);
+        uuid_unparse(*uuidmap_uuid_ptr(rm_new->uuid), uuid2);
 
         time_t old_first_time_s = 0;
         time_t old_last_time_s = 0;
@@ -127,7 +127,9 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
             old_last_time_s = rm->last_time_s;
         }
 
-        uuid_copy(rm->uuid, rm_new->uuid);
+        UUIDMAP_ID old_uuid = rm->uuid;
+        rm->uuid = rm_new->uuid;
+        uuidmap_free(old_uuid);
 
         time_t new_first_time_s = 0;
         time_t new_last_time_s = 0;
@@ -145,7 +147,9 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
                        , uuid2, new_first_time_s, new_last_time_s, new_last_time_s - new_first_time_s
                        );
 #else
-        uuid_copy(rm->uuid, rm_new->uuid);
+        UUIDMAP_ID old_uuid = rm->uuid;
+        rm->uuid = rm_new->uuid;
+        uuidmap_free(old_uuid);
 #endif
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
@@ -154,15 +158,6 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         rm->rrddim = rm_new->rrddim;
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(rm->rrddim && !uuid_eq(rm->uuid, rm->rrddim->metric_uuid)) {
-        char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
-        uuid_unparse(rm->uuid, uuid1);
-        uuid_unparse(rm_new->uuid, uuid2);
-        internal_error(true, "RRDMETRIC: '%s' is linked to RRDDIM '%s' but they have different UUIDs. RRDMETRIC has '%s', RRDDIM has '%s'", string2str(rm->id), rrddim_id(rm->rrddim), uuid1, uuid2);
-    }
-#endif
 
     if(rm->rrddim != rm_new->rrddim)
         rm->rrddim = rm_new->rrddim;
@@ -251,12 +246,12 @@ void rrdmetric_from_rrddim(RRDDIM *rd) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(rd->rrdset->rrdcontexts.rrdinstance);
 
     RRDMETRIC trm = {
+            .uuid = uuidmap_create(rd->metric_uuid),
             .id = string_dup(rd->id),
             .name = string_dup(rd->name),
             .flags = RRD_FLAG_NONE, // no need for atomics
             .rrddim = rd,
     };
-    uuid_copy(trm.uuid, rd->metric_uuid);
 
     RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)dictionary_set_and_acquire_item(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
 

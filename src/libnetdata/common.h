@@ -259,7 +259,7 @@ typedef uint32_t uid_t;
 #endif
 
 #define XXH_INLINE_ALL
-#include "xxHash/xxhash.h"
+#include "libnetdata/xxHash/xxhash.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 // OpenSSL
@@ -385,7 +385,7 @@ typedef uint32_t uid_t;
 // --------------------------------------------------------------------------------------------------------------------
 // Macro-only includes
 
-#include "linked_lists/linked_lists.h"
+#include "libnetdata/linked_lists/linked_lists.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -397,11 +397,6 @@ typedef uint32_t uid_t;
 #define CONCAT_INDIRECT(a, b) a##b
 #define CONCAT(a, b) CONCAT_INDIRECT(a, b)
 #define PAD64(type) uint8_t CONCAT(padding, __COUNTER__)[64 - sizeof(type)]; type
-
-// --------------------------------------------------------------------------------------------------------------------
-
-typedef int32_t REFCOUNT;
-#define REFCOUNT_DELETED (-65536)
 
 // --------------------------------------------------------------------------------------------------------------------
 

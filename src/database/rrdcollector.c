@@ -11,8 +11,8 @@
 // rrdset_collector_finished()).
 
 struct rrd_collector {
-    int32_t refcount;
-    int32_t refcount_dispatcher;
+    REFCOUNT refcount;
+    REFCOUNT refcount_dispatcher;
     pid_t tid;
     bool running;
 };
@@ -32,32 +32,18 @@ inline pid_t rrd_collector_tid(struct rrd_collector *rdc) {
 }
 
 bool rrd_collector_dispatcher_acquire(struct rrd_collector *rdc) {
-    int32_t expected = __atomic_load_n(&rdc->refcount_dispatcher, __ATOMIC_RELAXED);
-    int32_t wanted;
-    do {
-        if(expected < 0)
-            return false;
-
-        wanted = expected + 1;
-    } while(!__atomic_compare_exchange_n(&rdc->refcount_dispatcher, &expected, wanted, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-
-    return true;
+    return refcount_acquire(&rdc->refcount_dispatcher);
 }
 
 void rrd_collector_dispatcher_release(struct rrd_collector *rdc) {
-    __atomic_sub_fetch(&rdc->refcount_dispatcher, 1, __ATOMIC_RELAXED);
+    refcount_release(&rdc->refcount_dispatcher);
 }
 
 static void rrd_collector_free(struct rrd_collector *rdc) {
-    if(rdc->running)
-        return;
-
-    int32_t expected = 0;
-    if(!__atomic_compare_exchange_n(&rdc->refcount, &expected, -1, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+    if(rrd_collector_running(rdc) || !refcount_acquire_for_deletion(&rdc->refcount))
         // the collector is still referenced by charts.
         // leave it hanging there, the last chart will actually free it.
         return;
-    }
 
     // we can free it now
     freez(rdc);
@@ -84,27 +70,18 @@ void rrd_collector_finished(void) {
     // so, while cancellation requests are being dispatched, this structure is accessed.
     // delaying the exit of the thread is required to avoid cleaning up this structure.
 
-    int32_t expected = 0;
-    while(!__atomic_compare_exchange_n(&thread_rrd_collector->refcount_dispatcher, &expected, -1, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
-        expected = 0;
+    while(!refcount_acquire_for_deletion(&thread_rrd_collector->refcount_dispatcher))
         sleep_usec(1 * USEC_PER_MS);
-    }
 
     rrd_collector_free(thread_rrd_collector);
     thread_rrd_collector = NULL;
 }
 
-bool rrd_collector_acquire(struct rrd_collector *rdc) {
+static bool rrd_collector_acquire(struct rrd_collector *rdc) {
+    if(!rdc || !rrd_collector_running(rdc))
+        return false;
 
-    int32_t expected = __atomic_load_n(&rdc->refcount, __ATOMIC_RELAXED), wanted = 0;
-    do {
-        if(expected < 0 || !rrd_collector_running(rdc))
-            return false;
-
-        wanted = expected + 1;
-    } while(!__atomic_compare_exchange_n(&rdc->refcount, &expected, wanted, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
-
-    return true;
+    return refcount_acquire(&rdc->refcount);
 }
 
 struct rrd_collector *rrd_collector_acquire_current_thread(void) {
@@ -119,19 +96,6 @@ struct rrd_collector *rrd_collector_acquire_current_thread(void) {
 void rrd_collector_release(struct rrd_collector *rdc) {
     if(unlikely(!rdc)) return;
 
-    int32_t expected = __atomic_load_n(&rdc->refcount, __ATOMIC_RELAXED), wanted = 0;
-    do {
-        if(expected < 0)
-            return;
-
-        if(expected == 0) {
-            internal_fatal(true, "FUNCTIONS: Trying to release a collector that is not acquired.");
-            return;
-        }
-
-        wanted = expected - 1;
-    } while(!__atomic_compare_exchange_n(&rdc->refcount, &expected, wanted, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
-
-    if(wanted == 0)
+    if(refcount_release(&rdc->refcount) == 0)
         rrd_collector_free(rdc);
 }

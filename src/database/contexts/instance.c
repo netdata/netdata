@@ -39,7 +39,7 @@ inline RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     if (rrd_flag_check(ri, RRD_FLAG_OWN_LABELS | RRD_FLAG_DEMAND_LABELS)) {
         rrd_flag_clear(ri, RRD_FLAG_DEMAND_LABELS);
-        load_instance_labels_on_demand(&ri->uuid, ri);
+        load_instance_labels_on_demand(uuidmap_uuid_ptr(ri->uuid), ri);
         rrdinstance_trigger_updates(ri, __FUNCTION__ );
     }
     return ri->rrdlabels;
@@ -148,16 +148,18 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
                    "RRDINSTANCE: '%s' cannot change id to '%s'",
                    string2str(ri->id), string2str(ri_new->id));
 
-    if(!uuid_eq(ri->uuid, ri_new->uuid)) {
+    if(ri->uuid != ri_new->uuid) {
 #ifdef NETDATA_INTERNAL_CHECKS
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
-        uuid_unparse(ri->uuid, uuid1);
-        uuid_unparse(ri_new->uuid, uuid2);
+        uuid_unparse(*uuidmap_uuid_ptr(ri->uuid), uuid1);
+        uuid_unparse(*uuidmap_uuid_ptr(ri_new->uuid), uuid2);
         internal_error(true, "RRDINSTANCE: '%s' of host '%s' changed UUID from '%s' to '%s'",
                        string2str(ri->id), rrdhost_hostname(ri->rc->rrdhost), uuid1, uuid2);
 #endif
 
-        uuid_copy(ri->uuid, ri_new->uuid);
+        UUIDMAP_ID old = ri->uuid;
+        ri->uuid = ri_new->uuid;
+        uuidmap_free(old);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
@@ -165,15 +167,6 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
         ri->rrdset = ri_new->rrdset;
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(ri->rrdset && !uuid_eq(ri->uuid, ri->rrdset->chart_uuid)) {
-        char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
-        uuid_unparse(ri->uuid, uuid1);
-        uuid_unparse(ri->rrdset->chart_uuid, uuid2);
-        internal_error(true, "RRDINSTANCE: '%s' is linked to RRDSET '%s' but they have different UUIDs. RRDINSTANCE has '%s', RRDSET has '%s'", string2str(ri->id), rrdset_id(ri->rrdset), uuid1, uuid2);
-    }
-#endif
 
     if(ri->name != ri_new->name) {
         STRING *old = ri->name;
@@ -325,18 +318,18 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     RRDINSTANCE tri = {
-            .id = string_dup(st->id),
-            .name = string_dup(st->name),
-            .units = string_dup(st->units),
-            .family = string_dup(st->family),
-            .title = string_dup(st->title),
-            .chart_type = st->chart_type,
-            .priority = st->priority,
-            .update_every_s = st->update_every,
-            .flags = RRD_FLAG_NONE, // no need for atomics
-            .rrdset = st,
+        .uuid = uuidmap_create(st->chart_uuid),
+        .id = string_dup(st->id),
+        .name = string_dup(st->name),
+        .units = string_dup(st->units),
+        .family = string_dup(st->family),
+        .title = string_dup(st->title),
+        .chart_type = st->chart_type,
+        .priority = st->priority,
+        .update_every_s = st->update_every,
+        .flags = RRD_FLAG_NONE, // no need for atomics
+        .rrdset = st,
     };
-    uuid_copy(tri.uuid, st->chart_uuid);
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_set_and_acquire_item(rc->rrdinstances, string2str(tri.id), &tri, sizeof(tri));
 

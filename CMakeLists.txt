@@ -955,6 +955,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/object-state/object-state.h
         src/libnetdata/uuid/uuidmap.c
         src/libnetdata/uuid/uuidmap.h
+        src/libnetdata/atomics/refcount.h
+        src/libnetdata/log/nd_log-fatal.h
 )
 
 set(LIBH2O_FILES

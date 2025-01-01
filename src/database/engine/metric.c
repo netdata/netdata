@@ -6,7 +6,7 @@
 
 struct metric {
     Word_t section;                 // never changes
-    uuidmap_t uuid;                 // never changes
+    UUIDMAP_ID uuid;                 // never changes
 
     REFCOUNT refcount;
     uint8_t partition;
@@ -130,7 +130,7 @@ static inline time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, 
     return first_time_s;
 }
 
-static void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const char *msg) {
+static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const char *msg) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)metric->section;
 
     nd_uuid_t uuid;
@@ -219,21 +219,13 @@ static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric)
 }
 
 static inline bool metric_acquire(MRG *mrg, METRIC *metric) {
-    REFCOUNT expected, desired;
-
-    expected = __atomic_load_n(&metric->refcount, __ATOMIC_RELAXED);
-
-    do {
-        if(unlikely(expected < 0))
-            return false;
-
-        desired = expected + 1;
-
-    } while(!__atomic_compare_exchange_n(&metric->refcount, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
+    REFCOUNT rc = refcount_acquire_advanced(&metric->refcount);
+    if(!REFCOUNT_ACQUIRED(rc))
+        return false;
 
     size_t partition = metric->partition;
 
-    if(desired == 1)
+    if(rc == 1)
         __atomic_add_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
 
     __atomic_add_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
@@ -243,39 +235,28 @@ static inline bool metric_acquire(MRG *mrg, METRIC *metric) {
 
 static inline bool metric_release(MRG *mrg, METRIC *metric) {
     size_t partition = metric->partition;
-    REFCOUNT expected, desired;
 
-    expected = __atomic_load_n(&metric->refcount, __ATOMIC_RELAXED);
+    REFCOUNT refcount = refcount_release(&metric->refcount);
 
-    do {
-        if(expected <= 0) {
-            metric_log(mrg, metric, "refcount is zero or negative during release");
-            fatal("METRIC: refcount is %d (zero or negative) during release", expected);
-        }
+    if(!refcount && !acquired_metric_has_retention(mrg, metric) && refcount_acquire_for_deletion(&metric->refcount))
+        refcount = REFCOUNT_DELETED;
 
-        if(expected == 1 && !acquired_metric_has_retention(mrg, metric))
-            desired = REFCOUNT_DELETED;
-        else
-            desired = expected - 1;
-
-    } while(!__atomic_compare_exchange_n(&metric->refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
-
-    if(desired == 0 || desired == REFCOUNT_DELETED) {
+    if(refcount == 0 || refcount == REFCOUNT_DELETED) {
         __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
 
-        if(desired == REFCOUNT_DELETED)
+        if(refcount == REFCOUNT_DELETED)
             acquired_for_deletion_metric_delete(mrg, metric);
     }
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
 
-    return desired == REFCOUNT_DELETED;
+    return refcount == REFCOUNT_DELETED;
 }
 
 static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     size_t partition = uuid_partition(mrg, entry->uuid);
 
-    uuidmap_t id = uuidmap_create(*entry->uuid);
+    UUIDMAP_ID id = uuidmap_create(*entry->uuid);
     METRIC *allocation = aral_mallocz(mrg->index[partition].aral);
     Pvoid_t *PValue;
 

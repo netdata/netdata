@@ -8,13 +8,14 @@ extern "C" {
 # endif
 
 #include "common.h"
+#include "log/nd_log-fatal.h"
+#include "atomics/atomics.h"
 
 // NETDATA_TRACE_ALLOCATIONS does not work under musl libc, so don't enable it
 //#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
 //#define NETDATA_TRACE_ALLOCATIONS 1
 //#endif
 
-#include "atomics/atomics.h"
 #include "libjudy/judy-malloc.h"
 
 #include "object-state/object-state.h"

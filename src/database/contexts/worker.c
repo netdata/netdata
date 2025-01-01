@@ -50,13 +50,12 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
 
     RRDMETRIC trm = {
+            .uuid = uuidmap_create(sd->dim_id),
             .id = string_strdupz(sd->id),
             .name = string_strdupz(sd->name),
             .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomic
     };
     if(sd->hidden) trm.flags |= RRD_FLAG_HIDDEN;
-
-    uuid_copy(trm.uuid, sd->dim_id);
 
     dictionary_set(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
 
@@ -82,17 +81,17 @@ static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     RRDINSTANCE tri = {
-            .id = string_strdupz(sc->id),
-            .name = string_strdupz(sc->name),
-            .title = string_strdupz(sc->title),
-            .units = string_strdupz(sc->units),
-            .family = string_strdupz(sc->family),
-            .chart_type = sc->chart_type,
-            .priority = sc->priority,
-            .update_every_s = sc->update_every,
-            .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomics
+        .uuid = uuidmap_create(sc->chart_id),
+        .id = string_strdupz(sc->id),
+        .name = string_strdupz(sc->name),
+        .title = string_strdupz(sc->title),
+        .units = string_strdupz(sc->units),
+        .family = string_strdupz(sc->family),
+        .chart_type = sc->chart_type,
+        .priority = sc->priority,
+        .update_every_s = sc->update_every,
+        .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomics
     };
-    uuid_copy(tri.uuid, sc->chart_id);
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_set_and_acquire_item(rc->rrdinstances, sc->id, &tri, sizeof(tri));
 
@@ -280,8 +279,9 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
         for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             STORAGE_ENGINE *eng = rrdhost->db[tier].eng;
 
+            nd_uuid_t *uuid = uuidmap_uuid_ptr(rm->uuid);
             time_t first_time_t = 0, last_time_t = 0;
-            if (eng->api.metric_retention_by_uuid(rrdhost->db[tier].si, &rm->uuid, &first_time_t, &last_time_t)) {
+            if (eng->api.metric_retention_by_uuid(rrdhost->db[tier].si, uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t > 0 && first_time_t < min_first_time_t)
                     min_first_time_t = first_time_t;
 

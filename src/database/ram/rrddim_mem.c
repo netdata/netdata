@@ -30,7 +30,7 @@ struct mem_metric_handle {
     time_t last_updated_s;
     time_t update_every_s;
 
-    int32_t refcount;
+    REFCOUNT refcount;
 };
 
 static void update_metric_handle_from_rrddim(struct mem_metric_handle *mh, RRDDIM *rd) {
@@ -65,7 +65,7 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
             pulse_db_rrd_memory_change(judy_mem + (int64_t)sizeof(struct mem_metric_handle));
         }
         else {
-            if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
+            if(!refcount_acquire(&mh->refcount))
                 mh = NULL;
         }
         netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
@@ -83,7 +83,7 @@ rrddim_metric_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid) {
     Pvoid_t *PValue = JudyHSGet(rrddim_JudyHS_array, uuid, sizeof(nd_uuid_t));
     if (likely(NULL != PValue)) {
         mh = *PValue;
-        if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
+        if(!refcount_acquire(&mh->refcount))
             mh = NULL;
     }
     netdata_rwlock_rdunlock(&rrddim_JudyHS_rwlock);
@@ -93,30 +93,25 @@ rrddim_metric_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid) {
 
 STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *smh) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
-    __atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED);
+    refcount_release(&mh->refcount);
     return smh;
 }
 
 void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh __maybe_unused) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
 
-    if(__atomic_sub_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) == 0) {
-        // we are the last one holding this
+    if(refcount_release_and_acquire_for_deletion(&mh->refcount)) {
+        // we can delete it
 
-        int32_t expected = 0;
-        if(__atomic_compare_exchange_n(&mh->refcount, &expected, -99999, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
-            // we can delete it
+        RRDDIM *rd = mh->rd;
+        netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
+        JudyAllocThreadPulseReset();
+        JudyHSDel(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
+        int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+        netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
 
-            RRDDIM *rd = mh->rd;
-            netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
-            JudyAllocThreadPulseReset();
-            JudyHSDel(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
-            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
-            netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
-
-            freez(mh);
-            pulse_db_rrd_memory_change(judy_mem - (int64_t)sizeof(struct mem_metric_handle));
-        }
+        freez(mh);
+        pulse_db_rrd_memory_change(judy_mem - (int64_t)sizeof(struct mem_metric_handle));
     }
 }
 
