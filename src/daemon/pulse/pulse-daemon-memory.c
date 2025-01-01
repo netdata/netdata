@@ -131,7 +131,7 @@ void pulse_daemon_memory_do(bool extended) {
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_sender_allocated_memory());
 #else
         uint64_t metadata =
-            aral_by_size_structures_bytes() + aral_by_size_used_bytes() +
+            aral_by_size_used_bytes() +
             dictionary_stats_category_rrdhost.memory.dict + dictionary_stats_category_rrdhost.memory.index +
             dictionary_stats_category_rrdset.memory.dict + dictionary_stats_category_rrdset.memory.index +
             dictionary_stats_category_rrddim.memory.dict + dictionary_stats_category_rrddim.memory.index +
