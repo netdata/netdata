@@ -137,6 +137,20 @@ const char *aral_name(ARAL *ar) {
     return ar->config.name;
 }
 
+static inline void aral_element_given(ARAL *ar, ARAL_PAGE *page) {
+    if(ar->config.mmap.enabled || page->mapped)
+        __atomic_add_fetch(&ar->stats->mmap.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+    else
+        __atomic_add_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+}
+
+static inline void aral_element_returned(ARAL *ar, ARAL_PAGE *page) {
+    if(ar->config.mmap.enabled || page->mapped)
+        __atomic_sub_fetch(&ar->stats->mmap.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+    else
+        __atomic_sub_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+}
+
 size_t aral_structures_bytes_from_stats(struct aral_statistics *stats) {
     if(!stats) return 0;
     return __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
@@ -800,10 +814,7 @@ static void *aral_get_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *page, bo
     // put the page pointer after the element
     aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ar, page, found_fr, marked);
 
-    if(unlikely(ar->config.mmap.enabled || page->mapped))
-        __atomic_add_fetch(&ar->stats->mmap.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
-    else
-        __atomic_add_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+    aral_element_given(ar, page);
 
     return found_fr;
 }
@@ -816,11 +827,6 @@ static inline void aral_add_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *pa
     fr->next = page->incoming.list;
     page->incoming.list = fr;
     aral_page_incoming_unlock(ar, page);
-
-    if(unlikely(ar->config.mmap.enabled || page->mapped))
-        __atomic_sub_fetch(&ar->stats->mmap.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
-    else
-        __atomic_sub_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
 }
 
 void *aral_callocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
@@ -905,10 +911,7 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
     size_t idx = mark_to_idx(marked);
     __atomic_add_fetch(&ar->ops[idx].atomic.deallocators, 1, __ATOMIC_RELAXED);
 
-    if(unlikely(ar->config.mmap.enabled || page->mapped))
-        __atomic_sub_fetch(&ar->stats->mmap.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
-    else
-        __atomic_sub_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+    aral_element_returned(ar, page);
 
     // make this element available
     aral_add_free_slot___no_lock_required(ar, page, ptr);

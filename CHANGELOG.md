@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Fix shutdown [\#19306](https://github.com/netdata/netdata/pull/19306) ([ktsaou](https://github.com/ktsaou))
+- WAITQ: fixed mixed up ordering [\#19305](https://github.com/netdata/netdata/pull/19305) ([ktsaou](https://github.com/ktsaou))
+- load rrdcontext dimensions in batches [\#19304](https://github.com/netdata/netdata/pull/19304) ([ktsaou](https://github.com/ktsaou))
+- improvement\(go.d/nats\): add cluster\_name label and jetstream status chart [\#19303](https://github.com/netdata/netdata/pull/19303) ([ilyam8](https://github.com/ilyam8))
+- Waiting Queue [\#19302](https://github.com/netdata/netdata/pull/19302) ([ktsaou](https://github.com/ktsaou))
 - revert waiting-queue optimization [\#19301](https://github.com/netdata/netdata/pull/19301) ([ktsaou](https://github.com/ktsaou))
 - Improve stream sending thread error message [\#19300](https://github.com/netdata/netdata/pull/19300) ([ilyam8](https://github.com/ilyam8))
 - Streaming improvements No 12 [\#19299](https://github.com/netdata/netdata/pull/19299) ([ktsaou](https://github.com/ktsaou))
@@ -459,11 +464,6 @@
 - Update metadata.yaml [\#18755](https://github.com/netdata/netdata/pull/18755) ([Ancairon](https://github.com/Ancairon))
 -  Remove the overview section from cloud notif. integrations [\#18754](https://github.com/netdata/netdata/pull/18754) ([Ancairon](https://github.com/Ancairon))
 - Add Ubuntu 24.10 and Fedora 41 to CI. [\#18753](https://github.com/netdata/netdata/pull/18753) ([Ferroin](https://github.com/Ferroin))
-- Simplify sentence on cloud notification integrations [\#18750](https://github.com/netdata/netdata/pull/18750) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#18749](https://github.com/netdata/netdata/pull/18749) ([netdatabot](https://github.com/netdatabot))
-- fix\(freebsd.plugin\): fix sysctl arcstats.p fails on FreeBSD 14 [\#18748](https://github.com/netdata/netdata/pull/18748) ([ilyam8](https://github.com/ilyam8))
-- fix\(python.d.plugin\): fix plugin exit if no python found [\#18747](https://github.com/netdata/netdata/pull/18747) ([ilyam8](https://github.com/ilyam8))
-- Fix crash on agent initialization [\#18746](https://github.com/netdata/netdata/pull/18746) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
