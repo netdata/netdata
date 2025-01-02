@@ -34,7 +34,7 @@ func TestTargetClassificator_classify(t *testing.T) {
     - tags: "bar4"
       expr: '{{ glob .Name "mock*4*" }}'
 - selector: "rule3"
-  tags: "foo3"
+  tags: "-skip foo3"
   match:
     - tags: "bar5"
       expr: '{{ glob .Name "mock*5*" }}'
@@ -55,15 +55,15 @@ func TestTargetClassificator_classify(t *testing.T) {
 		},
 		"one rule two match": {
 			target:   newMockTarget("mock56", "rule3"),
-			wantTags: mustParseTags("foo3 bar5 bar6"),
+			wantTags: mustParseTags("-skip foo3 bar5 bar6"),
 		},
 		"all rules all matches": {
 			target:   newMockTarget("mock123456", "rule1 rule2 rule3"),
-			wantTags: mustParseTags("foo1 foo2 foo3 bar1 bar2 bar3 bar4 bar5 bar6"),
+			wantTags: mustParseTags("-skip foo1 foo2 foo3 bar1 bar2 bar3 bar4 bar5 bar6"),
 		},
 		"applying labels after every rule": {
 			target:   newMockTarget("mock123456", "rule0 rule1 rule2 rule3"),
-			wantTags: mustParseTags("skip foo3 bar5 bar6"),
+			wantTags: mustParseTags("-skip foo3 bar5 bar6"),
 		},
 	}
 

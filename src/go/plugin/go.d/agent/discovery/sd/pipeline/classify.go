@@ -69,8 +69,8 @@ func (c *targetClassificator) classify(tgt model.Target) model.Tags {
 				tags = model.NewTags()
 			}
 
-			tags.Merge(rule.tags)
-			tags.Merge(match.tags)
+			tags.Add(rule.tags)
+			tags.Add(match.tags)
 			tgtTags.Merge(tags)
 		}
 	}
