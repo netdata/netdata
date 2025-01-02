@@ -667,9 +667,9 @@ func (c *Collector) addServerCharts() {
 
 	for _, chart := range *charts {
 		chart.Labels = []module.Label{
+			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "server_name", Value: c.srvMeta.name},
-			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 		}
 	}
 
@@ -684,9 +684,9 @@ func (c *Collector) addAccountCharts(acc *accCacheEntry) {
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, acc.accName)
 		chart.Labels = []module.Label{
+			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "server_name", Value: c.srvMeta.name},
-			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "account", Value: acc.accName},
 		}
 		for _, dim := range chart.Dims {
@@ -710,9 +710,9 @@ func (c *Collector) addRouteCharts(route *routeCacheEntry) {
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, route.rid)
 		chart.Labels = []module.Label{
+			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "server_name", Value: c.srvMeta.name},
-			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "route_id", Value: strconv.FormatUint(route.rid, 10)},
 			{Key: "remote_id", Value: route.remoteId},
 		}
@@ -744,11 +744,12 @@ func (c *Collector) addGatewayConnCharts(gwConn *gwConnCacheEntry, isInbound boo
 		chart.Title = fmt.Sprintf(chart.Title, cases.Title(language.English, cases.Compact).String(direction))
 		chart.Ctx = fmt.Sprintf(chart.Ctx, direction)
 		chart.Labels = []module.Label{
+			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "server_name", Value: c.srvMeta.name},
-			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "gateway", Value: gwConn.gwName},
 			{Key: "remote_gateway", Value: gwConn.rgwName},
+			{Key: "cid", Value: strconv.FormatUint(gwConn.cid, 10)},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, direction, gwConn.rgwName, gwConn.cid)
@@ -776,9 +777,9 @@ func (c *Collector) addLeafCharts(leaf *leafCacheEntry) {
 		chart.ID = fmt.Sprintf(chart.ID, leaf.leafName, leaf.account, leaf.ip, leaf.port)
 		chart.ID = cleanChartID(chart.ID)
 		chart.Labels = []module.Label{
+			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "server_name", Value: c.srvMeta.name},
-			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "remote_name", Value: leaf.leafName},
 			{Key: "account", Value: leaf.account},
 			{Key: "ip", Value: leaf.ip},
