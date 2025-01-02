@@ -101,6 +101,7 @@ void apps_managers_and_aggregators_init(void) {
     managed_list_add(&tree.managers, "gnome-shell");                // gnome user applications
     managed_list_add(&tree.managers, "plasmashell");                // kde user applications
     managed_list_add(&tree.managers, "xfwm4");                      // xfce4 user applications
+    managed_list_add(&tree.managers, "*python3*bin/yugabyted*");    // https://docs.yugabyte.com/preview/tutorials/quick-start/docker/#create-a-local-cluster
 #elif defined(OS_WINDOWS)
     managed_list_add(&tree.managers, "wininit");
     managed_list_add(&tree.managers, "services");
