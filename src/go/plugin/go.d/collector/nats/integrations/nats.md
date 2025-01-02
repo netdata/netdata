@@ -67,7 +67,9 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| cluster_name | The name of the NATS cluster this server belongs to. |
 | server_id | A unique identifier for a server within the NATS cluster. |
+| server_name | The configured name of the NATS server. |
 
 Metrics:
 
@@ -99,7 +101,9 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| cluster_name | The name of the NATS cluster this server belongs to. |
 | server_id | A unique identifier for a server within the NATS cluster. |
+| server_name | The configured name of the NATS server. |
 | http_endpoint | HTTP endpoint path. |
 
 Metrics:
@@ -116,7 +120,9 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| cluster_name | The name of the NATS cluster this server belongs to. |
 | server_id | A unique identifier for a server within the NATS cluster. |
+| server_name | The configured name of the NATS server. |
 | account | Account name. |
 
 Metrics:
@@ -139,7 +145,9 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| cluster_name | The name of the NATS cluster this server belongs to. |
 | server_id | A unique identifier for a server within the NATS cluster. |
+| server_name | The configured name of the NATS server. |
 | route_id | A unique identifier for a route within the NATS cluster. |
 | remote_id | he unique identifier of the remote server connected via the route. |
 
@@ -159,7 +167,9 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| cluster_name | The name of the NATS cluster this server belongs to. |
 | server_id | A unique identifier for a server within the NATS cluster. |
+| server_name | The configured name of the NATS server. |
 | gateway | The name of the local gateway. |
 | remote_gateway | The name of the remote gateway. |
 | cid | A unique identifier for the connection. |
@@ -181,7 +191,9 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| cluster_name | The name of the NATS cluster this server belongs to. |
 | server_id | A unique identifier for a server within the NATS cluster. |
+| server_name | The configured name of the NATS server. |
 | gateway | The name of the local gateway. |
 | remote_gateway | The name of the remote gateway. |
 | cid | A unique identifier for the connection. |
@@ -203,6 +215,9 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| cluster_name | The name of the NATS cluster this server belongs to. |
+| server_id | A unique identifier for a server within the NATS cluster. |
+| server_name | The configured name of the NATS server. |
 | remote_name | Unique identifier of the remote leaf node server, either its configured name or automatically assigned ID. |
 | account | Name of the associated account. |
 | ip | IP address of the remote server. |
