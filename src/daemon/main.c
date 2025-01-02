@@ -403,6 +403,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return unittest_waiting_queue();
                         }
+                        else if(strcmp(optarg, "lockstest") == 0) {
+                            unittest_running = true;
+                            return locks_stress_test();
+                        }
                         else if(strcmp(optarg, "stringtest") == 0)  {
                             unittest_running = true;
                             return string_unittest(10000);

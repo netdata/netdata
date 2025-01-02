@@ -953,6 +953,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/waitq.h
         src/libnetdata/object-state/object-state.c
         src/libnetdata/object-state/object-state.h
+        src/libnetdata/locks/benchmark.c
+        src/libnetdata/locks/benchmark.h
 )
 
 set(LIBH2O_FILES
