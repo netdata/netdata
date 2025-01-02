@@ -186,8 +186,12 @@ modules:
         - name: server
           description: These metrics refer to NATS servers.
           labels:
+            - name: cluster_name
+              description: "The name of the NATS cluster this server belongs to."
             - name: server_id
               description: "A unique identifier for a server within the NATS cluster."
+            - name: server_name
+              description: "The configured name of the NATS server."
           metrics:
             - name: nats.server_traffic
               description: Server Traffic
@@ -297,8 +301,12 @@ modules:
         - name: http endpoint
           description: These metrics refer to HTTP endpoints.
           labels:
+            - name: cluster_name
+              description: "The name of the NATS cluster this server belongs to."
             - name: server_id
               description: "A unique identifier for a server within the NATS cluster."
+            - name: server_name
+              description: "The configured name of the NATS server."
             - name: http_endpoint
               description: "HTTP endpoint path."
           metrics:
@@ -311,8 +319,12 @@ modules:
         - name: account
           description: These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
           labels:
+            - name: cluster_name
+              description: "The name of the NATS cluster this server belongs to."
             - name: server_id
               description: "A unique identifier for a server within the NATS cluster."
+            - name: server_name
+              description: "The configured name of the NATS server."
             - name: account
               description: "Account name."
           metrics:
@@ -363,8 +375,12 @@ modules:
         - name: route
           description: These metrics refer to [Routes](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information).
           labels:
+            - name: cluster_name
+              description: "The name of the NATS cluster this server belongs to."
             - name: server_id
               description: "A unique identifier for a server within the NATS cluster."
+            - name: server_name
+              description: "The configured name of the NATS server."
             - name: route_id
               description: "A unique identifier for a route within the NATS cluster."
             - name: remote_id
@@ -393,8 +409,12 @@ modules:
         - name: inbound gateway connection
           description: These metrics refer to [Inbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
           labels:
+            - name: cluster_name
+              description: "The name of the NATS cluster this server belongs to."
             - name: server_id
               description: "A unique identifier for a server within the NATS cluster."
+            - name: server_name
+              description: "The configured name of the NATS server."
             - name: gateway
               description: "The name of the local gateway."
             - name: remote_gateway
@@ -431,8 +451,12 @@ modules:
         - name: outbound gateway connection
           description: These metrics refer to [Outbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
           labels:
+            - name: cluster_name
+              description: "The name of the NATS cluster this server belongs to."
             - name: server_id
               description: "A unique identifier for a server within the NATS cluster."
+            - name: server_name
+              description: "The configured name of the NATS server."
             - name: gateway
               description: "The name of the local gateway."
             - name: remote_gateway
@@ -469,6 +493,12 @@ modules:
         - name: leaf node connection
           description: These metrics refer to [Leaf Node Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#leaf-node-information).
           labels:
+            - name: cluster_name
+              description: "The name of the NATS cluster this server belongs to."
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
+            - name: server_name
+              description: "The configured name of the NATS server."
             - name: remote_name
               description: "Unique identifier of the remote leaf node server, either its configured name or automatically assigned ID."
             - name: account
