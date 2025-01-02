@@ -49,11 +49,12 @@ static void check_metric_handle_from_rrddim(struct mem_metric_handle *mh) {
 
 STORAGE_METRIC_HANDLE *
 rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
-    struct mem_metric_handle *mh = (struct mem_metric_handle *)rrddim_metric_get(si, &rd->metric_uuid);
+    nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(rd->uuid);
+    struct mem_metric_handle *mh = (struct mem_metric_handle *)rrddim_metric_get(si, rd_uuid);
     while(!mh) {
         netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
         JudyAllocThreadPulseReset();
-        Pvoid_t *PValue = JudyHSIns(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
+        Pvoid_t *PValue = JudyHSIns(&rrddim_JudyHS_array, rd_uuid, sizeof(nd_uuid_t), PJE0);
         int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
         mh = *PValue;
         if(!mh) {
@@ -106,7 +107,8 @@ void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh __maybe_unused) {
         RRDDIM *rd = mh->rd;
         netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
         JudyAllocThreadPulseReset();
-        JudyHSDel(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
+        nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(rd->uuid);
+        JudyHSDel(&rrddim_JudyHS_array, rd_uuid, sizeof(nd_uuid_t), PJE0);
         int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
         netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
 

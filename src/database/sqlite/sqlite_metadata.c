@@ -1063,7 +1063,8 @@ static int store_dimension_metadata(RRDDIM *rd)
     if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_STORE_DIMENSION, &res))
         return 1;
 
-    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &rd->metric_uuid, sizeof(rd->metric_uuid), SQLITE_STATIC));
+    nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(rd->uuid);
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, rd_uuid, sizeof(*rd_uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &rd->rrdset->chart_uuid, sizeof(rd->rrdset->chart_uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, string2str(rd->id), -1, SQLITE_STATIC));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, string2str(rd->name), -1, SQLITE_STATIC));

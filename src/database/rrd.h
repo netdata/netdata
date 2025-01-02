@@ -289,7 +289,7 @@ bool backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
 // RRD DIMENSION - this is a metric
 
 struct rrddim {
-    nd_uuid_t metric_uuid;                          // global UUID for this metric (unique_across hosts)
+    UUIDMAP_ID uuid;
 
     // ------------------------------------------------------------------------
     // dimension definition

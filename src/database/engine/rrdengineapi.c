@@ -170,25 +170,25 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     METRIC *metric;
 
-    metric = mrg_metric_get_and_acquire(main_mrg, &rd->metric_uuid, (Word_t) ctx);
+    metric = mrg_metric_get_and_acquire_by_id(main_mrg, rd->uuid, (Word_t) ctx);
 
     if(unlikely(!metric)) {
         if(unlikely(unittest_running)) {
             metric = rrdeng_metric_unittest(si, rrddim_id(rd), rrdset_id(rd->rrdset));
             if (metric)
-                uuid_copy(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric));
+                rd->uuid = mrg_metric_uuidmap_id_dup(main_mrg, metric);
         }
 
         if(likely(!metric))
-            metric = rrdeng_metric_create(si, &rd->metric_uuid);
+            metric = rrdeng_metric_create(si, uuidmap_uuid_ptr(rd->uuid));
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(!uuid_eq(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric))) {
+    if(!uuid_eq(*uuidmap_uuid_ptr(rd->uuid), *mrg_metric_uuid(main_mrg, metric))) {
         char uuid1[UUID_STR_LEN + 1];
         char uuid2[UUID_STR_LEN + 1];
 
-        uuid_unparse(rd->metric_uuid, uuid1);
+        uuid_unparse(*uuidmap_uuid_ptr(rd->uuid), uuid1);
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid2);
         fatal("DBENGINE: uuids do not match, asked for metric '%s', but got metric '%s'", uuid1, uuid2);
     }

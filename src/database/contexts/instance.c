@@ -81,12 +81,15 @@ static void rrdinstance_free(RRDINSTANCE *ri) {
     string_freez(ri->title);
     string_freez(ri->units);
     string_freez(ri->family);
+    uuidmap_free(ri->uuid);
 
     ri->id = NULL;
     ri->name = NULL;
     ri->title = NULL;
     ri->units = NULL;
     ri->family = NULL;
+    ri->uuid = 0;
+
     ri->rc = NULL;
     ri->rrdlabels = NULL;
     ri->rrdmetrics = NULL;
@@ -157,42 +160,27 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
                        string2str(ri->id), rrdhost_hostname(ri->rc->rrdhost), uuid1, uuid2);
 #endif
 
-        UUIDMAP_ID old = ri->uuid;
-        ri->uuid = ri_new->uuid;
-        uuidmap_free(old);
+        SWAP(ri->uuid, ri_new->uuid);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
-    if(ri->rrdset && ri_new->rrdset && ri->rrdset != ri_new->rrdset) {
-        ri->rrdset = ri_new->rrdset;
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
-    }
-
     if(ri->name != ri_new->name) {
-        STRING *old = ri->name;
-        ri->name = string_dup(ri_new->name);
-        string_freez(old);
+        SWAP(ri->name, ri_new->name);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->title != ri_new->title) {
-        STRING *old = ri->title;
-        ri->title = string_dup(ri_new->title);
-        string_freez(old);
+        SWAP(ri->title, ri_new->title);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->units != ri_new->units) {
-        STRING *old = ri->units;
-        ri->units = string_dup(ri_new->units);
-        string_freez(old);
+        SWAP(ri->units, ri_new->units);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->family != ri_new->family) {
-        STRING *old = ri->family;
-        ri->family = string_dup(ri_new->family);
-        string_freez(old);
+        SWAP(ri->family, ri_new->family);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
@@ -209,6 +197,11 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
     if(ri->update_every_s != ri_new->update_every_s) {
         ri->update_every_s = ri_new->update_every_s;
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+    }
+
+    if(ri->rrdset && ri_new->rrdset && ri->rrdset != ri_new->rrdset) {
+        ri->rrdset = ri_new->rrdset;
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
 
     if(ri->rrdset != ri_new->rrdset) {

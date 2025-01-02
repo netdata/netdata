@@ -66,10 +66,12 @@ inline time_t rrdmetric_acquired_last_entry(RRDMETRIC_ACQUIRED *rma) {
 static void rrdmetric_free(RRDMETRIC *rm) {
     string_freez(rm->id);
     string_freez(rm->name);
+    uuidmap_free(rm->uuid);
 
     rm->id = NULL;
     rm->name = NULL;
     rm->ri = NULL;
+    rm->uuid = 0;
 }
 
 // called when this rrdmetric is inserted to the rrdmetrics dictionary of a rrdinstance
@@ -127,10 +129,6 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
             old_last_time_s = rm->last_time_s;
         }
 
-        UUIDMAP_ID old_uuid = rm->uuid;
-        rm->uuid = rm_new->uuid;
-        uuidmap_free(old_uuid);
-
         time_t new_first_time_s = 0;
         time_t new_last_time_s = 0;
         if(rrdmetric_update_retention(rm)) {
@@ -146,11 +144,9 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
                        , uuid1, old_first_time_s, old_last_time_s, old_last_time_s - old_first_time_s
                        , uuid2, new_first_time_s, new_last_time_s, new_last_time_s - new_first_time_s
                        );
-#else
-        UUIDMAP_ID old_uuid = rm->uuid;
-        rm->uuid = rm_new->uuid;
-        uuidmap_free(old_uuid);
 #endif
+
+        SWAP(rm->uuid, rm_new->uuid);
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
@@ -163,9 +159,7 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         rm->rrddim = rm_new->rrddim;
 
     if(rm->name != rm_new->name) {
-        STRING *old = rm->name;
-        rm->name = string_dup(rm_new->name);
-        string_freez(old);
+        SWAP(rm->name, rm_new->name);
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
@@ -246,7 +240,7 @@ void rrdmetric_from_rrddim(RRDDIM *rd) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(rd->rrdset->rrdcontexts.rrdinstance);
 
     RRDMETRIC trm = {
-            .uuid = uuidmap_create(rd->metric_uuid),
+            .uuid = uuidmap_dup(rd->uuid),
             .id = string_dup(rd->id),
             .name = string_dup(rd->name),
             .flags = RRD_FLAG_NONE, // no need for atomics

@@ -40,7 +40,7 @@ struct mrg_statistics {
     PAD64(size_t) writers_conflicts;
 };
 
-MRG *mrg_create(ssize_t partitions);
+MRG *mrg_create(void);
 void mrg_destroy(MRG *mrg);
 
 METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric);
@@ -48,10 +48,12 @@ void mrg_metric_release(MRG *mrg, METRIC *metric);
 
 METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret);
 METRIC *mrg_metric_get_and_acquire(MRG *mrg, nd_uuid_t *uuid, Word_t section);
+METRIC *mrg_metric_get_and_acquire_by_id(MRG *mrg, UUIDMAP_ID id, Word_t section);
 bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric);
 
 Word_t mrg_metric_id(MRG *mrg, METRIC *metric);
 nd_uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric);
+UUIDMAP_ID mrg_metric_uuidmap_id_dup(MRG *mrg __maybe_unused, METRIC *metric);
 Word_t mrg_metric_section(MRG *mrg, METRIC *metric);
 
 bool mrg_metric_set_first_time_s(MRG *mrg, METRIC *metric, time_t first_time_s);

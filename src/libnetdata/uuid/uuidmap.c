@@ -18,7 +18,7 @@ struct uuidmap_partition {
 };
 
 static struct {
-    struct uuidmap_partition p[256];
+    struct uuidmap_partition p[UUIDMAP_PARTITIONS];
     ARAL *ar;
 } uuid_map = { 0 };
 
@@ -59,22 +59,14 @@ static void uuidmap_init_aral(void) {
     }
 }
 
-static inline uint8_t uuid_to_partition(const nd_uuid_t uuid) {
-    return uuid[15];
-}
-
-static inline uint8_t id_to_partition(UUIDMAP_ID id) {
-    return (uint8_t)(id >> 24);
-}
-
 static inline UUIDMAP_ID make_id(uint8_t partition, uint32_t id) {
     return ((UUIDMAP_ID)partition << 24) | (id & 0x00FFFFFF);
 }
 
-static inline UUIDMAP_ID uuidmap_get_by_uuid(const nd_uuid_t uuid) {
+static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
     UUIDMAP_ID id = 0;
 
-    uint8_t partition = uuid_to_partition(uuid);
+    uint8_t partition = uuid_to_uuidmap_partition(uuid);
 
     // try to find it in the JudyHS - we may have it already
     rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
@@ -92,7 +84,8 @@ static inline UUIDMAP_ID uuidmap_get_by_uuid(const nd_uuid_t uuid) {
             fatal("UUIDMAP: corrupted JudyL array");
 
         struct uuidmap_entry *ue = *PValue;
-        refcount_increment(&ue->refcount);
+        if(!refcount_acquire(&ue->refcount))
+            id = 0;
     }
 
     rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
@@ -100,34 +93,45 @@ static inline UUIDMAP_ID uuidmap_get_by_uuid(const nd_uuid_t uuid) {
 }
 
 UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
-    UUIDMAP_ID id = uuidmap_get_by_uuid(uuid);
+    UUIDMAP_ID id = uuidmap_acquire_by_uuid(uuid);
     if(id != 0) return id;
 
     uuidmap_init_aral();
 
     // we didn't find it - let's add it
 
-    uint8_t partition = uuid_to_partition(uuid);
+    uint8_t partition = uuid_to_uuidmap_partition(uuid);
 
     JudyAllocThreadPulseReset();
-    rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
 
-    Pvoid_t *PValue = JudyHSIns(&uuid_map.p[partition].uuid_to_id, (void *)uuid, sizeof(nd_uuid_t), PJE0);
-    if(!PValue || PValue == PJERR)
-        fatal("UUIDMAP: corrupted JudyHS array");
+    Pvoid_t *PValue;
+    while(true) {
+        rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
 
-    // If value exists, return it
-    if (*PValue != 0) {
-        id = (UUIDMAP_ID)(uintptr_t)*PValue;
-
-        PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
+        PValue = JudyHSIns(&uuid_map.p[partition].uuid_to_id, (void *)uuid, sizeof(nd_uuid_t), PJE0);
         if (!PValue || PValue == PJERR)
-            fatal("UUIDMAP: corrupted JudyL array");
+            fatal("UUIDMAP: corrupted JudyHS array");
 
-        struct uuidmap_entry *ue = *PValue;
-        refcount_increment(&ue->refcount);
+        // If value exists, return it
+        if (*PValue != 0) {
+            id = (UUIDMAP_ID)(uintptr_t)*PValue;
 
-        goto done;
+            PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
+            if (!PValue || PValue == PJERR)
+                fatal("UUIDMAP: corrupted JudyL array");
+
+            struct uuidmap_entry *ue = *PValue;
+            if (!refcount_acquire(&ue->refcount)) {
+                rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
+                continue;
+            }
+
+            uuid_map.p[partition].memory += JudyAllocThreadPulseGetAndReset();
+            rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
+            return id;
+        }
+        else
+            break;
     }
 
     id = make_id(partition, ++uuid_map.p[partition].next_id);
@@ -146,30 +150,36 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     uuid_map.p[partition].entries++;
     uuid_map.p[partition].memory += sizeof(*ue);
 
-done:
     uuid_map.p[partition].memory += JudyAllocThreadPulseGetAndReset();
     rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
     return id;
 }
 
-void uuidmap_free(UUIDMAP_ID id) {
-    JudyAllocThreadPulseReset();
+static struct uuidmap_entry *get_entry_by_id(UUIDMAP_ID id) {
+    if(id == 0) return NULL;
 
-    uint8_t partition = id_to_partition(id);
+    uint8_t partition = uuidmap_id_to_partition(id);
 
-    rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
 
     Pvoid_t *PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
     if (PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyL array");
 
-    if (!PValue) {
-        rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
-        return;
-    }
+    struct uuidmap_entry *ue = PValue ? *PValue : NULL;
 
-    struct uuidmap_entry *ue = *PValue;
-    if(refcount_decrement(&ue->refcount) == 0) {
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+
+    return ue;
+}
+
+void uuidmap_free(UUIDMAP_ID id) {
+    struct uuidmap_entry *ue = get_entry_by_id(id);
+
+    if(ue && refcount_release_and_acquire_for_deletion(&ue->refcount)) {
+        JudyAllocThreadPulseReset();
+        uint8_t partition = uuidmap_id_to_partition(id);
+        rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
 
         int rc;
         rc = JudyHSDel(&uuid_map.p[partition].uuid_to_id, (void *)ue->uuid, sizeof(nd_uuid_t), PJE0);
@@ -183,34 +193,25 @@ void uuidmap_free(UUIDMAP_ID id) {
         uuid_map.p[partition].memory -= sizeof(*ue);
         uuid_map.p[partition].entries--;
 
+        uuid_map.p[partition].memory += JudyAllocThreadPulseGetAndReset();
+        rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
+
         aral_freez(uuid_map.ar, ue);
     }
-
-    uuid_map.p[partition].memory += JudyAllocThreadPulseGetAndReset();
-    rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
 }
 
 nd_uuid_t *uuidmap_uuid_ptr(UUIDMAP_ID id) {
-    if (id == 0)
-        return NULL;
+    struct uuidmap_entry *ue = get_entry_by_id(id);
+    return ue ? &ue->uuid : NULL;
+}
 
-    uint8_t partition = id_to_partition(id);
+nd_uuid_t *uuidmap_uuid_ptr_and_dup(UUIDMAP_ID id) {
+    struct uuidmap_entry *ue = get_entry_by_id(id);
 
-    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+    if(ue && refcount_acquire(&ue->refcount))
+        return &ue->uuid;
 
-    Pvoid_t *PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
-    if (PValue == PJERR)
-        fatal("UUIDMAP: corrupted JudyL array");
-
-    if(!PValue) {
-        rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
-        return NULL;
-    }
-
-    struct uuidmap_entry *ue = *PValue;
-
-    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
-    return &ue->uuid;
+    return NULL;
 }
 
 bool uuidmap_uuid(UUIDMAP_ID id, nd_uuid_t out_uuid) {
@@ -231,13 +232,145 @@ ND_UUID uuidmap_get(UUIDMAP_ID id) {
     return uuid;
 }
 
+UUIDMAP_ID uuidmap_dup(UUIDMAP_ID id) {
+    struct uuidmap_entry *ue = get_entry_by_id(id);
+
+    if(!ue || !refcount_acquire(&ue->refcount))
+        fatal("UUIDMAP: id %u does not exist, or cannot be acquired, in %s", id, __FUNCTION__ );
+
+    return id;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
+
+static volatile bool stop_flag = false;
+
+typedef struct thread_stats {
+    size_t creates;
+    size_t finds;
+    size_t dups;
+    size_t frees;
+    size_t cycles;
+} THREAD_STATS;
+
+static void *concurrent_test_thread(void *arg) {
+    THREAD_STATS *stats = arg;
+    nd_uuid_t test_uuid = {
+        0x12, 0x34, 0x56, 0x78,
+        0x9a, 0xbc, 0xde, 0xf0,
+        0x12, 0x34, 0x56, 0x78,
+        0x9a, 0xbc, 0xde, 0xf0
+    };
+
+    while(!__atomic_load_n(&stop_flag, __ATOMIC_RELAXED)) {
+        // 1. Create UUID (refcount 1)
+        UUIDMAP_ID id = uuidmap_create(test_uuid);
+        if(!id) continue;
+        stats->creates++;
+
+        // 2. Find its pointer
+        nd_uuid_t *uuid_ptr = uuidmap_uuid_ptr(id);
+        if(!uuid_ptr) {
+            fprintf(stderr, "ERROR: Cannot find UUID we just created\n");
+            break;
+        }
+        stats->finds++;
+
+        // 3. Dup it (refcount 2)
+        UUIDMAP_ID id2 = uuidmap_dup(id);
+        if(!id2) {
+            fprintf(stderr, "ERROR: Cannot dup UUID\n");
+            break;
+        }
+        stats->dups++;
+
+        // 4. Free it once (refcount 1)
+        uuidmap_free(id);
+        stats->frees++;
+
+        // 5. Find its pointer again
+        uuid_ptr = uuidmap_uuid_ptr(id2);
+        if(!uuid_ptr) {
+            fprintf(stderr, "ERROR: Cannot find UUID after first free\n");
+            break;
+        }
+        stats->finds++;
+
+        // 6. Free it twice (should delete)
+        uuidmap_free(id2);
+        stats->frees++;
+
+        stats->cycles++;
+    }
+
+    return NULL;
+}
+
+static int uuidmap_concurrent_unittest(void) {
+    const int num_threads = 4;
+    const int num_seconds = 5;
+    fprintf(stderr, "\nTesting concurrent UUID Map access with %d threads for %d seconds...\n", num_threads, num_seconds);
+    int errors = 0;
+
+    THREAD_STATS stats[num_threads];
+    memset(stats, 0, sizeof(stats));
+
+    ND_THREAD *threads[num_threads];
+
+    // Start threads
+    __atomic_store_n(&stop_flag, false, __ATOMIC_RELAXED);
+
+    for(int i = 0; i < num_threads; i++) {
+        char thread_name[32];
+        snprintf(thread_name, sizeof(thread_name), "UUID-TEST-%d", i);
+        threads[i] = nd_thread_create(
+            thread_name,
+            NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
+            concurrent_test_thread,
+            &stats[i]);
+    }
+
+    // Let it run for 5 seconds
+    sleep_usec(num_seconds * USEC_PER_SEC);
+
+    // Stop threads
+    __atomic_store_n(&stop_flag, true, __ATOMIC_RELEASE);
+
+    // Wait for threads
+    for(int i = 0; i < num_threads; i++)
+        nd_thread_join(threads[i]);
+
+    // Print statistics
+    size_t total_cycles = 0;
+    for(int i = 0; i < num_threads; i++) {
+        fprintf(stderr, "Thread %d stats:\n"
+                        "  Cycles completed : %zu\n"
+                        "  Creates         : %zu\n"
+                        "  Finds           : %zu\n"
+                        "  Dups            : %zu\n"
+                        "  Frees           : %zu\n",
+                i,
+                stats[i].cycles,
+                stats[i].creates,
+                stats[i].finds,
+                stats[i].dups,
+                stats[i].frees);
+
+        total_cycles += stats[i].cycles;
+    }
+
+    fprintf(stderr, "\nTotal cycles completed: %zu (%.2f cycles/sec)\n",
+            total_cycles,
+            (double)total_cycles / 5.0);
+
+    return errors;
+}
 
 int uuidmap_unittest(void) {
     fprintf(stderr, "\nTesting UUID Map...\n");
 
     const size_t ENTRIES = 100000;
-    int errors = 0;
+    int errors = uuidmap_concurrent_unittest();
 
     struct test_entry {
         nd_uuid_t uuid;
@@ -263,7 +396,7 @@ int uuidmap_unittest(void) {
         uuid_unparse_lower(entries[i].uuid, uuid_str);
 
         // Test 1: Should not exist yet
-        UUIDMAP_ID id = uuidmap_get_by_uuid(entries[i].uuid);
+        UUIDMAP_ID id = uuidmap_acquire_by_uuid(entries[i].uuid);
         if(id != 0) {
             fprintf(stderr, "\nERROR [%zu]: UUID found before adding it"
                             "\n  UUID: %s"
@@ -401,7 +534,7 @@ int uuidmap_unittest(void) {
         start_ut = now_monotonic_usec();
 
         for(size_t i = 0; i < ENTRIES; i++) {
-            UUIDMAP_ID id = uuidmap_get_by_uuid(entries[i].uuid);
+            UUIDMAP_ID id = uuidmap_acquire_by_uuid(entries[i].uuid);
             if(id != 0) {
                 successful++;
                 uuidmap_free(id);  // Must free since get_by_uuid increases refcount
@@ -412,7 +545,7 @@ int uuidmap_unittest(void) {
         secs = (double)(end_ut - start_ut) / USEC_PER_SEC;
         ops = (double)successful / secs;
 
-        fprintf(stderr, "uuidmap_get_by_uuid(): %.2f ops/sec (%.2f usec/op)\n",
+        fprintf(stderr, "uuidmap_acquire_by_uuid(): %.2f ops/sec (%.2f usec/op)\n",
                 ops, (double)(end_ut - start_ut) / successful);
     }
 

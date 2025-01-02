@@ -84,8 +84,10 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->rrd_memory_mode = ctr->memory_mode;
 
-    if (unlikely(rrdcontext_find_dimension_uuid(st, rrddim_id(rd), &(rd->metric_uuid))))
-        uuid_generate(rd->metric_uuid);
+    nd_uuid_t uuid;
+    if (unlikely(rrdcontext_find_dimension_uuid(st, rrddim_id(rd), &uuid)))
+        uuid_generate(uuid);
+    rd->uuid = uuidmap_create(uuid);
 
     // initialize the db tiers
     {
@@ -209,7 +211,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     if (!rrddim_finalize_collection_and_check_retention(rd) && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         /* This metric has no data and no references */
-        metaqueue_delete_dimension_uuid(&rd->metric_uuid);
+        metaqueue_delete_dimension_uuid(uuidmap_uuid_ptr(rd->uuid));
     }
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
@@ -233,6 +235,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     string_freez(rd->id);
     string_freez(rd->name);
+    uuidmap_free(rd->uuid);
 }
 
 static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *new_rrddim, void *constructor_data) {
