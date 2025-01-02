@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix aral memory accounting [\#19308](https://github.com/netdata/netdata/pull/19308) ([ktsaou](https://github.com/ktsaou))
 - Fix shutdown [\#19306](https://github.com/netdata/netdata/pull/19306) ([ktsaou](https://github.com/ktsaou))
 - WAITQ: fixed mixed up ordering [\#19305](https://github.com/netdata/netdata/pull/19305) ([ktsaou](https://github.com/ktsaou))
 - load rrdcontext dimensions in batches [\#19304](https://github.com/netdata/netdata/pull/19304) ([ktsaou](https://github.com/ktsaou))
@@ -463,7 +464,6 @@
 - Regenerate integrations.js [\#18756](https://github.com/netdata/netdata/pull/18756) ([netdatabot](https://github.com/netdatabot))
 - Update metadata.yaml [\#18755](https://github.com/netdata/netdata/pull/18755) ([Ancairon](https://github.com/Ancairon))
 -  Remove the overview section from cloud notif. integrations [\#18754](https://github.com/netdata/netdata/pull/18754) ([Ancairon](https://github.com/Ancairon))
-- Add Ubuntu 24.10 and Fedora 41 to CI. [\#18753](https://github.com/netdata/netdata/pull/18753) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
