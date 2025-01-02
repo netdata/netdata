@@ -299,7 +299,7 @@ static void set_waitq_priorities(int thread_count, thread_context_t *contexts) {
             contexts[3].priority = WAITQ_PRIO_LOW;
             break;
 
-        default:  // 8, 16, 32
+        default: { // 8, 16, 32
             int threads_per_priority = thread_count / 4;
             int remainder = thread_count % 4;
             int thread_idx = 0;
@@ -313,6 +313,7 @@ static void set_waitq_priorities(int thread_count, thread_context_t *contexts) {
                 }
             }
             break;
+        }
     }
 }
 
