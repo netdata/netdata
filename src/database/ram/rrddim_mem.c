@@ -144,6 +144,17 @@ bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si __maybe_unused, nd_uui
     return true;
 }
 
+bool rrddim_metric_retention_by_id(STORAGE_INSTANCE *si __maybe_unused, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s) {
+    STORAGE_METRIC_HANDLE *smh = rrddim_metric_get_by_id(si, id);
+    if(!smh)
+        return false;
+
+    *first_entry_s = rrddim_query_oldest_time_s(smh);
+    *last_entry_s = rrddim_query_latest_time_s(smh);
+
+    return true;
+}
+
 void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
     struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;

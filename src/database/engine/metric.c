@@ -298,7 +298,7 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     return metric;
 }
 
-static inline METRIC *metric_get_and_acquire(MRG *mrg, UUIDMAP_ID id, Word_t section) {
+static inline METRIC *metric_get_and_acquire_by_id(MRG *mrg, UUIDMAP_ID id, Word_t section) {
     size_t partition = uuidmap_id_to_partition(id);
 
     while(1) {
@@ -373,19 +373,15 @@ inline METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) 
     return metric_add_and_acquire(mrg, &entry, ret);
 }
 
-inline METRIC *mrg_metric_get_and_acquire(MRG *mrg, nd_uuid_t *uuid, Word_t section) {
+inline METRIC *mrg_metric_get_and_acquire_by_uuid(MRG *mrg, nd_uuid_t *uuid, Word_t section) {
     UUIDMAP_ID id = uuidmap_create(*uuid);
-    METRIC *metric = metric_get_and_acquire(mrg, id, section);
+    METRIC *metric = metric_get_and_acquire_by_id(mrg, id, section);
     uuidmap_free(id);
     return metric;
 }
 
 inline METRIC *mrg_metric_get_and_acquire_by_id(MRG *mrg, UUIDMAP_ID id, Word_t section) {
-    nd_uuid_t *uuid = uuidmap_uuid_ptr(id);
-    if(!uuid)
-        fatal("METRIC: id %u is not found in uuidmap", id);
-
-    return metric_get_and_acquire(mrg, id, section);
+    return metric_get_and_acquire_by_id(mrg, id, section);
 }
 
 inline bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric) {
@@ -657,7 +653,7 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     }
 
     bool added = false;
-    METRIC *metric = mrg_metric_get_and_acquire(mrg, uuid, section);
+    METRIC *metric = mrg_metric_get_and_acquire_by_uuid(mrg, uuid, section);
     if (!metric) {
         MRG_ENTRY entry = {
                 .uuid = uuid,
@@ -797,7 +793,7 @@ int mrg_unittest(void) {
     if(ret)
         fatal("DBENGINE METRIC: managed to add the same metric twice");
 
-    m3_t0 = mrg_metric_get_and_acquire(mrg, entry.uuid, entry.section);
+    m3_t0 = mrg_metric_get_and_acquire_by_uuid(mrg, entry.uuid, entry.section);
     if(m3_t0 != m1_t0)
         fatal("DBENGINE METRIC: cannot find the metric added");
 
@@ -821,7 +817,7 @@ int mrg_unittest(void) {
     if(ret)
         fatal("DBENGINE METRIC: managed to add the same metric twice in (section 0)");
 
-    m3_t1 = mrg_metric_get_and_acquire(mrg, entry.uuid, entry.section);
+    m3_t1 = mrg_metric_get_and_acquire_by_uuid(mrg, entry.uuid, entry.section);
     if(m3_t1 != m1_t1)
         fatal("DBENGINE METRIC: cannot find the metric added (section %zu)", (size_t)entry.section);
 
@@ -835,7 +831,7 @@ int mrg_unittest(void) {
     if(!mrg_metric_release_and_delete(mrg, m1_t0))
         fatal("DBENGINE METRIC: cannot delete the first metric");
 
-    m4_t1 = mrg_metric_get_and_acquire(mrg, entry.uuid, entry.section);
+    m4_t1 = mrg_metric_get_and_acquire_by_uuid(mrg, entry.uuid, entry.section);
     if(m4_t1 != m1_t1)
         fatal("DBENGINE METRIC: cannot find the metric added (section %zu), after deleting the first one", (size_t)entry.section);
 

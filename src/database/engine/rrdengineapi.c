@@ -126,7 +126,7 @@ static METRIC *rrdeng_metric_unittest(STORAGE_INSTANCE *si, const char *rd_id, c
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     nd_uuid_t legacy_uuid;
     rrdeng_generate_unittest_uuid(rd_id, st_id, &legacy_uuid);
-    return mrg_metric_get_and_acquire(main_mrg, &legacy_uuid, (Word_t) ctx);
+    return mrg_metric_get_and_acquire_by_uuid(main_mrg, &legacy_uuid, (Word_t)ctx);
 }
 
 // ----------------------------------------------------------------------------
@@ -142,9 +142,14 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *smh) {
     return (STORAGE_METRIC_HANDLE *) mrg_metric_dup(main_mrg, metric);
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
-    return (STORAGE_METRIC_HANDLE *) mrg_metric_get_and_acquire(main_mrg, uuid, (Word_t) ctx);
+    return (STORAGE_METRIC_HANDLE *)mrg_metric_get_and_acquire_by_uuid(main_mrg, uuid, (Word_t)ctx);
+}
+
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    return (STORAGE_METRIC_HANDLE *)mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t)ctx);
 }
 
 static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
@@ -960,15 +965,32 @@ time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh) {
     return oldest_time_s;
 }
 
-bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s)
-{
+bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     if (unlikely(!ctx)) {
         netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
     }
 
-    METRIC *metric = mrg_metric_get_and_acquire(main_mrg, dim_uuid, (Word_t) ctx);
+    METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, dim_uuid, (Word_t)ctx);
+    if (unlikely(!metric))
+        return false;
+
+    mrg_metric_get_retention(main_mrg, metric, first_entry_s, last_entry_s, NULL);
+
+    mrg_metric_release(main_mrg, metric);
+
+    return true;
+}
+
+bool rrdeng_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    if (unlikely(!ctx)) {
+        netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
+        return false;
+    }
+
+    METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t)ctx);
     if (unlikely(!metric))
         return false;
 
