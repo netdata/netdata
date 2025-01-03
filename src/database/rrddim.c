@@ -96,7 +96,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             STORAGE_ENGINE *eng = host->db[tier].eng;
             rd->tiers[tier].seb = eng->seb;
             rd->tiers[tier].tier_grouping = host->db[tier].tier_grouping;
-            rd->tiers[tier].smh = eng->api.metric_get_or_create(rd, host->db[tier].si);
+            rd->tiers[tier].smh = eng->api.metric_get_or_create_by_uuid(rd, host->db[tier].si);
             spinlock_init(&rd->tiers[tier].spinlock);
             storage_point_unset(rd->tiers[tier].virtual_point);
             initialized++;

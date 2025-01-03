@@ -23,7 +23,8 @@ struct mem_query_handle {
 };
 
 STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si);
-STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
+STORAGE_METRIC_HANDLE *rrddim_metric_get_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
+STORAGE_METRIC_HANDLE *rrddim_metric_get_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
 STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *smh);
 void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh);
 

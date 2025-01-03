@@ -654,8 +654,8 @@ static inline time_t storage_engine_align_to_optimal_before(struct storage_engin
 // function pointers for all APIs provided by a storage engine
 typedef struct storage_engine_api {
     // metric management
-    STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
-    STORAGE_METRIC_HANDLE *(*metric_get_or_create)(RRDDIM *rd, STORAGE_INSTANCE *si);
+    STORAGE_METRIC_HANDLE *(*metric_get_by_uuid)(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
+    STORAGE_METRIC_HANDLE *(*metric_get_or_create_by_uuid)(RRDDIM *rd, STORAGE_INSTANCE *si);
     void (*metric_release)(STORAGE_METRIC_HANDLE *);
     STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
     bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *si, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
