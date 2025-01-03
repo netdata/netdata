@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- add yugabytedb docker manager [\#19313](https://github.com/netdata/netdata/pull/19313) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/sd\): correctly adding tags in classify [\#19312](https://github.com/netdata/netdata/pull/19312) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/nats\): add missing cid label to gw charts [\#19311](https://github.com/netdata/netdata/pull/19311) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19310](https://github.com/netdata/netdata/pull/19310) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/nats\): add missing labels to meta [\#19309](https://github.com/netdata/netdata/pull/19309) ([ilyam8](https://github.com/ilyam8))
+- fix aral memory accounting [\#19308](https://github.com/netdata/netdata/pull/19308) ([ktsaou](https://github.com/ktsaou))
 - Fix shutdown [\#19306](https://github.com/netdata/netdata/pull/19306) ([ktsaou](https://github.com/ktsaou))
 - WAITQ: fixed mixed up ordering [\#19305](https://github.com/netdata/netdata/pull/19305) ([ktsaou](https://github.com/ktsaou))
 - load rrdcontext dimensions in batches [\#19304](https://github.com/netdata/netdata/pull/19304) ([ktsaou](https://github.com/ktsaou))
@@ -458,12 +464,6 @@
 - Expand ml enabled option [\#18761](https://github.com/netdata/netdata/pull/18761) ([stelfrag](https://github.com/stelfrag))
 - Fix storing of repeat field [\#18760](https://github.com/netdata/netdata/pull/18760) ([stelfrag](https://github.com/stelfrag))
 - local-listeners without libmnl [\#18759](https://github.com/netdata/netdata/pull/18759) ([ktsaou](https://github.com/ktsaou))
-- fix\(proc.plugin/zfs\): fix arcstats.pm [\#18758](https://github.com/netdata/netdata/pull/18758) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/sd/net\_listeners\): exit if local-listeners constantly times out [\#18757](https://github.com/netdata/netdata/pull/18757) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18756](https://github.com/netdata/netdata/pull/18756) ([netdatabot](https://github.com/netdatabot))
-- Update metadata.yaml [\#18755](https://github.com/netdata/netdata/pull/18755) ([Ancairon](https://github.com/Ancairon))
--  Remove the overview section from cloud notif. integrations [\#18754](https://github.com/netdata/netdata/pull/18754) ([Ancairon](https://github.com/Ancairon))
-- Add Ubuntu 24.10 and Fedora 41 to CI. [\#18753](https://github.com/netdata/netdata/pull/18753) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
