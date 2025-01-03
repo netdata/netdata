@@ -407,6 +407,7 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "uuidmaptest") == 0) {
                             unittest_running = true;
                             return uuidmap_unittest();
+                        }
                         else if(strcmp(optarg, "lockstest") == 0) {
                             unittest_running = true;
                             return locks_stress_test();
