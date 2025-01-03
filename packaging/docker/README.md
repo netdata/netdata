@@ -142,7 +142,9 @@ volumes:
 
 <h3>Using the Podman Quadlet systemd generator</h3>
 
-Create a file named `netdata.service` in `/etc/containers/systemd` and paste the code below. Start Netdata by running `systemctl daemon-reload` and then `systemctl start netdata.service`.
+Create a file named `netdata.container` in `/etc/containers/systemd` and
+paste the code below. Start Netdata by running `systemctl daemon-reload`
+and then `systemctl start netdata.service`.
 
 ```ini
 [Unit]
@@ -164,9 +166,6 @@ SeccompProfile=unconfined
 Network=host
 HostName=%l
 Timezone=local
-Volume=netdataconfig:/etc/netdata
-Volume=netdatalib:/var/lib/netdata
-Volume=netdatacache:/var/cache/netdata
 Volume=/:/host/root:ro,rslave
 Volume=/etc/passwd:/host/etc/passwd:ro
 Volume=/etc/group:/host/etc/group:ro
@@ -178,6 +177,11 @@ Volume=/etc/hostname:/etc/hostname:ro
 Volume=/var/log:/host/var/log:ro
 Volume=/run/podman/podman.sock:/var/run/docker.sock:ro
 
+Volume=%E/%N:/etc/netdata
+Volume=%S/%N:/var/lib/netdata
+Volume=%C/%N:/var/cache/netdata
+Volume=%L/%N:/var/log/netdata
+
 [Service]
 Restart=always
 RestartSec=30
@@ -185,9 +189,24 @@ TimeoutStopSec=150
 CPUSchedulingPolicy=batch
 OOMPolicy=kill
 
+ConfigurationDirectory=%N
+StateDirectory=%N
+CacheDirectory=%N
+LogsDirectory=%N
+
 [Install]
 WantedBy=default.target
 ```
+
+Unlike the Docker CLI or Docker Compose setups, this will run the Netdata
+Agent container as a system service, using the regular host directories
+that a native install of Netdata would use for configuration, data
+storage, and logs, and utilizing the hostname and timezone configuration
+of the host system.
+
+If additional dependencies are required in the final unit, they can be
+added to the `[Unit]` section of the container file just like with a
+regular systemd unit.
 
 </TabItem>
 </Tabs>
@@ -357,6 +376,13 @@ volumes:
   netdatalib:
   netdatacache:
 ```
+
+</TabItem>
+<TabItem vaule="podman_quadlet" label="podman quadlet">
+
+<h3> Using the Podman Quadlet systemd generator</h3>
+
+Host editable configuration is already provided by this method.
 
 </TabItem>
 </Tabs>
@@ -568,7 +594,10 @@ resources that require elevated privileges. The following components do not work
 - freeipmi.plugin
 - perf.plugin
 - slabinfo.plugin
+- network-viewer.plugin
 - systemd-journal.plugin
+
+Other functionality may also be missing in rootless mode.
 
 This method creates a [volume](https://docs.docker.com/storage/volumes/) for Netdata's configuration files
 _within the container_ at `/etc/netdata`.
@@ -612,7 +641,7 @@ docker run -d --name=netdata \
 
 ## Docker tags
 
-See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
+See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata), [Quay](https://quay.io/repository/netdata/netdata), or [GitHub Container Registry](https://github.com/netdata/netdata/pkgs/container/netdata).
 
 The official `netdata/netdata` Docker image provides the following named tags:
 
