@@ -8,7 +8,7 @@
 
 typedef struct netdata_rw_spinlock {
     pid_t writer;
-    REFCOUNT counter; // positive is readers, negative is a writer
+    uint32_t counter;
 } RW_SPINLOCK;
 
 #define RW_SPINLOCK_INITIALIZER { .counter = 0, .writer = 0, }

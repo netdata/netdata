@@ -16,7 +16,8 @@ extern "C" {
 
 #include "atomics/atomics.h"
 #include "libjudy/judy-malloc.h"
-
+#include "locks/benchmark.h"
+#include "locks/benchmark-rw.h"
 #include "object-state/object-state.h"
 #include "storage-point.h"
 #include "paths/paths.h"

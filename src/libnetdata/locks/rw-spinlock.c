@@ -2,7 +2,10 @@
 
 #include "libnetdata/libnetdata.h"
 
-#define WRITER_LOCKED (-65536)
+#define MAX_USEC 512 // Maximum backoff limit in microseconds
+
+#define WRITER_BIT (1U << 31)
+#define READER_MASK (~WRITER_BIT)
 
 // ----------------------------------------------------------------------------
 // rw_spinlock implementation
@@ -15,27 +18,13 @@ void rw_spinlock_init_with_trace(RW_SPINLOCK *rw_spinlock, const char *func __ma
 bool rw_spinlock_tryread_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func) {
     size_t spins = 0;
 
-    REFCOUNT expected = rw_spinlock->counter;
-    while (true) {
-        if(expected == WRITER_LOCKED)
-            // writer is active
-            return false;
+    uint32_t val = __atomic_add_fetch(&rw_spinlock->counter, 1, __ATOMIC_ACQUIRE);
 
-        if(expected < 0)
-            fatal("RW_SPINLOCK: refcount found negative, on %s(), called from %s()", __FUNCTION__, func);
-
-        // increment reader count
-        if (__atomic_compare_exchange_n(
-                &rw_spinlock->counter,
-                &expected,
-                expected + 1,
-                false,              // Strong CAS
-                __ATOMIC_ACQUIRE,   // Success memory order
-                __ATOMIC_RELAXED    // Failure memory order
-                ))
-            break;
-
-        spins++;
+    // Check if a writer holds the lock
+    if (val & WRITER_BIT) {
+        // Undo our increment and fail
+        __atomic_sub_fetch(&rw_spinlock->counter, 1, __ATOMIC_RELEASE);
+        return false;
     }
 
     worker_spinlock_contention(func, spins);
@@ -45,109 +34,90 @@ bool rw_spinlock_tryread_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *f
 
 void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func) {
     size_t spins = 0;
-
-    REFCOUNT expected = rw_spinlock->counter;
-
-    // we should not increase it if it is negative (a writer holds the lock)
-    if(expected == WRITER_LOCKED) expected = 0;
+    usec_t usec = 1;
 
     while (true) {
-        if(expected < 0)
-            fatal("RW_SPINLOCK: refcount found negative, on %s(), called from %s()", __FUNCTION__, func);
+        // Optimistically increment reader count
+        uint32_t val = __atomic_add_fetch(&rw_spinlock->counter, 1, __ATOMIC_ACQUIRE);
 
-        // Attempt to increment reader count
-        if (__atomic_compare_exchange_n(
-                &rw_spinlock->counter,
-                &expected,
-                expected + 1,
-                false,              // Strong CAS
-                __ATOMIC_ACQUIRE,   // Success memory order
-                __ATOMIC_RELAXED    // Failure memory order
-                ))
-            break;
+        // Check if a writer holds the lock
+        if (!(val & WRITER_BIT)) {
+            // no writer, we are in
+            worker_spinlock_contention(func, spins);
+            nd_thread_rwspinlock_read_locked();
+            return;
+        }
+
+        // Undo our increment and retry
+        __atomic_sub_fetch(&rw_spinlock->counter, 1, __ATOMIC_RELEASE);
 
         spins++;
-
-        if (expected == WRITER_LOCKED) {
-            // writer is active
-
-            // we should not increase it if it is negative (a writer holds the lock)
-            expected = 0;
-
-            // wait a bit before retrying
-            tinysleep();
-            yield_the_processor();
-        }
+        microsleep(usec);
+        usec = usec >= MAX_USEC ? MAX_USEC : usec * 2;
     }
-
-    worker_spinlock_contention(func, spins);
-    nd_thread_rwspinlock_read_locked();
 }
 
 void rw_spinlock_read_unlock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func __maybe_unused) {
-    REFCOUNT x = __atomic_sub_fetch(&rw_spinlock->counter, 1, __ATOMIC_RELEASE);
-    if (x < 0)
-        fatal("RW_SPINLOCK: readers is negative %d, on %s called from %s()", x, __FUNCTION__, func);
-
+    __atomic_sub_fetch(&rw_spinlock->counter, 1, __ATOMIC_RELEASE);
     nd_thread_rwspinlock_read_unlocked();
 }
 
 bool rw_spinlock_trywrite_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func) {
-    REFCOUNT expected = 0;
+    // Optimistically set writer bit
+    uint32_t old = __atomic_fetch_or(&rw_spinlock->counter, WRITER_BIT, __ATOMIC_ACQUIRE);
 
-    // Attempt to acquire writer lock when no readers or writers are active
-    if (!__atomic_compare_exchange_n(
-            &rw_spinlock->counter,
-            &expected,
-            WRITER_LOCKED,
-            false,              // Strong CAS
-            __ATOMIC_ACQUIRE,   // Success memory order
-            __ATOMIC_RELAXED    // Failure memory order
-            )) {
-        return false;
+    if(old == 0) {
+        rw_spinlock->writer = gettid_cached();
+        worker_spinlock_contention(func, 0);
+        nd_thread_rwspinlock_write_locked();
+        return true;
     }
 
-    __atomic_store_n(&rw_spinlock->writer, gettid_cached(), __ATOMIC_RELAXED);
-    worker_spinlock_contention(func, 0);
-    nd_thread_rwspinlock_write_locked();
-    return true;
+    // Check if we were the only one
+    if (old & WRITER_BIT) {
+        // there is a writer inside (keep the writer bit there)
+    }
+    else /* if ((old & READER_MASK) != 0) */ {
+        // there are readers inside, remove the writer bit we added
+        __atomic_and_fetch(&rw_spinlock->counter, ~WRITER_BIT, __ATOMIC_RELEASE);
+    }
+
+    return false;
 }
 
 void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func) {
     size_t spins = 0;
+    usec_t usec = 1;
 
-    while (true) {
-        REFCOUNT expected = 0;
+    while (1) {
+        // Optimistically set writer bit
+        uint32_t old = __atomic_fetch_or(&rw_spinlock->counter, WRITER_BIT, __ATOMIC_ACQUIRE);
 
-        // Attempt to acquire writer lock when no readers or writers are active
-        if (__atomic_compare_exchange_n(
-                &rw_spinlock->counter,
-                &expected,
-                WRITER_LOCKED,
-                false,              // Strong CAS
-                __ATOMIC_ACQUIRE,   // Success memory order
-                __ATOMIC_RELAXED    // Failure memory order
-                )) {
-            break;
+        // Check if we were the only one
+        if (old == 0) {
+            rw_spinlock->writer = gettid_cached();
+            worker_spinlock_contention(func, spins);
+            nd_thread_rwspinlock_write_locked();
+            return;
+        }
+
+        // Check if we were the only one
+        if (old & WRITER_BIT) {
+            // there is a writer inside (keep the writer bit there)
+        }
+        else /* if ((old & READER_MASK) != 0) */ {
+            // there are readers inside, remove the writer bit we added
+            __atomic_and_fetch(&rw_spinlock->counter, ~WRITER_BIT, __ATOMIC_RELEASE);
         }
 
         spins++;
-        tinysleep();
+        microsleep(usec);
+        usec = usec >= MAX_USEC ? MAX_USEC : usec * 2;
     }
-
-    __atomic_store_n(&rw_spinlock->writer, gettid_cached(), __ATOMIC_RELAXED);
-    worker_spinlock_contention(func, spins);
-    nd_thread_rwspinlock_write_locked();
 }
 
 void rw_spinlock_write_unlock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func __maybe_unused) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    int32_t x = __atomic_load_n(&rw_spinlock->counter, __ATOMIC_RELAXED);
-    if (x != WRITER_LOCKED)
-        fatal("RW_SPINLOCK: writer unlock encountered unexpected state: %d, on %s() called from %s()", x, __FUNCTION__, func);
-#endif
-
-    __atomic_store_n(&rw_spinlock->writer, 0, __ATOMIC_RELAXED);
-    __atomic_store_n(&rw_spinlock->counter, 0, __ATOMIC_RELEASE); // Release writer lock
+    rw_spinlock->writer = 0;
+    __atomic_and_fetch(&rw_spinlock->counter, ~WRITER_BIT, __ATOMIC_RELEASE);
     nd_thread_rwspinlock_write_unlocked();
 }

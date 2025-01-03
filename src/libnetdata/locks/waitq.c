@@ -83,7 +83,7 @@ void waitq_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const char 
                 worker_spinlock_contention(func, spins);
                 return;
             }
-            tinysleep();
+            yield_the_processor();
         }
 
         // Back off
