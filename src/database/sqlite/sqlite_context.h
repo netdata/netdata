@@ -28,6 +28,8 @@ typedef struct ctx_dimension {
 
     char *context;
     char *chart_id;
+
+    void *ri;
 } SQL_DIMENSION_DATA;
 
 typedef struct ctx_label {
@@ -59,7 +61,7 @@ void ctx_get_context_list(nd_uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEX
 
 void ctx_get_chart_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data);
 void ctx_get_label_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data);
-void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data);
+void ctx_get_dimension_list(RRDHOST *host, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data);
 
 int ctx_store_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data);
 

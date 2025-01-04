@@ -3,6 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_context.h"
 #include "sqlite_db_migration.h"
+#include "database/contexts/internal.h"
 
 #define DB_CONTEXT_METADATA_VERSION 1
 
@@ -72,6 +73,8 @@ int sql_init_context_database(int memory)
     return 0;
 }
 
+extern __thread sqlite3 *db_meta_thread;
+extern __thread sqlite3 *db_context_thread;
 //
 // Fetching data
 //
@@ -80,14 +83,14 @@ int sql_init_context_database(int memory)
 
 void ctx_get_chart_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
     if (unlikely(!host_uuid)) {
        internal_error(true, "Requesting context chart list without host_id");
        return;
     }
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, CTX_GET_CHART_LIST, &res))
+    if (!PREPARE_STATEMENT(db_meta_thread ? db_meta_thread : db_meta, CTX_GET_CHART_LIST, &res))
         return;
 
     int param = 0;
@@ -111,23 +114,32 @@ void ctx_get_chart_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, 
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 // Dimension list
-#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END, c.type||'.'||c.id, c.context " \
+#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END, c.type||'.'||c.id, c.context, c.rowid " \
     "FROM dimension d, chart c WHERE c.host_id = @host_id AND d.chart_id = c.chart_id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
-void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
+void ctx_get_dimension_list(RRDHOST *host, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, CTX_GET_DIMENSION_LIST, &res))
+    if (!PREPARE_STATEMENT(db_meta_thread ? db_meta_thread : db_meta, CTX_GET_DIMENSION_LIST, &res))
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     SQL_DIMENSION_DATA dimension_data;
+
+    Pvoid_t rca_JudyL = NULL;
+    Pvoid_t ria_JudyL = NULL;
+
+    Pvoid_t *Pvalue;
+    Word_t row_id, last_row_id = 0;
+
+    RRDCONTEXT_ACQUIRED *rca;
+    RRDINSTANCE_ACQUIRED *ria = NULL;
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
@@ -137,12 +149,59 @@ void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_
         dimension_data.hidden = sqlite3_column_int(res, 3);
         dimension_data.chart_id = (char *) sqlite3_column_text(res, 4);
         dimension_data.context = (char *) sqlite3_column_text(res, 5);
+
+        row_id = sqlite3_column_int64(res, 6);
+
+        if (row_id == last_row_id && ria)
+            dimension_data.ri = rrdinstance_acquired_value(ria);
+        else {
+            last_row_id = row_id;
+            Pvalue = JudyLIns(&ria_JudyL, row_id, PJE0);
+            if (unlikely(!Pvalue || Pvalue == PJERR))
+                fatal("CONTEXT: corrupted ria array");
+
+            if (!*Pvalue) {
+                rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, dimension_data.context);
+                RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+                ria = (RRDINSTANCE_ACQUIRED *)dictionary_get_and_acquire_item(rc->rrdinstances, dimension_data.chart_id);
+                *Pvalue = ria;
+                dimension_data.ri = rrdinstance_acquired_value(ria);
+
+                Pvalue = JudyLIns(&rca_JudyL, row_id, PJE0);
+                if (unlikely(!Pvalue || Pvalue == PJERR))
+                    fatal("CONTEXT: corrupted rca array");
+
+                if (Pvalue)
+                    *Pvalue = rca;
+            } else
+                dimension_data.ri = rrdinstance_acquired_value(*Pvalue);
+        }
+
         dict_cb(&dimension_data, data);
     }
 
+    // Cleanup
+    bool first = true;
+    row_id = 0;
+    while ((Pvalue = JudyLFirstThenNext(ria_JudyL, &row_id, &first))) {
+        ria = *Pvalue;
+        if (ria)
+            rrdinstance_release(ria);
+    }
+    JudyLFreeArray(&ria_JudyL, PJE0);
+
+    first = true;
+    row_id = 0;
+    while ((Pvalue = JudyLFirstThenNext(rca_JudyL, &row_id, &first))) {
+        rca = *Pvalue;
+        if (rca)
+            rrdcontext_release(rca);
+    }
+    JudyLFreeArray(&rca_JudyL, PJE0);
+
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 // LABEL LIST
@@ -183,9 +242,9 @@ void ctx_get_context_list(nd_uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEX
     if (unlikely(!host_uuid))
         return;
 
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_context_meta, CTX_GET_CONTEXT_LIST, &res))
+    if (!PREPARE_STATEMENT(db_context_thread ? db_context_thread : db_context_meta, CTX_GET_CONTEXT_LIST, &res))
         return;
 
     VERSIONED_CONTEXT_DATA context_data = {0};
@@ -210,7 +269,7 @@ void ctx_get_context_list(nd_uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEX
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 
@@ -230,7 +289,7 @@ int ctx_store_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data
     if (unlikely(!host_uuid || !context_data || !context_data->id))
         return 0;
 
-    if (!PREPARE_STATEMENT(db_context_meta, CTX_STORE_CONTEXT, &res))
+    if (!PREPARE_STATEMENT(db_context_meta ? db_context_meta : db_meta, CTX_STORE_CONTEXT, &res))
         return 1;
 
     int param = 0;
