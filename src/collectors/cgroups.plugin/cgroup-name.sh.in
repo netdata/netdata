@@ -121,10 +121,14 @@ function parse_docker_like_inspect_output() {
   fi
 
   while IFS= read -r line; do
-    if [[ -n "$line" && $line == LABEL_netdata.cloud/* ]]; then
+    if [[ $line == LABEL_netdata.cloud/* ]]; then
       IFS="=" read -r lname lval <<<"$line"
       lname=${lname#LABEL_}
-      LABELS="$LABELS,${lname}=\"${lval}\""
+      if [ -n "$LABELS" ]; then
+        LABELS="$LABELS,${lname}=\"${lval}\""
+      else
+        LABELS="${lname}=\"${lval}\""
+      fi
     fi
   done <<<"$output"
 }
