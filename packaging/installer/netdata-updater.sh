@@ -395,7 +395,7 @@ auto_update_status() {
   enabled=""
 
   if issystemd; then
-    if ( systemctl list-units --full -all | grep -Fq "netdata-updater.timer" ); then
+    if systemctl list-units --full -all | grep -Fq "netdata-updater.timer"; then
       if systemctl is-enabled netdata-updater.timer; then
         info "Auto-updates using a systemd timer unit are ENABLED"
         enabled="systemd"
