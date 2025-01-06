@@ -8,7 +8,7 @@ Wants=network-online.target nss-lookup.target
 
 [Service]
 LogNamespace=netdata
-Type=simple
+Type=notify
 User=root
 RuntimeDirectory=netdata
 RuntimeDirectoryMode=0775
@@ -19,6 +19,7 @@ ExecStartPre=/bin/chown -R @netdata_user_POST@ @localstatedir_POST@/cache/netdat
 ExecStartPre=/bin/mkdir -p /run/netdata
 ExecStartPre=/bin/chown -R @netdata_user_POST@ /run/netdata
 PermissionsStartOnly=true
+NotifyAccess=exec
 
 # saving a big db on slow disks may need some time
 TimeoutStopSec=150

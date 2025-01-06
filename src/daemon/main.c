@@ -17,6 +17,10 @@
 #include "sentry-native/sentry-native.h"
 #endif
 
+#ifdef ENABLE_SYSTEMD_NOTIFY
+#include "systemd-notify.h"
+#endif
+
 #if defined(ENV32BIT)
 #warning COMPILING 32BIT NETDATA
 #endif
@@ -1048,6 +1052,10 @@ int main(int argc, char *argv[])
     int rc = netdata_main(argc, argv);
     if (rc != 10)
         return rc;
+
+#ifdef ENABLE_SYSTEMD_NOTIFY
+    notify_ready();
+#endif
 
     nd_process_signals();
     return 1;
