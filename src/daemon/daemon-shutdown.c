@@ -12,6 +12,10 @@
 #include "sentry-native/sentry-native.h"
 #endif
 
+#ifdef ENABLE_SYSTEMD_NOTIFY
+#include "systemd-notify.h"
+#endif
+
 void web_client_cache_destroy(void);
 
 extern struct netdata_static_thread *static_threads;
@@ -138,6 +142,10 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
     netdata_exit = 1;
+
+#ifdef ENABLE_SYSTEMD_NOTIFY
+    notify_stopping();
+#endif
 
 #ifdef ENABLE_DBENGINE
     if(!ret && dbengine_enabled)

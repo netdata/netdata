@@ -2,10 +2,6 @@
 
 #include "common.h"
 
-#ifdef ENABLE_SYSTEMD_NOTIFY
-#include "systemd-notify.h"
-#endif
-
 typedef enum signal_action {
     NETDATA_SIGNAL_END_OF_LIST,
     NETDATA_SIGNAL_IGNORE,
@@ -147,9 +143,6 @@ void nd_process_signals(void) {
                             case NETDATA_SIGNAL_EXIT_CLEANLY:
                                 nd_log_limits_unlimited();
                                 netdata_log_info("SIGNAL: Received %s. Cleaning up to exit...", name);
-#ifdef ENABLE_SYSTEMD_NOTIFY
-                                notify_stopping();
-#endif
                                 commands_exit();
                                 netdata_cleanup_and_exit(0, NULL, NULL, NULL);
                                 exit(0);
