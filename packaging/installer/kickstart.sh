@@ -2114,7 +2114,7 @@ prepare_offline_install_source() {
     failed_files=""
     for file in $(find . -name '*.gz.run'); do
       if ! grep -e "${file}" sha256sums.txt | safe_sha256sum -c -; then
-        failed_files="${failed_files}\n${file}\n$(report_bad_sha256sums "${file}" sha256sums.txt)"
+        failed_files="${failed_files}\n${file}\n$(report_bad_sha256sum "${file}" sha256sums.txt)"
       fi
     done
 
