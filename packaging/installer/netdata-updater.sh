@@ -400,28 +400,29 @@ _cannot_use_tmpdir() {
   return "${ret}"
 }
 
-create_tmp_directory() {
+create_exec_tmp_directory() {
   if [ -n "${NETDATA_TMPDIR_PATH}" ]; then
     echo "${NETDATA_TMPDIR_PATH}"
-  else
-    if [ -z "${NETDATA_TMPDIR}" ] || _cannot_use_tmpdir "${NETDATA_TMPDIR}" ; then
-      if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
-        if _cannot_use_tmpdir /tmp ; then
-          if _cannot_use_tmpdir "${PWD}" ; then
-            fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." U0003
-          else
-            TMPDIR="${PWD}"
-          fi
-        else
-          TMPDIR="/tmp"
-        fi
-      fi
-    else
-      TMPDIR="${NETDATA_TMPDIR}"
-    fi
-
-    mktemp -d -t netdata-updater-XXXXXXXXXX
+    return
   fi
+
+  root_dir=""
+
+  if [ -n "${NETDATA_TMPDIR}" ] && ! _cannot_use_tmpdir "${NETDATA_TMPDIR}"; then
+    root_dir="${NETDATA_TMPDIR}"
+  elif [ -n "${TMPDIR}" ] && ! _cannot_use_tmpdir "${TMPDIR}"; then
+    root_dir="${TMPDIR}"
+  elif ! _cannot_use_tmpdir /tmp; then
+    root_dir="/tmp"
+  elif ! _cannot_use_tmpdir "${PWD}"; then
+    root_dir="${PWD}"
+  else
+    fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." U0003
+  fi
+
+  TMPDIR="${root_dir}"
+
+  mktemp -d -p "${root_dir}" -t netdata-updater-XXXXXXXXXX
 }
 
 check_for_curl() {
@@ -532,7 +533,7 @@ get_netdata_latest_tag() {
 newer_commit_date() {
   info "Checking if a newer version of the updater script is available."
 
-  ndtmpdir="$(create_tmp_directory)"
+  ndtmpdir="$(create_exec_tmp_directory)"
   commit_check_file="${ndtmpdir}/latest-commit.json"
   commit_check_url="https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1"
   python_version_check="
@@ -586,7 +587,7 @@ self_update() {
   if [ -z "${NETDATA_NO_UPDATER_SELF_UPDATE}" ] && newer_commit_date; then
     info "Downloading newest version of updater script."
 
-    ndtmpdir=$(create_tmp_directory)
+    ndtmpdir=$(create_exec_tmp_directory)
     cd "$ndtmpdir" || exit 1
 
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
@@ -743,7 +744,7 @@ update_build() {
   [ -z "${logfile}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
   RUN_INSTALLER=0
-  ndtmpdir=$(create_tmp_directory)
+  ndtmpdir=$(create_exec_tmp_directory)
   cd "$ndtmpdir" || fatal "Failed to change current working directory to ${ndtmpdir}" U0016
 
   install_build_dependencies
@@ -842,7 +843,7 @@ update_build() {
 }
 
 update_static() {
-  ndtmpdir="$(create_tmp_directory)"
+  ndtmpdir="$(create_exec_tmp_directory)"
   PREVDIR="$(pwd)"
 
   info "Entering ${ndtmpdir}"
