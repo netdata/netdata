@@ -608,6 +608,18 @@ issystemd() {
     return 1
   fi
 
+  # Check the output of systemctl is-system-running.
+  # If this reports 'offline', it’s not systemd. If it reports 'unknown'
+  # or nothing at all (which indicates the command is not supported), it
+  # may or may not be systemd, so continue to other checks. If it reports
+  # anything else, it is systemd.
+  case "$(systemctl is-system-running)" in
+    offline) return 1 ;;
+    unknown) : ;;
+    "") : ;;
+    *) return 0 ;;
+  esac
+
   # if pid 1 is systemd, it is systemd
   [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && return 0
 

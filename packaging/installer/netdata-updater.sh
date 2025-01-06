@@ -117,6 +117,20 @@ is_integer () {
   esac
 }
 
+safe_pidof() {
+  pidof_cmd="$(command -v pidof 2> /dev/null)"
+  if [ -n "${pidof_cmd}" ]; then
+    ${pidof_cmd} "${@}"
+    return $?
+  else
+    ps -acxo pid,comm |
+      sed "s/^ *//g" |
+      grep netdata |
+      cut -d ' ' -f 1
+    return $?
+  fi
+}
+
 issystemd() {
   # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
   if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
@@ -128,6 +142,23 @@ issystemd() {
   if [ -z "${systemctl}" ] || [ ! -x "${systemctl}" ]; then
     return 1
   fi
+
+  # Check the output of systemctl is-system-running.
+  # If this reports 'offline', it’s not systemd. If it reports 'unknown'
+  # or nothing at all (which indicates the command is not supported), it
+  # may or may not be systemd, so continue to other checks. If it reports
+  # anything else, it is systemd.
+  #
+  # This may return a non-zero exit status in cases when it actually
+  # succeeded for our purposes, so we need to toggle set -e off here.
+  set +e
+  case "$(systemctl is-system-running)" in
+    offline) return 1 ;;
+    unknown) : ;;
+    "") : ;;
+    *) return 0 ;;
+  esac
+  set -e
 
   # if pid 1 is systemd, it is systemd
   [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && return 0

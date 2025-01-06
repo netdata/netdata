@@ -193,6 +193,19 @@ _check_systemd() {
   # if there is no systemctl command, it is not systemd
   [ -z "$(command -v systemctl 2>/dev/null || true)" ] && echo "NO" && return 0
 
+  # Check the output of systemctl is-system-running.
+  #
+  # This may return a non-zero exit status in cases when it actually
+  # succeeded for our purposes, so we need to toggle set -e off here.
+  set +e
+  case "$(systemctl is-system-running)" in
+    offline) echo "OFFLINE" && return 0 ;;
+    unknown) : ;;
+    "") : ;;
+    *) echo "YES" && return 0 ;;
+  esac
+  set -e
+
   # if pid 1 is systemd, it is systemd
   [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && echo "YES" && return 0
 
