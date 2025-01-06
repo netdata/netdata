@@ -1,0 +1,1128 @@
+# HELP mem_tracker_server_CQL_Compressed_Read_Buffer Memory consumed by Compressed Read Buffer->CQL->server->root
+# TYPE mem_tracker_server_CQL_Compressed_Read_Buffer gauge
+mem_tracker_server_CQL_Compressed_Read_Buffer{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP threads_running_shared_exchange threads_running_shared_exchange metric in ThreadCategoryTracker
+# TYPE threads_running_shared_exchange counter
+threads_running_shared_exchange{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP mem_tracker_server_CQL_CQL_processors Memory consumed by CQL processors->CQL->server->root
+# TYPE mem_tracker_server_CQL_CQL_processors gauge
+mem_tracker_server_CQL_CQL_processors{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 6624 1736161373401
+# HELP mem_tracker_server_CQL_Call Memory consumed by Call->CQL->server->root
+# TYPE mem_tracker_server_CQL_Call gauge
+mem_tracker_server_CQL_Call{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP mem_tracker_server_CQL_Read_Buffer_Outbound_RPC Memory consumed by Outbound RPC->Read Buffer->CQL->server->root
+# TYPE mem_tracker_server_CQL_Read_Buffer_Outbound_RPC gauge
+mem_tracker_server_CQL_Read_Buffer_Outbound_RPC{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP threads_running_CQLServer_reactor threads_running_CQLServer_reactor metric in ThreadCategoryTracker
+# TYPE threads_running_CQLServer_reactor counter
+threads_running_CQLServer_reactor{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 16 1736161373401
+# HELP mem_tracker_server_CQL Memory consumed by CQL->server->root
+# TYPE mem_tracker_server_CQL gauge
+mem_tracker_server_CQL{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1470728 1736161373401
+# HELP mem_tracker_server_CQL_CQL_Requests Memory consumed by CQL Requests->CQL->server->root
+# TYPE mem_tracker_server_CQL_CQL_Requests gauge
+mem_tracker_server_CQL_CQL_Requests{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP mem_tracker_server_CQL_Read_Buffer Memory consumed by Read Buffer->CQL->server->root
+# TYPE mem_tracker_server_CQL_Read_Buffer gauge
+mem_tracker_server_CQL_Read_Buffer{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP rpcs_in_queue_yb_server_GenericService rpcs_in_queue_yb_server_GenericService metric for ServicePoolImpl
+# TYPE rpcs_in_queue_yb_server_GenericService gauge
+rpcs_in_queue_yb_server_GenericService{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP mem_tracker_server_CQL_Call_Outbound_RPC Memory consumed by Outbound RPC->Call->CQL->server->root
+# TYPE mem_tracker_server_CQL_Call_Outbound_RPC gauge
+mem_tracker_server_CQL_Call_Outbound_RPC{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP mem_tracker_server_CQL_Compressed_Read_Buffer_Receive Memory consumed by Receive->Compressed Read Buffer->CQL->server->root
+# TYPE mem_tracker_server_CQL_Compressed_Read_Buffer_Receive gauge
+mem_tracker_server_CQL_Compressed_Read_Buffer_Receive{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 393216 1736161373401
+# HELP rpcs_in_queue_yb_cqlserver_CQLServerService rpcs_in_queue_yb_cqlserver_CQLServerService metric for ServicePoolImpl
+# TYPE rpcs_in_queue_yb_cqlserver_CQLServerService gauge
+rpcs_in_queue_yb_cqlserver_CQLServerService{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP threads_started_io_service threads_started_io_service metric in ThreadCategoryTracker
+# TYPE threads_started_io_service counter
+threads_started_io_service{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_io_service threads_running_io_service metric in ThreadCategoryTracker
+# TYPE threads_running_io_service counter
+threads_running_io_service{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP mem_tracker_server_CQL_CQL_prepared_statements Memory consumed by CQL prepared statements->CQL->server->root
+# TYPE mem_tracker_server_CQL_CQL_prepared_statements gauge
+mem_tracker_server_CQL_CQL_prepared_statements{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1451497 1736161373401
+# HELP threads_started_rocksdb:high threads_started_rocksdb:high metric in ThreadCategoryTracker
+# TYPE threads_started_rocksdb:high counter
+threads_started_rocksdb:high{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 3 1736161373401
+# HELP threads_started_shared_exchange threads_started_shared_exchange metric in ThreadCategoryTracker
+# TYPE threads_started_shared_exchange counter
+threads_started_shared_exchange{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_rocksdb:low threads_running_rocksdb:low metric in ThreadCategoryTracker
+# TYPE threads_running_rocksdb:low counter
+threads_running_rocksdb:low{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 3 1736161373401
+# HELP threads_started_CQLServer_reactor threads_started_CQLServer_reactor metric in ThreadCategoryTracker
+# TYPE threads_started_CQLServer_reactor counter
+threads_started_CQLServer_reactor{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 16 1736161373401
+# HELP threads_started_rocksdb:low threads_started_rocksdb:low metric in ThreadCategoryTracker
+# TYPE threads_started_rocksdb:low counter
+threads_started_rocksdb:low{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 3 1736161373401
+# HELP threads_running_iotp_TabletServer threads_running_iotp_TabletServer metric in ThreadCategoryTracker
+# TYPE threads_running_iotp_TabletServer counter
+threads_running_iotp_TabletServer{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 4 1736161373401
+# HELP threads_running_remote_bootstrap threads_running_remote_bootstrap metric in ThreadCategoryTracker
+# TYPE threads_running_remote_bootstrap counter
+threads_running_remote_bootstrap{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_started_long_operation_tracker threads_started_long_operation_tracker metric in ThreadCategoryTracker
+# TYPE threads_started_long_operation_tracker counter
+threads_started_long_operation_tracker{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_started_rpc_thread_pool threads_started_rpc_thread_pool metric in ThreadCategoryTracker
+# TYPE threads_started_rpc_thread_pool counter
+threads_started_rpc_thread_pool{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 22 1736161373401
+# HELP threads_running_cdc_service threads_running_cdc_service metric in ThreadCategoryTracker
+# TYPE threads_running_cdc_service counter
+threads_running_cdc_service{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_iotp_universe_key_client threads_running_iotp_universe_key_client metric in ThreadCategoryTracker
+# TYPE threads_running_iotp_universe_key_client counter
+threads_running_iotp_universe_key_client{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP threads_started_async_client_initializer threads_started_async_client_initializer metric in ThreadCategoryTracker
+# TYPE threads_started_async_client_initializer counter
+threads_started_async_client_initializer{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 3 1736161373401
+# HELP threads_running_heartbeater threads_running_heartbeater metric in ThreadCategoryTracker
+# TYPE threads_running_heartbeater counter
+threads_running_heartbeater{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_started_acceptor threads_started_acceptor metric in ThreadCategoryTracker
+# TYPE threads_started_acceptor counter
+threads_started_acceptor{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 2 1736161373401
+# HELP threads_running_full_compaction_manager threads_running_full_compaction_manager metric in ThreadCategoryTracker
+# TYPE threads_running_full_compaction_manager counter
+threads_running_full_compaction_manager{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_async_client_initializer threads_running_async_client_initializer metric in ThreadCategoryTracker
+# TYPE threads_running_async_client_initializer counter
+threads_running_async_client_initializer{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP threads_running_long_operation_tracker threads_running_long_operation_tracker metric in ThreadCategoryTracker
+# TYPE threads_running_long_operation_tracker counter
+threads_running_long_operation_tracker{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_started_heartbeater threads_started_heartbeater metric in ThreadCategoryTracker
+# TYPE threads_started_heartbeater counter
+threads_started_heartbeater{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_maintenance threads_running_maintenance metric in ThreadCategoryTracker
+# TYPE threads_running_maintenance counter
+threads_running_maintenance{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_started_maintenance threads_started_maintenance metric in ThreadCategoryTracker
+# TYPE threads_started_maintenance counter
+threads_started_maintenance{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_acceptor threads_running_acceptor metric in ThreadCategoryTracker
+# TYPE threads_running_acceptor counter
+threads_running_acceptor{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 2 1736161373401
+# HELP threads_running_tablet_manager threads_running_tablet_manager metric in ThreadCategoryTracker
+# TYPE threads_running_tablet_manager counter
+threads_running_tablet_manager{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 3 1736161373401
+# HELP threads_running_iotp_call_home threads_running_iotp_call_home metric in ThreadCategoryTracker
+# TYPE threads_running_iotp_call_home counter
+threads_running_iotp_call_home{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_iotp_CQLServer threads_running_iotp_CQLServer metric in ThreadCategoryTracker
+# TYPE threads_running_iotp_CQLServer counter
+threads_running_iotp_CQLServer{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 4 1736161373401
+# HELP threads_started_iotp_call_home threads_started_iotp_call_home metric in ThreadCategoryTracker
+# TYPE threads_started_iotp_call_home counter
+threads_started_iotp_call_home{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_rocksdb:high threads_running_rocksdb:high metric in ThreadCategoryTracker
+# TYPE threads_running_rocksdb:high counter
+threads_running_rocksdb:high{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 3 1736161373401
+# HELP threads_started_iotp_CQLServer threads_started_iotp_CQLServer metric in ThreadCategoryTracker
+# TYPE threads_started_iotp_CQLServer counter
+threads_started_iotp_CQLServer{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 4 1736161373401
+# HELP threads_started_PostgreSQL_supervisor threads_started_PostgreSQL_supervisor metric in ThreadCategoryTracker
+# TYPE threads_started_PostgreSQL_supervisor counter
+threads_started_PostgreSQL_supervisor{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_PostgreSQL_supervisor threads_running_PostgreSQL_supervisor metric in ThreadCategoryTracker
+# TYPE threads_running_PostgreSQL_supervisor counter
+threads_running_PostgreSQL_supervisor{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP mem_tracker_server_CQL_CQL_Metadata_cache Memory consumed by CQL Metadata cache->CQL->server->root
+# TYPE mem_tracker_server_CQL_CQL_Metadata_cache gauge
+mem_tracker_server_CQL_CQL_Metadata_cache{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 12607 1736161373401
+# HELP threads_started_metrics_snapshotter threads_started_metrics_snapshotter metric in ThreadCategoryTracker
+# TYPE threads_started_metrics_snapshotter counter
+threads_started_metrics_snapshotter{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_started_tablet_manager threads_started_tablet_manager metric in ThreadCategoryTracker
+# TYPE threads_started_tablet_manager counter
+threads_started_tablet_manager{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 3 1736161373401
+# HELP threads_running_rpc_thread_pool threads_running_rpc_thread_pool metric in ThreadCategoryTracker
+# TYPE threads_running_rpc_thread_pool counter
+threads_running_rpc_thread_pool{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 21 1736161373401
+# HELP threads_started_iotp_universe_key_client threads_started_iotp_universe_key_client metric in ThreadCategoryTracker
+# TYPE threads_started_iotp_universe_key_client counter
+threads_started_iotp_universe_key_client{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 4 1736161373401
+# HELP threads_started_thread_pool threads_started_thread_pool metric in ThreadCategoryTracker
+# TYPE threads_started_thread_pool counter
+threads_started_thread_pool{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 43 1736161373401
+# HELP threads_started_iotp_TabletServer threads_started_iotp_TabletServer metric in ThreadCategoryTracker
+# TYPE threads_started_iotp_TabletServer counter
+threads_started_iotp_TabletServer{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 4 1736161373401
+# HELP threads_started_remote_bootstrap threads_started_remote_bootstrap metric in ThreadCategoryTracker
+# TYPE threads_started_remote_bootstrap counter
+threads_started_remote_bootstrap{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_TabletServer_reactor threads_running_TabletServer_reactor metric in ThreadCategoryTracker
+# TYPE threads_running_TabletServer_reactor counter
+threads_running_TabletServer_reactor{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 16 1736161373401
+# HELP threads_running_thread_pool threads_running_thread_pool metric in ThreadCategoryTracker
+# TYPE threads_running_thread_pool counter
+threads_running_thread_pool{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 11 1736161373401
+# HELP threads_started_TabletServer_reactor threads_started_TabletServer_reactor metric in ThreadCategoryTracker
+# TYPE threads_started_TabletServer_reactor counter
+threads_started_TabletServer_reactor{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 16 1736161373401
+# HELP threads_started_cdc_service threads_started_cdc_service metric in ThreadCategoryTracker
+# TYPE threads_started_cdc_service counter
+threads_started_cdc_service{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_universe_key_client_reactor threads_running_universe_key_client_reactor metric in ThreadCategoryTracker
+# TYPE threads_running_universe_key_client_reactor counter
+threads_running_universe_key_client_reactor{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP threads_started_universe_key_client_reactor threads_started_universe_key_client_reactor metric in ThreadCategoryTracker
+# TYPE threads_started_universe_key_client_reactor counter
+threads_started_universe_key_client_reactor{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 4 1736161373401
+# HELP threads_started_full_compaction_manager threads_started_full_compaction_manager metric in ThreadCategoryTracker
+# TYPE threads_started_full_compaction_manager counter
+threads_started_full_compaction_manager{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP threads_running_metrics_snapshotter threads_running_metrics_snapshotter metric in ThreadCategoryTracker
+# TYPE threads_running_metrics_snapshotter counter
+threads_running_metrics_snapshotter{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 1 1736161373401
+# HELP rpc_connections_accepted Number of incoming TCP connections made to the RPC server
+# TYPE rpc_connections_accepted counter
+rpc_connections_accepted{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 4 1736161373401
+# HELP handler_latency_outbound_transfer_sum Microseconds spent to queue and write the response to the wire
+# TYPE handler_latency_outbound_transfer_sum counter
+handler_latency_outbound_transfer_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 51988964880 1736161373401
+# HELP handler_latency_outbound_transfer_count Microseconds spent to queue and write the response to the wire
+# TYPE handler_latency_outbound_transfer_count counter
+handler_latency_outbound_transfer_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 266689 1736161373401
+# HELP handler_latency_outbound_transfer Microseconds spent to queue and write the response to the wire
+# TYPE handler_latency_outbound_transfer gauge
+handler_latency_outbound_transfer{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 166912 1736161373401
+# HELP handler_latency_outbound_transfer Microseconds spent to queue and write the response to the wire
+# TYPE handler_latency_outbound_transfer gauge
+handler_latency_outbound_transfer{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 251904 1736161373401
+# HELP handler_latency_outbound_transfer Microseconds spent to queue and write the response to the wire
+# TYPE handler_latency_outbound_transfer gauge
+handler_latency_outbound_transfer{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 305152 1736161373401
+# HELP handler_latency_outbound_transfer Microseconds spent to queue and write the response to the wire
+# TYPE handler_latency_outbound_transfer gauge
+handler_latency_outbound_transfer{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 194914 1736161373401
+# HELP handler_latency_outbound_transfer Microseconds spent to queue and write the response to the wire
+# TYPE handler_latency_outbound_transfer gauge
+handler_latency_outbound_transfer{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 237469710 1736161373401
+# HELP handler_latency_outbound_transfer Microseconds spent to queue and write the response to the wire
+# TYPE handler_latency_outbound_transfer gauge
+handler_latency_outbound_transfer{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 25490 1736161373401
+# HELP rpc_connections_alive Number of alive RPC connections.
+# TYPE rpc_connections_alive gauge
+rpc_connections_alive{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 3 1736161373401
+# HELP rpc_connections_created Number of created RPC connections.
+# TYPE rpc_connections_created counter
+rpc_connections_created{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 4 1736161373401
+# HELP rpc_inbound_calls_alive Number of alive RPC inbound calls.
+# TYPE rpc_inbound_calls_alive gauge
+rpc_inbound_calls_alive{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP rpc_inbound_calls_created Number of created RPC inbound calls.
+# TYPE rpc_inbound_calls_created counter
+rpc_inbound_calls_created{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 266689 1736161373401
+# HELP rpc_outbound_calls_alive Number of alive RPC outbound calls.
+# TYPE rpc_outbound_calls_alive gauge
+rpc_outbound_calls_alive{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP rpc_outbound_calls_created Number of created RPC outbound calls.
+# TYPE rpc_outbound_calls_created counter
+rpc_outbound_calls_created{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP rpc_outbound_calls_stuck Number of events where we detected an unreasonably long running outbound RPC call.
+# TYPE rpc_outbound_calls_stuck counter
+rpc_outbound_calls_stuck{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP rpc_busy_reactors The number of reactors doing some work at this time.
+# TYPE rpc_busy_reactors gauge
+rpc_busy_reactors{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP rpc_incoming_queue_time_sum Number of microseconds incoming RPC requests spend in the worker queue
+# TYPE rpc_incoming_queue_time_sum counter
+rpc_incoming_queue_time_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 15996893 1736161373401
+# HELP rpc_incoming_queue_time_count Number of microseconds incoming RPC requests spend in the worker queue
+# TYPE rpc_incoming_queue_time_count counter
+rpc_incoming_queue_time_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 266689 1736161373401
+# HELP rpcs_timed_out_in_queue Number of RPCs whose timeout elapsed while waiting in the service queue, and thus were not processed. Does not include calls that were expired before we tried to execute them.
+# TYPE rpcs_timed_out_in_queue counter
+rpcs_timed_out_in_queue{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP rpcs_timed_out_early_in_queue Number of RPCs whose timeout elapsed while waiting in the service queue, and thus were not processed. Timeout for those calls were detected before the calls tried to execute.
+# TYPE rpcs_timed_out_early_in_queue counter
+rpcs_timed_out_early_in_queue{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP rpcs_queue_overflow Number of RPCs dropped because the service queue was full.
+# TYPE rpcs_queue_overflow counter
+rpcs_queue_overflow{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP tcp_bytes_sent Bytes sent over TCP connections
+# TYPE tcp_bytes_sent counter
+tcp_bytes_sent{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 19810282 1736161373401
+# HELP tcp_bytes_received Bytes received via TCP connections
+# TYPE tcp_bytes_received counter
+tcp_bytes_received{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 2422092 1736161373401
+# HELP service_request_bytes_yb_server_GenericService_SetFlag Bytes received by yb.server.GenericService.SetFlag() RPC requests
+# TYPE service_request_bytes_yb_server_GenericService_SetFlag counter
+service_request_bytes_yb_server_GenericService_SetFlag{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP service_response_bytes_yb_server_GenericService_SetFlag Bytes sent in response to yb.server.GenericService.SetFlag() RPC requests
+# TYPE service_response_bytes_yb_server_GenericService_SetFlag counter
+service_response_bytes_yb_server_GenericService_SetFlag{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_SetFlag_sum Microseconds spent handling yb.server.GenericService.SetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_SetFlag_sum counter
+handler_latency_yb_server_GenericService_SetFlag_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_SetFlag_count Microseconds spent handling yb.server.GenericService.SetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_SetFlag_count counter
+handler_latency_yb_server_GenericService_SetFlag_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_SetFlag Microseconds spent handling yb.server.GenericService.SetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_SetFlag gauge
+handler_latency_yb_server_GenericService_SetFlag{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_SetFlag Microseconds spent handling yb.server.GenericService.SetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_SetFlag gauge
+handler_latency_yb_server_GenericService_SetFlag{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_SetFlag Microseconds spent handling yb.server.GenericService.SetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_SetFlag gauge
+handler_latency_yb_server_GenericService_SetFlag{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_SetFlag Microseconds spent handling yb.server.GenericService.SetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_SetFlag gauge
+handler_latency_yb_server_GenericService_SetFlag{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_SetFlag Microseconds spent handling yb.server.GenericService.SetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_SetFlag gauge
+handler_latency_yb_server_GenericService_SetFlag{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_SetFlag Microseconds spent handling yb.server.GenericService.SetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_SetFlag gauge
+handler_latency_yb_server_GenericService_SetFlag{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP service_request_bytes_yb_server_GenericService_GetFlag Bytes received by yb.server.GenericService.GetFlag() RPC requests
+# TYPE service_request_bytes_yb_server_GenericService_GetFlag counter
+service_request_bytes_yb_server_GenericService_GetFlag{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP service_response_bytes_yb_server_GenericService_GetFlag Bytes sent in response to yb.server.GenericService.GetFlag() RPC requests
+# TYPE service_response_bytes_yb_server_GenericService_GetFlag counter
+service_response_bytes_yb_server_GenericService_GetFlag{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetFlag_sum Microseconds spent handling yb.server.GenericService.GetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetFlag_sum counter
+handler_latency_yb_server_GenericService_GetFlag_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetFlag_count Microseconds spent handling yb.server.GenericService.GetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetFlag_count counter
+handler_latency_yb_server_GenericService_GetFlag_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetFlag Microseconds spent handling yb.server.GenericService.GetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetFlag gauge
+handler_latency_yb_server_GenericService_GetFlag{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetFlag Microseconds spent handling yb.server.GenericService.GetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetFlag gauge
+handler_latency_yb_server_GenericService_GetFlag{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetFlag Microseconds spent handling yb.server.GenericService.GetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetFlag gauge
+handler_latency_yb_server_GenericService_GetFlag{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetFlag Microseconds spent handling yb.server.GenericService.GetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetFlag gauge
+handler_latency_yb_server_GenericService_GetFlag{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetFlag Microseconds spent handling yb.server.GenericService.GetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetFlag gauge
+handler_latency_yb_server_GenericService_GetFlag{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetFlag Microseconds spent handling yb.server.GenericService.GetFlag() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetFlag gauge
+handler_latency_yb_server_GenericService_GetFlag{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP service_request_bytes_yb_server_GenericService_ValidateFlagValue Bytes received by yb.server.GenericService.ValidateFlagValue() RPC requests
+# TYPE service_request_bytes_yb_server_GenericService_ValidateFlagValue counter
+service_request_bytes_yb_server_GenericService_ValidateFlagValue{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP service_response_bytes_yb_server_GenericService_ValidateFlagValue Bytes sent in response to yb.server.GenericService.ValidateFlagValue() RPC requests
+# TYPE service_response_bytes_yb_server_GenericService_ValidateFlagValue counter
+service_response_bytes_yb_server_GenericService_ValidateFlagValue{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ValidateFlagValue_sum Microseconds spent handling yb.server.GenericService.ValidateFlagValue() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ValidateFlagValue_sum counter
+handler_latency_yb_server_GenericService_ValidateFlagValue_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ValidateFlagValue_count Microseconds spent handling yb.server.GenericService.ValidateFlagValue() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ValidateFlagValue_count counter
+handler_latency_yb_server_GenericService_ValidateFlagValue_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ValidateFlagValue Microseconds spent handling yb.server.GenericService.ValidateFlagValue() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ValidateFlagValue gauge
+handler_latency_yb_server_GenericService_ValidateFlagValue{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ValidateFlagValue Microseconds spent handling yb.server.GenericService.ValidateFlagValue() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ValidateFlagValue gauge
+handler_latency_yb_server_GenericService_ValidateFlagValue{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ValidateFlagValue Microseconds spent handling yb.server.GenericService.ValidateFlagValue() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ValidateFlagValue gauge
+handler_latency_yb_server_GenericService_ValidateFlagValue{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ValidateFlagValue Microseconds spent handling yb.server.GenericService.ValidateFlagValue() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ValidateFlagValue gauge
+handler_latency_yb_server_GenericService_ValidateFlagValue{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ValidateFlagValue Microseconds spent handling yb.server.GenericService.ValidateFlagValue() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ValidateFlagValue gauge
+handler_latency_yb_server_GenericService_ValidateFlagValue{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ValidateFlagValue Microseconds spent handling yb.server.GenericService.ValidateFlagValue() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ValidateFlagValue gauge
+handler_latency_yb_server_GenericService_ValidateFlagValue{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP service_request_bytes_yb_server_GenericService_RefreshFlags Bytes received by yb.server.GenericService.RefreshFlags() RPC requests
+# TYPE service_request_bytes_yb_server_GenericService_RefreshFlags counter
+service_request_bytes_yb_server_GenericService_RefreshFlags{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP service_response_bytes_yb_server_GenericService_RefreshFlags Bytes sent in response to yb.server.GenericService.RefreshFlags() RPC requests
+# TYPE service_response_bytes_yb_server_GenericService_RefreshFlags counter
+service_response_bytes_yb_server_GenericService_RefreshFlags{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_RefreshFlags_sum Microseconds spent handling yb.server.GenericService.RefreshFlags() RPC requests
+# TYPE handler_latency_yb_server_GenericService_RefreshFlags_sum counter
+handler_latency_yb_server_GenericService_RefreshFlags_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_RefreshFlags_count Microseconds spent handling yb.server.GenericService.RefreshFlags() RPC requests
+# TYPE handler_latency_yb_server_GenericService_RefreshFlags_count counter
+handler_latency_yb_server_GenericService_RefreshFlags_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_RefreshFlags Microseconds spent handling yb.server.GenericService.RefreshFlags() RPC requests
+# TYPE handler_latency_yb_server_GenericService_RefreshFlags gauge
+handler_latency_yb_server_GenericService_RefreshFlags{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_RefreshFlags Microseconds spent handling yb.server.GenericService.RefreshFlags() RPC requests
+# TYPE handler_latency_yb_server_GenericService_RefreshFlags gauge
+handler_latency_yb_server_GenericService_RefreshFlags{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_RefreshFlags Microseconds spent handling yb.server.GenericService.RefreshFlags() RPC requests
+# TYPE handler_latency_yb_server_GenericService_RefreshFlags gauge
+handler_latency_yb_server_GenericService_RefreshFlags{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_RefreshFlags Microseconds spent handling yb.server.GenericService.RefreshFlags() RPC requests
+# TYPE handler_latency_yb_server_GenericService_RefreshFlags gauge
+handler_latency_yb_server_GenericService_RefreshFlags{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_RefreshFlags Microseconds spent handling yb.server.GenericService.RefreshFlags() RPC requests
+# TYPE handler_latency_yb_server_GenericService_RefreshFlags gauge
+handler_latency_yb_server_GenericService_RefreshFlags{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_RefreshFlags Microseconds spent handling yb.server.GenericService.RefreshFlags() RPC requests
+# TYPE handler_latency_yb_server_GenericService_RefreshFlags gauge
+handler_latency_yb_server_GenericService_RefreshFlags{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP service_request_bytes_yb_server_GenericService_GetAutoFlagsConfigVersion Bytes received by yb.server.GenericService.GetAutoFlagsConfigVersion() RPC requests
+# TYPE service_request_bytes_yb_server_GenericService_GetAutoFlagsConfigVersion counter
+service_request_bytes_yb_server_GenericService_GetAutoFlagsConfigVersion{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP service_response_bytes_yb_server_GenericService_GetAutoFlagsConfigVersion Bytes sent in response to yb.server.GenericService.GetAutoFlagsConfigVersion() RPC requests
+# TYPE service_response_bytes_yb_server_GenericService_GetAutoFlagsConfigVersion counter
+service_response_bytes_yb_server_GenericService_GetAutoFlagsConfigVersion{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion_sum Microseconds spent handling yb.server.GenericService.GetAutoFlagsConfigVersion() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion_sum counter
+handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion_count Microseconds spent handling yb.server.GenericService.GetAutoFlagsConfigVersion() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion_count counter
+handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion Microseconds spent handling yb.server.GenericService.GetAutoFlagsConfigVersion() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion gauge
+handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion Microseconds spent handling yb.server.GenericService.GetAutoFlagsConfigVersion() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion gauge
+handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion Microseconds spent handling yb.server.GenericService.GetAutoFlagsConfigVersion() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion gauge
+handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion Microseconds spent handling yb.server.GenericService.GetAutoFlagsConfigVersion() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion gauge
+handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion Microseconds spent handling yb.server.GenericService.GetAutoFlagsConfigVersion() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion gauge
+handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion Microseconds spent handling yb.server.GenericService.GetAutoFlagsConfigVersion() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion gauge
+handler_latency_yb_server_GenericService_GetAutoFlagsConfigVersion{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP service_request_bytes_yb_server_GenericService_FlushCoverage Bytes received by yb.server.GenericService.FlushCoverage() RPC requests
+# TYPE service_request_bytes_yb_server_GenericService_FlushCoverage counter
+service_request_bytes_yb_server_GenericService_FlushCoverage{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP service_response_bytes_yb_server_GenericService_FlushCoverage Bytes sent in response to yb.server.GenericService.FlushCoverage() RPC requests
+# TYPE service_response_bytes_yb_server_GenericService_FlushCoverage counter
+service_response_bytes_yb_server_GenericService_FlushCoverage{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_FlushCoverage_sum Microseconds spent handling yb.server.GenericService.FlushCoverage() RPC requests
+# TYPE handler_latency_yb_server_GenericService_FlushCoverage_sum counter
+handler_latency_yb_server_GenericService_FlushCoverage_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_FlushCoverage_count Microseconds spent handling yb.server.GenericService.FlushCoverage() RPC requests
+# TYPE handler_latency_yb_server_GenericService_FlushCoverage_count counter
+handler_latency_yb_server_GenericService_FlushCoverage_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_FlushCoverage Microseconds spent handling yb.server.GenericService.FlushCoverage() RPC requests
+# TYPE handler_latency_yb_server_GenericService_FlushCoverage gauge
+handler_latency_yb_server_GenericService_FlushCoverage{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_FlushCoverage Microseconds spent handling yb.server.GenericService.FlushCoverage() RPC requests
+# TYPE handler_latency_yb_server_GenericService_FlushCoverage gauge
+handler_latency_yb_server_GenericService_FlushCoverage{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_FlushCoverage Microseconds spent handling yb.server.GenericService.FlushCoverage() RPC requests
+# TYPE handler_latency_yb_server_GenericService_FlushCoverage gauge
+handler_latency_yb_server_GenericService_FlushCoverage{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_FlushCoverage Microseconds spent handling yb.server.GenericService.FlushCoverage() RPC requests
+# TYPE handler_latency_yb_server_GenericService_FlushCoverage gauge
+handler_latency_yb_server_GenericService_FlushCoverage{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_FlushCoverage Microseconds spent handling yb.server.GenericService.FlushCoverage() RPC requests
+# TYPE handler_latency_yb_server_GenericService_FlushCoverage gauge
+handler_latency_yb_server_GenericService_FlushCoverage{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_FlushCoverage Microseconds spent handling yb.server.GenericService.FlushCoverage() RPC requests
+# TYPE handler_latency_yb_server_GenericService_FlushCoverage gauge
+handler_latency_yb_server_GenericService_FlushCoverage{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP service_request_bytes_yb_server_GenericService_ServerClock Bytes received by yb.server.GenericService.ServerClock() RPC requests
+# TYPE service_request_bytes_yb_server_GenericService_ServerClock counter
+service_request_bytes_yb_server_GenericService_ServerClock{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP service_response_bytes_yb_server_GenericService_ServerClock Bytes sent in response to yb.server.GenericService.ServerClock() RPC requests
+# TYPE service_response_bytes_yb_server_GenericService_ServerClock counter
+service_response_bytes_yb_server_GenericService_ServerClock{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ServerClock_sum Microseconds spent handling yb.server.GenericService.ServerClock() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ServerClock_sum counter
+handler_latency_yb_server_GenericService_ServerClock_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ServerClock_count Microseconds spent handling yb.server.GenericService.ServerClock() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ServerClock_count counter
+handler_latency_yb_server_GenericService_ServerClock_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ServerClock Microseconds spent handling yb.server.GenericService.ServerClock() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ServerClock gauge
+handler_latency_yb_server_GenericService_ServerClock{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ServerClock Microseconds spent handling yb.server.GenericService.ServerClock() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ServerClock gauge
+handler_latency_yb_server_GenericService_ServerClock{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ServerClock Microseconds spent handling yb.server.GenericService.ServerClock() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ServerClock gauge
+handler_latency_yb_server_GenericService_ServerClock{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ServerClock Microseconds spent handling yb.server.GenericService.ServerClock() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ServerClock gauge
+handler_latency_yb_server_GenericService_ServerClock{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ServerClock Microseconds spent handling yb.server.GenericService.ServerClock() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ServerClock gauge
+handler_latency_yb_server_GenericService_ServerClock{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ServerClock Microseconds spent handling yb.server.GenericService.ServerClock() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ServerClock gauge
+handler_latency_yb_server_GenericService_ServerClock{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP service_request_bytes_yb_server_GenericService_GetStatus Bytes received by yb.server.GenericService.GetStatus() RPC requests
+# TYPE service_request_bytes_yb_server_GenericService_GetStatus counter
+service_request_bytes_yb_server_GenericService_GetStatus{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP service_response_bytes_yb_server_GenericService_GetStatus Bytes sent in response to yb.server.GenericService.GetStatus() RPC requests
+# TYPE service_response_bytes_yb_server_GenericService_GetStatus counter
+service_response_bytes_yb_server_GenericService_GetStatus{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetStatus_sum Microseconds spent handling yb.server.GenericService.GetStatus() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetStatus_sum counter
+handler_latency_yb_server_GenericService_GetStatus_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetStatus_count Microseconds spent handling yb.server.GenericService.GetStatus() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetStatus_count counter
+handler_latency_yb_server_GenericService_GetStatus_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetStatus Microseconds spent handling yb.server.GenericService.GetStatus() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetStatus gauge
+handler_latency_yb_server_GenericService_GetStatus{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetStatus Microseconds spent handling yb.server.GenericService.GetStatus() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetStatus gauge
+handler_latency_yb_server_GenericService_GetStatus{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetStatus Microseconds spent handling yb.server.GenericService.GetStatus() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetStatus gauge
+handler_latency_yb_server_GenericService_GetStatus{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetStatus Microseconds spent handling yb.server.GenericService.GetStatus() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetStatus gauge
+handler_latency_yb_server_GenericService_GetStatus{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetStatus Microseconds spent handling yb.server.GenericService.GetStatus() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetStatus gauge
+handler_latency_yb_server_GenericService_GetStatus{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_GetStatus Microseconds spent handling yb.server.GenericService.GetStatus() RPC requests
+# TYPE handler_latency_yb_server_GenericService_GetStatus gauge
+handler_latency_yb_server_GenericService_GetStatus{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP service_request_bytes_yb_server_GenericService_Ping Bytes received by yb.server.GenericService.Ping() RPC requests
+# TYPE service_request_bytes_yb_server_GenericService_Ping counter
+service_request_bytes_yb_server_GenericService_Ping{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP service_response_bytes_yb_server_GenericService_Ping Bytes sent in response to yb.server.GenericService.Ping() RPC requests
+# TYPE service_response_bytes_yb_server_GenericService_Ping counter
+service_response_bytes_yb_server_GenericService_Ping{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_Ping_sum Microseconds spent handling yb.server.GenericService.Ping() RPC requests
+# TYPE handler_latency_yb_server_GenericService_Ping_sum counter
+handler_latency_yb_server_GenericService_Ping_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_Ping_count Microseconds spent handling yb.server.GenericService.Ping() RPC requests
+# TYPE handler_latency_yb_server_GenericService_Ping_count counter
+handler_latency_yb_server_GenericService_Ping_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_Ping Microseconds spent handling yb.server.GenericService.Ping() RPC requests
+# TYPE handler_latency_yb_server_GenericService_Ping gauge
+handler_latency_yb_server_GenericService_Ping{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_Ping Microseconds spent handling yb.server.GenericService.Ping() RPC requests
+# TYPE handler_latency_yb_server_GenericService_Ping gauge
+handler_latency_yb_server_GenericService_Ping{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_Ping Microseconds spent handling yb.server.GenericService.Ping() RPC requests
+# TYPE handler_latency_yb_server_GenericService_Ping gauge
+handler_latency_yb_server_GenericService_Ping{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_Ping Microseconds spent handling yb.server.GenericService.Ping() RPC requests
+# TYPE handler_latency_yb_server_GenericService_Ping gauge
+handler_latency_yb_server_GenericService_Ping{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_Ping Microseconds spent handling yb.server.GenericService.Ping() RPC requests
+# TYPE handler_latency_yb_server_GenericService_Ping gauge
+handler_latency_yb_server_GenericService_Ping{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_Ping Microseconds spent handling yb.server.GenericService.Ping() RPC requests
+# TYPE handler_latency_yb_server_GenericService_Ping gauge
+handler_latency_yb_server_GenericService_Ping{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP service_request_bytes_yb_server_GenericService_ReloadCertificates Bytes received by yb.server.GenericService.ReloadCertificates() RPC requests
+# TYPE service_request_bytes_yb_server_GenericService_ReloadCertificates counter
+service_request_bytes_yb_server_GenericService_ReloadCertificates{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP service_response_bytes_yb_server_GenericService_ReloadCertificates Bytes sent in response to yb.server.GenericService.ReloadCertificates() RPC requests
+# TYPE service_response_bytes_yb_server_GenericService_ReloadCertificates counter
+service_response_bytes_yb_server_GenericService_ReloadCertificates{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ReloadCertificates_sum Microseconds spent handling yb.server.GenericService.ReloadCertificates() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ReloadCertificates_sum counter
+handler_latency_yb_server_GenericService_ReloadCertificates_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ReloadCertificates_count Microseconds spent handling yb.server.GenericService.ReloadCertificates() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ReloadCertificates_count counter
+handler_latency_yb_server_GenericService_ReloadCertificates_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ReloadCertificates Microseconds spent handling yb.server.GenericService.ReloadCertificates() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ReloadCertificates gauge
+handler_latency_yb_server_GenericService_ReloadCertificates{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ReloadCertificates Microseconds spent handling yb.server.GenericService.ReloadCertificates() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ReloadCertificates gauge
+handler_latency_yb_server_GenericService_ReloadCertificates{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ReloadCertificates Microseconds spent handling yb.server.GenericService.ReloadCertificates() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ReloadCertificates gauge
+handler_latency_yb_server_GenericService_ReloadCertificates{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ReloadCertificates Microseconds spent handling yb.server.GenericService.ReloadCertificates() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ReloadCertificates gauge
+handler_latency_yb_server_GenericService_ReloadCertificates{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ReloadCertificates Microseconds spent handling yb.server.GenericService.ReloadCertificates() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ReloadCertificates gauge
+handler_latency_yb_server_GenericService_ReloadCertificates{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_server_GenericService_ReloadCertificates Microseconds spent handling yb.server.GenericService.ReloadCertificates() RPC requests
+# TYPE handler_latency_yb_server_GenericService_ReloadCertificates gauge
+handler_latency_yb_server_GenericService_ReloadCertificates{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP hybrid_clock_hybrid_time Hybrid clock hybrid_time.
+# TYPE hybrid_clock_hybrid_time gauge
+hybrid_clock_hybrid_time{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 7111316985459867648 1736161373401
+# HELP hybrid_clock_error Server clock maximum error.
+# TYPE hybrid_clock_error gauge
+hybrid_clock_error{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 500000 1736161373401
+# HELP hybrid_clock_skew Server clock skew.
+# TYPE hybrid_clock_skew gauge
+hybrid_clock_skew{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP glog_info_messages Number of INFO-level log messages emitted by the application.
+# TYPE glog_info_messages counter
+glog_info_messages{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 31029 1736161373401
+# HELP glog_warning_messages Number of WARNING-level log messages emitted by the application.
+# TYPE glog_warning_messages counter
+glog_warning_messages{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 5 1736161373401
+# HELP glog_error_messages Number of ERROR-level log messages emitted by the application.
+# TYPE glog_error_messages counter
+glog_error_messages{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP server_uptime_ms The amount of time a server has been up for.
+# TYPE server_uptime_ms gauge
+server_uptime_ms{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 333269308 1736161373401
+# HELP server_memory_hard_limit If the server has a hard memory limit, that in bytes, otherwise -1.
+# TYPE server_memory_hard_limit gauge
+server_memory_hard_limit{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 9556947517 1736161373401
+# HELP server_memory_soft_limit If the server has a soft memory limit, that in bytes, otherwise -1.
+# TYPE server_memory_soft_limit gauge
+server_memory_soft_limit{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 8123405389 1736161373401
+# HELP untracked_memory The amount of memory not tracked by MemTracker
+# TYPE untracked_memory gauge
+untracked_memory{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 20705224 1736161373401
+# HELP generic_current_allocated_bytes Number of bytes used by the application. This will not typically match the memory use reported by the OS, because it does not include TCMalloc overhead or memory fragmentation.
+# TYPE generic_current_allocated_bytes gauge
+generic_current_allocated_bytes{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 40860800 1736161373401
+# HELP generic_heap_size Bytes of system memory reserved by TCMalloc.
+# TYPE generic_heap_size gauge
+generic_heap_size{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 69066752 1736161373401
+# HELP tcmalloc_pageheap_free_bytes Number of bytes in free, mapped pages in page heap. These bytes can be used to fulfill allocation requests. They always count towards virtual memory usage, and unless the underlying memory is swapped out by the OS, they also count towards physical memory usage.
+# TYPE tcmalloc_pageheap_free_bytes gauge
+tcmalloc_pageheap_free_bytes{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 2826240 1736161373401
+# HELP tcmalloc_pageheap_unmapped_bytes Number of bytes in free, unmapped pages in page heap. These are bytes that have been released back to the OS, possibly by one of the MallocExtension "Release" calls. They can be used to fulfill allocation requests, but typically incur a page fault. They always count towards virtual memory usage, and depending on the OS, typically do not count towards physical memory usage.
+# TYPE tcmalloc_pageheap_unmapped_bytes gauge
+tcmalloc_pageheap_unmapped_bytes{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 117579776 1736161373401
+# HELP tcmalloc_max_total_thread_cache_bytes A limit to how much memory TCMalloc dedicates for small objects. Higher numbers trade off more memory use for -- in some situations -- improved efficiency.
+# TYPE tcmalloc_max_total_thread_cache_bytes gauge
+tcmalloc_max_total_thread_cache_bytes{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 238923687 1736161373401
+# HELP tcmalloc_current_total_thread_cache_bytes A measure of some of the memory TCMalloc is using (for small objects).
+# TYPE tcmalloc_current_total_thread_cache_bytes gauge
+tcmalloc_current_total_thread_cache_bytes{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP dns_resolve_latency_sum Microseconds spent resolving DNS requests
+# TYPE dns_resolve_latency_sum counter
+dns_resolve_latency_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP dns_resolve_latency_count Microseconds spent resolving DNS requests
+# TYPE dns_resolve_latency_count counter
+dns_resolve_latency_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP spinlock_contention_time Amount of time consumed by contention on internal spinlocks since the server started. If this increases rapidly, it may indicate a performance issue in YB internals triggered by a particular workload and warrant investigation.
+# TYPE spinlock_contention_time counter
+spinlock_contention_time{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 2024 1736161373401
+# HELP threads_started Total number of threads started on this server
+# TYPE threads_started counter
+threads_started{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 138 1736161373401
+# HELP threads_running Current number of running threads
+# TYPE threads_running gauge
+threads_running{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 93 1736161373401
+# HELP cpu_utime Total user CPU time of the process
+# TYPE cpu_utime counter
+cpu_utime{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 5330122 1736161373401
+# HELP cpu_stime Total system CPU time of the process
+# TYPE cpu_stime counter
+cpu_stime{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 8564496 1736161373401
+# HELP voluntary_context_switches Total voluntary context switches
+# TYPE voluntary_context_switches counter
+voluntary_context_switches{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 216133524 1736161373401
+# HELP involuntary_context_switches Total involuntary context switches
+# TYPE involuntary_context_switches counter
+involuntary_context_switches{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 120184 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_GetProcessor_sum Time spent to get a processor for processing a CQL query request.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_GetProcessor_sum counter
+handler_latency_yb_cqlserver_CQLServerService_GetProcessor_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 85512 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_GetProcessor_count Time spent to get a processor for processing a CQL query request.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_GetProcessor_count counter
+handler_latency_yb_cqlserver_CQLServerService_GetProcessor_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 266689 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_GetProcessor Time spent to get a processor for processing a CQL query request.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_GetProcessor gauge
+handler_latency_yb_cqlserver_CQLServerService_GetProcessor{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_GetProcessor Time spent to get a processor for processing a CQL query request.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_GetProcessor gauge
+handler_latency_yb_cqlserver_CQLServerService_GetProcessor{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 1 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_GetProcessor Time spent to get a processor for processing a CQL query request.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_GetProcessor gauge
+handler_latency_yb_cqlserver_CQLServerService_GetProcessor{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 2 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_GetProcessor Time spent to get a processor for processing a CQL query request.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_GetProcessor gauge
+handler_latency_yb_cqlserver_CQLServerService_GetProcessor{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_GetProcessor Time spent to get a processor for processing a CQL query request.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_GetProcessor gauge
+handler_latency_yb_cqlserver_CQLServerService_GetProcessor{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 318 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_GetProcessor Time spent to get a processor for processing a CQL query request.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_GetProcessor gauge
+handler_latency_yb_cqlserver_CQLServerService_GetProcessor{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ProcessRequest_sum Time spent processing a CQL query request. From parsing till executing
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ProcessRequest_sum counter
+handler_latency_yb_cqlserver_CQLServerService_ProcessRequest_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 6507361 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ProcessRequest_count Time spent processing a CQL query request. From parsing till executing
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ProcessRequest_count counter
+handler_latency_yb_cqlserver_CQLServerService_ProcessRequest_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 266689 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ProcessRequest Time spent processing a CQL query request. From parsing till executing
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ProcessRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ProcessRequest{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 22 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ProcessRequest Time spent processing a CQL query request. From parsing till executing
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ProcessRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ProcessRequest{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 46 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ProcessRequest Time spent processing a CQL query request. From parsing till executing
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ProcessRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ProcessRequest{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 60 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ProcessRequest Time spent processing a CQL query request. From parsing till executing
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ProcessRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ProcessRequest{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 23 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ProcessRequest Time spent processing a CQL query request. From parsing till executing
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ProcessRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ProcessRequest{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 525 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ProcessRequest Time spent processing a CQL query request. From parsing till executing
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ProcessRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ProcessRequest{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 1 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ParseRequest_sum Time spent parsing CQL query request
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ParseRequest_sum counter
+handler_latency_yb_cqlserver_CQLServerService_ParseRequest_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 972175 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ParseRequest_count Time spent parsing CQL query request
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ParseRequest_count counter
+handler_latency_yb_cqlserver_CQLServerService_ParseRequest_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 266689 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ParseRequest Time spent parsing CQL query request
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ParseRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ParseRequest{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 3 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ParseRequest Time spent parsing CQL query request
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ParseRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ParseRequest{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 8 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ParseRequest Time spent parsing CQL query request
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ParseRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ParseRequest{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 11 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ParseRequest Time spent parsing CQL query request
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ParseRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ParseRequest{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 3 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ParseRequest Time spent parsing CQL query request
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ParseRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ParseRequest{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 490 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ParseRequest Time spent parsing CQL query request
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ParseRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ParseRequest{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_QueueResponse_sum Time spent after computing the CQL response to queue it onto the connection.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_QueueResponse_sum counter
+handler_latency_yb_cqlserver_CQLServerService_QueueResponse_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 4609293 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_QueueResponse_count Time spent after computing the CQL response to queue it onto the connection.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_QueueResponse_count counter
+handler_latency_yb_cqlserver_CQLServerService_QueueResponse_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 266689 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_QueueResponse Time spent after computing the CQL response to queue it onto the connection.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_QueueResponse gauge
+handler_latency_yb_cqlserver_CQLServerService_QueueResponse{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 17 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_QueueResponse Time spent after computing the CQL response to queue it onto the connection.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_QueueResponse gauge
+handler_latency_yb_cqlserver_CQLServerService_QueueResponse{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 35 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_QueueResponse Time spent after computing the CQL response to queue it onto the connection.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_QueueResponse gauge
+handler_latency_yb_cqlserver_CQLServerService_QueueResponse{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 47 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_QueueResponse Time spent after computing the CQL response to queue it onto the connection.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_QueueResponse gauge
+handler_latency_yb_cqlserver_CQLServerService_QueueResponse{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 17 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_QueueResponse Time spent after computing the CQL response to queue it onto the connection.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_QueueResponse gauge
+handler_latency_yb_cqlserver_CQLServerService_QueueResponse{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 289 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_QueueResponse Time spent after computing the CQL response to queue it onto the connection.
+# TYPE handler_latency_yb_cqlserver_CQLServerService_QueueResponse gauge
+handler_latency_yb_cqlserver_CQLServerService_QueueResponse{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest_sum Time spent executing the CQL query request in the handler
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest_sum counter
+handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 669591 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest_count Time spent executing the CQL query request in the handler
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest_count counter
+handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 266689 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest Time spent executing the CQL query request in the handler
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 2 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest Time spent executing the CQL query request in the handler
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 3 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest Time spent executing the CQL query request in the handler
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 5 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest Time spent executing the CQL query request in the handler
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 1 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest Time spent executing the CQL query request in the handler
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 224 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest Time spent executing the CQL query request in the handler
+# TYPE handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest gauge
+handler_latency_yb_cqlserver_CQLServerService_ExecuteRequest{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP yb_cqlserver_CQLServerService_ParsingErrors Errors encountered when parsing
+# TYPE yb_cqlserver_CQLServerService_ParsingErrors counter
+yb_cqlserver_CQLServerService_ParsingErrors{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_Any_sum Microseconds spent handling yb.cqlserver.CQLServerService.AnyMethod() RPC requests
+# TYPE handler_latency_yb_cqlserver_CQLServerService_Any_sum counter
+handler_latency_yb_cqlserver_CQLServerService_Any_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 4225161 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_Any_count Microseconds spent handling yb.cqlserver.CQLServerService.AnyMethod() RPC requests
+# TYPE handler_latency_yb_cqlserver_CQLServerService_Any_count counter
+handler_latency_yb_cqlserver_CQLServerService_Any_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 266689 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_Any Microseconds spent handling yb.cqlserver.CQLServerService.AnyMethod() RPC requests
+# TYPE handler_latency_yb_cqlserver_CQLServerService_Any gauge
+handler_latency_yb_cqlserver_CQLServerService_Any{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 15 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_Any Microseconds spent handling yb.cqlserver.CQLServerService.AnyMethod() RPC requests
+# TYPE handler_latency_yb_cqlserver_CQLServerService_Any gauge
+handler_latency_yb_cqlserver_CQLServerService_Any{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 29 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_Any Microseconds spent handling yb.cqlserver.CQLServerService.AnyMethod() RPC requests
+# TYPE handler_latency_yb_cqlserver_CQLServerService_Any gauge
+handler_latency_yb_cqlserver_CQLServerService_Any{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 43 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_Any Microseconds spent handling yb.cqlserver.CQLServerService.AnyMethod() RPC requests
+# TYPE handler_latency_yb_cqlserver_CQLServerService_Any gauge
+handler_latency_yb_cqlserver_CQLServerService_Any{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 14 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_Any Microseconds spent handling yb.cqlserver.CQLServerService.AnyMethod() RPC requests
+# TYPE handler_latency_yb_cqlserver_CQLServerService_Any gauge
+handler_latency_yb_cqlserver_CQLServerService_Any{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 1078 1736161373401
+# HELP handler_latency_yb_cqlserver_CQLServerService_Any Microseconds spent handling yb.cqlserver.CQLServerService.AnyMethod() RPC requests
+# TYPE handler_latency_yb_cqlserver_CQLServerService_Any gauge
+handler_latency_yb_cqlserver_CQLServerService_Any{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP cql_processors_alive Number of alive CQL Processors.
+# TYPE cql_processors_alive gauge
+cql_processors_alive{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 6 1736161373401
+# HELP cql_processors_created Number of created CQL Processors.
+# TYPE cql_processors_created counter
+cql_processors_created{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 6 1736161373401
+# HELP cql_parsers_alive Number of alive CQL Parsers.
+# TYPE cql_parsers_alive gauge
+cql_parsers_alive{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 15 1736161373401
+# HELP cql_parsers_created Number of created CQL Parsers.
+# TYPE cql_parsers_created counter
+cql_parsers_created{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.cqlserver"} 15 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ParseRequest_sum Time spent parsing the SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ParseRequest_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_ParseRequest_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 8246 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ParseRequest_count Time spent parsing the SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ParseRequest_count counter
+handler_latency_yb_cqlserver_SQLProcessor_ParseRequest_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 89 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ParseRequest Time spent parsing the SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ParseRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ParseRequest{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ParseRequest Time spent parsing the SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ParseRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ParseRequest{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ParseRequest Time spent parsing the SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ParseRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ParseRequest{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ParseRequest Time spent parsing the SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ParseRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ParseRequest{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ParseRequest Time spent parsing the SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ParseRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ParseRequest{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ParseRequest Time spent parsing the SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ParseRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ParseRequest{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest_sum Time spent to analyze the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 6348 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest_count Time spent to analyze the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest_count counter
+handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 89 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest Time spent to analyze the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest Time spent to analyze the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest Time spent to analyze the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest Time spent to analyze the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest Time spent to analyze the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest Time spent to analyze the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_AnalyzeRequest{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest_sum Time spent executing the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 241399 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest_count Time spent executing the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest_count counter
+handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 161 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest Time spent executing the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest Time spent executing the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest Time spent executing the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest Time spent executing the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest Time spent executing the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest Time spent executing the parsed SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest gauge
+handler_latency_yb_cqlserver_SQLProcessor_ExecuteRequest{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze_sum Number of rounds to successfully parse a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 89 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze_count Number of rounds to successfully parse a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze_count counter
+handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 89 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze Number of rounds to successfully parse a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze Number of rounds to successfully parse a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze Number of rounds to successfully parse a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze Number of rounds to successfully parse a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze Number of rounds to successfully parse a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze Number of rounds to successfully parse a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRoundsToAnalyze{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute_sum Number of retries to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute_count Number of retries to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute_count counter
+handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 161 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute Number of retries to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute Number of retries to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute Number of retries to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute Number of retries to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute Number of retries to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute Number of retries to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumRetriesToExecute{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute_sum Number of flushes to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 161 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute_count Number of flushes to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute_count counter
+handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 161 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute Number of flushes to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute Number of flushes to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute Number of flushes to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute Number of flushes to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute Number of flushes to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute Number of flushes to successfully execute a SQL query
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute gauge
+handler_latency_yb_cqlserver_SQLProcessor_NumFlushesToExecute{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_SelectStmt_sum Time spent processing a SELECT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_SelectStmt_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_SelectStmt_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 241399 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_SelectStmt_count Time spent processing a SELECT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_SelectStmt_count counter
+handler_latency_yb_cqlserver_SQLProcessor_SelectStmt_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 161 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_SelectStmt Time spent processing a SELECT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_SelectStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_SelectStmt{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_SelectStmt Time spent processing a SELECT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_SelectStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_SelectStmt{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_SelectStmt Time spent processing a SELECT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_SelectStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_SelectStmt{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_SelectStmt Time spent processing a SELECT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_SelectStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_SelectStmt{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_SelectStmt Time spent processing a SELECT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_SelectStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_SelectStmt{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_SelectStmt Time spent processing a SELECT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_SelectStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_SelectStmt{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_InsertStmt_sum Time spent processing an INSERT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_InsertStmt_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_InsertStmt_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_InsertStmt_count Time spent processing an INSERT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_InsertStmt_count counter
+handler_latency_yb_cqlserver_SQLProcessor_InsertStmt_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_InsertStmt Time spent processing an INSERT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_InsertStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_InsertStmt{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_InsertStmt Time spent processing an INSERT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_InsertStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_InsertStmt{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_InsertStmt Time spent processing an INSERT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_InsertStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_InsertStmt{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_InsertStmt Time spent processing an INSERT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_InsertStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_InsertStmt{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_InsertStmt Time spent processing an INSERT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_InsertStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_InsertStmt{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_InsertStmt Time spent processing an INSERT statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_InsertStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_InsertStmt{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt_sum Time spent processing an UPDATE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt_count Time spent processing an UPDATE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt_count counter
+handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt Time spent processing an UPDATE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt Time spent processing an UPDATE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt Time spent processing an UPDATE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt Time spent processing an UPDATE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt Time spent processing an UPDATE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt Time spent processing an UPDATE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UpdateStmt{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt_sum Time spent processing a DELETE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt_count Time spent processing a DELETE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt_count counter
+handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt Time spent processing a DELETE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt Time spent processing a DELETE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt Time spent processing a DELETE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt Time spent processing a DELETE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt Time spent processing a DELETE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt Time spent processing a DELETE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_DeleteStmt{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UseStmt_sum Time spent processing a USE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UseStmt_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_UseStmt_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UseStmt_count Time spent processing a USE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UseStmt_count counter
+handler_latency_yb_cqlserver_SQLProcessor_UseStmt_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UseStmt Time spent processing a USE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UseStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UseStmt{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UseStmt Time spent processing a USE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UseStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UseStmt{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UseStmt Time spent processing a USE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UseStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UseStmt{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UseStmt Time spent processing a USE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UseStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UseStmt{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UseStmt Time spent processing a USE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UseStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UseStmt{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_UseStmt Time spent processing a USE statement
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_UseStmt gauge
+handler_latency_yb_cqlserver_SQLProcessor_UseStmt{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_OtherStmts_sum Time spent processing any statement other than SELECT/INSERT/UPDATE/DELETE
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_OtherStmts_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_OtherStmts_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_OtherStmts_count Time spent processing any statement other than SELECT/INSERT/UPDATE/DELETE
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_OtherStmts_count counter
+handler_latency_yb_cqlserver_SQLProcessor_OtherStmts_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_OtherStmts Time spent processing any statement other than SELECT/INSERT/UPDATE/DELETE
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_OtherStmts gauge
+handler_latency_yb_cqlserver_SQLProcessor_OtherStmts{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_OtherStmts Time spent processing any statement other than SELECT/INSERT/UPDATE/DELETE
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_OtherStmts gauge
+handler_latency_yb_cqlserver_SQLProcessor_OtherStmts{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_OtherStmts Time spent processing any statement other than SELECT/INSERT/UPDATE/DELETE
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_OtherStmts gauge
+handler_latency_yb_cqlserver_SQLProcessor_OtherStmts{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_OtherStmts Time spent processing any statement other than SELECT/INSERT/UPDATE/DELETE
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_OtherStmts gauge
+handler_latency_yb_cqlserver_SQLProcessor_OtherStmts{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_OtherStmts Time spent processing any statement other than SELECT/INSERT/UPDATE/DELETE
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_OtherStmts gauge
+handler_latency_yb_cqlserver_SQLProcessor_OtherStmts{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_OtherStmts Time spent processing any statement other than SELECT/INSERT/UPDATE/DELETE
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_OtherStmts gauge
+handler_latency_yb_cqlserver_SQLProcessor_OtherStmts{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_Transaction_sum Time spent processing a transaction
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_Transaction_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_Transaction_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_Transaction_count Time spent processing a transaction
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_Transaction_count counter
+handler_latency_yb_cqlserver_SQLProcessor_Transaction_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_Transaction Time spent processing a transaction
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_Transaction gauge
+handler_latency_yb_cqlserver_SQLProcessor_Transaction{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_Transaction Time spent processing a transaction
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_Transaction gauge
+handler_latency_yb_cqlserver_SQLProcessor_Transaction{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_Transaction Time spent processing a transaction
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_Transaction gauge
+handler_latency_yb_cqlserver_SQLProcessor_Transaction{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_Transaction Time spent processing a transaction
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_Transaction gauge
+handler_latency_yb_cqlserver_SQLProcessor_Transaction{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_Transaction Time spent processing a transaction
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_Transaction gauge
+handler_latency_yb_cqlserver_SQLProcessor_Transaction{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_Transaction Time spent processing a transaction
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_Transaction gauge
+handler_latency_yb_cqlserver_SQLProcessor_Transaction{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ResponseSize_sum Size of the returned response blob (in bytes)
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ResponseSize_sum counter
+handler_latency_yb_cqlserver_SQLProcessor_ResponseSize_sum{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 1570190 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ResponseSize_count Size of the returned response blob (in bytes)
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ResponseSize_count counter
+handler_latency_yb_cqlserver_SQLProcessor_ResponseSize_count{metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 161 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ResponseSize Size of the returned response blob (in bytes)
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ResponseSize gauge
+handler_latency_yb_cqlserver_SQLProcessor_ResponseSize{quantile="p50",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ResponseSize Size of the returned response blob (in bytes)
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ResponseSize gauge
+handler_latency_yb_cqlserver_SQLProcessor_ResponseSize{quantile="p95",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ResponseSize Size of the returned response blob (in bytes)
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ResponseSize gauge
+handler_latency_yb_cqlserver_SQLProcessor_ResponseSize{quantile="p99",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ResponseSize Size of the returned response blob (in bytes)
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ResponseSize gauge
+handler_latency_yb_cqlserver_SQLProcessor_ResponseSize{quantile="mean",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ResponseSize Size of the returned response blob (in bytes)
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ResponseSize gauge
+handler_latency_yb_cqlserver_SQLProcessor_ResponseSize{quantile="max",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP handler_latency_yb_cqlserver_SQLProcessor_ResponseSize Size of the returned response blob (in bytes)
+# TYPE handler_latency_yb_cqlserver_SQLProcessor_ResponseSize gauge
+handler_latency_yb_cqlserver_SQLProcessor_ResponseSize{quantile="min",metric_id="yb.cqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1736161373401
+# HELP num_of_entries_cut_off Number of metric entries truncated due to exceeding the maximum metric entry limit
+# TYPE num_of_entries_cut_off counter
+num_of_entries_cut_off{exported_instance="pve-deb-work:9000"} 0 1736161373401

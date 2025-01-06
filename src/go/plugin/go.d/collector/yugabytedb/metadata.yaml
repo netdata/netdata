@@ -1,0 +1,536 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-yugabytedb
+      plugin_name: go.d.plugin
+      module_name: yugabytedb
+      monitored_instance:
+        name: YugabyteDB
+        link: https://www.yugabyte.com/yugabytedb
+        categories:
+          - data-collection.database-servers
+        icon_filename: yugabytedb.svg
+      related_resources:
+        integrations:
+          list: []
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - db
+        - database
+        - yb
+        - yugabyte
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the activity and performance of YugabyteDB servers.
+        method_description: |
+          It sends HTTP requests to the YugabyteDB [metric endpoints](https://docs.yugabyte.com/preview/launch-and-manage/monitor-and-alert/metrics/#metric-endpoints).
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects YugabyteDB instances running on localhost.
+            On startup, it tries to collect metrics from:
+            
+            - http://127.0.0.1:7000/prometheus-metrics (Master)
+            - http://127.0.0.1:9000/prometheus-metrics (Tablet Server)
+            - http://127.0.0.1:12000/prometheus-metrics (YCQL)
+            - http://127.0.0.1:13000/prometheus-metrics (YSQL)
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/yugabytedb.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:7000/prometheus-metrics
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:7000/prometheus-metrics     # Master
+                    # url: http://127.0.0.1:9000/prometheus-metrics   # Tablet Server
+                    # url: http://127.0.0.1:12000/prometheus-metrics  # YCQL
+                    # url: http://127.0.0.1:13000/prometheus-metrics  # YSQL
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:7000/prometheus-metrics
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: NGINX with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:7000/prometheus-metrics
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:7000/prometheus-metrics
+                
+                  - name: remote
+                    url: http://192.0.2.1:7000/prometheus-metrics
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Master Client operations (Master)
+          description: Metrics tracking latency and counts of Master Client RPC operations.
+          labels:
+            - name: operation
+              description: The specific MasterClient RPC operation name.
+          metrics:
+            - name: yugabytedb.master_client_operations
+              description: Master Client Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.master_client_operations_latency
+              description: Master Client Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+        - name: Master DDL operations
+          description: Metrics tracking Data Definition Language (DDL) operations performed on the Master server.
+          labels:
+            - name: operation
+              description: The specific DDL operation handler name.
+          metrics:
+            - name: yugabytedb.master_ddl_operations
+              description: Master DDL Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.master_ddl_operations_latency
+              description: Master DDL Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+        - name: TabletServerService (Master)
+          description: Metrics tracking latency and counts of TabletServer RPC operations on the Master server.
+          labels:
+            - name: op
+              description: The specific TabletServer RPC operation name.
+          metrics:
+            - name: yugabytedb.master_tabletserverservice_operations
+              description: Master TabletServerService Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.master_tabletserverservice_operations_latency
+              description: Master TabletServerService Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: yugabytedb.master_tabletserverservice_traffic
+              description: Master TabletServerService Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: PgClientService (Master)
+          description: Metrics tracking latency and counts of PostgreSQL client service RPC operations on the Master server.
+          labels:
+            - name: operation
+              description: The specific PgClientService RPC operation name that handles PostgreSQL protocol requests and responses.
+          metrics:
+            - name: yugabytedb.master_pgclientservice_operations
+              description: Master PgClientService Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.master_pgclientservice_operations_latency
+              description: Master PgClientService Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: yugabytedb.master_pgclientservice_traffic
+              description: Master PgClientService Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: RemoteBootstrapService (Master)
+          description: Metrics tracking latency and counts of RemoteBootstrap RPC operations on the Master server.
+          labels:
+            - name: operation
+              description: The specific RemoteBootstrap RPC operation name.
+          metrics:
+            - name: yugabytedb.master_remotebootstrapservice_operations
+              description: Master RemoteBootstrapService Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.master_remotebootstrapservice_operations_latency
+              description: Master RemoteBootstrapService Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: yugabytedb.master_remotebootstrapservice_traffic
+              description: Master RemoteBootstrapService Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: Raft operations (Master)
+          description: Metrics tracking latency and counts of Raft consensus protocol operations on the Master server.
+          labels:
+            - name: operation
+              description: The specific Raft protocol operation name.
+          metrics:
+            - name: yugabytedb.master_consensus_operations
+              description: Master Consensus Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.master_consensus_operations_latency
+              description: Master Consensus Operations Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: yugabytedb.master_consensus_traffic
+              description: Master Consensus Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: TabletServerService (Tablet Server)
+          description: Metrics tracking latency and counts of TabletServer RPC operations on the Tablet server.
+          labels:
+            - name: op
+              description: The specific TabletServer RPC operation name.
+          metrics:
+            - name: yugabytedb.tserver_tabletserverservice_operations
+              description: TServer TabletServerService Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.tserver_tabletserverservice_operations_latency
+              description: TServer TabletServerService Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: yugabytedb.tserver_tabletserverservice_traffic
+              description: TServer TabletServerService Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: TabletServerAdminService (Tablet Server)
+          description: Metrics tracking latency and counts of TabletServerAdmin RPC operations on the Tablet server.
+          labels:
+            - name: op
+              description: The specific TabletServerAdmin RPC operation name.
+          metrics:
+            - name: yugabytedb.tserver_tabletserveradminservice_operations
+              description: TServer TabletServerAdminService Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.tserver_tabletserveradminservice_operations_latency
+              description: TServer TabletServerAdminService Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: yugabytedb.tserver_tabletserveradminservice_traffic
+              description: TServer TabletServerAdminService Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: TabletServerBackupService (Tablet Server)
+          description: Metrics tracking latency and counts of TabletServerBackup RPC operations on the Tablet server.
+          labels:
+            - name: op
+              description: The specific TabletServerBackup RPC operation name.
+          metrics:
+            - name: yugabytedb.tserver_tabletserverbackupservice_operations
+              description: TServer TabletServerBackupService Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.tserver_tabletserverbackupservice_operations_latency
+              description: TServer TabletServerBackupService Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: yugabytedb.tserver_tabletserverbackupservice_traffic
+              description: TServer TabletServerBackupService Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: PgClientService (Tablet Server)
+          description: Metrics tracking latency and counts of PostgreSQL client service RPC operations on the Tablet server.
+          labels:
+            - name: operation
+              description: The specific PgClientService RPC operation name that handles PostgreSQL protocol requests and responses.
+          metrics:
+            - name: yugabytedb.tserver_pgclientservice_operations
+              description: TServer PgClientService Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.tserver_pgclientservice_operations_latency
+              description: TServer PgClientService Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: yugabytedb.tserver_pgclientservice_traffic
+              description: TServer PgClientService Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: RemoteBootstrapService (Tablet Server)
+          description: Metrics tracking latency and counts of RemoteBootstrap RPC operations on the Tablet server.
+          labels:
+            - name: operation
+              description: The specific RemoteBootstrap RPC operation name.
+          metrics:
+            - name: yugabytedb.tserver_remotebootstrapservice_operations
+              description: TServer RemoteBootstrapService Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.tserver_remotebootstrapservice_operations_latency
+              description: TServer RemoteBootstrapService Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: yugabytedb.tserver_remotebootstrapservice_traffic
+              description: TServer RemoteBootstrapService Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: Raft operations (Tablet Server)
+          description: Metrics tracking latency and counts of Raft consensus protocol operations on the Tablet server.
+          labels:
+            - name: operation
+              description: The specific Raft protocol operation name.
+          metrics:
+            - name: yugabytedb.tserver_consensus_operations
+              description: TServer Consensus Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: yugabytedb.tserver_consensus_operations_latency
+              description: TServer Consensus Operations Operations Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: yugabytedb.tserver_consensus_traffic
+              description: TServer Consensus Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: SQL Statements (YCQL)
+          description: Metrics tracking latency and counts of SQL statements on the YCQL server.
+          labels:
+            - name: statement
+              description: The specific SQL statement name.
+          metrics:
+            - name: yugabytedb.ycql_sql_statements
+              description: YCQL SQL Statements
+              unit: statements/s
+              chart_type: line
+              dimensions:
+                - name: statements
+            - name: yugabytedb.yCql_sql_statements_latency
+              description: YCQL SQL Statements Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+        - name: YSQL server
+          description: Metrics tracking connections on the YSQL server.
+          labels: []
+          metrics:
+            - name: yugabytedb.ysql_connection_usage
+              description: YSQL Connections Usage
+              unit: connections
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+            - name: yugabytedb.ysql_active_connections
+              description: YSQL Active Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: yugabytedb.ysql_established_connections
+              description: YSQL Established Connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: established
+            - name: yugabytedb.ysql_over_limit_connections
+              description: YSQL Rejected Over Limit Connections
+              unit: rejects/s
+              chart_type: line
+              dimensions:
+                - name: over_limit
+        - name: SQL Statements (YSQL)
+          description: Metrics tracking latency and counts of SQL statements on the YSQL server.
+          labels:
+            - name: statement
+              description: The specific SQL statement name.
+          metrics:
+            - name: yugabytedb.ysql_sql_statements
+              description: YSQL SQL Statements
+              unit: statements/s
+              chart_type: line
+              dimensions:
+                - name: statements
+            - name: yugabytedb.ysql_sql_statements_latency
+              description: YSQL SQL Statements Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency
