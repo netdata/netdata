@@ -148,6 +148,10 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 				}
 			}
 
+			if hasIgnoreLabel(cntr) {
+				continue
+			}
+
 			if len(cntr.Names) == 0 {
 				continue
 			}
@@ -201,4 +205,9 @@ func (c *Collector) negotiateAPIVersion() {
 	defer cancel()
 
 	c.client.NegotiateAPIVersion(ctx)
+}
+
+func hasIgnoreLabel(cntr types.Container) bool {
+	v, _ := cntr.Labels["netdata.cloud/ignore"]
+	return strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
 }
