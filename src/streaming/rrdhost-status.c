@@ -96,6 +96,18 @@ static NETDATA_DOUBLE rrdhost_sender_replication_completion_unsafe(RRDHOST *host
     return completion;
 }
 
+RRDHOST_INGEST_STATUS rrdhost_ingestion_status(RRDHOST *host) {
+    RRDHOST_STATUS status;
+    rrdhost_status(host, now_realtime_sec(), &status);
+    return status.ingest.status;
+}
+
+int16_t rrdhost_ingestion_hops(RRDHOST *host) {
+    if(rrdhost_is_local(host)) return 0;
+    if(!host->system_info) return 1;
+    return rrdhost_system_info_hops(host->system_info);
+}
+
 void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     memset(s, 0, sizeof(*s));
 
@@ -130,7 +142,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->stream.rcv.status.exit_reason;
 
     rrdhost_receiver_lock(host);
-    s->ingest.hops = (int16_t)(host->system_info ? rrdhost_system_info_hops(host->system_info) : (host == localhost) ? 0 : 1);
+    s->ingest.hops = rrdhost_ingestion_hops(host);
     bool has_receiver = false;
     if (host->receiver && rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE)) {
         has_receiver = true;
@@ -144,16 +156,20 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     }
     rrdhost_receiver_unlock(host);
 
+    s->ingest.collected.metrics = __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
+    s->ingest.collected.instances = __atomic_load_n(&host->collected.instances_count, __ATOMIC_RELAXED);
+    s->ingest.collected.contexts = __atomic_load_n(&host->collected.contexts_count, __ATOMIC_RELAXED);
+
     if (online) {
         if(s->db.status == RRDHOST_DB_STATUS_INITIALIZING)
             s->ingest.status = RRDHOST_INGEST_STATUS_INITIALIZING;
 
-        else if (host == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+        else if (rrdhost_is_local(host)) {
             s->ingest.status = RRDHOST_INGEST_STATUS_ONLINE;
             s->ingest.since = netdata_start_time;
         }
 
-        else if (s->ingest.replication.in_progress)
+        else if (s->ingest.replication.in_progress || !s->ingest.collected.metrics)
             s->ingest.status = RRDHOST_INGEST_STATUS_REPLICATING;
 
         else
@@ -168,10 +184,6 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         else
             s->ingest.status = RRDHOST_INGEST_STATUS_OFFLINE;
     }
-
-    s->ingest.collected.metrics = __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
-    s->ingest.collected.instances = __atomic_load_n(&host->collected.instances_count, __ATOMIC_RELAXED);
-    s->ingest.collected.contexts = __atomic_load_n(&host->collected.contexts_count, __ATOMIC_RELAXED);
 
     if(host == localhost)
         s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;

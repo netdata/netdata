@@ -119,13 +119,25 @@ function parse_docker_like_inspect_output() {
   if [ -n "${IMAGE_NAME}" ]; then
     LABELS="image=\"${IMAGE_NAME}\""
   fi
+
+  while IFS= read -r line; do
+    if [[ $line == LABEL_netdata.cloud/* ]]; then
+      IFS="=" read -r lname lval <<<"$line"
+      lname=${lname#LABEL_}
+      if [ -n "$LABELS" ]; then
+        LABELS="$LABELS,${lname}=\"${lval}\""
+      else
+        LABELS="${lname}=\"${lval}\""
+      fi
+    fi
+  done <<<"$output"
 }
 
 function docker_like_get_name_command() {
   local command="${1}"
   local id="${2}"
-  info "Running command: ${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}' \"${id}\""
-  if OUTPUT="$(${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}CONT_NAME={{ .Name}}{{println}}IMAGE_NAME={{ .Config.Image}}' "${id}")" &&
+  # shellcheck disable=SC2016
+  if OUTPUT="$(${command} inspect --format='{{range .Config.Env}}{{println .}}{{end}}{{range $key, $value := .Config.Labels}}LABEL_{{$key}}={{$value}}{{println}}{{end}}IMAGE_NAME={{.Config.Image}}{{println}}CONT_NAME={{.Name}}' "${id}")" &&
     [ -n "$OUTPUT" ]; then
       parse_docker_like_inspect_output "$OUTPUT"
   fi
@@ -151,7 +163,7 @@ function docker_like_get_name_api() {
     info "Running API command: curl \"${host}${path}\""
     JSON=$(curl -sS "${host}${path}")
   fi
-  if OUTPUT=$(echo "${JSON}" | jq -r '.Config.Env[]?,"CONT_NAME=\(.Name)","IMAGE_NAME=\(.Config.Image)"') && [ -n "$OUTPUT" ]; then
+  if OUTPUT=$(echo "${JSON}" | jq -r '.Config.Env[]?, "CONT_NAME=\(.Name)", "IMAGE_NAME=\(.Config.Image)", (.Config.Labels | to_entries[] | "LABEL_\(.key)=\(.value)")') && [ -n "$OUTPUT" ]; then
     parse_docker_like_inspect_output "$OUTPUT"
   fi
   return 0
@@ -424,7 +436,7 @@ function k8s_get_kubepod_name() {
     jq_filter+='namespace=\"\(.metadata.namespace)\",'
     jq_filter+='pod_name=\"\(.metadata.name)\",'
     jq_filter+='pod_uid=\"\(.metadata.uid)\",'
-    #jq_filter+='\(.metadata.labels | to_entries | map("pod_label_"+.key+"=\""+.value+"\"") | join(",") | if length > 0 then .+"," else . end)'
+    jq_filter+='\((.metadata.annotations // {}) | to_entries | map(select(.key | startswith("netdata.cloud/")) | .key+"=\""+.value+"\"") | join(",") | if length > 0 then .+"," else . end)'
     jq_filter+='\((.metadata.ownerReferences[]? | select(.controller==true) | "controller_kind=\""+.kind+"\",controller_name=\""+.name+"\",") // "")'
     jq_filter+='node_name=\"\(.spec.nodeName)\",'
     jq_filter+='" + '

@@ -38,7 +38,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts_status(BUFFER *
     buffer_json_add_array_item_object(wb);
 
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
-    buffer_json_member_add_uint64(wb, "hops", host->system_info ? rrdhost_system_info_hops(host->system_info) : (host == localhost) ? 0 : 1);
+    buffer_json_member_add_int64(wb, "hops", rrdhost_ingestion_hops(host));
     buffer_json_member_add_boolean(wb, "reachable", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
 
     buffer_json_member_add_string(wb, "guid", host->machine_guid);

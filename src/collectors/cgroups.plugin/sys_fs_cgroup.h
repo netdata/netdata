@@ -9,9 +9,10 @@
 #define PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME "systemd"
 #define PLUGIN_CGROUPS_MODULE_CGROUPS_NAME "/sys/fs/cgroup"
 
-#define CGROUP_OPTIONS_DISABLED_DUPLICATE   0x00000001
-#define CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE 0x00000002
-#define CGROUP_OPTIONS_IS_UNIFIED           0x00000004
+#define CGROUP_OPTIONS_DISABLED_DUPLICATE   (1 << 0)
+#define CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE (1 << 1)
+#define CGROUP_OPTIONS_IS_UNIFIED           (1 << 2)
+#define CGROUP_OPTIONS_DISABLED_EXCLUDED    (1 << 3)
 
 typedef struct netdata_ebpf_cgroup_shm_header {
     int cgroup_root_count;
@@ -42,7 +43,5 @@ typedef struct netdata_ebpf_cgroup_shm {
 #define NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME "/netdata_sem_cgroup_ebpf"
 
 #include "../proc.plugin/plugin_proc.h"
-
-char *cgroup_parse_resolved_name_and_labels(RRDLABELS *labels, char *data);
 
 #endif //NETDATA_SYS_FS_CGROUP_H

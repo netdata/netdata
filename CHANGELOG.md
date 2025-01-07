@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- fix\(cgroup-rename\): prevent leading comma in Docker LABELS when IMAGE empty [\#19318](https://github.com/netdata/netdata/pull/19318) ([ilyam8](https://github.com/ilyam8))
+- feat\(cgroup-name.sh\): Add support for `netdata.cloud/*` container labels [\#19315](https://github.com/netdata/netdata/pull/19315) ([ilyam8](https://github.com/ilyam8))
+- Locks Improvements [\#19314](https://github.com/netdata/netdata/pull/19314) ([ktsaou](https://github.com/ktsaou))
 - add yugabytedb docker manager [\#19313](https://github.com/netdata/netdata/pull/19313) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/sd\): correctly adding tags in classify [\#19312](https://github.com/netdata/netdata/pull/19312) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/nats\): add missing cid label to gw charts [\#19311](https://github.com/netdata/netdata/pull/19311) ([ilyam8](https://github.com/ilyam8))
@@ -460,10 +463,6 @@
 - Bump github.com/vmware/govmomi from 0.43.0 to 0.44.1 in /src/go [\#18766](https://github.com/netdata/netdata/pull/18766) ([dependabot[bot]](https://github.com/apps/dependabot))
 - SPAWN SERVER: close all open fds on callback [\#18764](https://github.com/netdata/netdata/pull/18764) ([ktsaou](https://github.com/ktsaou))
 - Adjust option \(Windows claim\) [\#18763](https://github.com/netdata/netdata/pull/18763) ([thiagoftsm](https://github.com/thiagoftsm))
-- NetFramework \(Part I\) [\#18762](https://github.com/netdata/netdata/pull/18762) ([thiagoftsm](https://github.com/thiagoftsm))
-- Expand ml enabled option [\#18761](https://github.com/netdata/netdata/pull/18761) ([stelfrag](https://github.com/stelfrag))
-- Fix storing of repeat field [\#18760](https://github.com/netdata/netdata/pull/18760) ([stelfrag](https://github.com/stelfrag))
-- local-listeners without libmnl [\#18759](https://github.com/netdata/netdata/pull/18759) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
