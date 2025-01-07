@@ -833,6 +833,29 @@ exit:
     return NULL;
 }
 
+bool aclk_host_state_update_auto(RRDHOST *host) {
+    int live;
+    switch(rrdhost_ingestion_status(host)) {
+        case RRDHOST_INGEST_STATUS_ARCHIVED:
+        case RRDHOST_INGEST_STATUS_INITIALIZING:
+        case RRDHOST_INGEST_STATUS_OFFLINE:
+            live = 0;
+            break;
+
+        case RRDHOST_INGEST_STATUS_REPLICATING:
+            // receiving replication
+            // no need to send this to NC
+            return false;
+
+        case RRDHOST_INGEST_STATUS_ONLINE:
+            // currently collecting data
+            live = 1;
+            break;
+    }
+    aclk_host_state_update(host, live, 1);
+    return true;
+}
+
 void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 {
     ND_UUID node_id;
@@ -858,7 +881,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 
             node_instance_creation_t node_instance_creation = {
                 .claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL,
-                .hops = rrdhost_system_info_hops(host->system_info),
+                .hops = rrdhost_ingestion_hops(host),
                 .hostname = rrdhost_hostname(host),
                 .machine_guid = host->machine_guid};
 
@@ -869,7 +892,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
             create_query->data.bin_payload.msg_name = "CreateNodeInstance";
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "Registering host=%s, hops=%d", host->machine_guid,
-                   rrdhost_system_info_hops(host->system_info));
+                   rrdhost_ingestion_hops(host));
 
             aclk_execute_query(create_query);
             return;
@@ -878,7 +901,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 
     aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
     node_instance_connection_t node_state_update = {
-        .hops = rrdhost_system_info_hops(host->system_info),
+        .hops = rrdhost_ingestion_hops(host),
         .live = cmd,
         .queryable = queryable,
         .session_id = aclk_session_newarch
@@ -895,7 +918,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Queuing status update for node=%s, live=%d, hops=%d, queryable=%d",
            (char*)node_state_update.node_id, cmd,
-           rrdhost_system_info_hops(host->system_info), queryable);
+           rrdhost_ingestion_hops(host), queryable);
 
     freez((void*)node_state_update.node_id);
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
@@ -1067,7 +1090,7 @@ char *aclk_state(void)
             }
 
             buffer_sprintf(wb, "\tStreaming Hops: %d\n\tRelationship: %s",
-                           rrdhost_system_info_hops(host->system_info),
+                           rrdhost_ingestion_hops(host),
                            host == localhost ? "self" : "child");
 
             if (host != localhost)
@@ -1202,7 +1225,7 @@ char *aclk_state_json(void)
             json_object_object_add(nodeinstance, "node-id", tmp);
         }
 
-        tmp = json_object_new_int(rrdhost_system_info_hops(host->system_info));
+        tmp = json_object_new_int(rrdhost_ingestion_hops(host));
         json_object_object_add(nodeinstance, "streaming-hops", tmp);
 
         tmp = json_object_new_string(host == localhost ? "self" : "child");
