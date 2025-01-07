@@ -282,7 +282,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     RRDHOST *host = rrdhost_find_by_guid(res.machine_guid);
     if (likely(host)) {
         node_state_update.live = rrdhost_is_local(host) ? 1 : 0;
-        node_state_update.hops = rrdhost_system_info_hops(host->system_info);
+        node_state_update.hops = rrdhost_ingestion_hops(host);
         node_state_update.capabilities = aclk_get_node_instance_capas(host);
         schedule_node_state_update(host, 5000);
     }

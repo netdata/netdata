@@ -166,5 +166,7 @@ typedef struct rrdhost_status_t {
 } RRDHOST_STATUS;
 
 void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s);
+RRDHOST_INGEST_STATUS rrdhost_ingestion_status(RRDHOST *host);
+int16_t rrdhost_ingestion_hops(RRDHOST *host);
 
 #endif //NETDATA_RRDHOST_STATUS_H
