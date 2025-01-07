@@ -404,7 +404,7 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container9_state_restarting":                     0,
 				"container_container9_state_running":                        0,
 				"containers_health_status_healthy":                          3,
-				"containers_health_status_none":                             3,
+				"containers_health_status_none":                             4,
 				"containers_health_status_not_running_unhealthy":            6,
 				"containers_health_status_starting":                         3,
 				"containers_health_status_unhealthy":                        1,
@@ -644,7 +644,7 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container9_state_restarting":                     0,
 				"container_container9_state_running":                        0,
 				"containers_health_status_healthy":                          3,
-				"containers_health_status_none":                             3,
+				"containers_health_status_none":                             4,
 				"containers_health_status_not_running_unhealthy":            6,
 				"containers_health_status_starting":                         3,
 				"containers_health_status_unhealthy":                        1,
@@ -800,6 +800,9 @@ func (m *mockClient) ContainerList(_ context.Context, opts typesContainer.ListOp
 			{Names: []string{"container14"}, State: "dead", Image: "example/example:v4"},
 			{Names: []string{"container15"}, State: "dead", Image: "example/example:v4"},
 			{Names: []string{"container16"}, State: "dead", Image: "example/example:v4"},
+			{Names: []string{"container17"}, State: "dead", Image: "example/example:v4",
+				Labels: map[string]string{"netdata.cloud/ignore": "true"},
+			},
 		}
 	}
 
