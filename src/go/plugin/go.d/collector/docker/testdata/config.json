@@ -3,5 +3,6 @@
   "update_every": 123,
   "address": "ok",
   "timeout": 123.123,
+  "container_selector": "ok",
   "collect_container_size": true
 }

@@ -403,7 +403,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
         wanted_cache_size = referenced_size + dirty;
 
     // if we don't have enough clean pages, there is no reason to be aggressive or critical
-    if(wanted_cache_size < current_cache_size - clean)
+    if(wanted_cache_size < (current_cache_size - clean) && current_cache_size > clean)
         wanted_cache_size = current_cache_size - clean;
 
     if(cache->config.out_of_memory_protection_bytes) {
@@ -415,7 +415,10 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
             const uint64_t min_available = cache->config.out_of_memory_protection_bytes;
             if (sm.ram_available_bytes < min_available) {
                 // we must shrink
-                wanted_cache_size = current_cache_size - (min_available - sm.ram_available_bytes);
+                if(current_cache_size > (min_available - sm.ram_available_bytes))
+                    wanted_cache_size = current_cache_size - (min_available - sm.ram_available_bytes);
+                else
+                    wanted_cache_size = hot + dirty;
             }
             else if(cache->config.use_all_ram) {
                 // we can grow

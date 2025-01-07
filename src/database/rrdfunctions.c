@@ -296,7 +296,7 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
                            rrd_collector_running(rdcf->collector) ? "yes" : "no",
                            host->stream.rcv.status.tid, host->stream.snd.status.tid,
                            state_id, rdcf->rrdhost_state_id,
-                           rrdhost_system_info_hops(host->system_info)
+                           rrdhost_ingestion_hops(host)
                            );
 
                     dictionary_acquired_item_release(host->functions, *item);

@@ -33,7 +33,7 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
     RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, sd->context);
     if(!rca) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "RRDCONTEXT: context '%s' is not found in host '%s'",
+               "RRDCONTEXT: context '%s' is not found in host '%s' - not loading dimensions",
                sd->context, rrdhost_hostname(host));
         return;
     }
@@ -43,7 +43,7 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
     if(!ria) {
         rrdcontext_release(rca);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "RRDCONTEXT: instance '%s' of context '%s' is not found in host '%s'",
+               "RRDCONTEXT: instance '%s' of context '%s' is not found in host '%s' - not loading dimensions",
                sd->chart_id, sd->context, rrdhost_hostname(host));
         return;
     }
@@ -67,18 +67,13 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
 static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
     RRDHOST *host = data;
 
-    RRDCONTEXT tc = {
-            .id = string_strdupz(sc->context),
-            .title = string_strdupz(sc->title),
-            .units = string_strdupz(sc->units),
-            .family = string_strdupz(sc->family),
-            .priority = sc->priority,
-            .chart_type = sc->chart_type,
-            .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomics
-            .rrdhost = host,
-    };
-
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item(host->rrdctx.contexts, string2str(tc.id), &tc, sizeof(tc));
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, sc->context);
+    if(!rca) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "RRDCONTEXT: context '%s' is not found in host '%s' - not loadings instances",
+               sc->context, rrdhost_hostname(host));
+        return;
+    }
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     RRDINSTANCE tri = {
