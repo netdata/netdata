@@ -23,6 +23,12 @@
         "type": "number",
         "default": 2
       },
+      "container_selector": {
+        "title": "Container Selector",
+        "description": "[Pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to specify which containers to monitor. Leave empty to collect metrics for all containers.",
+        "type": "string",
+        "default": "*"
+      },
       "collect_container_size": {
         "title": "Collect container size",
         "description": "Collect container writable layer size.",

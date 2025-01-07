@@ -111,7 +111,7 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 			ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 			defer cancel()
 
-			v, err := c.client.ContainerList(ctx, typesContainer.ListOptions{
+			containers, err := c.client.ContainerList(ctx, typesContainer.ListOptions{
 				All:     true,
 				Filters: filters.NewArgs(filters.KeyValuePair{Key: "health", Value: status}),
 				Size:    c.CollectContainerSize,
@@ -119,7 +119,7 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 			if err != nil {
 				return err
 			}
-			containerSet[status] = v
+			containerSet[status] = containers
 			return nil
 
 		}(); err != nil {
@@ -153,6 +153,10 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 			}
 
 			name := strings.TrimPrefix(cntr.Names[0], "/")
+
+			if c.cntrSr != nil && !c.cntrSr.MatchString(name) {
+				continue
+			}
 
 			seen[name] = true
 
