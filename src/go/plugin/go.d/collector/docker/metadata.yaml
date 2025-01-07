@@ -74,7 +74,7 @@ modules:
               default_value: 2
               required: false
             - name: container_selector
-              description: [Pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to specify which containers to monitor.
+              description: "[Pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to specify which containers to monitor."
               default_value: "*"
               required: false
             - name: collect_container_size
