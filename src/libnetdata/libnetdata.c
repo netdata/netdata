@@ -410,13 +410,19 @@ void freez_int(void *ptr, const char *file, const char *function, size_t line) {
 
 char *strdupz(const char *s) {
     char *t = strdup(s);
-    if (unlikely(!t)) fatal("Cannot strdup() string '%s'", s);
+    if (unlikely(!t)) {
+        OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
+        fatal("Cannot strdup() string '%s' (system memory available bytes: %lu)", s, sm.ram_available_bytes);
+    }
     return t;
 }
 
 char *strndupz(const char *s, size_t len) {
     char *t = strndup(s, len);
-    if (unlikely(!t)) fatal("Cannot strndup() string '%s' of len %zu", s, len);
+    if (unlikely(!t)) {
+        OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
+        fatal("Cannot strndup() string '%s' of len %zu (system memory available bytes: %lu)", s, len, sm.ram_available_bytes);
+    }
     return t;
 }
 
@@ -427,19 +433,28 @@ void freez(void *ptr) {
 
 void *mallocz(size_t size) {
     void *p = malloc(size);
-    if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", size);
+    if (unlikely(!p)) {
+        OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
+        fatal("Cannot allocate %zu bytes of memory (system memory available bytes: %lu)", size, sm.ram_available_bytes);
+    }
     return p;
 }
 
 void *callocz(size_t nmemb, size_t size) {
     void *p = calloc(nmemb, size);
-    if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", nmemb * size);
+    if (unlikely(!p)) {
+        OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
+        fatal("Cannot allocate %zu bytes of memory (system memory available bytes: %lu)", nmemb * size, sm.ram_available_bytes);
+    }
     return p;
 }
 
 void *reallocz(void *ptr, size_t size) {
     void *p = realloc(ptr, size);
-    if (unlikely(!p)) fatal("Cannot re-allocate memory to %zu bytes.", size);
+    if (unlikely(!p)) {
+        OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
+        fatal("Cannot re-allocate memory to %zu bytes. (system memory available bytes: %lu)", size, sm.ram_available_bytes);
+    }
     return p;
 }
 
