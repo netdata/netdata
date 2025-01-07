@@ -158,7 +158,7 @@ static inline void substitute_dots_in_id(char *s) {
 // parse k8s labels
 
 #define CGROUP_NETDATA_CLOUD_LABEL_PREFIX "netdata.cloud/"
-#define CGROUP_RENAME_LABEL "name="
+#define CGROUP_RENAME_LABEL "cgroup.name="
 #define CGROUP_IGNORE_LABEL "ignore="
 
 static char *cgroup_parse_resolved_name_and_labels(struct cgroup *cg, char *data) {
@@ -182,22 +182,24 @@ static char *cgroup_parse_resolved_name_and_labels(struct cgroup *cg, char *data
 
             if(strncmp(key, CGROUP_RENAME_LABEL, sizeof(CGROUP_RENAME_LABEL) - 1) == 0) {
                 char *n = &key[sizeof(CGROUP_RENAME_LABEL) - 1];
+                size_t len = strlen(n);
+                if(n[0] == '"' && n[len - 1] == '"') {
+                    n[len - 1] = '\0';
+                    n++;
+                }
                 if(*n) name = n;
 
                 // no need to add this label
             }
             else if(strncmp(key, CGROUP_IGNORE_LABEL, sizeof(CGROUP_IGNORE_LABEL) - 1) == 0) {
                 char *v = &key[sizeof(CGROUP_IGNORE_LABEL) - 1];
-                if(strcasecmp(v, "true") == 0 || strcasecmp(v, "yes") == 0)
+                if(strcasecmp(v, "\"true\"") == 0 || strcasecmp(v, "\"yes\"") == 0)
                     ignored = true;
                 else
                     ignored = false;
 
                 // no need to add this label
             }
-            else
-                // add the label, without the "netdata.cloud/" prefix
-                rrdlabels_add_pair(cg->chart_labels, key, RRDLABEL_SRC_AUTO | RRDLABEL_SRC_K8S);
         }
         else
             // add the label as-is
