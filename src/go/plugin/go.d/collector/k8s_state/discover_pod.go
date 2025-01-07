@@ -4,6 +4,9 @@ package k8s_state
 
 import (
 	"context"
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 
@@ -96,6 +99,9 @@ func (d *podDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
 			if exists {
 				r.val = item
 			}
+			if pod, err := toPod(r); err == nil && hasIgnoreAnnotation(pod) {
+				return
+			}
 			send(ctx, in, r)
 		}()
 	}
@@ -103,4 +109,12 @@ func (d *podDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
 
 func podSource(namespace, name string) string {
 	return "k8s/pod/" + namespace + "/" + name
+}
+
+func hasIgnoreAnnotation(pod *corev1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	v := pod.Annotations["netdata.cloud/ignore"]
+	return strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
 }
