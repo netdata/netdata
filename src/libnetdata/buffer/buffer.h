@@ -11,6 +11,7 @@
 #define BUFFER_JSON_MAX_DEPTH 32 // max is 255
 
 extern const char hex_digits[16];
+extern const char hex_digits_lower[16];
 extern const char base64_digits[64];
 extern unsigned char hex_value_from_ascii[256];
 extern unsigned char base64_value_from_ascii[256];
