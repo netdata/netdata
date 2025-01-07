@@ -23,4 +23,7 @@ typedef struct {
 // The function to get current system memory:
 OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram);
 
+// Returns the last successfully reported os_system_memory() value.
+OS_SYSTEM_MEMORY os_last_reported_system_memory(void);
+
 #endif //NETDATA_OS_MEM_AVAILABLE_H

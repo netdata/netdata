@@ -2,6 +2,14 @@
 
 #include "libnetdata/libnetdata.h"
 
+static OS_SYSTEM_MEMORY os_system_memory_last = {
+    0, 0,
+};
+
+OS_SYSTEM_MEMORY os_last_reported_system_memory(void) {
+    return os_system_memory_last;
+}
+
 // Windows
 #if defined(OS_WINDOWS)
 #include <windows.h>
@@ -14,6 +22,7 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram __maybe_unused) {
     if (GlobalMemoryStatusEx(&statex)) {
         sm.ram_total_bytes = statex.ullTotalPhys;
         sm.ram_available_bytes = statex.ullAvailPhys;
+        os_system_memory_last = sm;
     }
 
     return sm;
@@ -56,10 +65,11 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram) {
         mach_port_deallocate(mach_task_self(), mach_port);
     }
 
-    return (OS_SYSTEM_MEMORY){
+    os_system_memory_last = {
         .ram_total_bytes = total_ram,
         .ram_available_bytes = ram_available,
     };
+    return os_system_memory_last;
 }
 #endif
 
@@ -119,6 +129,7 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v1(bool query_total_ram __maybe_
 
 done:
     sm.ram_available_bytes = sm.ram_total_bytes - (used - inactive);
+    os_system_memory_last = sm;
     return sm;
 
 failed:
@@ -184,6 +195,7 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v2(bool query_total_ram __maybe_
 
 done:
     sm.ram_available_bytes = sm.ram_total_bytes - (used - inactive);
+    os_system_memory_last = sm;
     return sm;
 
 failed:
@@ -224,6 +236,7 @@ OS_SYSTEM_MEMORY os_system_memory_meminfo(bool query_total_ram __maybe_unused) {
     }
 
     // we keep ff open to speed up the next calls
+    os_system_memory_last = sm;
     return sm;
 
 failed:
@@ -342,6 +355,7 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram) {
 
     sm.ram_available_bytes = (free_pages + inactive_pages) * page_size;
 
+    os_system_memory_last = sm;
     return sm;
 
 failed:
