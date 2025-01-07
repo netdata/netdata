@@ -65,7 +65,7 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram) {
         mach_port_deallocate(mach_task_self(), mach_port);
     }
 
-    os_system_memory_last = {
+    os_system_memory_last = (OS_SYSTEM_MEMORY){
         .ram_total_bytes = total_ram,
         .ram_available_bytes = ram_available,
     };
