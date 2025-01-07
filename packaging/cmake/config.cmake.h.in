@@ -75,6 +75,7 @@
 #cmakedefine HAVE_GETRANDOM
 #cmakedefine HAVE_SYSINFO
 
+#cmakedefine HAVE_LIBUNWIND
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE
 #cmakedefine HAVE_SCHED_GETSCHEDULER

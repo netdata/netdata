@@ -707,6 +707,12 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
         .logfmt = "alert_notification_timestamp",
         .annotator = timestamp_usec_annotator,
     },
+    [NDF_STACK_TRACE] = {
+        .journal = "ND_STACK_TRACE",
+        .eventlog = "StackTrace",
+        .logfmt = NULL,
+        .annotator = stack_trace_annotator,
+    },
 
     // put new items here
     // leave the request URL and the message last
