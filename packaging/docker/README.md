@@ -28,9 +28,6 @@ along with their descriptions.
 |       Component       |          Privileges           | Description                                                                                                              |
 |:---------------------:|:-----------------------------:|--------------------------------------------------------------------------------------------------------------------------|
 |    cgroups.plugin     |   host PID mode, SYS_ADMIN    | Container network interfaces monitoring. Map virtual interfaces in the system namespace to interfaces inside containers. |
-|      proc.plugin      |       host network mode, DAC_READ_SEARCH       | Host system networking stack monitoring and assorted host driver monitoring |
-| debugfs.plugin | DAC_READ_SEARCH | Host system driver monitoring |
-|      go.d.plugin      |       host network mode, NET_RAW       | Monitoring applications running on the host and inside containers.                                                       |
 |    local-listeners    | host network mode, SYS_PTRACE | Discovering local services/applications. Map open (listening) ports to running services/applications.                    |
 | network-viewer.plugin | host network mode, SYS_ADMIN  | Discovering all current network sockets and building a network-map.                                                      |
 
@@ -55,10 +52,9 @@ along with their descriptions.
 
 ### Recommended way
 
-Both methods create a [volume](https://docs.docker.com/storage/volumes/) for Netdata's configuration files
-_within the container_ at `/etc/netdata`.
-See the [configure section](#configure-agent-containers) for details. If you want to access the configuration files from
-your _host_ machine, see [host-editable configuration](#with-host-editable-configuration).
+The `docker run` and Docker Compose methods create a [volume](https://docs.docker.com/storage/volumes/) for Netdata's configuration files
+_within the container_ at `/etc/netdata`.  See the [configure section](#configure-agent-containers) for details. If you want to access the
+configuration files from your _host_ machine, see [host-editable configuration](#with-host-editable-configuration).
 
 <Tabs>
 <TabItem value="docker_run" label="docker run">
@@ -84,8 +80,6 @@ docker run -d --name=netdata \
   -v /var/log:/host/var/log:ro \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --restart unless-stopped \
-  --cap-add DAC_READ_SEARCH \
-  --cap-add NET_RAW \
   --cap-add SYS_ADMIN \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
@@ -110,8 +104,6 @@ services:
     network_mode: host
     restart: unless-stopped
     cap_add:
-      - DAC_READ_SEARCH
-      - NET_RAW
       - SYS_ADMIN
       - SYS_PTRACE
     security_opt:
@@ -158,8 +150,6 @@ Image=quay.io/netdata/netdata:edge
 AutoUpdate=registry
 PodmanArgs=--pid=host
 PodmanArgs=--security-opt apparmor=unconfined
-AddCapability=DAC_READ_SEARCH
-AddCapability=NET_RAW
 AddCapability=SYS_ADMIN
 AddCapability=SYS_PTRACE
 SeccompProfile=unconfined
@@ -326,8 +316,6 @@ docker run -d --name=netdata \
   -v /var/log:/host/var/log:ro \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --restart unless-stopped \
-  --cap-add DAC_READ_SEARCH \
-  --cap-add NET_RAW \
   --cap-add SYS_ADMIN \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
@@ -352,8 +340,6 @@ services:
     network_mode: host
     restart: unless-stopped
     cap_add:
-      - DAC_READ_SEARCH
-      - NET_RAW
       - SYS_ADMIN
       - SYS_PTRACE
     security_opt:

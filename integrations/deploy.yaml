@@ -255,8 +255,6 @@
             -v /var/log:/host/var/log:ro \
             -v /var/run/docker.sock:/var/run/docker.sock:ro \
             --restart unless-stopped \
-            --cap-add DAC_READ_SEARCH \
-            --cap-add NET_RAW \
             --cap-add SYS_ADMIN \
             --cap-add SYS_PTRACE \
             --security-opt apparmor=unconfined \
@@ -306,8 +304,6 @@
                 network_mode: host
                 restart: unless-stopped
                 cap_add:
-                  - DAC_READ_SEARCH
-                  - NET_RAW
                   - SYS_ADMIN
                   - SYS_PTRACE
                 security_opt:
@@ -346,8 +342,6 @@
                 network_mode: host
                 restart: unless-stopped
                 cap_add:
-                  - DAC_READ_SEARCH
-                  - NET_RAW
                   - SYS_ADMIN
                   - SYS_PTRACE
                 security_opt:
@@ -386,8 +380,6 @@
                 pid: host
                 network_mode: host
                 cap_add:
-                  - DAC_READ_SEARCH
-                  - NET_RAW
                   - SYS_ADMIN
                   - SYS_PTRACE
                 security_opt:
@@ -429,8 +421,6 @@
                 pid: host
                 network_mode: host
                 cap_add:
-                  - DAC_READ_SEARCH
-                  - NET_RAW
                   - SYS_ADMIN
                   - SYS_PTRACE
                 security_opt:
@@ -478,17 +468,12 @@
             AutoUpdate=registry
             PodmanArgs=--pid=host
             PodmanArgs=--security-opt apparmor=unconfined
-            AddCapability=DAC_READ_SEARCH
-            AddCapability=NET_RAW
             AddCapability=SYS_ADMIN
             AddCapability=SYS_PTRACE
             SeccompProfile=unconfined
             Network=host
             HostName=%l
             Timezone=local
-            Volume=netdataconfig:/etc/netdata
-            Volume=netdatalib:/var/lib/netdata
-            Volume=netdatacache:/var/cache/netdata
             Volume=/:/host/root:ro,rslave
             Volume=/etc/passwd:/host/etc/passwd:ro
             Volume=/etc/group:/host/etc/group:ro
@@ -505,12 +490,22 @@
             Environment=NETDATA_CLAIM_ROOMS={% $claim_rooms %}
             {% /if %}
 
+            Volume=%E/%N:/etc/netdata
+            Volume=%S/%N:/var/lib/netdata
+            Volume=%C/%N:/var/cache/netdata
+            Volume=%L/%N:/var/log/netdata
+
             [Service]
             Restart=always
             RestartSec=30
             TimeoutStopSec=150
             CPUSchedulingPolicy=batch
             OOMPolicy=kill
+
+            ConfigurationDirectory=%N
+            StateDirectory=%N
+            CacheDirectory=%N
+            LogsDirectory=%N
 
             [Install]
             WantedBy=default.target
@@ -527,17 +522,12 @@
             AutoUpdate=registry
             PodmanArgs=--pid=host
             PodmanArgs=--security-opt apparmor=unconfined
-            AddCapability=DAC_READ_SEARCH
-            AddCapability=NET_RAW
             AddCapability=SYS_ADMIN
             AddCapability=SYS_PTRACE
             SeccompProfile=unconfined
             Network=host
             HostName=%l
             Timezone=local
-            Volume=netdataconfig:/etc/netdata
-            Volume=netdatalib:/var/lib/netdata
-            Volume=netdatacache:/var/cache/netdata
             Volume=/:/host/root:ro,rslave
             Volume=/etc/passwd:/host/etc/passwd:ro
             Volume=/etc/group:/host/etc/group:ro
@@ -554,12 +544,22 @@
             Environment=NETDATA_CLAIM_ROOMS={% $claim_rooms %}
             {% /if %}
 
+            Volume=%E/%N:/etc/netdata
+            Volume=%S/%N:/var/lib/netdata
+            Volume=%C/%N:/var/cache/netdata
+            Volume=%L/%N:/var/log/netdata
+
             [Service]
             Restart=always
             RestartSec=30
             TimeoutStopSec=150
             CPUSchedulingPolicy=batch
             OOMPolicy=kill
+
+            ConfigurationDirectory=%N
+            StateDirectory=%N
+            CacheDirectory=%N
+            LogsDirectory=%N
 
             [Install]
             WantedBy=default.target
