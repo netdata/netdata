@@ -97,7 +97,7 @@ Emails are sent with `msmtp`, and you need a basic configuration for it to work.
     volumes:
       - /path/to/netdata-docker/msmtprc:/etc/msmtprc:ro
 ```
-3. Update your docker with `docker compose up -d`
+3. Update your docker with `docker compose up -d`.
 4. Enter the docker container with `docker exec -it netdata /bin/bash`.
 5. Follow the instructions [above](https://github.com/netdata/netdata/blob/master/src/health/notifications/email/README.md#file) on how to edit the config file with `edit-config`.
 
