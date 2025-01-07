@@ -419,7 +419,12 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         fprintf(stderr, "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
                 function, line, file);
         fflush(stderr);
+
+#ifdef ENABLE_SENTRY
+        abort();
+#else
         _exit(1);
+#endif
     }
 
     int saved_errno = errno;
