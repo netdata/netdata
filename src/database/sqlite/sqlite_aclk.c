@@ -333,11 +333,8 @@ static void node_update_timer_cb(uv_timer_t *handle)
     struct aclk_sync_cfg_t *ahc = handle->data;
     RRDHOST *host = ahc->host;
 
-    rrdhost_receiver_lock(host);
-    int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
-    rrdhost_receiver_unlock(host);
-    nd_log(NDLS_ACLK, NDLP_DEBUG,"Timer: Sending node update info for %s, LIVE = %d", rrdhost_hostname(host), live);
-    aclk_host_state_update(host, live, 1);
+    if(aclk_host_state_update_auto(host))
+        uv_timer_stop(&ahc->timer);
 }
 
 static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
@@ -426,19 +423,16 @@ static void aclk_synchronization(void *arg)
                                 uv_timer_stop(&ahc->timer);
 
                             ahc->timer.data = ahc;
-                            int rc = uv_timer_start(&ahc->timer, node_update_timer_cb, schedule_time, 0);
+                            int rc = uv_timer_start(&ahc->timer, node_update_timer_cb, schedule_time, 5000);
                             if (!rc)
                                 break; // Timer started, exit
                         }
                     }
 
                     // This is fallback if timer fails
-                    rrdhost_receiver_lock(host);
-                    int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
-                    rrdhost_receiver_unlock(host);
-                    aclk_host_state_update(host, live, 1);
-                    nd_log(NDLS_ACLK, NDLP_DEBUG,"Sending node update info for %s, LIVE = %d", rrdhost_hostname(host), live);
+                    aclk_host_state_update_auto(host);
                     break;
+
                 case ACLK_DATABASE_NODE_UNREGISTER:
                     sql_unregister_node(cmd.param[0]);
                     break;

@@ -833,6 +833,32 @@ exit:
     return NULL;
 }
 
+bool aclk_host_state_update_auto(RRDHOST *host) {
+    RRDHOST_STATUS status;
+    rrdhost_status(host, now_realtime_sec(), &status);
+    int live;
+
+    switch(status.ingest.status) {
+        case RRDHOST_INGEST_STATUS_ARCHIVED:
+        case RRDHOST_INGEST_STATUS_INITIALIZING:
+        case RRDHOST_INGEST_STATUS_OFFLINE:
+            live = 0;
+            break;
+
+        case RRDHOST_INGEST_STATUS_REPLICATING:
+            // receiving replication
+            // no need to send this to NC
+            return false;
+
+        case RRDHOST_INGEST_STATUS_ONLINE:
+            // currently collecting data
+            live = 1;
+            break;
+    }
+    aclk_host_state_update(host, live, 1);
+    return true;
+}
+
 void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 {
     ND_UUID node_id;

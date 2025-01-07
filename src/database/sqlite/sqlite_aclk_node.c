@@ -135,27 +135,23 @@ void aclk_check_node_info_and_collectors(void)
         if (!wc->node_info_send_time && !wc->node_collectors_send)
             continue;
 
-        bool replicating = false;
-
         if (unlikely(rrdhost_receiver_replicating_charts(host))) {
             internal_error(true, "ACLK SYNC: Host %s is still replicating in", rrdhost_hostname(host));
             replicating_rcv++;
             replicating_rcv_host = host->hostname;
-            replicating = true;
         }
 
         if (unlikely(rrdhost_sender_replicating_charts(host))) {
             internal_error(true, "ACLK SYNC: Host %s is still replicating out", rrdhost_hostname(host));
             replicating_snd++;
             replicating_snd_host = host->hostname;
-            replicating = true;
         }
 
 #ifdef REPLICATION_TRACKING
         replication_tracking_counters(host, &replay_counters);
 #endif
 
-        if(replicating)
+        if(replicating_rcv)
             continue;
 
         bool pp_queue_empty = !(host->rrdctx.pp_queue && dictionary_entries(host->rrdctx.pp_queue));
