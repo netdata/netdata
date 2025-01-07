@@ -1560,15 +1560,23 @@ int rrdlabels_unittest_sanitization() {
 
     // invalid UTF8 No 1
     const unsigned char invalid1[] = { 0xC3, 0x28, 'A', 'B', 0x0 };
-    errors += rrdlabels_unittest_sanitize_value((const char *)invalid1, "(AB");
+    errors += rrdlabels_unittest_sanitize_value((const char *)invalid1, "c3(AB");
 
     // invalid UTF8 No 2
     const unsigned char invalid2[] = { 'A', 'B', 0xC3, 0x28, 'C', 'D', 0x0 };
-    errors += rrdlabels_unittest_sanitize_value((const char *)invalid2, "AB (CD");
+    errors += rrdlabels_unittest_sanitize_value((const char *)invalid2, "ABc3(CD");
 
     // invalid UTF8 No 3
     const unsigned char invalid3[] = { 'A', 'B', 0xC3, 0x28, 0x0 };
-    errors += rrdlabels_unittest_sanitize_value((const char *)invalid3, "AB (");
+    errors += rrdlabels_unittest_sanitize_value((const char *)invalid3, "ABc3(");
+
+    // invalid UTF8 No 4
+    const unsigned char invalid4[] = "clewd修改\xe7\x89";
+    errors += rrdlabels_unittest_sanitize_value((const char *)invalid4, "clewd修改e789");
+
+    // invalid UTF8 No 5
+    const unsigned char invalid5[] = "app.clewd修改\xe7\x89_fd_open_limits";
+    errors += rrdlabels_unittest_sanitize_value((const char *)invalid5, "app.clewd修改e789_fd_open_limits");
 
     return errors;
 }

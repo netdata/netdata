@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
@@ -35,6 +36,7 @@ func New() *Collector {
 		Config: Config{
 			Address:              docker.DefaultDockerHost,
 			Timeout:              confopt.Duration(time.Second * 2),
+			ContainerSelector:    "*",
 			CollectContainerSize: false,
 		},
 
@@ -42,6 +44,7 @@ func New() *Collector {
 		newClient: func(cfg Config) (dockerClient, error) {
 			return docker.NewClientWithOpts(docker.WithHost(cfg.Address))
 		},
+		cntrSr:     matcher.TRUE(),
 		containers: make(map[string]bool),
 	}
 }
@@ -51,6 +54,7 @@ type Config struct {
 	UpdateEvery          int              `yaml:"update_every,omitempty" json:"update_every"`
 	Address              string           `yaml:"address" json:"address"`
 	Timeout              confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	ContainerSelector    string           `yaml:"container_selector,omitempty" json:"container_selector"`
 	CollectContainerSize bool             `yaml:"collect_container_size" json:"collect_container_size"`
 }
 
@@ -66,6 +70,7 @@ type (
 
 		verNegotiated bool
 		containers    map[string]bool
+		cntrSr        matcher.Matcher
 	}
 	dockerClient interface {
 		NegotiateAPIVersion(context.Context)
@@ -85,6 +90,14 @@ func (c *Collector) Init(context.Context) error {
 		c.Infof("using docker host from environment: %s ", addr)
 		c.Address = addr
 	}
+	if c.ContainerSelector != "" {
+		sr, err := matcher.NewSimplePatternsMatcher(c.ContainerSelector)
+		if err != nil {
+			return err
+		}
+		c.cntrSr = sr
+	}
+
 	return nil
 }
 
