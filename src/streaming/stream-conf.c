@@ -31,7 +31,7 @@ struct _stream_send stream_send = {
             [COMPRESSION_ALGORITHM_ZSTD]    = 3,    // 1 (faster)  - 22 (smaller)
             [COMPRESSION_ALGORITHM_LZ4]     = 1,    // 1 (smaller) -  9 (faster)
             [COMPRESSION_ALGORITHM_BROTLI]  = 3,    // 0 (faster)  - 11 (smaller)
-            [COMPRESSION_ALGORITHM_GZIP]    = 1,    // 1 (faster)  -  9 (smaller)
+            [COMPRESSION_ALGORITHM_GZIP]    = 3,    // 1 (faster)  -  9 (smaller)
         }
     },
 };
@@ -43,6 +43,25 @@ struct _stream_receive stream_receive = {
         .step = 600,
     }
 };
+
+void stream_conf_set_sender_compression_levels(ND_COMPRESSION_PROFILE profile) {
+    switch(profile) {
+        default:
+        case ND_COMPRESSION_DEFAULT:
+            stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD]      = 3;
+            stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4]       = 1;
+            stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI]    = 3;
+            stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP]      = 3;
+            break;
+
+        case ND_COMPRESSION_FASTEST:
+            stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD]      = 1;
+            stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4]       = 9;
+            stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI]    = 1;
+            stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP]      = 1;
+            break;
+    }
+}
 
 static void stream_conf_load_internal() {
     errno_clear();

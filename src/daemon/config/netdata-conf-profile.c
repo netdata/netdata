@@ -104,6 +104,7 @@ void nd_profile_setup(void) {
         nd_profile.update_every = 1;        // MUST BE 2
         nd_profile.malloc_arenas = 1;
         nd_profile.malloc_trim = 32 * 1024;
+        nd_profile.stream_sender_compression = ND_COMPRESSION_FASTEST;
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -119,6 +120,7 @@ void nd_profile_setup(void) {
         nd_profile.update_every = 1;
         nd_profile.malloc_arenas = os_get_system_cpus_cached(true);
         nd_profile.malloc_trim = 256 * 1024;
+        nd_profile.stream_sender_compression = ND_COMPRESSION_FASTEST;
         // web server threads = dynamic
         // aclk query threads = dynamic
         // backfill threads = dynamic
@@ -131,6 +133,7 @@ void nd_profile_setup(void) {
         nd_profile.update_every = 1;
         nd_profile.malloc_arenas = 1;
         nd_profile.malloc_trim = 32 * 1024;
+        nd_profile.stream_sender_compression = ND_COMPRESSION_DEFAULT;
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -143,6 +146,7 @@ void nd_profile_setup(void) {
         nd_profile.update_every = 1;
         nd_profile.malloc_arenas = 1;
         nd_profile.malloc_trim = 64 * 1024;
+        nd_profile.stream_sender_compression = ND_COMPRESSION_DEFAULT;
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -152,4 +156,5 @@ void nd_profile_setup(void) {
     }
 
     netdata_conf_glibc_malloc_initialize(nd_profile.malloc_arenas, nd_profile.malloc_trim);
+    stream_conf_set_sender_compression_levels(nd_profile.stream_sender_compression);
 }

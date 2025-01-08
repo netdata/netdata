@@ -5,7 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     ND_PROFILE_NONE = (0),
 
     // system profiles
@@ -17,6 +17,11 @@ typedef enum {
     // optional attributed to profiles
 
 } ND_PROFILE;
+
+typedef enum __attribute__((packed)) {
+    ND_COMPRESSION_DEFAULT = 0,
+    ND_COMPRESSION_FASTEST,
+} ND_COMPRESSION_PROFILE;
 
 #define ND_CONF_PROFILES_SYSTEM (ND_PROFILE_STANDALONE | ND_PROFILE_PARENT | ND_PROFILE_CHILD | ND_PROFILE_IOT)
 
@@ -47,6 +52,7 @@ struct nd_profile_t {
     time_t update_every;
     size_t malloc_arenas;
     size_t malloc_trim;
+    ND_COMPRESSION_PROFILE stream_sender_compression;
 };
 
 extern struct nd_profile_t nd_profile;
