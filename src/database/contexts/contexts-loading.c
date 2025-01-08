@@ -2,8 +2,8 @@
 
 #include "internal.h"
 
-static __thread size_t ignored_contexts_on_metrics = 0, ignored_contexts_on_instances = 0,
-                       ignored_instances_on_metrics = 0;
+static __thread size_t ignored_metrics = 0, ignored_instances = 0;
+static __thread size_t loaded_metrics = 0, loaded_instances = 0, loaded_contexts = 0;
 
 static void rrdinstance_load_clabel(SQL_CLABEL_DATA *sld, void *data) {
     RRDINSTANCE *ri = data;
@@ -18,7 +18,7 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
     RRDHOST *host = data;
     RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, sd->context);
     if(!rca) {
-        ignored_contexts_on_metrics++;
+        ignored_metrics++;
 //        nd_log(NDLS_DAEMON, NDLP_ERR,
 //               "RRDCONTEXT: context '%s' is not found in host '%s' - not loading dimensions",
 //               sd->context, rrdhost_hostname(host));
@@ -29,7 +29,7 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_get_and_acquire_item(rc->rrdinstances, sd->chart_id);
     if(!ria) {
         rrdcontext_release(rca);
-        ignored_instances_on_metrics++;
+        ignored_metrics++;
 //        nd_log(NDLS_DAEMON, NDLP_ERR,
 //               "RRDCONTEXT: instance '%s' of context '%s' is not found in host '%s' - not loading dimensions",
 //               sd->chart_id, sd->context, rrdhost_hostname(host));
@@ -50,6 +50,7 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
 
     rrdinstance_release(ria);
     rrdcontext_release(rca);
+    loaded_metrics++;
 }
 
 static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
@@ -57,7 +58,7 @@ static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
 
     RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, sc->context);
     if(!rca) {
-        ignored_contexts_on_instances++;
+        ignored_instances++;
 //        nd_log(NDLS_DAEMON, NDLP_ERR,
 //               "RRDCONTEXT: context '%s' is not found in host '%s' - not loadings instances",
 //               sc->context, rrdhost_hostname(host));
@@ -82,6 +83,7 @@ static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
 
     rrdinstance_release(ria);
     rrdcontext_release(rca);
+    loaded_instances++;
 }
 
 static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, void *data) {
@@ -98,6 +100,7 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
         .hub = *ctx_data,
     };
     dictionary_set(host->rrdctx.contexts, string2str(trc.id), &trc, sizeof(trc));
+    loaded_contexts++;
 }
 
 void rrdhost_load_rrdcontext_data(RRDHOST *host) {
@@ -107,22 +110,23 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     if (host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
         return;
 
-    ignored_contexts_on_metrics = 0;
-    ignored_contexts_on_instances = 0;
-    ignored_instances_on_metrics = 0;
+    ignored_metrics = 0;
+    ignored_instances = 0;
+    loaded_metrics = 0;
+    loaded_instances = 0;
+    loaded_contexts = 0;
 
     ctx_get_context_list(&host->host_id.uuid, rrdcontext_load_context_callback, host);
     ctx_get_chart_list(&host->host_id.uuid, rrdinstance_load_instance_callback, host);
     ctx_get_dimension_list(&host->host_id.uuid, rrdinstance_load_dimension_callback, host);
 
-    if(ignored_contexts_on_instances + ignored_contexts_on_metrics + ignored_instances_on_metrics)
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "RRDCONTEXT: metadata report for node '%s':"
-               " did not load %zu contexts and %zu instances while loading metrics, "
-               " and %zu contexts while loadings instances",
-               rrdhost_hostname(host),
-               ignored_contexts_on_metrics, ignored_instances_on_metrics,
-               ignored_contexts_on_instances);
+    nd_log(NDLS_DAEMON, ignored_metrics || ignored_instances ? NDLP_WARNING : NDLP_NOTICE,
+           "RRDCONTEXT: metadata for node '%s':"
+           " loaded %zu contexts, %zu instances, and %zu metrics,"
+           " ignored %zu instances and %zu metrics",
+           rrdhost_hostname(host),
+           loaded_contexts, loaded_instances, loaded_metrics,
+           ignored_instances, ignored_metrics);
 
     RRDCONTEXT *rc;
     dfe_start_read(host->rrdctx.contexts, rc) {
