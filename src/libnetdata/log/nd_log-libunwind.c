@@ -55,7 +55,7 @@ const char *stack_trace_annotator(struct log_field *lf __maybe_unused) {
 }
 
 #else
-bool stack_trace_annotator(struct log_field *lf __maybe_unused) {
+const char *stack_trace_annotator(struct log_field *lf __maybe_unused) {
     return "libunwind not available";
 }
 #endif
