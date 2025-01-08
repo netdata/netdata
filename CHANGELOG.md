@@ -2,11 +2,23 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.1.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.1.1...HEAD)
 
 **Merged pull requests:**
 
+- improvement\(go.d/k8sstate\): respect ignore annotation [\#19342](https://github.com/netdata/netdata/pull/19342) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d/docker\): respect ignore label [\#19341](https://github.com/netdata/netdata/pull/19341) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19340](https://github.com/netdata/netdata/pull/19340) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/docker\): fix syntax error in meta [\#19339](https://github.com/netdata/netdata/pull/19339) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d/docker\): add option to filter containers [\#19337](https://github.com/netdata/netdata/pull/19337) ([ilyam8](https://github.com/ilyam8))
+- Contexts Loading [\#19336](https://github.com/netdata/netdata/pull/19336) ([ktsaou](https://github.com/ktsaou))
+- convert invalid utf8 sequences to hex characters [\#19333](https://github.com/netdata/netdata/pull/19333) ([ktsaou](https://github.com/ktsaou))
+- build\(deps\): bump golang.org/x/net from 0.33.0 to 0.34.0 in /src/go [\#19330](https://github.com/netdata/netdata/pull/19330) ([dependabot[bot]](https://github.com/apps/dependabot))
+- FD Leaks Fix [\#19327](https://github.com/netdata/netdata/pull/19327) ([ktsaou](https://github.com/ktsaou))
+- fix\(kickstart.sh\): correct wrong function name in perpare\_offline\_install [\#19323](https://github.com/netdata/netdata/pull/19323) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/vmware/govmomi from 0.46.3 to 0.47.0 in /src/go [\#19322](https://github.com/netdata/netdata/pull/19322) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fix\(cgroup-rename\): prevent leading comma in Docker LABELS when IMAGE empty [\#19318](https://github.com/netdata/netdata/pull/19318) ([ilyam8](https://github.com/ilyam8))
+- CGROUP labels [\#19316](https://github.com/netdata/netdata/pull/19316) ([ktsaou](https://github.com/ktsaou))
 - feat\(cgroup-name.sh\): Add support for `netdata.cloud/*` container labels [\#19315](https://github.com/netdata/netdata/pull/19315) ([ilyam8](https://github.com/ilyam8))
 - Locks Improvements [\#19314](https://github.com/netdata/netdata/pull/19314) ([ktsaou](https://github.com/ktsaou))
 - add yugabytedb docker manager [\#19313](https://github.com/netdata/netdata/pull/19313) ([ilyam8](https://github.com/ilyam8))
@@ -26,6 +38,7 @@
 - nd\_poll\(\) fairness [\#19298](https://github.com/netdata/netdata/pull/19298) ([ktsaou](https://github.com/ktsaou))
 - more descriptive alert transition logs [\#19297](https://github.com/netdata/netdata/pull/19297) ([ktsaou](https://github.com/ktsaou))
 - fix\(debugfs/sensors\): correct driver label value [\#19294](https://github.com/netdata/netdata/pull/19294) ([ilyam8](https://github.com/ilyam8))
+- fix\(netdata-updater.sh\): use explicit paths for temp dir creation [\#19293](https://github.com/netdata/netdata/pull/19293) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): add bison and flex [\#19292](https://github.com/netdata/netdata/pull/19292) ([ilyam8](https://github.com/ilyam8))
 - remove go.d/windows [\#19290](https://github.com/netdata/netdata/pull/19290) ([ilyam8](https://github.com/ilyam8))
 - fix\(netdata-updater.sh\): ensure tmpdir-path argument is always passed [\#19289](https://github.com/netdata/netdata/pull/19289) ([ilyam8](https://github.com/ilyam8))
@@ -64,6 +77,10 @@
 - feat\(go.d\): add  NATS collector [\#19252](https://github.com/netdata/netdata/pull/19252) ([ilyam8](https://github.com/ilyam8))
 - Monitor sensors using libsensors via debugfs.plugin [\#19251](https://github.com/netdata/netdata/pull/19251) ([ktsaou](https://github.com/ktsaou))
 - DBENGINE: pgc tuning, replication tuning [\#19237](https://github.com/netdata/netdata/pull/19237) ([ktsaou](https://github.com/ktsaou))
+
+## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.1.0...v2.1.1)
 
 ## [v2.1.0](https://github.com/netdata/netdata/tree/v2.1.0) (2024-12-19)
 
@@ -295,7 +312,6 @@
 - Balance streaming parents [\#18945](https://github.com/netdata/netdata/pull/18945) ([ktsaou](https://github.com/ktsaou))
 - added /api/v3/stream\_path [\#18943](https://github.com/netdata/netdata/pull/18943) ([ktsaou](https://github.com/ktsaou))
 - Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
-- IIS Metadata [\#18765](https://github.com/netdata/netdata/pull/18765) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
@@ -452,17 +468,6 @@
 - Windows Network Interfaces Charts and Alerts [\#18785](https://github.com/netdata/netdata/pull/18785) ([ktsaou](https://github.com/ktsaou))
 - Document ML enabled `auto` [\#18784](https://github.com/netdata/netdata/pull/18784) ([stelfrag](https://github.com/stelfrag))
 - Bump github.com/redis/go-redis/v9 from 9.6.1 to 9.6.2 in /src/go [\#18783](https://github.com/netdata/netdata/pull/18783) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Update README.md, fix a typo [\#18781](https://github.com/netdata/netdata/pull/18781) ([NicholasWilsonDEV](https://github.com/NicholasWilsonDEV))
-- fix\(go.d/apcupsd\): fix ups\_load value divided by 100 [\#18780](https://github.com/netdata/netdata/pull/18780) ([ilyam8](https://github.com/ilyam8))
-- unify claiming response json [\#18777](https://github.com/netdata/netdata/pull/18777) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d/sd/netlisteners\): fix exec deadline exceeded check [\#18774](https://github.com/netdata/netdata/pull/18774) ([ilyam8](https://github.com/ilyam8))
-- Sqlite upgrade to version 3.46.1 [\#18772](https://github.com/netdata/netdata/pull/18772) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#18771](https://github.com/netdata/netdata/pull/18771) ([netdatabot](https://github.com/netdatabot))
-- Bump github.com/bmatcuk/doublestar/v4 from 4.6.1 to 4.7.1 in /src/go [\#18768](https://github.com/netdata/netdata/pull/18768) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/sijms/go-ora/v2 from 2.8.20 to 2.8.22 in /src/go [\#18767](https://github.com/netdata/netdata/pull/18767) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/vmware/govmomi from 0.43.0 to 0.44.1 in /src/go [\#18766](https://github.com/netdata/netdata/pull/18766) ([dependabot[bot]](https://github.com/apps/dependabot))
-- SPAWN SERVER: close all open fds on callback [\#18764](https://github.com/netdata/netdata/pull/18764) ([ktsaou](https://github.com/ktsaou))
-- Adjust option \(Windows claim\) [\#18763](https://github.com/netdata/netdata/pull/18763) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
