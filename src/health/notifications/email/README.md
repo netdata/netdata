@@ -88,7 +88,6 @@ DEFAULT_RECIPIENT_EMAIL="recipient@example.com"
 
 ```
 
-
 ## Troubleshooting
 
 ### Test Notification
