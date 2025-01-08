@@ -95,8 +95,8 @@ void pulse_daemon_memory_do(bool extended) {
             netdata_buffers_statistics.buffers_web +
                          replication_sender_allocated_buffers() + aral_by_size_free_bytes() + judy_aral_free_bytes();
 
-        int sqlite3_memory_used_current = 0, sqlite3_memory_used_highwater = 0;
-        sqlite3_status(SQLITE_STATUS_MEMORY_USED, &sqlite3_memory_used_current, &sqlite3_memory_used_highwater, 1);
+        sqlite3_int64 sqlite3_memory_used_current = 0, sqlite3_memory_used_highwater = 0;
+        sqlite3_status64(SQLITE_STATUS_MEMORY_USED, &sqlite3_memory_used_current, &sqlite3_memory_used_highwater, 1);
 
         size_t strings_memory = 0, strings_index = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings_memory, &strings_index, NULL, NULL);
