@@ -393,15 +393,10 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     else
         wanted_cache_size = hot + dirty + index + cache->config.clean_size;
 
-    // protection against huge queries
-    // if huge queries are running, or huge amounts need to be saved
-    // allow the cache to grow more (hot pages in the main cache are also referenced)
-    if(unlikely(wanted_cache_size < referenced_size + dirty))
-        wanted_cache_size = referenced_size + dirty;
-
-    // if we don't have enough clean pages, there is no reason to be aggressive or critical
-    if(wanted_cache_size < (current_cache_size - clean) && current_cache_size > clean)
-        wanted_cache_size = current_cache_size - clean;
+    // calculate the absolute minimum we can go
+    const uint64_t min_cache_size1 = (referenced_size > hot ? referenced_size : hot) + dirty + index;
+    const uint64_t min_cache_size2 = (current_cache_size > clean) ? current_cache_size - clean : min_cache_size1;
+    const uint64_t min_cache_size = MAX(min_cache_size1, min_cache_size2);
 
     if(cache->config.out_of_memory_protection_bytes) {
         // out of memory protection
@@ -412,10 +407,12 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
             const uint64_t min_available = cache->config.out_of_memory_protection_bytes;
             if (sm.ram_available_bytes < min_available) {
                 // we must shrink
-                if(current_cache_size > (min_available - sm.ram_available_bytes))
-                    wanted_cache_size = current_cache_size - (min_available - sm.ram_available_bytes);
+                uint64_t must_lose = min_available - sm.ram_available_bytes;
+
+                if(current_cache_size > must_lose)
+                    wanted_cache_size = current_cache_size - must_lose;
                 else
-                    wanted_cache_size = hot + dirty;
+                    wanted_cache_size = min_cache_size;
             }
             else if(cache->config.use_all_ram) {
                 // we can grow
@@ -423,6 +420,10 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
             }
         }
     }
+
+    // never go below our minimum
+    if(unlikely(wanted_cache_size < min_cache_size))
+        wanted_cache_size = min_cache_size;
 
     const size_t per1000 = (size_t)(current_cache_size * 1000ULL / wanted_cache_size);
     __atomic_store_n(&cache->usage.per1000, per1000, __ATOMIC_RELAXED);

@@ -186,6 +186,39 @@ void pulse_daemon_memory_do(bool extended) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
+    OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
+    if (sm.ram_total_bytes) {
+        static RRDSET *st_memory_available = NULL;
+        static RRDDIM *rd_available = NULL;
+
+        if (unlikely(!st_memory_available)) {
+            st_memory_available = rrdset_create_localhost(
+                "netdata",
+                "out_of_memory_protection",
+                NULL,
+                "Memory Usage",
+                NULL,
+                "Out of Memory Protection",
+                "bytes",
+                "netdata",
+                "pulse",
+                130102,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_AREA);
+
+            rd_available = rrddim_add(st_memory_available, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        // the sum of all these needs to be above at the total buffers calculation
+        rrddim_set_by_pointer(
+            st_memory_available, rd_available,
+            (collected_number)sm.ram_available_bytes);
+
+        rrdset_done(st_memory_available);
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------
+
     if(!extended)
         return;
 
@@ -220,7 +253,7 @@ void pulse_daemon_memory_do(bool extended) {
                 "bytes",
                 "netdata",
                 "pulse",
-                130101,
+                130103,
                 localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 
