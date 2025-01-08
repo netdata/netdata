@@ -126,11 +126,6 @@ safe_pidof() {
 }
 
 issystemd() {
-  # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
-  if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
-    return 1
-  fi
-
   # if there is no systemctl command, it is not systemd
   systemctl=$(command -v systemctl 2> /dev/null)
   if [ -z "${systemctl}" ] || [ ! -x "${systemctl}" ]; then
@@ -144,15 +139,18 @@ issystemd() {
   # anything else, it is systemd.
   #
   # This may return a non-zero exit status in cases when it actually
-  # succeeded for our purposes, so we need to toggle set -e off here.
+  # succeeded for our purposes (notably, if the state is `degraded`),
+  # so we need to toggle set -e off here.
   set +e
-  case "$(systemctl is-system-running)" in
+  systemd_state="$(systemctl is-system-running)"
+  set -e
+
+  case "${systemd_state}" in
     offline) return 1 ;;
     unknown) : ;;
     "") : ;;
     *) return 0 ;;
   esac
-  set -e
 
   # if pid 1 is systemd, it is systemd
   [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && return 0
