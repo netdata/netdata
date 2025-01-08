@@ -184,7 +184,6 @@ sqlite3 *db_meta = NULL;
 
 enum metadata_opcode {
     METADATA_DATABASE_NOOP = 0,
-    METADATA_DATABASE_TIMER,
     METADATA_DEL_DIMENSION,
     METADATA_STORE_CLAIM_ID,
     METADATA_ADD_HOST_INFO,
@@ -1542,10 +1541,106 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
    }
 }
 
+
+#define SQL_SELECT_HOST_CTX_CHART_DIM_LIST                                                                             \
+    "SELECT d.dim_id FROM chart c, dimension d WHERE c.chart_id = d.chart_id AND c.rowid = @rowid"
+
+static void clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id, size_t *checked, size_t *deleted)
+{
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_CTX_CHART_DIM_LIST, res))
+            return;
+    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, chart_row_id));
+    param = 0;
+
+    while (sqlite3_step_monitored(*res) == SQLITE_ROW) {
+
+        if (sqlite3_column_bytes(*res, 0) != sizeof(nd_uuid_t))
+            continue;
+
+        nd_uuid_t *dim_id = (nd_uuid_t *)sqlite3_column_blob(*res, 0);
+
+        if (dimension_can_be_deleted(dim_id, NULL, false)) {
+            delete_dimension_uuid(dim_id, NULL, false);
+            (*deleted)++;
+        }
+        (*checked)++;
+    }
+done:
+
+    REPORT_BIND_FAIL(*res, param);
+    SQLITE_RESET(*res);
+}
+
+#define SQL_SELECT_HOST_CTX_CHART_LIST "SELECT rowid, context FROM chart WHERE host_id = @host"
+
+static void cleanup_host_context_metadata(Pvoid_t CTX_JudyL, void *data)
+{
+    if (!CTX_JudyL || !data)
+        return;
+
+    RRDHOST *host = data;
+
+    sqlite3_stmt *res = NULL;
+    sqlite3_stmt *dimension_res = NULL;
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_CTX_CHART_LIST, &res))
+        return;
+
+    Word_t num_of_contexts = JudyLCount(CTX_JudyL, 0, -1, PJE0);
+
+    nd_log_daemon(NDLP_DEBUG, "Verifying the retention of %zu contexts for host %s", num_of_contexts, rrdhost_hostname(host));
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+
+    param = 0;
+    Pvoid_t *Pvalue;
+    int64_t chart_row_id;
+
+    size_t deleted = 0;
+    size_t checked = 0;
+
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        chart_row_id = sqlite3_column_int64(res, 0);
+        const char *context = (char *)sqlite3_column_text(res, 1);
+        STRING *ctx = string_strdupz(context);
+        Pvalue = JudyLGet(CTX_JudyL, (Word_t)ctx, PJE0);
+        if (Pvalue)
+            clean_host_chart_dimensions(&dimension_res, chart_row_id, &checked, &deleted);
+        string_freez(ctx);
+    }
+
+    nd_log_daemon(
+        NDLP_DEBUG,
+        "Verified the contexts of host %s (Checked %zu metrics and removed %zu)",
+        rrdhost_hostname(host),
+        checked,
+        deleted);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+}
+
 void run_metadata_cleanup(struct metadata_wc *wc)
 {
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
        return;
+
+    // CLEANUP hosts
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host) {
+        ctx_get_context_list_to_cleanup(&host->host_id.uuid, cleanup_host_context_metadata, host);
+        if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
+            break;
+    }
+    dfe_done(host);
+
+    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
+        return;
 
     check_dimension_metadata(wc);
     check_chart_metadata(wc);
@@ -1956,7 +2051,7 @@ static void do_chart_label_cleanup(struct judy_list_t *cl_cleanup_data)
 }
 
 // Worker thread to scan hosts for pending metadata to store
-static void start_metadata_hosts(uv_work_t *req __maybe_unused)
+static void start_metadata_hosts(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
@@ -2072,7 +2167,6 @@ static void metadata_event_loop(void *arg)
 {
     worker_register("METASYNC");
     worker_register_job_name(METADATA_DATABASE_NOOP,        "noop");
-    worker_register_job_name(METADATA_DATABASE_TIMER,       "timer");
     worker_register_job_name(METADATA_DEL_DIMENSION,        "delete dimension");
     worker_register_job_name(METADATA_STORE_CLAIM_ID,       "add claim id");
     worker_register_job_name(METADATA_ADD_HOST_INFO,        "add host info");
@@ -2130,7 +2224,6 @@ static void metadata_event_loop(void *arg)
         nd_uuid_t  *uuid;
         RRDHOST *host = NULL;
         ALARM_ENTRY *ae = NULL;
-//        struct aclk_sync_cfg_t *host_aclk_sync;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -2156,7 +2249,6 @@ static void metadata_event_loop(void *arg)
 
             switch (opcode) {
                 case METADATA_DATABASE_NOOP:
-                case METADATA_DATABASE_TIMER:
                     break;
                 case METADATA_DEL_DIMENSION:
                     uuid = (nd_uuid_t *) cmd.param[0];
