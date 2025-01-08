@@ -5,26 +5,24 @@
 #ifdef HAVE_LIBUNWIND
 #include <libunwind.h>
 
-const char *stack_trace_annotator(struct log_field *lf __maybe_unused) {
-    static __thread char stack[4096];
+bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
     static __thread bool in_stack_trace = false;
 
-    // prevent recursion
+    // Prevent recursion
     if(in_stack_trace)
-        return "stack trace recursion detected";
+        return buffer_strcat(wb, "stack trace recursion detected"), true;
 
     in_stack_trace = true;
 
     unw_cursor_t cursor;
     unw_context_t context;
-    char *d = stack;
     size_t frames = 0;
 
     // Initialize context for current thread
     unw_getcontext(&context);
     unw_init_local(&cursor, &context);
 
-    // Skip first 3 frames (our annotator and the logging infrastructure)
+    // Skip first 3 frames (our logging infrastructure)
     unw_step(&cursor);
     unw_step(&cursor);
     unw_step(&cursor);
@@ -39,23 +37,25 @@ const char *stack_trace_annotator(struct log_field *lf __maybe_unused) {
 
         const char *name = sym;
         if (unw_get_proc_name(&cursor, sym, sizeof(sym), &offset) == 0) {
-            if(frames++)
-                d += snprintfz(d, sizeof(stack) - (d - stack), "\n");
-            d += snprintfz(d, sizeof(stack) - (d - stack), "%s+0x%lx", name, (unsigned long)offset);
+            if(frames++) buffer_strcat(wb, "\n");
+            buffer_sprintf(wb, "%s+0x%lx", name, (unsigned long)offset);
         }
         else {
             if(frames++)
-                d += snprintfz(d, sizeof(stack) - (d - stack), "\n");
-            d += snprintfz(d, sizeof(stack) - (d - stack), "<unknown>");
+                buffer_strcat(wb, "\n");
+            buffer_strcat(wb, "<unknown>");
         }
     }
 
     in_stack_trace = false;
-    return stack;
+    return true;
 }
 
-#else
-const char *stack_trace_annotator(struct log_field *lf __maybe_unused) {
-    return "libunwind not available";
+#else // !HAVE_LIBUNWIND
+
+bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
+    buffer_strcat(wb, "libunwind not available");
+    return true;
 }
+
 #endif

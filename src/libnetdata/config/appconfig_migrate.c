@@ -33,10 +33,10 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sect_old->values, opt_old, prev, next);
 
-    nd_log(NDLS_DAEMON, NDLP_WARNING,
-           "CONFIG: option '[%s].%s' has been migrated to '[%s].%s'.",
-           section_old, name_old,
-           section_new, name_new);
+//    nd_log(NDLS_DAEMON, NDLP_WARNING,
+//           "CONFIG: option '[%s].%s' has been migrated to '[%s].%s'.",
+//           section_old, name_old,
+//           section_new, name_new);
 
     if(!opt_old->migrated.name) {
         string_freez(opt_old->migrated.section);
