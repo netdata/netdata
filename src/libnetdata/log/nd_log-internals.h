@@ -195,6 +195,7 @@ struct log_field;
 const char *errno_annotator(struct log_field *lf);
 const char *priority_annotator(struct log_field *lf);
 const char *timestamp_usec_annotator(struct log_field *lf);
+const char *stack_trace_annotator(struct log_field *lf);
 
 #if defined(OS_WINDOWS)
 const char *winerror_annotator(struct log_field *lf);

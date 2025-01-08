@@ -957,6 +957,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/benchmark.h
         src/libnetdata/locks/benchmark-rw.c
         src/libnetdata/locks/benchmark-rw.h
+        src/libnetdata/log/nd_log-libunwind.c
 )
 
 set(LIBH2O_FILES
@@ -2091,6 +2092,25 @@ target_link_libraries(libnetdata PUBLIC judy)
 netdata_add_jsonc_to_target(libnetdata)
 
 netdata_add_libyaml_to_target(libnetdata)
+
+# libunwind
+pkg_check_modules(LIBUNWIND libunwind IMPORTED_TARGET)
+if(TARGET PkgConfig::LIBUNWIND)
+    set(HAVE_LIBUNWIND On)
+
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
+        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-x86_64)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-aarch64)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-arm)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "powerpc|ppc")
+        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-ppc64)
+    else()
+        message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR} for libunwind. Stack traces may not work.")
+        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND)
+    endif()
+endif()
 
 # zlib
 if(OS_MACOS)
