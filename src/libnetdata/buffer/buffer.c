@@ -331,6 +331,7 @@ void buffer_json_finalize(BUFFER *wb) {
 // ----------------------------------------------------------------------------
 
 const char hex_digits[16] = "0123456789ABCDEF";
+const char hex_digits_lower[16] = "0123456789abcdef";
 const char base64_digits[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 unsigned char hex_value_from_ascii[256];
 unsigned char base64_value_from_ascii[256];

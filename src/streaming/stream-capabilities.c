@@ -114,6 +114,12 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             disabled_capabilities |= host->sender->disabled_capabilities;
     }
 
+//    if(sender) {
+//        if(nd_profile.stream_sender_compression == ND_COMPRESSION_FASTEST)
+//            // lz4 or nothing
+//            disabled_capabilities |= (STREAM_CAP_COMPRESSIONS_AVAILABLE & ~(STREAM_CAP_LZ4_AVAILABLE));
+//    }
+
     return (STREAM_CAP_V1 |
             STREAM_CAP_V2 |
             STREAM_CAP_VN |

@@ -763,7 +763,7 @@ done:
     "SELECT SUM(version) FROM health_log hl, alert_version av"                                                         \
     " WHERE hl.host_id = @host_uuid AND hl.health_log_id = av.health_log_id AND av.status <> -2"
 
-static uint64_t calculate_node_alert_version(RRDHOST *host)
+uint64_t calculate_node_alert_version(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
 

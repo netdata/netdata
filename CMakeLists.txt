@@ -1455,6 +1455,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrd-database-mode.c
         src/database/rrdhost-system-info.c
         src/database/rrdhost-system-info.h
+        src/database/contexts/contexts-loading.c
 )
 
 if(ENABLE_DBENGINE)

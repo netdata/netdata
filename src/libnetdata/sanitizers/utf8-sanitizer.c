@@ -31,32 +31,55 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
     while(*src && d < end) {
         unsigned char c = *src;
 
-        if(IS_UTF8_STARTBYTE(c) && IS_UTF8_BYTE(src[1]) && d + 2 <= end) {
-            // UTF-8 multi-byte encoded character
+        if(IS_UTF8_STARTBYTE(c)) {
+            size_t utf8_character_bytes = 1;
+            bool valid_sequence = true;
 
-            // find how big this character is (2-4 bytes)
-            size_t utf_character_size = 2;
-            while(utf_character_size < 4 &&
-                    d + utf_character_size <= end &&
-                    IS_UTF8_BYTE(src[utf_character_size]) &&
-                    !IS_UTF8_STARTBYTE(src[utf_character_size]))
-                utf_character_size++;
+            // Determine expected sequence length based on start byte
+            if((c & 0xE0) == 0xC0) utf8_character_bytes = 2;      // 2-byte sequence
+            else if((c & 0xF0) == 0xE0) utf8_character_bytes = 3; // 3-byte sequence
+            else if((c & 0xF8) == 0xF0) utf8_character_bytes = 4; // 4-byte sequence
+
+            if(utf8_character_bytes == 1)
+                valid_sequence = false;
+            else {
+                // make sure all the characters are valid
+                for(size_t i = 1; i < utf8_character_bytes; i++) {
+                    if(!IS_UTF8_BYTE(src[i]) || IS_UTF8_STARTBYTE(src[i])) {
+                        valid_sequence = false;
+                        break;
+                    }
+                }
+            }
 
             if(utf) {
-                while(utf_character_size) {
-                    utf_character_size--;
-                    *d++ = *src++;
+                if (valid_sequence && d + utf8_character_bytes <= end) {
+                    // it is a valid utf8 character, and we have room at the destination
+                    for (size_t i = 0; i < utf8_character_bytes; i++)
+                        *d++ = *src++;
+                }
+                else {
+                    *d++ = hex_digits_lower[(*src & 0xF0) >> 4];
+                    if(d <= end) *d++ = hex_digits_lower[(*src & 0x0F)];
+
+                    src++;
+
+                    while(IS_UTF8_BYTE(*src) && !IS_UTF8_STARTBYTE(*src) && d <= end) {
+                        *d++ = hex_digits_lower[(*src & 0xF0) >> 4];
+                        if(d <= end) *d++ = hex_digits_lower[(*src & 0x0F)];
+                        src++;
+                    }
                 }
             }
             else {
-                // UTF-8 characters are not allowed.
-                // Assume it is an underscore
-                // and skip all except the first byte
-                *d++ = '_';
-                src += (utf_character_size - 1);
-            }
+                *d++ = '_'; // this fits, we tested in the while() above
 
-            last_is_space = 0;
+                src++; // skip the utf8 start byte
+                // and skip the rest too
+                while(IS_UTF8_BYTE(*src) && !IS_UTF8_STARTBYTE(*src))
+                    src++;
+            }
+            last_is_space = false;
             mblen++;
             continue;
         }
