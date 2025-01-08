@@ -8,6 +8,25 @@
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static void stream_receiver_connected_msg(RRDHOST *host, char *dst, size_t len) {
+    time_t now = now_realtime_sec();
+    time_t last_db_entry = 0;
+    rrdhost_retention(host, now, false, NULL, &last_db_entry);
+
+    if(now < last_db_entry)
+        last_db_entry = now;
+
+    if(!last_db_entry)
+        strncpyz(dst, "connected and ready to receive data, new node", len - 1);
+    else if(last_db_entry == now)
+        strncpyz(dst, "connected and ready to receive data, last sample in the db just now", len - 1);
+    else {
+        char buf[128];
+        duration_snprintf(buf, sizeof(buf), now - last_db_entry, "s", true);
+        snprintfz(dst, len, "connected and ready to receive data, last sample in the db %s ago", buf);
+    }
+}
+
 void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority) {
     // this function may be called BEFORE we spawn the receiver thread
     // so, we need to add the fields again (it does not harm)
@@ -28,7 +47,8 @@ void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, con
 
     nd_log(NDLS_DAEMON, priority, "STREAM RCV '%s' [from [%s]:%s]: %s %s%s%s"
            , (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""
-           , rpt->remote_ip, rpt->remote_port, msg
+           , rpt->remote_ip, rpt->remote_port
+           , msg
            , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?" (":""
            , stream_handshake_error_to_string(rpt->exit.reason)
            , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?")":""
@@ -171,6 +191,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             return false;
         }
 
+        // this is not needed since we now have a waiting list for nodes
 //        if (unlikely(!stream_control_children_should_be_accepted())) {
 //            stream_receiver_log_status(
 //                rpt,
@@ -656,9 +677,10 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(stream_receiver_send_first_response(rpt)) {
         // we are the receiver of the node
 
+        char msg[256];
+        stream_receiver_connected_msg(rpt->host, msg, sizeof(msg));
         stream_receiver_log_status(
-            rpt,
-            "connected and ready to receive data",
+            rpt, msg,
             STREAM_STATUS_CONNECTED, NDLP_INFO);
 
         // in case we have cloud connection we inform cloud a new child connected
