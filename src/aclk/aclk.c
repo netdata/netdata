@@ -1124,6 +1124,8 @@ static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 
     tmp = json_object_new_int(wc->snapshot_count);
     json_object_object_add(obj, "alert-snapshot-count", tmp);
+    tmp = json_object_new_int64(calculate_node_alert_version(wc->host));
+    json_object_object_add(obj, "alert-version", tmp);
 }
 
 static json_object *timestamp_to_json(const time_t *t)

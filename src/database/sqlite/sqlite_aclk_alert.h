@@ -14,5 +14,6 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused);
 void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, char *snapshot_uuid);
 bool process_alert_pending_queue(RRDHOST *host);
 void aclk_push_alert_events_for_all_hosts(void);
+uint64_t calculate_node_alert_version(RRDHOST *host);
 
 #endif //NETDATA_SQLITE_ACLK_ALERT_H
