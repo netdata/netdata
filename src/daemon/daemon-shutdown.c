@@ -144,7 +144,8 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     netdata_exit = 1;
 
 #ifdef ENABLE_SYSTEMD_NOTIFY
-    notify_stopping();
+    // FIXME: This should be calculated dynamically instead of hard-coded.
+    notify_stopping(150000000);
 #endif
 
 #ifdef ENABLE_DBENGINE

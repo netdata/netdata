@@ -723,6 +723,11 @@ int netdata_main(int argc, char **argv) {
         }
     }
 
+#ifdef ENABLE_SYSTEMD_NOTIFY
+    // FIXME: This should be computed dynamically and updated later on during startup
+    notify_extend_timeout(300000000);
+#endif
+
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
@@ -1019,6 +1024,10 @@ int netdata_main(int argc, char **argv) {
     cleanup_agent_event_log();
     netdata_ready = true;
 
+#ifdef ENABLE_SYSTEMD_NOTIFY
+    notify_ready();
+#endif
+
     analytics_statistic_t start_statistic = { "START", "-",  "-" };
     analytics_statistic_send(&start_statistic);
     if (crash_detected) {
@@ -1052,10 +1061,6 @@ int main(int argc, char *argv[])
     int rc = netdata_main(argc, argv);
     if (rc != 10)
         return rc;
-
-#ifdef ENABLE_SYSTEMD_NOTIFY
-    notify_ready();
-#endif
 
     nd_process_signals();
     return 1;

@@ -6,6 +6,9 @@
  *
  * The protocol itself is defined both in the aforementioned man page, as well as at https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html
  * Said protocol is guaranteed stable per systemd's normal stability guarantees for external APIs.
+ * Notably for our usage, the protocol also requires that unrecognized messages are ignored, which
+ * means we can safely send non-mandatory messages only supported in the newest versions of the protocol
+ * and trust systemd to handle them sanely.
  *
  * We use this instead of linking against libsystemd for sd_notify() support so that we can still use it with our static builds.
  */
@@ -34,7 +37,9 @@ static void closep(int *fd) {
   *fd = -1;
 }
 
-// Send a notification to the service manager.
+/* Send a notification to the service manager.
+ * The notification message should be UTF-8 compatible text consisting of one item per line.
+ */
 static int notify(const char *message) {
   union sockaddr_union {
     struct sockaddr sa;
@@ -57,7 +62,7 @@ static int notify(const char *message) {
   /* If the variable is not set, the protocol is a noop */
   socket_path = getenv("NOTIFY_SOCKET");
   if (!socket_path)
-    return 0; /* Not set? Nothing to do */
+    return 0; // Not set? Nothing to do
 
   /* Only AF_UNIX is supported, with path or abstract sockets */
   if (socket_path[0] != '/' && socket_path[0] != '@')
@@ -85,15 +90,20 @@ static int notify(const char *message) {
   if (written != (ssize_t) message_length)
     return written < 0 ? -errno : -EPROTO;
 
-  return 1; /* Notified! */
+  return 1; // Notified!
 }
 
-// Notify the service manager that Netdata has finished startup successfully.
+/* Notify the service manager that Netdata has finished startup successfully.
+ * This should be called only after we are sure we won’t exit due to
+ * some issue with the configuration or environment.
+ */
 int notify_ready(void) {
   return notify("READY=1");
 }
 
-// Notify the service manager that Netdata is reloading.
+/* Notify the service manager that Netdata is reloading.
+ * This should be called at the start of a configuration reload, and if called notify_read() _MUST_ be called when the configuration reload finishes.
+ */
 int notify_reloading(void) {
   /* A buffer with length sufficient to format the maximum UINT64 value. */
   char reload_message[sizeof("RELOADING=1\nMONOTONIC_USEC=18446744073709551615")];
@@ -118,7 +128,45 @@ int notify_reloading(void) {
   return notify(reload_message);
 }
 
-// Notify the service manager that Netdata is stopping.
-int notify_stopping(void) {
-  return notify("STOPPING=1");
+/* Request a service timeout extension from the service manager.
+ *
+ * The timeout should be a number in microseconds indicating the desired
+ * service timeout extension
+ */
+int notify_extend_timeout(uint64_t timeout) {
+  size_t msg_length = sizeof("EXTEND_TIMEOUT_USEC=18446744073709551615");
+  char message[msg_length];
+
+  snprintf(message, msg_length, "EXTEND_TIMEOUT_USEC=%lu", timeout);
+
+  return notify(message);
+}
+
+/* Notify the service manager that Netdata is stopping.
+ * This should be called during the clean exit path.
+ *
+ * The timeout should be a number in microseconds indicating the desired
+ * service timeout extension in the stop path (IOW, an upper bound on
+ * how long we think it will take to stop).
+ */
+int notify_stopping(uint64_t timeout) {
+  size_t msg_length = sizeof("STOPPING=1\nEXTEND_TIMEOUT_USEC=18446744073709551615");
+  /* A buffer with length sufficient to format the maximum UINT64 value. */
+  char stop_message[msg_length];
+
+  snprintf(stop_message, msg_length, "STOPPING=1\nEXTEND_TIMEOUT_USEC=%lu", timeout);
+
+  return notify(stop_message);
+}
+
+/* Send a status message to the service manager.
+ * These are used to indicate what step is happening during startup or shutdown.
+ */
+int notify_status(const char *message) {
+  size_t msg_length = strlen(message) + 7;
+  char status_message[msg_length];
+
+  snprintf(status_message, msg_length, "STATUS=%s", message);
+
+  return notify(status_message);
 }
