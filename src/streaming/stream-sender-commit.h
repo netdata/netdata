@@ -11,12 +11,13 @@ struct sender_state;
 struct receiver_state;
 
 struct sender_buffer {
-    pid_t receiver_tid;
-    BUFFER *wb;
-    bool used;
-    size_t our_recreates;
-    size_t sender_recreates;
     const char *last_function;
+    BUFFER *wb;
+    pid_t receiver_tid;
+    bool used;
+    uint16_t reused;
+    uint32_t our_recreates;
+    uint32_t sender_recreates;
 };
 void sender_buffer_destroy(struct sender_buffer *commit);
 
@@ -39,7 +40,7 @@ void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_
 #define sender_commit(s, wb, type) sender_thread_commit_with_trace(s, wb, type, __FUNCTION__)
 
 // commit any buffer
-// this is the preferred buffer for occasional senders, as it avoids constant buffer allocations
+// this is the preferred buffer for occasional senders, as it avoids a permanently allocated buffer
 void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buffer *commit, STREAM_TRAFFIC_TYPE type);
 #define sender_commit_clean_buffer(s, wb, type) sender_buffer_commit(s, wb, NULL, type)
 

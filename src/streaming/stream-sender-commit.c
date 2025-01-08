@@ -9,6 +9,7 @@ void sender_buffer_destroy(struct sender_buffer *commit) {
     buffer_free(commit->wb);
     commit->wb = NULL;
     commit->used = false;
+    commit->reused = 0;
     commit->our_recreates = 0;
     commit->sender_recreates = 0;
     commit->last_function = NULL;
@@ -19,7 +20,7 @@ void sender_thread_buffer_free(void) {
 }
 
 // Collector thread starting a transmission
-BUFFER *sender_commit_start_with_trace(struct sender_state *s __maybe_unused, struct sender_buffer *commit, const char *func) {
+BUFFER *sender_commit_start_with_trace(struct sender_state *s, struct sender_buffer *commit, const char *func) {
     if(unlikely(commit->used))
         fatal("STREAM SND '%s' [to %s]: thread buffer is used multiple times concurrently (%u). "
               "It is already being used by '%s()', and now is called by '%s()'",
@@ -46,11 +47,14 @@ BUFFER *sender_commit_start_with_trace(struct sender_state *s __maybe_unused, st
     }
 
     commit->used = true;
-    buffer_flush(commit->wb);
+
+    if(!commit->reused)
+        buffer_flush(commit->wb);
+
     return commit->wb;
 }
 
-BUFFER *sender_thread_buffer_with_trace(struct sender_state *s __maybe_unused, const char *func) {
+BUFFER *sender_thread_buffer_with_trace(struct sender_state *s, const char *func) {
     return sender_commit_start_with_trace(s, &commit___thread, func);
 }
 
@@ -223,7 +227,17 @@ compression_failed_with_lock: {
 }
 
 void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type, const char *func) {
-    struct sender_buffer *commit = (wb == commit___thread.wb) ? &commit___thread : &s->host->stream.snd.commit;
+    struct sender_buffer *commit;
+    bool is_receiver;
+
+    if(unlikely(wb == commit___thread.wb)) {
+        commit = &commit___thread;
+        is_receiver = false;
+    }
+    else {
+        commit = &s->host->stream.snd.commit;
+        is_receiver = commit->receiver_tid == gettid_cached();
+    }
 
     if (unlikely(wb != commit->wb))
         fatal("STREAM SND '%s' [to %s]: function '%s()' is trying to commit an unknown commit buffer.",
@@ -233,8 +247,13 @@ void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_
         fatal("STREAM SND '%s' [to %s]: function '%s()' is committing a sender buffer twice.",
               rrdhost_hostname(s->host), s->remote_ip, func);
 
+    if(!is_receiver || type != STREAM_TRAFFIC_TYPE_DATA || commit->reused > 10) {
+        sender_buffer_commit(s, wb, commit, type);
+        commit->reused = 0;
+    }
+    else
+        commit->reused++;
+
     commit->used = false;
     commit->last_function = NULL;
-
-    sender_buffer_commit(s, wb, commit, type);
 }
