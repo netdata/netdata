@@ -87,19 +87,6 @@ SEND_EMAIL="YES"
 DEFAULT_RECIPIENT_EMAIL="recipient@example.com"
 
 ```
-##### Docker Compose
-
-Emails are sent with `msmtp`, and you need a basic configuration for it to work. 
-
-1. Add a [msmtprc](https://marlam.de/msmtp/msmtprc.txt) config file on your Docker root folder, and edit it according to your needs.
-2. Link it into your Netdata Docker with this:
-```yaml
-    volumes:
-      - /path/to/netdata-docker/msmtprc:/etc/msmtprc:ro
-```
-3. Update your docker with `docker compose up -d`.
-4. Enter the docker container with `docker exec -it netdata /bin/bash`.
-5. Follow the instructions [above](https://github.com/netdata/netdata/blob/master/src/health/notifications/email/README.md#file) on how to edit the config file with `edit-config`.
 
 ## Troubleshooting
 
