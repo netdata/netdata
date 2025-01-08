@@ -836,6 +836,7 @@ exit:
 bool aclk_host_state_update_auto(RRDHOST *host) {
     int live;
     switch(rrdhost_ingestion_status(host)) {
+        default:
         case RRDHOST_INGEST_STATUS_ARCHIVED:
         case RRDHOST_INGEST_STATUS_INITIALIZING:
         case RRDHOST_INGEST_STATUS_OFFLINE:
