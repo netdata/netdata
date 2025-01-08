@@ -468,4 +468,6 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
 
 void rrdcontext_update_from_collected_rrdinstance(RRDINSTANCE *ri);
 
+void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs);
+
 #endif //NETDATA_RRDCONTEXT_INTERNAL_H
