@@ -641,13 +641,20 @@ issystemd() {
 }
 
 get_systemd_service_dir() {
-  if [ -w "/lib/systemd/system" ]; then
-    echo "/lib/systemd/system"
-  elif [ -w "/usr/lib/systemd/system" ]; then
-    echo "/usr/lib/systemd/system"
-  elif [ -w "/etc/systemd/system" ]; then
-    echo "/etc/systemd/system"
-  fi
+  unit_paths="$(systemctl show -p UnitPath --value | tr ' ' '\n')"
+
+  # The strange `sed` expression here reverses line order (systemd lists
+  # unit paths in descending priority, we want to check the lib paths in
+  # ascending priority)
+  lib_paths="$(echo "${unit_paths}" | grep -vE '^/\(run|etc\)' | sed '1!x;H;1h;$!d;g')"
+  etc_paths="$(echo "${unit_paths}" | grep -E '^/etc' | grep -vE '(attached|control)$')"
+
+  for path in ${lib_paths} ${etc_paths}; do
+    if [ -d "${path}" ] && [ -w "${path}" ]; then
+      echo "${path}"
+      return 0
+    fi
+  done
 }
 
 run_install_service_script() {
