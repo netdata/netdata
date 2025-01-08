@@ -7,6 +7,7 @@
 #include "stream-compression/compression.h"
 #include "stream-capabilities.h"
 #include "database/rrd-database-mode.h"
+#include "daemon/config/netdata-conf-profile.h"
 
 #define SENDER_MIN_RECONNECT_DELAY 5
 
@@ -91,5 +92,7 @@ bool stream_conf_is_child(void);
 bool stream_conf_is_key_type(const char *api_key, const char *type);
 bool stream_conf_api_key_is_enabled(const char *api_key, bool enabled);
 bool stream_conf_api_key_allows_client(const char *api_key, const char *client_ip);
+
+void stream_conf_set_sender_compression_levels(ND_COMPRESSION_PROFILE profile);
 
 #endif //NETDATA_STREAM_CONF_H
