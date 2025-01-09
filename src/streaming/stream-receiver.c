@@ -988,7 +988,7 @@ static bool stream_receiver_did_replication_progress(struct receiver_state *rpt)
         // we still have requests to execute
         return true;
 
-    return (now_monotonic_usec() - rpt->replication.last_progress_ut < 5ULL * 60 * USEC_PER_SEC);
+    return (now_monotonic_usec() - rpt->replication.last_progress_ut < 10ULL * 60 * USEC_PER_SEC);
 }
 
 void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
@@ -1003,39 +1003,51 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
         RRDHOST *host = rpt->host;
 
 
-        if(stream_receiver_did_replication_progress(rpt))
+        if(stream_receiver_did_replication_progress(rpt)) {
+            rpt->replication.last_checked_ut = 0;
+            continue;
+        }
+
+        if(rpt->replication.last_checked_ut == rpt->replication.last_progress_ut)
             continue;
 
-        size_t exceptions = 0;
+        size_t stalled = 0, finished = 0;
         RRDSET *st;
         rrdset_foreach_read(st, rpt->host) {
             RRDSET_FLAGS st_flags = rrdset_flag_get(st);
-            if(st_flags & (RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
+            if(st_flags & RRDSET_FLAG_OBSOLETE)
                 continue;
 
-            const char *status = (st_flags & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) ? "has not finished" : "has not started";
+            if(st_flags & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED) {
+                finished++;
+                continue;
+            }
 
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS: instance '%s' %s replication yet.",
                    sth->id, rrdhost_hostname(host), rpt->remote_ip,
-                   rrdset_id(st), status);
+                   rrdset_id(st),
+                   (st_flags & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) ? "has not finished" : "has not started");
 
-            exceptions++;
+            stalled++;
         }
         rrdset_foreach_done(st);
 
-        if(exceptions && !stream_receiver_did_replication_progress(rpt)) {
+        if(stalled && !stream_receiver_did_replication_progress(rpt)) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests. "
-                   "We have received %u and sent %u replication commands. "
+                   "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests (%zu finished). "
+                   "We have requested %u and got replies for %u replication commands. "
                    "Disconnecting node to restore streaming.",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, exceptions,
-                   __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED),
-                   __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED));
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip,
+                   stalled, finished,
+                   __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED),
+                   __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED));
 
             receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_REPLICATION_STALLED, false);
             stream_receiver_remove(sth, rpt, "replication reception stalled");
         }
+
+        rpt->replication.last_checked_ut = rpt->replication.last_progress_ut;
     }
 }
 
