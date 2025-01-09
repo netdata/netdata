@@ -561,7 +561,6 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
                 LQS_SOURCE_TYPE t = LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value);
                 if(t != LQS_SOURCE_TYPE_NONE) {
                     rq->source_type |= t;
-                    value = NULL;
                 }
                 else {
                     // else, match the source, whatever it is

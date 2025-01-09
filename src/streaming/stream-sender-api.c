@@ -75,7 +75,7 @@ void stream_sender_structures_free(struct rrdhost *host) {
     freez(host->sender);
     host->sender = NULL;
 
-    sender_buffer_destroy(&host->stream.snd.commit);
+    sender_host_buffer_free(host);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_SENDER_INITIALIZED);
 }
