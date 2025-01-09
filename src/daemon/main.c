@@ -744,7 +744,15 @@ int netdata_main(int argc, char **argv) {
 
     // initialize the log files
     nd_log_initialize();
-    netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
+    {
+        ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_startup_msgid),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
+    }
 
     // ----------------------------------------------------------------------------------------------------------------
     // global configuration

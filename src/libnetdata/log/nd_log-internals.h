@@ -107,6 +107,7 @@ struct nd_log_source {
     FILE *fp;
 
     ND_LOG_FIELD_PRIORITY min_priority;
+    const nd_uuid_t *pending_msgid;
     const char *pending_msg;
     struct nd_log_limit limits;
 
