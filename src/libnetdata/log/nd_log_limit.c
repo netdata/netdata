@@ -54,6 +54,7 @@ bool nd_log_limit_reached(struct nd_log_source *source) {
                 freez((void *)source->pending_msg);
 
             source->pending_msg = strdupz(buffer_tostring(wb));
+            source->pending_msgid = &log_flood_protection_msgid;
             buffer_free(wb);
         }
 
@@ -84,6 +85,7 @@ bool nd_log_limit_reached(struct nd_log_source *source) {
                 freez((void *)source->pending_msg);
 
             source->pending_msg = strdupz(buffer_tostring(wb));
+            source->pending_msgid = &log_flood_protection_msgid;
             buffer_free(wb);
         }
 

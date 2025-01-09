@@ -570,6 +570,9 @@ static void netdata_systemd_journal_message_ids_init(void) {
     msgid_into_dict("a8fa8dacdb1d443e9503b8be367a6adb", "SysV Service Found");
     msgid_into_dict("187c62eb1e7f463bb530394f52cb090f", "Portable Service attached");
     msgid_into_dict("76c5c754d628490d8ecba4c9d042112b", "Portable Service detached");
+    msgid_into_dict("9cf56b8baf9546cf9478783a8de42113", "systemd-networkd sysctl changed by foreign process");
+    msgid_into_dict("ad7089f928ac4f7ea00c07457d47ba8a", "SRK into TPM authorization failure");
+    msgid_into_dict("b2bcbaf5edf948e093ce50bbea0e81ec", "Secure Attention Key (SAK) was pressed");
 
     // dbus
     // https://github.com/bus1/dbus-broker/blob/main/src/catalog/catalog-ids.h
@@ -606,12 +609,14 @@ static void netdata_systemd_journal_message_ids_init(void) {
     msgid_into_dict("dd11929c788e48bdbb6276fb5f26b08a", "Boltd starting");
 
     // Netdata
+    msgid_into_dict("1e6061a9fbd44501b3ccc368119f2b69", "Netdata startup");
     msgid_into_dict("ed4cdb8f1beb4ad3b57cb3cae2d162fa", "Netdata connection from child");
     msgid_into_dict("6e2e3839067648968b646045dbf28d66", "Netdata connection to parent");
     msgid_into_dict("9ce0cb58ab8b44df82c4bf1ad9ee22de", "Netdata alert transition");
     msgid_into_dict("6db0018e83e34320ae2a659d78019fb7", "Netdata alert notification");
     msgid_into_dict("23e93dfccbf64e11aac858b9410d8a82", "Netdata fatal message");
     msgid_into_dict("8ddaf5ba33a74078b609250db1e951f3", "Sensor state transition");
+    msgid_into_dict("ec87a56120d5431bace51e2fb8bba243", "Netdata log flood protection");
 }
 
 void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
