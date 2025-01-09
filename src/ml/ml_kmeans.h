@@ -37,12 +37,11 @@ struct ml_kmeans_inlined_t {
 
     explicit ml_kmeans_inlined_t(const ml_kmeans_t &km)
     {
-        if (km.cluster_centers.size() != 2) {
-            throw std::runtime_error("ml_kmeans_t must have exactly 2 cluster centers");
+        if (km.cluster_centers.size() == 2) {
+            cluster_centers[0] = km.cluster_centers[0];
+            cluster_centers[1] = km.cluster_centers[1];
         }
 
-        cluster_centers[0] = km.cluster_centers[0];
-        cluster_centers[1] = km.cluster_centers[1];
         min_dist = km.min_dist;
         max_dist = km.max_dist;
         after = km.after;
@@ -51,11 +50,10 @@ struct ml_kmeans_inlined_t {
 
     ml_kmeans_inlined_t &operator=(const ml_kmeans_t &km)
     {
-        if (km.cluster_centers.size() != 2) {
-            throw std::runtime_error("ml_kmeans_t must have exactly 2 cluster centers");
+        if (km.cluster_centers.size() == 2) {
+            cluster_centers[0] = km.cluster_centers[0];
+            cluster_centers[1] = km.cluster_centers[1];
         }
-        cluster_centers[0] = km.cluster_centers[0];
-        cluster_centers[1] = km.cluster_centers[1];
         min_dist = km.min_dist;
         max_dist = km.max_dist;
         after = km.after;
