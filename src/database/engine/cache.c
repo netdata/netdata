@@ -2019,8 +2019,8 @@ PGC *pgc_create(const char *name,
                 NULL, NULL,
                 false, false, false);
         }
-    }
 #endif
+    }
 
 
 #if defined(PGC_QUEUE_LOCK_AS_WAITING_QUEUE)
