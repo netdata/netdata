@@ -428,7 +428,7 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
         .journal = "WINERROR",
         .eventlog = "WindowsLastError",
         .logfmt = "winerror",
-        .annotator = winerror_annotator,
+        .logfmt_annotator = winerror_annotator,
 #endif
     },
     [NDF_INVOCATION_ID] = {
