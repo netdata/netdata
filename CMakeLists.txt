@@ -1603,6 +1603,8 @@ set(WEB_PLUGIN_FILES
         src/web/api/v3/api_v3_stream_path.c
         src/web/api/queries/backfill.c
         src/web/api/queries/backfill.h
+        src/web/api/functions/function-metrics-cardinality.c
+        src/web/api/functions/function-metrics-cardinality.h
 )
 
 set(CLAIM_PLUGIN_FILES
