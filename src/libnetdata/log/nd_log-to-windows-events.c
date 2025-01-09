@@ -325,8 +325,8 @@ static const char *get_field_value_unsafe(struct log_field *fields, ND_LOG_FIELD
     static char number_str[MAX(MAX(UINT64_MAX_LENGTH, DOUBLE_MAX_LENGTH), UUID_STR_LEN)];
 
     const char *s = NULL;
-    if (fields[i].annotator)
-        s = fields[i].annotator(&fields[i]);
+    if (fields[i].logfmt_annotator)
+        s = fields[i].logfmt_annotator(&fields[i]);
 
     else
         switch (fields[i].entry.type) {

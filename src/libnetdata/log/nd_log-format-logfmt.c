@@ -71,8 +71,8 @@ void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max) {
 
         const char *key = fields[i].logfmt;
 
-        if(fields[i].annotator) {
-            const char *s = fields[i].annotator(&fields[i]);
+        if(fields[i].logfmt_annotator) {
+            const char *s = fields[i].logfmt_annotator(&fields[i]);
             if(!s) continue;
 
             if(buffer_strlen(wb))

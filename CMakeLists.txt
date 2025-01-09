@@ -1560,7 +1560,7 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/protocol/command-function.c
         src/streaming/protocol/command-host-labels.c
         src/streaming/protocol/command-chart-definition.c
-        src/streaming/protocol/command-begin-set-end.c
+        src/streaming/protocol/command-begin-set-end-v2.c
         src/streaming/protocol/command-host-variables.c
         src/streaming/stream-conf.c
         src/streaming/stream-conf.h
@@ -1586,6 +1586,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-replication-receiver.h
         src/streaming/stream-replication-tracking.c
         src/streaming/stream-replication-tracking.h
+        src/streaming/protocol/command-begin-set-end-v1.c
+        src/streaming/protocol/command-begin-set-end-init.c
 )
 
 set(WEB_PLUGIN_FILES

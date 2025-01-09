@@ -393,13 +393,13 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
         .journal = NULL,
         .logfmt = NULL,
         .eventlog = NULL,
-        .annotator = NULL,
+        .logfmt_annotator = NULL,
     },
     [NDF_TIMESTAMP_REALTIME_USEC] = {
         .journal = NULL,
         .eventlog = "Timestamp",
         .logfmt = "time",
-        .annotator = timestamp_usec_annotator,
+        .logfmt_annotator = timestamp_usec_annotator,
     },
     [NDF_SYSLOG_IDENTIFIER] = {
         .journal = "SYSLOG_IDENTIFIER", // standard journald field
@@ -415,20 +415,20 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
         .journal = "PRIORITY", // standard journald field
         .eventlog = "Level",
         .logfmt = "level",
-        .annotator = priority_annotator,
+        .logfmt_annotator = priority_annotator,
     },
     [NDF_ERRNO] = {
         .journal = "ERRNO", // standard journald field
         .eventlog = "UnixErrno",
         .logfmt = "errno",
-        .annotator = errno_annotator,
+        .logfmt_annotator = errno_annotator,
     },
     [NDF_WINERROR] = {
 #if defined(OS_WINDOWS)
         .journal = "WINERROR",
         .eventlog = "WindowsLastError",
         .logfmt = "winerror",
-        .annotator = winerror_annotator,
+        .logfmt_annotator = winerror_annotator,
 #endif
     },
     [NDF_INVOCATION_ID] = {
@@ -705,13 +705,12 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
         .journal = "ND_ALERT_NOTIFICATION_TIMESTAMP_USEC",
         .eventlog = "AlertNotificationTime",
         .logfmt = "alert_notification_timestamp",
-        .annotator = timestamp_usec_annotator,
+        .logfmt_annotator = timestamp_usec_annotator,
     },
     [NDF_STACK_TRACE] = {
         .journal = "ND_STACK_TRACE",
         .eventlog = "StackTrace",
         .logfmt = NULL,
-        .annotator = stack_trace_annotator,
     },
 
     // put new items here
