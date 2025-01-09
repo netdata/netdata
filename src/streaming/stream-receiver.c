@@ -373,30 +373,6 @@ static ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE ty
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void stream_receive_log_database_gap(struct receiver_state *rpt) {
-    RRDHOST *host = rpt->host;
-
-    time_t now = now_realtime_sec();
-    time_t last_db_entry = 0;
-    rrdhost_retention(host, now, false, NULL, &last_db_entry);
-
-    if(now < last_db_entry)
-        last_db_entry = now;
-
-    if(!last_db_entry) {
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "STREAM RCV '%s' [from [%s]:%s]: node connected; for the first time!",
-               rrdhost_hostname(host), rpt->remote_ip, rpt->remote_port);
-    }
-    else {
-        char buf[128];
-        duration_snprintf(buf, sizeof(buf), now - last_db_entry, "s", true);
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "STREAM RCV '%s' [from [%s]:%s]: node connected; last sample in the database %s ago",
-               rrdhost_hostname(host), rpt->remote_ip, rpt->remote_port, buf);
-    }
-}
-
 void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct receiver_state *rpt) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
@@ -508,8 +484,6 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
 #ifdef ENABLE_H2O
     parser->h2o_ctx = rpt->h2o_ctx;
 #endif
-
-    stream_receive_log_database_gap(rpt);
 
     // keep this last - it needs everything ready since to sends data to the child
     stream_receiver_send_node_and_claim_id_to_child(rpt->host);

@@ -274,7 +274,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     // make sure the socket is closed
     nd_sock_close(&s->sock);
 
-    s->hops = (int16_t)(rrdhost_system_info_hops(host->system_info) + 1);
+    s->hops = (int16_t)(rrdhost_ingestion_hops(s->host) + 1);
 
     // reset this to make sure we have its current value
     s->sock.verify_certificate = netdata_ssl_validate_certificate_sender;

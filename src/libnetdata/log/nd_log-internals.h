@@ -170,7 +170,7 @@ struct log_field {
     const char *journal;
     const char *logfmt;
     const char *eventlog;
-    annotator_t annotator;
+    annotator_t logfmt_annotator;
     struct log_stack_entry entry;
 };
 
@@ -195,6 +195,7 @@ struct log_field;
 const char *errno_annotator(struct log_field *lf);
 const char *priority_annotator(struct log_field *lf);
 const char *timestamp_usec_annotator(struct log_field *lf);
+bool stack_trace_formatter(BUFFER *wb, void *data);
 
 #if defined(OS_WINDOWS)
 const char *winerror_annotator(struct log_field *lf);

@@ -16,11 +16,11 @@ typedef enum __attribute__((packed)) {
 } RRDHOST_DB_LIVENESS;
 
 typedef enum __attribute__((packed)) {
-    RRDHOST_INGEST_STATUS_ARCHIVED = 0,
-    RRDHOST_INGEST_STATUS_INITIALIZING,
-    RRDHOST_INGEST_STATUS_REPLICATING,
-    RRDHOST_INGEST_STATUS_ONLINE,
-    RRDHOST_INGEST_STATUS_OFFLINE,
+    RRDHOST_INGEST_STATUS_ARCHIVED = 0,     // an old host in the database (never connected during this session)
+    RRDHOST_INGEST_STATUS_INITIALIZING,     // contexts are still loading
+    RRDHOST_INGEST_STATUS_REPLICATING,      // receiving replication
+    RRDHOST_INGEST_STATUS_ONLINE,           // currently collecting data
+    RRDHOST_INGEST_STATUS_OFFLINE,          // a disconnected node
 } RRDHOST_INGEST_STATUS;
 
 typedef enum __attribute__((packed)) {
@@ -166,5 +166,7 @@ typedef struct rrdhost_status_t {
 } RRDHOST_STATUS;
 
 void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s);
+RRDHOST_INGEST_STATUS rrdhost_ingestion_status(RRDHOST *host);
+int16_t rrdhost_ingestion_hops(RRDHOST *host);
 
 #endif //NETDATA_RRDHOST_STATUS_H

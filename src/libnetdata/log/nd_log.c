@@ -232,6 +232,9 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
     // set the common fields that are automatically set by the logging subsystem
 
+    if(likely(!thread_log_fields[NDF_STACK_TRACE].entry.set))
+        thread_log_fields[NDF_STACK_TRACE].entry = ND_LOG_FIELD_CB(NDF_STACK_TRACE, stack_trace_formatter, NULL);
+
     if(likely(!thread_log_fields[NDF_INVOCATION_ID].entry.set))
         thread_log_fields[NDF_INVOCATION_ID].entry = ND_LOG_FIELD_UUID(NDF_INVOCATION_ID, &nd_log.invocation_id);
 
@@ -419,7 +422,12 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         fprintf(stderr, "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
                 function, line, file);
         fflush(stderr);
+
+#ifdef ENABLE_SENTRY
+        abort();
+#else
         _exit(1);
+#endif
     }
 
     int saved_errno = errno;

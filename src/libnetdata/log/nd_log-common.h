@@ -119,11 +119,13 @@ typedef enum __attribute__((__packed__)) {
     NDF_ALERT_NOTIFICATION_REALTIME_USEC = 62,
     // NDF_ALERT_FLAGS,
 
+    NDF_STACK_TRACE = 63,                           // stack trace of the thread logging
+
     // put new items here
     // leave the request URL and the message last
 
-    NDF_REQUEST = 63,                               // the request we are currently working on
-    NDF_MESSAGE = 64,                               // the log message, if any
+    NDF_REQUEST = 64,                               // the request we are currently working on
+    NDF_MESSAGE = 65,                               // the log message, if any
 
     // terminator
     _NDF_MAX,

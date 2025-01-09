@@ -111,17 +111,46 @@ is_integer () {
   esac
 }
 
-issystemd() {
-  # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
-  if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
-    return 1
+safe_pidof() {
+  pidof_cmd="$(command -v pidof 2> /dev/null)"
+  if [ -n "${pidof_cmd}" ]; then
+    ${pidof_cmd} "${@}"
+    return $?
+  else
+    ps -acxo pid,comm |
+      sed "s/^ *//g" |
+      grep netdata |
+      cut -d ' ' -f 1
+    return $?
   fi
+}
 
+issystemd() {
   # if there is no systemctl command, it is not systemd
   systemctl=$(command -v systemctl 2> /dev/null)
   if [ -z "${systemctl}" ] || [ ! -x "${systemctl}" ]; then
     return 1
   fi
+
+  # Check the output of systemctl is-system-running.
+  # If this reports 'offline', it’s not systemd. If it reports 'unknown'
+  # or nothing at all (which indicates the command is not supported), it
+  # may or may not be systemd, so continue to other checks. If it reports
+  # anything else, it is systemd.
+  #
+  # This may return a non-zero exit status in cases when it actually
+  # succeeded for our purposes (notably, if the state is `degraded`),
+  # so we need to toggle set -e off here.
+  set +e
+  systemd_state="$(systemctl is-system-running)"
+  set -e
+
+  case "${systemd_state}" in
+    offline) return 1 ;;
+    unknown) : ;;
+    "") : ;;
+    *) return 0 ;;
+  esac
 
   # if pid 1 is systemd, it is systemd
   [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && return 0
@@ -346,6 +375,91 @@ disable_netdata_updater() {
   return 0
 }
 
+auto_update_status() {
+  case "$(_get_scheduler_type)" in
+    systemd) info "The default auto-update scheduling method for this system is: systemd timer units" ;;
+    crontab) info "The default auto-update scheduling method for this system is: drop-in crontab" ;;
+    interval) info "The default auto-update scheduling method for this system is: drop-in periodic script" ;;
+    *) info "No recognized auto-update scheduling method found" ; return ;;
+  esac
+
+  duplicate=""
+  enabled=""
+
+  if issystemd; then
+    if systemctl list-units --full -all | grep -Fq "netdata-updater.timer"; then
+      if systemctl is-enabled netdata-updater.timer; then
+        info "Auto-updates using a systemd timer unit are ENABLED"
+        enabled="systemd"
+      else
+        info "Auto-updates using a systemd timer unit are DISABLED"
+      fi
+    else
+      info "Auto-updates using a systemd timer unit are NOT SUPPORTED due to: Required unit files not installed"
+    fi
+  else
+    info "Auto-updates using a systemd timer unit are NOT SUPPORTED due to: Systemd not present"
+  fi
+
+  interval_found=""
+
+  if [ -d /etc/cron.daily ]; then
+    interval_found="1"
+
+    if [ -x /etc/cron.daily/netdata-updater.sh ] || [ -x /etc/cron.daily/netdata-updater ]; then
+      info "Auto-updates using a drop-in periodic script in /etc/cron.daily are ENABLED"
+
+      if [ -n "${enabled}" ]; then
+        duplicate="1"
+      else
+        enabled="cron.daily"
+      fi
+    else
+      info "Auto-updates using a drop-in periodic script in /etc/cron.daily are DISABLED"
+    fi
+  else
+    info "Auto-updates using a drop-in periodic script in /etc/cron.daily are NOT SUPPORTED: due to: Directory does not exist"
+  fi
+
+  if [ -d /etc/periodic/daily ]; then
+    if [ -x /etc/periodic/daily/netdata-updater.sh ] || [ -x /etc/periodic/daily/netdata-updater ]; then
+      info "Auto-updates using a drop-in periodic script in /etc/periodic/daily are ENABLED"
+
+      if [ -n "${enabled}" ]; then
+        duplicate="1"
+      else
+        enabled="periodic/daily"
+      fi
+    else
+      if [ -z "${interval_found}" ]; then
+        info "Auto-updates using a drop-in periodic script in /etc/periodic/daily are DISABLED"
+      fi
+    fi
+  elif [ -z "${interval_found}" ]; then
+    info "Auto-updates using a drop-in periodic script in /etc/periodic/daily are NOT SUPPORTED due to: Directory does not exist"
+  fi
+
+  if [ -d /etc/cron.d ]; then
+    if [ -f /etc/cron.d/netdata-updater ] || [ -f /etc/cron.d/netdata-updater-daily ]; then
+      info "Auto-updates using a drop-in crontab are ENABLED"
+
+      if [ -n "${enabled}" ]; then
+        duplicate="1"
+      else
+        enabled="cron.d"
+      fi
+    else
+      info "Auto-updates using a drop-in crontab are DISABLED"
+    fi
+  else
+    info "Auto-updates using a drop-in crontab are NOT SUPPORTED due to: Directory does not exist"
+  fi
+
+  if [ -n "${duplicate}" ]; then
+    warning "More than one method of auto-updates is enabled! Please disable and re-enable auto-updates to correct this."
+  fi
+}
+
 str_in_list() {
   printf "%s\n" "${2}" | tr ' ' "\n" | grep -qE "^${1}\$"
   return $?
@@ -394,28 +508,29 @@ _cannot_use_tmpdir() {
   return "${ret}"
 }
 
-create_tmp_directory() {
+create_exec_tmp_directory() {
   if [ -n "${NETDATA_TMPDIR_PATH}" ]; then
     echo "${NETDATA_TMPDIR_PATH}"
-  else
-    if [ -z "${NETDATA_TMPDIR}" ] || _cannot_use_tmpdir "${NETDATA_TMPDIR}" ; then
-      if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
-        if _cannot_use_tmpdir /tmp ; then
-          if _cannot_use_tmpdir "${PWD}" ; then
-            fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." U0003
-          else
-            TMPDIR="${PWD}"
-          fi
-        else
-          TMPDIR="/tmp"
-        fi
-      fi
-    else
-      TMPDIR="${NETDATA_TMPDIR}"
-    fi
-
-    mktemp -d -t netdata-updater-XXXXXXXXXX
+    return
   fi
+
+  root_dir=""
+
+  if [ -n "${NETDATA_TMPDIR}" ] && ! _cannot_use_tmpdir "${NETDATA_TMPDIR}"; then
+    root_dir="${NETDATA_TMPDIR}"
+  elif [ -n "${TMPDIR}" ] && ! _cannot_use_tmpdir "${TMPDIR}"; then
+    root_dir="${TMPDIR}"
+  elif ! _cannot_use_tmpdir /tmp; then
+    root_dir="/tmp"
+  elif ! _cannot_use_tmpdir "${PWD}"; then
+    root_dir="${PWD}"
+  else
+    fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." U0003
+  fi
+
+  TMPDIR="${root_dir}"
+
+  mktemp -d -p "${root_dir}" -t netdata-updater-XXXXXXXXXX
 }
 
 check_for_curl() {
@@ -526,7 +641,7 @@ get_netdata_latest_tag() {
 newer_commit_date() {
   info "Checking if a newer version of the updater script is available."
 
-  ndtmpdir="$(create_tmp_directory)"
+  ndtmpdir="$(create_exec_tmp_directory)"
   commit_check_file="${ndtmpdir}/latest-commit.json"
   commit_check_url="https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1"
   python_version_check="
@@ -580,7 +695,7 @@ self_update() {
   if [ -z "${NETDATA_NO_UPDATER_SELF_UPDATE}" ] && newer_commit_date; then
     info "Downloading newest version of updater script."
 
-    ndtmpdir=$(create_tmp_directory)
+    ndtmpdir=$(create_exec_tmp_directory)
     cd "$ndtmpdir" || exit 1
 
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
@@ -737,7 +852,7 @@ update_build() {
   [ -z "${logfile}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
   RUN_INSTALLER=0
-  ndtmpdir=$(create_tmp_directory)
+  ndtmpdir=$(create_exec_tmp_directory)
   cd "$ndtmpdir" || fatal "Failed to change current working directory to ${ndtmpdir}" U0016
 
   install_build_dependencies
@@ -836,7 +951,7 @@ update_build() {
 }
 
 update_static() {
-  ndtmpdir="$(create_tmp_directory)"
+  ndtmpdir="$(create_exec_tmp_directory)"
   PREVDIR="$(pwd)"
 
   info "Entering ${ndtmpdir}"
@@ -1121,6 +1236,10 @@ while [ -n "${1}" ]; do
     --disable-auto-updates)
       disable_netdata_updater
       exit $?
+      ;;
+    --auto-update-status)
+      auto_update_status
+      exit 0
       ;;
     *) fatal "Unrecognized option ${1}" U001A ;;
   esac

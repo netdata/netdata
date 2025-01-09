@@ -690,11 +690,11 @@ static void health_event_loop(void) {
         if(unlikely(!service_running(SERVICE_HEALTH)))
             break;
 
+        // wait for all notifications to finish before allowing health to be cleaned up
+        wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
+        
         health_sleep(next_run, loop);
     } // forever
-
-    // wait for all notifications to finish before allowing health to be cleaned up
-    wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
 }
 
 

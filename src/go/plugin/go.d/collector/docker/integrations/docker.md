@@ -141,6 +141,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | address | Docker daemon's listening address. When using a TCP socket, the format is: tcp://[ip]:[port] | unix:///var/run/docker.sock | yes |
 | timeout | Request timeout in seconds. | 2 | no |
+| container_selector | [Pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to specify which containers to monitor. | * | no |
 | collect_container_size | Whether to collect container writable layer size. | no | no |
 
 </details>

@@ -296,8 +296,13 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 #endif
 
 #ifdef ENABLE_SENTRY
-    nd_sentry_fini();
-#endif
-
+    if (ret) {
+        abort();
+    } else {
+        nd_sentry_fini();
+        exit(ret);
+    }
+#else
     exit(ret);
+#endif
 }
