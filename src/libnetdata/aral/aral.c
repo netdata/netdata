@@ -876,6 +876,10 @@ static ARAL_PAGE **aral_remove_marked_allocation___aral_lock_needed(ARAL *ar, AR
 }
 
 void aral_unmark_allocation(ARAL *ar, void *ptr) {
+#if defined(FSANITIZE_ADDRESS)
+    return;
+#endif
+
     if(unlikely(!ptr)) return;
 
     // get the page pointer
