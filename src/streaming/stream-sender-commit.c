@@ -19,6 +19,10 @@ void sender_thread_buffer_free(void) {
     sender_buffer_destroy(&commit___thread);
 }
 
+void sender_host_buffer_free(RRDHOST *host) {
+    sender_buffer_destroy(&host->stream.snd.commit);
+}
+
 // Collector thread starting a transmission
 BUFFER *sender_commit_start_with_trace(struct sender_state *s, struct sender_buffer *commit, const char *func) {
     if(unlikely(commit->used))

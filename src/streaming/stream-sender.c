@@ -158,6 +158,7 @@ static void stream_sender_on_disconnect(struct sender_state *s) {
     stream_sender_clear_parent_claim_id(s->host);
     stream_receiver_send_node_and_claim_id_to_child(s->host);
     stream_path_parent_disconnected(s->host);
+    sender_host_buffer_free(s->host);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
