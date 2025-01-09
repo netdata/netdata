@@ -94,6 +94,17 @@ AutoReqProv: yes
 %global _have_xenstat 0
 %endif
 
+# log2journal isn’t available on older openSUSE systems
+%if 0%{?suse_version}
+%if %{suse_version} < 1600
+%global _have_log2journal 0
+%else
+%global _have_log2journal 1
+%endif
+%else
+%global _have_log2journal 1
+%endif
+
 # Skip MongoDB exporter on known problem platforms
 %if 0%{?oraclelinux} || 0%{?suse_version} || 0%{?amzn}
 %global _have_mongo_exporter 0
@@ -188,6 +199,10 @@ BuildRequires: systemd
 # Core requirements for the install to succeed
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
+
+# Explicitly call out that we provide these
+Provides: user(%{name})
+Provides: group(%{name})
 
 # #####################################################################
 # External plugin package dependencies
@@ -626,7 +641,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %package plugin-cups
 Summary: The CUPS metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
+Requires: %{name}
 
 %description plugin-cups
  This plugin allows the Netdata Agent to collect metrics from the Common UNIX Printing System.
@@ -646,7 +661,7 @@ fi
 Summary: The FreeIPMI metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: freeipmi
-Requires: %{name} = %{version}
+Requires: %{name}
 
 %description plugin-freeipmi
  This plugin allows the Netdata Agent to collect metrics from hardware using FreeIPMI.
@@ -665,8 +680,8 @@ fi
 %package plugin-nfacct
 Summary: The NFACCT metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
+Conflicts: %{name} < 1.40
 
 %description plugin-nfacct
  This plugin allows the Netdata Agent to collect metrics from the firewall using NFACCT objects.
@@ -685,10 +700,9 @@ fi
 Summary: The charts.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: bash
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
+Conflicts: %{name} < 1.40
 %if 0%{?centos_ver} != 7
-Suggests: apcupsd
 Suggests: iw
 Suggests: sudo
 %endif
@@ -716,14 +730,14 @@ fi
 %package plugin-ebpf
 Summary: The eBPF metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
+Conflicts: %{name} < 1.40
 %if 0%{?centos_ver} != 7
-Recommends: %{name}-plugin-apps = %{version}
-Recommends: %{name}-ebpf-legacy-code >= %{version}
+Recommends: %{name}-plugin-apps
+Recommends: %{name}-ebpf-legacy-code
 %else
-Requires: %{name}-plugin-apps = %{version}
-Requires: %{name}-ebpf-legacy-code >= %{version}
+Requires: %{name}-plugin-apps
+Requires: %{name}-ebpf-legacy-code
 %endif
 
 %description plugin-ebpf
@@ -745,8 +759,8 @@ fi
 %package ebpf-legacy-code
 Summary: Compiled eBPF legacy code for the Netdata eBPF plugin
 Group: Applications/System
-Requires: %{name}-plugin-ebpf = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}-plugin-ebpf
+Conflicts: %{name} < 1.40
 
 %description ebpf-legacy-code
  This package provides the pre-compiled eBPF legacy code for use by the Netdata eBPF plugin.
@@ -767,8 +781,8 @@ fi
 %package plugin-pythond
 Summary: The python.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
+Conflicts: %{name} < 1.40
 %if 0%{?centos_ver} == 7 || 0%{?centos_ver} == 6
 Requires: python
 %else
@@ -800,11 +814,10 @@ fi
 %package plugin-go
 Summary: The go.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
+Conflicts: %{name} < 1.40
 %if 0%{?centos_ver} != 7
 Suggests: nvme-cli
-Suggests: sudo
 %endif
 %if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Recommends: lm_sensors
@@ -833,8 +846,8 @@ fi
 %package plugin-apps
 Summary: The per-application metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
+Conflicts: %{name} < 1.40
 
 %description plugin-apps
  This plugin allows the Netdata Agent to collect per-application and per-user metrics without using cgroups.
@@ -855,8 +868,8 @@ fi
 %package plugin-slabinfo
 Summary: The slabinfo metrics collector for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
+Conflicts: %{name} < 1.40
 
 %description plugin-slabinfo
  This plugin allows the Netdata Agent to collect perfromance and utilization metrics for the Linux kernel’s SLAB allocator.
@@ -875,8 +888,8 @@ fi
 %package plugin-perf
 Summary: The perf metrics collector for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
+Conflicts: %{name} < 1.40
 
 %description plugin-perf
  This plugin allows the Netdata to collect metrics from the Linux perf subsystem.
@@ -900,8 +913,8 @@ fi
 %package plugin-debugfs
 Summary: The debugfs metrics collector for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
+Conflicts: %{name} < 1.40
 
 %description plugin-debugfs
  This plugin allows the Netdata Agent to collect Linux kernel metrics exposed through debugfs.
@@ -920,8 +933,7 @@ fi
 %package plugin-systemd-journal
 Summary: The systemd-journal plugin for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
 
 %description plugin-systemd-journal
  This plugin allows the Netdata Agent to present entries from the systemd
@@ -942,8 +954,8 @@ fi
 %package plugin-xenstat
 Summary: The xenstat plugin for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
+Conflicts: %{name} < 1.40
 
 %description plugin-xenstat
  This plugin allows Netdata to collect metrics from the Xen Hypervisor.
@@ -962,8 +974,7 @@ fi
 %package plugin-network-viewer
 Summary: The network viewer plugin for the Netdata Agent
 Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
+Requires: %{name}
 %if 0%{?_have_ebpf}
 %if 0%{?centos_ver} != 7
 Recommends: %{name}-plugin-ebpf = %{version}
