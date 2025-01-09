@@ -118,9 +118,9 @@ done:
 }
 
 // Dimension list
-#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END, c.type||'.'||c.id, c.context, c.rowid " \
+#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END, c.type||'.'||c.id, c.context " \
     "FROM dimension d, chart c WHERE c.host_id = @host_id AND d.chart_id = c.chart_id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
-void ctx_get_dimension_list(RRDHOST *host, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
+void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     sqlite3_stmt *res = NULL;
 
@@ -128,18 +128,9 @@ void ctx_get_dimension_list(RRDHOST *host, void (*dict_cb)(SQL_DIMENSION_DATA *,
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
 
     SQL_DIMENSION_DATA dimension_data;
-
-    Pvoid_t rca_JudyL = NULL;
-    Pvoid_t ria_JudyL = NULL;
-
-    Pvoid_t *Pvalue;
-    Word_t row_id, last_row_id = 0;
-
-    RRDCONTEXT_ACQUIRED *rca;
-    RRDINSTANCE_ACQUIRED *ria = NULL;
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
@@ -149,55 +140,8 @@ void ctx_get_dimension_list(RRDHOST *host, void (*dict_cb)(SQL_DIMENSION_DATA *,
         dimension_data.hidden = sqlite3_column_int(res, 3);
         dimension_data.chart_id = (char *) sqlite3_column_text(res, 4);
         dimension_data.context = (char *) sqlite3_column_text(res, 5);
-
-        row_id = sqlite3_column_int64(res, 6);
-
-        if (row_id == last_row_id && ria)
-            dimension_data.ri = rrdinstance_acquired_value(ria);
-        else {
-            last_row_id = row_id;
-            Pvalue = JudyLIns(&ria_JudyL, row_id, PJE0);
-            if (unlikely(!Pvalue || Pvalue == PJERR))
-                fatal("CONTEXT: corrupted ria array");
-
-            if (!*Pvalue) {
-                rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, dimension_data.context);
-                RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-                ria = (RRDINSTANCE_ACQUIRED *)dictionary_get_and_acquire_item(rc->rrdinstances, dimension_data.chart_id);
-                *Pvalue = ria;
-                dimension_data.ri = rrdinstance_acquired_value(ria);
-
-                Pvalue = JudyLIns(&rca_JudyL, row_id, PJE0);
-                if (unlikely(!Pvalue || Pvalue == PJERR))
-                    fatal("CONTEXT: corrupted rca array");
-
-                if (Pvalue)
-                    *Pvalue = rca;
-            } else
-                dimension_data.ri = rrdinstance_acquired_value(*Pvalue);
-        }
-
         dict_cb(&dimension_data, data);
     }
-
-    // Cleanup
-    bool first = true;
-    row_id = 0;
-    while ((Pvalue = JudyLFirstThenNext(ria_JudyL, &row_id, &first))) {
-        ria = *Pvalue;
-        if (ria)
-            rrdinstance_release(ria);
-    }
-    JudyLFreeArray(&ria_JudyL, PJE0);
-
-    first = true;
-    row_id = 0;
-    while ((Pvalue = JudyLFirstThenNext(rca_JudyL, &row_id, &first))) {
-        rca = *Pvalue;
-        if (rca)
-            rrdcontext_release(rca);
-    }
-    JudyLFreeArray(&rca_JudyL, PJE0);
 
 done:
     REPORT_BIND_FAIL(res, param);
