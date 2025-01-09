@@ -191,17 +191,19 @@ void nd_log_set_facility(const char *facility) {
 }
 
 void nd_log_set_flood_protection(size_t logs, time_t period) {
-    nd_log.sources[NDLS_DAEMON].limits.logs_per_period =
-        nd_log.sources[NDLS_DAEMON].limits.logs_per_period_backup;
-    nd_log.sources[NDLS_COLLECTORS].limits.logs_per_period =
-        nd_log.sources[NDLS_COLLECTORS].limits.logs_per_period_backup = logs;
+    // daemon logs
+    nd_log.sources[NDLS_DAEMON].limits.logs_per_period = logs;
+    nd_log.sources[NDLS_DAEMON].limits.logs_per_period_backup = logs;
+    nd_log.sources[NDLS_DAEMON].limits.throttle_period = period;
 
-    nd_log.sources[NDLS_DAEMON].limits.throttle_period =
-        nd_log.sources[NDLS_COLLECTORS].limits.throttle_period = period;
+    // collectors logs
+    nd_log.sources[NDLS_COLLECTORS].limits.logs_per_period = logs;
+    nd_log.sources[NDLS_COLLECTORS].limits.logs_per_period_backup = logs;
+    nd_log.sources[NDLS_COLLECTORS].limits.throttle_period = period;
 
     char buf[100];
-    snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t )period);
+    snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t)period);
     nd_setenv("NETDATA_ERRORS_THROTTLE_PERIOD", buf, 1);
-    snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t )logs);
+    snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t)logs);
     nd_setenv("NETDATA_ERRORS_PER_PERIOD", buf, 1);
 }
