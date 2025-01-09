@@ -329,12 +329,19 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
                 .txt = nd_log.sources[source].pending_msg,
         };
 
+        thread_log_fields[NDF_MESSAGE_ID].entry = (struct log_stack_entry){
+            .set = nd_log.sources[source].pending_msgid != NULL,
+            .type = NDFT_UUID,
+            .uuid = nd_log.sources[source].pending_msgid,
+        };
+
         nd_logger_log_fields(spinlock, fp, false, priority, output,
                              &nd_log.sources[source],
                              thread_log_fields, THREAD_FIELDS_MAX);
 
         freez((void *)nd_log.sources[source].pending_msg);
         nd_log.sources[source].pending_msg = NULL;
+        nd_log.sources[source].pending_msgid = NULL;
     }
 
     errno_clear();
