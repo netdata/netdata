@@ -186,8 +186,8 @@ void pulse_daemon_memory_do(bool extended) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
-    if (sm.ram_total_bytes) {
+    OS_SYSTEM_MEMORY sm = os_system_memory(true);
+    if (sm.ram_total_bytes && dbengine_out_of_memory_protection) {
         static RRDSET *st_memory_available = NULL;
         static RRDDIM *rd_available = NULL;
 

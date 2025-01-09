@@ -82,54 +82,39 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v1(bool query_total_ram __maybe_
     uint64_t used = 0, inactive = 0;
 
     if(query_total_ram || sm.ram_total_bytes == 0) {
-        if (read_txt_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", buf, sizeof(buf)) != 0) {
-//             nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v1: cannot read /sys/fs/cgroup/memory/memory.limit_in_bytes");
+        if (read_txt_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", buf, sizeof(buf)) != 0)
             goto failed;
-        }
 
-        sm.ram_total_bytes = strtoull(buf, NULL, 10);
-        if(!sm.ram_total_bytes) {
-//             nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v1: /sys/fs/cgroup/memory/memory.limit_in_bytes is zero");
+        sm.ram_total_bytes = str2ull(buf, NULL);
+        if(!sm.ram_total_bytes)
             goto failed;
-        }
     }
 
     buf[0] = '\0';
-    if (read_txt_file("/sys/fs/cgroup/memory/memory.usage_in_bytes", buf, sizeof(buf)) != 0) {
-//         nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v1: cannot read /sys/fs/cgroup/memory/memory.usage_in_bytes");
+    if (read_txt_file("/sys/fs/cgroup/memory/memory.usage_in_bytes", buf, sizeof(buf)) != 0)
         goto failed;
-    }
 
-    used = strtoull(buf, NULL, 10);
-    if(!used || used > sm.ram_total_bytes) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v1: used is %llu, total is %llu: used is invalid",
-//               used, sm.ram_total_bytes);
+    used = str2ull(buf, NULL);
+    if(!used || used > sm.ram_total_bytes)
         goto failed;
-    }
 
-    if (read_txt_file("/sys/fs/cgroup/memory.stat", buf, sizeof(buf)) != 0) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot read /sys/fs/cgroup/memory.stat");
+    if (read_txt_file("/sys/fs/cgroup/memory.stat", buf, sizeof(buf)) != 0)
         goto done;
-    }
 
     const char *inactive_str = strstr(buf, "total_inactive_file ");
-    if(!inactive_str) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot file 'inactive_file ' in /sys/fs/cgroup/memory.stat");
+    if(!inactive_str)
         goto done;
-    }
+
     inactive_str += 20;
 
-    inactive = strtoull(inactive_str, NULL, 0);
+    inactive = str2ull(inactive_str, NULL);
     if(!inactive || inactive > used) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: inactive is %llu, used is %llu: inactive is invalid",
-//               inactive, used);
         inactive = 0;
         goto done;
     }
 
 done:
     sm.ram_available_bytes = sm.ram_total_bytes - (used - inactive);
-    os_system_memory_last = sm;
     return sm;
 
 failed:
@@ -144,58 +129,43 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v2(bool query_total_ram __maybe_
     uint64_t used = 0, inactive = 0;
 
     if(query_total_ram || sm.ram_total_bytes == 0) {
-        if (read_txt_file("/sys/fs/cgroup/memory.max", buf, sizeof(buf)) != 0) {
-//            nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot read /sys/fs/cgroup/memory.max");
+        if (read_txt_file("/sys/fs/cgroup/memory.max", buf, sizeof(buf)) != 0)
             goto failed;
-        }
 
         if(strcmp(buf, "max") == 0)
             sm.ram_total_bytes = UINT64_MAX;
         else
-            sm.ram_total_bytes = strtoull(buf, NULL, 0);
+            sm.ram_total_bytes = str2ull(buf, NULL);
 
-        if(!sm.ram_total_bytes) {
-//            nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: /sys/fs/cgroup/memory.max is zero");
+        if(!sm.ram_total_bytes)
             goto failed;
-        }
     }
 
     buf[0] = '\0';
-    if (read_txt_file("/sys/fs/cgroup/memory.current", buf, sizeof(buf)) != 0) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot read /sys/fs/cgroup/memory.current");
+    if (read_txt_file("/sys/fs/cgroup/memory.current", buf, sizeof(buf)) != 0)
         goto failed;
-    }
 
-    used = strtoull(buf, NULL, 0);
-    if(!used || used > sm.ram_total_bytes) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: used is %llu, total is %llu: used is invalid",
-//               used, sm.ram_total_bytes);
+    used = str2ull(buf, NULL);
+    if(!used || used > sm.ram_total_bytes)
         goto failed;
-    }
 
-    if (read_txt_file("/sys/fs/cgroup/memory.stat", buf, sizeof(buf)) != 0) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot read /sys/fs/cgroup/memory.stat");
+    if (read_txt_file("/sys/fs/cgroup/memory.stat", buf, sizeof(buf)) != 0)
         goto done;
-    }
 
     const char *inactive_str = strstr(buf, "inactive_file ");
-    if(!inactive_str) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot file 'inactive_file ' in /sys/fs/cgroup/memory.stat");
+    if(!inactive_str)
         goto done;
-    }
+
     inactive_str += 14;
 
-    inactive = strtoull(inactive_str, NULL, 0);
+    inactive = str2ull(inactive_str, NULL);
     if(!inactive || inactive > used) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: inactive is %llu, used is %llu: inactive is invalid",
-//               inactive, used);
         inactive = 0;
         goto done;
     }
 
 done:
     sm.ram_available_bytes = sm.ram_total_bytes - (used - inactive);
-    os_system_memory_last = sm;
     return sm;
 
 failed:
@@ -204,39 +174,28 @@ failed:
     return sm;
 }
 
-OS_SYSTEM_MEMORY os_system_memory_meminfo(bool query_total_ram __maybe_unused) {
+#define MEMINFO_MEMTOTAL "MemTotal:"
+#define MEMINFO_MEMAVAILABLE "MemAvailable:"
+
+static OS_SYSTEM_MEMORY os_system_memory_meminfo(bool query_total_ram __maybe_unused) {
     static OS_SYSTEM_MEMORY sm = {0, 0};
-    static procfile *ff = NULL;
 
-    if(unlikely(!ff)) {
-        ff = procfile_open("/proc/meminfo", ": \t", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff))
-            goto failed;
-    }
-
-    ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    char buf[4096];
+    if (read_txt_file("/proc/meminfo", buf, sizeof(buf)) != 0)
         goto failed;
 
-    bool matched_total = false, matched_available = false;
-    size_t lines = procfile_lines(ff);
-    for(size_t line = 0; line < lines ;line++) {
-        if(!matched_total && strcmp(procfile_lineword(ff, line, 0), "MemTotal") == 0) {
-            sm.ram_total_bytes = str2ull(procfile_lineword(ff, line, 1), NULL) * 1024;
-            matched_total = true;
-        }
+    char *s = strstr(buf, MEMINFO_MEMTOTAL);
+    if(!s) goto failed;
+    s += sizeof(MEMINFO_MEMTOTAL) - 1;
+    while(isspace((uint8_t)*s)) s++;
+    sm.ram_total_bytes = str2ull(s, NULL) * 1024;
 
-        if(!matched_available && strcmp(procfile_lineword(ff, line, 0), "MemAvailable") == 0) {
-            sm.ram_available_bytes = str2ull(procfile_lineword(ff, line, 1), NULL) * 1024;
-            matched_available = true;
-        }
+    s = strstr(buf, MEMINFO_MEMAVAILABLE);
+    if(!s) goto failed;
+    s += sizeof(MEMINFO_MEMAVAILABLE) - 1;
+    while(isspace((uint8_t)*s)) s++;
+    sm.ram_available_bytes = str2ull(s, NULL) * 1024;
 
-        if(matched_total && matched_available)
-            break;
-    }
-
-    // we keep ff open to speed up the next calls
-    os_system_memory_last = sm;
     return sm;
 
 failed:
@@ -314,6 +273,7 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram __maybe_unused) {
         }
     }
 
+    os_system_memory_last = sm;
     return sm;
 }
 #endif
