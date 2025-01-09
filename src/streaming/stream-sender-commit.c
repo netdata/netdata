@@ -251,8 +251,7 @@ void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_
         fatal("STREAM SND '%s' [to %s]: function '%s()' is committing a sender buffer twice.",
               rrdhost_hostname(s->host), s->remote_ip, func);
 
-    if(true ||
-        !is_receiver ||
+    if(!is_receiver ||
         type != STREAM_TRAFFIC_TYPE_DATA ||
         commit->reused >= 100 ||
         buffer_strlen(wb) >= COMPRESSION_MAX_MSG_SIZE * 2 / 3) {
