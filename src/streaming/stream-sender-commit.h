@@ -24,6 +24,7 @@ void sender_buffer_destroy(struct sender_buffer *commit);
 // thread buffer for sending data upstream (to a parent)
 
 void sender_thread_buffer_free(void);
+void sender_host_buffer_free(struct rrdhost *host);
 
 // get the thread buffer
 // this is the preferred buffer for dedicated workers sending a lot of messages (like replication)
