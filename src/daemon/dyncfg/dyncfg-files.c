@@ -142,12 +142,28 @@ void dyncfg_file_load(const char *d_name) {
 
     if (read_payload) {
         // Determine the actual size of the remaining file content
+        int rc = 0;
         long saved_position = ftell(fp); // Save current position
-        fseek(fp, 0, SEEK_END);
-        long total_size = ftell(fp); // Total size of the file
-        size_t actual_size = total_size - saved_position; // Calculate remaining content size
-        fseek(fp, saved_position, SEEK_SET); // Reset file pointer to the beginning of the payload
 
+        long total_size = 0;
+        size_t actual_size = 0;
+        if (saved_position != -1) {
+            rc = fseek(fp, 0, SEEK_END);
+            if (!rc) {
+                total_size = ftell(fp);                      // Total size of the file
+                actual_size = total_size - saved_position;   // Calculate remaining content size
+                rc = fseek(fp, saved_position, SEEK_SET);    // Reset file pointer to the beginning of the payload
+            }
+        }
+
+        // Check if any of the system calls failed
+        if (rc || saved_position == -1 || total_size == -1) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: error while accessing '%s' to calculate the %s.", filename,
+                   saved_position == -1 ? "payload position" : "file size");
+            fclose(fp);
+            dyncfg_cleanup(&tmp);
+            return;
+        }
         // Use actual_size instead of content_length to handle the whole remaining file
         tmp.dyncfg.payload = buffer_create(actual_size, NULL);
         tmp.dyncfg.payload->content_type = content_type;

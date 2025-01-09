@@ -1169,7 +1169,6 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
                             }
                             buffer_json_object_close(wb); // contexts
                             buffer_json_object_close(wb); // host
-                            last_host = NULL;
                         }
 
                         buffer_json_member_add_object(wb, host->machine_guid);

@@ -1398,6 +1398,10 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         max_time_s = MAX(max_time_s, metric_info->last_time_s);
     }
 
+    // Check if not properly set in the loop above to prevent overflow
+    if (min_time_s == LONG_MAX)
+        min_time_s = 0;
+
     // Store in the header
     j2_header.start_time_ut = min_time_s * USEC_PER_SEC;
     j2_header.end_time_ut = max_time_s * USEC_PER_SEC;

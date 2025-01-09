@@ -612,7 +612,9 @@ static void diskspace_main_cleanup(void *pptr) {
     if (diskspace_slow_thread)
         nd_thread_join(diskspace_slow_thread);
 
+    netdata_mutex_lock(&slow_mountinfo_mutex);
     free_basic_mountinfo_list(slow_mountinfo_tmp_root);
+    netdata_mutex_unlock(&slow_mountinfo_mutex);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
