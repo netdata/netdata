@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix compilation on windows [\#19354](https://github.com/netdata/netdata/pull/19354) ([ktsaou](https://github.com/ktsaou))
 - Minor fixes [\#19353](https://github.com/netdata/netdata/pull/19353) ([ktsaou](https://github.com/ktsaou))
 - RRDCONTEXTS: loading report [\#19351](https://github.com/netdata/netdata/pull/19351) ([ktsaou](https://github.com/ktsaou))
 - lower compression level to lower cpu resources on parents [\#19350](https://github.com/netdata/netdata/pull/19350) ([ktsaou](https://github.com/ktsaou))
@@ -467,7 +468,6 @@
 - docs: fix grammar in readme [\#18799](https://github.com/netdata/netdata/pull/18799) ([ilyam8](https://github.com/ilyam8))
 - local-listeners improvements [\#18798](https://github.com/netdata/netdata/pull/18798) ([ktsaou](https://github.com/ktsaou))
 - Remove macOS 12 from CI, and add macOS 15. [\#18797](https://github.com/netdata/netdata/pull/18797) ([Ferroin](https://github.com/Ferroin))
-- Windows fixes \(chart labels and warnings\) [\#18796](https://github.com/netdata/netdata/pull/18796) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
