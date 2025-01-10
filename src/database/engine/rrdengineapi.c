@@ -911,8 +911,8 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh)
         pgdc_reset(&handle->pgdc, NULL, UINT32_MAX);
     }
 
-    __atomic_store_n(&handle->pdc->workers_should_stop, true, __ATOMIC_RELAXED);
-    pdc_release_and_destroy_if_unreferenced(handle->pdc, false, false);
+    if(!pdc_release_and_destroy_if_unreferenced(handle->pdc, false, false))
+        __atomic_store_n(&handle->pdc->workers_should_stop, true, __ATOMIC_RELAXED);
 
     unregister_query_handle(handle);
     rrdeng_query_handle_release(handle);
