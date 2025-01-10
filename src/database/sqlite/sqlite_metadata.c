@@ -1772,7 +1772,7 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     struct scan_metadata_payload *data = req->data;
     struct metadata_wc *wc = data->wc;
 
-    bool first = false;
+    bool first = true;
     Word_t Index = 0;
     Pvoid_t *Pvalue;
     while ((Pvalue = JudyLFirstThenNext(wc->ae_DelJudyL, &Index, &first))) {
@@ -1780,7 +1780,7 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
         if(!__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED)) {
             health_alarm_log_free_one_nochecks_nounlink(ae);
             (void) JudyLDel(&wc->ae_DelJudyL, Index, PJE0);
-            first = false;
+            first = true;
             Index = 0;
         }
     }
