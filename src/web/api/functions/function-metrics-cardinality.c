@@ -32,6 +32,8 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
 
     DICTIONARY *contexts_dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
 
+    struct context_counts all = { 0 };
+    
     // Collect stats for each context across all nodes
     RRDHOST *host;
     dfe_start_read(rrdhost_root_index, host) {
@@ -40,45 +42,75 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
         bool host_online = rrdhost_is_online(host);
 
         RRDCONTEXT *rc;
-        dfe_start_read(host->rrdctx.contexts, rc) {
+        dfe_start_read(host->rrdctx.contexts, rc)
+        {
             const char *context_id = string2str(rc->id);
 
-            struct context_counts tmp = { 0 };
-            struct context_counts *cnt = dictionary_set(contexts_dict, context_id, &tmp, sizeof(tmp));
+            struct context_counts cnt = {0};
 
-            cnt->nodes++;
+            cnt.nodes++;
 
-            if(host_online)
-                cnt->online_nodes++;
+            if (host_online)
+                cnt.online_nodes++;
             else
-                cnt->offline_nodes++;
+                cnt.offline_nodes++;
 
             RRDINSTANCE *ri;
             dfe_start_read(rc->rrdinstances, ri) {
-                cnt->instances++;
+                cnt.instances++;
 
-                if(rrd_flag_check(ri, RRD_FLAG_COLLECTED)) {
-                    cnt->online_instances++;
+                if (rrd_flag_check(ri, RRD_FLAG_COLLECTED)) {
+                    cnt.online_instances++;
 
                     RRDMETRIC *rm;
                     dfe_start_read(ri->rrdmetrics, rm) {
-                        cnt->metrics++;
+                        cnt.metrics++;
 
-                        if(rrd_flag_check(rm, RRD_FLAG_COLLECTED))
-                            cnt->online_metrics++;
+                        if (rrd_flag_check(rm, RRD_FLAG_COLLECTED))
+                            cnt.online_metrics++;
                         else
-                            cnt->offline_metrics++;
+                            cnt.offline_metrics++;
                     }
                     dfe_done(rm);
                 }
                 else {
-                    cnt->offline_instances++;
+                    cnt.offline_instances++;
                     size_t metrics = dictionary_entries(ri->rrdmetrics);
-                    cnt->metrics += metrics;
-                    cnt->offline_metrics += metrics;
+                    cnt.metrics += metrics;
+                    cnt.offline_metrics += metrics;
                 }
             }
             dfe_done(ri);
+
+            struct context_counts *cc = dictionary_get(contexts_dict, context_id);
+            if (cc) {
+                cc->nodes += cnt.nodes;
+                cc->online_nodes += cnt.online_nodes;
+                cc->offline_nodes += cnt.offline_nodes;
+
+                cc->instances += cnt.instances;
+                cc->online_instances += cnt.online_instances;
+                cc->offline_instances += cnt.offline_instances;
+
+                cc->metrics += cnt.metrics;
+                cc->online_metrics += cnt.online_metrics;
+                cc->offline_metrics += cnt.offline_metrics;
+            }
+            else
+                dictionary_set(contexts_dict, context_id, &cnt, sizeof(cnt));
+
+            // keep track of the total
+            all.nodes += cnt.nodes;
+            all.online_nodes += cnt.online_nodes;
+            all.offline_nodes += cnt.offline_nodes;
+            
+            all.instances += cnt.instances;
+            all.online_instances += cnt.online_instances;
+            all.offline_instances += cnt.offline_instances;
+
+            all.metrics += cnt.metrics;
+            all.online_metrics += cnt.online_metrics;
+            all.offline_metrics += cnt.offline_metrics;
         }
         dfe_done(rc);
     }
@@ -110,6 +142,24 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
 
             double metrics_ephemerality = (cnt->metrics > 0) ? ((double)cnt->offline_metrics * 100.0) / (double)cnt->metrics : 0.0;
             buffer_json_add_array_item_double(wb, metrics_ephemerality);
+            
+            double percentage_of_all_instances = (all.instances) ? ((double)cnt->instances * 100.0) / (double)all.instances : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_all_instances);
+
+            double percentage_of_online_instances = (all.online_instances) ? ((double)cnt->online_instances * 100.0) / (double)all.online_instances : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_online_instances);
+
+            double percentage_of_offline_instances = (all.offline_instances) ? ((double)cnt->offline_instances * 100.0) / (double)all.offline_instances : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_offline_instances);
+
+            double percentage_of_all_metrics = (all.metrics) ? ((double)cnt->metrics * 100.0) / (double)all.metrics : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_all_metrics);
+            
+            double percentage_of_online_metrics = (all.online_metrics) ? ((double)cnt->online_metrics * 100.0) / (double)all.online_metrics : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_online_metrics);
+
+            double percentage_of_offline_metrics = (all.offline_metrics) ? ((double)cnt->offline_metrics * 100.0) / (double)all.offline_metrics : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_offline_metrics);
         }
         buffer_json_array_close(wb);
 
@@ -218,6 +268,48 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
                                     NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "Ephemeral Dimensions", "Percentage of Archived Time-Series",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "All Instances %", "Percentage of All Instances",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Curr. Instances %", "Percentage of Online Instances",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Old Instances %", "Percentage of Offline Instances",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "All Dimensions %", "Percentage of All Dimensions",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+        
+        buffer_rrdf_table_add_field(wb, field_id++, "Curr. Dimensions %", "Percentage of Online Dimensions",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Old Dimensions %", "Percentage of Offline Dimensions",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                                     2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
