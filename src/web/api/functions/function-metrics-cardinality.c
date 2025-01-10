@@ -3,7 +3,7 @@
 #include "function-metrics-cardinality.h"
 #include "database/contexts/internal.h"
 
-struct context_counts {
+struct counts {
     size_t nodes;
     size_t instances;
     size_t metrics;
@@ -25,13 +25,73 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
-    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_time_t(wb, "update_every", 10);
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_METRICS_CARDINALITY_HELP);
-    buffer_json_member_add_array(wb, "data");
+
+    // Add parameter definition similar to network-viewer
+    buffer_json_member_add_array(wb, "accepted_params");
+    {
+        buffer_json_add_array_item_string(wb, "group");
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_array(wb, "required_params");
+    {
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "id", "group");
+            buffer_json_member_add_string(wb, "name", "Grouping");
+            buffer_json_member_add_string(wb, "help", "Select how to group the metrics");
+            buffer_json_member_add_boolean(wb, "unique_view", true);
+            buffer_json_member_add_string(wb, "type", "select");
+            buffer_json_member_add_array(wb, "options");
+            {
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "by-context");
+                    buffer_json_member_add_string(wb, "name", "Group by Context");
+                }
+                buffer_json_object_close(wb);
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "by-node");
+                    buffer_json_member_add_string(wb, "name", "Group by Node");
+                }
+                buffer_json_object_close(wb);
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    // Parse function parameters
+    bool by_node = false;
+    {
+        char function_copy[strlen(function) + 1];
+        memcpy(function_copy, function, sizeof(function_copy));
+        char *words[1024];
+        size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
+        for (size_t i = 1; i < num_words; i++) {
+            char *param = get_word(words, num_words, i);
+            if (strcmp(param, "group:by-node") == 0) {
+                by_node = true;
+            } else if (strcmp(param, "group:by-context") == 0) {
+                by_node = false;
+            } else if (strcmp(param, "info") == 0) {
+                buffer_json_finalize(wb);
+                return HTTP_RESP_OK;
+            }
+        }
+    }
 
     DICTIONARY *contexts_dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
 
+    buffer_json_member_add_array(wb, "data");
+
+    struct counts all = { 0 };
+    
     // Collect stats for each context across all nodes
     RRDHOST *host;
     dfe_start_read(rrdhost_root_index, host) {
@@ -41,61 +101,92 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
 
         RRDCONTEXT *rc;
         dfe_start_read(host->rrdctx.contexts, rc) {
-            const char *context_id = string2str(rc->id);
+            const char *aggregation_key = by_node ? string2str(host->hostname) :string2str(rc->id);
 
-            struct context_counts tmp = { 0 };
-            struct context_counts *cnt = dictionary_set(contexts_dict, context_id, &tmp, sizeof(tmp));
+            struct counts cnt = { 0 };
 
-            cnt->nodes++;
+            cnt.nodes++;
 
-            if(host_online)
-                cnt->online_nodes++;
+            if (host_online)
+                cnt.online_nodes++;
             else
-                cnt->offline_nodes++;
+                cnt.offline_nodes++;
 
             RRDINSTANCE *ri;
             dfe_start_read(rc->rrdinstances, ri) {
-                cnt->instances++;
+                cnt.instances++;
 
-                if(rrd_flag_check(ri, RRD_FLAG_COLLECTED)) {
-                    cnt->online_instances++;
+                if (rrd_flag_check(ri, RRD_FLAG_COLLECTED)) {
+                    cnt.online_instances++;
 
                     RRDMETRIC *rm;
                     dfe_start_read(ri->rrdmetrics, rm) {
-                        cnt->metrics++;
+                        cnt.metrics++;
 
-                        if(rrd_flag_check(rm, RRD_FLAG_COLLECTED))
-                            cnt->online_metrics++;
+                        if (rrd_flag_check(rm, RRD_FLAG_COLLECTED))
+                            cnt.online_metrics++;
                         else
-                            cnt->offline_metrics++;
+                            cnt.offline_metrics++;
                     }
                     dfe_done(rm);
                 }
                 else {
-                    cnt->offline_instances++;
+                    cnt.offline_instances++;
                     size_t metrics = dictionary_entries(ri->rrdmetrics);
-                    cnt->metrics += metrics;
-                    cnt->offline_metrics += metrics;
+                    cnt.metrics += metrics;
+                    cnt.offline_metrics += metrics;
                 }
             }
             dfe_done(ri);
+
+            struct counts *cc = dictionary_get(contexts_dict, aggregation_key);
+            if (cc) {
+                cc->nodes += cnt.nodes;
+                cc->online_nodes += cnt.online_nodes;
+                cc->offline_nodes += cnt.offline_nodes;
+
+                cc->instances += cnt.instances;
+                cc->online_instances += cnt.online_instances;
+                cc->offline_instances += cnt.offline_instances;
+
+                cc->metrics += cnt.metrics;
+                cc->online_metrics += cnt.online_metrics;
+                cc->offline_metrics += cnt.offline_metrics;
+            }
+            else
+                dictionary_set(contexts_dict, aggregation_key, &cnt, sizeof(cnt));
+
+            // keep track of the total
+            all.nodes += cnt.nodes;
+            all.online_nodes += cnt.online_nodes;
+            all.offline_nodes += cnt.offline_nodes;
+            
+            all.instances += cnt.instances;
+            all.online_instances += cnt.online_instances;
+            all.offline_instances += cnt.offline_instances;
+
+            all.metrics += cnt.metrics;
+            all.online_metrics += cnt.online_metrics;
+            all.offline_metrics += cnt.offline_metrics;
         }
         dfe_done(rc);
     }
     dfe_done(host);
 
-    struct context_counts max = { 0 };
+    struct counts max = { 0 };
 
     // Output collected stats
-    struct context_counts *cnt;
+    struct counts *cnt;
     dfe_start_read(contexts_dict, cnt) {
         buffer_json_add_array_item_array(wb);
         {
             buffer_json_add_array_item_string(wb, cnt_dfe.name);
 
-            buffer_json_add_array_item_uint64(wb, cnt->nodes);
-            buffer_json_add_array_item_uint64(wb, cnt->online_nodes);
-            buffer_json_add_array_item_uint64(wb, cnt->offline_nodes);
+            if(!by_node) {
+                buffer_json_add_array_item_uint64(wb, cnt->nodes);
+                buffer_json_add_array_item_uint64(wb, cnt->online_nodes);
+                buffer_json_add_array_item_uint64(wb, cnt->offline_nodes);
+            }
 
             buffer_json_add_array_item_uint64(wb, cnt->instances);
             buffer_json_add_array_item_uint64(wb, cnt->online_instances);
@@ -110,6 +201,24 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
 
             double metrics_ephemerality = (cnt->metrics > 0) ? ((double)cnt->offline_metrics * 100.0) / (double)cnt->metrics : 0.0;
             buffer_json_add_array_item_double(wb, metrics_ephemerality);
+            
+            double percentage_of_all_instances = (all.instances) ? ((double)cnt->instances * 100.0) / (double)all.instances : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_all_instances);
+
+            double percentage_of_online_instances = (all.online_instances) ? ((double)cnt->online_instances * 100.0) / (double)all.online_instances : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_online_instances);
+
+            double percentage_of_offline_instances = (all.offline_instances) ? ((double)cnt->offline_instances * 100.0) / (double)all.offline_instances : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_offline_instances);
+
+            double percentage_of_all_metrics = (all.metrics) ? ((double)cnt->metrics * 100.0) / (double)all.metrics : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_all_metrics);
+            
+            double percentage_of_online_metrics = (all.online_metrics) ? ((double)cnt->online_metrics * 100.0) / (double)all.online_metrics : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_online_metrics);
+
+            double percentage_of_offline_metrics = (all.offline_metrics) ? ((double)cnt->offline_metrics * 100.0) / (double)all.offline_metrics : 0.0;
+            buffer_json_add_array_item_double(wb, percentage_of_offline_metrics);
         }
         buffer_json_array_close(wb);
 
@@ -140,33 +249,45 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
     {
         size_t field_id = 0;
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Context", "Context Name",
-                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                                    RRDF_FIELD_OPTS_FULL_WIDTH | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE,
-                                    NULL);
+        if(by_node) {
+            buffer_rrdf_table_add_field(wb, field_id++, "Hostname", "Hostname",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                        RRDF_FIELD_OPTS_FULL_WIDTH | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
+        }
+        else {
+            buffer_rrdf_table_add_field(wb, field_id++, "Context", "Context Name",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                        RRDF_FIELD_OPTS_FULL_WIDTH | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
+        }
 
-        buffer_rrdf_table_add_field(wb, field_id++, "All Nodes", "Number of Nodes",
-                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, "nodes", (double)max.nodes, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE,
-                                    NULL);
+        if(!by_node) {
+            buffer_rrdf_table_add_field(wb, field_id++, "All Nodes", "Number of Nodes",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                        0, "nodes", (double)max.nodes, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE,
+                                        NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Curr. Nodes", "Number of Online Nodes",
-                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, "nodes", (double)max.online_nodes, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE,
-                                    NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "Curr. Nodes", "Number of Online Nodes",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                        0, "nodes", (double)max.online_nodes, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Old Nodes", "Number of Offline Nodes",
-                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, "nodes", (double)max.offline_nodes, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE,
-                                    NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "Old Nodes", "Number of Offline Nodes",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                        0, "nodes", (double)max.offline_nodes, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
+        }
 
         buffer_rrdf_table_add_field(wb, field_id++, "All Instances", "Total Number of Instances",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
@@ -210,14 +331,56 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
                                     RRDF_FIELD_OPTS_NONE,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Ephemeral Instances", "Percentage of Archived Instances",
+        buffer_rrdf_table_add_field(wb, field_id++, "Ephemeral Instances", "Percentage of Archived Instances vs All Instances of the row",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                                     2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Ephemeral Dimensions", "Percentage of Archived Time-Series",
+        buffer_rrdf_table_add_field(wb, field_id++, "Ephemeral Dimensions", "Percentage of Archived Time-Series vs All Time-Series of the row",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "All Instances %", "Percentage of All Instances of row vs the sum of All Instances across all rows",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Curr. Instances %", "Percentage of Currently Collected Instances of row vs the sum of Currently Collected Instances across all rows",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Old Instances %", "Percentage of Old Instances of row vs the sum of Old Instances across all rows",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "All Dimensions %", "Percentage of All Time-Series of row vs the sum of All Time-Series across all rows",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+        
+        buffer_rrdf_table_add_field(wb, field_id++, "Curr. Dimensions %", "Percentage of Currently Collected Time-Series of row vs the sum of Currently Collected Time-Series across all rows",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Old Dimensions %", "Percentage of Archived Time-Series of row vs the sum of Archived Time-Series across all rows",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                                     2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
