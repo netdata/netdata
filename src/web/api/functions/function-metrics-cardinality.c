@@ -73,7 +73,9 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
                 }
                 else {
                     cnt->offline_instances++;
-                    cnt->offline_metrics += dictionary_entries(ri->rrdmetrics);
+                    size_t metrics = dictionary_entries(ri->rrdmetrics);
+                    cnt->metrics += metrics;
+                    cnt->offline_metrics += metrics;
                 }
             }
             dfe_done(ri);
