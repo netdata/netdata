@@ -312,14 +312,16 @@ static int set_pipe_size(int pipe_fd __maybe_unused, int new_size) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void stream_thread_messages_resize_unsafe(struct stream_thread *sth) {
+static void stream_thread_messages_resize(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     if(sth->nodes_count * 2 >= sth->messages.size) {
+        spinlock_lock(&sth->messages.spinlock);
         size_t new_size = MAX(sth->messages.size * 2, sth->nodes_count * 2);
         sth->messages.array = reallocz(sth->messages.array, new_size * sizeof(*sth->messages.array));
         sth->messages.copy = reallocz(sth->messages.copy, new_size * sizeof(*sth->messages.copy));
         sth->messages.size = new_size;
+        spinlock_unlock(&sth->messages.spinlock);
     }
 }
 
@@ -513,10 +515,10 @@ void *stream_thread(void *ptr) {
         if(now_ut - last_dequeue_ut >= 100 * USEC_PER_MS) {
             worker_is_busy(WORKER_STREAM_JOB_DEQUEUE);
 
+            stream_thread_messages_resize(sth);
+
             // move any pending hosts in the inbound queue, to the running list
             spinlock_lock(&sth->queue.spinlock);
-
-            stream_thread_messages_resize_unsafe(sth);
 
             stream_thread_process_waiting_list_unsafe(sth, now_ut);
             // stream_receiver_move_entire_queue_to_running_unsafe(sth);
