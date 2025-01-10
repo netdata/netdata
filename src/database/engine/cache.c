@@ -425,6 +425,10 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     if(unlikely(wanted_cache_size < min_cache_size))
         wanted_cache_size = min_cache_size;
 
+    // protection for the case the cache is totally empty
+    if(unlikely(wanted_cache_size < 65536))
+        wanted_cache_size = 65536;
+
     const size_t per1000 = (size_t)(current_cache_size * 1000ULL / wanted_cache_size);
     __atomic_store_n(&cache->usage.per1000, per1000, __ATOMIC_RELAXED);
     __atomic_store_n(&cache->stats.wanted_cache_size, wanted_cache_size, __ATOMIC_RELAXED);
