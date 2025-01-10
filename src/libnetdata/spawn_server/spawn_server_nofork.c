@@ -1210,6 +1210,8 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
 }
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
+    if(!server) return NULL;
+
     int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 };
 
     SPAWN_INSTANCE *instance = callocz(1, sizeof(SPAWN_INSTANCE));
