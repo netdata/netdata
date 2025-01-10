@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- metrics cardinality improvements [\#19366](https://github.com/netdata/netdata/pull/19366) ([ktsaou](https://github.com/ktsaou))
 - prevent memory corruption in dbengine [\#19365](https://github.com/netdata/netdata/pull/19365) ([ktsaou](https://github.com/ktsaou))
 - Revert "prevent memory corruption in dbengine" [\#19364](https://github.com/netdata/netdata/pull/19364) ([ktsaou](https://github.com/ktsaou))
 - prevent memory corruption in dbengine [\#19363](https://github.com/netdata/netdata/pull/19363) ([ktsaou](https://github.com/ktsaou))
@@ -41,6 +42,7 @@
 - FD Leaks Fix [\#19327](https://github.com/netdata/netdata/pull/19327) ([ktsaou](https://github.com/ktsaou))
 - fix\(kickstart.sh\): correct wrong function name in perpare\_offline\_install [\#19323](https://github.com/netdata/netdata/pull/19323) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/vmware/govmomi from 0.46.3 to 0.47.0 in /src/go [\#19322](https://github.com/netdata/netdata/pull/19322) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Improve context load time during startup [\#19321](https://github.com/netdata/netdata/pull/19321) ([stelfrag](https://github.com/stelfrag))
 - fix\(cgroup-rename\): prevent leading comma in Docker LABELS when IMAGE empty [\#19318](https://github.com/netdata/netdata/pull/19318) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity issues [\#19317](https://github.com/netdata/netdata/pull/19317) ([stelfrag](https://github.com/stelfrag))
 - CGROUP labels [\#19316](https://github.com/netdata/netdata/pull/19316) ([ktsaou](https://github.com/ktsaou))
@@ -468,8 +470,6 @@
 - Comment out dictionary with hashtable code for now [\#18814](https://github.com/netdata/netdata/pull/18814) ([stelfrag](https://github.com/stelfrag))
 - Fix variable scope to prevent invalid memory access [\#18813](https://github.com/netdata/netdata/pull/18813) ([stelfrag](https://github.com/stelfrag))
 - fix\(proc/proc\_net\_dev\): delay collecting all virtual interfaces [\#18812](https://github.com/netdata/netdata/pull/18812) ([ilyam8](https://github.com/ilyam8))
-- Revert "Fix atomic builtins test that currently fails for llvm+compiler\_rt when gcc is not present" [\#18811](https://github.com/netdata/netdata/pull/18811) ([stelfrag](https://github.com/stelfrag))
-- Windows storage metrics [\#18810](https://github.com/netdata/netdata/pull/18810) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
