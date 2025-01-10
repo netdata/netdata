@@ -35,14 +35,15 @@ typedef struct aral_free {
 } ARAL_FREE;
 
 typedef struct aral_page {
+    const char *filename;
+    uint8_t *data;
+
     bool marked;
     bool started_marked;
     bool mapped;
     uint32_t size;                      // the allocation size of the page
-    const char *filename;
-    uint8_t *data;
-
     uint32_t max_elements;              // the number of elements that can fit on this page
+    uint64_t elements_segmented;        // fast path for acquiring new elements in this page
 
     struct {
         uint32_t used_elements;         // the number of used elements on this page
@@ -582,14 +583,8 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
     __atomic_add_fetch(&ar->stats->structures.allocations, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ar->stats->structures.allocated_bytes, structures_size, __ATOMIC_RELAXED);
 
-    // link the free space to its page
-    ARAL_FREE *fr = (ARAL_FREE *)page->data;
-
-    fr->size = page->max_elements * ar->config.element_size;
-    fr->next = NULL;
-    page->available.list = fr;
-
-    aral_free_validate_internal_check(ar, fr);
+    // Initialize elements_segmented last with RELEASE
+    __atomic_store_n(&page->elements_segmented, 0, __ATOMIC_RELEASE);
 
     return page;
 }
@@ -769,6 +764,20 @@ static inline ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool mar
 }
 
 static void *aral_get_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *page, bool marked) {
+    // Try fast path first
+    uint64_t slot = __atomic_fetch_add(&page->elements_segmented, 1, __ATOMIC_ACQUIRE);
+    if (slot < page->max_elements) {
+        // Fast path - we got a valid slot
+        uint8_t *data = page->data + (slot * ar->config.element_size);
+
+        // Set the page pointer after the element
+        aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ar, page, data, marked);
+
+        aral_element_given(ar, page);
+        return data;
+    }
+
+    // Fall back to existing mechanism for reused memory
     aral_page_available_lock(ar, page);
 
     if(!page->available.list) {
@@ -778,40 +787,13 @@ static void *aral_get_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *page, bo
         aral_page_incoming_unlock(ar, page);
     }
 
-    ARAL_FREE *found_fr;
-    found_fr = page->available.list;
-
-    internal_fatal(!found_fr,
-                   "ARAL: '%s' incoming free list, cannot be NULL.", ar->config.name);
-
-    internal_fatal(found_fr->size < ar->config.element_size,
-                   "ARAL: '%s' free element size %zu, cannot be smaller than %zu",
-                   ar->config.name, page->available.list->size, ar->config.element_size);
-
-    // check if the remaining size (after we use this slot) is not enough for another element
-    if(unlikely(found_fr->size - ar->config.element_size < ar->config.element_size)) {
-        // we can use the entire free space entry
-
-        page->available.list = found_fr->next;
-    }
-    else {
-        // we can split the free space entry
-
-        uint8_t *data = (uint8_t *)found_fr;
-        ARAL_FREE *fr = (ARAL_FREE *)&data[ar->config.element_size];
-
-        fr->size = found_fr->size - ar->config.element_size;
-
-        // link the free slot first in the page
-        fr->next = found_fr->next;
-        page->available.list = fr;
-
-        aral_free_validate_internal_check(ar, fr);
-    }
+    ARAL_FREE *found_fr = page->available.list;
+    internal_fatal(!found_fr, "ARAL: '%s' incoming free list, cannot be NULL.", ar->config.name);
+    page->available.list = found_fr->next;
 
     aral_page_available_unlock(ar, page);
 
-    // put the page pointer after the element
+    // Set the page pointer after the element
     aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ar, page, found_fr, marked);
 
     aral_element_given(ar, page);
