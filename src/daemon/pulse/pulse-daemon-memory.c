@@ -28,7 +28,7 @@ static char *find_last(const char *haystack, const char *needle, size_t *found) 
 
 static bool parse_malloc_info(size_t *arenas, size_t *allocated_memory, size_t *used_fast, size_t *used_rest, size_t *used_mmap, size_t *unused_memory) {
     int found = 0;
-    
+
     *arenas = 0;
     *allocated_memory = 0;
     *used_fast = 0;
@@ -415,7 +415,7 @@ void pulse_daemon_memory_do(bool extended) {
                     "pulse",
                     130104,
                     localhost->rrd_update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_LINE);
 
                 rd_arenas = rrddim_add(st_arenas, "arenas", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
