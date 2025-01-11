@@ -98,6 +98,7 @@
 #cmakedefine HAVE_C__GENERIC
 #cmakedefine HAVE_C_MALLOPT
 #cmakedefine HAVE_C_MALLOC_TRIM
+#cmakedefine HAVE_C_MALLOC_INFO
 #cmakedefine HAVE_SETNS
 #cmakedefine HAVE_STRNDUP
 #cmakedefine SSL_HAS_PENDING
