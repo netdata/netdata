@@ -13,23 +13,28 @@ struct netdata_buffers_statistics netdata_buffers_statistics = { 0 };
 #include <malloc.h>
 
 // Helper function to find the last occurrence of a substring in a string
-static char *find_last(const char *haystack, const char *needle) {
+static char *find_last(const char *haystack, const char *needle, size_t *found) {
+    *found = 0;
+
     char *last = NULL;
     char *current = strstr(haystack, needle);
     while (current) {
+        (*found)++;
         last = current;
         current = strstr(current + 1, needle);
     }
     return last;
 }
 
-static bool parse_malloc_info(size_t *allocated_memory, size_t *used_fast, size_t *used_rest, size_t *used_mmap, size_t *unused_memory) {
+static bool parse_malloc_info(size_t *arenas, size_t *allocated_memory, size_t *used_fast, size_t *used_rest, size_t *used_mmap, size_t *unused_memory) {
+    int found = 0;
+    
+    *arenas = 0;
     *allocated_memory = 0;
     *used_fast = 0;
     *used_rest = 0;
     *used_mmap = 0;
     *unused_memory = 0;
-    int found = 0;
 
     // Buffer for malloc_info XML
     char *buffer = NULL;
@@ -57,7 +62,7 @@ static bool parse_malloc_info(size_t *allocated_memory, size_t *used_fast, size_
     buffer[size - 1] = '\0';
 
     // Find the last </heap>
-    char *last_heap_end = find_last(buffer, "</heap>");
+    char *last_heap_end = find_last(buffer, "</heap>", arenas);
     if (!last_heap_end)
         goto cleanup;
 
@@ -391,41 +396,70 @@ void pulse_daemon_memory_do(bool extended) {
     // ----------------------------------------------------------------------------------------------------------------
 
 #ifdef HAVE_C_MALLOC_INFO
-    size_t allocated_memory, used_fast, used_rest, used_mmap, unused_memory;
-    if(parse_malloc_info(&allocated_memory, &used_fast, &used_rest, &used_mmap, &unused_memory)) {
-        static RRDSET *st_malloc = NULL;
-        static RRDDIM *rd_unused = NULL;
-        static RRDDIM *rd_fast = NULL;
-        static RRDDIM *rd_rest = NULL;
-        static RRDDIM *rd_mmap = NULL;
+    size_t glibc_arenas, glibc_allocated_memory, glibc_used_fast, glibc_used_rest, glibc_used_mmap, glibc_unused_memory;
+    if(parse_malloc_info(&glibc_arenas, &glibc_allocated_memory, &glibc_used_fast, &glibc_used_rest, &glibc_used_mmap, &glibc_unused_memory)) {
+        if (glibc_arenas) {
+            static RRDSET *st_arenas = NULL;
+            static RRDDIM *rd_arenas = NULL;
 
-        if (unlikely(!st_malloc)) {
-            st_malloc = rrdset_create_localhost(
-                "netdata",
-                "malloc_info",
-                NULL,
-                "Memory Usage",
-                NULL,
-                "Glibc Memory Buffers",
-                "bytes",
-                "netdata",
-                "pulse",
-                130104,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_STACKED);
+            if (unlikely(!st_arenas)) {
+                st_arenas = rrdset_create_localhost(
+                    "netdata",
+                    "glibc_arenas",
+                    NULL,
+                    "Memory Usage",
+                    NULL,
+                    "Glibc Memory Arenas",
+                    "bytes",
+                    "netdata",
+                    "pulse",
+                    130104,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
 
-            rd_unused = rrddim_add(st_malloc, "unused", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_fast = rrddim_add(st_malloc, "fast", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_rest = rrddim_add(st_malloc, "rest", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_mmap = rrddim_add(st_malloc, "mmap", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_arenas = rrddim_add(st_arenas, "arenas", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            // the sum of all these needs to be above at the total buffers calculation
+            rrddim_set_by_pointer(st_arenas, rd_arenas, (collected_number)glibc_arenas);
+            rrdset_done(st_arenas);
         }
 
-        // the sum of all these needs to be above at the total buffers calculation
-        rrddim_set_by_pointer(st_malloc, rd_unused, (collected_number)unused_memory);
-        rrddim_set_by_pointer(st_malloc, rd_fast, (collected_number)used_fast);
-        rrddim_set_by_pointer(st_malloc, rd_rest, (collected_number)used_rest);
-        rrddim_set_by_pointer(st_malloc, rd_mmap, (collected_number)used_mmap);
-        rrdset_done(st_malloc);
+        if (glibc_allocated_memory > 0 && glibc_used_fast + glibc_used_rest + glibc_used_mmap + glibc_unused_memory > 0) {
+            static RRDSET *st_malloc = NULL;
+            static RRDDIM *rd_unused = NULL;
+            static RRDDIM *rd_fast = NULL;
+            static RRDDIM *rd_rest = NULL;
+            static RRDDIM *rd_mmap = NULL;
+
+            if (unlikely(!st_malloc)) {
+                st_malloc = rrdset_create_localhost(
+                    "netdata",
+                    "glibc_memory",
+                    NULL,
+                    "Memory Usage",
+                    NULL,
+                    "Glibc Memory Usage",
+                    "bytes",
+                    "netdata",
+                    "pulse",
+                    130105,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+                rd_unused = rrddim_add(st_malloc, "unused", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_fast = rrddim_add(st_malloc, "fast", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_rest = rrddim_add(st_malloc, "rest", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_mmap = rrddim_add(st_malloc, "mmap", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            // the sum of all these needs to be above at the total buffers calculation
+            rrddim_set_by_pointer(st_malloc, rd_unused, (collected_number)glibc_unused_memory);
+            rrddim_set_by_pointer(st_malloc, rd_fast, (collected_number)glibc_used_fast);
+            rrddim_set_by_pointer(st_malloc, rd_rest, (collected_number)glibc_used_rest);
+            rrddim_set_by_pointer(st_malloc, rd_mmap, (collected_number)glibc_used_mmap);
+            rrdset_done(st_malloc);
+        }
     }
 #endif
 
