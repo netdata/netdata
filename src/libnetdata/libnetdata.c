@@ -599,6 +599,8 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
 #endif
 }
 
+size_t netdata_mmap_count = 0;
+
 void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, bool dont_dump, int *open_fd)
 {
     // netdata_log_info("netdata_mmap('%s', %zu", filename, size);
@@ -671,6 +673,7 @@ cleanup:
             close(fd);
     }
     if(mem == MAP_FAILED) return NULL;
+    __atomic_add_fetch(&netdata_mmap_count, 1, __ATOMIC_RELAXED);
     errno_clear();
     return mem;
 }
@@ -679,7 +682,10 @@ int netdata_munmap(void *ptr, size_t size) {
 #ifdef NETDATA_TRACE_ALLOCATIONS
     malloc_trace_munmap(size);
 #endif
-    return munmap(ptr, size);
+    int rc = munmap(ptr, size);
+    if(rc == 0)
+        __atomic_sub_fetch(&netdata_mmap_count, 1, __ATOMIC_RELAXED);
+    return rc;
 }
 
 char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
