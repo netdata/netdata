@@ -503,7 +503,7 @@ void pulse_daemon_memory_do(bool extended) {
         size_t unused_total = mi.fordblks;
         size_t unused_releasable = mi.keepcost;
         // size_t unused_fast = mi.fsmblks;
-        size_t unused_fragments = unused_total - unused_releasable;
+        size_t unused_fragments = (unused_total > unused_releasable) ? unused_total - unused_releasable : 0;
 
         rrddim_set_by_pointer(st_mallinfo, rd_unused_releasable, (collected_number)unused_releasable);
         rrddim_set_by_pointer(st_mallinfo, rd_unused_fragments, (collected_number)unused_fragments);
