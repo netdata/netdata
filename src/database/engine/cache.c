@@ -1987,6 +1987,7 @@ static void *pgc_evict_thread(void *ptr) {
     worker_register("PGCEVICT");
     worker_register_job_name(0, "signaled");
     worker_register_job_name(1, "scheduled");
+    worker_register_job_name(2, "cleanup");
 
     unsigned job_id = 0;
     usec_t last_malloc_release_ut = 0;
@@ -2002,18 +2003,19 @@ static void *pgc_evict_thread(void *ptr) {
         if (nd_thread_signaled_to_cancel())
             break;
 
+        size_t size_to_evict = 0;
+        bool system_cleanup = false;
+        if(cache_usage_per1000(cache, &size_to_evict) > cache->config.aggressive_evict_per1000)
+            system_cleanup = true;
+
         evict_pages(cache, 0, 0, true, false);
 
-        size_t size_to_evict = 0;
-        if(cache_usage_per1000(cache, &size_to_evict) > cache->config.severe_pressure_per1000) {
+        if(system_cleanup) {
             usec_t now_ut = now_monotonic_usec();
 
             if(last_malloc_release_ut + USEC_PER_SEC < now_ut) {
                 last_malloc_release_ut = now_ut;
-
-                // so, we tried 100 times to reduce memory, and a second has passed,
-                // but it is still severe!
-
+                worker_is_busy(2);
                 mallocz_release_as_much_memory_to_the_system();
             }
         }

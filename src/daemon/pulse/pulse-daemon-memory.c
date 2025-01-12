@@ -410,7 +410,7 @@ void pulse_daemon_memory_do(bool extended) {
                     "Memory Usage",
                     NULL,
                     "Glibc Memory Arenas",
-                    "bytes",
+                    "arenas",
                     "netdata",
                     "pulse",
                     130104,
