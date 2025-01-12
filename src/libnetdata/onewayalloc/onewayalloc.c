@@ -55,10 +55,17 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     if(size_hint > size)
         size = size_hint;
 
-    // try to allocate half of the total we have allocated already
     if(head) {
-        size_t optimal_size = head->stats_pages_size / 2;
-        if(optimal_size > size) size = optimal_size;
+        // double the current allocation
+        size_t optimal_size = head->stats_pages_size;
+
+        // cap it at 1 MiB
+        if(optimal_size > 1ULL * 1024 * 1024)
+            optimal_size = 1ULL * 1024 * 1024;
+
+        // use the optimal if it is more than the required size
+        if(optimal_size > size)
+            size = optimal_size;
     }
 
     // Make sure our allocations are always a multiple of the hardware page size
