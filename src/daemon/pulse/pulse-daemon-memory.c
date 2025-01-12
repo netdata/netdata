@@ -507,19 +507,14 @@ void pulse_daemon_memory_do(bool extended) {
 
         struct mallinfo2 mi = mallinfo2();
 
-        // Memory used in mmapped regions
+        // size_t total = mi.uordblks;
         size_t used_mmap = mi.hblkhd;
+        size_t used_arena = mi.arena;
 
-        // Memory used in arena (non-mmapped allocations)
-        // uordblks includes both arena and mmap allocations, so we subtract mmap
-        size_t used_arena = (mi.uordblks > mi.hblkhd) ? mi.uordblks - mi.hblkhd : 0;
-
-        // Releasable memory (can be released via malloc_trim())
+        size_t unused_total = mi.fordblks;
         size_t unused_releasable = mi.keepcost;
-
-        // Fragmentation (remaining free space that's not easily releasable)
-        // This includes free chunks (fordblks) minus the releasable space
-        size_t unused_fragments = (mi.fordblks > mi.keepcost) ? mi.fordblks - mi.keepcost : 0;
+        // size_t unused_fast = mi.fsmblks;
+        size_t unused_fragments = (unused_total > unused_releasable) ? unused_total - unused_releasable : 0;
 
         rrddim_set_by_pointer(st_mallinfo, rd_unused_releasable, (collected_number)unused_releasable);
         rrddim_set_by_pointer(st_mallinfo, rd_unused_fragments, (collected_number)unused_fragments);
