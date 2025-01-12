@@ -1156,6 +1156,7 @@ set(DAEMON_FILES
         src/daemon/config/netdata-conf-cloud.h
         src/daemon/config/netdata-conf-profile.c
         src/daemon/config/netdata-conf-profile.h
+        src/daemon/pulse/pulse-daemon-memory-system.c
 )
 
 set(H2O_FILES
