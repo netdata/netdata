@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- Pulse extended memory statistics, now report glibc allocations [\#19379](https://github.com/netdata/netdata/pull/19379) ([ktsaou](https://github.com/ktsaou))
+- build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.2 to 0.2.3 in /src/go [\#19378](https://github.com/netdata/netdata/pull/19378) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump go.mongodb.org/mongo-driver from 1.17.1 to 1.17.2 in /src/go [\#19377](https://github.com/netdata/netdata/pull/19377) ([dependabot[bot]](https://github.com/apps/dependabot))
+- disable libunwind on forked children [\#19374](https://github.com/netdata/netdata/pull/19374) ([ktsaou](https://github.com/ktsaou))
+- Fix alert entry traversal when doing cleanup [\#19373](https://github.com/netdata/netdata/pull/19373) ([stelfrag](https://github.com/stelfrag))
+- fix for PGC wanted\_cache\_size getting to zero [\#19370](https://github.com/netdata/netdata/pull/19370) ([ktsaou](https://github.com/ktsaou))
+- metrics cardinality - more statistics and groupings [\#19368](https://github.com/netdata/netdata/pull/19368) ([ktsaou](https://github.com/ktsaou))
+- stream-thread fix memory corruption [\#19367](https://github.com/netdata/netdata/pull/19367) ([ktsaou](https://github.com/ktsaou))
 - metrics cardinality improvements [\#19366](https://github.com/netdata/netdata/pull/19366) ([ktsaou](https://github.com/ktsaou))
 - prevent memory corruption in dbengine [\#19365](https://github.com/netdata/netdata/pull/19365) ([ktsaou](https://github.com/ktsaou))
 - Revert "prevent memory corruption in dbengine" [\#19364](https://github.com/netdata/netdata/pull/19364) ([ktsaou](https://github.com/ktsaou))
@@ -463,13 +471,6 @@
 - More windows metrics [\#18824](https://github.com/netdata/netdata/pull/18824) ([ktsaou](https://github.com/ktsaou))
 - fix compilation on windows [\#18823](https://github.com/netdata/netdata/pull/18823) ([ktsaou](https://github.com/ktsaou))
 - numa basic meminfo [\#18822](https://github.com/netdata/netdata/pull/18822) ([ktsaou](https://github.com/ktsaou))
-- fixes last PR merge [\#18821](https://github.com/netdata/netdata/pull/18821) ([ktsaou](https://github.com/ktsaou))
-- optimizations for servers with vast amounts of sockets [\#18820](https://github.com/netdata/netdata/pull/18820) ([ktsaou](https://github.com/ktsaou))
-- claiming should wait for node id and status ONLINE only [\#18816](https://github.com/netdata/netdata/pull/18816) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d/vernemq\)!: support prometheus namespace added in v2.0 [\#18815](https://github.com/netdata/netdata/pull/18815) ([ilyam8](https://github.com/ilyam8))
-- Comment out dictionary with hashtable code for now [\#18814](https://github.com/netdata/netdata/pull/18814) ([stelfrag](https://github.com/stelfrag))
-- Fix variable scope to prevent invalid memory access [\#18813](https://github.com/netdata/netdata/pull/18813) ([stelfrag](https://github.com/stelfrag))
-- fix\(proc/proc\_net\_dev\): delay collecting all virtual interfaces [\#18812](https://github.com/netdata/netdata/pull/18812) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
