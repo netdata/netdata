@@ -1982,6 +1982,8 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
 }
 
 static void *pgc_evict_thread(void *ptr) {
+    static usec_t last_malloc_release_ut = 0;
+
     PGC *cache = ptr;
 
     worker_register("PGCEVICT");
@@ -1990,7 +1992,6 @@ static void *pgc_evict_thread(void *ptr) {
     worker_register_job_name(2, "cleanup");
 
     unsigned job_id = 0;
-    usec_t last_malloc_release_ut = 0;
 
     while (true) {
         worker_is_idle();
@@ -2013,8 +2014,8 @@ static void *pgc_evict_thread(void *ptr) {
         if(system_cleanup) {
             usec_t now_ut = now_monotonic_usec();
 
-            if(last_malloc_release_ut + USEC_PER_SEC < now_ut) {
-                last_malloc_release_ut = now_ut;
+            if(__atomic_load_n(&last_malloc_release_ut, __ATOMIC_RELAXED) + USEC_PER_SEC <= now_ut) {
+                __atomic_store_n(&last_malloc_release_ut, now_ut, __ATOMIC_RELAXED);
                 worker_is_busy(2);
                 mallocz_release_as_much_memory_to_the_system();
             }

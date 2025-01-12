@@ -466,11 +466,10 @@ void posix_memfree(void *ptr) {
 void mallocz_release_as_much_memory_to_the_system(void) {
 #if defined(HAVE_C_MALLOC_TRIM)
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-    spinlock_lock(&spinlock);
-
-    malloc_trim(0);
-
-    spinlock_unlock(&spinlock);
+    if(spinlock_trylock(&spinlock)) {
+        malloc_trim(0);
+        spinlock_unlock(&spinlock);
+    }
 #endif
 }
 
