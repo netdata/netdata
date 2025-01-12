@@ -509,7 +509,7 @@ void pulse_daemon_memory_do(bool extended) {
 
         // size_t total = mi.uordblks;
         size_t used_mmap = mi.hblkhd;
-        size_t used_arena = mi.arena;
+        size_t used_arena = (mi.arena > mi.fordblks) ? mi.arena - mi.fordblks : 0;
 
         size_t unused_total = mi.fordblks;
         size_t unused_releasable = mi.keepcost;
