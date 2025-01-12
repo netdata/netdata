@@ -485,6 +485,14 @@ int main() {
 " HAVE_C_MALLOC_TRIM)
 
 check_c_source_compiles("
+#include <malloc.h>
+int main() {
+        malloc_info(0, stdout);
+        return 0;
+}
+" HAVE_C_MALLOC_INFO)
+
+check_c_source_compiles("
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <sys/socket.h>
