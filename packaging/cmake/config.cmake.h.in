@@ -99,6 +99,7 @@
 #cmakedefine HAVE_C_MALLOPT
 #cmakedefine HAVE_C_MALLOC_TRIM
 #cmakedefine HAVE_C_MALLOC_INFO
+#cmakedefine HAVE_C_MALLINFO2
 #cmakedefine HAVE_SETNS
 #cmakedefine HAVE_STRNDUP
 #cmakedefine SSL_HAS_PENDING

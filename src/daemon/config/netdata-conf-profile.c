@@ -118,8 +118,8 @@ void nd_profile_setup(void) {
     else if(netdata_conf_is_parent()) {
         nd_profile.storage_tiers = 3;
         nd_profile.update_every = 1;
-        nd_profile.malloc_arenas = os_get_system_cpus_cached(true);
-        nd_profile.malloc_trim = 256 * 1024;
+        nd_profile.malloc_arenas = 1;
+        nd_profile.malloc_trim = 128 * 1024;
         nd_profile.stream_sender_compression = ND_COMPRESSION_FASTEST;
         // web server threads = dynamic
         // aclk query threads = dynamic

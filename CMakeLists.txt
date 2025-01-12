@@ -493,6 +493,14 @@ int main() {
 " HAVE_C_MALLOC_INFO)
 
 check_c_source_compiles("
+#include <malloc.h>
+int main() {
+        struct mallinfo2 m = mallinfo2();
+        return 0;
+}
+" HAVE_C_MALLINFO2)
+
+check_c_source_compiles("
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <sys/socket.h>
