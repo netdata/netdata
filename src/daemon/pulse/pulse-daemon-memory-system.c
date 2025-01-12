@@ -261,8 +261,15 @@ void pulse_daemon_memory_system_do(bool extended) {
         rrdset_done(st_maps);
     }
 
-    unsigned long long max_map_count = 0;
-    read_single_number_file("/proc/sys/vm/max_map_count", &max_map_count);
+    static unsigned long long max_map_count = 0;
+    static usec_t last_read_ut = 0;
+    usec_t now_ut = now_monotonic_usec();
+    if(now_ut - last_read_ut >= 60 * USEC_PER_SEC) {
+        // read this file once per minute
+        read_single_number_file("/proc/sys/vm/max_map_count", &max_map_count);
+        last_read_ut = now_ut;
+    }
+
     if (max_map_count && total_mmaps) {
         static RRDSET *st_maps_percent = NULL;
         static RRDDIM *rd_used = NULL;
