@@ -213,7 +213,7 @@ void pulse_daemon_memory_do(bool extended) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    if(extended) {
+    {
         static RRDSET *st_memory_buffers = NULL;
         static RRDDIM *rd_queries = NULL;
         static RRDDIM *rd_collectors = NULL;
@@ -241,7 +241,7 @@ void pulse_daemon_memory_do(bool extended) {
                 "bytes",
                 "netdata",
                 "pulse",
-                130110,
+                130103,
                 localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 

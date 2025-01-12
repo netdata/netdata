@@ -247,7 +247,7 @@ void pulse_daemon_memory_system_do(bool extended) {
                 "maps",
                 "netdata",
                 "pulse",
-                130103,
+                130105,
                 localhost->rrd_update_every,
                 RRDSET_TYPE_LINE);
 
@@ -278,7 +278,7 @@ void pulse_daemon_memory_system_do(bool extended) {
                 "%",
                 "netdata",
                 "pulse",
-                130104,
+                130106,
                 localhost->rrd_update_every,
                 RRDSET_TYPE_AREA);
 
