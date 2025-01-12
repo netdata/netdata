@@ -27,7 +27,10 @@
 
 // in malloc mode, when the page is bigger than this
 // use anonymous private mmap pages
-#define ARAL_MMAP_PAGES_ABOVE (32ULL * 1024)
+#define ARAL_MALLOC_USE_MMAP_ABOVE (4096ULL * 4)
+
+// do not allocate pages smaller than this
+#define ARAL_MIN_PAGE_SIZE (4096ULL * 4)
 
 #define ARAL_PAGE_INCOMING_PARTITIONS 4 // up to 32 (32-bits bitmap)
 
@@ -493,7 +496,7 @@ static size_t aral_next_allocation_size___adders_lock_needed(ARAL *ar, bool mark
         ar->ops[idx].adders.allocation_size = size;
     }
 
-    if(!ar->config.mmap.enabled && size < ARAL_MMAP_PAGES_ABOVE) {
+    if(!ar->config.mmap.enabled && size < ARAL_MALLOC_USE_MMAP_ABOVE) {
         // when doing malloc, don't allocate entire pages, but only what needed
         size =
             aral_elements_in_page_size(ar, size) * ar->config.element_size +
@@ -542,7 +545,7 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
     else {
         size_t ARAL_PAGE_size = memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT);
 
-        if (size >= ARAL_MMAP_PAGES_ABOVE) {
+        if (size >= ARAL_MALLOC_USE_MMAP_ABOVE) {
             bool mapped;
             uint8_t *ptr = netdata_mmap(NULL, size, MAP_PRIVATE, 1, false, ar->config.options & ARAL_DONT_DUMP, NULL);
             if (ptr) {
@@ -1104,6 +1107,10 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
 
     // find the minimum page size we will use
     size_t min_required_page_size = memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT) + 2 * ar->config.element_size;
+
+    if(min_required_page_size < ARAL_MIN_PAGE_SIZE)
+        min_required_page_size = ARAL_MIN_PAGE_SIZE;
+
     min_required_page_size = memory_alignment(min_required_page_size, ar->config.system_page_size);
 
     // make sure the maximum is enough
