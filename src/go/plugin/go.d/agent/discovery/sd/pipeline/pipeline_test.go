@@ -14,7 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 
-	"github.com/ilyam8/hashstructure"
+	"github.com/gohugoio/hashstructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"

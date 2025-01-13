@@ -45,10 +45,10 @@ func TestManager_Run(t *testing.T) {
 			wantFile: `
 {
  "module1": {
-  "name1:5956328514325012774": "ok"
+  "name1:17896517344060997937": "ok"
  },
  "module2": {
-  "name2:14684454322123948394": "ok"
+  "name2:14519194242031159283": "ok"
  }
 }
 `,
@@ -71,7 +71,7 @@ func TestManager_Run(t *testing.T) {
 			wantFile: `
 {
  "module1": {
-  "name1:5956328514325012774": "ok"
+  "name1:17896517344060997937": "ok"
  }
 }
 `,

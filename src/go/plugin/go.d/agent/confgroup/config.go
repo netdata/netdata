@@ -11,7 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/hostinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
-	"github.com/ilyam8/hashstructure"
+	"github.com/gohugoio/hashstructure"
 	"gopkg.in/yaml.v2"
 )
 
