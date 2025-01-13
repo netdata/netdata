@@ -4,6 +4,16 @@
 #include "pulse-daemon-memory.h"
 #include "streaming/stream-replication-sender.h"
 
+static size_t rrd_slot_memory = 0;
+
+void rrd_slot_memory_added(size_t added) {
+    __atomic_add_fetch(&rrd_slot_memory, added, __ATOMIC_RELAXED);
+}
+
+void rrd_slot_memory_removed(size_t added) {
+    __atomic_sub_fetch(&rrd_slot_memory, added, __ATOMIC_RELAXED);
+}
+
 #define dictionary_stats_memory_total(stats) \
     ((stats).memory.dict + (stats).memory.values + (stats).memory.index)
 
@@ -39,6 +49,7 @@ void pulse_daemon_memory_do(bool extended) {
         static RRDDIM *rd_workers = NULL;
         static RRDDIM *rd_aral = NULL;
         static RRDDIM *rd_judy = NULL;
+        static RRDDIM *rd_slots = NULL;
         static RRDDIM *rd_other = NULL;
 
         if (unlikely(!st_memory)) {
@@ -81,6 +92,7 @@ void pulse_daemon_memory_do(bool extended) {
             rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_aral = rrddim_add(st_memory, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_judy = rrddim_add(st_memory, "judy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_slots = rrddim_add(st_memory, "slots", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
@@ -179,6 +191,9 @@ void pulse_daemon_memory_do(bool extended) {
 
         rrddim_set_by_pointer(st_memory, rd_judy,
                               (collected_number) judy_aral_structures());
+
+        rrddim_set_by_pointer(st_memory, rd_slots,
+                              (collected_number)__atomic_load_n(&rrd_slot_memory, __ATOMIC_RELAXED));
 
         rrddim_set_by_pointer(st_memory, rd_other,
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));

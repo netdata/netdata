@@ -268,7 +268,7 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         }
         procfile_close(ff);
 
-        devices = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_collectors, 0);
+        devices = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(ZRAM_DEVICE));
         device_count = init_devices(devices, update_every);
     }
 
