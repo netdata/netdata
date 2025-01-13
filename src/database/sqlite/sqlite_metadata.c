@@ -897,6 +897,29 @@ done:
     return rc != SQLITE_DONE;
 }
 
+#define SQL_DELETE_DIMENSION_BY_ID   "DELETE FROM dimension WHERE rowid = @dimension_row AND dim_id = @uuid"
+
+static void delete_dimension_by_rowid(sqlite3_stmt **res, int64_t dimension_id, nd_uuid_t *dim_uuid)
+{
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_DIMENSION_BY_ID, res))
+            return;
+    }
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, dimension_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, dim_uuid, sizeof(*dim_uuid), SQLITE_STATIC));
+
+    param = 0;
+    int rc = sqlite3_step_monitored(*res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to delete dimension id, rc = %d", rc);
+
+done:
+    REPORT_BIND_FAIL(*res, param);
+    SQLITE_RESET(*res);
+}
+
 static void delete_dimension_uuid(nd_uuid_t *dimension_uuid, sqlite3_stmt **action_res __maybe_unused, bool flag __maybe_unused)
 {
     static __thread sqlite3_stmt *res = NULL;
@@ -1543,10 +1566,12 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
 
 
 #define SQL_SELECT_HOST_CTX_CHART_DIM_LIST                                                                             \
-    "SELECT d.dim_id FROM chart c, dimension d WHERE c.chart_id = d.chart_id AND c.rowid = @rowid"
+    "SELECT d.dim_id, d.rowid FROM chart c, dimension d WHERE c.chart_id = d.chart_id AND c.rowid = @rowid"
 
 static void clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id, size_t *checked, size_t *deleted)
 {
+    struct metadata_wc *wc = &metasync_worker;
+
     if (!*res) {
         if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_CTX_CHART_DIM_LIST, res))
             return;
@@ -1555,21 +1580,27 @@ static void clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, chart_row_id));
     param = 0;
 
+    sqlite3_stmt *dim_del_stmt = NULL;
+
     while (sqlite3_step_monitored(*res) == SQLITE_ROW) {
 
         if (sqlite3_column_bytes(*res, 0) != sizeof(nd_uuid_t))
             continue;
 
-        nd_uuid_t *dim_id = (nd_uuid_t *)sqlite3_column_blob(*res, 0);
+        nd_uuid_t *dim_uuid = (nd_uuid_t *)sqlite3_column_blob(*res, 0);
+        int64_t dimension_id = sqlite3_column_int64(*res, 1);
 
-        if (dimension_can_be_deleted(dim_id, NULL, false)) {
-            delete_dimension_uuid(dim_id, NULL, false);
+        if (dimension_can_be_deleted(dim_uuid, NULL, false)) {
+            delete_dimension_by_rowid(&dim_del_stmt, dimension_id, dim_uuid);
             (*deleted)++;
         }
         (*checked)++;
+        if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
+            break;
     }
-done:
+    SQLITE_FINALIZE(dim_del_stmt);
 
+done:
     REPORT_BIND_FAIL(*res, param);
     SQLITE_RESET(*res);
 }
@@ -1581,10 +1612,13 @@ static void cleanup_host_context_metadata(Pvoid_t CTX_JudyL, void *data)
     if (!CTX_JudyL || !data)
         return;
 
+    struct metadata_wc *wc = &metasync_worker;
+
     RRDHOST *host = data;
 
     sqlite3_stmt *res = NULL;
     sqlite3_stmt *dimension_res = NULL;
+    sqlite3_stmt *context_res = NULL;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_CTX_CHART_LIST, &res))
         return;
@@ -1608,10 +1642,16 @@ static void cleanup_host_context_metadata(Pvoid_t CTX_JudyL, void *data)
         const char *context = (char *)sqlite3_column_text(res, 1);
         STRING *ctx = string_strdupz(context);
         Pvalue = JudyLGet(CTX_JudyL, (Word_t)ctx, PJE0);
-        if (Pvalue)
+        if (Pvalue) {
             clean_host_chart_dimensions(&dimension_res, chart_row_id, &checked, &deleted);
+            ctx_delete_metadata_cleanup_context(&context_res, &host->host_id.uuid, context);
+        }
         string_freez(ctx);
+        if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
+            break;
     }
+    SQLITE_FINALIZE(dimension_res);
+    SQLITE_FINALIZE(context_res);
 
     nd_log_daemon(
         NDLP_DEBUG,
