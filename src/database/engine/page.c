@@ -318,6 +318,16 @@ static size_t pgd_data_footprint(size_t size, size_t partition) {
 }
 
 // ----------------------------------------------------------------------------
+
+void *dbengine_extent_alloc(size_t size) {
+    return pgd_data_alloc(size, 0, false);
+}
+
+void dbengine_extent_free(void *extent, size_t size) {
+    pgd_data_free(extent, size, 0);
+}
+
+// ----------------------------------------------------------------------------
 // management api
 
 PGD *pgd_create(uint8_t type, uint32_t slots) {

@@ -584,15 +584,6 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker) {
 
 // ----------------------------------------------------------------------------
 
-void *dbengine_extent_alloc(size_t size) {
-    void *extent = mallocz(size);
-    return extent;
-}
-
-void dbengine_extent_free(void *extent, size_t size __maybe_unused) {
-    freez(extent);
-}
-
 static void journalfile_extent_build(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr) {
     unsigned count, payload_length, descr_size, size_bytes;
     void *buf;

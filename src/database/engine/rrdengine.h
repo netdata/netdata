@@ -470,9 +470,6 @@ static inline void ctx_last_flush_fileno_set(struct rrdengine_instance *ctx, uns
 
 #define ctx_is_available_for_queries(ctx) (__atomic_load_n(&(ctx)->quiesce.enabled, __ATOMIC_RELAXED) == false && __atomic_load_n(&(ctx)->quiesce.exit_mode, __ATOMIC_RELAXED) == false)
 
-void *dbengine_extent_alloc(size_t size);
-void dbengine_extent_free(void *extent, size_t size);
-
 bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx);
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
