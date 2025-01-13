@@ -42,7 +42,7 @@ static bool aer_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 
 static void aer_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct aer_entry *a = value;
-    a->values = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
+    a->values = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE|DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(struct aer_value));
     dictionary_register_conflict_callback(a->values, aer_value_conflict_callback, NULL);
 }
 
@@ -209,7 +209,7 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
         if(!do_root_ports && !do_pci_slots)
             return 1;
 
-        aer_root = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+        aer_root = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(struct aer_entry));
         dictionary_register_insert_callback(aer_root, aer_insert_callback, NULL);
 
         AER_TYPE types = ((do_root_ports) ? (AER_ROOTPORT_TOTAL_ERR_COR|AER_ROOTPORT_TOTAL_ERR_FATAL) : 0) |

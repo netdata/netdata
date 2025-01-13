@@ -141,6 +141,7 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
             st->pluginsd.prd_array[i].id = NULL;
         }
 
+        rrd_slot_memory_added((wanted_size - st->pluginsd.size) * sizeof(struct pluginsd_rrddim));
         st->pluginsd.size = wanted_size;
     }
 
@@ -301,6 +302,8 @@ static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st,
 
         host->stream.rcv.pluginsd_chart_slots.size = new_slots;
         spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
+
+        rrd_slot_memory_added((new_slots - old_slots) * sizeof(uint32_t));
     }
 
     host->stream.rcv.pluginsd_chart_slots.array[slot - 1] = st;

@@ -1288,12 +1288,10 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         void *extent_data = datafile_extent_read(ctx, epdl->file, epdl->extent_offset, epdl->extent_size);
         if(extent_data != NULL) {
 
-#if defined(NETDATA_TRACE_ALLOCATIONS)
             void *tmp = dbengine_extent_alloc(epdl->extent_size);
             memcpy(tmp, extent_data, epdl->extent_size);
             datafile_extent_read_free(extent_data);
             extent_data = tmp;
-#endif
 
             if(worker)
                 worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);

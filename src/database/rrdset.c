@@ -34,13 +34,15 @@ static void rrdset_stream_send_chart_slot_release(RRDSET *st) {
     spinlock_lock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
 
     if(host->stream.snd.pluginsd_chart_slots.available.used >= host->stream.snd.pluginsd_chart_slots.available.size) {
-        uint32_t old_size = host->stream.snd.pluginsd_chart_slots.available.size;
-        uint32_t new_size = (old_size > 0) ? (old_size * 2) : 1024;
+        uint32_t old_slots = host->stream.snd.pluginsd_chart_slots.available.size;
+        uint32_t new_slots = (old_slots > 0) ? (old_slots * 2) : 1024;
 
         host->stream.snd.pluginsd_chart_slots.available.array =
-            reallocz(host->stream.snd.pluginsd_chart_slots.available.array, new_size * sizeof(uint32_t));
+            reallocz(host->stream.snd.pluginsd_chart_slots.available.array, new_slots * sizeof(uint32_t));
 
-        host->stream.snd.pluginsd_chart_slots.available.size = new_size;
+        host->stream.snd.pluginsd_chart_slots.available.size = new_slots;
+
+        rrd_slot_memory_added((new_slots - old_slots) * sizeof(uint32_t));
     }
 
     host->stream.snd.pluginsd_chart_slots.available.array[host->stream.snd.pluginsd_chart_slots.available.used++] =
@@ -51,6 +53,8 @@ static void rrdset_stream_send_chart_slot_release(RRDSET *st) {
 }
 
 void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host) {
+    rrd_slot_memory_removed(host->stream.snd.pluginsd_chart_slots.available.size * sizeof(uint32_t));
+
     spinlock_lock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
     host->stream.snd.pluginsd_chart_slots.available.ignore = true;
     freez(host->stream.snd.pluginsd_chart_slots.available.array);
@@ -95,6 +99,7 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
 
     rrdset_pluginsd_receive_unslot(st);
 
+    rrd_slot_memory_removed(st->pluginsd.size * sizeof(struct pluginsd_rrddim));
     freez(st->pluginsd.prd_array);
     st->pluginsd.prd_array = NULL;
     st->pluginsd.size = 0;
@@ -113,6 +118,8 @@ static void rrdset_pluginsd_receive_slots_initialize(RRDSET *st) {
 }
 
 void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host) {
+    rrd_slot_memory_removed(host->stream.rcv.pluginsd_chart_slots.size * sizeof(uint32_t));
+
     spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
 
     if(host->stream.rcv.pluginsd_chart_slots.array) {

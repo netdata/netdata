@@ -56,6 +56,9 @@ size_t pgd_append_point(PGD *pg,
 void pgdc_reset(PGDC *pgdc, PGD *pgd, uint32_t position);
 bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position, STORAGE_POINT *sp);
 
+void *dbengine_extent_alloc(size_t size);
+void dbengine_extent_free(void *extent, size_t size);
+
 #ifdef __cplusplus
 }
 #endif
