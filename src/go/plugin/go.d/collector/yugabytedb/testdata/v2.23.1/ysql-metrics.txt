@@ -1,0 +1,474 @@
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_SelectStmt_count Number of SELECT statements that have been executed
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_SelectStmt_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_SelectStmt_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_SelectStmt_sum Total time spent executing SELECT statements
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_SelectStmt_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_SelectStmt_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_InsertStmt_count Number of INSERT statements that have been executed
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_InsertStmt_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_InsertStmt_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_InsertStmt_sum Total time spent executing INSERT statements
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_InsertStmt_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_InsertStmt_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_DeleteStmt_count Number of DELETE statements that have been executed
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_DeleteStmt_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_DeleteStmt_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_DeleteStmt_sum Total time spent executing DELETE statements
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_DeleteStmt_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_DeleteStmt_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_UpdateStmt_count Number of UPDATE statements that have been executed
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_UpdateStmt_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_UpdateStmt_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_UpdateStmt_sum Total time spent executing UPDATE statements
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_UpdateStmt_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_UpdateStmt_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_BeginStmt_count Number of BEGIN statements that have been executed
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_BeginStmt_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_BeginStmt_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_BeginStmt_sum Total time spent executing BEGIN statements
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_BeginStmt_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_BeginStmt_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CommitStmt_count Number of COMMIT statements that have been executed
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CommitStmt_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CommitStmt_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CommitStmt_sum Total time spent executing COMMIT statements
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CommitStmt_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_CommitStmt_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_RollbackStmt_count Number of ROLLBACK statements that have been executed
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_RollbackStmt_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_RollbackStmt_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_RollbackStmt_sum Total time spent executing ROLLBACK statements
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_RollbackStmt_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_RollbackStmt_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_OtherStmts_count Number of other statements that have been executed
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_OtherStmts_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_OtherStmts_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_OtherStmts_sum Total time spent executing other statements
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_OtherStmts_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_OtherStmts_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_Single_Shard_Transactions_count Number of single shard transactions that have been executed (deprecated)
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_Single_Shard_Transactions_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_Single_Shard_Transactions_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_Single_Shard_Transactions_sum Total time spent executing single shard transactions (deprecated)
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_Single_Shard_Transactions_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_Single_Shard_Transactions_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_SingleShardTransactions_count Number of single shard transactions that have been executed
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_SingleShardTransactions_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_SingleShardTransactions_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_SingleShardTransactions_sum Total time spent executing single shard transactions
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_SingleShardTransactions_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_SingleShardTransactions_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_Transactions_count Number of transactions that have been executed
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_Transactions_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_Transactions_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_Transactions_sum Total time spent executing transactions
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_Transactions_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_Transactions_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_AggregatePushdowns_count Number of aggregate pushdowns
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_AggregatePushdowns_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_AggregatePushdowns_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_AggregatePushdowns_sum Total time spent executing aggregate pushdowns
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_AggregatePushdowns_sum counter
+handler_latency_yb_ysqlserver_SQLProcessor_AggregatePushdowns_sum{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Total number of catalog cache misses
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_aggregate_fnoid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_aggregate_fnoid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_am_name_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_am_name_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_am_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_am_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_amop_opr_fam_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_amop_opr_fam_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_amop_fam_strat_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_amop_fam_strat_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_amproc_fam_proc_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_amproc_fam_proc_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_attribute_relid_attnam_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_attribute_relid_attnam_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_attribute_relid_attnum_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_attribute_relid_attnum_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_auth_members_member_role_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_auth_members_member_role_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_auth_members_role_member_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_auth_members_role_member_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_authid_rolname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_authid_rolname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_authid_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_authid_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_cast_source_target_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_cast_source_target_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_opclass_am_name_nsp_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_opclass_am_name_nsp_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_opclass_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_opclass_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_collation_name_enc_nsp_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_collation_name_enc_nsp_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_collation_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_collation_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_conversion_default_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_conversion_default_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_conversion_name_nsp_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_conversion_name_nsp_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_constraint_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_constraint_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_conversion_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_conversion_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_database_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_database_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_default_acl_role_nsp_obj_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_default_acl_role_nsp_obj_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_enum_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_enum_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_enum_typid_label_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_enum_typid_label_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_event_trigger_evtname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_event_trigger_evtname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_event_trigger_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_event_trigger_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_foreign_data_wrapper_name_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_foreign_data_wrapper_name_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_foreign_data_wrapper_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_foreign_data_wrapper_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_foreign_server_name_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_foreign_server_name_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_foreign_server_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_foreign_server_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_foreign_table_relid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_foreign_table_relid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_index_indexrelid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_index_indexrelid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_language_name_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_language_name_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_language_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_language_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_namespace_nspname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_namespace_nspname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_namespace_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_namespace_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_operator_oprname_l_r_n_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_operator_oprname_l_r_n_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_operator_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_operator_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_opfamily_am_name_nsp_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_opfamily_am_name_nsp_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_opfamily_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_opfamily_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_partitioned_table_partrelid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_partitioned_table_partrelid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_proc_proname_args_nsp_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_proc_proname_args_nsp_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_proc_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_proc_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_publication_pubname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_publication_pubname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_publication_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_publication_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_publication_rel_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_publication_rel_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_publication_rel_prrelid_prpubid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_publication_rel_prrelid_prpubid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_range_rngtypid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_range_rngtypid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_class_relname_nsp_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_class_relname_nsp_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_class_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_class_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_replication_origin_roiident_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_replication_origin_roiident_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_replication_origin_roname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_replication_origin_roname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_rewrite_rel_rulename_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_rewrite_rel_rulename_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_sequence_seqrelid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_sequence_seqrelid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_statistic_ext_name_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_statistic_ext_name_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_statistic_ext_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_statistic_ext_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_statistic_relid_att_inh_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_statistic_relid_att_inh_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_subscription_subname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_subscription_subname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_subscription_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_subscription_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_subscription_rel_srrelid_srsubid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_subscription_rel_srrelid_srsubid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_tablespace_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_tablespace_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_transform_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_transform_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_transform_type_lang_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_transform_type_lang_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_ts_config_map_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_config_map_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_ts_config_cfgname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_config_cfgname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_ts_config_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_config_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_ts_dict_dictname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_dict_dictname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_ts_dict_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_dict_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_ts_parser_prsname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_parser_prsname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_ts_parser_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_parser_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_ts_template_tmplname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_template_tmplname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_ts_template_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_template_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_type_typname_nsp_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_type_typname_nsp_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_type_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_type_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_user_mapping_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_user_mapping_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_user_mapping_user_server_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_user_mapping_user_server_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_yb_tablegroup_oid_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_yb_tablegroup_oid_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count Number of catalog cache misses for index pg_constraint_conrelid_contypid_conname_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_constraint_conrelid_contypid_conname_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_aggregate
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_aggregate",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_am
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_am",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_amop
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_amop",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_amproc
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_amproc",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_attribute
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_attribute",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_auth_members
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_auth_members",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_authid
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_authid",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_cast
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_cast",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_class
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_class",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_collation
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_collation",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_constraint
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_constraint",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_conversion
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_conversion",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_database
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_database",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_default_acl
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_default_acl",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_enum
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_enum",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_event_trigger
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_event_trigger",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_foreign_data_wrapper
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_foreign_data_wrapper",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_foreign_server
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_foreign_server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_foreign_table
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_foreign_table",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_index
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_index",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_language
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_language",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_namespace
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_namespace",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_opclass
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_opclass",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_operator
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_operator",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_opfamily
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_opfamily",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_partitioned_table
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_partitioned_table",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_proc
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_proc",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_publication
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_publication",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_publication_rel
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_publication_rel",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_range
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_range",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_replication_origin
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_replication_origin",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_rewrite
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_rewrite",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_sequence
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_sequence",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_statistic
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_statistic",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_statistic_ext
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_statistic_ext",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_subscription
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_subscription",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_subscription_rel
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_subscription_rel",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_tablespace
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_tablespace",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_transform
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_transform",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_ts_config
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_config",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_ts_config_map
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_config_map",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_ts_dict
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_dict",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_ts_parser
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_parser",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_ts_template
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_ts_template",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_type
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_type",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_user_mapping
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_user_mapping",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count Number of catalog cache misses for table pg_yb_tablegroup
+# TYPE handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count counter
+handler_latency_yb_ysqlserver_SQLProcessor_CatalogCacheTableMisses_count{metric_id="yb.ysqlserver",metric_type="server",table_name="pg_yb_tablegroup",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP yb_ysqlserver_active_connection_total Total number of active YSQL connections
+# TYPE yb_ysqlserver_active_connection_total gauge
+yb_ysqlserver_active_connection_total{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP yb_ysqlserver_connection_total Total number of YSQL connections
+# TYPE yb_ysqlserver_connection_total gauge
+yb_ysqlserver_connection_total{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 1 1735842969185
+# HELP yb_ysqlserver_max_connection_total Maximum number of YSQL connections
+# TYPE yb_ysqlserver_max_connection_total gauge
+yb_ysqlserver_max_connection_total{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 300 1735842969185
+# HELP yb_ysqlserver_connection_over_limit_total Number of YSQL connections rejected due to connection limits
+# TYPE yb_ysqlserver_connection_over_limit_total gauge
+yb_ysqlserver_connection_over_limit_total{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 0 1735842969185
+# HELP yb_ysqlserver_new_connection_total Number of YSQL connections established since start of postmaster
+# TYPE yb_ysqlserver_new_connection_total counter
+yb_ysqlserver_new_connection_total{metric_id="yb.ysqlserver",metric_type="server",exported_instance="pve-deb-work:9000"} 1 1735842969185
+# HELP ysql_conn_mgr_num_pools Number of YSQL Connection Manager pools
+# TYPE ysql_conn_mgr_num_pools gauge
+ysql_conn_mgr_num_pools{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.ysqlserver"} 0 1735842969185
+# HELP ysql_conn_mgr_last_updated_timestamp Timestamp of last update to YSQL Connection Manager metrics
+# TYPE ysql_conn_mgr_last_updated_timestamp gauge
+ysql_conn_mgr_last_updated_timestamp{exported_instance="pve-deb-work:9000",metric_type="server",metric_id="yb.ysqlserver"} 0 1735842969185

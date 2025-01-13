@@ -231,7 +231,7 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 			continue
 		}
 
-		if tgt.IPAddress == "0.0.0.0" || strings.HasPrefix(tgt.IPAddress, "127") {
+		if tgt.IPAddress == "0.0.0.0" {
 			tgt.IPAddress = local4
 		} else if tgt.IPAddress == "::" {
 			tgt.IPAddress = local6
@@ -284,7 +284,7 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 		keyLocal4 := proto + ":" + net.JoinHostPort(local4, tgt.Port)
 		keyLocal6 := proto + "6:" + net.JoinHostPort(local6, tgt.Port)
 
-		// Filter targets that accept conns on any (0.0.0.0) and additionally on each individual network interface  (a.b.c.d).
+		// Filter targets that accept conns on any (0.0.0.0) and additionally on each network interface  (a.b.c.d).
 		// Create a target only for localhost. Assumption: any address always goes first.
 		if seen[key] || seen[keyLocal4] || seen[keyLocal6] {
 			continue

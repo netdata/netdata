@@ -1,0 +1,191 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "YugabyteDB collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 5
+      },
+      "url": {
+        "title": "URL",
+        "description": "The URL of the YugabyteDB Prometheus endpoint.",
+        "type": "string",
+        "default": "http://127.0.0.1:7000/prometheus-metrics",
+        "format": "uri"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "The timeout in seconds for the HTTP request.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      },
+      "not_follow_redirects": {
+        "title": "Not follow redirects",
+        "description": "If set, the client will not follow HTTP redirects automatically.",
+        "type": "boolean"
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
+      "username": {
+        "title": "Username",
+        "description": "The username for basic authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "password": {
+        "title": "Password",
+        "description": "The password for basic authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "The URL of the proxy server.",
+        "type": "string"
+      },
+      "proxy_username": {
+        "title": "Proxy username",
+        "description": "The username for proxy authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "proxy_password": {
+        "title": "Proxy password",
+        "description": "The password for proxy authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "headers": {
+        "title": "Headers",
+        "description": "Additional HTTP headers to include in the request.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "If set, TLS certificate verification will be skipped.",
+        "type": "boolean"
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "The path to the CA certificate file for TLS verification.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "The path to the client certificate file for TLS authentication.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "The path to the client key file for TLS authentication.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "body": {
+        "title": "Body",
+        "type": "string"
+      },
+      "method": {
+        "title": "Method",
+        "type": "string"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "body": {
+      "ui:widget": "hidden"
+    },
+    "method": {
+      "ui:widget": "hidden"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "username": {
+      "ui:widget": "password"
+    },
+    "proxy_username": {
+      "ui:widget": "password"
+    },
+    "password": {
+      "ui:widget": "password"
+    },
+    "proxy_password": {
+      "ui:widget": "password"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "url",
+            "timeout",
+            "not_follow_redirects",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Auth",
+          "fields": [
+            "username",
+            "password"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
+        },
+        {
+          "title": "Proxy",
+          "fields": [
+            "proxy_url",
+            "proxy_username",
+            "proxy_password"
+          ]
+        },
+        {
+          "title": "Headers",
+          "fields": [
+            "headers"
+          ]
+        }
+      ]
+    }
+  }
+}
