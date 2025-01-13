@@ -226,12 +226,11 @@ static inline bool metric_release(MRG *mrg, METRIC *metric) {
     return refcount == REFCOUNT_DELETED;
 }
 
-static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
+static inline METRIC *metric_add_and_acquire___free_id_on_failure(MRG *mrg, UUIDMAP_ID id, MRG_ENTRY *entry, bool *ret) {
     JudyAllocThreadPulseReset();
 
     size_t partition = uuid_to_uuidmap_partition(*entry->uuid);
 
-    UUIDMAP_ID id = uuidmap_create(*entry->uuid);
     METRIC *allocation = aral_mallocz(mrg->index[partition].aral);
     Pvoid_t *PValue;
 
@@ -370,7 +369,14 @@ inline METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) 
 //    internal_fatal(entry.latest_time_s > max_acceptable_collected_time(),
 //        "DBENGINE METRIC: metric latest time is in the future");
 
-    return metric_add_and_acquire(mrg, &entry, ret);
+    UUIDMAP_ID id = uuidmap_create(*entry.uuid);
+    METRIC *metric = metric_get_and_acquire_by_id(mrg, id, entry.section);
+    if(!metric)
+        metric = metric_add_and_acquire___free_id_on_failure(mrg, id, &entry, ret);
+    else
+        uuidmap_free(id);
+
+    return metric;
 }
 
 inline METRIC *mrg_metric_get_and_acquire_by_uuid(MRG *mrg, nd_uuid_t *uuid, Word_t section) {

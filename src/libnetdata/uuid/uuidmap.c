@@ -59,10 +59,6 @@ static void uuidmap_init_aral(void) {
     }
 }
 
-static inline UUIDMAP_ID make_id(uint8_t partition, uint32_t id) {
-    return ((UUIDMAP_ID)partition << 24) | (id & 0x00FFFFFF);
-}
-
 static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
     UUIDMAP_ID id = 0;
 
@@ -134,7 +130,7 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
             break;
     }
 
-    id = make_id(partition, ++uuid_map.p[partition].next_id);
+    id = uuidmap_make_id(partition, ++uuid_map.p[partition].next_id);
     *(UUIDMAP_ID *)PValue = id;
 
     // Store ID -> UUID mapping
