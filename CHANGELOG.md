@@ -6,9 +6,15 @@
 
 **Merged pull requests:**
 
+- Reduce glibc memory fragmentation [\#19385](https://github.com/netdata/netdata/pull/19385) ([ktsaou](https://github.com/ktsaou))
+- added mmap count charts [\#19384](https://github.com/netdata/netdata/pull/19384) ([ktsaou](https://github.com/ktsaou))
+- used\_arena should exclude unused memory [\#19382](https://github.com/netdata/netdata/pull/19382) ([ktsaou](https://github.com/ktsaou))
+- fix mallinfo2 [\#19381](https://github.com/netdata/netdata/pull/19381) ([ktsaou](https://github.com/ktsaou))
+- limit the glibc unused memory [\#19380](https://github.com/netdata/netdata/pull/19380) ([ktsaou](https://github.com/ktsaou))
 - Pulse extended memory statistics, now report glibc allocations [\#19379](https://github.com/netdata/netdata/pull/19379) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.2 to 0.2.3 in /src/go [\#19378](https://github.com/netdata/netdata/pull/19378) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump go.mongodb.org/mongo-driver from 1.17.1 to 1.17.2 in /src/go [\#19377](https://github.com/netdata/netdata/pull/19377) ([dependabot[bot]](https://github.com/apps/dependabot))
+- ARAL: fast path to quickly allocate elements on a new page [\#19376](https://github.com/netdata/netdata/pull/19376) ([ktsaou](https://github.com/ktsaou))
 - disable libunwind on forked children [\#19374](https://github.com/netdata/netdata/pull/19374) ([ktsaou](https://github.com/ktsaou))
 - Fix alert entry traversal when doing cleanup [\#19373](https://github.com/netdata/netdata/pull/19373) ([stelfrag](https://github.com/stelfrag))
 - fix for PGC wanted\_cache\_size getting to zero [\#19370](https://github.com/netdata/netdata/pull/19370) ([ktsaou](https://github.com/ktsaou))
@@ -465,12 +471,6 @@
 - spawn-server-nofork: invalid magic [\#18831](https://github.com/netdata/netdata/pull/18831) ([ktsaou](https://github.com/ktsaou))
 - remove old obsolete check for excess data in request [\#18830](https://github.com/netdata/netdata/pull/18830) ([ktsaou](https://github.com/ktsaou))
 - Add the Windows event logs integration to the meta [\#18829](https://github.com/netdata/netdata/pull/18829) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): bump github.com/redis/go-redis/v9 from 9.6.2 to 9.7.0 in /src/go [\#18828](https://github.com/netdata/netdata/pull/18828) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Regenerate integrations.js [\#18826](https://github.com/netdata/netdata/pull/18826) ([netdatabot](https://github.com/netdatabot))
-- Common O/S Caching Layer for users and groups [\#18825](https://github.com/netdata/netdata/pull/18825) ([ktsaou](https://github.com/ktsaou))
-- More windows metrics [\#18824](https://github.com/netdata/netdata/pull/18824) ([ktsaou](https://github.com/ktsaou))
-- fix compilation on windows [\#18823](https://github.com/netdata/netdata/pull/18823) ([ktsaou](https://github.com/ktsaou))
-- numa basic meminfo [\#18822](https://github.com/netdata/netdata/pull/18822) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
