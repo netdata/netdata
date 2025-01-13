@@ -161,7 +161,7 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
 void dyncfg_init_low_level(bool load_saved) {
     if(!dyncfg_globals.nodes) {
-        dyncfg_globals.nodes = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, sizeof(DYNCFG));
+        dyncfg_globals.nodes = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_dyncfg, sizeof(DYNCFG));
         dictionary_register_insert_callback(dyncfg_globals.nodes, dyncfg_insert_cb, NULL);
         dictionary_register_react_callback(dyncfg_globals.nodes, dyncfg_react_cb, NULL);
         dictionary_register_conflict_callback(dyncfg_globals.nodes, dyncfg_conflict_cb, NULL);

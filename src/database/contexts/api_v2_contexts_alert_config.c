@@ -131,5 +131,6 @@ int contexts_v2_alert_config_to_json(struct web_client *w, const char *config_ha
         }
     }
 
+    dictionary_destroy(configs);
     return ret;
 }

@@ -288,7 +288,7 @@ void health_init_prototypes(void) {
     if(health_globals.prototypes.dict)
         return;
 
-    health_globals.prototypes.dict = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    health_globals.prototypes.dict = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_rrdhealth, sizeof(RRD_ALERT_PROTOTYPE));
     dictionary_register_insert_callback(health_globals.prototypes.dict, health_prototype_insert_cb, NULL);
     dictionary_register_conflict_callback(health_globals.prototypes.dict, health_prototype_conflict_cb, NULL);
     dictionary_register_delete_callback(health_globals.prototypes.dict, health_prototype_delete_cb, NULL);
@@ -472,7 +472,7 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg) {
     // add it to the prototypes
     dictionary_set_advanced(health_globals.prototypes.dict,
                             string2str(ap->config.name), string_strlen(ap->config.name),
-                            ap, sizeof(*ap),
+                            ap, sizeof(RRD_ALERT_PROTOTYPE),
                             NULL);
 
     return true;

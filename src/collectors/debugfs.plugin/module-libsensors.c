@@ -1230,7 +1230,7 @@ void *libsensors_thread(void *ptr __maybe_unused) {
     }
     if(fp) fclose(fp);
 
-    sensors_dict = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED);
+    sensors_dict = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(SENSOR));
 
     // preflight to check data collection latency
     {
