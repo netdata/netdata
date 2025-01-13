@@ -2,15 +2,19 @@
 
 #include "uuidmap.h"
 
+#define UUIDMAP_REUSE_GAP 1000
+
 struct uuidmap_entry {
     nd_uuid_t uuid;
     REFCOUNT refcount;
 };
 
 struct uuidmap_partition {
-    Pvoid_t uuid_to_id;     // JudyL: UUID string -> ID
-    Pvoid_t id_to_uuid;     // JudyL: ID -> UUID binary
-    UUIDMAP_ID next_id;     // Only use lower 24 bits
+    Pvoid_t uuid_to_id;         // JudyL: UUID string -> ID
+    Pvoid_t id_to_uuid;         // JudyL: ID -> UUID binary
+    Pvoid_t freed_ids;          // JudyL: the freed IDs
+    UUIDMAP_ID next_id;         // Only use lower bits
+    UUIDMAP_ID next_free_id;    // fifo id when reusing freed ids
     RW_SPINLOCK spinlock;
 
     int64_t memory;
@@ -59,6 +63,36 @@ static void uuidmap_init_aral(void) {
     }
 }
 
+static UUIDMAP_ID get_next_id_unsafe(struct uuidmap_partition *partition) {
+    UUIDMAP_ID id = 0;
+
+    // Try to get a freed ID first if we have enough gap
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+
+    PValue = JudyLFirst(partition->freed_ids, &Index, PJE0);
+    if (PValue && PValue != PJERR && *PValue) {
+        // Check if the stored ID is old enough to be reused
+        UUIDMAP_ID stored_id = *(UUIDMAP_ID *)PValue;
+        UUIDMAP_ID current_next_id = uuidmap_make_id(partition - uuid_map.p, partition->next_id);
+
+        if ((current_next_id - stored_id) >= UUIDMAP_REUSE_GAP) {
+            id = stored_id;
+            // Remove this entry from freed_ids since we're reusing it
+            int rc = JudyLDel(&partition->freed_ids, Index, PJE0);
+            if (unlikely(!rc))
+                fatal("UUIDMAP: cannot delete ID from freed_ids JudyL");
+        }
+    }
+
+    if (id == 0) {
+        // No reusable IDs available, get next sequential ID
+        id = uuidmap_make_id(partition - uuid_map.p, ++partition->next_id);
+    }
+
+    return id;
+}
+
 static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
     UUIDMAP_ID id = 0;
 
@@ -73,7 +107,7 @@ static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
     if(PValue && *PValue) {
         // it is found
 
-        id = (UUIDMAP_ID)(uintptr_t)*PValue;
+        id = *(UUIDMAP_ID *)PValue;
 
         PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
         if (!PValue || PValue == PJERR)
@@ -130,7 +164,7 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
             break;
     }
 
-    id = uuidmap_make_id(partition, ++uuid_map.p[partition].next_id);
+    id = get_next_id_unsafe(&uuid_map.p[partition]);
     *(UUIDMAP_ID *)PValue = id;
 
     // Store ID -> UUID mapping
@@ -185,6 +219,13 @@ void uuidmap_free(UUIDMAP_ID id) {
         rc = JudyLDel(&uuid_map.p[partition].id_to_uuid, id, PJE0);
         if(unlikely(!rc))
             fatal("UUIDMAP: cannot delete ID from JudyL");
+
+        // Add the freed ID to the freed_ids JudyL using next_free_id as index
+        Pvoid_t *PValue = JudyLIns(&uuid_map.p[partition].freed_ids, ++uuid_map.p[partition].next_free_id, PJE0);
+        if (!PValue || PValue == PJERR)
+            fatal("UUIDMAP: corrupted freed_ids JudyL array");
+
+        *(UUIDMAP_ID *)PValue = id;  // Store the actual METRIC_ID as the value
 
         uuid_map.p[partition].memory -= sizeof(*ue);
         uuid_map.p[partition].entries--;
