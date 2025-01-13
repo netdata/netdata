@@ -20,7 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
-	"github.com/ilyam8/hashstructure"
+	"github.com/gohugoio/hashstructure"
 )
 
 var (
