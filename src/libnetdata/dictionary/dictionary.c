@@ -21,12 +21,35 @@ inline void dictionary_write_unlock(DICTIONARY *dict) {
 }
 
 // ----------------------------------------------------------------------------
+// ARAL for dict and hooks
+
+static ARAL *ar_dict = NULL;
+static ARAL *ar_hooks = NULL;
+
+static void dictionary_init_aral(void) {
+    if(ar_dict && ar_hooks) return;
+
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+    spinlock_lock(&spinlock);
+
+    if(!ar_dict)
+        ar_dict = aral_by_size_acquire(sizeof(DICTIONARY));
+
+    if(!ar_hooks)
+        ar_hooks = aral_by_size_acquire(sizeof(struct dictionary_hooks));
+
+    spinlock_unlock(&spinlock);
+}
+
+// ----------------------------------------------------------------------------
 // callbacks registration
 
 static inline void dictionary_hooks_allocate(DICTIONARY *dict) {
     if(dict->hooks) return;
 
-    dict->hooks = callocz(1, sizeof(struct dictionary_hooks));
+    dictionary_init_aral();
+
+    dict->hooks = aral_callocz(ar_hooks);
     dict->hooks->links = 1;
 
     DICTIONARY_STATS_PLUS_MEMORY(dict, 0, sizeof(struct dictionary_hooks), 0);
@@ -37,7 +60,7 @@ static inline size_t dictionary_hooks_free(DICTIONARY *dict) {
 
     REFCOUNT links = __atomic_sub_fetch(&dict->hooks->links, 1, __ATOMIC_ACQUIRE);
     if(links == 0) {
-        freez(dict->hooks);
+        aral_freez(ar_hooks, dict->hooks);
         dict->hooks = NULL;
 
         DICTIONARY_STATS_MINUS_MEMORY(dict, 0, sizeof(struct dictionary_hooks), 0);
@@ -268,7 +291,7 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     if(dict->value_aral)
         aral_by_size_release(dict->value_aral);
 
-    freez(dict);
+    aral_freez(ar_dict, dict);
 
     internal_error(
         false,
@@ -464,9 +487,10 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
 // API - dictionary management
 
 static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size) {
+    dictionary_init_aral();
     cleanup_destroyed_dictionaries();
 
-    DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
+    DICTIONARY *dict = aral_callocz(ar_dict);
     dict->options = options;
     dict->stats = stats;
 
