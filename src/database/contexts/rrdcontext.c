@@ -131,7 +131,7 @@ int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, nd_uuid_t *store_
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
 
-    uuid_copy(*store_uuid, rm->uuid);
+    uuidmap_uuid(rm->uuid, *store_uuid);
 
     rrdmetric_release(rma);
     rrdinstance_release(ria);
@@ -155,7 +155,7 @@ int rrdcontext_find_chart_uuid(RRDSET *st, nd_uuid_t *store_uuid) {
     }
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    uuid_copy(*store_uuid, ri->uuid);
+    uuidmap_uuid(ri->uuid, *store_uuid);
 
     rrdinstance_release(ria);
     rrdcontext_release(rca);

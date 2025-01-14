@@ -3,8 +3,8 @@
 #include "rrddim_mem.h"
 #include "Judy.h"
 
-static Pvoid_t rrddim_JudyHS_array = NULL;
-static netdata_rwlock_t rrddim_JudyHS_rwlock = NETDATA_RWLOCK_INITIALIZER;
+static Pvoid_t rrddim_Judy_array = NULL;
+static netdata_rwlock_t rrddim_Judy_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
 // ----------------------------------------------------------------------------
 // metrics groups
@@ -30,7 +30,7 @@ struct mem_metric_handle {
     time_t last_updated_s;
     time_t update_every_s;
 
-    int32_t refcount;
+    REFCOUNT refcount;
 };
 
 static void update_metric_handle_from_rrddim(struct mem_metric_handle *mh, RRDDIM *rd) {
@@ -47,13 +47,12 @@ static void check_metric_handle_from_rrddim(struct mem_metric_handle *mh) {
     internal_fatal(mh->update_every_s != rd->rrdset->update_every, "RRDDIM: update every does not match");
 }
 
-STORAGE_METRIC_HANDLE *
-rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
-    struct mem_metric_handle *mh = (struct mem_metric_handle *)rrddim_metric_get(si, &rd->metric_uuid);
+STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
+    struct mem_metric_handle *mh = (struct mem_metric_handle *)rrddim_metric_get_by_id(si, rd->uuid);
     while(!mh) {
-        netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
+        netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
         JudyAllocThreadPulseReset();
-        Pvoid_t *PValue = JudyHSIns(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
+        Pvoid_t *PValue = JudyLIns(&rrddim_Judy_array, rd->uuid, PJE0);
         int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
         mh = *PValue;
         if(!mh) {
@@ -65,63 +64,88 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
             pulse_db_rrd_memory_change(judy_mem + (int64_t)sizeof(struct mem_metric_handle));
         }
         else {
-            if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
+            if(!refcount_acquire(&mh->refcount))
                 mh = NULL;
         }
-        netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
+        netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
     }
 
-    internal_fatal(mh->rd != rd, "RRDDIM_MEM: incorrect pointer returned from index.");
+    if(unlikely(mh->rd != rd))
+        fatal("DB_RAM_ALLOC: incorrect pointer returned from index.");
 
     return (STORAGE_METRIC_HANDLE *)mh;
 }
 
-STORAGE_METRIC_HANDLE *
-rrddim_metric_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid) {
+STORAGE_METRIC_HANDLE *rrddim_metric_get_by_id(STORAGE_INSTANCE *si __maybe_unused, UUIDMAP_ID id) {
     struct mem_metric_handle *mh = NULL;
-    netdata_rwlock_rdlock(&rrddim_JudyHS_rwlock);
-    Pvoid_t *PValue = JudyHSGet(rrddim_JudyHS_array, uuid, sizeof(nd_uuid_t));
-    if (likely(NULL != PValue)) {
-        mh = *PValue;
-        if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
-            mh = NULL;
+
+    netdata_rwlock_rdlock(&rrddim_Judy_rwlock);
+    {
+        Pvoid_t *PValue = JudyLGet(rrddim_Judy_array, id, PJE0);
+        if (unlikely(PValue == PJERR))
+            fatal("DB_RAM_ALLOC: corrupted judy array!");
+
+        if (likely(NULL != PValue)) {
+            mh = *PValue;
+            if (!refcount_acquire(&mh->refcount))
+                mh = NULL;
+        }
     }
-    netdata_rwlock_rdunlock(&rrddim_JudyHS_rwlock);
+    netdata_rwlock_rdunlock(&rrddim_Judy_rwlock);
 
     return (STORAGE_METRIC_HANDLE *)mh;
+}
+
+STORAGE_METRIC_HANDLE *rrddim_metric_get_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
+    UUIDMAP_ID id = uuidmap_create(*uuid);
+    STORAGE_METRIC_HANDLE *mh = rrddim_metric_get_by_id(si, id);
+    uuidmap_free(id);
+    return mh;
 }
 
 STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *smh) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
-    __atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED);
+
+    if(!refcount_acquire(&mh->refcount))
+        fatal("DB_RAM_ALLOC: cannot acquire an already acquired refcount");
+
     return smh;
 }
 
 void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh __maybe_unused) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
 
-    if(__atomic_sub_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) == 0) {
-        // we are the last one holding this
+    if(refcount_release_and_acquire_for_deletion(&mh->refcount)) {
+        // we can delete it
 
-        int32_t expected = 0;
-        if(__atomic_compare_exchange_n(&mh->refcount, &expected, -99999, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
-            // we can delete it
-
-            RRDDIM *rd = mh->rd;
-            netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
+        int64_t judy_mem = 0;
+        RRDDIM *rd = mh->rd;
+        netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+        {
             JudyAllocThreadPulseReset();
-            JudyHSDel(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
-            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
-            netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
-
-            freez(mh);
-            pulse_db_rrd_memory_change(judy_mem - (int64_t)sizeof(struct mem_metric_handle));
+            JudyLDel(&rrddim_Judy_array, rd->uuid, PJE0);
+            judy_mem = JudyAllocThreadPulseGetAndReset();
         }
+        netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+
+        freez(mh);
+        pulse_db_rrd_memory_change(judy_mem - (int64_t)sizeof(struct mem_metric_handle));
     }
 }
 
 bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s) {
-    STORAGE_METRIC_HANDLE *smh = rrddim_metric_get(si, uuid);
+    STORAGE_METRIC_HANDLE *smh = rrddim_metric_get_by_uuid(si, uuid);
+    if(!smh)
+        return false;
+
+    *first_entry_s = rrddim_query_oldest_time_s(smh);
+    *last_entry_s = rrddim_query_latest_time_s(smh);
+
+    return true;
+}
+
+bool rrddim_metric_retention_by_id(STORAGE_INSTANCE *si __maybe_unused, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s) {
+    STORAGE_METRIC_HANDLE *smh = rrddim_metric_get_by_id(si, id);
     if(!smh)
         return false;
 

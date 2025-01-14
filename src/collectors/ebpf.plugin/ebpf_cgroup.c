@@ -26,7 +26,7 @@ static inline void *ebpf_cgroup_map_shm_locally(int fd, size_t length)
 {
     void *value;
 
-    value =  mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    value =  nd_mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (!value) {
         netdata_log_error("Cannot map shared memory used between eBPF and cgroup, integration between processes won't happen");
         close(shm_fd_ebpf_cgroup);
@@ -44,7 +44,7 @@ static inline void *ebpf_cgroup_map_shm_locally(int fd, size_t length)
  */
 void ebpf_unmap_cgroup_shared_memory()
 {
-    munmap(ebpf_mapped_memory, shm_ebpf_cgroup.header->body_length);
+    nd_munmap(ebpf_mapped_memory, shm_ebpf_cgroup.header->body_length);
 }
 
 /**
@@ -87,7 +87,7 @@ void ebpf_map_cgroup_shared_memory()
 
     size_t length =  header->body_length;
 
-    munmap(header, sizeof(netdata_ebpf_cgroup_shm_header_t));
+    nd_munmap(header, sizeof(netdata_ebpf_cgroup_shm_header_t));
 
     if (length <= ((sizeof(netdata_ebpf_cgroup_shm_header_t) + sizeof(netdata_ebpf_cgroup_shm_body_t)))) {
         return;
@@ -105,7 +105,7 @@ void ebpf_map_cgroup_shared_memory()
     if (shm_sem_ebpf_cgroup == SEM_FAILED) {
         netdata_log_error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
         limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
-        munmap(ebpf_mapped_memory, length);
+        nd_munmap(ebpf_mapped_memory, length);
         shm_ebpf_cgroup.header = NULL;
         shm_ebpf_cgroup.body = NULL;
         close(shm_fd_ebpf_cgroup);

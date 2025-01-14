@@ -3,6 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_context.h"
 #include "sqlite_db_migration.h"
+#include "database/contexts/internal.h"
 
 #define DB_CONTEXT_METADATA_VERSION 1
 
@@ -72,6 +73,8 @@ int sql_init_context_database(int memory)
     return 0;
 }
 
+extern __thread sqlite3 *db_meta_thread;
+extern __thread sqlite3 *db_context_thread;
 //
 // Fetching data
 //
@@ -80,14 +83,14 @@ int sql_init_context_database(int memory)
 
 void ctx_get_chart_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
     if (unlikely(!host_uuid)) {
        internal_error(true, "Requesting context chart list without host_id");
        return;
     }
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, CTX_GET_CHART_LIST, &res))
+    if (!PREPARE_STATEMENT(db_meta_thread ? db_meta_thread : db_meta, CTX_GET_CHART_LIST, &res))
         return;
 
     int param = 0;
@@ -111,7 +114,7 @@ void ctx_get_chart_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, 
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 // Dimension list
@@ -119,9 +122,9 @@ done:
     "FROM dimension d, chart c WHERE c.host_id = @host_id AND d.chart_id = c.chart_id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
 void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, CTX_GET_DIMENSION_LIST, &res))
+    if (!PREPARE_STATEMENT(db_meta_thread ? db_meta_thread : db_meta, CTX_GET_DIMENSION_LIST, &res))
         return;
 
     int param = 0;
@@ -142,7 +145,7 @@ void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 // LABEL LIST
@@ -183,9 +186,9 @@ void ctx_get_context_list(nd_uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEX
     if (unlikely(!host_uuid))
         return;
 
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_context_meta, CTX_GET_CONTEXT_LIST, &res))
+    if (!PREPARE_STATEMENT(db_context_thread ? db_context_thread : db_context_meta, CTX_GET_CONTEXT_LIST, &res))
         return;
 
     VERSIONED_CONTEXT_DATA context_data = {0};
@@ -210,7 +213,7 @@ void ctx_get_context_list(nd_uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEX
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 
@@ -230,7 +233,7 @@ int ctx_store_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data
     if (unlikely(!host_uuid || !context_data || !context_data->id))
         return 0;
 
-    if (!PREPARE_STATEMENT(db_context_meta, CTX_STORE_CONTEXT, &res))
+    if (!PREPARE_STATEMENT(db_context_meta ? db_context_meta : db_meta, CTX_STORE_CONTEXT, &res))
         return 1;
 
     int param = 0;

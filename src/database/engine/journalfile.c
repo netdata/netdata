@@ -196,7 +196,7 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
     spinlock_lock(&journalfile->mmap.spinlock);
 
     if(!journalfile->mmap.data) {
-        journalfile->mmap.data = mmap(NULL, journalfile->mmap.size, PROT_READ, MAP_SHARED, journalfile->mmap.fd, 0);
+        journalfile->mmap.data = nd_mmap(NULL, journalfile->mmap.size, PROT_READ, MAP_SHARED, journalfile->mmap.fd, 0);
         if (journalfile->mmap.data == MAP_FAILED) {
             internal_fatal(true, "DBENGINE: failed to re-mmap() journal file v2");
             close(journalfile->mmap.fd);
@@ -268,7 +268,7 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
 
     if(!journalfile->v2.refcount) {
         if(journalfile->mmap.data) {
-            if (munmap(journalfile->mmap.data, journalfile->mmap.size)) {
+            if (nd_munmap(journalfile->mmap.data, journalfile->mmap.size)) {
                 char path[RRDENG_PATH_MAX];
                 journalfile_v2_generate_path(journalfile->datafile, path, sizeof(path));
                 netdata_log_error("DBENGINE: failed to unmap index file '%s'", path);
@@ -682,7 +682,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
         }
 
         temp_id = (nd_uuid_t *)jf_metric_data->descr[i].uuid;
-        METRIC *metric = mrg_metric_get_and_acquire(main_mrg, temp_id, (Word_t) ctx);
+        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, temp_id, (Word_t)ctx);
 
         struct rrdeng_extent_page_descr *descr = &jf_metric_data->descr[i];
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
@@ -1087,7 +1087,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     }
 
     usec_t mmap_start_ut = now_monotonic_usec();
-    uint8_t *data_start = mmap(NULL, journal_v2_file_size, PROT_READ, MAP_SHARED, fd, 0);
+    uint8_t *data_start = nd_mmap(NULL, journal_v2_file_size, PROT_READ, MAP_SHARED, fd, 0);
     if (data_start == MAP_FAILED) {
         close(fd);
         return 1;
@@ -1105,7 +1105,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         else
             error_report("File %s is invalid and it will be rebuilt", path_v2);
 
-        if (unlikely(munmap(data_start, journal_v2_file_size)))
+        if (unlikely(nd_munmap(data_start, journal_v2_file_size)))
             netdata_log_error("DBENGINE: failed to unmap '%s'", path_v2);
 
         close(fd);
@@ -1116,7 +1116,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     uint32_t entries = j2_header->metric_count;
 
     if (unlikely(!entries)) {
-        if (unlikely(munmap(data_start, journal_v2_file_size)))
+        if (unlikely(nd_munmap(data_start, journal_v2_file_size)))
             netdata_log_error("DBENGINE: failed to unmap '%s'", path_v2);
 
         close(fd);
@@ -1338,7 +1338,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     total_file_size  += sizeof(struct journal_v2_block_trailer);
 
     int fd_v2;
-    uint8_t *data_start = netdata_mmap(path, total_file_size, MAP_SHARED, 0, false, true, &fd_v2);
+    uint8_t *data_start = nd_mmap_advanced(path, total_file_size, MAP_SHARED, 0, false, true, &fd_v2);
     uint8_t *data = data_start;
 
     memset(data_start, 0, extent_offset);
@@ -1494,7 +1494,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         resize_file_to = sizeof(j2_header);
     }
 
-    netdata_munmap(data_start, total_file_size);
+    nd_munmap(data_start, total_file_size);
     freez(uuid_list);
 
     if (likely(resize_file_to == total_file_size))

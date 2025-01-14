@@ -530,7 +530,7 @@ static bool stream_sender_did_replication_progress(struct sender_state *s) {
         // we still have requests to execute
         return true;
 
-    return (now_monotonic_usec() - s->replication.last_progress_ut < 5ULL * 60 * USEC_PER_SEC);
+    return (now_monotonic_usec() - s->replication.last_progress_ut < 10ULL * 60 * USEC_PER_SEC);
 }
 
 void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
@@ -544,7 +544,12 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
         struct sender_state *s = m->s;
         RRDHOST *host = s->host;
 
-        if(stream_sender_did_replication_progress(s))
+        if(stream_sender_did_replication_progress(s)) {
+            s->replication.last_checked_ut = 0;
+            continue;
+        }
+
+        if(s->replication.last_checked_ut == s->replication.last_progress_ut)
             continue;
 
         ND_LOG_STACK lgs[] = {
@@ -557,35 +562,42 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        size_t exceptions = 0;
+        size_t stalled = 0, finished = 0;
         RRDSET *st;
         rrdset_foreach_read(st, host) {
             RRDSET_FLAGS st_flags = rrdset_flag_get(st);
-            if(st_flags & (RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_UPSTREAM_IGNORE | RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
+            if(st_flags & (RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_UPSTREAM_IGNORE))
                 continue;
 
-            const char *status = (st_flags & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS) ? "has not finished" : "has not started";
+            if(st_flags & RRDSET_FLAG_SENDER_REPLICATION_FINISHED) {
+                finished++;
+                continue;
+            }
 
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM SND[%zu] '%s' [to %s]: REPLICATION STALLED: instance '%s' %s replication yet.",
                    sth->id, rrdhost_hostname(host), s->remote_ip,
-                   rrdset_id(st), status);
+                   rrdset_id(st),
+                   (st_flags & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS) ? "has not finished" : "has not started");
 
-            exceptions++;
+            stalled++;
         }
         rrdset_foreach_done(st);
 
-        if(exceptions && !stream_sender_did_replication_progress(s)) {
+        if(stalled && !stream_sender_did_replication_progress(s)) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests."
+                   "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests (%zu completed)."
                    "We have received %u and sent %u replication commands. "
                    "Disconnecting node to restore streaming.",
-                   sth->id, rrdhost_hostname(s->host), s->remote_ip, exceptions,
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip,
+                   stalled, finished,
                    __atomic_load_n(&host->stream.snd.status.replication.counter_in, __ATOMIC_RELAXED),
                    __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED));
 
             stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_REPLICATION_STALLED, true);
         }
+
+        s->replication.last_checked_ut = s->replication.last_progress_ut;
     }
 }
 
@@ -594,11 +606,8 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
 
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
     while(status == EVLOOP_STATUS_CONTINUE) {
-        if(!stream_sender_trylock(s)) {
-            sth->snd.send_misses++;
-            status = EVLOOP_STATUS_CANT_GET_LOCK;
-            break;
-        }
+        waitq_acquire(&s->waitq, WAITQ_PRIO_URGENT);
+        stream_sender_lock(s);
 
         STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(s->scb);
         char *chunk;
@@ -607,6 +616,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
         if(!outstanding) {
             status = EVLOOP_STATUS_NO_MORE_DATA;
             stream_sender_unlock(s);
+            waitq_release(&s->waitq);
             continue;
         }
 
@@ -640,6 +650,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
                 status = EVLOOP_STATUS_SOCKET_ERROR;
         }
         stream_sender_unlock(s);
+        waitq_release(&s->waitq);
 
         if (status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED) {
             const char *disconnect_reason = NULL;

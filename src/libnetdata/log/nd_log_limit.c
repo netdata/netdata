@@ -32,13 +32,16 @@ bool nd_log_limit_reached(struct nd_log_source *source) {
     if(source->limits.throttle_period == 0 || source->limits.logs_per_period == 0)
         return false;
 
+    spinlock_lock(&source->limits.spinlock);
+
     usec_t now_ut = now_monotonic_usec();
     if(!source->limits.started_monotonic_ut)
         source->limits.started_monotonic_ut = now_ut;
 
     source->limits.counter++;
 
-    if(now_ut - source->limits.started_monotonic_ut > (usec_t)source->limits.throttle_period) {
+    // Check if we need to reset the period
+    if(now_ut - source->limits.started_monotonic_ut > (usec_t)source->limits.throttle_period * USEC_PER_SEC) {
         if(source->limits.prevented) {
             BUFFER *wb = buffer_create(1024, NULL);
             buffer_sprintf(wb,
@@ -51,7 +54,7 @@ bool nd_log_limit_reached(struct nd_log_source *source) {
                 freez((void *)source->pending_msg);
 
             source->pending_msg = strdupz(buffer_tostring(wb));
-
+            source->pending_msgid = &log_flood_protection_msgid;
             buffer_free(wb);
         }
 
@@ -60,7 +63,7 @@ bool nd_log_limit_reached(struct nd_log_source *source) {
         source->limits.counter = 1;
         source->limits.prevented = 0;
 
-        // log this error
+        spinlock_unlock(&source->limits.spinlock);
         return false;
     }
 
@@ -82,11 +85,12 @@ bool nd_log_limit_reached(struct nd_log_source *source) {
                 freez((void *)source->pending_msg);
 
             source->pending_msg = strdupz(buffer_tostring(wb));
-
+            source->pending_msgid = &log_flood_protection_msgid;
             buffer_free(wb);
         }
 
         source->limits.prevented++;
+        spinlock_unlock(&source->limits.spinlock);
 
         // prevent logging this error
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -96,5 +100,6 @@ bool nd_log_limit_reached(struct nd_log_source *source) {
 #endif
     }
 
+    spinlock_unlock(&source->limits.spinlock);
     return false;
 }

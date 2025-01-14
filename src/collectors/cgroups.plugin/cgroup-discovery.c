@@ -1070,9 +1070,8 @@ static void netdata_cgroup_ebpf_initialize_shm()
         goto end_init_shm;
     }
 
-    shm_cgroup_ebpf.header = (netdata_ebpf_cgroup_shm_header_t *) mmap(NULL, length,
-                                                                       PROT_READ | PROT_WRITE, MAP_SHARED,
-                                                                       shm_fd_cgroup_ebpf, 0);
+    shm_cgroup_ebpf.header = (netdata_ebpf_cgroup_shm_header_t *)
+        nd_mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd_cgroup_ebpf, 0);
 
     if (unlikely(MAP_FAILED == shm_cgroup_ebpf.header)) {
         shm_cgroup_ebpf.header = NULL;
@@ -1091,7 +1090,7 @@ static void netdata_cgroup_ebpf_initialize_shm()
     }
 
     collector_error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
-    munmap(shm_cgroup_ebpf.header, length);
+    nd_munmap(shm_cgroup_ebpf.header, length);
     shm_cgroup_ebpf.header = NULL;
 
     end_init_shm:
@@ -1108,7 +1107,7 @@ static void cgroup_cleanup_ebpf_integration()
 
     if (shm_cgroup_ebpf.header) {
         shm_cgroup_ebpf.header->cgroup_root_count = 0;
-        munmap(shm_cgroup_ebpf.header, shm_cgroup_ebpf.header->body_length);
+        nd_munmap(shm_cgroup_ebpf.header, shm_cgroup_ebpf.header->body_length);
     }
 
     if (shm_fd_cgroup_ebpf > 0) {

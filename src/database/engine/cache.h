@@ -144,9 +144,6 @@ struct pgc_statistics {
     // waste events - spins
     PAD64(size_t) p2_waste_insert_spins;
     PAD64(size_t) p2_waste_evict_useless_spins;
-    PAD64(size_t) p2_waste_release_spins;
-    PAD64(size_t) p2_waste_acquire_spins;
-    PAD64(size_t) p2_waste_delete_spins;
 
     // waste events - eviction
     PAD64(size_t) p2_waste_evict_relocated;

@@ -1286,7 +1286,7 @@ void replication_sender_delete_pending_requests(struct sender_state *sender) {
 
 void replication_sender_init(struct sender_state *sender) {
     sender->replication.requests = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                                                              NULL, sizeof(struct replication_request));
+                                                              &dictionary_stats_category_replication, sizeof(struct replication_request));
 
     dictionary_register_react_callback(sender->replication.requests, replication_request_react_callback, sender);
     dictionary_register_conflict_callback(sender->replication.requests, replication_request_conflict_callback, sender);

@@ -12,6 +12,7 @@ struct dictionary_stats dictionary_stats_category_rrdlabels = { .name = "labels"
 struct dictionary_stats dictionary_stats_category_rrdhealth = { .name = "health" };
 struct dictionary_stats dictionary_stats_category_functions = { .name = "functions" };
 struct dictionary_stats dictionary_stats_category_replication = { .name = "replication" };
+struct dictionary_stats dictionary_stats_category_dyncfg = { .name = "dyncfg" };
 
 #ifdef DICT_WITH_STATS
 struct dictionary_categories {
@@ -64,6 +65,7 @@ struct dictionary_categories {
     { .stats = &dictionary_stats_category_rrdhealth, },
     { .stats = &dictionary_stats_category_functions, },
     { .stats = &dictionary_stats_category_replication, },
+    { .stats = &dictionary_stats_category_dyncfg, },
     { .stats = &dictionary_stats_category_other, },
 
     // terminator

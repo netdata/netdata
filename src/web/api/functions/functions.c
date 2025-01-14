@@ -40,4 +40,16 @@ void global_functions_add(void) {
         RRDFUNCTIONS_TAG_HIDDEN,
         HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
         function_bearer_get_token);
+
+    rrd_function_add_inline(
+        localhost,
+        NULL,
+        "metrics-cardinality",
+        10,
+        RRDFUNCTIONS_PRIORITY_DEFAULT,
+        RRDFUNCTIONS_VERSION_DEFAULT,
+        RRDFUNCTIONS_METRICS_CARDINALITY_HELP,
+        "top",
+        HTTP_ACCESS_ANONYMOUS_DATA,
+        function_metrics_cardinality);
 }

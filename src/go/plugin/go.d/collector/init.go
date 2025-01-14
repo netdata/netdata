@@ -123,6 +123,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/whoisquery"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/wireguard"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/x509check"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/yugabytedb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/zfspool"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/zookeeper"
 )

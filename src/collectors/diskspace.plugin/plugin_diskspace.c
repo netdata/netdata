@@ -332,7 +332,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             SIMPLE_PATTERN_EXACT,
             true);
 
-        dict_mountpoints = dictionary_create_advanced(DICT_OPTION_NONE, &dictionary_stats_category_collectors, 0);
+        dict_mountpoints = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(struct mount_point_metadata));
         dictionary_register_delete_callback(dict_mountpoints, mountpoint_delete_cb, NULL);
     }
 

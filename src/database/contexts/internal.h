@@ -211,7 +211,8 @@ rrd_flags_replace_atomic(RRD_FLAGS *flags, RRD_FLAGS desired) {
 
 
 typedef struct rrdmetric {
-    nd_uuid_t uuid;
+    UUIDMAP_ID uuid;
+    RRD_FLAGS flags;
 
     STRING *id;
     STRING *name;
@@ -220,30 +221,30 @@ typedef struct rrdmetric {
 
     time_t first_time_s;
     time_t last_time_s;
-    RRD_FLAGS flags;
 
     struct rrdinstance *ri;
 } RRDMETRIC;
 
 typedef struct rrdinstance {
-    nd_uuid_t uuid;
+    UUIDMAP_ID uuid;
+    int update_every_s;                 // data collection frequency
+
+    RRD_FLAGS flags;                    // flags related to this instance
+    uint32_t priority:24;
+    RRDSET_TYPE chart_type;
 
     STRING *id;
     STRING *name;
     STRING *title;
     STRING *units;
     STRING *family;
-    uint32_t priority:24;
-    RRDSET_TYPE chart_type;
 
-    RRD_FLAGS flags;                    // flags related to this instance
     time_t first_time_s;
     time_t last_time_s;
 
-    time_t update_every_s;              // data collection frequency
     RRDSET *rrdset;                     // pointer to RRDSET when collected, or NULL
 
-    RRDLABELS *rrdlabels;              // linked to RRDSET->chart_labels or own version
+    RRDLABELS *rrdlabels;               // linked to RRDSET->chart_labels or own version
 
     struct rrdcontext *rc;
     DICTIONARY *rrdmetrics;

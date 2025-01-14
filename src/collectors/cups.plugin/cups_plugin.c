@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
 
     errno_clear();
 
-    dict_dest_job_metrics = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    dict_dest_job_metrics = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct job_metrics));
 
     // ------------------------------------------------------------------------
     // the main loop

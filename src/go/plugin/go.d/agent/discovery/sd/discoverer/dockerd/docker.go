@@ -19,7 +19,7 @@ import (
 	"github.com/docker/docker/api/types"
 	typesContainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
-	"github.com/ilyam8/hashstructure"
+	"github.com/gohugoio/hashstructure"
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {

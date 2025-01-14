@@ -3,8 +3,6 @@
 #include "../libnetdata.h"
 #include <Judy.h>
 
-typedef int32_t REFCOUNT;
-
 // ----------------------------------------------------------------------------
 // STRING implementation - dedup all STRING
 
@@ -91,34 +89,13 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
     }
 }
 
-#define string_entry_acquire(se) __atomic_add_fetch(&((se)->refcount), 1, __ATOMIC_SEQ_CST)
-#define string_entry_release(se) __atomic_sub_fetch(&((se)->refcount), 1, __ATOMIC_SEQ_CST)
-
 static inline bool string_entry_check_and_acquire(STRING *se) {
 #ifdef NETDATA_INTERNAL_CHECKS
     uint8_t partition = string_partition(se);
 #endif
 
-    REFCOUNT expected, desired, count = 0;
-
-    expected = __atomic_load_n(&se->refcount, __ATOMIC_SEQ_CST);
-
-    do {
-        count++;
-
-        if(expected <= 0) {
-            // We cannot use this.
-            // The reference counter reached value zero,
-            // so another thread is deleting this.
-            string_internal_stats_add(partition, spins, count - 1);
-            return false;
-        }
-
-        desired = expected + 1;
-
-    } while(!__atomic_compare_exchange_n(&se->refcount, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
-
-    string_internal_stats_add(partition, spins, count - 1);
+    if(!refcount_acquire(&se->refcount))
+        return false;
 
     // statistics
     // string_base.active_references is altered at the in string_strdupz() and string_freez()
@@ -130,12 +107,8 @@ static inline bool string_entry_check_and_acquire(STRING *se) {
 STRING *string_dup(STRING *string) {
     if(unlikely(!string)) return NULL;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(__atomic_load_n(&string->refcount, __ATOMIC_SEQ_CST) <= 0))
-        fatal("STRING: tried to %s() a string that is freed (it has %d references).", __FUNCTION__, string->refcount);
-#endif
-
-    string_entry_acquire(string);
+    if(!refcount_acquire(&string->refcount))
+        fatal("STRING: tried to %s() a string that is deleted (refcount %d).", __FUNCTION__, string->refcount);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     uint8_t partition = string_partition(string);
@@ -262,11 +235,6 @@ static inline void string_index_delete(STRING *string) {
 
     rw_spinlock_write_lock(&string_base[partition].spinlock);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(__atomic_load_n(&string->refcount, __ATOMIC_SEQ_CST) != 0))
-        fatal("STRING: tried to delete a string at %s() that is already freed (it has %d references).", __FUNCTION__, string->refcount);
-#endif
-
     bool deleted = false;
     int64_t judy_mem = 0;
 
@@ -352,14 +320,8 @@ void string_freez(STRING *string) {
 #ifdef NETDATA_INTERNAL_CHECKS
     uint8_t partition = string_partition(string);
 #endif
-    REFCOUNT refcount = string_entry_release(string);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(refcount < 0))
-        fatal("STRING: tried to %s() a string that is already freed (it has %d references).", __FUNCTION__, string->refcount);
-#endif
-
-    if(unlikely(refcount == 0))
+    if(unlikely(refcount_release_and_acquire_for_deletion(&string->refcount)))
         string_index_delete(string);
 
     // statistics

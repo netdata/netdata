@@ -88,7 +88,7 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
 
     if(options & RRDCONTEXT_OPTION_SHOW_UUIDS) {
         char uuid[UUID_STR_LEN];
-        uuid_unparse(rm->uuid, uuid);
+        uuid_unparse(*uuidmap_uuid_ptr(rm->uuid), uuid);
         buffer_json_member_add_string(wb, "uuid", uuid);
     }
 
@@ -188,7 +188,7 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
 
     if(options & RRDCONTEXT_OPTION_SHOW_UUIDS) {
         char uuid[UUID_STR_LEN];
-        uuid_unparse(ri->uuid, uuid);
+        uuid_unparse(*uuidmap_uuid_ptr(ri->uuid), uuid);
         buffer_json_member_add_string(wb, "uuid", uuid);
     }
 

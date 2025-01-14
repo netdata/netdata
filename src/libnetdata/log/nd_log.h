@@ -9,6 +9,7 @@ extern "C" {
 
 #include "../libnetdata.h"
 #include "nd_log-common.h"
+#include "nd_log-fatal.h"
 
 #define ND_LOG_DEFAULT_THROTTLE_LOGS 1000
 #define ND_LOG_DEFAULT_THROTTLE_PERIOD 60
@@ -124,15 +125,10 @@ void nd_log_limits_unlimited(void);
 #ifdef NETDATA_INTERNAL_CHECKS
 #define netdata_log_debug(type, args...) do { if(unlikely(debug_flags & type)) netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_error(condition, args...) do { if(unlikely(condition)) netdata_logger(NDLS_DAEMON, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
-#define internal_fatal(condition, args...) do { if(unlikely(condition)) netdata_logger_fatal(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
 #define netdata_log_debug(type, args...) debug_dummy()
 #define internal_error(args...) debug_dummy()
-#define internal_fatal(args...) debug_dummy()
 #endif
-
-#define fatal(args...)   netdata_logger_fatal(__FILE__, __FUNCTION__, __LINE__, ##args)
-#define fatal_assert(expr) ((expr) ? (void)(0) : netdata_logger_fatal(__FILE__, __FUNCTION__, __LINE__, "Assertion `%s' failed", #expr))
 
 // ----------------------------------------------------------------------------
 // normal logging
@@ -170,7 +166,6 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 
 // ----------------------------------------------------------------------------
 
-void netdata_logger_fatal( const char *file, const char *function, unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 
 #define error_report(x, args...) do { errno_clear(); netdata_log_error(x, ##args); } while(0)
 

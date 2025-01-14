@@ -384,6 +384,7 @@ int netdata_main(int argc, char **argv) {
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
+                            if (uuidmap_unittest()) return 1;
                             sqlite_library_shutdown();
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
@@ -402,6 +403,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "waitqtest") == 0) {
                             unittest_running = true;
                             return unittest_waiting_queue();
+                        }
+                        else if(strcmp(optarg, "uuidmaptest") == 0) {
+                            unittest_running = true;
+                            return uuidmap_unittest();
                         }
                         else if(strcmp(optarg, "lockstest") == 0) {
                             unittest_running = true;
@@ -739,7 +744,15 @@ int netdata_main(int argc, char **argv) {
 
     // initialize the log files
     nd_log_initialize();
-    netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
+    {
+        ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_startup_msgid),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
+    }
 
     // ----------------------------------------------------------------------------------------------------------------
     // global configuration

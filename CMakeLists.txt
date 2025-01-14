@@ -205,6 +205,8 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
+option(ENABLE_LIBUNWIND "Include stack traces in log output" False)
+
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
@@ -483,6 +485,22 @@ int main() {
         return 0;
 }
 " HAVE_C_MALLOC_TRIM)
+
+check_c_source_compiles("
+#include <malloc.h>
+int main() {
+        malloc_info(0, stdout);
+        return 0;
+}
+" HAVE_C_MALLOC_INFO)
+
+check_c_source_compiles("
+#include <malloc.h>
+int main() {
+        struct mallinfo2 m = mallinfo2();
+        return 0;
+}
+" HAVE_C_MALLINFO2)
 
 check_c_source_compiles("
 #define _GNU_SOURCE
@@ -953,11 +971,22 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/waitq.h
         src/libnetdata/object-state/object-state.c
         src/libnetdata/object-state/object-state.h
+        src/libnetdata/uuid/uuidmap.c
+        src/libnetdata/uuid/uuidmap.h
+        src/libnetdata/atomics/refcount.h
+        src/libnetdata/log/nd_log-fatal.h
         src/libnetdata/locks/benchmark.c
         src/libnetdata/locks/benchmark.h
         src/libnetdata/locks/benchmark-rw.c
         src/libnetdata/locks/benchmark-rw.h
         src/libnetdata/log/nd_log-libunwind.c
+        src/libnetdata/memory/nd-mallocz.c
+        src/libnetdata/memory/nd-mallocz.h
+        src/libnetdata/memory/nd-mmap.c
+        src/libnetdata/memory/nd-mmap.h
+        src/libnetdata/memory/alignment.h
+        src/libnetdata/os/get_system_pagesize.c
+        src/libnetdata/os/get_system_pagesize.h
 )
 
 set(LIBH2O_FILES
@@ -1136,6 +1165,7 @@ set(DAEMON_FILES
         src/daemon/config/netdata-conf-cloud.h
         src/daemon/config/netdata-conf-profile.c
         src/daemon/config/netdata-conf-profile.h
+        src/daemon/pulse/pulse-daemon-memory-system.c
 )
 
 set(H2O_FILES
@@ -1599,6 +1629,8 @@ set(WEB_PLUGIN_FILES
         src/web/api/v3/api_v3_stream_path.c
         src/web/api/queries/backfill.c
         src/web/api/queries/backfill.h
+        src/web/api/functions/function-metrics-cardinality.c
+        src/web/api/functions/function-metrics-cardinality.h
 )
 
 set(CLAIM_PLUGIN_FILES
@@ -2096,22 +2128,26 @@ netdata_add_jsonc_to_target(libnetdata)
 netdata_add_libyaml_to_target(libnetdata)
 
 # libunwind
-pkg_check_modules(LIBUNWIND libunwind IMPORTED_TARGET)
-if(TARGET PkgConfig::LIBUNWIND)
+if(ENABLE_LIBUNWIND)
+  pkg_check_modules(LIBUNWIND libunwind IMPORTED_TARGET)
+  if(TARGET PkgConfig::LIBUNWIND)
     set(HAVE_LIBUNWIND On)
 
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
-        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-x86_64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-x86_64)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
-        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-aarch64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-aarch64)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
-        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-arm)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-arm)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "powerpc|ppc")
-        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-ppc64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-ppc64)
     else()
-        message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR} for libunwind. Stack traces may not work.")
-        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND)
+      message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR} for libunwind. Stack traces may not work.")
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND)
     endif()
+  else()
+    message(FATAL "Could not find libunwind for logging of stack traces")
+  endif()
 endif()
 
 # zlib

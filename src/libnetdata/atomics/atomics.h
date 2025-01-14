@@ -4,5 +4,6 @@
 #define NETDATA_ATOMICS_H
 
 #include "atomic_flags.h"
+#include "refcount.h"
 
 #endif //NETDATA_ATOMICS_H

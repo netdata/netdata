@@ -105,7 +105,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     return 1;
 }
 
-static void health_sleep(time_t next_run, uint64_t loop) {
+static void health_sleep(time_t next_run, uint64_t loop __maybe_unused) {
     time_t now = now_realtime_sec();
     if(now < next_run) {
         worker_is_idle();

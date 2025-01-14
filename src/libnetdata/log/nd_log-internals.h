@@ -107,6 +107,7 @@ struct nd_log_source {
     FILE *fp;
 
     ND_LOG_FIELD_PRIORITY min_priority;
+    const nd_uuid_t *pending_msgid;
     const char *pending_msg;
     struct nd_log_limit limits;
 
@@ -195,6 +196,8 @@ struct log_field;
 const char *errno_annotator(struct log_field *lf);
 const char *priority_annotator(struct log_field *lf);
 const char *timestamp_usec_annotator(struct log_field *lf);
+
+extern bool nd_log_forked;
 bool stack_trace_formatter(BUFFER *wb, void *data);
 
 #if defined(OS_WINDOWS)

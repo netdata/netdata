@@ -4,10 +4,22 @@
 #include "pulse-daemon-memory.h"
 #include "streaming/stream-replication-sender.h"
 
+static size_t rrd_slot_memory = 0;
+
+void rrd_slot_memory_added(size_t added) {
+    __atomic_add_fetch(&rrd_slot_memory, added, __ATOMIC_RELAXED);
+}
+
+void rrd_slot_memory_removed(size_t added) {
+    __atomic_sub_fetch(&rrd_slot_memory, added, __ATOMIC_RELAXED);
+}
+
 #define dictionary_stats_memory_total(stats) \
     ((stats).memory.dict + (stats).memory.values + (stats).memory.index)
 
 struct netdata_buffers_statistics netdata_buffers_statistics = { 0 };
+
+void pulse_daemon_memory_system_do(bool extended);
 
 void pulse_daemon_memory_do(bool extended) {
     {
@@ -28,6 +40,7 @@ void pulse_daemon_memory_do(bool extended) {
 #else
         static RRDDIM *rd_metadata = NULL;
 #endif
+        static RRDDIM *rd_uuid = NULL;
         static RRDDIM *rd_labels = NULL; // labels use dictionary like statistics, but it is not ARAL based dictionary
         static RRDDIM *rd_ml = NULL;
         static RRDDIM *rd_strings = NULL;
@@ -36,6 +49,7 @@ void pulse_daemon_memory_do(bool extended) {
         static RRDDIM *rd_workers = NULL;
         static RRDDIM *rd_aral = NULL;
         static RRDDIM *rd_judy = NULL;
+        static RRDDIM *rd_slots = NULL;
         static RRDDIM *rd_other = NULL;
 
         if (unlikely(!st_memory)) {
@@ -69,6 +83,7 @@ void pulse_daemon_memory_do(bool extended) {
 #else
             rd_metadata = rrddim_add(st_memory, "metadata", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 #endif
+            rd_uuid = rrddim_add(st_memory, "uuid", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_labels = rrddim_add(st_memory, "labels", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_ml = rrddim_add(st_memory, "ML", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_strings = rrddim_add(st_memory, "strings", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -77,6 +92,7 @@ void pulse_daemon_memory_do(bool extended) {
             rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_aral = rrddim_add(st_memory, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_judy = rrddim_add(st_memory, "judy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_slots = rrddim_add(st_memory, "slots", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
@@ -93,7 +109,10 @@ void pulse_daemon_memory_do(bool extended) {
             netdata_buffers_statistics.buffers_streaming +
             netdata_buffers_statistics.cbuffers_streaming +
             netdata_buffers_statistics.buffers_web +
-                         replication_sender_allocated_buffers() + aral_by_size_free_bytes() + judy_aral_free_bytes();
+            replication_sender_allocated_buffers() +
+            aral_by_size_free_bytes() +
+            judy_aral_free_bytes() +
+            uuidmap_free_bytes();
 
         sqlite3_int64 sqlite3_memory_used_current = 0, sqlite3_memory_used_highwater = 0;
         sqlite3_status64(SQLITE_STATUS_MEMORY_USED, &sqlite3_memory_used_current, &sqlite3_memory_used_highwater, 1);
@@ -145,6 +164,9 @@ void pulse_daemon_memory_do(bool extended) {
         rrddim_set_by_pointer(st_memory, rd_metadata, (collected_number)metadata);
 #endif
 
+        rrddim_set_by_pointer(st_memory, rd_uuid,
+                              (collected_number)uuidmap_memory());
+
         // labels use dictionary like statistics, but it is not ARAL based dictionary
         rrddim_set_by_pointer(st_memory, rd_labels,
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdlabels));
@@ -170,49 +192,14 @@ void pulse_daemon_memory_do(bool extended) {
         rrddim_set_by_pointer(st_memory, rd_judy,
                               (collected_number) judy_aral_structures());
 
+        rrddim_set_by_pointer(st_memory, rd_slots,
+                              (collected_number)__atomic_load_n(&rrd_slot_memory, __ATOMIC_RELAXED));
+
         rrddim_set_by_pointer(st_memory, rd_other,
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
 
         rrdset_done(st_memory);
     }
-
-    // ----------------------------------------------------------------------------------------------------------------
-
-    OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
-    if (sm.ram_total_bytes) {
-        static RRDSET *st_memory_available = NULL;
-        static RRDDIM *rd_available = NULL;
-
-        if (unlikely(!st_memory_available)) {
-            st_memory_available = rrdset_create_localhost(
-                "netdata",
-                "out_of_memory_protection",
-                NULL,
-                "Memory Usage",
-                NULL,
-                "Out of Memory Protection",
-                "bytes",
-                "netdata",
-                "pulse",
-                130102,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_AREA);
-
-            rd_available = rrddim_add(st_memory_available, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
-
-        // the sum of all these needs to be above at the total buffers calculation
-        rrddim_set_by_pointer(
-            st_memory_available, rd_available,
-            (collected_number)sm.ram_available_bytes);
-
-        rrdset_done(st_memory_available);
-    }
-
-    // ----------------------------------------------------------------------------------------------------------------
-
-    if(!extended)
-        return;
 
     // ----------------------------------------------------------------------------------------------------------------
 
@@ -232,6 +219,7 @@ void pulse_daemon_memory_do(bool extended) {
         static RRDDIM *rd_buffers_web = NULL;
         static RRDDIM *rd_buffers_aral = NULL;
         static RRDDIM *rd_buffers_judy = NULL;
+        static RRDDIM *rd_buffers_uuid = NULL;
 
         if (unlikely(!st_memory_buffers)) {
             st_memory_buffers = rrdset_create_localhost(
@@ -244,7 +232,7 @@ void pulse_daemon_memory_do(bool extended) {
                 "bytes",
                 "netdata",
                 "pulse",
-                130103,
+                130102,
                 localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 
@@ -262,6 +250,7 @@ void pulse_daemon_memory_do(bool extended) {
             rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_aral = rrddim_add(st_memory_buffers, "aral-by-size free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_judy = rrddim_add(st_memory_buffers, "aral-judy free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_uuid = rrddim_add(st_memory_buffers, "uuid", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         // the sum of all these needs to be above at the total buffers calculation
@@ -279,10 +268,45 @@ void pulse_daemon_memory_do(bool extended) {
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_sender_allocated_buffers());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)aral_by_size_free_bytes());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_judy, (collected_number)judy_aral_free_bytes());
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_uuid, (collected_number)uuidmap_free_bytes());
 
         rrdset_done(st_memory_buffers);
     }
 
     // ----------------------------------------------------------------------------------------------------------------
 
+    OS_SYSTEM_MEMORY sm = os_system_memory(true);
+    if (sm.ram_total_bytes && dbengine_out_of_memory_protection) {
+        static RRDSET *st_memory_available = NULL;
+        static RRDDIM *rd_available = NULL;
+
+        if (unlikely(!st_memory_available)) {
+            st_memory_available = rrdset_create_localhost(
+                "netdata",
+                "out_of_memory_protection",
+                NULL,
+                "Memory Usage",
+                NULL,
+                "Out of Memory Protection",
+                "bytes",
+                "netdata",
+                "pulse",
+                130103,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_AREA);
+
+            rd_available = rrddim_add(st_memory_available, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        // the sum of all these needs to be above at the total buffers calculation
+        rrddim_set_by_pointer(
+            st_memory_available, rd_available,
+            (collected_number)sm.ram_available_bytes);
+
+        rrdset_done(st_memory_available);
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------
+
+    pulse_daemon_memory_system_do(extended);
 }

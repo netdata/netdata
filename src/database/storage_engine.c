@@ -12,10 +12,12 @@ static STORAGE_ENGINE engines[] = {
         .name = RRD_MEMORY_MODE_NONE_NAME,
         .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
-            .metric_get = rrddim_metric_get,
+            .metric_get_by_id = rrddim_metric_get_by_id,
+            .metric_get_by_uuid = rrddim_metric_get_by_uuid,
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_id = rrddim_metric_retention_by_id,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
         }
     },
@@ -24,10 +26,12 @@ static STORAGE_ENGINE engines[] = {
         .name = RRD_MEMORY_MODE_RAM_NAME,
         .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
-            .metric_get = rrddim_metric_get,
+            .metric_get_by_id = rrddim_metric_get_by_id,
+            .metric_get_by_uuid = rrddim_metric_get_by_uuid,
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_id = rrddim_metric_retention_by_id,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
         }
     },
@@ -36,10 +40,12 @@ static STORAGE_ENGINE engines[] = {
         .name = RRD_MEMORY_MODE_ALLOC_NAME,
         .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
-            .metric_get = rrddim_metric_get,
+            .metric_get_by_id = rrddim_metric_get_by_id,
+            .metric_get_by_uuid = rrddim_metric_get_by_uuid,
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_id = rrddim_metric_retention_by_id,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
         }
     },
@@ -49,10 +55,12 @@ static STORAGE_ENGINE engines[] = {
         .name = RRD_MEMORY_MODE_DBENGINE_NAME,
         .seb = STORAGE_ENGINE_BACKEND_DBENGINE,
         .api = {
-            .metric_get = rrdeng_metric_get,
+            .metric_get_by_id = rrdeng_metric_get_by_id,
+            .metric_get_by_uuid = rrdeng_metric_get_by_uuid,
             .metric_get_or_create = rrdeng_metric_get_or_create,
             .metric_dup = rrdeng_metric_dup,
             .metric_release = rrdeng_metric_release,
+            .metric_retention_by_id = rrdeng_metric_retention_by_id,
             .metric_retention_by_uuid = rrdeng_metric_retention_by_uuid,
         }
     },

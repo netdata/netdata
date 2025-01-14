@@ -20,11 +20,25 @@ KICKSTART_SOURCE="$(
     echo "$(pwd -P)/${self##*/}"
 )"
 DEFAULT_PLUGIN_PACKAGES=""
-PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 REPOCONFIG_DEB_VERSION="4-1"
 REPOCONFIG_RPM_VERSION="4-1"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l armv6l aarch64 ppc64le"
+
+# ======================================================================
+# Properly sort out inconsistencies in `$PATH` across distros
+#
+# Debian and Ubuntu still don’t include sbin directories for regular
+# users (even though the distinction is all but pointless at this point in
+# time), and a number of distros don’t include the standard paths under
+# `/usr/local` either.
+
+for dir in /usr/sbin /sbin /usr/local/bin /usr/local/sbin ; do
+  case ":${PATH}:" in
+    *:${dir}:*) ;;
+    *) PATH="${PATH}:${dir}" ;;
+  esac
+done
 
 # ======================================================================
 # URLs used throughout the script
@@ -39,8 +53,8 @@ INSTALL_DOC_URL="https://learn.netdata.cloud/docs/install-the-netdata-agent/one-
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 RELEASE_INFO_URL="https://repo.netdata.cloud/releases"
-REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
-REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
+REPOCONFIG_DEB_URL_PREFIX="https://repository.netdata.cloud/repos/repoconfig"
+REPOCONFIG_RPM_URL_PREFIX="https://repository.netdata.cloud/repos/repoconfig"
 TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
 
 # ======================================================================
@@ -1279,7 +1293,11 @@ write_claim_config() {
   run_as_root mv -f "${claim_config}.tmp" "${claim_config}" || return 1
 
   if [ -z "${NETDATA_CLAIM_NORELOAD}" ]; then
-    run_as_root "${netdatacli}" reload-claiming-state || return 1
+    if [ -n "${netdatacli}" ]; then
+      run_as_root "${netdatacli}" reload-claiming-state || return 1
+    else
+      warning "Unable to find the netdatacli binary, the agent must be restarted to finish claiming"
+    fi
   fi
 }
 

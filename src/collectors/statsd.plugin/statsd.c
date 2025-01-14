@@ -623,7 +623,7 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
         statsd_reset_metric(m);
 
     if (unlikely(!m->dictionary.dict))
-        m->dictionary.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
+        m->dictionary.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC_DICTIONARY_ITEM));
 
     if(unlikely(value_is_zinit(value))) {
         // magic loading of metric, without affecting anything
@@ -2455,13 +2455,13 @@ void *statsd_main(void *ptr) {
     worker_register_job_name(WORKER_STATSD_FLUSH_DICTIONARIES, "dictionaries");
     worker_register_job_name(WORKER_STATSD_FLUSH_STATS, "statistics");
 
-    statsd.gauges.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
-    statsd.meters.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
-    statsd.counters.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
-    statsd.histograms.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
-    statsd.dictionaries.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
-    statsd.sets.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
-    statsd.timers.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
+    statsd.gauges.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC));
+    statsd.meters.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC));
+    statsd.counters.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC));
+    statsd.histograms.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC));
+    statsd.dictionaries.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC));
+    statsd.sets.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC));
+    statsd.timers.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(STATSD_METRIC));
 
     dictionary_register_insert_callback(statsd.gauges.dict, dictionary_metric_insert_callback, &statsd.gauges);
     dictionary_register_insert_callback(statsd.meters.dict, dictionary_metric_insert_callback, &statsd.meters);
