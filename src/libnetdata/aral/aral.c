@@ -11,12 +11,6 @@
 #define TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS
 #endif
 
-#if ENV32BIT
-#define SYSTEM_REQUIRED_ALIGNMENT (sizeof(uintptr_t) * 2)
-#else
-#define SYSTEM_REQUIRED_ALIGNMENT (alignof(uintptr_t))
-#endif
-
 // max mapped file size
 #define ARAL_MAX_PAGE_SIZE_MMAP (1ULL * 1024 * 1024 * 1024)
 
@@ -437,19 +431,6 @@ static inline void aral_free_validate_internal_check(ARAL *ar, ARAL_FREE *fr) {
 // --------------------------------------------------------------------------------------------------------------------
 // page size management
 
-static inline size_t memory_alignment(size_t size, size_t alignment) {
-    // return (size + alignment - 1) & ~(alignment - 1); // assumees alignment is power of 2
-    return ((size + alignment - 1) / alignment) * alignment;
-}
-
-static size_t aral_get_system_page_size(void) {
-    long int page_size = sysconf(_SC_PAGE_SIZE);
-    if (unlikely(page_size <= 4096))
-        return 4096;
-    else
-        return page_size;
-}
-
 static size_t aral_element_slot_size(size_t requested_element_size, bool usable) {
     // we need to add a page pointer after the element
     // so, first align the element size to the pointer size
@@ -525,7 +506,8 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
         page->filename = strdupz(filename);
         page->mapped = true;
 
-        page->data = netdata_mmap(page->filename, size, MAP_SHARED, 0, false, ar->config.options & ARAL_DONT_DUMP, NULL);
+        page->data =
+            nd_mmap_advanced(page->filename, size, MAP_SHARED, 0, false, ar->config.options & ARAL_DONT_DUMP, NULL);
         if (unlikely(!page->data))
             fatal("ARAL: '%s' cannot allocate aral buffer of size %zu on filename '%s'",
                   ar->config.name, size, page->filename);
@@ -547,7 +529,8 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
 
         if (size >= ARAL_MALLOC_USE_MMAP_ABOVE) {
             bool mapped;
-            uint8_t *ptr = netdata_mmap(NULL, size, MAP_PRIVATE, 1, false, ar->config.options & ARAL_DONT_DUMP, NULL);
+            uint8_t *ptr =
+                nd_mmap_advanced(NULL, size, MAP_ANONYMOUS | MAP_PRIVATE, 1, false, ar->config.options & ARAL_DONT_DUMP, NULL);
             if (ptr) {
                 mapped = true;
                 stats = &ar->stats->mmap;
@@ -614,7 +597,7 @@ void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_
         stats = &ar->stats->mmap;
         total_size = size + sizeof(ARAL_PAGE);
 
-        netdata_munmap(page->data, page->size);
+        nd_munmap(page->data, page->size);
 
         if (unlikely(unlink(page->filename) == 1))
             netdata_log_error("Cannot delete file '%s'", page->filename);
@@ -632,7 +615,7 @@ void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_
 #else
         if(page->mapped) {
             stats = &ar->stats->mmap;
-            netdata_munmap(page, page->size);
+            nd_munmap(page, page->size);
         }
         else {
             stats = &ar->stats->malloc;
@@ -1093,7 +1076,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     // ----------------------------------------------------------------------------------------------------------------
     // calculate allocation sizes
 
-    ar->config.system_page_size = aral_get_system_page_size();
+    ar->config.system_page_size = os_get_system_page_size();
 
     if (ar->config.initial_page_elements < 2)
         ar->config.initial_page_elements = 2;

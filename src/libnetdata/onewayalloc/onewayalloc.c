@@ -1,8 +1,5 @@
 #include "onewayalloc.h"
 
-// https://www.gnu.org/software/libc/manual/html_node/Aligned-Memory-Blocks.html
-#define OWA_NATURAL_ALIGNMENT  (sizeof(uintptr_t) * 2)
-
 typedef struct owa_page {
     size_t stats_pages;
     size_t stats_pages_size;
@@ -20,29 +17,12 @@ size_t onewayalloc_allocated_memory(void) {
     return __atomic_load_n(&onewayalloc_total_memory, __ATOMIC_RELAXED);
 }
 
-// allocations need to be aligned to CPU register width
-// https://en.wikipedia.org/wiki/Data_structure_alignment
-static inline size_t natural_alignment(size_t size) {
-    if(unlikely(size % OWA_NATURAL_ALIGNMENT))
-        size = size + OWA_NATURAL_ALIGNMENT - (size % OWA_NATURAL_ALIGNMENT);
-
-    return size;
-}
-
 // Create an OWA
 // Once it is created, the caller may call the onewayalloc_mallocz()
 // any number of times, for any amount of memory.
 
 static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
-    static size_t OWA_NATURAL_PAGE_SIZE = 0;
-
-    if(unlikely(!OWA_NATURAL_PAGE_SIZE)) {
-        long int page_size = sysconf(_SC_PAGE_SIZE);
-        if (unlikely(page_size == -1))
-            OWA_NATURAL_PAGE_SIZE = 4096;
-        else
-            OWA_NATURAL_PAGE_SIZE = page_size;
-    }
+    size_t OWA_NATURAL_PAGE_SIZE = os_get_system_page_size();
 
     // our default page size
     size_t size = 32768;
@@ -73,7 +53,7 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
         size = size + OWA_NATURAL_PAGE_SIZE - (size % OWA_NATURAL_PAGE_SIZE);
 
     // Use netdata_mmap instead of mallocz
-    OWA_PAGE *page = (OWA_PAGE *)netdata_mmap(NULL, size, MAP_ANONYMOUS|MAP_PRIVATE, 0, false, false, NULL);
+    OWA_PAGE *page = (OWA_PAGE *)nd_mmap_advanced(NULL, size, MAP_ANONYMOUS | MAP_PRIVATE, 0, false, false, NULL);
     if(unlikely(!page)) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
 
     __atomic_add_fetch(&onewayalloc_total_memory, size, __ATOMIC_RELAXED);
@@ -216,7 +196,7 @@ void onewayalloc_destroy(ONEWAYALLOC *owa) {
         page = page->next;
 
         // Use netdata_munmap instead of freez
-        netdata_munmap(p, p->size);
+        nd_munmap(p, p->size);
     }
 
     __atomic_sub_fetch(&onewayalloc_total_memory, total_size, __ATOMIC_RELAXED);

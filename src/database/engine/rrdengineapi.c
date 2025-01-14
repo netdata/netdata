@@ -1399,7 +1399,9 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     }
 
 //    stats.sizeof_metric = 0;
-    stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
+    stats.sizeof_datafile =
+        natural_alignment(sizeof(struct rrdengine_datafile)) +
+                            natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
     stats.sizeof_point_data = page_type_size[ctx->config.page_type];
     stats.sizeof_page_data = tier_page_size[ctx->config.tier];

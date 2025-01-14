@@ -62,7 +62,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t entries = st->db.entries;
         if(!entries) entries = 5;
 
-        rd->db.data = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, true, NULL);
+        rd->db.data = nd_mmap_advanced(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, true, NULL);
         if(rd->db.data) {
             rd->db.memsize = entries * sizeof(storage_number);
             pulse_db_rrd_memory_add(rd->db.memsize);
@@ -228,7 +228,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         pulse_db_rrd_memory_sub(rd->db.memsize);
 
         if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)
-            netdata_munmap(rd->db.data, rd->db.memsize);
+            nd_munmap(rd->db.data, rd->db.memsize);
         else
             freez(rd->db.data);
     }
