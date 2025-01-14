@@ -84,7 +84,7 @@ static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, 
         host->retention.last_time_s = last_time_s;
     }
     else {
-        if(!host->retention.first_time_s || first_time_s < host->retention.first_time_s)
+        if(!host->retention.first_time_s || (first_time_s && first_time_s < host->retention.first_time_s))
             host->retention.first_time_s = first_time_s;
 
         if(!host->retention.last_time_s || last_time_s > host->retention.last_time_s)
