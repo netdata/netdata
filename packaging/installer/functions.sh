@@ -644,10 +644,7 @@ get_systemd_service_dir() {
   unit_paths="$(systemctl show -p UnitPath | cut -f 2- -d '=' | tr ' ' '\n')"
 
   if [ -n "${unit_paths}" ]; then
-    # The strange `sed` expression here reverses line order (systemd lists
-    # unit paths in descending priority, we want to check the lib paths in
-    # ascending priority)
-    lib_paths="$(echo "${unit_paths}" | grep -vE '^/(run|etc)' | sed '1!x;H;1h;$!d;g')"
+    lib_paths="$(echo "${unit_paths}" | grep -vE '^/(run|etc)' | awk '{line[NR] = $0} END {for (i = NR; i > 0; i--) print line[i]}')"
     etc_paths="$(echo "${unit_paths}" | grep -E '^/etc' | grep -vE '(attached|control)$')"
   else
     lib_paths="/usr/lib/systemd/system /lib/systemd/system /usr/local/lib/systemd/system"
