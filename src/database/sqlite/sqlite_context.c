@@ -13,12 +13,12 @@ const char *database_context_config[] = {
     "last_time_t INT NOT NULL, deleted INT NOT NULL, "
     "family TEXT, PRIMARY KEY (host_id, id))",
 
-    "CREATE TABLE IF NOT EXISTS context_metadata_cleanup (id INTEGER PRIMARY KEY, host_id BLOB, context TEXT NOT NULL, "
+    "CREATE TABLE IF NOT EXISTS context_metadata_cleanup (id INTEGER PRIMARY KEY, host_id BLOB, context TEXT NOT NULL, date_created INT, "
     "UNIQUE (host_id, context))",
 
     "CREATE TRIGGER IF NOT EXISTS del_context1 AFTER DELETE ON context "
-    "BEGIN INSERT INTO context_metadata_cleanup (host_id, context) "
-    "VALUES (old.host_id, old.id) ON CONFLICT DO NOTHING; END",
+    "BEGIN INSERT INTO context_metadata_cleanup (host_id, context, date_created) "
+    "VALUES (old.host_id, old.id, UNIXEPOCH()) ON CONFLICT DO UPDATE SET date_created = excluded.date_created; END",
 
     NULL
 };
