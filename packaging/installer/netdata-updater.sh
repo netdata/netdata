@@ -174,6 +174,18 @@ issystemd() {
   return 1
 }
 
+systemd_unit_exists() {
+  if issystemd; then
+    if systemctl list-unit-files "${1}" >/dev/null 2>&1; then
+      return 0
+    else
+      return 1
+    fi
+  else
+    return 1
+  fi
+}
+
 # shellcheck disable=SC2009
 running_under_anacron() {
     pid="${1:-$$}"
@@ -309,11 +321,17 @@ enable_netdata_updater() {
   case "${updater_type}" in
     "systemd")
       if issystemd; then
-        systemctl enable netdata-updater.timer
+        if systemd_unit_exists netdata-updater.timer; then
+          systemctl enable netdata-updater.timer
+          systemctl start netdata-updater.timer
 
-        info "Auto-updating has been ENABLED using a systemd timer unit.\n"
-        info "If the update process fails, the failure will be logged to the systemd journal just like a regular service failure."
-        info "Successful updates should produce empty logs."
+          info "Auto-updating has been ENABLED using a systemd timer unit.\n"
+          info "If the update process fails, the failure will be logged to the systemd journal just like a regular service failure."
+          info "Successful updates should produce empty logs."
+        else
+          error "Systemd-based auto-update scheduling requested, but the required timer unit does not exist. Auto-updates have NOT been enabled."
+          return 1
+        fi
       else
         error "Systemd-based auto-update scheduling requested, but this does not appear to be a systemd system. Auto-updates have NOT been enabled."
         return 1
@@ -353,8 +371,9 @@ enable_netdata_updater() {
 }
 
 disable_netdata_updater() {
-  if issystemd && ( systemctl list-units --full -all | grep -Fq "netdata-updater.timer" ) ; then
+  if systemd_unit_exists "netdata-updater.timer" ; then
     systemctl disable netdata-updater.timer
+    systemctl stop netdata-updater.timer
   fi
 
   if [ -d /etc/cron.daily ]; then
@@ -389,7 +408,7 @@ auto_update_status() {
   enabled=""
 
   if issystemd; then
-    if systemctl list-units --full -all | grep -Fq "netdata-updater.timer"; then
+    if systemd_unit_exists "netdata-updater.timer"; then
       if systemctl is-enabled netdata-updater.timer; then
         info "Auto-updates using a systemd timer unit are ENABLED"
         enabled="systemd"

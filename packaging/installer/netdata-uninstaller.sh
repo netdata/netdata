@@ -737,13 +737,27 @@ fi
 
 #### REMOVE NETDATA FILES
 
+# Handle updater files first so that it doesn’t try to run while we
+# are uninstalling things.
+if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" ]; then
+  "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" --disable-auto-updates
+else
+  rm_file /etc/periodic/daily/netdata-updater
+  rm_file /etc/cron.daily/netdata-updater
+  rm_file /etc/cron.d/netdata-updater
+  rm_file /etc/cron.d/netdata-updater-daily
+fi
+
 if issystemd; then
   for unit in netdata.service netdata-updater.timer; do
-    systemctl disable --now "${unit}"
+    systemctl disable "${unit}"
+    systemctl stop "${unit}"
   done
 
   for unit in netdata.service netdata-updater.service netdata-updater.timer; do
-    for path in $(systemctl show -p FragmentPath -p DropInPaths --value "${unit}"); do
+    unit_path="$(systemctl show -p FragmentPath | cut -f 2- -d '=')"
+    override_paths="$(systemctl show -p DropInPaths | cut -f 2- -d '=' | tr ' ' '\n')"
+    for path in "${unit_path}" ${override_paths} ; do
       rm_file "${path}"
     done
   done
@@ -755,15 +769,6 @@ if issystemd; then
   rm_file /lib/systemd/system-preset/50-netdata.preset
 
   systemctl daemon-reload
-fi
-
-if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" ]; then
-  "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" --disable-auto-updates
-else
-  rm_file /etc/periodic/daily/netdata-updater
-  rm_file /etc/cron.daily/netdata-updater
-  rm_file /etc/cron.d/netdata-updater
-  rm_file /etc/cron.d/netdata-updater-daily
 fi
 
 rm_file /etc/logrotate.d/netdata
