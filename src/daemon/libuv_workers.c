@@ -56,6 +56,10 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_METADATA_CLEANUP, "metadata cleanup");
     worker_register_job_name(UV_EVENT_METADATA_ML_LOAD, "metadata load ml models");
 
+    // aclk_sync
+    worker_register_job_name(UV_EVENT_ACLK_NODE_INFO, "aclk host node info");
+    worker_register_job_name(UV_EVENT_ACLK_ALERT_PUSH, "aclk alert push");
+
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
 

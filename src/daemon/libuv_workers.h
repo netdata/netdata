@@ -48,6 +48,10 @@ enum event_loop_job {
     UV_EVENT_METADATA_CLEANUP,
     UV_EVENT_METADATA_ML_LOAD,
 
+    // aclk_sync
+    UV_EVENT_ACLK_NODE_INFO,
+    UV_EVENT_ACLK_ALERT_PUSH,
+
     // netdatacli
     UV_EVENT_SCHEDULE_CMD,
 };
