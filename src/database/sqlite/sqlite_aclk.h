@@ -24,7 +24,6 @@ enum aclk_database_opcode {
     ACLK_MQTT_WSS_CLIENT,
     ACLK_QUERY_EXECUTE,
     ACLK_QUERY_EXECUTE_SYNC,
-    ACLK_DATABASE_TIMER,
 
     // leave this last
     // we need it to check for worker utilization
