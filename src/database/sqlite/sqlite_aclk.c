@@ -297,7 +297,6 @@ struct aclk_query_payload {
 
 static void after_aclk_run_query_job(uv_work_t *req, int status __maybe_unused)
 {
-    worker_is_busy(ACLK_QUERY_EXECUTE);
     struct aclk_query_payload *payload = req->data;
     struct aclk_sync_config_s *config = payload->config;
     config->aclk_queries_running--;
