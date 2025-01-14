@@ -984,6 +984,9 @@ set(LIBNETDATA_FILES
         src/libnetdata/memory/nd-mallocz.h
         src/libnetdata/memory/nd-mmap.c
         src/libnetdata/memory/nd-mmap.h
+        src/libnetdata/memory/alignment.h
+        src/libnetdata/os/get_system_pagesize.c
+        src/libnetdata/os/get_system_pagesize.h
 )
 
 set(LIBH2O_FILES

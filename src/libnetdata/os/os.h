@@ -19,6 +19,7 @@
 #include "gettid.h"
 #include "get_pid_max.h"
 #include "get_system_cpus.h"
+#include "get_system_pagesize.h"
 #include "sleep.h"
 #include "uuid_generate.h"
 #include "setenv.h"

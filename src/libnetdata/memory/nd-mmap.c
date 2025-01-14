@@ -2,6 +2,9 @@
 
 #include "../libnetdata.h"
 
+size_t nd_mmap_count = 0;
+size_t nd_mmap_size = 0;
+
 #if !defined(MADV_DONTFORK)
 #define MADV_DONTFORK 0
 #endif
@@ -109,23 +112,50 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
 #endif
 }
 
-size_t netdata_mmap_count = 0;
+int nd_munmap(void *ptr, size_t size) {
+#ifdef NETDATA_TRACE_ALLOCATIONS
+    malloc_trace_munmap(size);
+#endif
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, bool dont_dump, int *open_fd)
-{
+    int rc = munmap(ptr, size);
+
+    if(rc == 0) {
+        __atomic_sub_fetch(&nd_mmap_count, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&nd_mmap_size, size, __ATOMIC_RELAXED);
+    }
+
+    return rc;
+}
+
+void *nd_mmap(void *addr, size_t len, int prot, int flags, int fd, __off_t offset) {
+    void *rc = mmap(addr, len, prot, flags, fd, offset);
+
+    if(rc != MAP_FAILED) {
+        __atomic_add_fetch(&nd_mmap_count, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&nd_mmap_size, len, __ATOMIC_RELAXED);
+
+#ifdef NETDATA_TRACE_ALLOCATIONS
+        malloc_trace_mmap(size);
+#endif
+    }
+
+    return rc;
+}
+
+void *nd_mmap_advanced(const char *filename, size_t size, int flags, int ksm, bool read_only, bool dont_dump, int *open_fd) {
     // netdata_log_info("netdata_mmap('%s', %zu", filename, size);
 
     // MAP_SHARED is used in memory mode map
     // MAP_PRIVATE is used in memory mode ram and save
 
     if(unlikely(!(flags & MAP_SHARED) && !(flags & MAP_PRIVATE)))
-        fatal("Neither MAP_SHARED or MAP_PRIVATE were given to netdata_mmap()");
+        fatal("Neither MAP_SHARED or MAP_PRIVATE were given to nd_mmap_advanced()");
 
     if(unlikely((flags & MAP_SHARED) && (flags & MAP_PRIVATE)))
-        fatal("Both MAP_SHARED and MAP_PRIVATE were given to netdata_mmap()");
+        fatal("Both MAP_SHARED and MAP_PRIVATE were given to nd_mmap_advanced()");
 
     if(unlikely((flags & MAP_SHARED) && (!filename || !*filename)))
-        fatal("MAP_SHARED requested, without a filename to netdata_mmap()");
+        fatal("MAP_SHARED requested, without a filename to nd_mmap_advanced()");
 
     // don't enable ksm is the global setting is disabled
     if(unlikely(!enable_ksm)) ksm = 0;
@@ -151,13 +181,8 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool r
         fd_for_mmap = -1;
     }
 
-    mem = mmap(NULL, size, read_only ? PROT_READ : PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
+    mem = nd_mmap(NULL, size, read_only ? PROT_READ : PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
     if (mem != MAP_FAILED) {
-
-#ifdef NETDATA_TRACE_ALLOCATIONS
-        malloc_trace_mmap(size);
-#endif
-
         // if we have a file open, but we didn't give it to mmap(),
         // we have to read the file into the memory block we allocated
         if(fd != -1 && fd_for_mmap == -1) {
@@ -182,19 +207,10 @@ cleanup:
         else
             close(fd);
     }
-    if(mem == MAP_FAILED) return NULL;
-    __atomic_add_fetch(&netdata_mmap_count, 1, __ATOMIC_RELAXED);
+
+    if(mem == MAP_FAILED)
+        return NULL;
+
     errno_clear();
     return mem;
 }
-
-int netdata_munmap(void *ptr, size_t size) {
-#ifdef NETDATA_TRACE_ALLOCATIONS
-    malloc_trace_munmap(size);
-#endif
-    int rc = munmap(ptr, size);
-    if(rc == 0)
-        __atomic_sub_fetch(&netdata_mmap_count, 1, __ATOMIC_RELAXED);
-    return rc;
-}
-

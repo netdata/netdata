@@ -229,7 +229,7 @@ void pulse_daemon_memory_system_do(bool extended) {
     }
 #endif // HAVE_C_MALLINFO2
 
-    size_t netdata_mmaps = __atomic_load_n(&netdata_mmap_count, __ATOMIC_RELAXED);
+    size_t netdata_mmaps = __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED);
     size_t total_mmaps = netdata_mmaps + glibc_mmaps;
     {
         static RRDSET *st_maps = NULL;
