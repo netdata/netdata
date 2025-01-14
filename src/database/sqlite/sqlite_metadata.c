@@ -8,6 +8,8 @@
 
 #define DB_METADATA_VERSION 18
 
+extern long long def_journal_size_limit;
+
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
     "registry_hostname TEXT NOT NULL default 'unknown', update_every INT NOT NULL default 1, "
@@ -665,6 +667,31 @@ void sqlite_uuid_random(sqlite3_context *context, int argc, sqlite3_value **argv
     nd_uuid_t uuid;
     uuid_generate_random(uuid);
     sqlite3_result_blob(context, &uuid, sizeof(nd_uuid_t), SQLITE_TRANSIENT);
+}
+
+static int64_t sql_get_wal_size(const char *database_file)
+{
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename) - 1, "%s/%s-wal", netdata_configured_cache_dir, database_file);
+
+    uv_fs_t req;
+    int result = uv_fs_stat(NULL, &req, filename, NULL);
+    int64_t file_size = result >= 0 ? (int64_t) req.statbuf.st_size : -1;
+
+    uv_fs_req_cleanup(&req);
+    return file_size;
+}
+
+#define SQLITE_METADATA_WAL_LIMIT_X (10)
+
+bool sql_metadata_wal_size_acceptable()
+{
+    int64_t wal_size = sql_get_wal_size("netdata-meta.db");
+
+    if (wal_size > SQLITE_METADATA_WAL_LIMIT_X * def_journal_size_limit)
+        return false;
+
+    return true;
 }
 
 // Init
@@ -1568,13 +1595,13 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
 #define SQL_SELECT_HOST_CTX_CHART_DIM_LIST                                                                             \
     "SELECT d.dim_id, d.rowid FROM chart c, dimension d WHERE c.chart_id = d.chart_id AND c.rowid = @rowid"
 
-static void clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id, size_t *checked, size_t *deleted)
+static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id, size_t *checked, size_t *deleted)
 {
     struct metadata_wc *wc = &metasync_worker;
 
     if (!*res) {
         if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_CTX_CHART_DIM_LIST, res))
-            return;
+            return false;
     }
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, chart_row_id));
@@ -1582,8 +1609,9 @@ static void clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
 
     sqlite3_stmt *dim_del_stmt = NULL;
 
-    while (sqlite3_step_monitored(*res) == SQLITE_ROW) {
+    bool can_continue = true;
 
+    while (can_continue && sqlite3_step_monitored(*res) == SQLITE_ROW) {
         if (sqlite3_column_bytes(*res, 0) != sizeof(nd_uuid_t))
             continue;
 
@@ -1595,14 +1623,14 @@ static void clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
             (*deleted)++;
         }
         (*checked)++;
-        if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
-            break;
+        can_continue = (!metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)) && sql_metadata_wal_size_acceptable();
     }
     SQLITE_FINALIZE(dim_del_stmt);
 
 done:
     REPORT_BIND_FAIL(*res, param);
     SQLITE_RESET(*res);
+    return can_continue;
 }
 
 #define SQL_SELECT_HOST_CTX_CHART_LIST "SELECT rowid, context FROM chart WHERE host_id = @host"
@@ -1637,18 +1665,19 @@ static void cleanup_host_context_metadata(Pvoid_t CTX_JudyL, void *data)
     size_t deleted = 0;
     size_t checked = 0;
 
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+    bool can_continue = true;
+    while (can_continue && sqlite3_step_monitored(res) == SQLITE_ROW) {
         chart_row_id = sqlite3_column_int64(res, 0);
         const char *context = (char *)sqlite3_column_text(res, 1);
         STRING *ctx = string_strdupz(context);
         Pvalue = JudyLGet(CTX_JudyL, (Word_t)ctx, PJE0);
         if (Pvalue) {
-            clean_host_chart_dimensions(&dimension_res, chart_row_id, &checked, &deleted);
+            can_continue = clean_host_chart_dimensions(&dimension_res, chart_row_id, &checked, &deleted);
             ctx_delete_metadata_cleanup_context(&context_res, &host->host_id.uuid, context);
         }
         string_freez(ctx);
-        if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
-            break;
+        can_continue =
+            can_continue && (!metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)) && sql_metadata_wal_size_acceptable();
     }
     SQLITE_FINALIZE(dimension_res);
     SQLITE_FINALIZE(context_res);
@@ -1670,14 +1699,15 @@ void run_metadata_cleanup(struct metadata_wc *wc)
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
        return;
 
-    // CLEANUP hosts
-    RRDHOST *host;
-    dfe_start_reentrant(rrdhost_root_index, host) {
-        ctx_get_context_list_to_cleanup(&host->host_id.uuid, cleanup_host_context_metadata, host);
-        if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
-            break;
+    if (sql_metadata_wal_size_acceptable()) {
+        RRDHOST *host;
+        dfe_start_reentrant(rrdhost_root_index, host) {
+            ctx_get_context_list_to_cleanup(&host->host_id.uuid, cleanup_host_context_metadata, host);
+            if (metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN) || false == sql_metadata_wal_size_acceptable())
+                break;
+        }
+        dfe_done(host);
     }
-    dfe_done(host);
 
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
         return;
