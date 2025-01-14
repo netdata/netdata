@@ -321,11 +321,16 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
 
 static void aclk_run_query_job(uv_work_t *req)
 {
+    register_libuv_worker_jobs();
+
+    worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
+
     struct aclk_query_payload *payload =  req->data;
     struct aclk_sync_config_s *config = payload->config;
     aclk_query_t query = (aclk_query_t) payload->data;
 
     aclk_run_query(config, query);
+    worker_is_idle();
 }
 
 static void node_update_timer_cb(uv_timer_t *handle)
@@ -385,7 +390,6 @@ static void aclk_synchronization(void *arg)
     worker_register_job_name(ACLK_DATABASE_NODE_STATE,           "node state");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
-    worker_register_job_name(ACLK_QUERY_EXECUTE,                 "query execute");
     worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,            "query execute sync");
 
     uv_loop_t *loop = &config->loop;
