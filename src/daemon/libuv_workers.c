@@ -59,7 +59,7 @@ void register_libuv_worker_jobs() {
     // aclk_sync
     worker_register_job_name(UV_EVENT_ACLK_NODE_INFO, "aclk host node info");
     worker_register_job_name(UV_EVENT_ACLK_ALERT_PUSH, "aclk alert push");
-    worker_register_job_name(UV_EVENT_ACLK_QUERY_EXECUTE, "query execute");
+    worker_register_job_name(UV_EVENT_ACLK_QUERY_EXECUTE, "aclk query execute");
 
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");

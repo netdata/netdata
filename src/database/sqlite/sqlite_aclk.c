@@ -390,7 +390,7 @@ static void aclk_synchronization(void *arg)
     worker_register_job_name(ACLK_DATABASE_NODE_STATE,           "node state");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
-    worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,            "query execute sync");
+    worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,            "aclk query execute sync");
 
     uv_loop_t *loop = &config->loop;
     fatal_assert(0 == uv_loop_init(loop));
