@@ -205,6 +205,8 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
+option(ENABLE_LIBUNWIND "Include stack traces in log output" False)
+
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
@@ -2119,22 +2121,26 @@ netdata_add_jsonc_to_target(libnetdata)
 netdata_add_libyaml_to_target(libnetdata)
 
 # libunwind
-pkg_check_modules(LIBUNWIND libunwind IMPORTED_TARGET)
-if(TARGET PkgConfig::LIBUNWIND)
+if(ENABLE_LIBUNWIND)
+  pkg_check_modules(LIBUNWIND libunwind IMPORTED_TARGET)
+  if(TARGET PkgConfig::LIBUNWIND)
     set(HAVE_LIBUNWIND On)
 
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
-        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-x86_64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-x86_64)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
-        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-aarch64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-aarch64)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
-        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-arm)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-arm)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "powerpc|ppc")
-        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-ppc64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-ppc64)
     else()
-        message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR} for libunwind. Stack traces may not work.")
-        target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND)
+      message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR} for libunwind. Stack traces may not work.")
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND)
     endif()
+  else()
+    message(FATAL "Could not find libunwind for logging of stack traces")
+  endif()
 endif()
 
 # zlib
