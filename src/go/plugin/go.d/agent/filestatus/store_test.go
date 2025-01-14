@@ -40,7 +40,7 @@ func TestStore_add(t *testing.T) {
 			prepare: func() *Store {
 				return &Store{
 					items: map[string]map[string]string{
-						"modName": {"jobName:18299273693089411682": "state"},
+						"modName": {"jobName:14246646561040761746": "state"},
 					},
 				}
 			},
@@ -97,8 +97,8 @@ func TestStore_remove(t *testing.T) {
 				return &Store{
 					items: map[string]map[string]string{
 						"modName": {
-							"jobName:18299273693089411682": "state",
-							"jobName:18299273693089411683": "state",
+							"jobName:14246646561040761746": "state",
+							"jobName:14246646561040761747": "state",
 						},
 					},
 				}
