@@ -606,11 +606,8 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
 
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
     while(status == EVLOOP_STATUS_CONTINUE) {
-        if(!stream_sender_trylock(s)) {
-            sth->snd.send_misses++;
-            status = EVLOOP_STATUS_CANT_GET_LOCK;
-            break;
-        }
+        waitq_acquire(&s->waitq, WAITQ_PRIO_URGENT);
+        stream_sender_lock(s);
 
         STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(s->scb);
         char *chunk;
@@ -619,6 +616,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
         if(!outstanding) {
             status = EVLOOP_STATUS_NO_MORE_DATA;
             stream_sender_unlock(s);
+            waitq_release(&s->waitq);
             continue;
         }
 
@@ -652,6 +650,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
                 status = EVLOOP_STATUS_SOCKET_ERROR;
         }
         stream_sender_unlock(s);
+        waitq_release(&s->waitq);
 
         if (status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED) {
             const char *disconnect_reason = NULL;

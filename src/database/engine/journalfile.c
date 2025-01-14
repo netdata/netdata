@@ -682,7 +682,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
         }
 
         temp_id = (nd_uuid_t *)jf_metric_data->descr[i].uuid;
-        METRIC *metric = mrg_metric_get_and_acquire(main_mrg, temp_id, (Word_t) ctx);
+        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, temp_id, (Word_t)ctx);
 
         struct rrdeng_extent_page_descr *descr = &jf_metric_data->descr[i];
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(

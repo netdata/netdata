@@ -189,7 +189,7 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
     // if we can set refcount to REFCOUNT_DELETING, we can delete this item
 
     size_t spins = 0;
-    REFCOUNT refcount, desired = REFCOUNT_DICONNECTED;
+    REFCOUNT refcount, desired = REFCOUNT_DELETED;
 
     int ret = RC_ITEM_OK;
 
@@ -234,7 +234,7 @@ static inline bool item_shared_release_and_check_if_it_can_be_freed(DICTIONARY *
     // if we can set refcount to REFCOUNT_DELETING, we can delete this item
 
     REFCOUNT links = __atomic_sub_fetch(&item->shared->links, 1, __ATOMIC_RELEASE);
-    if(links == 0 && __atomic_compare_exchange_n(&item->shared->links, &links, REFCOUNT_DICONNECTED, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+    if(links == 0 && __atomic_compare_exchange_n(&item->shared->links, &links, REFCOUNT_DELETED, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
 
         // we can delete it
         return true;

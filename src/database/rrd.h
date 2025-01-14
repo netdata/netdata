@@ -289,7 +289,7 @@ bool backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
 // RRD DIMENSION - this is a metric
 
 struct rrddim {
-    nd_uuid_t metric_uuid;                          // global UUID for this metric (unique_across hosts)
+    UUIDMAP_ID uuid;
 
     // ------------------------------------------------------------------------
     // dimension definition
@@ -654,10 +654,12 @@ static inline time_t storage_engine_align_to_optimal_before(struct storage_engin
 // function pointers for all APIs provided by a storage engine
 typedef struct storage_engine_api {
     // metric management
-    STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
+    STORAGE_METRIC_HANDLE *(*metric_get_by_id)(STORAGE_INSTANCE *si, UUIDMAP_ID id);
+    STORAGE_METRIC_HANDLE *(*metric_get_by_uuid)(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
     STORAGE_METRIC_HANDLE *(*metric_get_or_create)(RRDDIM *rd, STORAGE_INSTANCE *si);
     void (*metric_release)(STORAGE_METRIC_HANDLE *);
     STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
+    bool (*metric_retention_by_id)(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s);
     bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *si, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
 } STORAGE_ENGINE_API;
 

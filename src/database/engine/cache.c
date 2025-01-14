@@ -14,9 +14,6 @@
  *
  */
 
-typedef int32_t REFCOUNT;
-#define REFCOUNT_DICONNECTED (-100)
-
 // to use ARAL uncomment the following line:
 #if !defined(FSANITIZE_ADDRESS)
 #define PGC_WITH_ARAL 1
@@ -869,58 +866,28 @@ static inline void PGC_REFERENCED_PAGES_MINUS1(PGC *cache, size_t assumed_size) 
 }
 
 // If the page is not already acquired,
-// YOU HAVE TO HAVE THE QUEUE (hot, dirty, clean) THE PAGE IS IN, L O C K E D !
-// If you don't have it locked, NOTHING PREVENTS THIS PAGE FOR VANISHING WHILE THIS IS CALLED!
+// YOU HAVE TO HAVE THE QUEUE (hot, dirty, clean - the page is in), LOCKED!
+// If you don't have it locked, NOTHING PREVENTS THIS PAGE FROM VANISHING WHILE THIS IS CALLED!
 static inline bool page_acquire(PGC *cache, PGC_PAGE *page) {
     __atomic_add_fetch(&cache->stats.acquires, 1, __ATOMIC_RELAXED);
 
-    REFCOUNT expected, desired;
+    REFCOUNT rc = refcount_acquire_advanced(&page->refcount);
+    if(REFCOUNT_ACQUIRED(rc)) {
+        if(rc == 1)
+            PGC_REFERENCED_PAGES_PLUS1(cache, page);
 
-    expected = __atomic_load_n(&page->refcount, __ATOMIC_RELAXED);
-    size_t spins = 0;
+        return true;
+    }
 
-    do {
-        spins++;
-
-        if(unlikely(expected < 0))
-            return false;
-
-        desired = expected + 1;
-
-    } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
-
-    if(unlikely(spins > 1))
-        p2_add_fetch(&cache->stats.p2_waste_acquire_spins, spins - 1);
-
-    if(desired == 1)
-        PGC_REFERENCED_PAGES_PLUS1(cache, page);
-
-    return true;
+    return false;
 }
 
 static inline void page_release(PGC *cache, PGC_PAGE *page, bool evict_if_necessary) {
     __atomic_add_fetch(&cache->stats.releases, 1, __ATOMIC_RELAXED);
 
     size_t assumed_size = page->assumed_size; // take the size before we release it
-    REFCOUNT expected, desired;
 
-    expected = __atomic_load_n(&page->refcount, __ATOMIC_RELAXED);
-
-    size_t spins = 0;
-    do {
-        spins++;
-
-        internal_fatal(expected <= 0,
-                       "DBENGINE CACHE: trying to release a page with reference counter %d", expected);
-
-        desired = expected - 1;
-
-    } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
-
-    if(unlikely(spins > 1))
-        p2_add_fetch(&cache->stats.p2_waste_release_spins, spins - 1);
-
-    if(desired == 0) {
+    if(refcount_release(&page->refcount) == 0) {
         PGC_REFERENCED_PAGES_MINUS1(cache, assumed_size);
 
         if(evict_if_necessary)
@@ -934,38 +901,17 @@ static inline bool non_acquired_page_get_for_deletion___while_having_clean_locke
     internal_fatal(!is_page_clean(page),
                    "DBENGINE CACHE: only clean pages can be deleted");
 
-    REFCOUNT expected, desired;
-
-    expected = __atomic_load_n(&page->refcount, __ATOMIC_RELAXED);
-    size_t spins = 0;
-    bool delete_it;
-
-    do {
-        spins++;
-
-        if (expected == 0) {
-            desired = REFCOUNT_DICONNECTED;
-            delete_it = true;
-        }
-        else {
-            delete_it = false;
-            break;
-        }
-
-    } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
-
-    if(delete_it) {
+    if(refcount_acquire_for_deletion(&page->refcount)) {
         // we can delete this page
         internal_fatal(page_flag_check(page, PGC_PAGE_IS_BEING_DELETED),
                        "DBENGINE CACHE: page is already being deleted");
 
         page_flag_set(page, PGC_PAGE_IS_BEING_DELETED);
+
+        return true;
     }
 
-    if(unlikely(spins > 1))
-        p2_add_fetch(&cache->stats.p2_waste_delete_spins, spins - 1);
-
-    return delete_it;
+    return false;
 }
 
 static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __maybe_unused, PGC_PAGE *page) {
@@ -973,32 +919,7 @@ static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __may
 
     size_t assumed_size = page->assumed_size; // take the size before we release it
 
-    REFCOUNT expected, desired;
-
-    expected = __atomic_load_n(&page->refcount, __ATOMIC_RELAXED);
-    size_t spins = 0;
-    bool delete_it;
-
-    do {
-        spins++;
-
-        internal_fatal(expected < 1,
-                       "DBENGINE CACHE: page to be deleted should be acquired by the caller.");
-
-        if (expected == 1) {
-            // we are the only one having this page referenced
-            desired = REFCOUNT_DICONNECTED;
-            delete_it = true;
-        }
-        else {
-            // this page cannot be deleted
-            desired = expected - 1;
-            delete_it = false;
-        }
-
-    } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
-
-    if(delete_it) {
+    if(refcount_release_and_acquire_for_deletion(&page->refcount)) {
         PGC_REFERENCED_PAGES_MINUS1(cache, assumed_size);
 
         // we can delete this page
@@ -1006,12 +927,11 @@ static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __may
                        "DBENGINE CACHE: page is already being deleted");
 
         page_flag_set(page, PGC_PAGE_IS_BEING_DELETED);
+
+        return true;
     }
 
-    if(unlikely(spins > 1))
-        p2_add_fetch(&cache->stats.p2_waste_delete_spins, spins - 1);
-
-    return delete_it;
+    return false;
 }
 
 
@@ -2365,7 +2285,7 @@ bool pgc_flush_pages(PGC *cache) {
 }
 
 void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_s, size_t additional_bytes) {
-    internal_fatal(!is_page_hot(page),
+    internal_fatal(!is_page_hot(page) && !netdata_exit,
                    "DBENGINE CACHE: end_time_s update on non-hot page");
 
     internal_fatal(end_time_s < __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),

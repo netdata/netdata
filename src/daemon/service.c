@@ -38,7 +38,7 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
         /* only a collector can mark a chart as obsolete, so we must remove the reference */
         if (!rrddim_finalize_collection_and_check_retention(rd)) {
             /* This metric has no data and no references */
-            metaqueue_delete_dimension_uuid(&rd->metric_uuid);
+            metaqueue_delete_dimension_uuid(uuidmap_uuid_ptr(rd->uuid));
         }
         else {
             /* Do not delete this dimension */

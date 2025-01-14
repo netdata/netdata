@@ -126,7 +126,7 @@ static METRIC *rrdeng_metric_unittest(STORAGE_INSTANCE *si, const char *rd_id, c
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     nd_uuid_t legacy_uuid;
     rrdeng_generate_unittest_uuid(rd_id, st_id, &legacy_uuid);
-    return mrg_metric_get_and_acquire(main_mrg, &legacy_uuid, (Word_t) ctx);
+    return mrg_metric_get_and_acquire_by_uuid(main_mrg, &legacy_uuid, (Word_t)ctx);
 }
 
 // ----------------------------------------------------------------------------
@@ -142,9 +142,14 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *smh) {
     return (STORAGE_METRIC_HANDLE *) mrg_metric_dup(main_mrg, metric);
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
-    return (STORAGE_METRIC_HANDLE *) mrg_metric_get_and_acquire(main_mrg, uuid, (Word_t) ctx);
+    return (STORAGE_METRIC_HANDLE *)mrg_metric_get_and_acquire_by_uuid(main_mrg, uuid, (Word_t)ctx);
+}
+
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    return (STORAGE_METRIC_HANDLE *)mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t)ctx);
 }
 
 static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
@@ -170,25 +175,25 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     METRIC *metric;
 
-    metric = mrg_metric_get_and_acquire(main_mrg, &rd->metric_uuid, (Word_t) ctx);
+    metric = mrg_metric_get_and_acquire_by_id(main_mrg, rd->uuid, (Word_t) ctx);
 
     if(unlikely(!metric)) {
         if(unlikely(unittest_running)) {
             metric = rrdeng_metric_unittest(si, rrddim_id(rd), rrdset_id(rd->rrdset));
             if (metric)
-                uuid_copy(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric));
+                rd->uuid = mrg_metric_uuidmap_id_dup(main_mrg, metric);
         }
 
         if(likely(!metric))
-            metric = rrdeng_metric_create(si, &rd->metric_uuid);
+            metric = rrdeng_metric_create(si, uuidmap_uuid_ptr(rd->uuid));
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(!uuid_eq(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric))) {
+    if(!uuid_eq(*uuidmap_uuid_ptr(rd->uuid), *mrg_metric_uuid(main_mrg, metric))) {
         char uuid1[UUID_STR_LEN + 1];
         char uuid2[UUID_STR_LEN + 1];
 
-        uuid_unparse(rd->metric_uuid, uuid1);
+        uuid_unparse(*uuidmap_uuid_ptr(rd->uuid), uuid1);
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid2);
         fatal("DBENGINE: uuids do not match, asked for metric '%s', but got metric '%s'", uuid1, uuid2);
     }
@@ -263,6 +268,8 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
     METRIC *metric = (METRIC *)smh;
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
 
+    RRDENG_COLLECT_HANDLE_OPTIONS options = 0;
+#ifdef NETDATA_INTERNAL_CHECKS
     bool is_1st_metric_writer = true;
     if(!mrg_metric_set_writer(main_mrg, metric)) {
         is_1st_metric_writer = false;
@@ -270,6 +277,12 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
         netdata_log_error("DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts", uuid);
     }
+    if(is_1st_metric_writer)
+        options = RRDENG_1ST_METRIC_WRITER;
+    else
+        __atomic_add_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
+
+#endif
 
     metric = mrg_metric_dup(main_mrg, metric);
 
@@ -285,11 +298,9 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
     handle->page_position = 0;
     handle->page_entries_max = 0;
     handle->update_every_ut = (usec_t)update_every * USEC_PER_SEC;
-    handle->options = is_1st_metric_writer ? RRDENG_1ST_METRIC_WRITER : 0;
+    handle->options = options;
 
     __atomic_add_fetch(&ctx->atomic.collectors_running, 1, __ATOMIC_RELAXED);
-    if(!is_1st_metric_writer)
-        __atomic_add_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
 
     mrg_metric_set_update_every(main_mrg, metric, update_every);
 
@@ -654,11 +665,14 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch) {
     rrdeng_page_alignment_release(handle->alignment);
 
     __atomic_sub_fetch(&ctx->atomic.collectors_running, 1, __ATOMIC_RELAXED);
+
+#ifdef NETDATA_INTERNAL_CHECKS
     if(!(handle->options & RRDENG_1ST_METRIC_WRITER))
         __atomic_sub_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
 
     if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_clear_writer(main_mrg, handle->metric))
         internal_fatal(true, "DBENGINE: metric is already released");
+#endif
 
     time_t first_time_s, last_time_s;
     mrg_metric_get_retention(main_mrg, handle->metric, &first_time_s, &last_time_s, NULL);
@@ -953,15 +967,32 @@ time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh) {
     return oldest_time_s;
 }
 
-bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s)
-{
+bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     if (unlikely(!ctx)) {
         netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
     }
 
-    METRIC *metric = mrg_metric_get_and_acquire(main_mrg, dim_uuid, (Word_t) ctx);
+    METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, dim_uuid, (Word_t)ctx);
+    if (unlikely(!metric))
+        return false;
+
+    mrg_metric_get_retention(main_mrg, metric, first_entry_s, last_entry_s, NULL);
+
+    mrg_metric_release(main_mrg, metric);
+
+    return true;
+}
+
+bool rrdeng_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    if (unlikely(!ctx)) {
+        netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
+        return false;
+    }
+
+    METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t)ctx);
     if (unlikely(!metric))
         return false;
 

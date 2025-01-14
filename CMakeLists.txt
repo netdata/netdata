@@ -971,6 +971,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/waitq.h
         src/libnetdata/object-state/object-state.c
         src/libnetdata/object-state/object-state.h
+        src/libnetdata/uuid/uuidmap.c
+        src/libnetdata/uuid/uuidmap.h
+        src/libnetdata/atomics/refcount.h
+        src/libnetdata/log/nd_log-fatal.h
         src/libnetdata/locks/benchmark.c
         src/libnetdata/locks/benchmark.h
         src/libnetdata/locks/benchmark-rw.c

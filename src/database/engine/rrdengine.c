@@ -1129,7 +1129,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
     size_t added = 0;
     for (size_t index = 0; index < count; ++index) {
-        METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &uuid_list[index].uuid, (Word_t) ctx);
+        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &uuid_list[index].uuid, (Word_t)ctx);
         if (!metric)
             continue;
 

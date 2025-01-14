@@ -1084,7 +1084,7 @@ static bool epdl_populate_pages_from_extent_data(
             continue;
         }
 
-        METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t)ctx);
+        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &header->descr[i].uuid, (Word_t)ctx);
         Word_t metric_id = (Word_t)metric;
         if(!metric) {
             char log[200 + 1];

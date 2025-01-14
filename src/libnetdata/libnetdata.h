@@ -8,13 +8,14 @@ extern "C" {
 # endif
 
 #include "common.h"
+#include "log/nd_log-fatal.h"
+#include "atomics/atomics.h"
 
 // NETDATA_TRACE_ALLOCATIONS does not work under musl libc, so don't enable it
 //#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
 //#define NETDATA_TRACE_ALLOCATIONS 1
 //#endif
 
-#include "atomics/atomics.h"
 #include "libjudy/judy-malloc.h"
 #include "locks/benchmark.h"
 #include "locks/benchmark-rw.h"
@@ -116,6 +117,7 @@ extern const char *netdata_configured_host_prefix;
 #include "buffer/buffer.h"
 
 #include "uuid/uuid.h"
+#include "uuid/uuidmap.h"
 #include "http/content_type.h"
 #include "http/http_access.h"
 

@@ -40,6 +40,7 @@ void pulse_daemon_memory_do(bool extended) {
 #else
         static RRDDIM *rd_metadata = NULL;
 #endif
+        static RRDDIM *rd_uuid = NULL;
         static RRDDIM *rd_labels = NULL; // labels use dictionary like statistics, but it is not ARAL based dictionary
         static RRDDIM *rd_ml = NULL;
         static RRDDIM *rd_strings = NULL;
@@ -82,6 +83,7 @@ void pulse_daemon_memory_do(bool extended) {
 #else
             rd_metadata = rrddim_add(st_memory, "metadata", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 #endif
+            rd_uuid = rrddim_add(st_memory, "uuid", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_labels = rrddim_add(st_memory, "labels", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_ml = rrddim_add(st_memory, "ML", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_strings = rrddim_add(st_memory, "strings", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -107,7 +109,10 @@ void pulse_daemon_memory_do(bool extended) {
             netdata_buffers_statistics.buffers_streaming +
             netdata_buffers_statistics.cbuffers_streaming +
             netdata_buffers_statistics.buffers_web +
-                         replication_sender_allocated_buffers() + aral_by_size_free_bytes() + judy_aral_free_bytes();
+            replication_sender_allocated_buffers() +
+            aral_by_size_free_bytes() +
+            judy_aral_free_bytes() +
+            uuidmap_free_bytes();
 
         sqlite3_int64 sqlite3_memory_used_current = 0, sqlite3_memory_used_highwater = 0;
         sqlite3_status64(SQLITE_STATUS_MEMORY_USED, &sqlite3_memory_used_current, &sqlite3_memory_used_highwater, 1);
@@ -158,6 +163,9 @@ void pulse_daemon_memory_do(bool extended) {
 
         rrddim_set_by_pointer(st_memory, rd_metadata, (collected_number)metadata);
 #endif
+
+        rrddim_set_by_pointer(st_memory, rd_uuid,
+                              (collected_number)uuidmap_memory());
 
         // labels use dictionary like statistics, but it is not ARAL based dictionary
         rrddim_set_by_pointer(st_memory, rd_labels,
@@ -211,6 +219,7 @@ void pulse_daemon_memory_do(bool extended) {
         static RRDDIM *rd_buffers_web = NULL;
         static RRDDIM *rd_buffers_aral = NULL;
         static RRDDIM *rd_buffers_judy = NULL;
+        static RRDDIM *rd_buffers_uuid = NULL;
 
         if (unlikely(!st_memory_buffers)) {
             st_memory_buffers = rrdset_create_localhost(
@@ -241,6 +250,7 @@ void pulse_daemon_memory_do(bool extended) {
             rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_aral = rrddim_add(st_memory_buffers, "aral-by-size free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_judy = rrddim_add(st_memory_buffers, "aral-judy free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_uuid = rrddim_add(st_memory_buffers, "uuid", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         // the sum of all these needs to be above at the total buffers calculation
@@ -258,6 +268,7 @@ void pulse_daemon_memory_do(bool extended) {
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_sender_allocated_buffers());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)aral_by_size_free_bytes());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_judy, (collected_number)judy_aral_free_bytes());
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_uuid, (collected_number)uuidmap_free_bytes());
 
         rrdset_done(st_memory_buffers);
     }

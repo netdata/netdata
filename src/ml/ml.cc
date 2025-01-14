@@ -366,7 +366,8 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
             *active_stmt = res;
     }
 
-    rc = sqlite3_bind_blob(res, ++param, &dim->rd->metric_uuid, sizeof(dim->rd->metric_uuid), SQLITE_STATIC);
+    nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(dim->rd->uuid);
+    rc = sqlite3_bind_blob(res, ++param, rd_uuid, sizeof(*rd_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -619,7 +620,8 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
 
     // Add the newly generated model to the list of pending models to flush
     ml_model_info_t model_info;
-    uuid_copy(model_info.metric_uuid, dim->rd->metric_uuid);
+    nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(dim->rd->uuid);
+    uuid_copy(model_info.metric_uuid, *rd_uuid);
     model_info.inlined_kmeans = dim->km_contexts.back();
     worker->pending_model_info.push_back(model_info);
 
