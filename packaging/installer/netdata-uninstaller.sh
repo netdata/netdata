@@ -755,8 +755,8 @@ if issystemd; then
   done
 
   for unit in netdata.service netdata-updater.service netdata-updater.timer; do
-    unit_path="$(systemctl show -p FragmentPath | cut -f 2- -d '=')"
-    override_paths="$(systemctl show -p DropInPaths | cut -f 2- -d '=' | tr ' ' '\n')"
+    unit_path="$(systemctl show -p FragmentPath "${unit}" | cut -f 2- -d '=')"
+    override_paths="$(systemctl show -p DropInPaths "${unit}" | cut -f 2- -d '=')"
     for path in "${unit_path}" ${override_paths} ; do
       rm_file "${path}"
     done
