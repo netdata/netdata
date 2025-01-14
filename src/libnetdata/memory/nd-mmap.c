@@ -127,7 +127,7 @@ int nd_munmap(void *ptr, size_t size) {
     return rc;
 }
 
-void *nd_mmap(void *addr, size_t len, int prot, int flags, int fd, __off_t offset) {
+void *nd_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset) {
     void *rc = mmap(addr, len, prot, flags, fd, offset);
 
     if(rc != MAP_FAILED) {

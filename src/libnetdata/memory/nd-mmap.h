@@ -18,7 +18,7 @@ extern size_t nd_mmap_size;
 extern int enable_ksm;
 
 void *nd_mmap_advanced(const char *filename, size_t size, int flags, int ksm, bool read_only, bool dont_dump, int *open_fd);
-void *nd_mmap(void *addr, size_t len, int prot, int flags, int fd, __off_t offset);
+void *nd_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
 int nd_munmap(void *ptr, size_t size);
 
 #endif //NETDATA_ND_MMAP_H
