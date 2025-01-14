@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "storage_engine.h"
+#include "storage-engine.h"
 #include "ram/rrddim_mem.h"
 #ifdef ENABLE_DBENGINE
 #include "engine/rrdengineapi.h"

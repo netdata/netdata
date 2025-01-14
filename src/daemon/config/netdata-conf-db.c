@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "netdata-conf-db.h"
+#include "daemon/common.h"
 
 int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 

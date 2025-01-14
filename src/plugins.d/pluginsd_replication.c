@@ -5,6 +5,7 @@
 #include "streaming/stream-replication-receiver.h"
 #include "streaming/stream-waiting-list.h"
 #include "web/api/queries/backfill.h"
+#include "database/rrddim-collection.h"
 
 static bool backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
     if(!object_state_acquire(&brd->host->state_id, brd->host_state_id)) {

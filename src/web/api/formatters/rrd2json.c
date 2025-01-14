@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web/api/web_api_v1.h"
-#include "database/storage_engine.h"
+#include "database/storage-engine.h"
 
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
 {

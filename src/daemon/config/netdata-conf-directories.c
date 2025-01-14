@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "netdata-conf-directories.h"
+#include "daemon/common.h"
 
 static const char *get_varlib_subdir_from_config(const char *prefix, const char *dir) {
     char filename[FILENAME_MAX + 1];

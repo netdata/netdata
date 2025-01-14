@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
 #if RRD_STORAGE_TIERS != 5
@@ -34,7 +33,7 @@ RRDHOST *find_host_by_node_id(char *node_id) {
 DICTIONARY *rrdhost_root_index = NULL;
 static DICTIONARY *rrdhost_root_index_hostname = NULL;
 
-static inline void rrdhost_init() {
+void rrdhost_init() {
     if(unlikely(!rrdhost_root_index)) {
         rrdhost_root_index = dictionary_create_advanced(
             DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
@@ -293,7 +292,7 @@ static void rrdhost_set_replication_parameters(RRDHOST *host, RRD_MEMORY_MODE me
     }
 }
 
-static RRDHOST *rrdhost_create(
+RRDHOST *rrdhost_create(
         const char *hostname,
         const char *registry_hostname,
         const char *guid,
@@ -770,109 +769,6 @@ bool rrdhost_should_run_health(RRDHOST *host) {
         return false;
 
     return true;
-}
-
-void api_v1_management_init(void);
-
-int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
-    rrdhost_init();
-
-    if (unlikely(sql_init_meta_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-            set_late_analytics_variables(system_info);
-            fatal("Failed to initialize SQLite");
-        }
-
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "Skipping SQLITE metadata initialization since memory mode is not dbengine");
-    }
-
-    if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
-        error_report("Failed to initialize context metadata database");
-    }
-
-    if (unlikely(unittest)) {
-        dbengine_enabled = true;
-    }
-    else {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || stream_conf_receiver_needs_dbengine()) {
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "DBENGINE: Initializing ...");
-
-            netdata_conf_dbengine_init(hostname);
-        }
-        else
-            nd_profile.storage_tiers = 1;
-
-        if (!dbengine_enabled) {
-            if (nd_profile.storage_tiers > 1) {
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1",
-                    nd_profile.storage_tiers);
-
-                nd_profile.storage_tiers = 1;
-            }
-
-            if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "dbengine is not enabled, but it has been given as the default db mode. "
-                       "Resetting db mode to alloc");
-
-                default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
-            }
-        }
-    }
-
-    if(!unittest)
-        metadata_sync_init();
-
-    localhost = rrdhost_create(
-            hostname
-            , registry_get_this_machine_hostname()
-            , registry_get_this_machine_guid()
-            , os_type
-            , netdata_configured_timezone
-            , netdata_configured_abbrev_timezone
-            , netdata_configured_utc_offset
-            , program_name
-            , NETDATA_VERSION
-            ,
-        nd_profile.update_every, default_rrd_history_entries
-            , default_rrd_memory_mode
-            , health_plugin_enabled()
-            , stream_send.enabled
-            , stream_send.parents.destination
-            , stream_send.api_key
-            , stream_send.send_charts_matching
-            , stream_receive.replication.enabled
-            , stream_receive.replication.period
-            , stream_receive.replication.step
-            , system_info
-            , 1
-            , 0
-    );
-
-    if (unlikely(!localhost))
-        return 1;
-
-    rrdhost_flag_set(localhost, RRDHOST_FLAG_COLLECTOR_ONLINE);
-    object_state_activate(&localhost->state_id);
-
-    ml_host_start(localhost);
-    dyncfg_host_init(localhost);
-
-    if(!unittest)
-        health_plugin_init();
-
-    global_functions_add();
-
-    if (likely(system_info)) {
-        detect_machine_guid_change(&localhost->host_id.uuid);
-        sql_aclk_sync_init();
-        api_v1_management_init();
-    }
-
-    return 0;
 }
 
 // ----------------------------------------------------------------------------

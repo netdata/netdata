@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "netdata-conf-global.h"
+#include "daemon/common.h"
 
 size_t netdata_conf_cpus(void) {
     static size_t processors = 0;

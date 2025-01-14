@@ -80,9 +80,9 @@ ENUM_STR_DEFINE_FUNCTIONS_EXTERN(RRDHOST_DYNCFG_STATUS);
 #define rrdhost_health_status_to_string(status) RRDHOST_HEALTH_STATUS_2str(status)
 #define rrdhost_dyncfg_status_to_string(status) RRDHOST_DYNCFG_STATUS_2str(status)
 
-#include "stream-handshake.h"
-#include "stream-capabilities.h"
-#include "database/rrd.h"
+#include "streaming/stream-handshake.h"
+#include "streaming/stream-capabilities.h"
+#include "rrd.h"
 
 typedef struct rrdhost_status_t {
     RRDHOST *host;

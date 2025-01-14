@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#define NETDATA_RRD_INTERNALS 1
 
+#define RRDHOST_INTERNALS
 #include "rrd.h"
-#include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
 // globals
@@ -59,41 +58,6 @@ const char *rrd_algorithm_name(RRD_ALGORITHM algorithm) {
     }
 }
 
-
-// ----------------------------------------------------------------------------
-// RRD - chart types
-
-inline RRDSET_TYPE rrdset_type_id(const char *name) {
-    if(unlikely(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0))
-        return RRDSET_TYPE_AREA;
-
-    else if(unlikely(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0))
-        return RRDSET_TYPE_STACKED;
-
-    else if(unlikely(strcmp(name, RRDSET_TYPE_HEATMAP_NAME) == 0))
-        return RRDSET_TYPE_HEATMAP;
-
-    else // if(unlikely(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0))
-        return RRDSET_TYPE_LINE;
-}
-
-const char *rrdset_type_name(RRDSET_TYPE chart_type) {
-    switch(chart_type) {
-        case RRDSET_TYPE_LINE:
-        default:
-            return RRDSET_TYPE_LINE_NAME;
-
-        case RRDSET_TYPE_AREA:
-            return RRDSET_TYPE_AREA_NAME;
-
-        case RRDSET_TYPE_STACKED:
-            return RRDSET_TYPE_STACKED_NAME;
-
-        case RRDSET_TYPE_HEATMAP:
-            return RRDSET_TYPE_HEATMAP_NAME;
-    }
-}
-
 // ----------------------------------------------------------------------------
 // RRD - string management
 
@@ -105,4 +69,132 @@ STRING *rrd_string_strdupz(const char *s) {
     STRING *ret = string_strdupz(tmp);
     freez(tmp);
     return ret;
+}
+
+// ----------------------------------------------------------------------------
+
+inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
+    if(mode == RRD_MEMORY_MODE_DBENGINE) return 0;
+    if(mode == RRD_MEMORY_MODE_NONE) return 5;
+
+    if(entries < 5) entries = 5;
+    if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
+
+    if(mode == RRD_MEMORY_MODE_RAM) {
+        long header_size = 0;
+
+        long page = (long)sysconf(_SC_PAGESIZE);
+        long size = (long)(header_size + entries * sizeof(storage_number));
+        if (unlikely(size % page)) {
+            size -= (size % page);
+            size += page;
+
+            long n = (long)((size - header_size) / sizeof(storage_number));
+            return n;
+        }
+    }
+
+    return entries;
+}
+
+void api_v1_management_init(void);
+int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
+    rrdhost_init();
+
+    if (unlikely(sql_init_meta_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            set_late_analytics_variables(system_info);
+            fatal("Failed to initialize SQLite");
+        }
+
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "Skipping SQLITE metadata initialization since memory mode is not dbengine");
+    }
+
+    if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
+        error_report("Failed to initialize context metadata database");
+    }
+
+    if (unlikely(unittest)) {
+        dbengine_enabled = true;
+    }
+    else {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || stream_conf_receiver_needs_dbengine()) {
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "DBENGINE: Initializing ...");
+
+            netdata_conf_dbengine_init(hostname);
+        }
+        else
+            nd_profile.storage_tiers = 1;
+
+        if (!dbengine_enabled) {
+            if (nd_profile.storage_tiers > 1) {
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1",
+                       nd_profile.storage_tiers);
+
+                nd_profile.storage_tiers = 1;
+            }
+
+            if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "dbengine is not enabled, but it has been given as the default db mode. "
+                       "Resetting db mode to alloc");
+
+                default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
+            }
+        }
+    }
+
+    if(!unittest)
+        metadata_sync_init();
+
+    localhost = rrdhost_create(
+        hostname
+        , registry_get_this_machine_hostname()
+            , registry_get_this_machine_guid()
+            , os_type
+        , netdata_configured_timezone
+        , netdata_configured_abbrev_timezone
+        , netdata_configured_utc_offset
+        , program_name
+        , NETDATA_VERSION
+        ,
+        nd_profile.update_every, default_rrd_history_entries
+        , default_rrd_memory_mode
+        , health_plugin_enabled()
+            , stream_send.enabled
+        , stream_send.parents.destination
+        , stream_send.api_key
+        , stream_send.send_charts_matching
+        , stream_receive.replication.enabled
+        , stream_receive.replication.period
+        , stream_receive.replication.step
+        , system_info
+        , 1
+        , 0
+    );
+
+    if (unlikely(!localhost))
+        return 1;
+
+    rrdhost_flag_set(localhost, RRDHOST_FLAG_COLLECTOR_ONLINE);
+    object_state_activate(&localhost->state_id);
+
+    ml_host_start(localhost);
+    dyncfg_host_init(localhost);
+
+    if(!unittest)
+        health_plugin_init();
+
+    global_functions_add();
+
+    if (likely(system_info)) {
+        detect_machine_guid_change(&localhost->host_id.uuid);
+        sql_aclk_sync_init();
+        api_v1_management_init();
+    }
+
+    return 0;
 }

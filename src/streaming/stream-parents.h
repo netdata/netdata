@@ -17,7 +17,7 @@ typedef struct rrdhost_stream_parents {
 } RRDHOST_STREAM_PARENTS;
 
 #include "stream-handshake.h"
-#include "rrdhost-status.h"
+#include "database/rrdhost-status.h"
 
 void rrdhost_stream_parent_ssl_init(struct sender_state *s);
 

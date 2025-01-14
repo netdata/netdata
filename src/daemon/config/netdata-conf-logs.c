@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "netdata-conf-logs.h"
+#include "daemon/common.h"
 
 static void debug_flags_initialize(void) {
     // --------------------------------------------------------------------
