@@ -8,6 +8,8 @@
 
 #define DB_METADATA_VERSION 18
 
+extern long long def_journal_size_limit;
+
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
     "registry_hostname TEXT NOT NULL default 'unknown', update_every INT NOT NULL default 1, "
@@ -184,7 +186,6 @@ sqlite3 *db_meta = NULL;
 
 enum metadata_opcode {
     METADATA_DATABASE_NOOP = 0,
-    METADATA_DATABASE_TIMER,
     METADATA_DEL_DIMENSION,
     METADATA_STORE_CLAIM_ID,
     METADATA_ADD_HOST_INFO,
@@ -668,6 +669,31 @@ void sqlite_uuid_random(sqlite3_context *context, int argc, sqlite3_value **argv
     sqlite3_result_blob(context, &uuid, sizeof(nd_uuid_t), SQLITE_TRANSIENT);
 }
 
+static int64_t sql_get_wal_size(const char *database_file)
+{
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename) - 1, "%s/%s-wal", netdata_configured_cache_dir, database_file);
+
+    uv_fs_t req;
+    int result = uv_fs_stat(NULL, &req, filename, NULL);
+    int64_t file_size = result >= 0 ? (int64_t) req.statbuf.st_size : -1;
+
+    uv_fs_req_cleanup(&req);
+    return file_size;
+}
+
+#define SQLITE_METADATA_WAL_LIMIT_X (10)
+
+bool sql_metadata_wal_size_acceptable()
+{
+    int64_t wal_size = sql_get_wal_size("netdata-meta.db");
+
+    if (wal_size > SQLITE_METADATA_WAL_LIMIT_X * def_journal_size_limit)
+        return false;
+
+    return true;
+}
+
 // Init
 /*
  * Initialize the SQLite database
@@ -896,6 +922,29 @@ done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
     return rc != SQLITE_DONE;
+}
+
+#define SQL_DELETE_DIMENSION_BY_ID   "DELETE FROM dimension WHERE rowid = @dimension_row AND dim_id = @uuid"
+
+static void delete_dimension_by_rowid(sqlite3_stmt **res, int64_t dimension_id, nd_uuid_t *dim_uuid)
+{
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_DIMENSION_BY_ID, res))
+            return;
+    }
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, dimension_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, dim_uuid, sizeof(*dim_uuid), SQLITE_STATIC));
+
+    param = 0;
+    int rc = sqlite3_step_monitored(*res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to delete dimension id, rc = %d", rc);
+
+done:
+    REPORT_BIND_FAIL(*res, param);
+    SQLITE_RESET(*res);
 }
 
 static void delete_dimension_uuid(nd_uuid_t *dimension_uuid, sqlite3_stmt **action_res __maybe_unused, bool flag __maybe_unused)
@@ -1542,10 +1591,126 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
    }
 }
 
+
+#define SQL_SELECT_HOST_CTX_CHART_DIM_LIST                                                                             \
+    "SELECT d.dim_id, d.rowid FROM chart c, dimension d WHERE c.chart_id = d.chart_id AND c.rowid = @rowid"
+
+static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id, size_t *checked, size_t *deleted)
+{
+    struct metadata_wc *wc = &metasync_worker;
+
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_CTX_CHART_DIM_LIST, res))
+            return false;
+    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, chart_row_id));
+    param = 0;
+
+    sqlite3_stmt *dim_del_stmt = NULL;
+
+    bool can_continue = true;
+
+    while (can_continue && sqlite3_step_monitored(*res) == SQLITE_ROW) {
+        if (sqlite3_column_bytes(*res, 0) != sizeof(nd_uuid_t))
+            continue;
+
+        nd_uuid_t *dim_uuid = (nd_uuid_t *)sqlite3_column_blob(*res, 0);
+        int64_t dimension_id = sqlite3_column_int64(*res, 1);
+
+        if (dimension_can_be_deleted(dim_uuid, NULL, false)) {
+            delete_dimension_by_rowid(&dim_del_stmt, dimension_id, dim_uuid);
+            (*deleted)++;
+        }
+        (*checked)++;
+        can_continue = (!metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)) && sql_metadata_wal_size_acceptable();
+    }
+    SQLITE_FINALIZE(dim_del_stmt);
+
+done:
+    REPORT_BIND_FAIL(*res, param);
+    SQLITE_RESET(*res);
+    return can_continue;
+}
+
+#define SQL_SELECT_HOST_CTX_CHART_LIST "SELECT rowid, context FROM chart WHERE host_id = @host"
+
+static void cleanup_host_context_metadata(Pvoid_t CTX_JudyL, void *data)
+{
+    if (!CTX_JudyL || !data)
+        return;
+
+    struct metadata_wc *wc = &metasync_worker;
+
+    RRDHOST *host = data;
+
+    sqlite3_stmt *res = NULL;
+    sqlite3_stmt *dimension_res = NULL;
+    sqlite3_stmt *context_res = NULL;
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_CTX_CHART_LIST, &res))
+        return;
+
+    Word_t num_of_contexts = JudyLCount(CTX_JudyL, 0, -1, PJE0);
+
+    nd_log_daemon(NDLP_DEBUG, "Verifying the retention of %zu contexts for host %s", num_of_contexts, rrdhost_hostname(host));
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+
+    param = 0;
+    Pvoid_t *Pvalue;
+    int64_t chart_row_id;
+
+    size_t deleted = 0;
+    size_t checked = 0;
+
+    bool can_continue = true;
+    while (can_continue && sqlite3_step_monitored(res) == SQLITE_ROW) {
+        chart_row_id = sqlite3_column_int64(res, 0);
+        const char *context = (char *)sqlite3_column_text(res, 1);
+        STRING *ctx = string_strdupz(context);
+        Pvalue = JudyLGet(CTX_JudyL, (Word_t)ctx, PJE0);
+        if (Pvalue) {
+            can_continue = clean_host_chart_dimensions(&dimension_res, chart_row_id, &checked, &deleted);
+            ctx_delete_metadata_cleanup_context(&context_res, &host->host_id.uuid, context);
+        }
+        string_freez(ctx);
+        can_continue =
+            can_continue && (!metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)) && sql_metadata_wal_size_acceptable();
+    }
+    SQLITE_FINALIZE(dimension_res);
+    SQLITE_FINALIZE(context_res);
+
+    nd_log_daemon(
+        NDLP_DEBUG,
+        "Verified the contexts of host %s (Checked %zu metrics and removed %zu)",
+        rrdhost_hostname(host),
+        checked,
+        deleted);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+}
+
 void run_metadata_cleanup(struct metadata_wc *wc)
 {
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
        return;
+
+    if (sql_metadata_wal_size_acceptable()) {
+        RRDHOST *host;
+        dfe_start_reentrant(rrdhost_root_index, host) {
+            ctx_get_context_list_to_cleanup(&host->host_id.uuid, cleanup_host_context_metadata, host);
+            if (metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN) || false == sql_metadata_wal_size_acceptable())
+                break;
+        }
+        dfe_done(host);
+    }
+
+    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
+        return;
 
     check_dimension_metadata(wc);
     check_chart_metadata(wc);
@@ -1956,7 +2121,7 @@ static void do_chart_label_cleanup(struct judy_list_t *cl_cleanup_data)
 }
 
 // Worker thread to scan hosts for pending metadata to store
-static void start_metadata_hosts(uv_work_t *req __maybe_unused)
+static void start_metadata_hosts(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
@@ -2072,7 +2237,6 @@ static void metadata_event_loop(void *arg)
 {
     worker_register("METASYNC");
     worker_register_job_name(METADATA_DATABASE_NOOP,        "noop");
-    worker_register_job_name(METADATA_DATABASE_TIMER,       "timer");
     worker_register_job_name(METADATA_DEL_DIMENSION,        "delete dimension");
     worker_register_job_name(METADATA_STORE_CLAIM_ID,       "add claim id");
     worker_register_job_name(METADATA_ADD_HOST_INFO,        "add host info");
@@ -2130,7 +2294,6 @@ static void metadata_event_loop(void *arg)
         nd_uuid_t  *uuid;
         RRDHOST *host = NULL;
         ALARM_ENTRY *ae = NULL;
-//        struct aclk_sync_cfg_t *host_aclk_sync;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -2156,7 +2319,6 @@ static void metadata_event_loop(void *arg)
 
             switch (opcode) {
                 case METADATA_DATABASE_NOOP:
-                case METADATA_DATABASE_TIMER:
                     break;
                 case METADATA_DEL_DIMENSION:
                     uuid = (nd_uuid_t *) cmd.param[0];

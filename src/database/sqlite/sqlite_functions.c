@@ -5,6 +5,8 @@
 #define MAX_PREPARED_STATEMENTS (32)
 pthread_key_t key_pool[MAX_PREPARED_STATEMENTS];
 
+long long def_journal_size_limit = 16777216;
+
 SQLITE_API int sqlite3_exec_monitored(
     sqlite3 *db,                               /* An open database */
     const char *sql,                           /* SQL to be evaluated */
@@ -84,7 +86,6 @@ int configure_sqlite_database(sqlite3 *database, int target_version, const char 
     const char *def_synchronous = "NORMAL";
     const char *def_journal_mode = "WAL";
     const char *def_temp_store = "MEMORY";
-    long long def_journal_size_limit = 16777216;
     long long def_cache_size = -2000;
 
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
@@ -122,8 +123,10 @@ int configure_sqlite_database(sqlite3 *database, int target_version, const char 
     // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
     // PRAGMA schema.journal_size_limit = N ;
     snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_size_limit=%lld", def_journal_size_limit);
-    if (config_exists(CONFIG_SECTION_SQLITE, "journal size limit"))
-        snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_size_limit=%lld", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", def_journal_size_limit));
+    if (config_exists(CONFIG_SECTION_SQLITE, "journal size limit")) {
+        def_journal_size_limit = config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", def_journal_size_limit);
+        snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_size_limit=%lld", def_journal_size_limit);
+    }
     if (init_database_batch(database, list, description))
         return 1;
 
