@@ -98,7 +98,7 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v1(bool query_total_ram __maybe_
     if(!used || used > sm.ram_total_bytes)
         goto failed;
 
-    if (read_txt_file("/sys/fs/cgroup/memory.stat", buf, sizeof(buf)) != 0)
+    if (read_txt_file("/sys/fs/cgroup/memory/memory.stat", buf, sizeof(buf)) != 0)
         goto done;
 
     const char *inactive_str = strstr(buf, "total_inactive_file ");
