@@ -1017,6 +1017,9 @@ void *rrdcontext_main(void *ptr) {
         dfe_start_reentrant(rrdhost_root_index, host) {
             if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
+            if(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
+                continue;
+
             worker_is_busy(WORKER_JOB_HOSTS);
 
             if(host->rrdctx.pp_queue) {
