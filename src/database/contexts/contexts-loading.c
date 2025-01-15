@@ -16,12 +16,22 @@ void load_instance_labels_on_demand(nd_uuid_t *uuid, void *data) {
 
 static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *data) {
     RRDHOST *host = data;
+
+    UUIDMAP_ID id = uuidmap_create(sd->dim_id);
+    time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
+    get_metric_retention_by_id(host, id, &min_first_time_t, &max_last_time_t);
+    if((!min_first_time_t || min_first_time_t == LONG_MAX) && !max_last_time_t) {
+        uuidmap_free(id);
+        return;
+    }
+
     RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, sd->context);
     if(!rca) {
         ignored_metrics++;
 //        nd_log(NDLS_DAEMON, NDLP_ERR,
 //               "RRDCONTEXT: context '%s' is not found in host '%s' - not loading dimensions",
 //               sd->context, rrdhost_hostname(host));
+        uuidmap_free(id);
         return;
     }
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -33,12 +43,13 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
 //        nd_log(NDLS_DAEMON, NDLP_ERR,
 //               "RRDCONTEXT: instance '%s' of context '%s' is not found in host '%s' - not loading dimensions",
 //               sd->chart_id, sd->context, rrdhost_hostname(host));
+        uuidmap_free(id);
         return;
     }
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
 
     RRDMETRIC trm = {
-        .uuid = uuidmap_create(sd->dim_id),
+        .uuid = id,
         .id = string_strdupz(sd->id),
         .name = string_strdupz(sd->name),
         .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomic
@@ -55,14 +66,18 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
 static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
     RRDHOST *host = data;
 
-    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, sc->context);
-    if(!rca) {
-        ignored_instances++;
-//        nd_log(NDLS_DAEMON, NDLP_ERR,
-//               "RRDCONTEXT: context '%s' is not found in host '%s' - not loadings instances",
-//               sc->context, rrdhost_hostname(host));
-        return;
-    }
+    RRDCONTEXT tc = {
+        .id = string_strdupz(sc->context),
+        .title = string_strdupz(sc->title),
+        .units = string_strdupz(sc->units),
+        .family = string_strdupz(sc->family),
+        .priority = sc->priority,
+        .chart_type = sc->chart_type,
+        .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomics
+        .rrdhost = host,
+    };
+
+    RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item(host->rrdctx.contexts, string2str(tc.id), &tc, sizeof(tc));
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     RRDINSTANCE tri = {
