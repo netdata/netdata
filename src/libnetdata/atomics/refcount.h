@@ -66,12 +66,21 @@ static inline bool WARNUNUSED refcount_acquire_with_trace(REFCOUNT *refcount, co
 
 // returns the number of references remaining
 static inline REFCOUNT refcount_release_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
-    REFCOUNT rc = refcount_decrement(refcount);
+    REFCOUNT expected, desired;
 
-    if(!REFCOUNT_VALID(rc))
-        fatal("REFCOUNT %d is invalid (detected at %s(), called from %s())", rc, __FUNCTION__, func);
+    do {
+        expected = refcount_references(refcount);
+        if(!REFCOUNT_VALID(expected))
+            fatal("REFCOUNT %d is invalid (detected at %s(), called from %s())", expected, __FUNCTION__, func);
 
-    return rc;
+//        // the following is a valid case when using refcount_acquire_for_deletion_and_wait_with_trace()
+//        if(expected <= 0)
+//            fatal("REFCOUNT cannot release a refcount of %d (detected at %s(), called from %s())", expected, __FUNCTION__, func);
+
+        desired = expected - 1;
+    } while(!__atomic_compare_exchange_n(refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+
+    return desired;
 }
 
 // returns true when the item can be deleted, false when the item is currently referenced
@@ -89,10 +98,25 @@ static inline bool WARNUNUSED refcount_acquire_for_deletion_with_trace(REFCOUNT 
 }
 
 static inline bool WARNUNUSED refcount_release_and_acquire_for_deletion_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
-    if(refcount_release_with_trace(refcount, func) == 0)
-        return refcount_acquire_for_deletion_with_trace(refcount, func);
+    REFCOUNT expected, desired;
 
-    return false;
+    do {
+        expected = refcount_references(refcount);
+        if(!REFCOUNT_VALID(expected))
+            fatal("REFCOUNT %d is invalid (detected at %s(), called from %s())", expected, __FUNCTION__, func);
+
+//        // the following is a valid case when using refcount_acquire_for_deletion_and_wait_with_trace()
+//        if(expected <= 0)
+//            fatal("REFCOUNT cannot release a refcount of %d (detected at %s(), called from %s())", expected, __FUNCTION__, func);
+
+        if(expected == 1)
+            desired = REFCOUNT_DELETED;
+        else
+            desired = expected - 1;
+
+    } while(!__atomic_compare_exchange_n(refcount, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
+
+    return (desired == REFCOUNT_DELETED);
 }
 
 // this sleeps for 1 nanosecond (posix systems), or Sleep(0) on Windows
