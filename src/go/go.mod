@@ -16,7 +16,7 @@ require (
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/docker/docker v27.4.1+incompatible
+	github.com/docker/docker v27.5.0+incompatible
 	github.com/facebook/time v0.0.0-20241106150441-cd750f39df58
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-ldap/ldap/v3 v3.4.8
