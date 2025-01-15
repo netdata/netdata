@@ -66,7 +66,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
     }
 
     if (unlikely(
-            st->rrd_memory_mode == RRD_MEMORY_MODE_NONE &&
+            st->rrd_memory_mode == RRD_DB_MODE_NONE &&
             !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
         netdata_log_debug(
             D_EXPORTING,

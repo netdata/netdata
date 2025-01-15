@@ -9,25 +9,9 @@ typedef struct rrdset RRDSET;
 typedef struct rrdset_acquired RRDSET_ACQUIRED;
 typedef struct ml_chart rrd_ml_chart_t;
 
+#include "rrdset-type.h"
 #include "rrdlabels.h"
 #include "rrd-database-mode.h"
-
-// --------------------------------------------------------------------------------------------------------------------
-
-typedef enum __attribute__ ((__packed__)) rrdset_type {
-    RRDSET_TYPE_LINE    = 0,
-    RRDSET_TYPE_AREA    = 1,
-    RRDSET_TYPE_STACKED = 2,
-    RRDSET_TYPE_HEATMAP = 3,
-} RRDSET_TYPE;
-
-#define RRDSET_TYPE_LINE_NAME "line"
-#define RRDSET_TYPE_AREA_NAME "area"
-#define RRDSET_TYPE_STACKED_NAME "stacked"
-#define RRDSET_TYPE_HEATMAP_NAME "heatmap"
-
-RRDSET_TYPE rrdset_type_id(const char *name);
-const char *rrdset_type_name(RRDSET_TYPE chart_type);
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -128,7 +112,7 @@ struct rrdset {
     // operational state members
 
     RRDSET_FLAGS flags;                             // flags
-    RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
+    RRD_DB_MODE rrd_memory_mode;                // the db mode of this rrdset
 
     DICTIONARY *rrddim_root_index;                  // dimensions index
 
@@ -295,69 +279,33 @@ void rrdset_metadata_updated(RRDSET *st);
 // --------------------------------------------------------------------------------------------------------------------
 
 #ifdef NETDATA_INTERNAL_CHECKS
-#define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
-            netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); } while(0)
+#define rrdset_debug(st, fmt, args...) do { \
+        if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
+            netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); \
+    } while(0)
 #else
 #define rrdset_debug(st, fmt, args...) debug_dummy()
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
 
-#include "rrdset-index-name.h"
-#include "rrdset-index-id.h"
-#include "rrdset-slots.h"
-#include "rrdset-collection.h"
-
 void rrdset_update_heterogeneous_flag(RRDSET *st);
-
-time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s);
-
-RRDSET *rrdset_find(RRDHOST *host, const char *id);
-
-RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
-RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
-void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
-
-#define rrdset_find_localhost(id) rrdset_find(localhost, id)
-/* This will not return charts that are archived */
-static inline RRDSET *rrdset_find_active_localhost(const char *id)
-{
-    RRDSET *st = rrdset_find_localhost(id);
-    return st;
-}
-
-RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
-#define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(localhost, type, id)
-/* This will not return charts that are archived */
-static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id)
-{
-    RRDSET *st = rrdset_find_bytype_localhost(type, id);
-    return st;
-}
-
-RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
-#define rrdset_find_byname_localhost(name)  rrdset_find_byname(localhost, name)
-/* This will not return charts that are archived */
-static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
-{
-    RRDSET *st = rrdset_find_byname_localhost(name);
-    return st;
-}
-
-void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
-void rrdset_next_usec(RRDSET *st, usec_t microseconds);
-void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t microseconds);
-#define rrdset_next(st) rrdset_next_usec(st, 0ULL)
-
-void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next);
-void rrdset_done(RRDSET *st);
 
 void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st);
 void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
-#define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && rrdset_number_of_dimensions(st) && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
-#define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && rrdset_number_of_dimensions(st))
+#define rrdset_is_available_for_viewers(st) ( \
+    !rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && \
+    !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && \
+    rrdset_number_of_dimensions(st) &&        \
+    (st)->rrd_memory_mode != RRD_DB_MODE_NONE \
+ )
+
+#define rrdset_is_available_for_exporting_and_alarms(st) ( \
+    !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) &&        \
+    rrdset_number_of_dimensions(st)                        \
+ )
 
 time_t rrdset_first_entry_s(RRDSET *st);
 time_t rrdset_first_entry_s_of_tier(RRDSET *st, size_t tier);
@@ -368,9 +316,9 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
 
 void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels);
 
-void rrdset_free(RRDSET *st);
-
-void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st);
-void rrdset_pluginsd_receive_unslot(RRDSET *st);
+#include "rrdset-index-name.h"
+#include "rrdset-index-id.h"
+#include "rrdset-slots.h"
+#include "rrdset-collection.h"
 
 #endif //NETDATA_RRDSET_H

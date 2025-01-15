@@ -8,8 +8,8 @@
 
 static STORAGE_ENGINE engines[] = {
     {
-        .id = RRD_MEMORY_MODE_NONE,
-        .name = RRD_MEMORY_MODE_NONE_NAME,
+        .id = RRD_DB_MODE_NONE,
+        .name = RRD_DB_MODE_NONE_NAME,
         .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get_by_id = rrddim_metric_get_by_id,
@@ -22,8 +22,8 @@ static STORAGE_ENGINE engines[] = {
         }
     },
     {
-        .id = RRD_MEMORY_MODE_RAM,
-        .name = RRD_MEMORY_MODE_RAM_NAME,
+        .id = RRD_DB_MODE_RAM,
+        .name = RRD_DB_MODE_RAM_NAME,
         .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get_by_id = rrddim_metric_get_by_id,
@@ -36,8 +36,8 @@ static STORAGE_ENGINE engines[] = {
         }
     },
     {
-        .id = RRD_MEMORY_MODE_ALLOC,
-        .name = RRD_MEMORY_MODE_ALLOC_NAME,
+        .id = RRD_DB_MODE_ALLOC,
+        .name = RRD_DB_MODE_ALLOC_NAME,
         .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get_by_id = rrddim_metric_get_by_id,
@@ -51,8 +51,8 @@ static STORAGE_ENGINE engines[] = {
     },
 #ifdef ENABLE_DBENGINE
     {
-        .id = RRD_MEMORY_MODE_DBENGINE,
-        .name = RRD_MEMORY_MODE_DBENGINE_NAME,
+        .id = RRD_DB_MODE_DBENGINE,
+        .name = RRD_DB_MODE_DBENGINE_NAME,
         .seb = STORAGE_ENGINE_BACKEND_DBENGINE,
         .api = {
             .metric_get_by_id = rrdeng_metric_get_by_id,
@@ -65,7 +65,7 @@ static STORAGE_ENGINE engines[] = {
         }
     },
 #endif
-    { .id = RRD_MEMORY_MODE_NONE, .name = NULL }
+    { .id = RRD_DB_MODE_NONE, .name = NULL }
 };
 
 STORAGE_ENGINE* storage_engine_find(const char* name)
@@ -77,7 +77,7 @@ STORAGE_ENGINE* storage_engine_find(const char* name)
     return NULL;
 }
 
-STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode)
+STORAGE_ENGINE* storage_engine_get(RRD_DB_MODE mmode)
 {
     for (STORAGE_ENGINE* it = engines; it->name; it++) {
         if (it->id == mmode)

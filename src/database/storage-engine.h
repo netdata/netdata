@@ -70,12 +70,12 @@ typedef struct storage_engine_api {
 
 typedef struct storage {
     STORAGE_ENGINE_BACKEND seb;
-    RRD_MEMORY_MODE id;
+    RRD_DB_MODE id;
     const char* name;
     STORAGE_ENGINE_API api;
 } STORAGE_ENGINE;
 
-STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode);
+STORAGE_ENGINE* storage_engine_get(RRD_DB_MODE mmode);
 STORAGE_ENGINE* storage_engine_find(const char* name);
 
 // Iterator over existing engines

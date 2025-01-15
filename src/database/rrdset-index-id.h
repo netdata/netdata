@@ -19,7 +19,8 @@ RRDSET *rrdset_create_custom(
     , long priority
     , int update_every
     , RRDSET_TYPE chart_type
-    , RRD_MEMORY_MODE memory_mode
+    ,
+    RRD_DB_MODE memory_mode
     , long history_entries
 );
 
@@ -59,8 +60,6 @@ static inline
         localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type);
 }
 
-int rrdset_reset_name(RRDSET *st, const char *name);
-
 void rrdset_index_init(RRDHOST *host);
 void rrdset_index_destroy(RRDHOST *host);
 
@@ -73,5 +72,19 @@ RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
 
 void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
+
+#define rrdset_find_localhost(id) rrdset_find(localhost, id)
+/* This will not return charts that are archived */
+static inline RRDSET *rrdset_find_active_localhost(const char *id) {
+    RRDSET *st = rrdset_find_localhost(id);
+    return st;
+}
+
+#define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(localhost, type, id)
+/* This will not return charts that are archived */
+static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id) {
+    RRDSET *st = rrdset_find_bytype_localhost(type, id);
+    return st;
+}
 
 #endif //NETDATA_RRDSET_INDEX_ID_H

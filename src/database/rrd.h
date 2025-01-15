@@ -32,26 +32,6 @@ typedef enum __attribute__ ((__packed__)) {
 } QUERY_SOURCE;
 
 // --------------------------------------------------------------------------------------------------------------------
-// algorithms types
-
-typedef enum __attribute__ ((__packed__)) rrd_algorithm {
-    RRD_ALGORITHM_ABSOLUTE              = 0,
-    RRD_ALGORITHM_INCREMENTAL           = 1,
-    RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL = 2,
-    RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL  = 3,
-
-    // this is 8-bit
-} RRD_ALGORITHM;
-
-#define RRD_ALGORITHM_ABSOLUTE_NAME                "absolute"
-#define RRD_ALGORITHM_INCREMENTAL_NAME             "incremental"
-#define RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME   "percentage-of-incremental-row"
-#define RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME    "percentage-of-absolute-row"
-
-RRD_ALGORITHM rrd_algorithm_id(const char *name);
-const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
-
-// --------------------------------------------------------------------------------------------------------------------
 
 typedef struct rrdcalc RRDCALC;
 typedef struct alarm_entry ALARM_ENTRY;
@@ -101,7 +81,7 @@ extern netdata_rwlock_t rrd_rwlock;
 STRING *rrd_string_strdupz(const char *s);
 
 #include "rrd-database-mode.h"
-long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
+long align_entries_to_pagesize(RRD_DB_MODE mode, long entries);
 
 static inline uint32_t get_uint32_id() {
     return now_realtime_sec() & UINT32_MAX;

@@ -121,7 +121,7 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     if(host->rrdctx.contexts) return;
 
     rrdhost_create_rrdcontexts(host);
-    if (host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+    if (host->rrd_memory_mode != RRD_DB_MODE_DBENGINE)
         return;
 
     ignored_metrics = 0;

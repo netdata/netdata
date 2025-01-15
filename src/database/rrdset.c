@@ -9,41 +9,6 @@ void rrdset_metadata_updated(RRDSET *st) {
 }
 
 // ----------------------------------------------------------------------------
-// RRD - chart types
-
-inline RRDSET_TYPE rrdset_type_id(const char *name) {
-    if(unlikely(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0))
-        return RRDSET_TYPE_AREA;
-
-    else if(unlikely(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0))
-        return RRDSET_TYPE_STACKED;
-
-    else if(unlikely(strcmp(name, RRDSET_TYPE_HEATMAP_NAME) == 0))
-        return RRDSET_TYPE_HEATMAP;
-
-    else // if(unlikely(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0))
-        return RRDSET_TYPE_LINE;
-}
-
-const char *rrdset_type_name(RRDSET_TYPE chart_type) {
-    switch(chart_type) {
-        case RRDSET_TYPE_LINE:
-        default:
-            return RRDSET_TYPE_LINE_NAME;
-
-        case RRDSET_TYPE_AREA:
-            return RRDSET_TYPE_AREA_NAME;
-
-        case RRDSET_TYPE_STACKED:
-            return RRDSET_TYPE_STACKED_NAME;
-
-        case RRDSET_TYPE_HEATMAP:
-            return RRDSET_TYPE_HEATMAP_NAME;
-    }
-}
-
-// ----------------------------------------------------------------------------
-// RRDSET - rename charts
 
 // get the timestamp of the last entry in the round-robin database
 time_t rrdset_last_entry_s(RRDSET *st) {
@@ -148,7 +113,7 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
     *last_time_s = db_last_entry_s;
 }
 
-inline void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
+void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
     if(!st) return;
 
     rrdset_pluginsd_receive_unslot(st);
@@ -171,7 +136,7 @@ inline void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
     }
 }
 
-inline void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st) {
+void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
 
 //        netdata_log_info("Clearing obsolete flag on chart 'host:%s/chart:%s'",
@@ -188,7 +153,7 @@ inline void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st) {
     }
 }
 
-inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
+void rrdset_update_heterogeneous_flag(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
     (void)host;
 

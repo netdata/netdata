@@ -28,7 +28,7 @@ struct rrdset_constructor {
     long priority;
     int update_every;
     RRDSET_TYPE chart_type;
-    RRD_MEMORY_MODE memory_mode;
+    RRD_DB_MODE memory_mode;
     long history_entries;
 
     enum {
@@ -69,7 +69,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->module_name = rrd_string_strdupz(ctr->module);
     st->priority = ctr->priority;
 
-    st->db.entries = (ctr->memory_mode != RRD_MEMORY_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
+    st->db.entries = (ctr->memory_mode != RRD_DB_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
     st->update_every = ctr->update_every;
     st->rrd_memory_mode = ctr->memory_mode;
 
@@ -378,7 +378,8 @@ RRDSET *rrdset_create_custom(
     , long priority
     , int update_every
     , RRDSET_TYPE chart_type
-    , RRD_MEMORY_MODE memory_mode
+    ,
+    RRD_DB_MODE memory_mode
     , long history_entries
 ) {
     if (host != localhost)

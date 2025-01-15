@@ -12,13 +12,14 @@ typedef struct rrdhost RRDHOST;
 typedef struct ml_host rrd_ml_host_t;
 typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
 
-#include "streaming/stream-traffic-types.h"
+//#include "streaming/stream-traffic-types.h"
 #include "streaming/stream-sender-commit.h"
-#include "streaming/stream-replication-tracking.h"
+#include "rrd-database-mode.h"
+//#include "streaming/stream-replication-tracking.h"
 #include "streaming/stream-parents.h"
 #include "streaming/stream-path.h"
 #include "storage-engine.h"
-#include "streaming/stream-traffic-types.h"
+//#include "streaming/stream-traffic-types.h"
 #include "rrdlabels.h"
 #include "health/health-alert-log.h"
 
@@ -143,13 +144,13 @@ struct rrdhost {
     int32_t rrd_update_every;                       // the update frequency of the host
     int32_t rrd_history_entries;                    // the number of history entries for the host's charts
 
-    RRD_MEMORY_MODE rrd_memory_mode;                // the configured memory more for the charts of this host
-                                     // the actual per tier is at .db[tier].mode
+    RRD_DB_MODE rrd_memory_mode;                    // the configured memory more for the charts of this host
+                                                    // the actual per tier is at .db[tier].mode
 
     char *cache_dir;                                // the directory to save RRD cache files
 
     struct {
-        RRD_MEMORY_MODE mode;                       // the db mode for this tier
+        RRD_DB_MODE mode;                           // the db mode for this tier
         STORAGE_ENGINE *eng;                        // the storage engine API for this tier
         STORAGE_INSTANCE *si;                       // the db instance for this tier
         uint32_t tier_grouping;                     // tier 0 iterations aggregated on this tier
@@ -393,7 +394,7 @@ RRDHOST *rrdhost_create(
     const char *prog_version,
     int update_every,
     long entries,
-    RRD_MEMORY_MODE memory_mode,
+    RRD_DB_MODE memory_mode,
     bool health,
     bool stream,
     STRING *parents,
@@ -422,7 +423,7 @@ RRDHOST *rrdhost_find_or_create(
     const char *prog_version,
     int update_every,
     long history,
-    RRD_MEMORY_MODE mode,
+    RRD_DB_MODE mode,
     bool health,
     bool stream,
     STRING *parents,
@@ -441,11 +442,9 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force);
 bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
 bool rrdhost_should_run_health(RRDHOST *host);
 
-void reload_host_labels(void);
-void rrdhost_set_is_parent_label(void);
-
 void set_host_properties(
-    RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *registry_hostname,
+    RRDHOST *host, int update_every,
+    RRD_DB_MODE memory_mode, const char *registry_hostname,
     const char *os, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *prog_name, const char *prog_version);
 
@@ -463,10 +462,11 @@ static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, tim
         *to = online ? now : last_time_s;
 }
 
-void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host);
-void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host);
-
 extern time_t rrdhost_free_orphan_time_s;
 extern time_t rrdhost_free_ephemeral_time_s;
+
+#include "rrdhost-collection.h"
+#include "rrdhost-slots.h"
+#include "rrdhost-labels.h"
 
 #endif //NETDATA_RRDHOST_H

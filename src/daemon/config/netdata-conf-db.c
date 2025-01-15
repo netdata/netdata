@@ -87,9 +87,9 @@ static void netdata_conf_dbengine_pre_logs(void) {
     //    }
 
 #else
-    if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
-        default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+    if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
+        error_report("RRD_DB_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
+        default_rrd_memory_mode = RRD_DB_MODE_RAM;
     }
 #endif
 }
@@ -381,7 +381,7 @@ void netdata_conf_section_db(void) {
     // ------------------------------------------------------------------------
     // get default database size
 
-    if(default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && default_rrd_memory_mode != RRD_MEMORY_MODE_NONE) {
+    if(default_rrd_memory_mode != RRD_DB_MODE_DBENGINE && default_rrd_memory_mode != RRD_DB_MODE_NONE) {
         default_rrd_history_entries = (int)config_get_duration_seconds(
             CONFIG_SECTION_DB, "retention",
             align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));

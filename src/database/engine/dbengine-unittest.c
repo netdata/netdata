@@ -106,7 +106,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
         NETDATA_VERSION,
         nd_profile.update_every,
         default_rrd_history_entries,
-        RRD_MEMORY_MODE_DBENGINE,
+        RRD_DB_MODE_DBENGINE,
         health_plugin_enabled(),
         stream_send.enabled,
         stream_send.parents.destination,
@@ -362,7 +362,7 @@ int test_dbengine(void) {
     nd_log_limits_unlimited();
     fprintf(stderr, "\nRunning DB-engine test\n");
 
-    default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+    default_rrd_memory_mode = RRD_DB_MODE_DBENGINE;
     fprintf(stderr, "Initializing localhost with hostname 'unittest-dbengine'");
     RRDHOST *host = dbengine_rrdhost_find_or_create("unittest-dbengine");
     if(!host)

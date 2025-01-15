@@ -220,7 +220,7 @@ typedef struct statsd_app {
     const char *name;
     SIMPLE_PATTERN *metrics;
     STATS_METRIC_OPTIONS default_options;
-    RRD_MEMORY_MODE rrd_memory_mode;
+    RRD_DB_MODE rrd_memory_mode;
     int32_t rrd_history_entries;
     DICTIONARY *dict;
 
