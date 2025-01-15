@@ -471,4 +471,6 @@ void rrdcontext_update_from_collected_rrdinstance(RRDINSTANCE *ri);
 
 void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs);
 
+void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_time_t, time_t *max_last_time_t);
+
 #endif //NETDATA_RRDCONTEXT_INTERNAL_H
