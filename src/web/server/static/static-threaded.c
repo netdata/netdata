@@ -160,7 +160,6 @@ static void web_server_del_callback(POLLINFO *pi) {
     web_server_log_connection(w, "DISCONNECTED");
     web_client_request_done(w);
     web_client_release_to_cache(w);
-    pulse_web_client_disconnected();
 
     worker_is_idle();
 }
