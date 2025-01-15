@@ -102,21 +102,22 @@ static inline bool WARNUNUSED refcount_release_and_acquire_for_deletion_with_tra
 
     do {
         expected = refcount_references(refcount);
-        if(!REFCOUNT_VALID(expected))
+        if (!REFCOUNT_VALID(expected))
             fatal("REFCOUNT %d is invalid (detected at %s(), called from %s())", expected, __FUNCTION__, func);
 
-//        // the following is a valid case when using refcount_acquire_for_deletion_and_wait_with_trace()
-//        if(expected <= 0)
-//            fatal("REFCOUNT cannot release a refcount of %d (detected at %s(), called from %s())", expected, __FUNCTION__, func);
-
-        if(expected == 1)
+        if (expected == 1) {
+            // we can get it for deletion
             desired = REFCOUNT_DELETED;
-        else
+            if (__atomic_compare_exchange_n(refcount, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+                return true;
+        }
+        else {
+            // we can only release it
             desired = expected - 1;
-
-    } while(!__atomic_compare_exchange_n(refcount, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
-
-    return (desired == REFCOUNT_DELETED);
+            if (__atomic_compare_exchange_n(refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED))
+                return false;
+        }
+    } while (true);
 }
 
 // this sleeps for 1 nanosecond (posix systems), or Sleep(0) on Windows
