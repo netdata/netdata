@@ -3,7 +3,7 @@
 #define RRDHOST_INTERNALS
 #include "rrd.h"
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // globals
 
 /*
@@ -14,51 +14,14 @@ int rrd_delete_unupdated_dimensions = 0;
 */
 
 #ifdef ENABLE_DBENGINE
-RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+RRD_DB_MODE default_rrd_memory_mode = RRD_DB_MODE_DBENGINE;
 #else
-RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+RRD_DB_MODE default_rrd_memory_mode = RRD_DB_MODE_RAM;
 #endif
 int gap_when_lost_iterations_above = 1;
 
 
-// ----------------------------------------------------------------------------
-// RRD - algorithms types
-
-RRD_ALGORITHM rrd_algorithm_id(const char *name) {
-    if(strcmp(name, RRD_ALGORITHM_INCREMENTAL_NAME) == 0)
-        return RRD_ALGORITHM_INCREMENTAL;
-
-    else if(strcmp(name, RRD_ALGORITHM_ABSOLUTE_NAME) == 0)
-        return RRD_ALGORITHM_ABSOLUTE;
-
-    else if(strcmp(name, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME) == 0)
-        return RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL;
-
-    else if(strcmp(name, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME) == 0)
-        return RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL;
-
-    else
-        return RRD_ALGORITHM_ABSOLUTE;
-}
-
-const char *rrd_algorithm_name(RRD_ALGORITHM algorithm) {
-    switch(algorithm) {
-        case RRD_ALGORITHM_ABSOLUTE:
-        default:
-            return RRD_ALGORITHM_ABSOLUTE_NAME;
-
-        case RRD_ALGORITHM_INCREMENTAL:
-            return RRD_ALGORITHM_INCREMENTAL_NAME;
-
-        case RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL:
-            return RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME;
-
-        case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
-            return RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME;
-    }
-}
-
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // RRD - string management
 
 STRING *rrd_string_strdupz(const char *s) {
@@ -71,16 +34,16 @@ STRING *rrd_string_strdupz(const char *s) {
     return ret;
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 
-inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
-    if(mode == RRD_MEMORY_MODE_DBENGINE) return 0;
-    if(mode == RRD_MEMORY_MODE_NONE) return 5;
+inline long align_entries_to_pagesize(RRD_DB_MODE mode, long entries) {
+    if(mode == RRD_DB_MODE_DBENGINE) return 0;
+    if(mode == RRD_DB_MODE_NONE) return 5;
 
     if(entries < 5) entries = 5;
     if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
 
-    if(mode == RRD_MEMORY_MODE_RAM) {
+    if(mode == RRD_DB_MODE_RAM) {
         long header_size = 0;
 
         long page = (long)sysconf(_SC_PAGESIZE);
@@ -97,12 +60,15 @@ inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
     return entries;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+
 void api_v1_management_init(void);
+
 int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
 
     if (unlikely(sql_init_meta_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
             set_late_analytics_variables(system_info);
             fatal("Failed to initialize SQLite");
         }
@@ -119,7 +85,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         dbengine_enabled = true;
     }
     else {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || stream_conf_receiver_needs_dbengine()) {
+        if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE || stream_conf_receiver_needs_dbengine()) {
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "DBENGINE: Initializing ...");
 
@@ -137,12 +103,12 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
                 nd_profile.storage_tiers = 1;
             }
 
-            if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
                 nd_log(NDLS_DAEMON, NDLP_WARNING,
                        "dbengine is not enabled, but it has been given as the default db mode. "
                        "Resetting db mode to alloc");
 
-                default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
+                default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
             }
         }
     }

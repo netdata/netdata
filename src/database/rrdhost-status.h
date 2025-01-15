@@ -95,7 +95,7 @@ typedef struct rrdhost_status_t {
     struct {
         RRDHOST_DB_STATUS status;
         RRDHOST_DB_LIVENESS liveness;
-        RRD_MEMORY_MODE mode;
+        RRD_DB_MODE mode;
         time_t first_time_s;
         time_t last_time_s;
         size_t metrics;

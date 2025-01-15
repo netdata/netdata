@@ -47,7 +47,7 @@ void mountinfo_free_all(struct mountinfo *mi)
 RRDSET *rrdset_create_custom(
     RRDHOST *host, const char *type, const char *id, const char *name, const char *family, const char *context,
     const char *title, const char *units, const char *plugin, const char *module, long priority, int update_every,
-    RRDSET_TYPE chart_type, RRD_MEMORY_MODE memory_mode, long history_entries)
+    RRDSET_TYPE chart_type, RRD_DB_MODE memory_mode, long history_entries)
 {
     UNUSED(host);
     UNUSED(type);
@@ -70,7 +70,7 @@ RRDSET *rrdset_create_custom(
 
 RRDDIM *rrddim_add_custom(
     RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor,
-    RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode)
+    RRD_ALGORITHM algorithm, RRD_DB_MODE memory_mode)
 {
     UNUSED(st);
     UNUSED(id);

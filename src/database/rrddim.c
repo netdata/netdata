@@ -18,7 +18,7 @@ struct rrddim_constructor {
     collected_number multiplier;
     collected_number divisor;
     RRD_ALGORITHM algorithm;
-    RRD_MEMORY_MODE memory_mode;
+    RRD_DB_MODE memory_mode;
 
     enum {
         RRDDIM_REACT_NONE    = 0,
@@ -57,7 +57,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
         rd->collector.counter = 1;
 
-    if(ctr->memory_mode == RRD_MEMORY_MODE_RAM) {
+    if(ctr->memory_mode == RRD_DB_MODE_RAM) {
         size_t entries = st->db.entries;
         if(!entries) entries = 5;
 
@@ -68,11 +68,11 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
         else {
             netdata_log_info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
-            ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
+            ctr->memory_mode = RRD_DB_MODE_ALLOC;
         }
     }
 
-    if(ctr->memory_mode == RRD_MEMORY_MODE_ALLOC || ctr->memory_mode == RRD_MEMORY_MODE_NONE) {
+    if(ctr->memory_mode == RRD_DB_MODE_ALLOC || ctr->memory_mode == RRD_DB_MODE_NONE) {
         size_t entries = st->db.entries;
         if(entries < 5) entries = 5;
 
@@ -208,7 +208,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     netdata_log_debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
-    if (!rrddim_finalize_collection_and_check_retention(rd) && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+    if (!rrddim_finalize_collection_and_check_retention(rd) && rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
         /* This metric has no data and no references */
         metaqueue_delete_dimension_uuid(uuidmap_uuid_ptr(rd->uuid));
     }
@@ -226,7 +226,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if(rd->db.data) {
         pulse_db_rrd_memory_sub(rd->db.memsize);
 
-        if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)
+        if(rd->rrd_memory_mode == RRD_DB_MODE_RAM)
             nd_munmap(rd->db.data, rd->db.memsize);
         else
             freez(rd->db.data);
@@ -454,7 +454,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st
                           , collected_number multiplier
                           , collected_number divisor
                           , RRD_ALGORITHM algorithm
-                          , RRD_MEMORY_MODE memory_mode
+                          ,
+    RRD_DB_MODE memory_mode
                           ) {
     struct rrddim_constructor tmp = {
         .st = st,

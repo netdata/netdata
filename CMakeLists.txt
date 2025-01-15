@@ -1473,8 +1473,8 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/vendored/sqlite3recover.c
         src/database/sqlite/vendored/sqlite3recover.h
         src/database/sqlite/vendored/dbdata.c
-        src/database/KolmogorovSmirnovDist.c
-        src/database/KolmogorovSmirnovDist.h
+        src/web/api/queries/KolmogorovSmirnovDist.c
+        src/web/api/queries/KolmogorovSmirnovDist.h
         src/database/rrdfunctions-inflight.c
         src/database/rrdfunctions-inflight.h
         src/database/rrdfunctions-exporters.c
@@ -1503,6 +1503,16 @@ set(RRD_PLUGIN_FILES
         src/database/rrddim-backfill.h
         src/database/rrddim-collection.c
         src/database/rrddim-collection.h
+        src/database/rrdset-type.c
+        src/database/rrdset-type.h
+        src/database/rrdhost-slots.c
+        src/database/rrdhost-slots.h
+        src/database/rrd-algorithm.c
+        src/database/rrd-algorithm.h
+        src/database/rrdhost-labels.c
+        src/database/rrdhost-labels.h
+        src/database/rrdhost-collection.c
+        src/database/rrdhost-collection.h
 )
 
 if(ENABLE_DBENGINE)

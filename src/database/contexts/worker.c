@@ -264,7 +264,7 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
     rc->hub.units = string2str(rc->units);
     rc->hub.family = string2str(rc->family);
 
-    if (rc->rrdhost->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+    if (rc->rrdhost->rrd_memory_mode != RRD_DB_MODE_DBENGINE)
         return;
 
     // delete it from SQL
@@ -762,7 +762,7 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
         rrdcontext_delete_from_sql_unsafe(rc);
 
     else {
-        if (rc->rrdhost->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        if (rc->rrdhost->rrd_memory_mode != RRD_DB_MODE_DBENGINE)
             return;
         if (ctx_store_context(&rc->rrdhost->host_id.uuid, &rc->hub) != 0)
             netdata_log_error(

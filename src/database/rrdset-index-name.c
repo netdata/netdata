@@ -4,6 +4,8 @@
 #include "rrdset-index-id.h"
 #include "rrdset-slots.h"
 
+static RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name);
+
 STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const char *type, const char *current_name, const char *name) {
     if(!name || !*name) return NULL;
 
@@ -74,7 +76,7 @@ static void rrdset_name_delete_callback(const DICTIONARY_ITEM *item __maybe_unus
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
 }
 
-RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
+static RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
     if (unlikely(!host->rrdset_root_index_name))
         return NULL;
     return dictionary_get(host->rrdset_root_index_name, name);
@@ -101,7 +103,7 @@ void rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
         dictionary_del(host->rrdset_root_index_name, rrdset_name(st));
 }
 
-inline RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
+RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find_byname() for chart '%s' in host '%s'", name, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find_name(host, name);
     return(st);

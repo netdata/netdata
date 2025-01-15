@@ -144,7 +144,7 @@ void ml_config_load(ml_config_t *cfg) {
 
     cfg->enable_statistics_charts = enable_statistics_charts;
 
-    if (cfg->enable_anomaly_detection == CONFIG_BOOLEAN_AUTO && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+    if (cfg->enable_anomaly_detection == CONFIG_BOOLEAN_AUTO && default_rrd_memory_mode != RRD_DB_MODE_DBENGINE) {
         Cfg.enable_anomaly_detection = 0;
         config_set_boolean(config_section_ml, "enabled", CONFIG_BOOLEAN_NO);
         return;

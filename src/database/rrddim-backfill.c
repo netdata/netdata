@@ -6,8 +6,6 @@
 // ----------------------------------------------------------------------------
 // fill the gap of a tier
 
-void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
-
 bool backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
     if(unlikely(tier >= nd_profile.storage_tiers)) return false;
 #ifdef ENABLE_DBENGINE

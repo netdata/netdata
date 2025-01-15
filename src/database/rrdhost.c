@@ -187,7 +187,8 @@ static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, co
     host->utc_offset = utc_offset;
 }
 
-void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode,
+void set_host_properties(RRDHOST *host, int update_every,
+    RRD_DB_MODE memory_mode,
                          const char *registry_hostname, const char *os, const char *tzone,
                          const char *abbrev_tzone, int32_t utc_offset, const char *prog_name,
                          const char *prog_version)
@@ -238,7 +239,7 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
         snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
 
         if ((initialized = create_dbengine_directory(host, dbenginepath))) {
-            host->db[0].mode = RRD_MEMORY_MODE_DBENGINE;
+            host->db[0].mode = RRD_DB_MODE_DBENGINE;
             host->db[0].eng = storage_engine_get(host->db[0].mode);
             host->db[0].tier_grouping = get_tier_grouping(0);
 
@@ -274,20 +275,20 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
 }
 #endif
 
-static void rrdhost_set_replication_parameters(RRDHOST *host, RRD_MEMORY_MODE memory_mode, time_t period, time_t step) {
+static void rrdhost_set_replication_parameters(RRDHOST *host, RRD_DB_MODE memory_mode, time_t period, time_t step) {
     host->stream.replication.period = period;
     host->stream.replication.step = step;
     host->stream.rcv.status.replication.percent = 100.0;
 
     switch(memory_mode) {
         default:
-        case RRD_MEMORY_MODE_ALLOC:
-        case RRD_MEMORY_MODE_RAM:
+        case RRD_DB_MODE_ALLOC:
+        case RRD_DB_MODE_RAM:
             if(host->stream.replication.period > (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every)
                 host->stream.replication.period = (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every;
             break;
 
-        case RRD_MEMORY_MODE_DBENGINE:
+        case RRD_DB_MODE_DBENGINE:
             break;
     }
 }
@@ -304,7 +305,7 @@ RRDHOST *rrdhost_create(
         const char *prog_version,
         int update_every,
         long entries,
-        RRD_MEMORY_MODE memory_mode,
+    RRD_DB_MODE memory_mode,
         bool health,
         bool stream,
         STRING *parents,
@@ -317,12 +318,12 @@ RRDHOST *rrdhost_create(
         int is_localhost,
         bool archived
 ) {
-    if(memory_mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled) {
+    if(memory_mode == RRD_DB_MODE_DBENGINE && !dbengine_enabled) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "memory mode 'dbengine' is not enabled, but host '%s' is configured for it. Falling back to 'alloc'",
                hostname);
 
-        memory_mode = RRD_MEMORY_MODE_ALLOC;
+        memory_mode = RRD_DB_MODE_ALLOC;
     }
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
@@ -349,7 +350,7 @@ RRDHOST *rrdhost_create(
     rrdhost_init_hostname(host, hostname, false);
 
     host->rrd_history_entries        = align_entries_to_pagesize(memory_mode, entries);
-    host->health.enabled = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health;
+    host->health.enabled = ((memory_mode == RRD_DB_MODE_NONE)) ? 0 : health;
 
     spinlock_init(&host->receiver_lock);
 
@@ -385,7 +386,7 @@ RRDHOST *rrdhost_create(
 
     rrdcalc_rrdhost_index_init(host);
 
-    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+    if (host->rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         if (unittest_running) {
             host = prepare_host_for_unittest(host);
@@ -394,14 +395,14 @@ RRDHOST *rrdhost_create(
         }
         else {
             for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-                host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+                host->db[tier].mode = RRD_DB_MODE_DBENGINE;
                 host->db[tier].eng = storage_engine_get(host->db[tier].mode);
                 host->db[tier].si = (STORAGE_INSTANCE *)multidb_ctx[tier];
                 host->db[tier].tier_grouping = get_tier_grouping(tier);
             }
         }
 #else
-        fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
+        fatal("RRD_DB_MODE_DBENGINE is not supported in this platform.");
 #endif
     }
     else {
@@ -413,7 +414,7 @@ RRDHOST *rrdhost_create(
 #ifdef ENABLE_DBENGINE
         // the first tier is reserved for the non-dbengine modes
         for(size_t tier = 1; tier < nd_profile.storage_tiers; tier++) {
-            host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
+            host->db[tier].mode = RRD_DB_MODE_DBENGINE;
             host->db[tier].eng = storage_engine_get(host->db[tier].mode);
             host->db[tier].si = (STORAGE_INSTANCE *) multidb_ctx[tier];
             host->db[tier].tier_grouping = get_tier_grouping(tier);
@@ -519,7 +520,8 @@ static void rrdhost_update(RRDHOST *host
                            , const char *prog_version
                            , int update_every
                            , long history
-                           , RRD_MEMORY_MODE mode
+                           ,
+    RRD_DB_MODE mode
                            , bool health
                            , bool stream
                            , STRING *parents
@@ -535,7 +537,7 @@ static void rrdhost_update(RRDHOST *host
 
     spinlock_lock(&host->rrdhost_update_lock);
 
-    host->health.enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health;
+    host->health.enabled = (mode == RRD_DB_MODE_NONE) ? 0 : health;
 
     {
         struct rrdhost_system_info *old = host->system_info;
@@ -596,7 +598,7 @@ static void rrdhost_update(RRDHOST *host
                rrd_memory_mode_name(host->rrd_memory_mode),
                rrd_memory_mode_name(mode));
 
-    else if(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && host->rrd_history_entries < history)
+    else if(host->rrd_memory_mode != RRD_DB_MODE_DBENGINE && host->rrd_history_entries < history)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "Host '%s' has history of %d entries, but the wanted one is %ld entries. "
                "Restart netdata here to apply the new settings.",
@@ -654,7 +656,8 @@ RRDHOST *rrdhost_find_or_create(
     , const char *prog_version
     , int update_every
     , long history
-    , RRD_MEMORY_MODE mode
+    ,
+    RRD_DB_MODE mode
     , bool health
     , bool stream
     , STRING *parents
@@ -879,132 +882,4 @@ void rrdhost_free_all(void) {
         rrdhost_free___while_having_rrd_wrlock(localhost, true);
 
     rrd_wrunlock();
-}
-
-void rrd_finalize_collection_for_all_hosts(void) {
-    RRDHOST *host;
-    dfe_start_reentrant(rrdhost_root_index, host) {
-        rrdhost_finalize_collection(host);
-    }
-    dfe_done(host);
-}
-
-void rrdhost_set_is_parent_label(void) {
-    uint32_t count = stream_receivers_currently_connected();
-
-    if (count == 0 || count == 1) {
-        RRDLABELS *labels = localhost->rrdlabels;
-        rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
-
-        // queue a node info
-        aclk_queue_node_info(localhost, false);
-    }
-}
-
-static bool config_label_cb(void *data __maybe_unused, const char *name, const char *value) {
-    rrdlabels_add(localhost->rrdlabels, name, value, RRDLABEL_SRC_CONFIG);
-    return true;
-}
-
-static void rrdhost_load_config_labels(void) {
-    int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
-    if(!status) {
-        char *filename = CONFIG_DIR "/" CONFIG_FILENAME;
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "RRDLABEL: Cannot reload the configuration file '%s', using labels in memory",
-               filename);
-    }
-
-    appconfig_foreach_value_in_section(&netdata_config, CONFIG_SECTION_HOST_LABEL, config_label_cb, NULL);
-}
-
-static void rrdhost_load_kubernetes_labels(void) {
-    char label_script[sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2)];
-    sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
-
-    if (unlikely(access(label_script, R_OK) != 0)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "Kubernetes pod label fetching script %s not found.",
-               label_script);
-
-        return;
-    }
-
-    POPEN_INSTANCE *instance = spawn_popen_run(label_script);
-    if(!instance) return;
-
-    char buffer[1000 + 1];
-    while (fgets(buffer, 1000, spawn_popen_stdout(instance)) != NULL)
-        rrdlabels_add_pair(localhost->rrdlabels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
-
-    // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
-    // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
-    int rc = spawn_popen_wait(instance);
-    if(rc)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "%s exited abnormally. Failed to get kubernetes labels.",
-               label_script);
-}
-
-static void rrdhost_load_auto_labels(void) {
-    RRDLABELS *labels = localhost->rrdlabels;
-
-    rrdhost_system_info_to_rrdlabels(localhost->system_info, labels);
-    add_aclk_host_labels();
-
-    // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
-    // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.
-
-    int is_ephemeral = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "is ephemeral node", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", RRDLABEL_SRC_AUTO);
-
-    int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
-
-    rrdlabels_add(labels, "_is_parent", (stream_receivers_currently_connected() > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
-
-    rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
-    rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
-
-    if (localhost->stream.snd.destination)
-        rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);
-}
-
-void reload_host_labels(void) {
-    if(!localhost->rrdlabels)
-        localhost->rrdlabels = rrdlabels_create();
-
-    rrdlabels_unmark_all(localhost->rrdlabels);
-
-    // priority is important here
-    rrdhost_load_config_labels();
-    rrdhost_load_kubernetes_labels();
-    rrdhost_load_auto_labels();
-
-    rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
-
-    stream_send_host_labels(localhost);
-}
-
-void rrdhost_finalize_collection(RRDHOST *host) {
-    ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rrdhost_hostname(host)),
-        ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "RRD: 'host:%s' stopping data collection...",
-           rrdhost_hostname(host));
-
-    RRDSET *st;
-    rrdset_foreach_read(st, host)
-        rrdset_finalize_collection(st, true);
-    rrdset_foreach_done(st);
-}
-
-bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now) {
-    time_t first_time_s, last_time_s;
-    rrdhost_retention(host, now, rrdhost_is_online(host), &first_time_s, &last_time_s);
-    return query_matches_retention(after, before, first_time_s, last_time_s, 0);
 }

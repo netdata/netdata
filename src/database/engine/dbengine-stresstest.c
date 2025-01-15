@@ -20,7 +20,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
         NETDATA_VERSION,
         nd_profile.update_every,
         default_rrd_history_entries,
-        RRD_MEMORY_MODE_DBENGINE,
+        RRD_DB_MODE_DBENGINE,
         health_plugin_enabled(),
         stream_send.enabled,
         stream_send.parents.destination,
@@ -140,7 +140,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     int i;
     time_t time_present;
 
-    default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+    default_rrd_memory_mode = RRD_DB_MODE_DBENGINE;
     default_rrdeng_page_cache_mb = 128;
     // Worst case for uncompressible data
     default_rrdeng_disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * history_seconds) /
@@ -333,7 +333,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     if (PAGE_CACHE_MB < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
         PAGE_CACHE_MB = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
 
-    default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+    default_rrd_memory_mode = RRD_DB_MODE_DBENGINE;
     default_rrdeng_page_cache_mb = PAGE_CACHE_MB;
     if (DISK_SPACE_MB) {
         fprintf(stderr, "By setting disk space limit data are allowed to be deleted. "

@@ -51,7 +51,7 @@ void analytics_set_data_str(char **name, const char *value);
 #define REQUIRE_DB(db)                                                                                                 \
     ({                                                                                                                 \
         if (unlikely(!(db))) {                                                                                         \
-            if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)                                                   \
+            if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE)                                                       \
                 error_report("Database has not been initialized in %s", __FUNCTION__);                                 \
         }                                                                                                              \
         (db) != NULL;                                                                                                  \

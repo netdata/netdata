@@ -4,6 +4,7 @@
 #define NETDATA_RRDDIM_H
 
 #include "libnetdata/libnetdata.h"
+#include "rrd-algorithm.h"
 
 typedef struct rrddim RRDDIM;
 typedef struct rrddim_acquired RRDDIM_ACQUIRED;
@@ -60,7 +61,7 @@ struct rrddim {
     STRING *name;                                   // the name of this dimension (as presented to user)
 
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
-    RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
+    RRD_DB_MODE rrd_memory_mode;                // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // run time changing status flags
 
     int32_t multiplier;                             // the multiplier of the collected values
@@ -195,7 +196,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st
                           , collected_number multiplier
                           , collected_number divisor
                           , RRD_ALGORITHM algorithm
-                          , RRD_MEMORY_MODE memory_mode
+                          , RRD_DB_MODE memory_mode
 );
 
 #define rrddim_add(st, id, name, multiplier, divisor, algorithm) \
@@ -223,16 +224,6 @@ collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number 
 collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 
 bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd);
-void rrdset_finalize_collection(RRDSET *st, bool dimensions_too);
-void rrdhost_finalize_collection(RRDHOST *host);
-void rrd_finalize_collection_for_all_hosts(void);
-
-#ifdef NETDATA_LOG_COLLECTION_ERRORS
-#define rrddim_store_metric(rd, point_end_time_ut, n, flags) rrddim_store_metric_with_trace(rd, point_end_time_ut, n, flags, __FUNCTION__)
-void rrddim_store_metric_with_trace(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags, const char *function);
-#else
-void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags);
-#endif
 
 void rrddim_free(RRDSET *st, RRDDIM *rd);
 

@@ -213,7 +213,7 @@ int unittest_prepare_rrd(const char **user) {
     netdata_conf_section_global_run_as_user(user);
     netdata_conf_section_global();
     nd_profile.update_every = 1;
-    default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+    default_rrd_memory_mode = RRD_DB_MODE_RAM;
     health_plugin_disable();
     nd_profile.storage_tiers = 1;
     registry_init();
