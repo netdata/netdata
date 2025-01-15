@@ -170,6 +170,7 @@ sqlite3 *db_meta = NULL;
 
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_REPEAT (60)            // Repeat if last run for dimensions, charts, labels needs more work
+#define METADATA_MAINTENANCE_CTX_CLEAN_REPEAT (300) // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
 #define METADATA_DIM_CHECK_INTERVAL (3600)          // Repeat maintenance for dimensions
 #define METADATA_CHART_CHECK_INTERVAL (3600)        // Repeat maintenance for charts
@@ -1696,10 +1697,17 @@ done:
 
 void run_metadata_cleanup(struct metadata_wc *wc)
 {
+    static time_t next_context_list_cleanup = 0;
+
+    time_t now = now_realtime_sec();
+
+    if (!next_context_list_cleanup)
+        next_context_list_cleanup = now + METADATA_MAINTENANCE_FIRST_CHECK;
+
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
        return;
 
-    if (sql_metadata_wal_size_acceptable()) {
+    if (next_context_list_cleanup < now && sql_metadata_wal_size_acceptable()) {
         RRDHOST *host;
         dfe_start_reentrant(rrdhost_root_index, host) {
             ctx_get_context_list_to_cleanup(&host->host_id.uuid, cleanup_host_context_metadata, host);
@@ -1707,6 +1715,7 @@ void run_metadata_cleanup(struct metadata_wc *wc)
                 break;
         }
         dfe_done(host);
+        next_context_list_cleanup = now_realtime_sec() + METADATA_MAINTENANCE_CTX_CLEAN_REPEAT;
     }
 
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
