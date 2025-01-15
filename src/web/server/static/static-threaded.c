@@ -28,6 +28,7 @@ long web_client_streaming_rate_t = 0L;
 static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
     struct web_client *w;
 
+    pulse_web_client_connected();
     w = web_client_get_from_cache();
     w->fd = pi->fd;
 
