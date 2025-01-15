@@ -417,6 +417,9 @@ inline Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {
 inline bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
     internal_fatal(first_time_s < 0, "DBENGINE METRIC: timestamp is negative");
 
+    if(first_time_s == LONG_MAX)
+        first_time_s = 0;
+
     if(unlikely(first_time_s < 0))
         return false;
 
@@ -433,8 +436,8 @@ inline void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric,
     internal_fatal(last_time_s > max_acceptable_collected_time(),
                    "DBENGINE METRIC: metric last time is in the future");
 
-    if(first_time_s > 0)
-        set_metric_field_with_condition(metric->first_time_s, first_time_s, _current <= 0 || _wanted < _current);
+    if(first_time_s > 0 && first_time_s != LONG_MAX)
+        set_metric_field_with_condition(metric->first_time_s, first_time_s, _current <= 0 || (_wanted != 0 && _wanted != LONG_MAX && _wanted < _current));
 
     if(last_time_s > 0) {
         if(set_metric_field_with_condition(metric->latest_time_s_clean, last_time_s, _current <= 0 || _wanted > _current) &&
@@ -449,7 +452,7 @@ inline void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric,
 
 inline bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
     internal_fatal(first_time_s < 0, "DBENGINE METRIC: timestamp is negative");
-    return set_metric_field_with_condition(metric->first_time_s, first_time_s, _wanted > _current);
+    return set_metric_field_with_condition(metric->first_time_s, first_time_s, _wanted != 0 && _wanted != LONG_MAX && _wanted > _current);
 }
 
 inline time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
