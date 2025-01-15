@@ -109,8 +109,6 @@ struct web_client *web_client_get_from_cache(void) {
         web_clients_cache.used.allocated++;
     }
 
-    pulse_web_client_connected();
-
     // link it to used web clients
     DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(web_clients_cache.used.head, w, cache.prev, cache.next);
     web_clients_cache.used.count++;
@@ -129,8 +127,6 @@ struct web_client *web_client_get_from_cache(void) {
 }
 
 void web_client_release_to_cache(struct web_client *w) {
-    pulse_web_client_disconnected();
-
     netdata_ssl_close(&w->ssl);
 
     // unlink it from the used
