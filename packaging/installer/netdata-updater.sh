@@ -175,12 +175,8 @@ issystemd() {
 }
 
 systemd_unit_exists() {
-  if issystemd; then
-    if systemctl list-unit-files "${1}" >/dev/null 2>&1; then
-      return 0
-    else
-      return 1
-    fi
+  if systemctl list-unit-files "${1}" 2>&1 | tail -n 1 | grep -qv '^0 '; then
+    return 0
   else
     return 1
   fi
@@ -371,7 +367,7 @@ enable_netdata_updater() {
 }
 
 disable_netdata_updater() {
-  if systemd_unit_exists "netdata-updater.timer" ; then
+  if issystemd && systemd_unit_exists "netdata-updater.timer" ; then
     systemctl disable netdata-updater.timer
     systemctl stop netdata-updater.timer
   fi
