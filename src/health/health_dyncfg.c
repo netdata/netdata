@@ -659,11 +659,11 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
                 code = dyncfg_default_response(result, HTTP_RESP_OK, "already enabled");
             else {
                 size_t matches_enabled = 0;
-                spinlock_lock(&ap->_internal.spinlock);
+                rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
                 for(RRD_ALERT_PROTOTYPE *t = ap; t ;t = t->_internal.next)
                     if(t->match.enabled)
                         matches_enabled++;
-                spinlock_unlock(&ap->_internal.spinlock);
+                rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
 
                 if(!matches_enabled) {
                     code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "all rules in this alert are disabled, so enabling the alert has no effect");

@@ -114,4 +114,7 @@ void nd_thread_rwspinlock_write_unlocked(void);
 #define nd_thread_rwspinlock_write_unlocked() debug_dummy()
 #endif
 
+void nd_thread_can_run_sql(bool exclude);
+bool nd_thread_runs_sql(void);
+
 #endif //NETDATA_THREADS_H

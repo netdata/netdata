@@ -206,7 +206,7 @@ static void health_prototype_cleanup_one_unsafe(RRD_ALERT_PROTOTYPE *ap) {
 }
 
 void health_prototype_cleanup(RRD_ALERT_PROTOTYPE *ap) {
-    spinlock_lock(&ap->_internal.spinlock);
+    rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
 
     while(ap->_internal.next) {
         RRD_ALERT_PROTOTYPE *t = ap->_internal.next;
@@ -215,7 +215,7 @@ void health_prototype_cleanup(RRD_ALERT_PROTOTYPE *ap) {
         freez(t);
     }
 
-    spinlock_unlock(&ap->_internal.spinlock);
+    rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
 
     health_prototype_cleanup_one_unsafe(ap);
 }
@@ -228,7 +228,7 @@ void health_prototype_free(RRD_ALERT_PROTOTYPE *ap) {
 
 void health_prototype_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     RRD_ALERT_PROTOTYPE *ap = value;
-    spinlock_init(&ap->_internal.spinlock);
+    rw_spinlock_init(&ap->_internal.rw_spinlock);
     if(ap->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG)
         ap->_internal.is_on_disk = true;
 }
@@ -253,9 +253,9 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
             nap = callocz(1, sizeof(*nap));
             memcpy(nap, new_value, sizeof(*nap));
 
-            spinlock_lock(&ap->_internal.spinlock);
+            rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, nap, _internal.prev, _internal.next);
-            spinlock_unlock(&ap->_internal.spinlock);
+            rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
 
             if(nap->_internal.enabled)
                 ap->_internal.enabled = true;
@@ -263,14 +263,13 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
     }
     else {
         // alerts with the same name replace the existing one
-        spinlock_init(&nap->_internal.spinlock);
-        nap->_internal.uses = ap->_internal.uses;
+        rw_spinlock_init(&nap->_internal.rw_spinlock);
 
-        spinlock_lock(&nap->_internal.spinlock);
-        spinlock_lock(&ap->_internal.spinlock);
+        rw_spinlock_write_lock(&nap->_internal.rw_spinlock);
+        rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
         SWAP(*ap, *nap);
-        spinlock_unlock(&ap->_internal.spinlock);
-        spinlock_unlock(&nap->_internal.spinlock);
+        rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
+        rw_spinlock_write_unlock(&nap->_internal.rw_spinlock);
 
         health_prototype_cleanup(nap);
         memset(nap, 0, sizeof(*nap));
@@ -598,7 +597,7 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
     if(!ap->_internal.enabled)
         return;
 
-    spinlock_lock(&ap->_internal.spinlock);
+    rw_spinlock_read_lock(&ap->_internal.rw_spinlock);
     for(size_t template = 0; template < 2; template++) {
         bool want_template = template ? true : false;
 
@@ -617,11 +616,10 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
             if (!prototype_matches_rrdset(st, t))
                 continue;
 
-            if (rrdcalc_add_from_prototype(st->rrdhost, st, t))
-                ap->_internal.uses++;
+            rrdcalc_add_from_prototype(st->rrdhost, st, t);
         }
     }
-    spinlock_unlock(&ap->_internal.spinlock);
+    rw_spinlock_read_unlock(&ap->_internal.rw_spinlock);
 }
 
 void health_prototype_alerts_for_rrdset_incrementally(RRDSET *st) {

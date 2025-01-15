@@ -53,10 +53,9 @@ typedef struct rrd_alert_prototype {
     struct rrd_alert_config config;
 
     struct {
-        uint32_t uses;
         bool enabled;
         bool is_on_disk;
-        SPINLOCK spinlock;
+        RW_SPINLOCK rw_spinlock;
         struct rrd_alert_prototype *prev, *next;
     } _internal;
 } RRD_ALERT_PROTOTYPE;
