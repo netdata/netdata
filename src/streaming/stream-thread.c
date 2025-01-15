@@ -381,6 +381,8 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
 void *stream_thread(void *ptr) {
     struct stream_thread *sth = ptr;
 
+    nd_thread_can_run_sql(false);
+
     worker_register("STREAM");
 
     // stream thread main event loop

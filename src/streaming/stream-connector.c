@@ -511,6 +511,8 @@ static void *stream_connector_thread(void *ptr) {
     struct connector *sc = ptr;
     sc->tid = gettid_cached();
 
+    nd_thread_can_run_sql(false);
+
     worker_register("STREAMCNT");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_CONNECTING, "connect");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_CONNECTED, "connected");

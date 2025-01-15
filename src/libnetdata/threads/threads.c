@@ -64,6 +64,16 @@ static struct {
 
 static __thread ND_THREAD *_nd_thread_info = NULL;
 static __thread char _nd_thread_os_name[ND_THREAD_TAG_MAX + 1] = "";
+static __thread bool _nd_thread_can_run_sql = true;
+
+void nd_thread_can_run_sql(bool run_sql) {
+    _nd_thread_can_run_sql = run_sql;
+}
+
+bool nd_thread_runs_sql(void) {
+    return _nd_thread_can_run_sql;
+}
+
 
 // --------------------------------------------------------------------------------------------------------------------
 // O/S abstraction

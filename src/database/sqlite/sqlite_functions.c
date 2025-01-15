@@ -14,12 +14,16 @@ SQLITE_API int sqlite3_exec_monitored(
     void *data,                                /* 1st argument to callback */
     char **errmsg                              /* Error msg written here */
 ) {
+    internal_fatal(!nd_thread_runs_sql(), "THIS THREAD CANNOT RUN SQL");
+
     int rc = sqlite3_exec(db, sql, callback, data, errmsg);
     pulse_sqlite3_query_completed(rc == SQLITE_OK, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
     return rc;
 }
 
 SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
+    internal_fatal(!nd_thread_runs_sql(), "THIS THREAD CANNOT RUN SQL");
+
     int rc;
     int cnt = 0;
 
@@ -66,8 +70,7 @@ static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database, int r
     return false;
 }
 
-int execute_insert(sqlite3_stmt *res)
-{
+int execute_insert(sqlite3_stmt *res) {
     int rc;
     rc =  sqlite3_step_monitored(res);
     if (rc == SQLITE_CORRUPT) {
