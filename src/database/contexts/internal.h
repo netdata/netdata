@@ -8,7 +8,7 @@
 #include "../../aclk/schema-wrappers/context.h"
 #include "../../aclk/aclk_contexts_api.h"
 #include "../../aclk/aclk.h"
-#include "../storage_engine.h"
+#include "../storage-engine.h"
 
 #define MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST         5000
 #define FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS    120

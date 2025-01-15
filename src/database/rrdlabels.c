@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
 // Key OF HS ARRRAY

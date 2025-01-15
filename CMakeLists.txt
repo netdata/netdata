@@ -1448,8 +1448,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrd.c
         src/database/rrd.h
         src/database/rrdset.c
-        src/database/storage_engine.c
-        src/database/storage_engine.h
+        src/database/storage-engine.c
+        src/database/storage-engine.h
         src/database/ram/rrddim_mem.c
         src/database/ram/rrddim_mem.h
         src/database/sqlite/sqlite_metadata.c
@@ -1486,6 +1486,23 @@ set(RRD_PLUGIN_FILES
         src/database/rrdhost-system-info.c
         src/database/rrdhost-system-info.h
         src/database/contexts/contexts-loading.c
+        src/database/rrdset-index-id.c
+        src/database/rrdset-index-id.h
+        src/database/rrdset-index-name.c
+        src/database/rrdset-index-name.h
+        src/database/rrdset-slots.c
+        src/database/rrdset-slots.h
+        src/database/rrdset-collection.c
+        src/database/rrdset-collection.h
+        src/database/rrdset.h
+        src/database/rrdhost.h
+        src/database/rrdhost-status.c
+        src/database/rrdhost-status.h
+        src/database/rrddim.h
+        src/database/rrddim-backfill.c
+        src/database/rrddim-backfill.h
+        src/database/rrddim-collection.c
+        src/database/rrddim-collection.h
 )
 
 if(ENABLE_DBENGINE)
@@ -1592,8 +1609,6 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-conf.h
         src/streaming/stream-handshake.h
         src/streaming/stream-parents.h
-        src/streaming/rrdhost-status.c
-        src/streaming/rrdhost-status.h
         src/streaming/stream-sender-api.c
         src/streaming/stream-receiver-internals.h
         src/streaming/stream-receiver-api.c

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "netdata-conf.h"
+#include "daemon/common.h"
 
 struct config netdata_config = APPCONFIG_INITIALIZER;
 

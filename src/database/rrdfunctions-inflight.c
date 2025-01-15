@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define NETDATA_RRD_INTERNALS
-
 #include "rrdcollector-internals.h"
 #include "rrdfunctions-internals.h"
 #include "rrdfunctions-inflight.h"
