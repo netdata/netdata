@@ -31,6 +31,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/dovecot"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/elasticsearch"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/envoy"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ethtool"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/exim"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/fail2ban"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/filecheck"
