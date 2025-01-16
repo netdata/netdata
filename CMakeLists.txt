@@ -987,6 +987,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/memory/alignment.h
         src/libnetdata/os/get_system_pagesize.c
         src/libnetdata/os/get_system_pagesize.h
+        src/libnetdata/os/hostname.c
+        src/libnetdata/os/hostname.h
 )
 
 set(LIBH2O_FILES
