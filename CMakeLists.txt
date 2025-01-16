@@ -2930,6 +2930,15 @@ if(ENABLE_PLUGIN_GO)
 endif()
 
 #
+# otel.plugin
+#
+
+install(FILES
+        src/collectors/otel.plugin/config/otel-receivers-config.yaml
+        COMPONENT netdata
+        DESTINATION etc/netdata)
+
+#
 # Generate config file
 #
 if(NOT NETDATA_RUNTIME_PREFIX STREQUAL "")

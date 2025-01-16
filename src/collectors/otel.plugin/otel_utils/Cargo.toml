@@ -1,0 +1,16 @@
+[package]
+name = "otel_utils"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+opentelemetry-proto = { workspace = true }
+tonic = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+regex = { workspace = true }
+xxhash-rust = { workspace = true }
+
+[dev-dependencies]
+fake = { workspace = true }
+serde_json = { workspace = true }

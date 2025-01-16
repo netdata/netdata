@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = [
+    "main",
+    "otel_utils",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+opentelemetry-proto = { version = "0.27", features = ["gen-tonic", "metrics", "with-serde"] }
+tonic = { version = "0.12.3", features = ["gzip"] }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = { version = "1.0" }
+serde_yaml = { version = "0.9" }
+regex = { version = "1.5" }
+fake = { version = "3.0" }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+polars = { version = "0.45", features = ["diagonal_concat"] }
+otel_utils = { path = "otel_utils" }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1

@@ -1,0 +1,102 @@
+scopes:
+  ".*hostmetricsreceiver.*cpuscraper.*":
+    metrics:
+      system.cpu.time:
+        dimensions_attribute: state
+        instance_attributes: [cpu]
+      system.cpu.frequency:
+        instance_attributes: [cpu]
+      system.cpu.utilization:
+        dimensions_attribute: state
+        instance_attributes: [cpu]
+
+  ".*hostmetricsreceiver.*memory.*":
+    metrics:
+      system.memory.utilization:
+        dimensions_attribute: state
+      system.memory.usage:
+        dimensions_attribute: state
+
+  ".*hostmetricsreceiver.*network.*":
+    metrics:
+      system.network.connections:
+        dimensions_attribute: state
+        instance_attributes: [protocol]
+      system.network.dropped:
+        dimensions_attribute: direction
+        instance_attributes: [device]
+      system.network.errors:
+        dimensions_attribute: direction
+        instance_attributes: [device]
+      system.network.io:
+        dimensions_attribute: direction
+        instance_attributes: [device]
+      system.network.packets:
+        dimensions_attribute: direction
+        instance_attributes: [device]
+
+  ".*hostmetricsreceiver.*paging.*":
+    metrics:
+      system.paging.faults:
+        dimensions_attribute: type
+      system.paging.operations:
+        dimensions_attribute: direction
+        instance_attributes: [type]
+      system.paging.usage:
+        dimensions_attribute: state
+        instance_attributes: [device]
+      system.paging.utilization:
+        dimensions_attribute: state
+        instance_attributes: [device]
+
+  ".*hostmetricsreceiver.*processes.*":
+    metrics:
+      system.processes.count:
+        dimensions_attribute: status
+
+  ".*hostmetricsreceiver.*processscraper.*":
+    metrics:
+      process.cpu.time:
+        dimensions_attribute: state
+      process.cpu.utilization:
+        dimensions_attribute: state
+
+  ".*hostmetricsreceiver.*disk.*":
+    metrics:
+      system.disk.io:
+        dimensions_attribute: direction
+        instance_attributes: [device]
+
+      system.disk.io_time:
+        instance_attributes: [device]
+
+      system.disk.merged:
+        dimensions_attribute: direction
+        instance_attributes: [device]
+
+      system.disk.operation_time:
+        dimensions_attribute: direction
+        instance_attributes: [device]
+
+      system.disk.operations:
+        dimensions_attribute: direction
+        instance_attributes: [device]
+
+      system.disk.pending_operations:
+        instance_attributes: [device]
+
+      system.disk.weighted_io_time:
+        instance_attributes: [device]
+
+  "*.hostmetricsreceiver.*filesystem.*":
+    metrics:
+      system.filesystem.inodes.usage:
+        dimensions_attribute: state
+        instance_attributes: [mountpoint]
+
+      system.filesystem.usage:
+        dimensions_attribute: state
+        instance_attributes: [mountpoint]
+
+      system.filesystem.utilization:
+        instance_attributes: [mountpoint]

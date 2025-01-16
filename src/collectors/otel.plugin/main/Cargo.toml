@@ -1,0 +1,14 @@
+[package]
+name = "main"
+version.workspace = true
+edition.workspace = true
+
+[features]
+dev = ["polars"]
+
+[dependencies]
+opentelemetry-proto = { workspace = true }
+otel_utils = { workspace = true }
+polars = { workspace = true, optional = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
