@@ -706,6 +706,11 @@ void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc) {
     rrdcontext_post_process_updates(rc, false, RRD_FLAG_NONE, true);
 }
 
+void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc) {
+    rrdcontext_dequeue_from_post_processing(rc);
+    dictionary_del(host->rrdctx.contexts, string2str(rc->id));
+}
+
 static void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
     if(unlikely(!host->rrdctx.pp_queue)) return;
 
