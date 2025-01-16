@@ -21,6 +21,7 @@
 #  - kafka notifications by @ktsaou #1342
 #  - pagerduty.com notifications by Jim Cooley @jimcooley #1373
 #  - messagebird.com notifications by @tech_no_logical #1453
+#  - smseagle notificaitons by @smseagle
 #  - hipchat notifications by @ktsaou #1561
 #  - fleep notifications by @Ferroin
 #  - prowlapp.com notifications by @Ferroin
@@ -270,6 +271,7 @@ sms
 syslog
 telegram
 twilio
+smseagle
 "
 
 # -----------------------------------------------------------------------------
@@ -437,6 +439,10 @@ HIPCHAT_AUTH_TOKEN=
 # messagebird configs
 MESSAGEBIRD_ACCESS_KEY=
 MESSAGEBIRD_NUMBER=
+
+#smseagle configs
+SMSEAGLE_API_URL=
+SMSEAGLE_API_ACCESSTOKEN=
 
 # kavenegar configs
 KAVENEGAR_API_KEY=
@@ -718,6 +724,9 @@ fi
 # check messagebird
 { [ -z "${MESSAGEBIRD_ACCESS_KEY}" ] || [ -z "${MESSAGEBIRD_NUMBER}" ]; } && SEND_MESSAGEBIRD="NO"
 
+# check smseagle
+{ [ -z "${SMSEAGLE_API_URL}" ] || [ -z "${SMSEAGLE_API_ACCESSTOKEN}" ]; } && SEND_SMSEAGLE="NO"
+
 # check kavenegar
 { [ -z "${KAVENEGAR_API_KEY}" ] || [ -z "${KAVENEGAR_SENDER}" ]; } && SEND_KAVENEGAR="NO"
 
@@ -785,6 +794,7 @@ check_supported_targets() {
     [ "${SEND_HIPCHAT}" = "YES" ] ||
     [ "${SEND_TWILIO}" = "YES" ] ||
     [ "${SEND_MESSAGEBIRD}" = "YES" ] ||
+    [ "${SEND_SMSEAGLE}" = "YES" ] ||
     [ "${SEND_KAVENEGAR}" = "YES" ] ||
     [ "${SEND_TELEGRAM}" = "YES" ] ||
     [ "${SEND_PUSHBULLET}" = "YES" ] ||
@@ -818,6 +828,7 @@ check_supported_targets() {
       SEND_TWILIO="NO"
       SEND_HIPCHAT="NO"
       SEND_MESSAGEBIRD="NO"
+      SEND_SMSEAGLE="NO"
       SEND_KAVENEGAR="NO"
       SEND_KAFKA="NO"
       SEND_FLEEP="NO"
@@ -968,6 +979,7 @@ for method in "${SEND_EMAIL}" \
   "${SEND_TWILIO}" \
   "${SEND_HIPCHAT}" \
   "${SEND_MESSAGEBIRD}" \
+  "${SEND_SMSEAGLE}" \
   "${SEND_KAVENEGAR}" \
   "${SEND_PUSHBULLET}" \
   "${SEND_KAFKA}" \
@@ -1473,6 +1485,57 @@ send_messagebird() {
 
   return 1
 }
+
+# -----------------------------------------------------------------------------
+# smseagle sender
+
+send_smseagle() {
+        local address="${1}" access_token="${2}" recipients="${3}" msg="${host} ${status_message}: ${chart}, ${alarm}" httpcode sent=0 user
+        if [ "${SEND_SMSEAGLE}" = "YES" ] && [ -n "${address}" ] && [ -n "${access_token}" ] && [ -n "${recipients}" ] && [ -n "${msg}" ]; then
+                IFS=' ' read -r -a recipientsArray <<< "${recipients}"
+                for ((i=0; i<${#recipientsArray[@]}; i++)); do
+                        if [ $i -gt 0 ]; then
+                                to+=","
+                        fi
+                        to+="\"${recipientsArray[$i]}\""
+                done
+
+                payload=$(cat <<EOF
+                {
+                        "to": "[${to}]",
+                        "text": "${msg}"
+                }
+EOF
+)
+
+                response=$(docurl -s -w "\n%{http_code}" -X POST \
+                        --data "${payload}" \
+                        -H "access-token: ${access_token}" \
+                        -H "Accept: application/json" \
+                        -H "Content-Type: application/json" \
+                        "${address}/api/v2/messages/sms"
+                )
+
+                response=("${response[@]}")
+                httpcode=${response[-1]}
+                output=${response[@]::${#response[@]}-1}
+
+                echo ${httpcode}
+                echo ${output}
+
+                if [ "${httpcode}" = "200" ]; then
+                        info "Sending successful for ${notification_description}: ${output}"
+                        sent=$((sent + 1))
+                else
+                        error "Sending failed for ${notification_description}, with response code ${httpcode}: ${output}"
+                fi
+
+                [ ${sent} -gt 0 ] && return 0
+        fi
+        return 1
+}
+
+
 
 # -----------------------------------------------------------------------------
 # kavenegar sender
@@ -2709,6 +2772,16 @@ ${info}"
 SENT_MESSAGEBIRD=$?
 
 # -----------------------------------------------------------------------------
+# send the SMSEAGLE SMS
+
+send_smseagle "${SMSEAGLE_API_URL}" "${SMSEAGLE_API_ACCESSTOKEN}" "${to_smseagle}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}
+Severity: ${severity}
+Chart: ${chart}
+${info}"
+
+SENT_SMSEAGLE=$?
+
+# -----------------------------------------------------------------------------
 # send the kavenegar SMS
 
 send_kavenegar "${KAVENEGAR_API_KEY}" "${KAVENEGAR_SENDER}" "${to_kavenegar}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}
@@ -3667,6 +3740,7 @@ for state in "${SENT_EMAIL}" \
   "${SENT_TWILIO}" \
   "${SENT_HIPCHAT}" \
   "${SENT_MESSAGEBIRD}" \
+  "${SENT_SMSEAGLE}" \
   "${SENT_KAVENEGAR}" \
   "${SENT_PUSHBULLET}" \
   "${SENT_KAFKA}" \

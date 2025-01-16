@@ -1,0 +1,67 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-smseagle'
+  meta:
+    name: 'SMSEagle'
+    link: 'https://www.smseagle.eu/'
+    categories:
+      - notify.agent
+    icon_filename: 'smseagle.svg'
+  keywords:
+    - SMSEagle
+  overview:
+    notification_description: |
+      Send notifications to MessageBird using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - An access key under 'API ACCESS (REST)' (you will want a live key), you can read more [here](https://developers.messagebird.com/quickstarts/sms/test-credits-api-keys/).
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'DEFAULT_RECIPIENT_MESSAGEBIRD'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_MESSAGEBIRD` to the number you want the alert notification to be sent as an SMS. You can define multiple recipients like this: +15555555555 +17777777777."
+            required: true
+            detailed_description: |
+              All roles will default to this variable if left unconfigured.
+
+              You can then have different recipients per role, by editing `DEFAULT_RECIPIENT_MESSAGEBIRD` with the number you want, in the following entries at the bottom of the same file:
+              ```text
+              role_recipients_messagebird[sysadmin]="+15555555555"
+              role_recipients_messagebird[domainadmin]="+15555555556"
+              role_recipients_messagebird[dba]="+15555555557"
+              role_recipients_messagebird[webmaster]="+15555555558"
+              role_recipients_messagebird[proxyadmin]="+15555555559"
+              role_recipients_messagebird[sitemgr]="+15555555550"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # Messagebird (messagebird.com) SMS options
+
+              SEND_MESSAGEBIRD="YES"
+              MESSAGEBIRD_ACCESS_KEY="XXXXXXXX"
+              MESSAGEBIRD_NUMBER="XXXXXXX"
+              DEFAULT_RECIPIENT_MESSAGEBIRD="+15555555555"
+  troubleshooting:
+    problems:
+      list: []
