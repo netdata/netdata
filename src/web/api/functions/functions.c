@@ -8,7 +8,7 @@ void global_functions_add(void) {
     rrd_function_add_inline(
         localhost,
         NULL,
-        "streaming",
+        "netdata-streaming",
         10,
         RRDFUNCTIONS_PRIORITY_DEFAULT + 1,
         RRDFUNCTIONS_VERSION_DEFAULT,
@@ -44,7 +44,7 @@ void global_functions_add(void) {
     rrd_function_add_inline(
         localhost,
         NULL,
-        "metrics-cardinality",
+        "netdata-metrics-cardinality",
         10,
         RRDFUNCTIONS_PRIORITY_DEFAULT,
         RRDFUNCTIONS_VERSION_DEFAULT,
