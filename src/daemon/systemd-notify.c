@@ -106,7 +106,8 @@ int notify_ready(void) {
  */
 int notify_reloading(void) {
   /* A buffer with length sufficient to format the maximum UINT64 value. */
-  char reload_message[sizeof("RELOADING=1\nMONOTONIC_USEC=18446744073709551615")];
+  size_t msg_length = sizeof("RELOADING=1\nMONOTONIC_USEC=18446744073709551615");
+  char reload_message[msg_length];
   struct timespec ts;
   uint64_t now;
 
@@ -128,13 +129,15 @@ int notify_reloading(void) {
   return notify(reload_message);
 }
 
+#define ND_EXTEND_TIMEOUT_USEC "EXTEND_TIMEOUT_USEC=18446744073709551615"
+
 /* Request a service timeout extension from the service manager.
  *
  * The timeout should be a number in microseconds indicating the desired
  * service timeout extension
  */
 int notify_extend_timeout(uint64_t timeout) {
-  size_t msg_length = sizeof("EXTEND_TIMEOUT_USEC=18446744073709551615");
+  size_t msg_length = sizeof(ND_EXTEND_TIMEOUT_USEC);
   char message[msg_length];
 
   snprintf(message, msg_length, "EXTEND_TIMEOUT_USEC=%lu", timeout);
@@ -150,7 +153,7 @@ int notify_extend_timeout(uint64_t timeout) {
  * how long we think it will take to stop).
  */
 int notify_stopping(uint64_t timeout) {
-  size_t msg_length = sizeof("STOPPING=1\nEXTEND_TIMEOUT_USEC=18446744073709551615");
+  size_t msg_length = sizeof("STOPPING=1\n") + sizeof(ND_EXTEND_TIMEOUT_USEC);
   /* A buffer with length sufficient to format the maximum UINT64 value. */
   char stop_message[msg_length];
 
