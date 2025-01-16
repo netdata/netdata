@@ -987,6 +987,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/memory/alignment.h
         src/libnetdata/os/get_system_pagesize.c
         src/libnetdata/os/get_system_pagesize.h
+        src/libnetdata/os/hostname.c
+        src/libnetdata/os/hostname.h
 )
 
 set(LIBH2O_FILES
@@ -2241,6 +2243,53 @@ target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
 
 # openssl
 target_link_libraries(libnetdata PUBLIC PkgConfig::TLS)
+
+# iconv detection
+include(CheckFunctionExists)
+check_function_exists(iconv HAVE_ICONV_IN_LIBC)
+
+if(NOT HAVE_ICONV_IN_LIBC)
+    # Try to find standalone libiconv if not in libc
+    if(OS_MACOS)
+        # On macOS, check Homebrew first
+        execute_process(
+                COMMAND brew --prefix libiconv
+                RESULT_VARIABLE BREW_ICONV_RESULT
+                OUTPUT_VARIABLE BREW_ICONV_PREFIX
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(BREW_ICONV_RESULT EQUAL 0)
+            set(ICONV_FOUND TRUE)
+            set(ICONV_LIBRARIES "-L${BREW_ICONV_PREFIX}/lib -liconv")
+            set(ICONV_INCLUDE_DIRS "${BREW_ICONV_PREFIX}/include")
+        endif()
+    else()
+        # For other systems, try pkg-config first
+        pkg_check_modules(ICONV libiconv)
+
+        if(NOT ICONV_FOUND)
+            # Direct library check as fallback
+            find_library(ICONV_LIB NAMES iconv libiconv libiconv-2)
+            find_path(ICONV_INCLUDE_DIR iconv.h)
+
+            if(ICONV_LIB AND ICONV_INCLUDE_DIR)
+                set(ICONV_FOUND TRUE)
+                set(ICONV_LIBRARIES ${ICONV_LIB})
+                set(ICONV_INCLUDE_DIRS ${ICONV_INCLUDE_DIR})
+            endif()
+        endif()
+    endif()
+
+    if(ICONV_FOUND)
+        set(HAVE_LIBICONV TRUE)
+        target_include_directories(libnetdata BEFORE PUBLIC ${ICONV_INCLUDE_DIRS})
+        target_link_libraries(libnetdata PUBLIC ${ICONV_LIBRARIES})
+        message(STATUS "Using external libiconv")
+    endif()
+else()
+    set(HAVE_LIBICONV TRUE)
+    message(STATUS "Using iconv from libc")
+endif()
 
 # mnl
 if(NOT OS_MACOS)
