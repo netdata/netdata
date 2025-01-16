@@ -163,7 +163,11 @@ int notify_stopping(uint64_t timeout) {
  * These are used to indicate what step is happening during startup or shutdown.
  */
 int notify_status(const char *message) {
-  size_t msg_length = strlen(message) + 7;
+  size_t msg_length = strlen(message) + 9;
+  // We have an empty message
+  if (msg_length < 10) {
+      return -EINVAL;
+  }
   char status_message[msg_length];
 
   snprintf(status_message, msg_length, "STATUS=%s", message);
