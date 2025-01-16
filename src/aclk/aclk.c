@@ -66,6 +66,13 @@ time_t aclk_block_until = 0;
 
 mqtt_wss_client mqttwss_client;
 
+struct mqtt_wss_stats aclk_statistics(void) {
+    if(mqttwss_client)
+        return mqtt_wss_get_stats(mqttwss_client);
+    else
+        return (struct mqtt_wss_stats) { 0 };
+}
+
 struct aclk_shared_state aclk_shared_state = {
     .mqtt_shutdown_msg_id = -1,
     .mqtt_shutdown_msg_rcvd = 0

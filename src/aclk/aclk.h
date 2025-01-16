@@ -94,4 +94,6 @@ char *aclk_state_json(void);
 void add_aclk_host_labels(void);
 void aclk_queue_node_info(RRDHOST *host, bool immediate);
 
+struct mqtt_wss_stats aclk_statistics(void);
+
 #endif /* ACLK_H */

@@ -13,8 +13,6 @@ static struct web_statistics {
     PAD64(uint64_t) web_requests;
     PAD64(uint64_t) web_usec;
     PAD64(uint64_t) web_usec_max;
-    PAD64(uint64_t) bytes_received;
-    PAD64(uint64_t) bytes_sent;
 
     PAD64(uint64_t) content_size_uncompressed;
     PAD64(uint64_t) content_size_compressed;
@@ -29,8 +27,8 @@ void pulse_web_client_disconnected(void) {
 }
 
 void pulse_web_request_completed(uint64_t dt,
-                                             uint64_t bytes_received,
-                                             uint64_t bytes_sent,
+                                             uint64_t bytes_received __maybe_unused,
+                                             uint64_t bytes_sent __maybe_unused,
                                              uint64_t content_size,
                                              uint64_t compressed_content_size) {
     uint64_t old_web_usec_max = live_stats.web_usec_max;
@@ -39,8 +37,8 @@ void pulse_web_request_completed(uint64_t dt,
 
     __atomic_fetch_add(&live_stats.web_requests, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&live_stats.web_usec, dt, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&live_stats.bytes_received, bytes_received, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&live_stats.bytes_sent, bytes_sent, __ATOMIC_RELAXED);
+//    __atomic_fetch_add(&live_stats.bytes_received, bytes_received, __ATOMIC_RELAXED);
+//    __atomic_fetch_add(&live_stats.bytes_sent, bytes_sent, __ATOMIC_RELAXED);
     __atomic_fetch_add(&live_stats.content_size_uncompressed, content_size, __ATOMIC_RELAXED);
     __atomic_fetch_add(&live_stats.content_size_compressed, compressed_content_size, __ATOMIC_RELAXED);
 }
@@ -50,8 +48,8 @@ static inline void pulse_web_copy(struct web_statistics *gs, uint8_t options) {
     gs->web_requests = __atomic_load_n(&live_stats.web_requests, __ATOMIC_RELAXED);
     gs->web_usec = __atomic_load_n(&live_stats.web_usec, __ATOMIC_RELAXED);
     gs->web_usec_max = __atomic_load_n(&live_stats.web_usec_max, __ATOMIC_RELAXED);
-    gs->bytes_received = __atomic_load_n(&live_stats.bytes_received, __ATOMIC_RELAXED);
-    gs->bytes_sent = __atomic_load_n(&live_stats.bytes_sent, __ATOMIC_RELAXED);
+//    gs->bytes_received = __atomic_load_n(&live_stats.bytes_received, __ATOMIC_RELAXED);
+//    gs->bytes_sent = __atomic_load_n(&live_stats.bytes_sent, __ATOMIC_RELAXED);
     gs->content_size_uncompressed = __atomic_load_n(&live_stats.content_size_uncompressed, __ATOMIC_RELAXED);
     gs->content_size_compressed = __atomic_load_n(&live_stats.content_size_compressed, __ATOMIC_RELAXED);
 
@@ -121,38 +119,6 @@ void pulse_web_do(bool extended) {
 
         rrddim_set_by_pointer(st_reqs, rd_requests, (collected_number) gs.web_requests);
         rrdset_done(st_reqs);
-    }
-
-    // ----------------------------------------------------------------
-
-    {
-        static RRDSET *st_bytes = NULL;
-        static RRDDIM *rd_in = NULL,
-                      *rd_out = NULL;
-
-        if (unlikely(!st_bytes)) {
-            st_bytes = rrdset_create_localhost(
-                "netdata"
-                , "net"
-                , NULL
-                , "HTTP API"
-                , "netdata.http_api_traffic"
-                , "Netdata Web API Network Traffic"
-                , "kilobits/s"
-                , "netdata"
-                , "pulse"
-                , 130400
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_AREA
-            );
-
-            rd_in  = rrddim_add(st_bytes, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_bytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_bytes, rd_in, (collected_number) gs.bytes_received);
-        rrddim_set_by_pointer(st_bytes, rd_out, (collected_number) gs.bytes_sent);
-        rrdset_done(st_bytes);
     }
 
     // ----------------------------------------------------------------
