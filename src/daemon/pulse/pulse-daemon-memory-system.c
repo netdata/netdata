@@ -107,7 +107,7 @@ cleanup:
 }
 #endif // HAVE_C_MALLOC_INFO
 
-void pulse_daemon_memory_system_do(bool extended) {
+void pulse_daemon_memory_system_do(bool extended __maybe_unused) {
 
 #ifdef HAVE_C_MALLOC_INFO
     size_t glibc_arenas, glibc_allocated_arenas, glibc_unused_fast, glibc_unused_rest, glibc_allocated_mmap;

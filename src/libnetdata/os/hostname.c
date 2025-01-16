@@ -6,7 +6,7 @@
 bool os_hostname(char *dst, size_t dst_size, const char *filesystem_root __maybe_unused) {
     WCHAR wbuf[HOST_NAME_MAX * 4 + 1];
     char buf[HOST_NAME_MAX * 4 + 1];
-    DWORD size = sizeof(wbuf) / sizeof(WCHAR);
+    DWORD size = _countof(wbuf);
     bool success = false;
 
     // First try DNS hostname
@@ -15,7 +15,7 @@ bool os_hostname(char *dst, size_t dst_size, const char *filesystem_root __maybe
     }
     // Then try NetBIOS name
     else {
-        size = sizeof(wbuf) / sizeof(WCHAR);
+        size = _countof(wbuf);
         if (GetComputerNameW(wbuf, &size)) {
             success = true;
         }
@@ -54,12 +54,12 @@ bool os_hostname(char *dst, size_t dst_size, const char *filesystem_root __maybe
             WCHAR rootPath[] = L"C:\\";
             DWORD serialNumber;
             if (GetVolumeInformationW(rootPath, NULL, 0, &serialNumber, NULL, NULL, NULL, 0)) {
-                snprintf(buf, sizeof(buf), "host%08lx", serialNumber);
+                snprintf(buf, sizeof(buf), "host%08lx", (long unsigned)serialNumber);
                 success = true;
             }
             else {
                 // Last resort: use process ID
-                snprintf(buf, sizeof(buf), "host%lu", GetCurrentProcessId());
+                snprintf(buf, sizeof(buf), "host%lu", (long unsigned)GetCurrentProcessId());
             }
         }
     }
