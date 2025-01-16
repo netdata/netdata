@@ -156,6 +156,7 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
         dictionary_garbage_collect(rc->rrdinstances);
 
         if(!instances) {
+            metadata_queue_ctx_host_cleanup(&host->host_id.uuid, rc_dfe.name);
             dictionary_del(host->rrdctx.contexts, rc_dfe.name);
             loaded_and_deleted_contexts++;
         }

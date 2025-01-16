@@ -275,6 +275,8 @@ int ctx_delete_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_dat
     if (!PREPARE_STATEMENT(db_context_meta, CTX_DELETE_CONTEXT, &res))
         return 1;
 
+    metadata_queue_ctx_host_cleanup(host_uuid, context_data->id);
+
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, context_data->id, -1, SQLITE_STATIC));
