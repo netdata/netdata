@@ -154,36 +154,36 @@ void pulse_network_do(bool extended __maybe_unused) {
         rrdset_done(st_bytes);
     }
 
-    struct mqtt_wss_stats t = aclk_statistics();
-    if(t.bytes_rx || t.bytes_tx) {
-        static RRDSET *st_bytes = NULL;
-        static RRDDIM *rd_in = NULL,
-                      *rd_out = NULL;
+    if(aclk_online()) {
+        struct mqtt_wss_stats t = aclk_statistics();
+        if (t.bytes_rx || t.bytes_tx) {
+            static RRDSET *st_bytes = NULL;
+            static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if (unlikely(!st_bytes)) {
-            st_bytes = rrdset_create_localhost(
-                "netdata"
-                , "network_aclk"
-                , NULL
-                , PULSE_NETWORK_CHART_FAMILY
-                , PULSE_NETWORK_CHART_CONTEXT
-                , PULSE_NETWORK_CHART_TITLE
-                , PULSE_NETWORK_CHART_UNITS
-                , "netdata"
-                , "pulse"
-                , PULSE_NETWORK_CHART_PRIORITY
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_AREA
-            );
+            if (unlikely(!st_bytes)) {
+                st_bytes = rrdset_create_localhost(
+                    "netdata",
+                    "network_aclk",
+                    NULL,
+                    PULSE_NETWORK_CHART_FAMILY,
+                    PULSE_NETWORK_CHART_CONTEXT,
+                    PULSE_NETWORK_CHART_TITLE,
+                    PULSE_NETWORK_CHART_UNITS,
+                    "netdata",
+                    "pulse",
+                    PULSE_NETWORK_CHART_PRIORITY,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_AREA);
 
-            rrdlabels_add(st_bytes->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
+                rrdlabels_add(st_bytes->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
 
-            rd_in  = rrddim_add(st_bytes, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_bytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                rd_in = rrddim_add(st_bytes, "in", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                rd_out = rrddim_add(st_bytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st_bytes, rd_in, (collected_number)t.bytes_rx);
+            rrddim_set_by_pointer(st_bytes, rd_out, (collected_number)t.bytes_tx);
+            rrdset_done(st_bytes);
         }
-
-        rrddim_set_by_pointer(st_bytes, rd_in, (collected_number) t.bytes_rx);
-        rrddim_set_by_pointer(st_bytes, rd_out, (collected_number) t.bytes_tx);
-        rrdset_done(st_bytes);
     }
 }

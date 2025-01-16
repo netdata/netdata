@@ -994,6 +994,13 @@ struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client)
     return current;
 }
 
+void mqtt_wss_reset_stats(mqtt_wss_client client)
+{
+    spinlock_lock(&client->stat_lock);
+    memset(&client->stats, 0, sizeof(client->stats));
+    spinlock_unlock(&client->stat_lock);
+}
+
 int mqtt_wss_set_topic_alias(mqtt_wss_client client, const char *topic)
 {
     return mqtt_ng_set_topic_alias(client->mqtt, topic);
