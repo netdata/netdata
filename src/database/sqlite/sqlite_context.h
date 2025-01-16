@@ -62,10 +62,6 @@ void ctx_get_label_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *
 void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data);
 
 int ctx_store_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data);
-
-void ctx_get_context_list_to_cleanup(nd_uuid_t *host_uuid, void (*cleanup_cb)(Pvoid_t context, void *data), void *data);
-void ctx_delete_metadata_cleanup_context(sqlite3_stmt **context_res, nd_uuid_t(*host_uuid), const char *context);
-
 #define ctx_update_context(host_uuid, context_data)    ctx_store_context(host_uuid, context_data)
 
 int ctx_delete_context(nd_uuid_t *host_id, VERSIONED_CONTEXT_DATA *context_data);

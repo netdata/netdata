@@ -72,6 +72,7 @@ void commit_alert_transitions(RRDHOST *host);
 
 void metadata_sync_shutdown_background(void);
 void metadata_sync_shutdown_background_wait(void);
+void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context);
 
 // UNIT TEST
 int metadata_unittest(void);

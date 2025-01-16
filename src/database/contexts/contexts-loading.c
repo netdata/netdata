@@ -2,8 +2,7 @@
 
 #include "internal.h"
 
-static __thread size_t ignored_metrics = 0, ignored_instances = 0;
-static __thread size_t loaded_metrics = 0, loaded_instances = 0, loaded_contexts = 0;
+static __thread size_t th_ignored_metrics = 0, th_ignored_instances = 0, th_zero_retention_metrics = 0;
 
 static void rrdinstance_load_clabel(SQL_CLABEL_DATA *sld, void *data) {
     RRDINSTANCE *ri = data;
@@ -22,15 +21,13 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
     get_metric_retention_by_id(host, id, &min_first_time_t, &max_last_time_t);
     if((!min_first_time_t || min_first_time_t == LONG_MAX) && !max_last_time_t) {
         uuidmap_free(id);
+        th_zero_retention_metrics++;
         return;
     }
 
     RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, sd->context);
     if(!rca) {
-        ignored_metrics++;
-//        nd_log(NDLS_DAEMON, NDLP_ERR,
-//               "RRDCONTEXT: context '%s' is not found in host '%s' - not loading dimensions",
-//               sd->context, rrdhost_hostname(host));
+        th_ignored_metrics++;
         uuidmap_free(id);
         return;
     }
@@ -38,11 +35,8 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_get_and_acquire_item(rc->rrdinstances, sd->chart_id);
     if(!ria) {
+        th_ignored_metrics++;
         rrdcontext_release(rca);
-        ignored_metrics++;
-//        nd_log(NDLS_DAEMON, NDLP_ERR,
-//               "RRDCONTEXT: instance '%s' of context '%s' is not found in host '%s' - not loading dimensions",
-//               sd->chart_id, sd->context, rrdhost_hostname(host));
         uuidmap_free(id);
         return;
     }
@@ -60,7 +54,6 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
 
     rrdinstance_release(ria);
     rrdcontext_release(rca);
-    loaded_metrics++;
 }
 
 static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
@@ -97,7 +90,6 @@ static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
 
     rrdinstance_release(ria);
     rrdcontext_release(rca);
-    loaded_instances++;
 }
 
 static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, void *data) {
@@ -114,7 +106,6 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
         .hub = *ctx_data,
     };
     dictionary_set(host->rrdctx.contexts, string2str(trc.id), &trc, sizeof(trc));
-    loaded_contexts++;
 }
 
 void rrdhost_load_rrdcontext_data(RRDHOST *host) {
@@ -124,39 +115,68 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     if (host->rrd_memory_mode != RRD_DB_MODE_DBENGINE)
         return;
 
-    ignored_metrics = 0;
-    ignored_instances = 0;
-    loaded_metrics = 0;
-    loaded_instances = 0;
-    loaded_contexts = 0;
+    th_ignored_metrics = th_ignored_instances = th_zero_retention_metrics = 0;
 
     ctx_get_context_list(&host->host_id.uuid, rrdcontext_load_context_callback, host);
     ctx_get_chart_list(&host->host_id.uuid, rrdinstance_load_instance_callback, host);
     ctx_get_dimension_list(&host->host_id.uuid, rrdinstance_load_dimension_callback, host);
 
-    nd_log(NDLS_DAEMON, ignored_metrics || ignored_instances ? NDLP_WARNING : NDLP_NOTICE,
-           "RRDCONTEXT: metadata for node '%s':"
-           " loaded %zu contexts, %zu instances, and %zu metrics,"
-           " ignored %zu instances and %zu metrics",
-           rrdhost_hostname(host),
-           loaded_contexts, loaded_instances, loaded_metrics,
-           ignored_instances, ignored_metrics);
+    size_t ignored_metrics = th_ignored_metrics, ignored_instances = th_ignored_instances, zero_retention_metrics = th_zero_retention_metrics;
+    size_t loaded_metrics = 0, loaded_instances = 0, loaded_contexts = 0;
+    size_t loaded_and_deleted_instances = 0, loaded_and_deleted_contexts = 0;
 
     RRDCONTEXT *rc;
     dfe_start_read(host->rrdctx.contexts, rc) {
+        size_t instances = 0;
+
         RRDINSTANCE *ri;
-        dfe_start_read(rc->rrdinstances, ri) {
+        dfe_start_write(rc->rrdinstances, ri) {
+            size_t metrics = 0;
+
             RRDMETRIC *rm;
             dfe_start_read(ri->rrdmetrics, rm) {
                 rrdmetric_trigger_updates(rm, __FUNCTION__ );
+                loaded_metrics++;
+                metrics++;
             }
             dfe_done(rm);
-            rrdinstance_trigger_updates(ri, __FUNCTION__ );
+            dictionary_garbage_collect(ri->rrdmetrics);
+
+            if(!metrics) {
+                dictionary_del(rc->rrdinstances, ri_dfe.name);
+                loaded_and_deleted_instances++;
+            }
+            else {
+                rrdinstance_trigger_updates(ri, __FUNCTION__);
+                loaded_instances++;
+                instances++;
+            }
         }
         dfe_done(ri);
-        rrdcontext_trigger_updates(rc, __FUNCTION__ );
+        dictionary_garbage_collect(rc->rrdinstances);
+
+        if(!instances) {
+            metadata_queue_ctx_host_cleanup(&host->host_id.uuid, rc_dfe.name);
+            rrdcontext_delete_after_loading(host, rc);
+            loaded_and_deleted_contexts++;
+        }
+        else {
+            rrdcontext_trigger_updates(rc, __FUNCTION__);
+            rrdcontext_initial_processing_after_loading(rc);
+            loaded_contexts++;
+        }
     }
     dfe_done(rc);
-
+    dictionary_garbage_collect(host->rrdctx.contexts);
     rrdcontext_garbage_collect_single_host(host, false);
+
+    nd_log(NDLS_DAEMON, ignored_metrics || ignored_instances ? NDLP_WARNING : NDLP_NOTICE,
+           "RRDCONTEXT: metadata for node '%s': "
+           "contexts %zu (deleted %zu), "
+           "instances %zu (deleted %zu, ignored %zu), and "
+           "metrics %zu (ignored %zu, zero retention %zu)",
+           rrdhost_hostname(host),
+           loaded_contexts, loaded_and_deleted_contexts,
+           loaded_instances, loaded_and_deleted_instances, ignored_instances,
+           loaded_metrics, ignored_metrics, zero_retention_metrics);
 }
