@@ -2208,7 +2208,7 @@ static void store_ctx_cleanup_list(struct judy_list_t *pending_ctx_cleanup_list)
 
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
     nd_log_daemon(
-        NDLP_INFO,
+        NDLP_DEBUG,
         "Stored %zu host context cleanup items in %0.2f ms",
         entries,
         (double)(ended_ut - started_ut) / USEC_PER_MS);
