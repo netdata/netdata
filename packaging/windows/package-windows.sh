@@ -29,7 +29,7 @@ fi
 
 ${GITHUB_ACTIONS+echo "::group::Licenses"}
 if [ ! -f "/gpl-3.0.txt" ]; then
-    curl -o /gpl-3.0.txt "https://www.gnu.org/licenses/gpl-3.0.txt"
+    cp "${repo_root}/LICENSE" /gpl-3.0.txt
 fi
 
 if [ ! -f "/cloud.txt" ]; then
