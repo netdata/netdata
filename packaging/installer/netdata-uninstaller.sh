@@ -731,26 +731,44 @@ if [ "$(uname -s)" = "Darwin" ]; then
 fi
 
 #### REMOVE NETDATA FILES
-rm_file /etc/logrotate.d/netdata
-rm_file /usr/lib/systemd/journald@netdata.conf.d/netdata.conf
-rm_file /etc/systemd/system/netdata.service
-rm_file /lib/systemd/system/netdata.service
-rm_file /usr/lib/systemd/system/netdata.service
-rm_file /etc/systemd/system/netdata-updater.service
-rm_file /lib/systemd/system/netdata-updater.service
-rm_file /usr/lib/systemd/system/netdata-updater.service
-rm_file /etc/systemd/system/netdata-updater.timer
-rm_file /lib/systemd/system/netdata-updater.timer
-rm_file /usr/lib/systemd/system/netdata-updater.timer
-rm_file /usr/lib/systemd/system-preset/50-netdata.preset
-rm_file /lib/systemd/system-preset/50-netdata.preset
-rm_file /etc/init.d/netdata
-rm_file /etc/periodic/daily/netdata-updater
-rm_file /etc/cron.daily/netdata-updater
-rm_file /etc/cron.d/netdata-updater
-rm_file /etc/cron.d/netdata-updater-daily
-rm_file /Library/LaunchDaemons/com.github.netdata.plist
 
+# Handle updater files first so that it doesn’t try to run while we
+# are uninstalling things.
+if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" ]; then
+  "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" --disable-auto-updates
+else
+  rm_file /etc/periodic/daily/netdata-updater
+  rm_file /etc/cron.daily/netdata-updater
+  rm_file /etc/cron.d/netdata-updater
+  rm_file /etc/cron.d/netdata-updater-daily
+fi
+
+if issystemd; then
+  for unit in netdata.service netdata-updater.timer; do
+    systemctl disable "${unit}"
+    systemctl stop "${unit}"
+  done
+
+  for unit in netdata.service netdata-updater.service netdata-updater.timer; do
+    unit_path="$(systemctl show -p FragmentPath "${unit}" | cut -f 2- -d '=')"
+    override_paths="$(systemctl show -p DropInPaths "${unit}" | cut -f 2- -d '=')"
+    for path in "${unit_path}" ${override_paths} ; do
+      rm_file "${path}"
+    done
+  done
+
+  rm_file /usr/lib/systemd/journald@netdata.conf.d/netdata.conf
+  rm_file /lib/systemd/journald@netdata.conf.d/netdata.conf
+  rm_dir /usr/lib/systemd/journald@netdata.conf.d/
+  rm_file /usr/lib/systemd/system-preset/50-netdata.preset
+  rm_file /lib/systemd/system-preset/50-netdata.preset
+
+  systemctl daemon-reload
+fi
+
+rm_file /etc/logrotate.d/netdata
+rm_file /etc/init.d/netdata
+rm_file /Library/LaunchDaemons/com.github.netdata.plist
 
 if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ] && [ "netdata" = "$(basename "$NETDATA_PREFIX")" ] ; then
   rm_dir "${NETDATA_PREFIX}"
@@ -768,7 +786,6 @@ else
   rm_dir "${NETDATA_PREFIX}/var/cache/netdata"
   rm_dir "${NETDATA_PREFIX}/var/log/netdata"
   rm_dir "${NETDATA_PREFIX}/etc/netdata"
-  rm_dir /usr/lib/systemd/journald@netdata.conf.d/
 fi
 
 if [ -n "${tmpdir}" ]; then

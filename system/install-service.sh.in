@@ -229,16 +229,27 @@ check_systemd() {
 }
 
 get_systemd_service_dir() {
-  if [ -w "/lib/systemd/system" ]; then
-    echo "/lib/systemd/system"
-  elif [ -w "/usr/lib/systemd/system" ]; then
-    echo "/usr/lib/systemd/system"
-  elif [ -w "/etc/systemd/system" ]; then
-    echo "/etc/systemd/system"
+  set +e
+  unit_paths="$(systemctl show -p UnitPath | cut -f 2- -d '=' | tr ' ' '\n')"
+  set -e
+
+  if [ -n "${unit_paths}" ]; then
+    lib_paths="$(echo "${unit_paths}" | grep -vE '^/(run|etc)' | awk '{line[NR] = $0} END {for (i = NR; i > 0; i--) print line[i]}')"
+    etc_paths="$(echo "${unit_paths}" | grep -E '^/etc' | grep -vE '(attached|control)$')"
   else
-    error "Unable to detect systemd service directory."
-    exit 4
+    lib_paths="/usr/lib/systemd/system /lib/systemd/system /usr/local/lib/systemd/system"
+    etc_paths="/etc/systemd/system"
   fi
+
+  for path in ${lib_paths} ${etc_paths}; do
+    if [ -d "${path}" ] && [ -w "${path}" ]; then
+      echo "${path}"
+      return 0
+    fi
+  done
+
+  error "Unable to detect usable systemd service directory."
+  exit 4
 }
 
 install_systemd_service() {
