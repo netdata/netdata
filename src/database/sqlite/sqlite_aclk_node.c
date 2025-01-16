@@ -217,7 +217,7 @@ void aclk_check_node_info_and_collectors(void)
             context_pp_post = "')";
         }
 
-        nd_log_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
+        nd_log_limit_static_global_var(erl, 10, 100 * USEC_PER_MS);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
                      "NODES INFO: %zu nodes loading contexts%s%s%s, %zu receiving replication%s%s%s, %zu sending replication%s%s%s, %zu pending context post processing%s%s%s%s",
                      context_loading, context_loading_pre, context_loading_body, context_loading_post,

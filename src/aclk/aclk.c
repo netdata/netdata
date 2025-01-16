@@ -24,12 +24,17 @@ int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 int aclk_rcvd_cloud_msgs = 0;
 int aclk_connection_counter = 0;
 
+mqtt_wss_client mqttwss_client;
+
 static bool aclk_connected = false;
 static inline void aclk_set_connected(void) {
     __atomic_store_n(&aclk_connected, true, __ATOMIC_RELAXED);
 }
 static inline void aclk_set_disconnected(void) {
     __atomic_store_n(&aclk_connected, false, __ATOMIC_RELAXED);
+
+    if(mqttwss_client)
+        mqtt_wss_reset_stats(mqttwss_client);
 }
 
 inline bool aclk_online(void) {
@@ -64,7 +69,12 @@ float last_backoff_value = 0;
 
 time_t aclk_block_until = 0;
 
-mqtt_wss_client mqttwss_client;
+struct mqtt_wss_stats aclk_statistics(void) {
+    if(mqttwss_client)
+        return mqtt_wss_get_stats(mqttwss_client);
+    else
+        return (struct mqtt_wss_stats) { 0 };
+}
 
 struct aclk_shared_state aclk_shared_state = {
     .mqtt_shutdown_msg_id = -1,

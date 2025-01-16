@@ -179,13 +179,17 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
     bytes = web_client_receive(w);
 
     if (likely(bytes > 0)) {
+        pulse_web_server_received_bytes(bytes);
+
         netdata_log_debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
         worker_is_idle();
         worker_is_busy(WORKER_JOB_PROCESS);
         web_client_process_request_from_web_server(w);
 
         if (unlikely(w->mode == HTTP_REQUEST_MODE_STREAM)) {
-            web_client_send(w);
+            ssize_t rc = web_client_send(w);
+            if(rc > 0)
+                pulse_web_server_sent_bytes(rc);
         }
         else if(unlikely(w->fd == fd && web_client_has_wait_receive(w)))
             *events |= ND_POLL_READ;
@@ -228,6 +232,8 @@ static int web_server_snd_callback(POLLINFO *pi, nd_poll_event_t *events) {
         retval = -1;
         goto cleanup;
     }
+
+    pulse_web_server_sent_bytes(ret);
 
     if(unlikely(w->fd == fd && web_client_has_wait_receive(w)))
         *events |= ND_POLL_READ;

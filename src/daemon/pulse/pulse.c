@@ -18,8 +18,9 @@
 #define WORKER_JOB_MALLOC_TRACE         12
 #define WORKER_JOB_REGISTRY             13
 #define WORKER_JOB_ARAL                 14
+#define WORKER_JOB_NETWORK              15
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 15
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 16
 #error "WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 14"
 #endif
 
@@ -44,6 +45,7 @@ static void pulse_register_workers(void) {
     worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
     worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
     worker_register_job_name(WORKER_JOB_ARAL, "aral");
+    worker_register_job_name(WORKER_JOB_NETWORK, "network");
 }
 
 static void pulse_cleanup(void *pptr)
@@ -98,6 +100,9 @@ void *pulse_thread_main(void *ptr) {
 
         worker_is_busy(WORKER_JOB_QUERIES);
         pulse_queries_do(pulse_extended_enabled);
+
+        worker_is_busy(WORKER_JOB_NETWORK);
+        pulse_network_do(pulse_extended_enabled);
 
         worker_is_busy(WORKER_JOB_ML);
         pulse_ml_do(pulse_extended_enabled);

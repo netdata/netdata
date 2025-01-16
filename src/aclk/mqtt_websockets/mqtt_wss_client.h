@@ -141,6 +141,7 @@ struct mqtt_wss_stats {
 };
 
 struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client);
+void mqtt_wss_reset_stats(mqtt_wss_client client);
 
 #ifdef MQTT_WSS_DEBUG
 #include <openssl/ssl.h>

@@ -622,6 +622,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
 
         ssize_t rc = nd_sock_send_nowait(&s->sock, chunk, outstanding);
         if (likely(rc > 0)) {
+            pulse_stream_sent_bytes(rc);
             stream_circular_buffer_del_unsafe(s->scb, rc, now_ut);
             replication_sender_recalculate_buffer_used_ratio_unsafe(s);
             s->thread.last_traffic_ut = now_ut;
@@ -712,6 +713,7 @@ bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *
 
             s->thread.last_traffic_ut = now_ut;
             sth->snd.bytes_received += rc;
+            pulse_stream_received_bytes(rc);
 
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
             stream_sender_execute_commands(s);

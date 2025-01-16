@@ -167,6 +167,7 @@ static inline ssize_t receiver_read_uncompressed(struct receiver_state *r) {
 
         r->thread.uncompressed.read_len += bytes;
         r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] = '\0';
+        pulse_stream_received_bytes(bytes);
     }
 
     return bytes;
@@ -276,15 +277,16 @@ static inline ssize_t receiver_read_compressed(struct receiver_state *r) {
     internal_fatal(r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
-    ssize_t bytes_read = read_stream(r, r->thread.compressed.buf + r->thread.compressed.used,
+    ssize_t bytes = read_stream(r, r->thread.compressed.buf + r->thread.compressed.used,
                                  r->thread.compressed.size - r->thread.compressed.used);
 
-    if(bytes_read > 0) {
-        r->thread.compressed.used += bytes_read;
-        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
+    if(bytes > 0) {
+        r->thread.compressed.used += bytes;
+        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes);
+        pulse_stream_received_bytes(bytes);
     }
 
-    return bytes_read;
+    return bytes;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -697,6 +699,7 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
 
         ssize_t rc = write_stream(rpt, chunk, outstanding);
         if (likely(rc > 0)) {
+            pulse_stream_sent_bytes(rc);
             rpt->thread.last_traffic_ut = now_ut;
             stream_circular_buffer_del_unsafe(scb, rc, now_ut);
             if (!stats->bytes_outstanding) {
