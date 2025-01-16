@@ -2,6 +2,74 @@
 
 #include "libnetdata/libnetdata.h"
 
+#if defined(OS_WINDOWS)
+bool os_hostname(char *dst, size_t dst_size, const char *filesystem_root __maybe_unused) {
+    WCHAR wbuf[HOST_NAME_MAX * 4 + 1];
+    char buf[HOST_NAME_MAX * 4 + 1];
+    DWORD size = sizeof(wbuf) / sizeof(WCHAR);
+    bool success = false;
+
+    // First try DNS hostname
+    if (GetComputerNameExW(ComputerNameDnsHostname, wbuf, &size)) {
+        success = true;
+    }
+    // Then try NetBIOS name
+    else {
+        size = sizeof(wbuf) / sizeof(WCHAR);
+        if (GetComputerNameW(wbuf, &size)) {
+            success = true;
+        }
+    }
+
+    if (success) {
+        // Convert UTF-16 to UTF-8
+        int utf8_size = WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, NULL, 0, NULL, NULL);
+        if (utf8_size > 0 && utf8_size <= (int)sizeof(buf)) {
+            WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, buf, utf8_size, NULL, NULL);
+        }
+        else {
+            success = false;
+        }
+    }
+
+    if (!success) {
+        // Try getting the machine GUID first
+        HKEY hKey;
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Cryptography", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+            WCHAR guidW[64];
+            DWORD guidSize = sizeof(guidW);
+            DWORD type = REG_SZ;
+
+            if (RegQueryValueExW(hKey, L"MachineGuid", NULL, &type, (LPBYTE)guidW, &guidSize) == ERROR_SUCCESS) {
+                // Convert GUID to UTF-8
+                if (WideCharToMultiByte(CP_UTF8, 0, guidW, -1, buf, sizeof(buf), NULL, NULL) > 0) {
+                    success = true;
+                }
+            }
+            RegCloseKey(hKey);
+        }
+
+        if (!success) {
+            // If machine GUID fails, try getting volume serial number of C: drive
+            WCHAR rootPath[] = L"C:\\";
+            DWORD serialNumber;
+            if (GetVolumeInformationW(rootPath, NULL, 0, &serialNumber, NULL, NULL, NULL, 0)) {
+                snprintf(buf, sizeof(buf), "host%08lx", serialNumber);
+                success = true;
+            }
+            else {
+                // Last resort: use process ID
+                snprintf(buf, sizeof(buf), "host%lu", GetCurrentProcessId());
+            }
+        }
+    }
+
+    char *hostname = trim(buf);
+    rrdlabels_sanitize_value(dst, hostname, dst_size);
+    return *dst != '\0';
+}
+#else // !OS_WINDOWS
+
 #ifdef HAVE_LIBICONV
 #include <iconv.h>
 
@@ -89,3 +157,5 @@ bool os_hostname(char *dst, size_t dst_size, const char *filesystem_root) {
     rrdlabels_sanitize_value(dst, original_hostname, dst_size);
     return *dst != '\0';
 }
+
+#endif // !OS_WINDOWS
