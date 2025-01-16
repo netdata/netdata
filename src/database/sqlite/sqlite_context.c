@@ -13,17 +13,12 @@ const char *database_context_config[] = {
     "last_time_t INT NOT NULL, deleted INT NOT NULL, "
     "family TEXT, PRIMARY KEY (host_id, id))",
 
-    "CREATE TABLE IF NOT EXISTS context_metadata_cleanup (id INTEGER PRIMARY KEY, host_id BLOB, context TEXT NOT NULL, date_created INT, "
-    "UNIQUE (host_id, context))",
-
-    "CREATE TRIGGER IF NOT EXISTS del_context1 AFTER DELETE ON context "
-    "BEGIN INSERT INTO context_metadata_cleanup (host_id, context, date_created) "
-    "VALUES (old.host_id, old.id, UNIXEPOCH()) ON CONFLICT DO UPDATE SET date_created = excluded.date_created; END",
-
     NULL
 };
 
 const char *database_context_cleanup[] = {
+    "DROP TRIGGER IF EXISTS del_context1",
+    "DROP TABLE IF EXISTS context_metadata_cleanup",
     "VACUUM",
     NULL
 };
@@ -189,7 +184,6 @@ done:
 
 void ctx_get_context_list(nd_uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
 {
-
     if (unlikely(!host_uuid))
         return;
 
@@ -266,76 +260,6 @@ done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
     return (rc_stored != SQLITE_DONE);
-}
-
-#define CTX_DELETE_CONTEXT_META_CLEANUP_ITEM "DELETE FROM context_metadata_cleanup WHERE host_id = @host_id AND context = @context"
-
-void ctx_delete_metadata_cleanup_context(sqlite3_stmt **res, nd_uuid_t(*host_uuid), const char *context)
-{
-    if (!*res) {
-        if (!PREPARE_STATEMENT(db_context_meta, CTX_DELETE_CONTEXT_META_CLEANUP_ITEM, res))
-            return;
-    }
-
-    int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_text(*res, ++param, context, -1, SQLITE_STATIC));
-
-    param = 0;
-    int rc = sqlite3_step_monitored(*res);
-    if (rc != SQLITE_DONE)
-        error_report("Failed to delete context check entry, rc = %d", rc);
-
-done:
-    REPORT_BIND_FAIL(*res, param);
-    SQLITE_RESET(*res);
-}
-
-// Schedule context cleanup for host
-#define CTX_GET_CONTEXT_META_CLEANUP_LIST "SELECT context FROM context_metadata_cleanup WHERE host_id = @host_id"
-
-void ctx_get_context_list_to_cleanup(nd_uuid_t *host_uuid, void (*cleanup_cb)(Pvoid_t JudyL, void *data), void *data)
-{
-    if (unlikely(!host_uuid))
-        return;
-
-    sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_context_meta, CTX_GET_CONTEXT_META_CLEANUP_LIST, &res))
-        return;
-
-    int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
-    param = 0;
-
-    const char *context;
-    Pvoid_t CTX_JudyL = NULL;
-    Pvoid_t *Pvalue;
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        context = (char *) sqlite3_column_text(res, 0);
-        STRING *ctx = string_strdupz(context);
-        Pvalue = JudyLIns(&CTX_JudyL, (Word_t) ctx, PJE0);
-        if (*Pvalue)
-            string_freez(ctx);
-        else
-            *(int *)Pvalue = 1;
-    }
-
-    if (CTX_JudyL) {
-        cleanup_cb(CTX_JudyL, data);
-
-        bool first = true;
-        Word_t Index = 0;
-        while ((Pvalue = JudyLFirstThenNext(CTX_JudyL, &Index, &first))) {
-            STRING *ctx = (STRING *) Index;
-            string_freez(ctx);
-        }
-    }
-    (void)JudyLFreeArray(&CTX_JudyL, PJE0);
-
-done:
-    REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
 }
 
 // Delete a context
