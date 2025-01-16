@@ -71,6 +71,14 @@ bool os_hostname(char *dst, size_t dst_size, const char *filesystem_root __maybe
 #else // !OS_WINDOWS
 
 #ifdef HAVE_LIBICONV
+
+#if defined(__FreeBSD__) || defined(__DragonFly__)
+#define LIBICONV_PLUG
+#define iconv_open  libiconv_open
+#define iconv       libiconv
+#define iconv_close libiconv_close
+#endif
+
 #include <iconv.h>
 
 static const char *get_current_locale(void) {
