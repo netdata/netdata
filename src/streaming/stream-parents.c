@@ -495,9 +495,11 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
         d->selection.info = false;
         d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM PARENTS '%s': failed to extract fields from JSON stream info response from '%s': %s",
+               "STREAM PARENTS '%s': failed to extract fields from JSON stream info response from '%s': %s"
+               " - JSON data: %s",
                hostname, string2str(d->destination),
-               buffer_tostring(error));
+               buffer_tostring(error),
+               payload_start);
         return false;
     }
 
