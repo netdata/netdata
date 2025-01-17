@@ -30,8 +30,7 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			BinaryPath: "/usr/sbin/ethtool",
-			Timeout:    confopt.Duration(time.Second * 2),
+			Timeout: confopt.Duration(time.Second * 2),
 		},
 		charts:             &module.Charts{},
 		seenOpticIfaces:    make(map[string]bool),
@@ -42,7 +41,6 @@ func New() *Collector {
 type Config struct {
 	UpdateEvery     int              `yaml:"update_every,omitempty" json:"update_every"`
 	Timeout         confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	BinaryPath      string           `yaml:"binary_path,omitempty" json:"binary_path"`
 	OpticInterfaces string           `yaml:"optical_interfaces,omitempty" json:"optical_interfaces"`
 }
 
