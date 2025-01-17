@@ -255,8 +255,8 @@ void pulse_daemon_memory_system_do(bool extended __maybe_unused) {
             rd_glibc = rrddim_add(st_maps, "glibc", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(st_maps, rd_glibc, (collected_number)netdata_mmaps);
-        rrddim_set_by_pointer(st_maps, rd_netdata, (collected_number)glibc_mmaps);
+        rrddim_set_by_pointer(st_maps, rd_glibc, (collected_number)glibc_mmaps);
+        rrddim_set_by_pointer(st_maps, rd_netdata, (collected_number)netdata_mmaps);
 
         rrdset_done(st_maps);
     }
