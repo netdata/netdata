@@ -22,10 +22,13 @@
         "title": "Optical Interfaces",
         "description": "Space-separated list of optical interface names which must have optical transceiver modules with [DDM](https://en.wikipedia.org/wiki/Small_Form-factor_Pluggable#Digital_diagnostics_monitoring).",
         "type": "string"
-      },
-      "required": [
-        "optical_interfaces"
-      ]
+      }
+    },
+    "required": [
+      "optical_interfaces"
+    ],
+    "patternProperties": {
+      "^name$": {}
     }
   },
   "uiSchema": {
@@ -34,9 +37,6 @@
     },
     "optical_interfaces": {
       "ui:placeholder": "enp1s0 enp1s1 enp2s0"
-    },
-    "binary_path": {
-      "ui:help": "If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable."
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
