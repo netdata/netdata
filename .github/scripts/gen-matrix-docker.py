@@ -18,6 +18,6 @@ for arch in data['docker_arches']:
         'qemu': data['arch_data'][arch]['qemu'],
     })
 
-entries.sort(key=lambda k: (data['arch_order'].index(k['arch']), k['distro'], k['version']))
+entries.sort(key=lambda k: data['arch_order'].index(k['arch']))
 matrix = json.dumps({'include': entries}, sort_keys=True)
 print(matrix)
