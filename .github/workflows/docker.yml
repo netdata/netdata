@@ -72,6 +72,7 @@ jobs:
             netdata-installer.sh
             .github/workflows/docker.yml
             .github/scripts/docker-test.sh
+            .github/scripts/gen-matrix-docker.py
             .github/scripts/gen-docker-tags.py
             .github/scripts/gen-docker-imagetool-args.py
             packaging/cmake/
@@ -116,19 +117,57 @@ jobs:
             echo 'skip-go=' >> "${GITHUB_OUTPUT}"
           fi
 
+  matrix:
+    name: Generate Docker Build Matrix
+    runs-on: ubunut-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+      - name: Prepare tools
+        id: prepare
+        run: |
+          sudo apt-get update || true
+          sudo apt-get install -y python3-ruamel.yaml
+      - name: Read build matrix
+        id: set-matrix
+        run: |
+          matrix="$(.github/scripts/gen-matrix-docker.py)"
+          echo "Generated matrix: ${matrix}"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Docker build matrix preparation failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to prepare build matrix for build checks.
+              Checkout: ${{ steps.checkout.outcome }}
+              Prepare tools: ${{ steps.prepare.outcome }}
+              Read build matrix: ${{ steps.set-matrix.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
+          }}
+
   build-images:
     name: Build Docker Images
     needs:
       - file-check
-    runs-on: ubuntu-latest
+      - matrix
+    runs-on: ${{ matrix.runner }}
     strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/i386
-          - linux/arm/v7
-          - linux/arm64
-          - linux/ppc64le
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+      # Fail fast on releases, but run everything to completion on other triggers.
       fail-fast: false
     steps:
       - name: Skip Check
@@ -152,7 +191,7 @@ jobs:
         run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
-        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64' && needs.file-check.outputs.run == 'true'
+        if: matrix.qemu && needs.file-check.outputs.run == 'true'
         run: |
           sudo apt-get update
           sudo apt-get upgrade -y
@@ -237,15 +276,10 @@ jobs:
     needs:
       - build-images
       - gen-tags
+      - matrix
     strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/i386
-          - linux/arm/v7
-          - linux/arm64
-          - linux/ppc64le
-    runs-on: ubuntu-latest
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         id: checkout
@@ -268,7 +302,7 @@ jobs:
         run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
-        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64'
+        if: matrix.qemu
         uses: docker/setup-qemu-action@v3
       - name: Setup Buildx
         id: prepare
@@ -391,15 +425,10 @@ jobs:
     needs:
       - build-images
       - gen-tags
+      - matrix
     strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/i386
-          - linux/arm/v7
-          - linux/arm64
-          - linux/ppc64le
-    runs-on: ubuntu-latest
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         id: checkout
@@ -422,7 +451,7 @@ jobs:
         run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
-        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64'
+        if: matrix.qemu
         uses: docker/setup-qemu-action@v3
       - name: Setup Buildx
         id: prepare
@@ -547,15 +576,10 @@ jobs:
     needs:
       - build-images
       - gen-tags
+      - matrix
     strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/i386
-          - linux/arm/v7
-          - linux/arm64
-          - linux/ppc64le
-    runs-on: ubuntu-latest
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         id: checkout
@@ -578,7 +602,7 @@ jobs:
         run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
-        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64'
+        if: matrix.qemu
         uses: docker/setup-qemu-action@v3
       - name: Setup Buildx
         id: prepare
