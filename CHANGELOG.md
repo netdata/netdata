@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- PULSE: network traffic [\#19419](https://github.com/netdata/netdata/pull/19419) ([ktsaou](https://github.com/ktsaou))
+- hostnames: convert to utf8 and santitize [\#19418](https://github.com/netdata/netdata/pull/19418) ([ktsaou](https://github.com/ktsaou))
+- cleanup contexts during loading [\#19416](https://github.com/netdata/netdata/pull/19416) ([ktsaou](https://github.com/ktsaou))
+- packaging\(windows\): use local copy of GPL-3 [\#19414](https://github.com/netdata/netdata/pull/19414) ([ilyam8](https://github.com/ilyam8))
+- add "netdata-" prefix to streaming and metrics-cardinality functions [\#19413](https://github.com/netdata/netdata/pull/19413) ([ilyam8](https://github.com/ilyam8))
 - REFCOUNT: use only compare-and-exchange [\#19411](https://github.com/netdata/netdata/pull/19411) ([ktsaou](https://github.com/ktsaou))
 - Alert prototypes: use r/w spinlock instead of spinlock [\#19410](https://github.com/netdata/netdata/pull/19410) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump github.com/docker/docker from 27.4.1+incompatible to 27.5.0+incompatible in /src/go [\#19408](https://github.com/netdata/netdata/pull/19408) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -62,6 +67,7 @@
 - PGC wanted size [\#19349](https://github.com/netdata/netdata/pull/19349) ([ktsaou](https://github.com/ktsaou))
 - log a summary of metadata ignored contexts [\#19348](https://github.com/netdata/netdata/pull/19348) ([ktsaou](https://github.com/ktsaou))
 - use sqlite3\_status64\(\) [\#19347](https://github.com/netdata/netdata/pull/19347) ([ktsaou](https://github.com/ktsaou))
+- Query systemd for unit file paths on install/uninstall. [\#19346](https://github.com/netdata/netdata/pull/19346) ([Ferroin](https://github.com/Ferroin))
 - Assorted systemd detection fixes [\#19345](https://github.com/netdata/netdata/pull/19345) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#19344](https://github.com/netdata/netdata/pull/19344) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/k8sstate\): respect ignore annotation [\#19342](https://github.com/netdata/netdata/pull/19342) ([ilyam8](https://github.com/ilyam8))
@@ -467,10 +473,6 @@
 - build\(deps\): bump github.com/prometheus/common from 0.60.0 to 0.60.1 in /src/go [\#18874](https://github.com/netdata/netdata/pull/18874) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump k8s.io/client-go from 0.31.1 to 0.31.2 in /src/go [\#18873](https://github.com/netdata/netdata/pull/18873) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/vmware/govmomi from 0.45.0 to 0.45.1 in /src/go [\#18872](https://github.com/netdata/netdata/pull/18872) ([dependabot[bot]](https://github.com/apps/dependabot))
-- fix: correct health schema typo preventing Action alert rendering. [\#18871](https://github.com/netdata/netdata/pull/18871) ([ilyam8](https://github.com/ilyam8))
-- Adjust text\_sanitizer to accept the default value [\#18870](https://github.com/netdata/netdata/pull/18870) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#18869](https://github.com/netdata/netdata/pull/18869) ([netdatabot](https://github.com/netdatabot))
-- docs\(go.d/ping\): clarify permissions [\#18868](https://github.com/netdata/netdata/pull/18868) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
