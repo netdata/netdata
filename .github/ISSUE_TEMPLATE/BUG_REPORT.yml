@@ -2,6 +2,7 @@ name: "Netdata Agent: Bug report"
 description: "Submit a report and help us improve our free and open-source Netdata Agent"
 title: "[Bug]: "
 labels: ["bug", "needs triage"]
+type: "bug"
 body:
   - type: markdown
     attributes:
