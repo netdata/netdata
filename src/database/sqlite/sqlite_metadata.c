@@ -2606,6 +2606,40 @@ static void metadata_event_loop(void *arg)
         completion_destroy(wc->scan_complete);
         freez(wc->scan_complete);
     }
+
+    Word_t Index;
+    bool first;
+
+    if (cl_cleanup_data) {
+        Index = 0;
+        first = true;
+        while ((PValue = JudyLFirstThenNext(cl_cleanup_data->JudyL, &Index, &first))) {
+            char *machine_guid = *PValue;
+            freez(machine_guid);
+        }
+        JudyLFreeArray(&cl_cleanup_data->JudyL, PJE0);
+        freez(cl_cleanup_data);
+    }
+
+    if (pending_ae_list) {
+        (void)JudyLFreeArray(&pending_ae_list->JudyL, PJE0);
+        freez(pending_ae_list);
+    }
+
+    if (pending_ctx_cleanup_list) {
+        Index = 0;
+        first = true;
+        while ((PValue = JudyLFirstThenNext(pending_ctx_cleanup_list->JudyL, &Index, &first))) {
+            if (!*PValue)
+                continue;
+            struct host_ctx_cleanup_s *ctx_cleanup = *PValue;
+            string_freez(ctx_cleanup->context);
+            freez(ctx_cleanup);
+        }
+        (void)JudyLFreeArray(&pending_ctx_cleanup_list->JudyL, PJE0);
+        freez(pending_ctx_cleanup_list);
+    }
+
     metadata_free_cmd_queue(wc);
     return;
 
