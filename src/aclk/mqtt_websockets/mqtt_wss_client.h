@@ -5,7 +5,6 @@
 
 #include "common_public.h"
 
-
 #define MQTT_WSS_OK                 0       // All OK call me at your earliest convinience
 #define MQTT_WSS_OK_TO              1       // All OK, poll timeout you requested when calling mqtt_wss_service expired
                                             //you might want to know if timeout

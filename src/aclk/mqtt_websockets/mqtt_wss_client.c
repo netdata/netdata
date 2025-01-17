@@ -5,6 +5,7 @@
 #endif
 
 #include "libnetdata/libnetdata.h"
+#include "aclk_mqtt_workers.h"
 #include "mqtt_wss_client.h"
 #include "mqtt_ng.h"
 #include "ws_client.h"
@@ -809,7 +810,10 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     client->stats.time_keepalive += t2 - t1;
 #endif
 
+    worker_is_idle();
     if ((ret = poll(client->poll_fds, 2, timeout_ms >= 0 ? timeout_ms : -1)) < 0) {
+        worker_is_busy(WORKER_ACLK_POLL_ERROR);
+
         if (errno == EINTR) {
             nd_log(NDLS_DAEMON, NDLP_WARNING, "poll interrupted by EINTR");
             return 0;
@@ -817,6 +821,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         nd_log(NDLS_DAEMON, NDLP_ERR, "poll error \"%s\"", strerror(errno));
         return -2;
     }
+    worker_is_busy(WORKER_ACLK_POLL_OK);
 
 #ifdef MQTT_WSS_CPUSTATS
     t1 = mqtt_wss_now_usec();
@@ -829,6 +834,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             // MQTT keep alives
             mqtt_ng_ping(client->mqtt);
             ping_timeout = now + PING_TIMEOUT;
+            worker_is_busy(WORKER_ACLK_SENT_PING);
         } else {
             if (ping_timeout && ping_timeout < now) {
                 disconnect_req = ACLK_PING_TIMEOUT;
@@ -848,6 +854,8 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     client->poll_fds[POLLFD_SOCKET].events = 0;
 
     if ((ptr = rbuf_get_linear_insert_range(client->ws_client->buf_read, &size))) {
+        worker_is_busy(WORKER_ACLK_RX);
+
         if((ret = SSL_read(client->ssl, ptr, size)) > 0) {
             spinlock_lock(&client->stat_lock);
             client->stats.bytes_rx += ret;
@@ -859,6 +867,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             set_socket_pollfds(client, ret);
             if (ret != SSL_ERROR_WANT_READ &&
                 ret != SSL_ERROR_WANT_WRITE) {
+                worker_is_busy(WORKER_ACLK_RX_ERROR);
                 nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_read error: %d %s", ret, util_openssl_ret_err(ret));
                 if (ret == SSL_ERROR_SYSCALL)
                     nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_read SYSCALL errno: %d %s", errnobkp, strerror(errnobkp));
@@ -894,9 +903,11 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     // process MQTT stuff
-    if(client->ws_client->state == WS_ESTABLISHED)
+    if(client->ws_client->state == WS_ESTABLISHED) {
+        worker_is_busy(WORKER_ACLK_HANDLE_MQTT_INTERNAL);
         if (handle_mqtt_internal(client))
             return MQTT_WSS_ERR_PROTO_MQTT;
+    }
 
     if (client->mqtt_didnt_finish_write) {
         client->mqtt_didnt_finish_write = 0;
@@ -909,6 +920,8 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     if ((ptr = rbuf_get_linear_read_range(client->ws_client->buf_write, &size))) {
+        worker_is_busy(WORKER_ACLK_TX);
+
         if ((ret = SSL_write(client->ssl, ptr, size)) > 0) {
             spinlock_lock(&client->stat_lock);
             client->stats.bytes_tx += ret;
@@ -920,6 +933,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             set_socket_pollfds(client, ret);
             if (ret != SSL_ERROR_WANT_READ &&
                 ret != SSL_ERROR_WANT_WRITE) {
+                worker_is_busy(WORKER_ACLK_TX_ERROR);
                 nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_write error: %d %s", ret, util_openssl_ret_err(ret));
                 if (ret == SSL_ERROR_SYSCALL)
                     nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_write SYSCALL errno: %d %s", errnobkp, strerror(errnobkp));

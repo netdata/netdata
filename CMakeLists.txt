@@ -1900,6 +1900,7 @@ set(MQTT_WEBSOCKETS_FILES
         src/aclk/mqtt_websockets/common_public.c
         src/aclk/mqtt_websockets/common_public.h
         src/aclk/mqtt_websockets/common_internal.h
+        src/aclk/mqtt_websockets/aclk_mqtt_workers.h
 )
 
 set(ACLK_PROTO_DEFS
