@@ -106,6 +106,7 @@ const char *database_cleanup[] = {
     "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host)",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host)",
     "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host)",
+    "DELETE FROM ctx_metadata_cleanup WHERE host_id NOT IN (SELECT host_id FROM host)",
     "DROP TRIGGER IF EXISTS tr_dim_del",
     "DROP INDEX IF EXISTS ind_d1",
     "DROP INDEX IF EXISTS ind_c1",
