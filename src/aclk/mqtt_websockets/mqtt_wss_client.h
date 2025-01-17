@@ -58,7 +58,7 @@ int mqtt_wss_connect(
     int ssl_flags,
     const struct mqtt_wss_proxy *proxy,
     bool *fallback_ipv4);
-int mqtt_wss_service(mqtt_wss_client client, int timeout_ms);
+int mqtt_wss_service(mqtt_wss_client client, int t_ms);
 void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms);
 
 // we redefine this instead of using MQTT-C flags as in future
