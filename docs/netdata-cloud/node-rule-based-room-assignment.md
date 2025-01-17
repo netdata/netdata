@@ -4,48 +4,29 @@ Organize Nodes within Rooms automatically using configurable label-based rules. 
 
 **Important**:
 
-- Rules can be used with all Rooms except "All Nodes" (which automatically includes every Node)
-- You must have Node management permissions to create or modify Rules
-- Rules are evaluated in real-time, they automatically update Node assignments when labels change
-- When both inclusion and exclusion rules exist, exclusion rules always take priority
+- Rules work with all Rooms except the "All Nodes" Room, as it includes all Nodes by default.
+- Creating and editing Rules requires Node management permissions.
+- Rules are evaluated in real-time as labels change.
+- Exclusion rules always override inclusion rules.
 
-## Understanding Rules
+## Rule Structure
 
-A rule consists of two main parts:
-1. An Action (Include or Exclude) that determines whether matching Nodes will be added to or removed from the Room
-2. One or more Clauses that define the conditions for matching Nodes (all clauses must be true for a match)
+The rules consist of the following elements:
 
-### Clause Components
+| Element | Description                                                                                       |
+|:--------|:--------------------------------------------------------------------------------------------------|
+| Action  | Determines whether matching Nodes will be included or excluded from the Room                      |
+| Clauses | Set of conditions that determine which Nodes match the Rule (all must be satisfied - logical AND) |
 
-Each clause checks a specific host label using these components:
+Each clause consists of:
 
-| Component | Description |
-|:----------|:------------|
-| Label | The host label to evaluate |
-| Operator | The comparison method (e.g., equals, contains) |
-| Value | What to compare the label against |
-| Negate | When set to true, reverses the comparison result (e.g., "equals" becomes "does not equal") |
+| Element  | Description                  |
+|:---------|:-----------------------------|
+| Label    | The host label to check      |
+| Value    | The comparison method        |
+| Operator | The value to compare against |
 
-#### Available Operators
-
-The following operators can be used to compare label values:
-
-| Operator | Description |
-|:---------|:------------|
-| equals | Exact match of the entire value |
-| starts_with | Value begins with the specified text |
-| ends_with | Value ends with the specified text |
-| contains | Value includes the specified text anywhere |
-
-For example, with the label `environment: production-us-east`:
-- `equals: production-us-east` ✓ matches
-- `starts_with: production` ✓ matches
-- `ends_with: east` ✓ matches
-- `contains: us` ✓ matches
-
-### Example Rule
-
-Below is a conceptual representation of a rule that includes all production database Nodes:
+Below is a conceptual representation of a rule that includes all production database Nodes. The structure is shown in YAML format for clarity:
 
 ```yaml
 Action: Include
@@ -58,33 +39,22 @@ Clauses:
     Value: database
 ```
 
-## How Rules Work
+### Available Operators
 
-### How Rules Are Processed
+The following operators can be used to compare label values:
 
-1. Exclusion Rules are checked first, then Inclusion Rules. Processing stops at the first matching rule
-2. Within each rule:
-  - All clauses must match for the rule to apply (AND logic)
-  - If any clause doesn't match, the rule is skipped and the next rule is evaluated
-3. Between different rules:
-  - Only one rule needs to match (OR logic)
-4. If no rules match:
-  - The Node is removed from the Room if it was previously added by rules
-  - Note: This doesn't affect Nodes that were manually added (STATIC membership)
+| Operator    | Description                          |
+|:------------|:-------------------------------------|
+| equals      | Exact match of  value                |
+| starts_with | Value begins with the specified text |
+| ends_with   | Value ends with the specified text   |
+| contains    | Value includes the specified text    |
 
-### Node Membership Types
+## Rule Evaluation Order
 
-Nodes can belong to a Room in different ways:
-
-| Type | Description |
-|:-----|:------------|
-| STATIC | Node was manually added to the Room |
-| RULE | Node was added by matching Rule(s) |
-| STATIC and RULE | Node matches both criteria |
-
-You can view each Node's membership status in the Room's Nodes table under the "Membership" column.
-
-Note: STATIC and RULE memberships are independent. A rule cannot remove a manual (STATIC) membership, and manually removing a Node doesn't affect its rule-based (RULE) membership.
+- Inclusion rules are checked first
+- Exclusion rules are checked second
+  If both match, exclusion wins
 
 ## Creating Rules
 
@@ -96,3 +66,19 @@ Note: STATIC and RULE memberships are independent. A rule cannot remove a manual
     - Select Action (Include/Exclude)
     - Add clause(s)
     - Save changes
+
+## Membership Status
+
+Nodes can have multiple membership types in a Room:
+
+| Status          | Description                |
+|:----------------|:---------------------------|
+| STATIC          | Manually added to the Room |
+| RULE            | Added by matching Rule(s)  |
+| STATIC and RULE | Both manual and Rule-based |
+
+You can view each Node's membership status in the Room's Nodes table under the "Membership" column.
+
+> **Note**
+>
+> STATIC and RULE memberships are independent. A rule cannot remove a manual (STATIC) membership, and manually removing a Node doesn't affect its rule-based (RULE) membership.
