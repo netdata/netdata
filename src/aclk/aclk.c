@@ -3,6 +3,7 @@
 #include "aclk.h"
 
 #include "mqtt_websockets/mqtt_wss_client.h"
+#include "mqtt_websockets/aclk_mqtt_workers.h"
 #include "aclk_otp.h"
 #include "aclk_tx_msgs.h"
 #include "aclk_query.h"
@@ -307,6 +308,7 @@ static int handle_connection(mqtt_wss_client client)
         // timeout 1000 to check at least once a second
         // for netdata_exit
         if (mqtt_wss_service(client, 1000) < 0){
+            worker_is_busy(WORKER_ACLK_DISCONNECTED);
             error_report("Connection Error or Dropped");
             return 1;
         }
@@ -315,16 +317,20 @@ static int handle_connection(mqtt_wss_client client)
             const char *reason;
             switch (disconnect_req) {
                 case ACLK_CLOUD_DISCONNECT:
+                    worker_is_busy(WORKER_ACLK_CMD_DISCONNECT);
                     reason = "cloud request";
                     break;
                 case ACLK_PING_TIMEOUT:
+                    worker_is_busy(WORKER_ACLK_CMD_TIMEOUT);
                     reason = "ping timeout";
                     schedule_node_update = true;
                     break;
                 case ACLK_RELOAD_CONF:
+                    worker_is_busy(WORKER_ACLK_CMD_RELOAD_CONF);
                     reason = "reclaim";
                     break;
                 default:
+                    worker_is_busy(WORKER_ACLK_CMD_UNKNOWN);
                     reason = "unknown";
                     break;
             }
@@ -769,6 +775,31 @@ void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *static_thread = ptr;
 
+    worker_register("ACLK");
+    worker_register_job_name(WORKER_ACLK_WAIT_CLAIMING, "wait claim");
+    worker_register_job_name(WORKER_ACLK_CONNECT, "connect");
+    worker_register_job_name(WORKER_ACLK_NODE_UPDATE, "node update");
+    worker_register_job_name(WORKER_ACLK_HANDLE_CONNECTION, "handle connection");
+    worker_register_job_name(WORKER_ACLK_DISCONNECTED, "disconnected");
+    worker_register_job_name(WORKER_ACLK_CMD_DISCONNECT, "cmd disconnect");
+    worker_register_job_name(WORKER_ACLK_CMD_TIMEOUT, "cmd timeout");
+    worker_register_job_name(WORKER_ACLK_CMD_RELOAD_CONF, "cmd reload");
+    worker_register_job_name(WORKER_ACLK_CMD_UNKNOWN, "cmd unknown");
+    worker_register_job_name(WORKER_ACLK_SENT_PING, "sent ping");
+    worker_register_job_name(WORKER_ACLK_POLL_ERROR, "poll error");
+    worker_register_job_name(WORKER_ACLK_POLL_OK, "poll ok");
+    worker_register_job_name(WORKER_ACLK_RX, "rx");
+    worker_register_job_name(WORKER_ACLK_RX_ERROR, "rx error");
+    worker_register_job_name(WORKER_ACLK_PROCESS_RAW, "p-raw");
+    worker_register_job_name(WORKER_ACLK_PROCESS_HANDSHAKE, "p-handshake");
+    worker_register_job_name(WORKER_ACLK_PROCESS_ESTABLISHED, "p-established");
+    worker_register_job_name(WORKER_ACLK_PROCESS_ERROR, "p-error");
+    worker_register_job_name(WORKER_ACLK_PROCESS_CLOSED_GRACEFULLY, "p-closed");
+    worker_register_job_name(WORKER_ACLK_PROCESS_UNKNOWN, "p-unknown");
+    worker_register_job_name(WORKER_ACLK_HANDLE_MQTT_INTERNAL, "mqtt internal");
+    worker_register_job_name(WORKER_ACLK_TX, "tx");
+    worker_register_job_name(WORKER_ACLK_TX_ERROR, "tx error");
+
     ACLK_PROXY_TYPE proxy_type;
     aclk_get_proxy(&proxy_type);
     if (proxy_type == PROXY_TYPE_SOCKS5) {
@@ -779,6 +810,7 @@ void *aclk_main(void *ptr)
 
     aclk_init_rx_msg_handlers();
 
+    worker_is_busy(WORKER_ACLK_WAIT_CLAIMING);
     if (wait_till_agent_claim_ready())
         goto exit;
 
@@ -809,21 +841,26 @@ void *aclk_main(void *ptr)
     netdata_log_info("Starting ACLK query event loop");
     aclk_query_init(mqttwss_client);
     do {
+        worker_is_busy(WORKER_ACLK_CONNECT);
         if (aclk_attempt_to_connect(mqttwss_client))
             goto exit_full;
 
         if (schedule_node_update) {
+            worker_is_busy(WORKER_ACLK_NODE_UPDATE);
             schedule_node_state_update(localhost, 0);
             schedule_node_update = false;
         }
 
+        worker_is_busy(WORKER_ACLK_HANDLE_CONNECTION);
         if (handle_connection(mqttwss_client)) {
+            worker_is_busy(WORKER_ACLK_DISCONNECTED);
             last_disconnect_time = now_realtime_sec();
             aclk_set_disconnected();
             nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK DISCONNECTED");
         }
     } while (service_running(SERVICE_ACLK));
 
+    worker_is_busy(WORKER_ACLK_DISCONNECTED);
     aclk_graceful_disconnect(mqttwss_client);
 
 #ifdef MQTT_WSS_DEBUG

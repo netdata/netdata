@@ -125,6 +125,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "DBENGINE",    .family = "workers dbengine instances",      .priority = 1000000 },
     { .name = "LIBUV",       .family = "workers libuv threadpool",        .priority = 1000000 },
     { .name = "WEB",         .family = "workers web server",              .priority = 1000000 },
+    { .name = "ACLK",        .family = "workers aclk",                    .priority = 1000000 },
     { .name = "ACLKSYNC",    .family = "workers aclk sync",               .priority = 1000000 },
     { .name = "METASYNC",    .family = "workers metadata sync",           .priority = 1000000 },
     { .name = "PLUGINSD",    .family = "workers plugins.d",               .priority = 1000000 },

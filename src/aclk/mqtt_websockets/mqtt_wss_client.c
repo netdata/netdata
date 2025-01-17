@@ -5,6 +5,7 @@
 #endif
 
 #include "libnetdata/libnetdata.h"
+#include "aclk_mqtt_workers.h"
 #include "mqtt_wss_client.h"
 #include "mqtt_ng.h"
 #include "ws_client.h"
@@ -616,7 +617,7 @@ int mqtt_wss_connect(
     client->poll_fds[POLLFD_SOCKET].events = POLLIN;
     // wait till MQTT connection is established
     while (!client->mqtt_connected) {
-        if(mqtt_wss_service(client, -1)) {
+        if(mqtt_wss_service(client, 60 * MSEC_PER_SEC)) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Error connecting to MQTT WSS server \"%s\", port %d.", host, port);
             return 2;
         }
@@ -661,13 +662,13 @@ static const char *mqtt_wss_error_tos(int ec)
 
 static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
 {
-    uint64_t exit_by = boottime_usec() + (timeout_ms * NSEC_PER_MSEC);
+    uint64_t exit_by_us = boottime_usec() + (timeout_ms * NSEC_PER_MSEC);
     client->poll_fds[POLLFD_SOCKET].events |= POLLOUT; // TODO when entering mwtt_wss_service use out buffer size to arm POLLOUT
     while (rbuf_bytes_available(client->ws_client->buf_write)) {
-        const uint64_t now = boottime_usec();
-        if (now >= exit_by)
+        const uint64_t now_us = boottime_usec();
+        if (now_us >= exit_by_us)
             return MWS_TIMED_OUT;
-        if (mqtt_wss_service(client, exit_by - now))
+        if (mqtt_wss_service(client, (exit_by_us - now_us) / USEC_PER_SEC))
             return MWS_ERROR;
     }
     return MWS_OK;
@@ -753,9 +754,23 @@ static int handle_mqtt_internal(mqtt_wss_client client)
 
 static int t_till_next_keepalive_ms(mqtt_wss_client client)
 {
-    time_t last_send = mqtt_ng_last_send_time(client->mqtt);
-    time_t next_mqtt_keep_alive = last_send + client->mqtt_keepalive * 0.75;
-    return ((next_mqtt_keep_alive - now_realtime_sec()) * MSEC_PER_SEC);
+    time_t last_send_ts = mqtt_ng_last_send_time(client->mqtt);
+    time_t next_mqtt_keep_alive_ts = last_send_ts + client->mqtt_keepalive * 0.75;
+
+    time_t now_ts = now_realtime_sec();
+
+    if(now_ts >= next_mqtt_keep_alive_ts)
+        return 0;
+
+    int timeout_ms = (int)((next_mqtt_keep_alive_ts - now_ts) * MSEC_PER_SEC);
+
+    if(timeout_ms < 1)
+        timeout_ms = 1;
+
+    if(timeout_ms > (int)(45 * MSEC_PER_SEC))
+        timeout_ms = (int)(45 * MSEC_PER_SEC);
+
+    return timeout_ms;
 }
 
 #ifdef MQTT_WSS_CPUSTATS
@@ -784,8 +799,6 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     // Check user requested TO doesn't interfere with MQTT keep alives
     if (!ping_timeout) {
         int till_next_keep_alive = t_till_next_keepalive_ms(client);
-        if (till_next_keep_alive < 0)
-            till_next_keep_alive = 0;
         if (client->mqtt_connected && (timeout_ms < 0 || timeout_ms >= till_next_keep_alive)) {
             timeout_ms = till_next_keep_alive;
             send_keepalive = 1;
@@ -797,7 +810,10 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     client->stats.time_keepalive += t2 - t1;
 #endif
 
+    worker_is_idle();
     if ((ret = poll(client->poll_fds, 2, timeout_ms >= 0 ? timeout_ms : -1)) < 0) {
+        worker_is_busy(WORKER_ACLK_POLL_ERROR);
+
         if (errno == EINTR) {
             nd_log(NDLS_DAEMON, NDLP_WARNING, "poll interrupted by EINTR");
             return 0;
@@ -805,6 +821,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         nd_log(NDLS_DAEMON, NDLP_ERR, "poll error \"%s\"", strerror(errno));
         return -2;
     }
+    worker_is_busy(WORKER_ACLK_POLL_OK);
 
 #ifdef MQTT_WSS_CPUSTATS
     t1 = mqtt_wss_now_usec();
@@ -817,6 +834,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             // MQTT keep alives
             mqtt_ng_ping(client->mqtt);
             ping_timeout = now + PING_TIMEOUT;
+            worker_is_busy(WORKER_ACLK_SENT_PING);
         } else {
             if (ping_timeout && ping_timeout < now) {
                 disconnect_req = ACLK_PING_TIMEOUT;
@@ -836,6 +854,8 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     client->poll_fds[POLLFD_SOCKET].events = 0;
 
     if ((ptr = rbuf_get_linear_insert_range(client->ws_client->buf_read, &size))) {
+        worker_is_busy(WORKER_ACLK_RX);
+
         if((ret = SSL_read(client->ssl, ptr, size)) > 0) {
             spinlock_lock(&client->stat_lock);
             client->stats.bytes_rx += ret;
@@ -847,6 +867,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             set_socket_pollfds(client, ret);
             if (ret != SSL_ERROR_WANT_READ &&
                 ret != SSL_ERROR_WANT_WRITE) {
+                worker_is_busy(WORKER_ACLK_RX_ERROR);
                 nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_read error: %d %s", ret, util_openssl_ret_err(ret));
                 if (ret == SSL_ERROR_SYSCALL)
                     nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_read SYSCALL errno: %d %s", errnobkp, strerror(errnobkp));
@@ -882,9 +903,11 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     // process MQTT stuff
-    if(client->ws_client->state == WS_ESTABLISHED)
+    if(client->ws_client->state == WS_ESTABLISHED) {
+        worker_is_busy(WORKER_ACLK_HANDLE_MQTT_INTERNAL);
         if (handle_mqtt_internal(client))
             return MQTT_WSS_ERR_PROTO_MQTT;
+    }
 
     if (client->mqtt_didnt_finish_write) {
         client->mqtt_didnt_finish_write = 0;
@@ -897,6 +920,8 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     if ((ptr = rbuf_get_linear_read_range(client->ws_client->buf_write, &size))) {
+        worker_is_busy(WORKER_ACLK_TX);
+
         if ((ret = SSL_write(client->ssl, ptr, size)) > 0) {
             spinlock_lock(&client->stat_lock);
             client->stats.bytes_tx += ret;
@@ -908,6 +933,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             set_socket_pollfds(client, ret);
             if (ret != SSL_ERROR_WANT_READ &&
                 ret != SSL_ERROR_WANT_WRITE) {
+                worker_is_busy(WORKER_ACLK_TX_ERROR);
                 nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_write error: %d %s", ret, util_openssl_ret_err(ret));
                 if (ret == SSL_ERROR_SYSCALL)
                     nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_write SYSCALL errno: %d %s", errnobkp, strerror(errnobkp));

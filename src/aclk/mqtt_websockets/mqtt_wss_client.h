@@ -5,7 +5,6 @@
 
 #include "common_public.h"
 
-
 #define MQTT_WSS_OK                 0       // All OK call me at your earliest convinience
 #define MQTT_WSS_OK_TO              1       // All OK, poll timeout you requested when calling mqtt_wss_service expired
                                             //you might want to know if timeout
@@ -58,7 +57,7 @@ int mqtt_wss_connect(
     int ssl_flags,
     const struct mqtt_wss_proxy *proxy,
     bool *fallback_ipv4);
-int mqtt_wss_service(mqtt_wss_client client, int timeout_ms);
+int mqtt_wss_service(mqtt_wss_client client, int t_ms);
 void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms);
 
 // we redefine this instead of using MQTT-C flags as in future
