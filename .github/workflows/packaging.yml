@@ -325,7 +325,6 @@ jobs:
               ${{ github.repository }}: ${{ matrix.repo_distro }} ${{ matrix.version }} package build for ${{ matrix.arch }} failed.
               Checkout: ${{ steps.checkout.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
-              Setup Docker: ${{ steps.docker-config.outcome }}
               Fetch images: ${{ steps.fetch-images.outcome }}
               Build: ${{ steps.build.outcome }}
               Test: ${{ steps.test.outcome }}
