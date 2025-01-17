@@ -11,12 +11,6 @@
         "minimum": 1,
         "default": 10
       },
-      "binary_path": {
-        "title": "Binary path",
-        "description": "Path to the `ethtool` binary.",
-        "type": "string",
-        "default": "/usr/sbin/ethtool"
-      },
       "timeout": {
         "title": "Timeout",
         "description": "Timeout for executing the binary, specified in seconds.",
@@ -30,7 +24,7 @@
         "type": "string"
       },
       "required": [
-        "binary_path"
+        "optical_interfaces"
       ]
     }
   },

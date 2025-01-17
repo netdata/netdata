@@ -4,38 +4,28 @@ package ethtool
 
 import (
 	"errors"
+	"fmt"
 	"os"
-	"os/exec"
-	"strings"
+	"path/filepath"
+
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
 func (c *Collector) validateConfig() error {
 	if c.OpticInterfaces == "" {
 		return errors.New("no optic interfaces specified")
 	}
-	if c.BinaryPath == "" {
-		return errors.New("no ethtool binary path specified")
-	}
 	return nil
 }
 
 func (c *Collector) initEthtoolCli() (ethtoolCli, error) {
-	binPath := c.BinaryPath
+	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
+	if _, err := os.Stat(ndsudoPath); err != nil {
+		return nil, fmt.Errorf("ndsudo executable not found: %v", err)
 
-	if !strings.HasPrefix(binPath, "/") {
-		path, err := exec.LookPath(binPath)
-		if err != nil {
-			return nil, err
-		}
-		binPath = path
 	}
 
-	if _, err := os.Stat(binPath); err != nil {
-		return nil, err
-	}
-
-	et := newEthtoolExec(binPath, c.Timeout.Duration())
-	et.Logger = c.Logger
+	et := newEthtoolExec(ndsudoPath, c.Timeout.Duration(), c.Logger)
 
 	return et, nil
 }
