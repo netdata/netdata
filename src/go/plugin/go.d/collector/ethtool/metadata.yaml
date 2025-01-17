@@ -9,7 +9,7 @@ modules:
         link: ""
         icon_filename: network-wired.svg
         categories:
-          - data-collection.data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking-stack-and-network-interfaces
       keywords:
         - sfp
         - ddm
