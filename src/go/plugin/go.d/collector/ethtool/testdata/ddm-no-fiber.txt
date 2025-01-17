@@ -1,0 +1,74 @@
+Identifier                                : 0x03 (SFP)
+Extended identifier                       : 0x04 (GBIC/SFP defined by 2-wire interface ID)
+Connector                                 : 0x01 (SC)
+Transceiver codes                         : 0x20 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+Transceiver type                          : 10G Ethernet: 10G Base-LR
+Encoding                                  : 0x03 (NRZ)
+BR, Nominal                               : 10000MBd
+Rate identifier                           : 0x00 (unspecified)
+Length (SMF,km)                           : 20km
+Length (SMF)                              : 20000m
+Length (50um)                             : 0m
+Length (62.5um)                           : 0m
+Length (Copper)                           : 0m
+Length (OM3)                              : 0m
+Laser wavelength                          : 1270nm
+Vendor name                               : FS
+Vendor OUI                                : XXXXXXXX
+Vendor PN                                 : XXXXXXXXXXXXXXX
+Vendor rev                                : XXXX
+Option values                             : 0x00 0x1a
+Option                                    : RX_LOS implemented
+Option                                    : TX_FAULT implemented
+Option                                    : TX_DISABLE implemented
+BR margin, max                            : 0%
+BR margin, min                            : 0%
+Vendor SN                                 : XXXXXXXXXXX
+Date code                                 : XXXXXX
+Optical diagnostics support               : Yes
+Laser bias current                        : 12.768 mA
+Laser output power                        : 3.0487 mW / 4.84 dBm
+Receiver signal average optical power     : 0.0001 mW / -40.00 dBm
+Module temperature                        : 36.75 degrees C / 98.15 degrees F
+Module voltage                            : 3.4860 V
+Alarm/warning flags implemented           : Yes
+Laser bias current high alarm             : Off
+Laser bias current low alarm              : Off
+Laser bias current high warning           : Off
+Laser bias current low warning            : Off
+Laser output power high alarm             : Off
+Laser output power low alarm              : Off
+Laser output power high warning           : Off
+Laser output power low warning            : Off
+Module temperature high alarm             : Off
+Module temperature low alarm              : Off
+Module temperature high warning           : Off
+Module temperature low warning            : Off
+Module voltage high alarm                 : Off
+Module voltage low alarm                  : Off
+Module voltage high warning               : Off
+Module voltage low warning                : Off
+Laser rx power high alarm                 : Off
+Laser rx power low alarm                  : On
+Laser rx power high warning               : Off
+Laser rx power low warning                : On
+Laser bias current high alarm threshold   : 95.000 mA
+Laser bias current low alarm threshold    : 1.000 mA
+Laser bias current high warning threshold : 85.000 mA
+Laser bias current low warning threshold  : 2.000 mA
+Laser output power high alarm threshold   : 6.4566 mW / 8.10 dBm
+Laser output power low alarm threshold    : 1.9953 mW / 3.00 dBm
+Laser output power high warning threshold : 6.4566 mW / 8.10 dBm
+Laser output power low warning threshold  : 2.5119 mW / 4.00 dBm
+Module temperature high alarm threshold   : 100.00 degrees C / 212.00 degrees F
+Module temperature low alarm threshold    : -40.00 degrees C / -40.00 degrees F
+Module temperature high warning threshold : 90.00 degrees C / 194.00 degrees F
+Module temperature low warning threshold  : -30.00 degrees C / -22.00 degrees F
+Module voltage high alarm threshold       : 3.7000 V
+Module voltage low alarm threshold        : 2.8999 V
+Module voltage high warning threshold     : 3.5000 V
+Module voltage low warning threshold      : 3.1000 V
+Laser rx power high alarm threshold       : 0.1995 mW / -7.00 dBm
+Laser rx power low alarm threshold        : 0.0010 mW / -30.00 dBm
+Laser rx power high warning threshold     : 0.1584 mW / -8.00 dBm
+Laser rx power low warning threshold      : 0.0012 mW / -29.21 dBm
