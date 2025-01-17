@@ -342,12 +342,15 @@ static bool stream_info_json_parse_v1(struct json_object *jobj, const char *path
         return true;
     }
 
+    buffer_sprintf(error, "status reported (%d) is not OK (%d)", d->remote.status, HTTP_RESP_OK);
+
     d->remote.db_first_time_s = 0;
     d->remote.db_last_time_s = 0;
     d->remote.db_status = 0;
     d->remote.db_liveness = 0;
     d->remote.ingest_type = 0;
     d->remote.ingest_status = 0;
+
     return false;
 }
 
@@ -495,9 +498,11 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
         d->selection.info = false;
         d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM PARENTS '%s': failed to extract fields from JSON stream info response from '%s': %s",
+               "STREAM PARENTS '%s': failed to extract fields from JSON stream info response from '%s': %s"
+               " - JSON data: %s",
                hostname, string2str(d->destination),
-               buffer_tostring(error));
+               buffer_tostring(error),
+               payload_start);
         return false;
     }
 
