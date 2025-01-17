@@ -65,6 +65,7 @@ jobs:
             .github/workflows/build.yml
             .github/scripts/build-static.sh
             .github/scripts/get-static-cache-key.sh
+            .github/scripts/gen-matrix-static.py
             .github/scripts/gen-matrix-build.py
             .github/scripts/run-updater-check.sh
             packaging/cmake/
@@ -181,20 +182,58 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
+  static-matrix: # Generate the static build matrix.
+    name: Prepare Build Matrix
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch'
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+      - name: Prepare tools
+        id: prepare
+        run: |
+          sudo apt-get update || true
+          sudo apt-get install -y python3-ruamel.yaml
+      - name: Read build matrix
+        id: set-matrix
+        run: |
+          matrix="$(.github/scripts/gen-matrix-static.py)"
+          echo "Generated matrix: ${matrix}"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Static build matrix preparation failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to prepare build matrix for build checks.
+              Checkout: ${{ steps.checkout.outcome }}
+              Prepare tools: ${{ steps.prepare.outcome }}
+              Read build matrix: ${{ steps.set-matrix.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
+          }}
+
   build-static: # Build the static binary archives, and store them as artifacts.
     name: Build Static
-    runs-on: ubuntu-latest
     needs:
       - file-check
+      - static-matrix
     strategy:
-      matrix:
-        arch:
-          - x86_64
-          - armv6l
-          - armv7l
-          - aarch64
-          - ppc64le
+      matrix: ${{ fromJson(needs.static-matrix.outputs.matrix) }}
       fail-fast: false
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Skip Check
         id: skip
@@ -230,7 +269,7 @@ jobs:
           key: ${{ steps.cache-key.outputs.key }}
       - name: Set up QEMU
         id: qemu
-        if: needs.file-check.outputs.run == 'true'
+        if: matrix.qemu && needs.file-check.outputs.run == 'true'
         run: |
           sudo apt-get update
           sudo apt-get upgrade -y
@@ -239,7 +278,7 @@ jobs:
         if: github.event_name != 'workflow_dispatch' && needs.file-check.outputs.run == 'true' # Don’t use retries on PRs.
         run: |
           export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
-          export SKIP_EMULATION=1
+          [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
           .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Build
         if: github.event_name == 'workflow_dispatch' && needs.file-check.outputs.run == 'true'
@@ -250,7 +289,7 @@ jobs:
           max_attempts: 3
           command: |
             export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
-            export SKIP_EMULATION=1
+            [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
             .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Store
         id: store
@@ -893,7 +932,7 @@ jobs:
 
   # Remaining jobs are only used for CI checks, and not as part of the release process
 
-  matrix: # Generate the shared build matrix for our Linux build tests.
+  src-matrix: # Generate the shared build matrix for our Linux build tests.
     name: Prepare Build Matrix
     runs-on: ubuntu-latest
     if: github.event_name != 'workflow_dispatch'
@@ -941,12 +980,12 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'workflow_dispatch'
     needs:
-      - matrix
+      - src-matrix
       - file-check
     strategy:
       fail-fast: false
       max-parallel: 8
-      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.src-matrix.outputs.matrix) }}
     steps:
       - name: Skip Check
         id: skip
