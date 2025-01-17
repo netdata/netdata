@@ -46,17 +46,9 @@ func TestCollector_Init(t *testing.T) {
 		config   Config
 		wantFail bool
 	}{
-		"fails if 'binary_path' is not set": {
+		"fails if failed to locate ndsudo": {
 			wantFail: true,
-			config: Config{
-				BinaryPath: "",
-			},
-		},
-		"fails if failed to find binary": {
-			wantFail: true,
-			config: Config{
-				BinaryPath: "ethtool!!!",
-			},
+			config:   New().Config,
 		},
 	}
 

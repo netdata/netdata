@@ -5,7 +5,7 @@ modules:
       plugin_name: go.d.plugin
       module_name: ethtool
       monitored_instance:
-        name: Network interfaces (hardware)
+        name: Optical modules
         link: ""
         icon_filename: network-wired.svg
         categories:
@@ -25,8 +25,10 @@ modules:
         metrics_description: >
           This collector monitors optical transceiver modules' diagnostic parameters 
           (temperature, voltage, laser bias current, transmit/receive power levels) from network interfaces 
-          equipped with modules that support Digital Diagnostic Monitoring (DDM) 
-          using the command line tool [ethtool](https://man7.org/linux/man-pages/man8/ethtool.8.html).
+          equipped with modules that support Digital Diagnostic Monitoring (DDM).
+          It relies on the [`ethtool`](https://man7.org/linux/man-pages/man8/ethtool.8.html) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
         method_description: ""
       supported_platforms:
         include: [Linux]
@@ -58,10 +60,6 @@ modules:
               description: Data collection frequency.
               default_value: 10
               required: false
-            - name: binary_path
-              description: Path to the `ethtool` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
-              default_value: /usr/sbin/ethtool
-              required: true
             - name: timeout
               description: Timeout for executing the binary, specified in seconds.
               default_value: 2
