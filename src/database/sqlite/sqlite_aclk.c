@@ -312,13 +312,14 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
 
     struct ctxs_checkpoint *cmd;
 
-    bool ok_to_send = false;
+    bool ok_to_send = true;
 
     switch (query->type) {
         case HTTP_API_V2:
             if (is_worker)
                 worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
             http_api_v2(config->client, query);
+            ok_to_send = false;
             break;
         case CTX_CHECKPOINT:;
             if (is_worker)
@@ -328,6 +329,7 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             freez(cmd->claim_id);
             freez(cmd->node_id);
             freez(cmd);
+            ok_to_send = false;
             break;
         case CTX_STOP_STREAMING:
             if (is_worker)
@@ -337,42 +339,43 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             freez(cmd->claim_id);
             freez(cmd->node_id);
             freez(cmd);
+            ok_to_send = false;
             break;
         case ALARM_PROVIDE_CFG:
             if (is_worker)
                 worker_is_busy(UV_EVENT_ALARM_PROVIDE_CFG);
-            // fall through
+            break;
         case ALARM_SNAPSHOT:
             if (is_worker)
                 worker_is_busy(UV_EVENT_ALARM_SNAPSHOT);
-            // fall through
+            break;
         case REGISTER_NODE:
             if (is_worker)
                 worker_is_busy(UV_EVENT_REGISTER_NODE);
-            // fall through
+            break;
         case UPDATE_NODE_COLLECTORS:
             if (is_worker)
                 worker_is_busy(UV_EVENT_UPDATE_NODE_COLLECTORS);
-            // fall through
+            break;
         case UPDATE_NODE_INFO:
             if (is_worker)
                 worker_is_busy(UV_EVENT_UPDATE_NODE_INFO);
-            // fall through
+            break;
         case CTX_SEND_SNAPSHOT:
             if (is_worker)
                 worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT);
-            // fall through
+            break;
         case CTX_SEND_SNAPSHOT_UPD:
             if (is_worker)
                 worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT_UPD);
-            // fall through
+            break;
         case NODE_STATE_UPDATE:
             if (is_worker)
                 worker_is_busy(UV_EVENT_NODE_STATE_UPDATE);
-            ok_to_send = true;
             break;
         default:
             nd_log_daemon(NDLP_ERR, "Unknown msg type %u; ignoring", query->type);
+            ok_to_send = false;
             break;
     }
     if (ok_to_send)
