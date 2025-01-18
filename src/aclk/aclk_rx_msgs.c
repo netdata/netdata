@@ -6,6 +6,7 @@
 #include "aclk.h"
 #include "aclk_capas.h"
 #include "aclk_query.h"
+#include "mqtt_websockets/aclk_mqtt_workers.h"
 
 #include "schema-wrappers/proto_2_json.h"
 

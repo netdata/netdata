@@ -809,6 +809,7 @@ void *aclk_main(void *ptr)
     worker_register_job_name(WORKER_ACLK_CPT_DISCONNECT, "cpt disconnect");
     worker_register_job_name(WORKER_ACLK_CPT_UNKNOWN, "cpt unknown");
     worker_register_job_name(WORKER_ACLK_SEND_FRAGMENT, "send fragment");
+    worker_register_job_name(WORKER_ACLK_MSG_CALLBACK, "msg callback");
 
     ACLK_PROXY_TYPE proxy_type;
     aclk_get_proxy(&proxy_type);

@@ -2058,8 +2058,11 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                 }
             }
 
-            if (client->msg_callback)
+            if (client->msg_callback) {
+                worker_is_busy(WORKER_ACLK_MSG_CALLBACK);
                 client->msg_callback(pub->topic, pub->data, pub->data_len, pub->qos);
+            }
+
             // in case we have property topic alias and we have topic we take over the string
             // and add pointer to it into topic alias list
             if (prop == NULL)
