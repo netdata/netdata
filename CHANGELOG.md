@@ -6,6 +6,19 @@
 
 **Merged pull requests:**
 
+- fix go.d/ethtool config schema [\#19434](https://github.com/netdata/netdata/pull/19434) ([ilyam8](https://github.com/ilyam8))
+- Cleanup context check list on startup [\#19433](https://github.com/netdata/netdata/pull/19433) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations docs [\#19432](https://github.com/netdata/netdata/pull/19432) ([netdatabot](https://github.com/netdatabot))
+- Drop Fedora 39 from CI and package builds. [\#19431](https://github.com/netdata/netdata/pull/19431) ([Ferroin](https://github.com/Ferroin))
+- docs: fix go.d/ethtool meta [\#19430](https://github.com/netdata/netdata/pull/19430) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/ethtool\): use ndsudo for module info [\#19429](https://github.com/netdata/netdata/pull/19429) ([ilyam8](https://github.com/ilyam8))
+- add 'ethtool -m' to ndsudo [\#19428](https://github.com/netdata/netdata/pull/19428) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/ethtool\): collect module ddm info using ethtool [\#19426](https://github.com/netdata/netdata/pull/19426) ([ilyam8](https://github.com/ilyam8))
+- ACLK timeout [\#19425](https://github.com/netdata/netdata/pull/19425) ([ktsaou](https://github.com/ktsaou))
+- log stream\_info payload when it cannot be parsed [\#19424](https://github.com/netdata/netdata/pull/19424) ([ktsaou](https://github.com/ktsaou))
+- Fix coverity issues [\#19422](https://github.com/netdata/netdata/pull/19422) ([stelfrag](https://github.com/stelfrag))
+- add 'type' to GH report forms [\#19421](https://github.com/netdata/netdata/pull/19421) ([ilyam8](https://github.com/ilyam8))
+- fix mmaps accounting [\#19420](https://github.com/netdata/netdata/pull/19420) ([ktsaou](https://github.com/ktsaou))
 - PULSE: network traffic [\#19419](https://github.com/netdata/netdata/pull/19419) ([ktsaou](https://github.com/ktsaou))
 - hostnames: convert to utf8 and santitize [\#19418](https://github.com/netdata/netdata/pull/19418) ([ktsaou](https://github.com/ktsaou))
 - cleanup contexts during loading [\#19416](https://github.com/netdata/netdata/pull/19416) ([ktsaou](https://github.com/ktsaou))
@@ -463,16 +476,6 @@
 - Regenerate integrations.js [\#18891](https://github.com/netdata/netdata/pull/18891) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d.plugin\): add spigotmc collector [\#18890](https://github.com/netdata/netdata/pull/18890) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/spigotmc [\#18889](https://github.com/netdata/netdata/pull/18889) ([ilyam8](https://github.com/ilyam8))
-- improvement\(go.d/k8sstate\): collect pod status reason [\#18887](https://github.com/netdata/netdata/pull/18887) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18886](https://github.com/netdata/netdata/pull/18886) ([netdatabot](https://github.com/netdatabot))
-- fix\(go.d/k8sstate\): use static list of warning/terminated reasons [\#18885](https://github.com/netdata/netdata/pull/18885) ([ilyam8](https://github.com/ilyam8))
-- properly sanitize prometheus names and values [\#18884](https://github.com/netdata/netdata/pull/18884) ([ktsaou](https://github.com/ktsaou))
-- Windows storage fixes [\#18880](https://github.com/netdata/netdata/pull/18880) ([ktsaou](https://github.com/ktsaou))
-- include windows.h globally in libnetdata [\#18878](https://github.com/netdata/netdata/pull/18878) ([ktsaou](https://github.com/ktsaou))
-- fix: correct go.d.plugin permission for source builds [\#18876](https://github.com/netdata/netdata/pull/18876) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/prometheus/common from 0.60.0 to 0.60.1 in /src/go [\#18874](https://github.com/netdata/netdata/pull/18874) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump k8s.io/client-go from 0.31.1 to 0.31.2 in /src/go [\#18873](https://github.com/netdata/netdata/pull/18873) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/vmware/govmomi from 0.45.0 to 0.45.1 in /src/go [\#18872](https://github.com/netdata/netdata/pull/18872) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
