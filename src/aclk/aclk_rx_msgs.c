@@ -6,6 +6,7 @@
 #include "aclk.h"
 #include "aclk_capas.h"
 #include "aclk_query.h"
+#include "mqtt_websockets/aclk_mqtt_workers.h"
 
 #include "schema-wrappers/proto_2_json.h"
 
@@ -417,11 +418,9 @@ int contexts_checkpoint(const char *msg, size_t msg_len)
     if (!cmd)
         return 1;
 
-    rrdcontext_hub_checkpoint_command(cmd);
-
-    freez(cmd->claim_id);
-    freez(cmd->node_id);
-    freez(cmd);
+    aclk_query_t query = aclk_query_new(CTX_CHECKPOINT);
+    query->data.payload = cmd;
+    aclk_execute_query(query);
     return 0;
 }
 
@@ -436,11 +435,9 @@ int stop_streaming_contexts(const char *msg, size_t msg_len)
     if (!cmd)
         return 1;
 
-    rrdcontext_hub_stop_streaming_command(cmd);
-
-    freez(cmd->claim_id);
-    freez(cmd->node_id);
-    freez(cmd);
+    aclk_query_t query = aclk_query_new(CTX_STOP_STREAMING);
+    query->data.payload = cmd;
+    aclk_execute_query(query);
     return 0;
 }
 

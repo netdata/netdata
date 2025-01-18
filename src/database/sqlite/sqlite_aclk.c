@@ -303,18 +303,83 @@ static void after_aclk_run_query_job(uv_work_t *req, int status __maybe_unused)
     freez(payload);
 }
 
-static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query)
+static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query, bool is_worker)
 {
     if (query->type == UNKNOWN || query->type >= ACLK_QUERY_TYPE_COUNT) {
         error_report("Unknown query in query queue. %u", query->type);
         return;
     }
 
-    if (query->type == HTTP_API_V2) {
-        http_api_v2(config->client, query);
-    } else {
-        send_bin_msg(config->client, query);
+    struct ctxs_checkpoint *cmd;
+
+    bool ok_to_send = true;
+
+    switch (query->type) {
+        case HTTP_API_V2:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
+            http_api_v2(config->client, query);
+            ok_to_send = false;
+            break;
+        case CTX_CHECKPOINT:;
+            if (is_worker)
+                worker_is_busy(UV_EVENT_CTX_CHECKPOINT);
+            cmd = query->data.payload;
+            rrdcontext_hub_checkpoint_command(cmd);
+            freez(cmd->claim_id);
+            freez(cmd->node_id);
+            freez(cmd);
+            ok_to_send = false;
+            break;
+        case CTX_STOP_STREAMING:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_CTX_STOP_STREAMING);
+            cmd = query->data.payload;
+            rrdcontext_hub_stop_streaming_command(cmd);
+            freez(cmd->claim_id);
+            freez(cmd->node_id);
+            freez(cmd);
+            ok_to_send = false;
+            break;
+        case ALARM_PROVIDE_CFG:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_ALARM_PROVIDE_CFG);
+            break;
+        case ALARM_SNAPSHOT:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_ALARM_SNAPSHOT);
+            break;
+        case REGISTER_NODE:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_REGISTER_NODE);
+            break;
+        case UPDATE_NODE_COLLECTORS:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_UPDATE_NODE_COLLECTORS);
+            break;
+        case UPDATE_NODE_INFO:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_UPDATE_NODE_INFO);
+            break;
+        case CTX_SEND_SNAPSHOT:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT);
+            break;
+        case CTX_SEND_SNAPSHOT_UPD:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT_UPD);
+            break;
+        case NODE_STATE_UPDATE:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_NODE_STATE_UPDATE);
+            break;
+        default:
+            nd_log_daemon(NDLP_ERR, "Unknown msg type %u; ignoring", query->type);
+            ok_to_send = false;
+            break;
     }
+    if (ok_to_send)
+        send_bin_msg(config->client, query);
     aclk_query_free(query);
 }
 
@@ -322,13 +387,11 @@ static void aclk_run_query_job(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
-    worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
-
     struct aclk_query_payload *payload =  req->data;
     struct aclk_sync_config_s *config = payload->config;
     aclk_query_t query = (aclk_query_t) payload->data;
 
-    aclk_run_query(config, query);
+    aclk_run_query(config, query, true);
     worker_is_idle();
 }
 
@@ -508,7 +571,7 @@ static void aclk_synchronization(void *arg)
 
                     if (execute_now) {
                         worker_is_busy(ACLK_QUERY_EXECUTE_SYNC);
-                        aclk_run_query(config, query);
+                        aclk_run_query(config, query, false);
                         freez(payload);
                         config->aclk_queries_running--;
                     }

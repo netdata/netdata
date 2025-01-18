@@ -18,8 +18,12 @@ typedef enum {
     ALARM_PROVIDE_CFG,
     ALARM_SNAPSHOT,
     UPDATE_NODE_COLLECTORS,
-    PROTO_BIN_MESSAGE,
-    ACLK_QUERY_TYPE_COUNT // always keep this as last
+    CTX_SEND_SNAPSHOT,              // Context snapshot to the cloud
+    CTX_SEND_SNAPSHOT_UPD,          // Context incremental update to the cloud
+    CTX_CHECKPOINT,                 // Context checkpoint from the cloud
+    CTX_STOP_STREAMING,             // Context stop streaming
+    CREATE_NODE_INSTANCE,           // Create node instance on the agent
+    ACLK_QUERY_TYPE_COUNT           // always keep this as last
 } aclk_query_type_t;
 
 struct aclk_query_http_api_v2 {
@@ -56,6 +60,7 @@ struct aclk_query {
     union {
         struct aclk_query_http_api_v2 http_api_v2;
         struct aclk_bin_payload bin_payload;
+        void *payload;
     } data;
 };
 
