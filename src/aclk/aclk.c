@@ -799,6 +799,16 @@ void *aclk_main(void *ptr)
     worker_register_job_name(WORKER_ACLK_HANDLE_MQTT_INTERNAL, "mqtt internal");
     worker_register_job_name(WORKER_ACLK_TX, "tx");
     worker_register_job_name(WORKER_ACLK_TX_ERROR, "tx error");
+    worker_register_job_name(WORKER_ACLK_TRY_SEND_ALL, "try send all");
+    worker_register_job_name(WORKER_ACLK_HANDLE_INCOMING, "handle incoming");
+    worker_register_job_name(WORKER_ACLK_CPT_CONNACK, "cpt connack");
+    worker_register_job_name(WORKER_ACLK_CPT_PUBACK, "cpt puback");
+    worker_register_job_name(WORKER_ACLK_CPT_PINGRESP, "cpt pingresp");
+    worker_register_job_name(WORKER_ACLK_CPT_SUBACK, "cpt suback");
+    worker_register_job_name(WORKER_ACLK_CPT_PUBLISH, "cpt publish");
+    worker_register_job_name(WORKER_ACLK_CPT_DISCONNECT, "cpt disconnect");
+    worker_register_job_name(WORKER_ACLK_CPT_UNKNOWN, "cpt unknown");
+    worker_register_job_name(WORKER_ACLK_SEND_FRAGMENT, "send fragment");
 
     ACLK_PROXY_TYPE proxy_type;
     aclk_get_proxy(&proxy_type);

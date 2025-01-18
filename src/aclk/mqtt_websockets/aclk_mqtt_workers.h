@@ -26,5 +26,15 @@
 #define WORKER_ACLK_HANDLE_MQTT_INTERNAL        20
 #define WORKER_ACLK_TX                          21
 #define WORKER_ACLK_TX_ERROR                    22
+#define WORKER_ACLK_TRY_SEND_ALL                23
+#define WORKER_ACLK_HANDLE_INCOMING             24
+#define WORKER_ACLK_CPT_CONNACK                 25
+#define WORKER_ACLK_CPT_PUBACK                  26
+#define WORKER_ACLK_CPT_PINGRESP                27
+#define WORKER_ACLK_CPT_SUBACK                  28
+#define WORKER_ACLK_CPT_PUBLISH                 29
+#define WORKER_ACLK_CPT_DISCONNECT              30
+#define WORKER_ACLK_CPT_UNKNOWN                 31
+#define WORKER_ACLK_SEND_FRAGMENT               32
 
 #endif //NETDATA_ACLK_MQTT_WORKERS_H
