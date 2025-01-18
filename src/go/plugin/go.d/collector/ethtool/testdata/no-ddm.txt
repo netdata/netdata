@@ -1,0 +1,29 @@
+Identifier                                : 0x03 (SFP)
+Extended identifier                       : 0x04 (GBIC/SFP defined by 2-wire interface ID)
+Connector                                 : 0x07 (LC)
+Transceiver codes                         : 0x10 0x00 0x00 0x01 0x00 0x00 0x00 0x00 0x00
+Transceiver type                          : 10G Ethernet: 10G Base-SR
+Transceiver type                          : Ethernet: 1000BASE-SX
+Encoding                                  : 0x06 (64B/66B)
+BR, Nominal                               : 10300MBd
+Rate identifier                           : 0x02 (8/4/2G Rx Rate_Select only)
+Length (SMF,km)                           : 0km
+Length (SMF)                              : 0m
+Length (50um)                             : 80m
+Length (62.5um)                           : 30m
+Length (Copper)                           : 0m
+Length (OM3)                              : 300m
+Laser wavelength                          : 850nm
+Vendor name                               : Intel Corp
+Vendor OUI                                : 00:XX:XX
+Vendor PN                                 : FTXXXXXXXXXXX
+Vendor rev                                : A
+Option values                             : 0x00 0x3a
+Option                                    : RX_LOS implemented
+Option                                    : TX_FAULT implemented
+Option                                    : TX_DISABLE implemented
+Option                                    : RATE_SELECT implemented
+BR margin, max                            : 0%
+BR margin, min                            : 0%
+Vendor SN                                 : XXXXXXXX
+Date code                                 : XXXXXX

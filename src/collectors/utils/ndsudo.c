@@ -14,6 +14,15 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "ethtool-module-info",
+        .params = "-m {{devname}}",
+        .search =
+            {
+                [0] = "ethtool",
+                [1] = NULL,
+            },
+    },
+    {
         .name = "chronyc-serverstats",
         .params = "serverstats",
         .search =
