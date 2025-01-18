@@ -11,6 +11,52 @@ void sanity_check(void) {
 #include "sqlite_aclk_node.h"
 #include "../aclk_query_queue.h"
 #include "../aclk_query.h"
+#include "../aclk_capas.h"
+
+static void create_node_instance_result_job(const char *machine_guid, const char *node_id)
+{
+    nd_uuid_t host_uuid, node_uuid;
+
+    if (uuid_parse(machine_guid, host_uuid)) {
+        netdata_log_error("Error parsing machine_guid provided by CreateNodeInstanceResult");
+        return;
+    }
+
+    if (uuid_parse(node_id, node_uuid)) {
+        netdata_log_error("Error parsing node_id provided by CreateNodeInstanceResult");
+        return;
+    }
+
+    sql_update_node_id(&host_uuid, &node_uuid);
+
+    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
+    node_instance_connection_t node_state_update = {
+        .hops = 1,
+        .live = 0,
+        .queryable = 1,
+        .session_id = aclk_session_newarch,
+        .node_id = node_id,
+        .capabilities = NULL};
+
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
+    if (likely(host)) {
+        node_state_update.live = rrdhost_is_local(host) ? 1 : 0;
+        node_state_update.hops = rrdhost_ingestion_hops(host);
+        node_state_update.capabilities = aclk_get_node_instance_capas(host);
+        schedule_node_state_update(host, 5000);
+    }
+
+    CLAIM_ID claim_id = claim_id_get();
+    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
+    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
+
+    freez((void *)node_state_update.capabilities);
+
+    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
+    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
+
+    aclk_execute_query(query);
+}
 
 struct aclk_sync_config_s {
     uv_thread_t thread;
@@ -315,6 +361,8 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
     bool ok_to_send = true;
 
     switch (query->type) {
+
+// Incoming : cloud -> agent
         case HTTP_API_V2:
             if (is_worker)
                 worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
@@ -341,6 +389,37 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             freez(cmd);
             ok_to_send = false;
             break;
+        case SEND_NODE_INSTANCES:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_SEND_NODE_INSTANCES);
+            aclk_send_node_instances();
+            ok_to_send = false;
+            break;
+        case ALERT_START_STREAMING:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_ALERT_START_STREAMING);
+            aclk_start_alert_streaming(query->data.node_id, query->version);
+            freez(query->data.node_id);
+            ok_to_send = false;
+            break;
+        case ALERT_CHECKPOINT:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_ALERT_CHECKPOINT);
+            aclk_alert_version_check(query->data.node_id, query->claim_id, query->version);
+            freez(query->data.node_id);
+            freez(query->claim_id);
+            ok_to_send = false;
+            break;
+        case CREATE_NODE_INSTANCE:
+            if (is_worker)
+                worker_is_busy(UV_EVENT_CREATE_NODE_INSTANCE);
+            create_node_instance_result_job(query->machine_guid, query->data.node_id);
+            freez(query->data.node_id);
+            freez(query->machine_guid);
+            ok_to_send = false;
+            break;
+
+// Outgoing: agent -> cloud
         case ALARM_PROVIDE_CFG:
             if (is_worker)
                 worker_is_busy(UV_EVENT_ALARM_PROVIDE_CFG);
@@ -378,8 +457,10 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             ok_to_send = false;
             break;
     }
+
     if (ok_to_send)
         send_bin_msg(config->client, query);
+
     aclk_query_free(query);
 }
 

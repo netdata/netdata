@@ -255,49 +255,11 @@ int create_node_instance_result(const char *msg, size_t msg_len)
 
     netdata_log_debug(D_ACLK, "CreateNodeInstanceResult: guid:%s nodeid:%s", res.machine_guid, res.node_id);
 
-    nd_uuid_t host_id, node_id;
-    if (uuid_parse(res.machine_guid, host_id)) {
-        netdata_log_error("Error parsing machine_guid provided by CreateNodeInstanceResult");
-        freez(res.machine_guid);
-        freez(res.node_id);
-        return 1;
-    }
-    if (uuid_parse(res.node_id, node_id)) {
-        netdata_log_error("Error parsing node_id provided by CreateNodeInstanceResult");
-        freez(res.machine_guid);
-        freez(res.node_id);
-        return 1;
-    }
-    sql_update_node_id(&host_id, &node_id);
-
-    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-    node_instance_connection_t node_state_update = {
-        .hops = 1,
-        .live = 0,
-        .queryable = 1,
-        .session_id = aclk_session_newarch,
-        .node_id = res.node_id,
-        .capabilities = NULL
-    };
-
-    RRDHOST *host = rrdhost_find_by_guid(res.machine_guid);
-    if (likely(host)) {
-        node_state_update.live = rrdhost_is_local(host) ? 1 : 0;
-        node_state_update.hops = rrdhost_ingestion_hops(host);
-        node_state_update.capabilities = aclk_get_node_instance_capas(host);
-        schedule_node_state_update(host, 5000);
-    }
-
-    CLAIM_ID claim_id = claim_id_get();
-    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
-    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-
-    freez((void *)node_state_update.capabilities);
-
-    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
-    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-
+    aclk_query_t query = aclk_query_new(CREATE_NODE_INSTANCE);
+    query->data.node_id = strdupz(res.node_id);
+    query->machine_guid = strdupz(res.machine_guid);
     aclk_execute_query(query);
+
     freez(res.node_id);
     freez(res.machine_guid);
     return 0;
@@ -307,7 +269,8 @@ int send_node_instances(const char *msg, size_t msg_len)
 {
     UNUSED(msg);
     UNUSED(msg_len);
-    aclk_send_node_instances();
+    aclk_query_t query = aclk_query_new(SEND_NODE_INSTANCES);
+    aclk_execute_query(query);
     return 0;
 }
 
@@ -342,7 +305,10 @@ int start_alarm_streaming(const char *msg, size_t msg_len)
         netdata_log_error("Error parsing StartAlarmStreaming");
         return 1;
     }
-    aclk_start_alert_streaming(res.node_id, res.version);
+    aclk_query_t query = aclk_query_new(ALERT_START_STREAMING);
+    query->data.node_id = strdupz(res.node_id);
+    query->version = res.version;
+    aclk_execute_query(query);
     freez(res.node_id);
     return 0;
 }
@@ -356,7 +322,11 @@ int send_alarm_checkpoint(const char *msg, size_t msg_len)
         freez(sac.claim_id);
         return 1;
     }
-    aclk_alert_version_check(sac.node_id, sac.claim_id, sac.version);
+    aclk_query_t query = aclk_query_new(ALERT_CHECKPOINT);
+    query->data.node_id = strdupz(sac.node_id);
+    query->claim_id = strdupz(sac.claim_id);
+    query->version = sac.version;
+    aclk_execute_query(query);
     freez(sac.node_id);
     freez(sac.claim_id);
     return 0;
@@ -466,18 +436,18 @@ typedef struct {
 
 new_cloud_rx_msg_t rx_msgs[] = {
     { .name = "cmd",                       .name_hash = 0, .fnc = handle_old_proto_cmd         },
-    { .name = "CreateNodeInstanceResult",  .name_hash = 0, .fnc = create_node_instance_result  },
-    { .name = "SendNodeInstances",         .name_hash = 0, .fnc = send_node_instances          },
-    { .name = "StreamChartsAndDimensions", .name_hash = 0, .fnc = stream_charts_and_dimensions },
-    { .name = "ChartsAndDimensionsAck",    .name_hash = 0, .fnc = charts_and_dimensions_ack    },
-    { .name = "UpdateChartConfigs",        .name_hash = 0, .fnc = update_chart_configs         },
-    { .name = "StartAlarmStreaming",       .name_hash = 0, .fnc = start_alarm_streaming        },
-    { .name = "SendAlarmCheckpoint",       .name_hash = 0, .fnc = send_alarm_checkpoint        },
-    { .name = "SendAlarmConfiguration",    .name_hash = 0, .fnc = send_alarm_configuration     },
-    { .name = "SendAlarmSnapshot",         .name_hash = 0, .fnc = send_alarm_snapshot          },
+    { .name = "CreateNodeInstanceResult",  .name_hash = 0, .fnc = create_node_instance_result  },  // TODO
+    { .name = "SendNodeInstances",         .name_hash = 0, .fnc = send_node_instances          },  // async
+    { .name = "StreamChartsAndDimensions", .name_hash = 0, .fnc = stream_charts_and_dimensions },  // unused
+    { .name = "ChartsAndDimensionsAck",    .name_hash = 0, .fnc = charts_and_dimensions_ack    },  // unused
+    { .name = "UpdateChartConfigs",        .name_hash = 0, .fnc = update_chart_configs         },  // unused
+    { .name = "StartAlarmStreaming",       .name_hash = 0, .fnc = start_alarm_streaming        },  // async
+    { .name = "SendAlarmCheckpoint",       .name_hash = 0, .fnc = send_alarm_checkpoint        },  // async
+    { .name = "SendAlarmConfiguration",    .name_hash = 0, .fnc = send_alarm_configuration     },  // async
+    { .name = "SendAlarmSnapshot",         .name_hash = 0, .fnc = send_alarm_snapshot          },  // shouldn't be used
     { .name = "DisconnectReq",             .name_hash = 0, .fnc = handle_disconnect_req        },
-    { .name = "ContextsCheckpoint",        .name_hash = 0, .fnc = contexts_checkpoint          },
-    { .name = "StopStreamingContexts",     .name_hash = 0, .fnc = stop_streaming_contexts      },
+    { .name = "ContextsCheckpoint",        .name_hash = 0, .fnc = contexts_checkpoint          },  // async
+    { .name = "StopStreamingContexts",     .name_hash = 0, .fnc = stop_streaming_contexts      },  // async
     { .name = "CancelPendingRequest",      .name_hash = 0, .fnc = cancel_pending_req           },
     { .name = NULL,                        .name_hash = 0, .fnc = NULL                         },
 };
