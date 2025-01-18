@@ -98,7 +98,7 @@ void pulse_aclk_sent_message_acked(usec_t sent_ut, size_t len __maybe_unused) {
     usec_t usec = now_monotonic_usec() - sent_ut;
 
     size_t slot = aclk_time_histogram_slot(&aclk_time_heatmap, usec);
-    internal_fatal(slot >= _countof(h->array), "hey!");
+    internal_fatal(slot >= _countof(aclk_time_heatmap.array), "hey!");
 
     __atomic_add_fetch(&aclk_time_heatmap.array[slot].count, 1, __ATOMIC_RELAXED);
 }
