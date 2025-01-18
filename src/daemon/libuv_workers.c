@@ -60,6 +60,17 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_ACLK_NODE_INFO, "aclk host node info");
     worker_register_job_name(UV_EVENT_ACLK_ALERT_PUSH, "aclk alert push");
     worker_register_job_name(UV_EVENT_ACLK_QUERY_EXECUTE, "aclk query execute");
+    // aclk
+    worker_register_job_name(UV_EVENT_CTX_STOP_STREAMING, "ctx stop streaming");
+    worker_register_job_name(UV_EVENT_CTX_CHECKPOINT, "ctx version check");
+    worker_register_job_name(UV_EVENT_ALARM_PROVIDE_CFG, "send alarm config");
+    worker_register_job_name(UV_EVENT_ALARM_SNAPSHOT, "alert snapshot");
+    worker_register_job_name(UV_EVENT_REGISTER_NODE, "register node");
+    worker_register_job_name(UV_EVENT_UPDATE_NODE_COLLECTORS, "update collectors");
+    worker_register_job_name(UV_EVENT_UPDATE_NODE_INFO, "send node info");
+    worker_register_job_name(UV_EVENT_CTX_SEND_SNAPSHOT, "ctx send snapshot");
+    worker_register_job_name(UV_EVENT_CTX_SEND_SNAPSHOT_UPD, "ctx send update");
+    worker_register_job_name(UV_EVENT_NODE_STATE_UPDATE, "node state update");
 
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
