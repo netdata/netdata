@@ -1928,6 +1928,7 @@ static void mark_message_for_gc(struct buffer_fragment *frag)
 
 static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
 {
+    size_t reclaimable = 0;
     LOCK_HDR_BUFFER(&client->main_buffer);
     struct buffer_fragment *frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
     while (frag) {
@@ -1938,9 +1939,18 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
                 return 1;
             }
             mark_message_for_gc(frag);
+
+            size_t used = BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer);
+            if (reclaimable >= (used / 4))
+                transaction_buffer_garbage_collect(&client->main_buffer);
+
             UNLOCK_HDR_BUFFER(&client->main_buffer);
             return 0;
         }
+
+        if(frag_is_marked_for_gc(frag))
+            reclaimable += FRAG_SIZE_IN_BUFFER(frag);
+
         frag = frag->next;
     }
     nd_log(NDLS_DAEMON, NDLP_ERR, "Received packet_id (%" PRIu16 ") is unknown!", packet_id);
