@@ -73,6 +73,7 @@ void *pulse_thread_main(void *ptr) {
     }
 
     pulse_aral_init();
+    aclk_time_histogram_init();
 
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;

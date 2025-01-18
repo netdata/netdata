@@ -5,6 +5,7 @@
 #endif
 
 #include "libnetdata/libnetdata.h"
+void pulse_aclk_sent_message_acked(usec_t usec, size_t len);
 
 #include "common_internal.h"
 #include "mqtt_constants.h"
@@ -32,14 +33,13 @@
 
 typedef uint16_t buffer_frag_flag_t;
 struct buffer_fragment {
-    size_t len;
-    size_t sent;
+    uint32_t len;
+    uint32_t sent;
     buffer_frag_flag_t flags;
+    uint16_t packet_id;
     void (*free_fnc)(void *ptr);
     unsigned char *data;
-
-    uint16_t packet_id;
-
+    usec_t sent_monotonic_ut;
     struct buffer_fragment *next;
 };
 
@@ -1852,6 +1852,7 @@ static int mqtt_ng_next_to_send(struct mqtt_ng_client *client) {
     if ( client->ping_pending && (!frag || (frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD && frag->sent == 0)) ) {
         client->ping_pending = 0;
         ping_frag.sent = 0;
+        ping_frag.sent_monotonic_ut = 0;
         client->main_buffer.sending_frag = &ping_frag;
         return 0;
     }
@@ -1881,6 +1882,7 @@ static int send_fragment(struct mqtt_ng_client *client) {
     else
         nd_log(NDLS_DAEMON, NDLP_WARNING, "This fragment was fully sent already. This should not happen!");
 
+    frag->sent_monotonic_ut = now_monotonic_usec();
     frag->sent += processed;
     if (frag->sent != frag->len)
         return -1;
@@ -1938,6 +1940,7 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
                 UNLOCK_HDR_BUFFER(&client->main_buffer);
                 return 1;
             }
+            pulse_aclk_sent_message_acked(frag->sent_monotonic_ut, frag->len);
             mark_message_for_gc(frag);
 
             size_t used = BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer);
@@ -2016,6 +2019,7 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
 
         case MQTT_CPT_PINGRESP:
             worker_is_busy(WORKER_ACLK_CPT_PINGRESP);
+            pulse_aclk_sent_message_acked(ping_frag.sent_monotonic_ut, ping_frag.len);
             break;
 
         case MQTT_CPT_SUBACK:
