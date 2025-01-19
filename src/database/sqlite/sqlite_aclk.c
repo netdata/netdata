@@ -492,7 +492,7 @@ static void aclk_run_query_job(uv_work_t *req)
     worker_is_idle();
 }
 
-static void after_aclk_batch_job(uv_work_t *req, int status __maybe_unused)
+static void after_aclk_execute_batch(uv_work_t *req, int status __maybe_unused)
 {
     struct aclk_query_payload *payload = req->data;
     struct aclk_sync_config_s *config = payload->config;
@@ -500,7 +500,7 @@ static void after_aclk_batch_job(uv_work_t *req, int status __maybe_unused)
     freez(payload);
 }
 
-static void aclk_batch_job(uv_work_t *req)
+static void aclk_execute_batch(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
@@ -531,7 +531,7 @@ static void aclk_batch_job(uv_work_t *req)
     usec_t ended_ut = now_monotonic_usec();
     (void)ended_ut;
     nd_log_daemon(
-        NDLP_INFO, "Processed %zu ACLK commands in %0.2f ms", entries, (double)(ended_ut - started_ut) / USEC_PER_MS);
+        NDLP_DEBUG, "Processed %zu ACLK commands in %0.2f ms", entries, (double)(ended_ut - started_ut) / USEC_PER_MS);
 
     worker_is_idle();
 }
@@ -756,7 +756,7 @@ static void aclk_synchronization(void *arg)
                     config->aclk_jobs_pending -= aclk_query_batch->count;
                     aclk_query_batch = NULL;
 
-                    if (uv_queue_work(loop, &payload->request, aclk_batch_job, after_aclk_batch_job)) {
+                    if (uv_queue_work(loop, &payload->request, aclk_execute_batch, after_aclk_execute_batch)) {
                         aclk_query_batch = payload->data;
                         config->aclk_jobs_pending += aclk_query_batch->count;
                         freez(payload);
