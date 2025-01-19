@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- add more aclk worker jobs [\#19435](https://github.com/netdata/netdata/pull/19435) ([ktsaou](https://github.com/ktsaou))
 - fix go.d/ethtool config schema [\#19434](https://github.com/netdata/netdata/pull/19434) ([ilyam8](https://github.com/ilyam8))
 - Cleanup context check list on startup [\#19433](https://github.com/netdata/netdata/pull/19433) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#19432](https://github.com/netdata/netdata/pull/19432) ([netdatabot](https://github.com/netdatabot))
@@ -475,7 +476,6 @@
 - Fix coverity issues [\#18892](https://github.com/netdata/netdata/pull/18892) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18891](https://github.com/netdata/netdata/pull/18891) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d.plugin\): add spigotmc collector [\#18890](https://github.com/netdata/netdata/pull/18890) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/spigotmc [\#18889](https://github.com/netdata/netdata/pull/18889) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
