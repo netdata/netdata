@@ -953,7 +953,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
                    "Registering host=%s, hops=%d", host->machine_guid,
                    rrdhost_ingestion_hops(host));
 
-            aclk_execute_query(create_query);
+            aclk_add_job(create_query);
             return;
         }
     }
@@ -982,7 +982,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
     freez((void*)node_state_update.node_id);
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-    aclk_execute_query(query);
+    aclk_add_job(query);
 }
 
 void aclk_send_node_instances()
@@ -1028,7 +1028,7 @@ void aclk_send_node_instances()
             freez((void*)node_state_update.node_id);
             query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
             query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-            aclk_execute_query(query);
+            aclk_add_job(query);
         } else {
             aclk_query_t create_query;
             create_query = aclk_query_new(REGISTER_NODE);
@@ -1050,7 +1050,7 @@ void aclk_send_node_instances()
                    (char*)node_instance_creation.machine_guid, list->hops);
 
             freez((void *)node_instance_creation.machine_guid);
-            aclk_execute_query(create_query);
+            aclk_add_job(create_query);
         }
         freez(list->hostname);
 
