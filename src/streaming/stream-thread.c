@@ -142,6 +142,8 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
                     if (sth->messages.array[i].meta == &rpt->thread.meta) {
                         rpt->thread.send_to_child.msg_slot = i;
                         sth->messages.array[rpt->thread.send_to_child.msg_slot].opcode |= msg.opcode;
+                        if(msg.reason)
+                            sth->messages.array[rpt->thread.send_to_child.msg_slot].reason = msg.reason;
                         spinlock_unlock(&sth->messages.spinlock);
                         internal_fatal(true, "the stream opcode queue is full, but this receiver is already on slot %zu", i);
                         return;
@@ -158,9 +160,12 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
             rpt->thread.send_to_child.msg_slot = sth->messages.used++;
             sth->messages.array[rpt->thread.send_to_child.msg_slot] = msg;
         }
-        else
+        else {
             // the existing slot is good
             sth->messages.array[rpt->thread.send_to_child.msg_slot].opcode |= msg.opcode;
+            if(msg.reason)
+                sth->messages.array[rpt->thread.send_to_child.msg_slot].reason = msg.reason;
+        }
     }
     spinlock_unlock(&sth->messages.spinlock);
 
@@ -223,6 +228,8 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
                     if (sth->messages.array[i].meta == &s->thread.meta) {
                         s->thread.msg_slot = i;
                         sth->messages.array[s->thread.msg_slot].opcode |= msg.opcode;
+                        if(msg.reason)
+                            sth->messages.array[s->thread.msg_slot].reason = msg.reason;
                         spinlock_unlock(&sth->messages.spinlock);
                         internal_fatal(true, "the dispatcher message queue is full, but this sender is already on slot %zu", i);
                         return;
@@ -239,9 +246,12 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
             s->thread.msg_slot = sth->messages.used++;
             sth->messages.array[s->thread.msg_slot] = msg;
         }
-        else
+        else {
             // the existing slot is good
             sth->messages.array[s->thread.msg_slot].opcode |= msg.opcode;
+            if(msg.reason)
+                sth->messages.array[s->thread.msg_slot].reason = msg.reason;
+        }
     }
     spinlock_unlock(&sth->messages.spinlock);
 
@@ -395,7 +405,6 @@ void *stream_thread(void *ptr) {
     // both sender and receiver
     worker_register_job_name(WORKER_STREAM_JOB_SOCKET_RECEIVE, "receive");
     worker_register_job_name(WORKER_STREAM_JOB_SOCKET_SEND, "send");
-    worker_register_job_name(WORKER_STREAM_JOB_SOCKET_ERROR, "sock error");
 
     // receiver
     worker_register_job_name(WORKER_STREAM_JOB_COMPRESS, "compress");
@@ -409,8 +418,8 @@ void *stream_thread(void *ptr) {
 
     // disconnection reasons
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
+    worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
+    worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
     worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED, "disconnect remote closed");
     worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
     worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
@@ -745,6 +754,8 @@ void stream_receiver_add_to_queue(struct receiver_state *rpt) {
     RECEIVERS_SET(&sth->queue.receivers, ++sth->queue.id, rpt);
     sth->queue.receivers_waiting++;
     spinlock_unlock(&sth->queue.spinlock);
+
+    pulse_receiver_waiting(rpt->hops);
 }
 
 void stream_sender_add_to_queue(struct sender_state *s) {

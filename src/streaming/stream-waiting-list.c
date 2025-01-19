@@ -42,6 +42,8 @@ void stream_thread_process_waiting_list_unsafe(struct stream_thread *sth, usec_t
         return;
     }
 
+    pulse_receiver_not_waiting(rpt->hops);
+
     RECEIVERS_DEL(&sth->queue.receivers, idx);
     stream_receiver_move_to_running_unsafe(sth, rpt);
     sth->queue.receivers_waiting--;

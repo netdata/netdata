@@ -5,6 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include "stream-circular-buffer.h"
+#include "stream-handshake.h"
 
 struct stream_thread;
 struct pollfd_slotted {
@@ -30,6 +31,7 @@ struct stream_opcode {
     int32_t thread_slot;                // the dispatcher id this message refers to
     uint32_t session;                   // random number used to verify that the message the dispatcher receives is for this sender
     STREAM_OPCODE opcode;               // the actual message to be delivered
+    STREAM_HANDSHAKE reason;
     struct pollfd_meta *meta;
 };
 
@@ -45,46 +47,48 @@ struct stream_opcode {
 // socket operations
 #define WORKER_STREAM_JOB_SOCKET_RECEIVE                                5
 #define WORKER_STREAM_JOB_SOCKET_SEND                                   6
-#define WORKER_STREAM_JOB_SOCKET_ERROR                                  7
 
 // compression
-#define WORKER_STREAM_JOB_COMPRESS                                      8
-#define WORKER_STREAM_JOB_DECOMPRESS                                    9
+#define WORKER_STREAM_JOB_COMPRESS                                      7
+#define WORKER_STREAM_JOB_DECOMPRESS                                    8
 
 // receiver events
-#define WORKER_RECEIVER_JOB_BYTES_READ                                  10
-#define WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED                          11
+#define WORKER_RECEIVER_JOB_BYTES_READ                                  9
+#define WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED                          10
 
 // sender received commands
-#define WORKER_SENDER_JOB_EXECUTE                                       12
-#define WORKER_SENDER_JOB_EXECUTE_REPLAY                                13
-#define WORKER_SENDER_JOB_EXECUTE_FUNCTION                              14
-#define WORKER_SENDER_JOB_EXECUTE_META                                  15
+#define WORKER_SENDER_JOB_EXECUTE                                       11
+#define WORKER_SENDER_JOB_EXECUTE_REPLAY                                12
+#define WORKER_SENDER_JOB_EXECUTE_FUNCTION                              13
+#define WORKER_SENDER_JOB_EXECUTE_META                                  14
 
-#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                           16
-#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT                            17
-#define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR                       18
-#define WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED                      19
-#define WORKER_STREAM_JOB_DISCONNECT_RECEIVE_ERROR                      20
-#define WORKER_STREAM_JOB_DISCONNECT_SEND_ERROR                         21
-#define WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR                  22
-#define WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT                      23
-#define WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP                       24
+// disconnect reasons
+#define WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED                      15
+#define WORKER_STREAM_JOB_DISCONNECT_RECEIVE_ERROR                      16
+#define WORKER_STREAM_JOB_DISCONNECT_SEND_ERROR                         17
+#define WORKER_STREAM_JOB_DISCONNECT_TIMEOUT                            18
+#define WORKER_STREAM_JOB_DISCONNECT_SOCKET_ERROR                       19
+
+// sender-only disconnect reasons
+#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                           20
+#define WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR                  21
+#define WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT                      22
+#define WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP                       23
 
 // dispatcher metrics
 // this has to be the same at pluginsd_parser.h
-#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION                      25
-#define WORKER_STREAM_METRIC_NODES                                      26
-#define WORKER_SENDER_JOB_BUFFER_RATIO                                  27
-#define WORKER_SENDER_JOB_BYTES_RECEIVED                                28
-#define WORKER_SENDER_JOB_BYTES_SENT                                    29
-#define WORKER_SENDER_JOB_BYTES_COMPRESSED                              30
-#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED                            31
-#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO                       32
-#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                              33
-#define WORKER_SENDER_JOB_MESSAGES                                      34
-#define WORKER_STREAM_JOB_RECEIVERS_WAITING_LIST_SIZE                   35
-#define WORKER_STREAM_JOB_SEND_MISSES                                   36
+#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION                      24
+#define WORKER_STREAM_METRIC_NODES                                      25
+#define WORKER_SENDER_JOB_BUFFER_RATIO                                  26
+#define WORKER_SENDER_JOB_BYTES_RECEIVED                                27
+#define WORKER_SENDER_JOB_BYTES_SENT                                    28
+#define WORKER_SENDER_JOB_BYTES_COMPRESSED                              29
+#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED                            30
+#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO                       31
+#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                              32
+#define WORKER_SENDER_JOB_MESSAGES                                      33
+#define WORKER_STREAM_JOB_RECEIVERS_WAITING_LIST_SIZE                   34
+#define WORKER_STREAM_JOB_SEND_MISSES                                   35
 
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
 

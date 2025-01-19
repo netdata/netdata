@@ -811,7 +811,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     stream_sender_structures_free(host);
 
     if (netdata_exit || force)
-        stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP);
+        stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP);
 
 
     // ------------------------------------------------------------------------

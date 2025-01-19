@@ -26,6 +26,7 @@ extern bool pulse_extended_enabled;
 #include "pulse-trace-allocations.h"
 #include "pulse-aral.h"
 #include "pulse-network.h"
+#include "pulse-parents.h"
 
 void *pulse_thread_main(void *ptr);
 void *pulse_thread_sqlite3_main(void *ptr);

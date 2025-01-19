@@ -235,7 +235,7 @@ stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, ch
     }
 
     if(version >= STREAM_HANDSHAKE_OK_V1) {
-        stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_CONNECTED,
+        stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_SP_CONNECTED,
                                           stream_send.parents.reconnect_delay_s);
         s->capabilities = convert_stream_version_to_capabilities(version, host, true);
         return true;
@@ -328,7 +328,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
         nd_sock_close(&s->sock);
         stream_parent_set_reconnect_delay(
-            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE, 60);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_SND_DISCONNECT_HTTP_UPGRADE_FAILED, 60);
         return false;
     }
 
@@ -466,6 +466,8 @@ void stream_connector_requeue(struct sender_state *s) {
     SENDERS_SET(&sc->queue.senders, (Word_t)s, s);
     spinlock_unlock(&sc->queue.spinlock);
 
+    pulse_sender_connecting();
+
     // signal the connector to catch the job
     completion_mark_complete_a_job(&sc->completion);
 }
@@ -504,7 +506,8 @@ static void stream_connector_remove(struct sender_state *s) {
            "STREAM CNT '%s' [to %s]: streaming connector removed host: %s (signaled to stop)",
            rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(s->exit.reason));
 
-    stream_sender_remove(s);
+    pulse_sender_not_connecting();
+    stream_sender_remove(s, s->exit.reason ? s->exit.reason : STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
 }
 
 static void *stream_connector_thread(void *ptr) {
@@ -565,6 +568,8 @@ static void *stream_connector_thread(void *ptr) {
                 worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTED);
                 SENDERS_DEL(&sc->queue.senders, (Word_t)s);
                 spinlock_unlock(&sc->queue.spinlock);
+
+                pulse_sender_not_connecting();
 
                 // do not have the connector lock when calling this
                 stream_sender_add_to_queue(s);

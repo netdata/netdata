@@ -229,14 +229,14 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
                stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
 
         stream_sender_move_running_to_connector_or_remove(
-            sth, s, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SEND_BUFFER, true);
+            sth, s, STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW, true);
         return;
     }
 
     if(msg->opcode & STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT);
         stream_sender_move_running_to_connector_or_remove(
-            sth, s, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
+            sth, s, msg->reason ? msg->reason : STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP, false);
         return;
     }
 
@@ -248,14 +248,14 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
                sth->id, rrdhost_hostname(s->host), s->remote_ip);
 
         stream_sender_move_running_to_connector_or_remove(
-            sth, s, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_COMPRESSION_FAILED, true);
+            sth, s, STREAM_HANDSHAKE_SND_DISCONNECT_COMPRESSION_FAILED, true);
         return;
     }
 
     if(msg->opcode & STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP);
         stream_sender_move_running_to_connector_or_remove(
-            sth, s, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, false);
+            sth, s, STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP, false);
         return;
     }
 
@@ -329,28 +329,35 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
                    "STREAM SND[%zu] '%s' [to %s]: failed to add sender socket to nd_poll()",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip);
 
+        pulse_sender_running(s->hops);
         stream_sender_on_ready_to_dispatch(s);
     }
 }
 
-void stream_sender_remove(struct sender_state *s) {
+void stream_sender_remove(struct sender_state *s, STREAM_HANDSHAKE reason) {
     // THIS FUNCTION IS USED BY THE CONNECTOR TOO
     // when it gives up on a certain node
 
     stream_sender_lock(s);
 
+    if(reason == STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP && s->exit.reason) {
+        reason = s->exit.reason;
+        s->exit.reason = 0;
+    }
+
     __atomic_store_n(&s->exit.shutdown, false, __ATOMIC_RELAXED);
     rrdhost_flag_clear(s->host,
-        RRDHOST_FLAG_STREAM_SENDER_ADDED | RRDHOST_FLAG_STREAM_SENDER_CONNECTED |
-            RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
+                       RRDHOST_FLAG_STREAM_SENDER_ADDED | RRDHOST_FLAG_STREAM_SENDER_CONNECTED |
+                           RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     s->last_state_since_t = now_realtime_sec();
-    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, s->exit.reason, s->last_state_since_t);
+    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, s->last_state_since_t);
     s->connector.id = -1;
+    s->exit.reason = 0;
 
     stream_sender_unlock(s);
 
-    rrdhost_stream_parents_reset(s->host, STREAM_HANDSHAKE_EXITING);
+    rrdhost_stream_parents_reset(s->host, reason);
 
 #ifdef NETDATA_LOG_STREAM_SENDER
     spinlock_lock(&s->log.spinlock);
@@ -423,10 +430,14 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
     stream_thread_node_removed(s->host);
 
-    if (should_remove)
-        stream_sender_remove(s);
-    else
+    if (should_remove) {
+        stream_sender_remove(s, reason);
+        pulse_sender_not_running(s->hops, reason, true);
+    }
+    else {
         stream_connector_requeue(s);
+        pulse_sender_not_running(s->hops, reason, false);
+    }
 }
 
 void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut) {
@@ -466,7 +477,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
             };
             ND_LOG_STACK_PUSH(lgs);
 
-            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
+            worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_TIMEOUT);
 
             char duration[RFC3339_MAX_LENGTH];
             duration_snprintf(duration, sizeof(duration), (int64_t)(now_monotonic_usec() - s->thread.last_traffic_ut), "us", true);
@@ -483,7 +494,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
                    stats.bytes_sent, stats.sends,
                    duration, pending, stats.buffer_ratio);
 
-            stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_TIMEOUT, true);
+            stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_TIMEOUT, true);
             continue;
         }
 
@@ -594,7 +605,7 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
                    __atomic_load_n(&host->stream.snd.status.replication.counter_in, __ATOMIC_RELAXED),
                    __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED));
 
-            stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_REPLICATION_STALLED, true);
+            stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_REPLICATION_STALLED, true);
         }
 
         s->replication.last_checked_ut = s->replication.last_progress_ut;
@@ -665,7 +676,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
             else /* if(status == EVLOOP_STATUS_SOCKET_CLOSED) */ {
                 worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED);
                 disconnect_reason = "socket reports EOF (closed by parent)";
-                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END;
+                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE;
             }
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -739,7 +750,7 @@ bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *
             }
             else /* if(status == EVLOOP_STATUS_SOCKET_CLOSED) */ {
                 worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED);
-                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END;
+                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE;
                 disconnect_reason = "socket reports EOF (closed by parent)";
             }
 
@@ -775,8 +786,6 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
     if(unlikely(events & (ND_POLL_ERROR|ND_POLL_HUP|ND_POLL_INVALID))) {
         // we have errors on this socket
 
-        worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
-
         char *error = "unknown error";
 
         if (events & ND_POLL_ERROR)
@@ -786,7 +795,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         else if (events & ND_POLL_INVALID)
             error = "connection is invalid";
 
-        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR);
+        worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_SOCKET_ERROR);
 
         stream_sender_lock(s);
         // copy the statistics

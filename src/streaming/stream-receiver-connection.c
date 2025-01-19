@@ -286,7 +286,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
                     rpt,
                     "cannot reply back, dropping connection",
                     STREAM_STATUS_CANT_REPLY, NDLP_ERR);
-                rrdhost_clear_receiver(rpt);
+                rrdhost_clear_receiver(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED);
                 return false;
             }
 #ifdef ENABLE_H2O
@@ -635,7 +635,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         rrd_rdunlock();
 
         if (receiver_stale &&
-            stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_STALE_RECEIVER)) {
+            stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_RCV_DISCONNECT_STALE_RECEIVER)) {
             // we stopped the receiver
             // we can proceed with this connection
             receiver_stale = false;
@@ -691,7 +691,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             rrdhost_option_set(rpt->host, RRDHOST_OPTION_EPHEMERAL_HOST);
 
         // let it reconnect to parents asap
-        rrdhost_stream_parents_reset(rpt->host, STREAM_HANDSHAKE_PREPARING);
+        rrdhost_stream_parents_reset(rpt->host, STREAM_HANDSHAKE_SP_PREPARING);
 
         // add it to a stream thread queue
         stream_receiver_add_to_queue(rpt);

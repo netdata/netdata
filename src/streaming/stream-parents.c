@@ -233,26 +233,26 @@ cleanup:
 static void stream_parent_nd_sock_error_to_reason(STREAM_PARENT *d, ND_SOCK *sock) {
     switch (sock->error) {
         case ND_SOCK_ERR_CONNECTION_REFUSED:
-            d->reason = STREAM_HANDSHAKE_CONNECTION_REFUSED;
+            d->reason = STREAM_HANDSHAKE_SP_CONNECTION_REFUSED;
             d->postpone_until_ut = randomize_wait_ut(30, 60);
             block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_CANNOT_RESOLVE_HOSTNAME:
-            d->reason = STREAM_HANDSHAKE_CANT_RESOLVE_HOSTNAME;
+            d->reason = STREAM_HANDSHAKE_SP_CANT_RESOLVE_HOSTNAME;
             d->postpone_until_ut = randomize_wait_ut(30, 60);
             block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_NO_HOST_IN_DEFINITION:
-            d->reason = STREAM_HANDSHAKE_NO_HOST_IN_DESTINATION;
+            d->reason = STREAM_HANDSHAKE_SP_NO_HOST_IN_DESTINATION;
             d->banned_for_this_session = true;
             d->postpone_until_ut = randomize_wait_ut(30, 60);
             block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_TIMEOUT:
-            d->reason = STREAM_HANDSHAKE_CONNECT_TIMEOUT;
+            d->reason = STREAM_HANDSHAKE_SP_CONNECT_TIMEOUT;
             d->postpone_until_ut = randomize_wait_ut(300, d->remote.nodes < 10 ? 600 : 900);
             block_parent_for_all_nodes(d, 300);
             break;
@@ -387,7 +387,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
            hostname, string2str(d->destination));
 
     // Establish connection
-    d->reason = STREAM_HANDSHAKE_CONNECTING;
+    d->reason = STREAM_HANDSHAKE_SP_CONNECTING;
     if (!nd_sock_connect_to_this(&sock, string2str(d->destination), default_port, 5, ssl)) {
         d->selection.info = false;
         stream_parent_nd_sock_error_to_reason(d, &sock);
@@ -485,7 +485,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
     CLEAN_JSON_OBJECT *jobj = json_tokener_parse(payload_start);
     if (!jobj) {
         d->selection.info = false;
-        d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
+        d->reason = STREAM_HANDSHAKE_SP_NO_STREAM_INFO;
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM PARENTS '%s': failed to parse stream info response from '%s', JSON data: %s",
                hostname, string2str(d->destination), payload_start);
@@ -496,7 +496,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
 
     if(!stream_info_json_parse_v1(jobj, "", d, error)) {
         d->selection.info = false;
-        d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
+        d->reason = STREAM_HANDSHAKE_SP_NO_STREAM_INFO;
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM PARENTS '%s': failed to extract fields from JSON stream info response from '%s': %s"
                " - JSON data: %s",
