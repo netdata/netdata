@@ -353,7 +353,11 @@ int send_alarm_snapshot(const char *msg, size_t msg_len)
         destroy_send_alarm_snapshot(sas);
         return 1;
     }
-    aclk_process_send_alarm_snapshot(sas->node_id, sas->claim_id, sas->snapshot_uuid);
+    aclk_query_t query = aclk_query_new(ALERT_CHECKPOINT);
+    query->data.node_id = strdupz(sas->node_id);
+    query->claim_id = strdupz(sas->claim_id);
+    query->version = 0; // force snapshot
+    aclk_execute_query(query);
     destroy_send_alarm_snapshot(sas);
     return 0;
 }
@@ -436,7 +440,7 @@ typedef struct {
 
 new_cloud_rx_msg_t rx_msgs[] = {
     { .name = "cmd",                       .name_hash = 0, .fnc = handle_old_proto_cmd         },
-    { .name = "CreateNodeInstanceResult",  .name_hash = 0, .fnc = create_node_instance_result  },  // TODO
+    { .name = "CreateNodeInstanceResult",  .name_hash = 0, .fnc = create_node_instance_result  },  // async
     { .name = "SendNodeInstances",         .name_hash = 0, .fnc = send_node_instances          },  // async
     { .name = "StreamChartsAndDimensions", .name_hash = 0, .fnc = stream_charts_and_dimensions },  // unused
     { .name = "ChartsAndDimensionsAck",    .name_hash = 0, .fnc = charts_and_dimensions_ack    },  // unused
