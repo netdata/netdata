@@ -258,7 +258,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     aclk_query_t query = aclk_query_new(CREATE_NODE_INSTANCE);
     query->data.node_id = strdupz(res.node_id);
     query->machine_guid = strdupz(res.machine_guid);
-    aclk_execute_query(query);
+    aclk_add_job(query);
 
     freez(res.node_id);
     freez(res.machine_guid);
@@ -270,7 +270,7 @@ int send_node_instances(const char *msg, size_t msg_len)
     UNUSED(msg);
     UNUSED(msg_len);
     aclk_query_t query = aclk_query_new(SEND_NODE_INSTANCES);
-    aclk_execute_query(query);
+    aclk_add_job(query);
     return 0;
 }
 
@@ -308,7 +308,7 @@ int start_alarm_streaming(const char *msg, size_t msg_len)
     aclk_query_t query = aclk_query_new(ALERT_START_STREAMING);
     query->data.node_id = strdupz(res.node_id);
     query->version = res.version;
-    aclk_execute_query(query);
+    aclk_add_job(query);
     freez(res.node_id);
     return 0;
 }
@@ -326,7 +326,7 @@ int send_alarm_checkpoint(const char *msg, size_t msg_len)
     query->data.node_id = strdupz(sac.node_id);
     query->claim_id = strdupz(sac.claim_id);
     query->version = sac.version;
-    aclk_execute_query(query);
+    aclk_add_job(query);
     freez(sac.node_id);
     freez(sac.claim_id);
     return 0;
@@ -357,7 +357,7 @@ int send_alarm_snapshot(const char *msg, size_t msg_len)
     query->data.node_id = strdupz(sas->node_id);
     query->claim_id = strdupz(sas->claim_id);
     query->version = 0; // force snapshot
-    aclk_execute_query(query);
+    aclk_add_job(query);
     destroy_send_alarm_snapshot(sas);
     return 0;
 }
@@ -394,7 +394,7 @@ int contexts_checkpoint(const char *msg, size_t msg_len)
 
     aclk_query_t query = aclk_query_new(CTX_CHECKPOINT);
     query->data.payload = cmd;
-    aclk_execute_query(query);
+    aclk_add_job(query);
     return 0;
 }
 
@@ -411,7 +411,7 @@ int stop_streaming_contexts(const char *msg, size_t msg_len)
 
     aclk_query_t query = aclk_query_new(CTX_STOP_STREAMING);
     query->data.payload = cmd;
-    aclk_execute_query(query);
+    aclk_add_job(query);
     return 0;
 }
 

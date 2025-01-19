@@ -27,6 +27,12 @@ static void create_node_instance_result_job(const char *machine_guid, const char
         return;
     }
 
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
+    if (unlikely(!host)) {
+        netdata_log_error("Cannot find machine_guid provided by CreateNodeInstanceResult");
+        return;
+    }
+
     sql_update_node_id(&host_uuid, &node_uuid);
 
     aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
@@ -38,13 +44,10 @@ static void create_node_instance_result_job(const char *machine_guid, const char
         .node_id = node_id,
         .capabilities = NULL};
 
-    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
-    if (likely(host)) {
-        node_state_update.live = rrdhost_is_local(host) ? 1 : 0;
-        node_state_update.hops = rrdhost_ingestion_hops(host);
-        node_state_update.capabilities = aclk_get_node_instance_capas(host);
-        schedule_node_state_update(host, 5000);
-    }
+    node_state_update.live = rrdhost_is_local(host) ? 1 : 0;
+    node_state_update.hops = rrdhost_ingestion_hops(host);
+    node_state_update.capabilities = aclk_get_node_instance_capas(host);
+    schedule_node_state_update(host, 5000);
 
     CLAIM_ID claim_id = claim_id_get();
     node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
@@ -55,7 +58,7 @@ static void create_node_instance_result_job(const char *machine_guid, const char
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
 
-    aclk_execute_query(query);
+    aclk_add_job(query);
 }
 
 struct aclk_sync_config_s {
@@ -67,7 +70,9 @@ struct aclk_sync_config_s {
     mqtt_wss_client client;
     int aclk_queries_running;
     bool alert_push_running;
+    bool aclk_batch_job_is_running;
     SPINLOCK cmd_queue_lock;
+    uint32_t aclk_jobs_pending;
     struct aclk_database_cmd *cmd_base;
 } aclk_sync_config = { 0 };
 
@@ -315,6 +320,11 @@ static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_un
     return 0;
 }
 
+struct judy_list_t {
+    Pvoid_t JudyL;
+    Word_t count;
+};
+
 static void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
@@ -327,10 +337,16 @@ static void timer_cb(uv_timer_t *handle)
 {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
+    struct aclk_sync_config_s *config = handle->data;
 
     struct aclk_database_cmd cmd = { 0 };
     if (aclk_online_for_alerts()) {
         cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
+        aclk_database_enq_cmd(&cmd);
+    }
+
+    if (config->aclk_jobs_pending > 0) {
+        cmd.opcode = ACLK_QUERY_BATCH_EXECUTE;
         aclk_database_enq_cmd(&cmd);
     }
 }
@@ -476,6 +492,51 @@ static void aclk_run_query_job(uv_work_t *req)
     worker_is_idle();
 }
 
+static void after_aclk_batch_job(uv_work_t *req, int status __maybe_unused)
+{
+    struct aclk_query_payload *payload = req->data;
+    struct aclk_sync_config_s *config = payload->config;
+    config->aclk_batch_job_is_running = false;
+    freez(payload);
+}
+
+static void aclk_batch_job(uv_work_t *req)
+{
+    register_libuv_worker_jobs();
+
+    struct aclk_query_payload *payload =  req->data;
+    struct aclk_sync_config_s *config = payload->config;
+    struct judy_list_t *aclk_query_batch = payload->data;
+
+    if (!aclk_query_batch)
+        return;
+
+    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
+
+    size_t entries = aclk_query_batch->count;
+    Word_t Index = 0;
+    bool first = true;
+    Pvoid_t *PValue;
+    while ((PValue = JudyLFirstThenNext(aclk_query_batch->JudyL, &Index, &first))) {
+        if (!*PValue)
+            continue;
+
+        aclk_query_t query = *PValue;
+        aclk_run_query(config, query, true);
+    }
+
+    (void) JudyLFreeArray(&aclk_query_batch->JudyL, PJE0);
+    freez(aclk_query_batch);
+
+    usec_t ended_ut = now_monotonic_usec();
+    (void)ended_ut;
+    nd_log_daemon(
+        NDLP_INFO, "Processed %zu ACLK commands in %0.2f ms", entries, (double)(ended_ut - started_ut) / USEC_PER_MS);
+
+    worker_is_idle();
+}
+
+
 static void node_update_timer_cb(uv_timer_t *handle)
 {
     struct aclk_sync_cfg_t *ahc = handle->data;
@@ -522,6 +583,8 @@ static void start_alert_push(uv_work_t *req __maybe_unused)
     worker_is_idle();
 }
 
+#define MAX_ACLK_BATCH_JOBS_IN_QUEUE (20)
+
 static void aclk_synchronization(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
@@ -529,11 +592,13 @@ static void aclk_synchronization(void *arg)
     worker_register("ACLKSYNC");
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
-    worker_register_job_name(ACLK_DATABASE_NOOP,                 "noop");
-    worker_register_job_name(ACLK_DATABASE_NODE_STATE,           "node state");
-    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
-    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
-    worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,            "aclk query execute sync");
+    worker_register_job_name(ACLK_DATABASE_NOOP,                "noop");
+    worker_register_job_name(ACLK_DATABASE_NODE_STATE,          "node state");
+    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,          "alert push");
+    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,   "alert conf push");
+    worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,           "aclk query execute sync");
+    worker_register_job_name(ACLK_QUERY_BATCH_EXECUTE,          "aclk batch execute");
+    worker_register_job_name(ACLK_QUERY_BATCH_ADD,              "aclk batch add");
 
     uv_loop_t *loop = &config->loop;
     fatal_assert(0 == uv_loop_init(loop));
@@ -553,6 +618,10 @@ static void aclk_synchronization(void *arg)
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
 
     struct alert_push_data *data;
+    aclk_query_t query;
+    struct judy_list_t *aclk_query_batch = NULL;
+    Pvoid_t *Pvalue;
+    struct aclk_query_payload *payload;
 
     while (likely(service_running(SERVICE_ACLK))) {
         enum aclk_database_opcode opcode;
@@ -636,10 +705,9 @@ static void aclk_synchronization(void *arg)
                     config->client = (mqtt_wss_client) cmd.param[0];
                     break;
 
-                case ACLK_QUERY_EXECUTE:;
-                    aclk_query_t query = (aclk_query_t)cmd.param[0];
-
-                    struct aclk_query_payload *payload = NULL;
+                case ACLK_QUERY_EXECUTE:
+                    query = (aclk_query_t)cmd.param[0];
+                    payload = NULL;
                     config->aclk_queries_running++;
                     bool execute_now = (config->aclk_queries_running > query_thread_count);
                     if (!execute_now) {
@@ -655,6 +723,44 @@ static void aclk_synchronization(void *arg)
                         aclk_run_query(config, query, false);
                         freez(payload);
                         config->aclk_queries_running--;
+                    }
+                    break;
+
+// Note: The following two opcodes must be in this order
+                case ACLK_QUERY_BATCH_ADD:
+                    query = (aclk_query_t)cmd.param[0];
+                    if (!query)
+                        break;
+
+                    if (!aclk_query_batch)
+                        aclk_query_batch = callocz(1, sizeof(*aclk_query_batch));
+
+                    Pvalue = JudyLIns(&aclk_query_batch->JudyL, ++aclk_query_batch->count, PJE0);
+                    if (Pvalue)
+                        *Pvalue = query;
+
+                    config->aclk_jobs_pending++;
+                    if (aclk_query_batch->count < MAX_ACLK_BATCH_JOBS_IN_QUEUE || config->aclk_batch_job_is_running)
+                        break;
+                    // fall through
+                case ACLK_QUERY_BATCH_EXECUTE:
+                    if (!aclk_query_batch || config->aclk_batch_job_is_running)
+                        break;
+
+                    payload = mallocz(sizeof(*payload));
+                    payload->request.data = payload;
+                    payload->config = config;
+                    payload->data = aclk_query_batch;
+
+                    config->aclk_batch_job_is_running = true;
+                    config->aclk_jobs_pending -= aclk_query_batch->count;
+                    aclk_query_batch = NULL;
+
+                    if (uv_queue_work(loop, &payload->request, aclk_batch_job, after_aclk_batch_job)) {
+                        aclk_query_batch = payload->data;
+                        config->aclk_jobs_pending += aclk_query_batch->count;
+                        freez(payload);
+                        config->aclk_batch_job_is_running = false;
                     }
                     break;
 
@@ -781,6 +887,14 @@ void aclk_execute_query(aclk_query_t query)
         return;
 
     queue_aclk_sync_cmd(ACLK_QUERY_EXECUTE, query, NULL);
+}
+
+void aclk_add_job(aclk_query_t query)
+{
+    if (unlikely(!aclk_sync_config.initialized))
+        return;
+
+    queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
 }
 
 void aclk_query_init(mqtt_wss_client client) {

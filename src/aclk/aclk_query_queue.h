@@ -75,6 +75,7 @@ aclk_query_t aclk_query_new(aclk_query_type_t type);
 void aclk_query_free(aclk_query_t query);
 
 void aclk_execute_query(aclk_query_t query);
+void aclk_add_job(aclk_query_t query);
 
 #define QUEUE_IF_PAYLOAD_PRESENT(query)                                                                                \
     do {                                                                                                               \
