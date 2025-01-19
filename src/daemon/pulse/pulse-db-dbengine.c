@@ -686,7 +686,6 @@ void pulse_dbengine_do(bool extended) {
     mrg_get_statistics(main_mrg, &mrg_stats);
 
     size_t priority = 135000;
-
     {
         static RRDSET *st_pgc_memory = NULL;
         static RRDDIM *rd_pgc_memory_main = NULL;

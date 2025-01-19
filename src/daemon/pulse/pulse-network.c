@@ -124,7 +124,7 @@ static void pulse_aclk_time_heatmap(void) {
 
         rds[0] = rrddim_add(st, "instant", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         for(size_t i = 1; i < _countof(rds) - 1 ;i++) {
-            char buf[128];
+            char buf[350];
             snprintf(buf, sizeof(buf), "%.2fs", (double)aclk_time_heatmap.array[i].upto / (double)USEC_PER_SEC);
             // duration_snprintf(buf, sizeof(buf), aclk_time_heatmap.array[i].upto, "us", false);
             rds[i] = rrddim_add(st, buf, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
