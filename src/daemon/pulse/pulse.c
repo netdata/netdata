@@ -118,6 +118,7 @@ void *pulse_thread_main(void *ptr) {
         if(dbengine_enabled) {
             worker_is_busy(WORKER_JOB_DBENGINE);
             pulse_dbengine_do(pulse_extended_enabled);
+            dbengine_retention_statistics(pulse_extended_enabled);
         }
 #endif
 

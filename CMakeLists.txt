@@ -1170,6 +1170,8 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-daemon-memory-system.c
         src/daemon/pulse/pulse-network.c
         src/daemon/pulse/pulse-network.h
+        src/daemon/pulse/pulse-db-dbengine-retention.c
+        src/daemon/pulse/pulse-db-dbengine-retention.h
 )
 
 set(H2O_FILES
