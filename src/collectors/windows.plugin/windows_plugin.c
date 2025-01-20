@@ -33,6 +33,7 @@ static struct proc_module {
     {.name = "PerflibMSSQL",  .dim = "PerflibMSSQL",               .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibMSSQL},
 
     {.name = "PerflibNetFramework",  .dim = "PerflibNetFramework", .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibNetFramework},
+    {.name = "PerflibAD",            .dim = "PerflibAD",           .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibAD},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}
