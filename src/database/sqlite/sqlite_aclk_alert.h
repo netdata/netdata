@@ -11,7 +11,6 @@ void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version);
 void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_version);
 
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused);
-void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, char *snapshot_uuid);
 bool process_alert_pending_queue(RRDHOST *host);
 void aclk_push_alert_events_for_all_hosts(void);
 uint64_t calculate_node_alert_version(RRDHOST *host);

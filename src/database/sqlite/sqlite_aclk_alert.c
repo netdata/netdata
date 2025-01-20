@@ -819,36 +819,6 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *wc, uint64
     wc->checkpoint_count++;
 }
 
-void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unused, char *snapshot_uuid)
-{
-    nd_uuid_t node_uuid;
-
-    if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
-        return;
-
-    struct aclk_sync_cfg_t *wc;
-
-    RRDHOST *host = find_host_by_node_id(node_id);
-    if (unlikely(!host || !(wc = host->aclk_config))) {
-        nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK STA [%s (N/A)]: ACLK node id does not exist", node_id);
-        return;
-    }
-
-    nd_log(NDLS_ACCESS, NDLP_DEBUG,
-            "IN [%s (%s)]: Request to send alerts snapshot, snapshot_uuid %s",
-            node_id,
-            wc->host ? rrdhost_hostname(wc->host) : "N/A",
-            snapshot_uuid);
-
-    if (wc->alerts_snapshot_uuid && !strcmp(wc->alerts_snapshot_uuid,snapshot_uuid))
-        return;
-
-    wc->alerts_snapshot_uuid = strdupz(snapshot_uuid);
-
-    wc->send_snapshot = 1;
-    rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-}
-
 #define SQL_COUNT_SNAPSHOT_ENTRIES                                                                                     \
     "SELECT COUNT(1) FROM alert_version av, health_log hl "                                                            \
     "WHERE hl.host_id = @host_id AND hl.health_log_id = av.health_log_id AND av.status <> -2"

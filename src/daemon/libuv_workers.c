@@ -71,6 +71,10 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_CTX_SEND_SNAPSHOT, "ctx send snapshot");
     worker_register_job_name(UV_EVENT_CTX_SEND_SNAPSHOT_UPD, "ctx send update");
     worker_register_job_name(UV_EVENT_NODE_STATE_UPDATE, "node state update");
+    worker_register_job_name(UV_EVENT_SEND_NODE_INSTANCES, "send node instances");
+    worker_register_job_name(UV_EVENT_ALERT_START_STREAMING, "alert start streaming");
+    worker_register_job_name(UV_EVENT_ALERT_CHECKPOINT, "alert checkpoint");
+    worker_register_job_name(UV_EVENT_CREATE_NODE_INSTANCE, "create node instance");
 
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
