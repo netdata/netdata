@@ -587,6 +587,26 @@ static void start_alert_push(uv_work_t *req __maybe_unused)
 
 #define MAX_BATCH_SIZE (64)
 
+// Take a query, and try to schedule it in a worker
+// Update config->aclk_queries_running if success
+// config->aclk_queries_running is only accessed from the vent loop
+// On failure: free the payload
+
+int schedule_query_in_worker(uv_loop_t *loop, struct aclk_sync_config_s *config, aclk_query_t query) {
+    struct aclk_query_payload *payload = mallocz(sizeof(*payload));
+    payload->request.data = payload;
+    payload->config = config;
+    payload->data = query;
+    config->aclk_queries_running++;
+    int rc = uv_queue_work(loop, &payload->request, aclk_run_query_job, after_aclk_run_query_job);
+    if (rc) {
+        config->aclk_queries_running--;
+        freez(payload);
+    }
+    return rc;
+}
+
+
 static void aclk_synchronization(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
@@ -624,6 +644,9 @@ static void aclk_synchronization(void *arg)
     struct alert_push_data *data;
     aclk_query_t query;
     struct judy_list_t *aclk_query_batch = NULL;
+    struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));;
+    size_t pending_queries = 0;
+
     Pvoid_t *Pvalue;
     struct aclk_query_payload *payload;
 
@@ -650,11 +673,17 @@ static void aclk_synchronization(void *arg)
             if(likely(opcode != ACLK_DATABASE_NOOP && opcode != ACLK_QUERY_EXECUTE))
                 worker_is_busy(opcode);
 
+            // Check if we have pending commands to execute
+            if (opcode == ACLK_DATABASE_NOOP && pending_queries && config->aclk_queries_running < query_thread_count) {
+                opcode = ACLK_QUERY_EXECUTE;
+                cmd.param[0] = NULL;
+            }
+
             switch (opcode) {
                 case ACLK_DATABASE_NOOP:
                     /* the command queue was empty, do nothing */
                     break;
-// NODE STATE
+                    // NODE STATE
                 case ACLK_DATABASE_NODE_STATE:;
                     RRDHOST *host = cmd.param[0];
                     struct aclk_sync_cfg_t *ahc = host->aclk_config;
@@ -712,28 +741,71 @@ static void aclk_synchronization(void *arg)
                     }
                     break;
                 case ACLK_MQTT_WSS_CLIENT:
-                    config->client = (mqtt_wss_client) cmd.param[0];
+                    config->client = (mqtt_wss_client)cmd.param[0];
                     break;
 
                 case ACLK_QUERY_EXECUTE:
                     query = (aclk_query_t)cmd.param[0];
-                    payload = NULL;
-                    config->aclk_queries_running++;
-                    bool execute_now = (config->aclk_queries_running > query_thread_count);
-                    if (!execute_now) {
-                        payload = mallocz(sizeof(*payload));
-                        payload->request.data = payload;
-                        payload->config = config;
-                        payload->data = query;
-                        execute_now = uv_queue_work(loop, &payload->request, aclk_run_query_job, after_aclk_run_query_job);
+
+                    bool too_busy = (config->aclk_queries_running >= query_thread_count);
+
+                    // If we are busy and it's just a ping to run, leave
+                    if (too_busy && !query)
+                        break;
+
+                    // if we are busy (we have a query) store it and leave
+                    if (too_busy) {
+                        Pvalue = JudyLIns(&aclk_query_execute->JudyL, ++aclk_query_execute->count, PJE0);
+                        if (Pvalue != PJERR) {
+                            *Pvalue = query;
+                            pending_queries++;
+                        } else
+                            nd_log_daemon(NDLP_ERR, "Failed to add ACLK command to the pending commands Judy");
+                        break;
                     }
 
-                    if (execute_now) {
-                        worker_is_busy(ACLK_QUERY_EXECUTE_SYNC);
-                        aclk_run_query(config, query, false);
-                        freez(payload);
-                        config->aclk_queries_running--;
-                        cmd_batch_size = MAX_BATCH_SIZE;
+                    // Here: we are not busy
+                    // If we have query it was a normal incoming command
+                    // if we dont, it was a ping from the callback
+
+                    // Lets try to queue as many of the pending commands
+                    while(!too_busy && pending_queries && config->aclk_queries_running < query_thread_count) {
+
+                        Word_t Index = 0;
+                        Pvalue = JudyLFirst(aclk_query_execute->JudyL, &Index, PJE0);
+
+                        // We have nothing, leave
+                        if (Pvalue == NULL)
+                            break;
+                        aclk_query_t query_in_queue = *Pvalue;
+
+                        // Schedule it and increase running
+                        too_busy = schedule_query_in_worker(loop, config, query_in_queue);
+
+                        // It was scheduled in worker, remove it from pending
+                        if (!too_busy) {
+                            pending_queries--;
+                            (void)JudyLDel(&aclk_query_execute->JudyL, Index, PJE0);
+                        }
+                    }
+
+                    // Was it just a ping to run? leave
+                    if (!query)
+                        break;
+
+                    // We have a query, if not busy lets run it
+                    if (!too_busy)
+                        too_busy = schedule_query_in_worker(loop, config, query);
+
+                    // We were either busy, or failed to start worker, schedule for later
+                    if (too_busy) {
+                        Pvalue = JudyLIns(&aclk_query_execute->JudyL, ++aclk_query_execute->count, PJE0);
+                        if (Pvalue != PJERR) {
+                            *Pvalue = query;
+                            pending_queries++;
+                        }
+                        else
+                            nd_log_daemon(NDLP_ERR, "Failed to add ACLK command to the pending commands Judy");
                     }
                     break;
 
