@@ -55,6 +55,13 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_METADATA_STORE, "metadata store host");
     worker_register_job_name(UV_EVENT_METADATA_CLEANUP, "metadata cleanup");
     worker_register_job_name(UV_EVENT_METADATA_ML_LOAD, "metadata load ml models");
+    worker_register_job_name(UV_EVENT_CTX_CLEANUP_SCHEDULE, "metadata ctx cleanup schedule");
+    worker_register_job_name(UV_EVENT_CTX_CLEANUP, "metadata ctx cleanup");
+    worker_register_job_name(UV_EVENT_STORE_ALERT_TRANSITIONS, "metadata store alert transitions");
+    worker_register_job_name(UV_EVENT_CHART_LABEL_CLEANUP, "metadata chart label cleanup");
+    worker_register_job_name(UV_EVENT_UUID_DELETION, "metadata dimension deletion");
+    worker_register_job_name(UV_EVENT_DIMENSION_CLEANUP, "metadata dimension cleanup");
+    worker_register_job_name(UV_EVENT_CHART_CLEANUP, "metadata chart cleanup");
 
     // aclk_sync
     worker_register_job_name(UV_EVENT_ACLK_NODE_INFO, "aclk host node info");
