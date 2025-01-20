@@ -644,6 +644,7 @@ static void aclk_synchronization(void *arg)
             if (unlikely(!service_running(SERVICE_ACLK)))
                 break;
 
+            ++cmd_batch_size;
             opcode = cmd.opcode;
 
             if(likely(opcode != ACLK_DATABASE_NOOP && opcode != ACLK_QUERY_EXECUTE))
@@ -732,6 +733,7 @@ static void aclk_synchronization(void *arg)
                         aclk_run_query(config, query, false);
                         freez(payload);
                         config->aclk_queries_running--;
+                        cmd_batch_size = MAX_BATCH_SIZE;
                     }
                     break;
 
