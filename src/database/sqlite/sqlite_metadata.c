@@ -2853,13 +2853,6 @@ void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid)
     queue_metadata_cmd(METADATA_STORE_CLAIM_ID, local_host_uuid, local_claim_uuid);
 }
 
-//void metaqueue_host_update_info(RRDHOST *host)
-//{
-//    if (unlikely(!metasync_worker.loop))
-//        return;
-//    queue_metadata_cmd(METADATA_ADD_HOST_INFO, host, NULL);
-//}
-
 void metaqueue_ml_load_models(RRDDIM *rd)
 {
     rrddim_flag_set(rd, RRDDIM_FLAG_ML_MODEL_LOAD);
