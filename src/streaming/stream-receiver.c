@@ -491,7 +491,7 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     parser->h2o_ctx = rpt->h2o_ctx;
 #endif
 
-    pulse_receiver_running(rpt->hops);
+    pulse_parent_receiver_running(rpt->hops);
 
     // keep this last - it needs everything ready since to sends data to the child
     stream_receiver_send_node_and_claim_id_to_child(rpt->host);
@@ -505,7 +505,7 @@ void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *s
     for(struct receiver_state *rpt = RECEIVERS_FIRST(&sth->queue.receivers, &idx);
          rpt;
          rpt = RECEIVERS_NEXT(&sth->queue.receivers, &idx)) {
-        pulse_receiver_not_waiting(rpt->hops);
+        pulse_parent_receiver_not_waiting(rpt->hops);
         RECEIVERS_DEL(&sth->queue.receivers, idx);
         stream_receiver_move_to_running_unsafe(sth, rpt);
     }
@@ -562,7 +562,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     }
 
     stream_thread_node_removed(rpt->host);
-    pulse_receiver_not_running(rpt->hops, reason);
+    pulse_parent_receiver_not_running(rpt->hops, reason);
 
     // set a default exit reason, if not set
     receiver_set_exit_reason(rpt, reason, false);

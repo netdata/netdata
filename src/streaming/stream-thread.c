@@ -755,7 +755,7 @@ void stream_receiver_add_to_queue(struct receiver_state *rpt) {
     sth->queue.receivers_waiting++;
     spinlock_unlock(&sth->queue.spinlock);
 
-    pulse_receiver_waiting(rpt->hops);
+    pulse_parent_receiver_waiting(rpt->hops);
 }
 
 void stream_sender_add_to_queue(struct sender_state *s) {

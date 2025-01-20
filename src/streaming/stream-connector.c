@@ -4,7 +4,6 @@
 
 static struct {
     const char *response;
-    const char *status;
     size_t length;
     int32_t version;
     bool dynamic;
@@ -16,7 +15,6 @@ static struct {
     {
         .response = START_STREAMING_PROMPT_VN,
         .length = sizeof(START_STREAMING_PROMPT_VN) - 1,
-        .status = STREAM_STATUS_CONNECTED,
         .version = STREAM_HANDSHAKE_OK_V3, // and above
         .dynamic = true,                 // dynamic = we will parse the version / capabilities
         .error = NULL,
@@ -27,7 +25,6 @@ static struct {
     {
         .response = START_STREAMING_PROMPT_V2,
         .length = sizeof(START_STREAMING_PROMPT_V2) - 1,
-        .status = STREAM_STATUS_CONNECTED,
         .version = STREAM_HANDSHAKE_OK_V2,
         .dynamic = false,
         .error = NULL,
@@ -38,7 +35,6 @@ static struct {
     {
         .response = START_STREAMING_PROMPT_V1,
         .length = sizeof(START_STREAMING_PROMPT_V1) - 1,
-        .status = STREAM_STATUS_CONNECTED,
         .version = STREAM_HANDSHAKE_OK_V1,
         .dynamic = false,
         .error = NULL,
@@ -49,8 +45,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_SAME_LOCALHOST,
         .length = sizeof(START_STREAMING_ERROR_SAME_LOCALHOST) - 1,
-        .status = STREAM_STATUS_LOCALHOST,
-        .version = STREAM_HANDSHAKE_ERROR_LOCALHOST,
+        .version = STREAM_HANDSHAKE_PARENT_IS_LOCALHOST,
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is its localhost",
         .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
@@ -60,8 +55,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_ALREADY_STREAMING,
         .length = sizeof(START_STREAMING_ERROR_ALREADY_STREAMING) - 1,
-        .status = STREAM_STATUS_ALREADY_CONNECTED,
-        .version = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED,
+        .version = STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED,
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is already streamed to it",
         .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
@@ -71,8 +65,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_NOT_PERMITTED,
         .length = sizeof(START_STREAMING_ERROR_NOT_PERMITTED) - 1,
-        .status = STREAM_STATUS_PERMISSION_DENIED,
-        .version = STREAM_HANDSHAKE_ERROR_DENIED,
+        .version = STREAM_HANDSHAKE_PARENT_DENIED_ACCESS,
         .dynamic = false,
         .error = "remote server denied access, probably we don't have the right API key?",
         .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
@@ -82,8 +75,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_BUSY_TRY_LATER,
         .length = sizeof(START_STREAMING_ERROR_BUSY_TRY_LATER) - 1,
-        .status = STREAM_STATUS_RATE_LIMIT,
-        .version = STREAM_HANDSHAKE_BUSY_TRY_LATER,
+        .version = STREAM_HANDSHAKE_PARENT_BUSY_TRY_LATER,
         .dynamic = false,
         .error = "remote server is currently busy, we should try later",
         .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
@@ -93,8 +85,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_INTERNAL_ERROR,
         .length = sizeof(START_STREAMING_ERROR_INTERNAL_ERROR) - 1,
-        .status = STREAM_STATUS_INTERNAL_SERVER_ERROR,
-        .version = STREAM_HANDSHAKE_INTERNAL_ERROR,
+        .version = STREAM_HANDSHAKE_PARENT_INTERNAL_ERROR,
         .dynamic = false,
         .error = "remote server is encountered an internal error, we should try later",
         .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
@@ -104,8 +95,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_INITIALIZATION,
         .length = sizeof(START_STREAMING_ERROR_INITIALIZATION) - 1,
-        .status = STREAM_STATUS_INITIALIZATION_IN_PROGRESS,
-        .version = STREAM_HANDSHAKE_INITIALIZATION,
+        .version = STREAM_HANDSHAKE_PARENT_IS_INITIALIZING,
         .dynamic = false,
         .error = "remote server is initializing, we should try later",
         .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
@@ -117,8 +107,7 @@ static struct {
     {
         .response = NULL,
         .length = 0,
-        .status = STREAM_STATUS_BAD_HANDSHAKE,
-        .version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE,
+        .version = STREAM_HANDSHAKE_CONNECT_HANDSHAKE_FAILED,
         .dynamic = false,
         .error = "remote node response is not understood, is it Netdata?",
         .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
@@ -216,7 +205,7 @@ err_cleanup:
 
 static bool
 stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, char *http, size_t http_length) {
-    int32_t version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE;
+    int32_t version = STREAM_HANDSHAKE_CONNECT_HANDSHAKE_FAILED;
 
     int i;
     for(i = 0; stream_responses[i].response ; i++) {
@@ -243,7 +232,6 @@ stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, ch
 
     ND_LOG_FIELD_PRIORITY priority = stream_responses[i].priority;
     const char *error = stream_responses[i].error;
-    const char *status = stream_responses[i].status;
     int worker_job_id = stream_responses[i].worker_job_id;
     int delay = stream_responses[i].postpone_reconnect_seconds;
 
@@ -251,7 +239,7 @@ stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, ch
     stream_parent_set_reconnect_delay(host->stream.snd.parents.current, version, delay);
 
     ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
+        ND_LOG_FIELD_I64(NDF_RESPONSE_CODE, stream_handshake_error_to_response_code(version)),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -319,12 +307,6 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     buffer_strcat(wb, "Accept: */*" HTTP_HDR_END);
 
     if (s->parent_using_h2o && stream_connect_upgrade_prelude(host, s)) {
-        ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, STREAM_STATUS_CANT_UPGRADE_CONNECTION),
-            ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
-
         worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
         nd_sock_close(&s->sock);
         stream_parent_set_reconnect_delay(
@@ -336,7 +318,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     ssize_t bytes = nd_sock_send_timeout(&s->sock, (void *)buffer_tostring(wb), len, 0, timeout);
     if(bytes <= 0) { // timeout is 0
         ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, STREAM_STATUS_TIMEOUT),
+            ND_LOG_FIELD_I64(NDF_RESPONSE_CODE, stream_handshake_error_to_response_code(STREAM_HANDSHAKE_CONNECT_SEND_TIMEOUT)),
             ND_LOG_FIELD_END(),
         };
         ND_LOG_STACK_PUSH(lgs);
@@ -349,7 +331,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
                rrdhost_hostname(host), s->remote_ip);
 
         stream_parent_set_reconnect_delay(
-            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, 60);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_CONNECT_SEND_TIMEOUT, 60);
         return false;
     }
 
@@ -359,7 +341,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         nd_sock_close(&s->sock);
 
         ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, STREAM_STATUS_TIMEOUT),
+            ND_LOG_FIELD_I64(NDF_RESPONSE_CODE, stream_handshake_error_to_response_code(STREAM_HANDSHAKE_CONNECT_RECEIVE_TIMEOUT)),
             ND_LOG_FIELD_END(),
         };
         ND_LOG_STACK_PUSH(lgs);
@@ -371,7 +353,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
                rrdhost_hostname(host), s->remote_ip);
 
         stream_parent_set_reconnect_delay(
-            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, 30);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_CONNECT_RECEIVE_TIMEOUT, 30);
 
         return false;
     }
@@ -387,7 +369,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     log_sender_capabilities(s);
 
     ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, STREAM_STATUS_CONNECTED),
+        ND_LOG_FIELD_I64(NDF_RESPONSE_CODE, HTTP_RESP_OK),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);

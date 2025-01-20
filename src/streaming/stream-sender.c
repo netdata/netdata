@@ -432,7 +432,10 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
     if (should_remove) {
         stream_sender_remove(s, reason);
-        pulse_sender_not_running(s->hops, reason, true);
+        pulse_sender_not_running(s->hops, reason,
+                                 reason != STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN &&
+                                 reason != STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP &&
+                                 reason != STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP);
     }
     else {
         stream_connector_requeue(s);
