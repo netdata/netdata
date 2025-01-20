@@ -388,6 +388,8 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
            "STREAM PARENTS '%s': fetching stream info from '%s'...",
            hostname, string2str(d->destination));
 
+    pulse_stream_info_sent_request();
+
     // Establish connection
     d->reason = STREAM_HANDSHAKE_SP_CONNECTING;
     if (!nd_sock_connect_to_this(&sock, string2str(d->destination), default_port, 5, ssl)) {
@@ -619,8 +621,10 @@ bool stream_parent_connect_to_one_unsafe(
                                rrdhost_hostname(host), string2str(d->destination));
                         continue;
                     }
-                    else
+                    else {
+                        pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                         skip = true;
+                    }
                     break;
 
                 default:
@@ -632,12 +636,14 @@ bool stream_parent_connect_to_one_unsafe(
             switch(d->remote.ingest_status) {
                 case RRDHOST_INGEST_STATUS_INITIALIZING:
                     d->reason = STREAM_HANDSHAKE_PARENT_IS_INITIALIZING;
+                    pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                     skip = true;
                     break;
 
                 case RRDHOST_INGEST_STATUS_REPLICATING:
                 case RRDHOST_INGEST_STATUS_ONLINE:
                     d->reason = STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED;
+                    pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                     if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, host->sender->hops)) {
                         d->since_ut = now_ut;
                         d->banned_for_this_session = true;
@@ -656,6 +662,8 @@ bool stream_parent_connect_to_one_unsafe(
                     break;
             }
         }
+        else
+            pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
 
         if(skip) {
             skipped_but_useful++;
@@ -809,6 +817,7 @@ bool stream_parent_connect_to_one_unsafe(
         }
         else {
             stream_parent_nd_sock_error_to_reason(d, sender_sock);
+            pulse_sender_connection_failed(string2str(d->destination), d->reason);
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM PARENTS '%s': stream connection to '%s' failed (default port: %d): %s",
                    rrdhost_hostname(host),

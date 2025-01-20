@@ -329,8 +329,9 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
                    "STREAM SND[%zu] '%s' [to %s]: failed to add sender socket to nd_poll()",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip);
 
-        pulse_sender_running(s->hops);
         stream_sender_on_ready_to_dispatch(s);
+
+        pulse_host_status(s->host, PULSE_HOST_STATUS_SND_RUNNING, 0);
     }
 }
 
@@ -430,17 +431,16 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
     stream_thread_node_removed(s->host);
 
-    if (should_remove) {
+    pulse_host_status(s->host, PULSE_HOST_STATUS_SND_OFFLINE,
+                      reason == STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN ||
+                              reason == STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP ||
+                              reason == STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP ?
+                          reason : STREAM_HANDSHAKE_SND_DISCONNECT_RECEIVER_LEFT);
+
+    if (should_remove)
         stream_sender_remove(s, reason);
-        pulse_sender_not_running(s->hops, reason,
-                                 reason != STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN &&
-                                 reason != STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP &&
-                                 reason != STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP);
-    }
-    else {
+    else
         stream_connector_requeue(s);
-        pulse_sender_not_running(s->hops, reason, false);
-    }
 }
 
 void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut) {

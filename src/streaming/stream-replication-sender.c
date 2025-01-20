@@ -705,7 +705,8 @@ bool replication_response_execute_finalize_and_send(struct replication_query *q,
 
             RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
             if(!(old & RRDSET_FLAG_SENDER_REPLICATION_FINISHED)) {
-                rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
+                if(rrdhost_sender_replicating_charts_minus_one(st->rrdhost) == 0)
+                    pulse_host_status(st->rrdhost, PULSE_HOST_STATUS_SND_RUNNING, 0);
 
                 if(!finished_with_gap)
                     st->stream.snd.resync_time_s = 0;

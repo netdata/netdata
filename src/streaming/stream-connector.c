@@ -268,14 +268,19 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     s->sock.verify_certificate = netdata_ssl_validate_certificate_sender;
     s->sock.ctx = netdata_ssl_streaming_sender_ctx;
 
+    pulse_host_status(s->host, PULSE_HOST_STATUS_SND_CONNECTING, 0);
     if(!stream_parent_connect_to_one(
             &s->sock, host, default_port, timeout,
             s->remote_ip, sizeof(s->remote_ip) - 1,
             &host->stream.snd.parents.current)) {
 
-        if(s->sock.error != ND_SOCK_ERR_NO_DESTINATION_AVAILABLE)
+        if(s->sock.error != ND_SOCK_ERR_NO_DESTINATION_AVAILABLE) {
+            pulse_host_status(s->host, PULSE_HOST_STATUS_SND_OFFLINE, STREAM_HANDSHAKE_CONNECTION_FAILED);
             nd_log(NDLS_DAEMON, NDLP_WARNING, "can't connect to a parent, last error: %s",
                    ND_SOCK_ERROR_2str(s->sock.error));
+        }
+        else
+            pulse_host_status(s->host, PULSE_HOST_STATUS_SND_NO_DST, 0);
 
         nd_sock_close(&s->sock);
         return false;
@@ -448,7 +453,7 @@ void stream_connector_requeue(struct sender_state *s) {
     SENDERS_SET(&sc->queue.senders, (Word_t)s, s);
     spinlock_unlock(&sc->queue.spinlock);
 
-    pulse_sender_connecting();
+    pulse_host_status(s->host, PULSE_HOST_STATUS_SND_CONNECTING, 0);
 
     // signal the connector to catch the job
     completion_mark_complete_a_job(&sc->completion);
@@ -488,8 +493,9 @@ static void stream_connector_remove(struct sender_state *s) {
            "STREAM CNT '%s' [to %s]: streaming connector removed host: %s (signaled to stop)",
            rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(s->exit.reason));
 
-    pulse_sender_not_connecting();
-    stream_sender_remove(s, s->exit.reason ? s->exit.reason : STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
+    STREAM_HANDSHAKE reason = s->exit.reason ? s->exit.reason : STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP;
+    pulse_host_status(s->host, PULSE_HOST_STATUS_SND_OFFLINE, reason);
+    stream_sender_remove(s, reason);
 }
 
 static void *stream_connector_thread(void *ptr) {
@@ -550,8 +556,6 @@ static void *stream_connector_thread(void *ptr) {
                 worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTED);
                 SENDERS_DEL(&sc->queue.senders, (Word_t)s);
                 spinlock_unlock(&sc->queue.spinlock);
-
-                pulse_sender_not_connecting();
 
                 // do not have the connector lock when calling this
                 stream_sender_add_to_queue(s);

@@ -147,6 +147,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
 
     rrdhost_flag_set(localhost, RRDHOST_FLAG_COLLECTOR_ONLINE);
     object_state_activate(&localhost->state_id);
+    pulse_host_status(localhost, 0, 0); // this will detect the receiver status
 
     ml_host_start(localhost);
     dyncfg_host_init(localhost);

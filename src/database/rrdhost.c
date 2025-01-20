@@ -868,6 +868,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->hostname);
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
+    pulse_host_status(host, PULSE_HOST_STATUS_DELETED, 0);
     freez(host);
 }
 
