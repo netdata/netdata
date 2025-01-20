@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- move dbengine-retention chart to pulse [\#19444](https://github.com/netdata/netdata/pull/19444) ([ktsaou](https://github.com/ktsaou))
+- build\(deps\): bump github.com/prometheus/common from 0.61.0 to 0.62.0 in /src/go [\#19439](https://github.com/netdata/netdata/pull/19439) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/sijms/go-ora/v2 from 2.8.22 to 2.8.23 in /src/go [\#19438](https://github.com/netdata/netdata/pull/19438) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump k8s.io/client-go from 0.32.0 to 0.32.1 in /src/go [\#19437](https://github.com/netdata/netdata/pull/19437) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Handle incoming ACLK traffic asynchronously [\#19436](https://github.com/netdata/netdata/pull/19436) ([stelfrag](https://github.com/stelfrag))
 - add more aclk worker jobs [\#19435](https://github.com/netdata/netdata/pull/19435) ([ktsaou](https://github.com/ktsaou))
 - fix go.d/ethtool config schema [\#19434](https://github.com/netdata/netdata/pull/19434) ([ilyam8](https://github.com/ilyam8))
 - Cleanup context check list on startup [\#19433](https://github.com/netdata/netdata/pull/19433) ([stelfrag](https://github.com/stelfrag))
@@ -469,13 +474,6 @@
 - Regenerate integrations.js [\#18899](https://github.com/netdata/netdata/pull/18899) ([netdatabot](https://github.com/netdatabot))
 - Updating Netdata docs [\#18898](https://github.com/netdata/netdata/pull/18898) ([Ancairon](https://github.com/Ancairon))
 - remove python.d/zscores [\#18897](https://github.com/netdata/netdata/pull/18897) ([ilyam8](https://github.com/ilyam8))
-- Coverity fixes [\#18896](https://github.com/netdata/netdata/pull/18896) ([stelfrag](https://github.com/stelfrag))
-- docs edit [\#18895](https://github.com/netdata/netdata/pull/18895) ([Ancairon](https://github.com/Ancairon))
-- Start-stop-restart for windows, plus move info to its own file [\#18894](https://github.com/netdata/netdata/pull/18894) ([Ancairon](https://github.com/Ancairon))
-- log2journal: fix config parsing memory leaks [\#18893](https://github.com/netdata/netdata/pull/18893) ([ktsaou](https://github.com/ktsaou))
-- Fix coverity issues [\#18892](https://github.com/netdata/netdata/pull/18892) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#18891](https://github.com/netdata/netdata/pull/18891) ([netdatabot](https://github.com/netdatabot))
-- feat\(go.d.plugin\): add spigotmc collector [\#18890](https://github.com/netdata/netdata/pull/18890) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
