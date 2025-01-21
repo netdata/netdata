@@ -660,14 +660,14 @@ bool stream_parent_connect_to_one_unsafe(
                                rrdhost_hostname(host), string2str(d->destination));
                         continue;
                     }
-                    else {
-                        skip = true;
-                        if(!netdata_conf_is_parent()) {
-                            nd_log(NDLS_DAEMON, NDLP_INFO,
-                                   "STREAM PARENTS '%s': destination '%s' reports I am already connected.",
-                                   rrdhost_hostname(host), string2str(d->destination));
-                        }
-                    }
+//                    else {
+//                        skip = true;
+//                        if(!netdata_conf_is_parent()) {
+//                            nd_log(NDLS_DAEMON, NDLP_INFO,
+//                                   "STREAM PARENTS '%s': destination '%s' reports I am already connected.",
+//                                   rrdhost_hostname(host), string2str(d->destination));
+//                        }
+//                    }
                     break;
 
                 default:
