@@ -31,6 +31,7 @@ static void netdata_ad_atq(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
                                                                      , update_every
                                                                      , RRDSET_TYPE_LINE
                                                                      );
+
             rd_atq_average_request_latency = rrddim_add(st_atq_average_request_latency,
                                                         "time",
                                                         NULL,
@@ -41,7 +42,7 @@ static void netdata_ad_atq(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
 
         rrddim_set_by_pointer(st_atq_average_request_latency,
                               rd_atq_average_request_latency,
-                              (collected_number)p->atqAverageRequestLatency.current.Data);
+                              (collected_number)atqAverageRequestLatency.current.Data);
         rrdset_done(st_atq_average_request_latency);
     }
 
@@ -70,9 +71,89 @@ static void netdata_ad_atq(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
 
         rrddim_set_by_pointer(st_atq_outstanding_requests,
                               rd_atq_outstanding_requests,
-                              (collected_number)p->atqOutstandingRequests.current.Data);
+                              (collected_number)atqOutstandingRequests.current.Data);
         rrdset_done(st_atq_outstanding_requests);
     }
+}
+
+static void netdata_ad_op_total(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA databaseAddsPerSec = { .key = "Database adds/sec" };
+    static COUNTER_DATA databaseDeletesPerSec = { .key = "Database deletes/sec" };
+    static COUNTER_DATA databaseModifiesPerSec = { .key = "Database modifys/sec" };
+    static COUNTER_DATA databaseRecyclesPerSec = { .key = "Database recycles/sec" };
+
+    static RRDSET *st_database_operation_total = NULL;
+    static RRDDIM *rd_database_operation_total_add = NULL;
+    static RRDDIM *rd_database_operation_total_delete = NULL;
+    static RRDDIM *rd_database_operation_total_modify = NULL;
+    static RRDDIM *rd_database_operation_total_recycle = NULL;
+
+    perflibGetObjectCounter(pDataBlock, pObjectType, &databaseAddsPerSec);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &databaseDeletesPerSec);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &databaseModifiesPerSec);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &databaseRecyclesPerSec);
+
+    if (unlikely(!st_database_operation_total)) {
+        st_database_operation_total = rrdset_create_localhost("ad"
+                                                              , "database_operations"
+                                                              , NULL
+                                                              , "database"
+                                                              , "ad.database_operations"
+                                                              , "AD database operations"
+                                                              , "operations/s"
+                                                              , PLUGIN_WINDOWS_NAME
+                                                              , "PerflibAD"
+                                                              , PRIO_AD_OPERATIONS_TOTAL
+                                                              , update_every
+                                                              , RRDSET_TYPE_LINE);
+
+        rd_database_operation_total_add = rrddim_add(st_database_operation_total,
+                                                     "add",
+                                                     NULL,
+                                                     1,
+                                                     1,
+                                                     RRD_ALGORITHM_INCREMENTAL);
+
+        rd_database_operation_total_delete = rrddim_add(st_database_operation_total,
+                                                        "delete",
+                                                        NULL,
+                                                        1,
+                                                        1,
+                                                        RRD_ALGORITHM_INCREMENTAL);
+
+        rd_database_operation_total_modify = rrddim_add(st_database_operation_total,
+                                                        "modify",
+                                                        NULL,
+                                                        1,
+                                                        1,
+                                                        RRD_ALGORITHM_INCREMENTAL);
+
+        rd_database_operation_total_recycle = rrddim_add(st_database_operation_total,
+                                                         "recycle",
+                                                         NULL,
+                                                         1,
+                                                         1,
+                                                         RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_database_operation_total,
+                          rd_database_operation_total_add,
+                          (collected_number)databaseAddsPerSec.current.Data);
+
+    rrddim_set_by_pointer(st_database_operation_total,
+                          rd_database_operation_total_delete,
+                          (collected_number)databaseDeletesPerSec.current.Data);
+
+    rrddim_set_by_pointer(st_database_operation_total,
+                          rd_database_operation_total_modify,
+                          (collected_number)databaseModifiesPerSec.current.Data);
+
+    rrddim_set_by_pointer(st_database_operation_total,
+                          rd_database_operation_total_recycle,
+                          (collected_number)databaseRecyclesPerSec.current.Data);
+
+    rrdset_done(st_database_operation_total);
+
 }
 
 static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
@@ -82,6 +163,7 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     static void (*doAD[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_ad_atq,
+        netdata_ad_op_total,
 
         // This must be the end
         NULL
@@ -89,12 +171,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     for (int i = 0; doAD[i]; i++)
         doAD[i](pDataBlock, pObjectType, update_every);
-
-    // Operations Total
-    static COUNTER_DATA databaseAddsPerSec = { .key = "Database adds/sec" };
-    static COUNTER_DATA databaseDeletesPerSec = { .key = "Database deletes/sec" };
-    static COUNTER_DATA databaseModifiesPerSec = { .key = "Database modifys/sec" };
-    static COUNTER_DATA databaseRecyclesPerSec = { .key = "Database recycles/sec" };
 
     /* TODO : Compare with dumpto confirm
     static COUNTER_DATA directoryReadsPerSec = { .key = "DS Directory Reads/sec" };
