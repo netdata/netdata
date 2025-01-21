@@ -118,6 +118,79 @@ static void netdata_ad_searches(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
     }
 }
 
+static void netdata_ad_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA replicationSyncPending = { .key = "DRA Pending Replication Synchronizations" };
+    static COUNTER_DATA replicationSyncRequestsTotal = { .key = "DRA Sync Requests Made" };
+
+    static RRDSET *st_dra_replication_pending_syncs = NULL;
+    static RRDDIM *rd_dra_replication_pending_syncs = NULL;
+    static RRDSET *st_dra_replication_sync_requests = NULL;
+    static RRDDIM *rd_dra_replication_sync_requests = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationSyncPending)) {
+        goto totalSyncChart;
+    }
+
+    if (unlikely(!st_dra_replication_pending_syncs)) {
+        st_dra_replication_pending_syncs = rrdset_create_localhost("ad"
+                                                                   , "dra_replication_pending_syncs"
+                                                                   , NULL
+                                                                   , "replication"
+                                                                   , "ad.dra_replication_pending_syncs"
+                                                                   , "DRA replication pending syncs"
+                                                                   , "syncs"
+                                                                   , PLUGIN_WINDOWS_NAME
+                                                                   , "PerflibAD"
+                                                                   , PRIO_AD_SYNC_PENDING
+                                                                   , update_every
+                                                                   , RRDSET_TYPE_LINE);
+
+        rd_dra_replication_pending_syncs = rrddim_add(st_dra_replication_pending_syncs,
+                                                     "pending",
+                                                     NULL,
+                                                     1,
+                                                     1,
+                                                     RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(st_dra_replication_pending_syncs,
+                          rd_dra_replication_pending_syncs,
+                          (collected_number)replicationSyncPending.current.Data);
+    rrdset_done(st_dra_replication_pending_syncs);
+
+totalSyncChart:
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationSyncRequestsTotal)) {
+        return;
+    }
+
+    if (unlikely(!st_dra_replication_sync_requests)) {
+        st_dra_replication_sync_requests = rrdset_create_localhost("ad"
+                                                                   , "dra_replication_sync_requests"
+                                                                   , NULL
+                                                                   , "replication"
+                                                                   , "ad.dra_replication_sync_requests"
+                                                                   , "DRA replication sync requests"
+                                                                   , "requests/s"
+                                                                   , PLUGIN_WINDOWS_NAME
+                                                                   , "PerflibAD"
+                                                                   , PRIO_AD_SYNC_TOTAL
+                                                                   , update_every
+                                                                   , RRDSET_TYPE_LINE);
+
+        rd_dra_replication_sync_requests = rrddim_add(st_dra_replication_sync_requests,
+                                                      "request",
+                                                      NULL,
+                                                      1,
+                                                      1,
+                                                      RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_dra_replication_sync_requests,
+                          rd_dra_replication_sync_requests,
+                          (collected_number)replicationSyncRequestsTotal.current.Data);
+    rrdset_done(st_dra_replication_sync_requests);
+}
+
 static void netdata_ad_service_threads_in_use(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA directoryServiceThreads = { .key = "DS Threads in Use" };
 
@@ -429,10 +502,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     static COUNTER_DATA replicationDataIntraSiteBytesTotal = { .key = "DRA Inbound Bytes Not Compressed (Within Site)/sec"};
 
     static COUNTER_DATA replicationPendingSyncs = { .key = "DRA Pending Replication Synchronizations" };
-
-    // Replication sync
-    static COUNTER_DATA replicationSyncRequestsTotal = { .key = "DRA Sync Requests Made" };
-    static COUNTER_DATA replicationSyncRequestsTotal = { .key = "DRA Sync Requests Successful" };
 
     return true;
 }
