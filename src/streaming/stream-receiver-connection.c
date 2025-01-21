@@ -668,11 +668,11 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
             char msg[200 + 1];
             snprintfz(msg, sizeof(msg) - 1,
-                      "rejecting streaming connection; multiple connections for same host, "
+                      "rejecting streaming connection; multiple connections for the same host, "
                       "old connection was last used %ld secs ago%s",
                       age, receiver_stale ? " (signaled old receiver to stop)" : " (new connection not accepted)");
 
-            stream_receiver_log_status(rpt, msg, STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED, NDLP_DEBUG);
+            stream_receiver_log_status(rpt, msg, STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED, NDLP_WARNING);
 
             // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
             buffer_flush(w->response.data);
