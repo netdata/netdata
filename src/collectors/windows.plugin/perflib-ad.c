@@ -7,14 +7,88 @@ static void initialize(void) {
     ;
 }
 
+static void netdata_ad_atq(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA atqAverageRequestLatency = { .key = "ATQ Request Latency" };
+    static COUNTER_DATA atqOutstandingRequests = { .key = "ATQ Outstanding Queued Requests" };
+
+    static RRDSET *st_atq_average_request_latency = NULL;
+    static RRDDIM *rd_atq_average_request_latency = NULL;
+    static RRDSET *st_atq_outstanding_requests = NULL;
+    static RRDDIM *rd_atq_outstanding_requests = NULL;
+
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &atqAverageRequestLatency)) {
+        if (unlikely(!st_atq_average_request_latency)) {
+            st_atq_average_request_latency =  rrdset_create_localhost("ad"
+                                                                     , "atq_average_request_latency"
+                                                                     , NULL
+                                                                     , "queue"
+                                                                     , "ad.atq_average_request_latency"
+                                                                     , "Average request processing time"
+                                                                     , "seconds"
+                                                                     , PLUGIN_WINDOWS_NAME
+                                                                     , "PerflibAD"
+                                                                     , PRIO_AD_AVG_REQUEST_LATENCY
+                                                                     , update_every
+                                                                     , RRDSET_TYPE_LINE
+                                                                     );
+            rd_atq_average_request_latency = rrddim_add(st_atq_average_request_latency,
+                                                        "time",
+                                                        NULL,
+                                                        1,
+                                                        1000,
+                                                        RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st_atq_average_request_latency,
+                              rd_atq_average_request_latency,
+                              (collected_number)p->atqAverageRequestLatency.current.Data);
+        rrdset_done(st_atq_average_request_latency);
+    }
+
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &atqOutstandingRequests)) {
+        if (unlikely(!st_atq_outstanding_requests)) {
+            st_atq_outstanding_requests = rrdset_create_localhost("ad"
+                                                                  , "atq_outstanding_requests"
+                                                                  , NULL
+                                                                  , "queue"
+                                                                  , "ad.atq_outstanding_requests"
+                                                                  , "Outstanding requests"
+                                                                  , "requests"
+                                                                  , PLUGIN_WINDOWS_NAME
+                                                                  , "PerflibAD"
+                                                                  , PRIO_AD_OUTSTANDING_REQUEST
+                                                                  , update_every
+                                                                  , RRDSET_TYPE_LINE);
+
+            rd_atq_outstanding_requests = rrddim_add(st_atq_outstanding_requests,
+                                                     "outstanding",
+                                                     NULL,
+                                                     1,
+                                                     1,
+                                                     RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st_atq_outstanding_requests,
+                              rd_atq_outstanding_requests,
+                              (collected_number)p->atqOutstandingRequests.current.Data);
+        rrdset_done(st_atq_outstanding_requests);
+    }
+}
+
 static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "DirectoryServices");
     if (!pObjectType)
         return false;
 
-    // ATQ
-    static COUNTER_DATA atqAverageRequestLatency = { .key = "ATQ Request Latency" };
-    static COUNTER_DATA atqOutstandingRequests = { .key = "ATQ Outstanding Queued Requests" };
+    static void (*doAD[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
+        netdata_ad_atq,
+
+        // This must be the end
+        NULL
+    };
+
+    for (int i = 0; doAD[i]; i++)
+        doAD[i](pDataBlock, pObjectType, update_every);
 
     // Operations Total
     static COUNTER_DATA databaseAddsPerSec = { .key = "Database adds/sec" };
