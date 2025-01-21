@@ -118,6 +118,43 @@ static void netdata_ad_searches(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
     }
 }
 
+static void netdata_ad_service_threads_in_use(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA directoryServiceThreads = { .key = "DS Threads in Use" };
+
+    static RRDSET *st_directory_services_threads = NULL;
+    static RRDDIM *rd_directory_services_threads = NULL;
+
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &directoryServiceThreads)) {
+        if (unlikely(!st_directory_services_threads)) {
+            st_directory_services_threads =  rrdset_create_localhost("ad"
+                                                                    , "ds_threads"
+                                                                    , NULL
+                                                                    , "threads"
+                                                                    , "ad.ds_threads"
+                                                                    , "Directory Service threads"
+                                                                    , "threads"
+                                                                    , PLUGIN_WINDOWS_NAME
+                                                                    , "PerflibAD"
+                                                                    , PRIO_AD_THREADS_IN_USE
+                                                                    , update_every
+                                                                    , RRDSET_TYPE_LINE
+            );
+
+            rd_directory_services_threads = rrddim_add(st_directory_services_threads,
+                                                       "in_use",
+                                                       NULL,
+                                                       1,
+                                                       1,
+                                                       RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st_directory_services_threads,
+                              rd_directory_services_threads,
+                              (collected_number)directoryServiceThreads.current.Data);
+        rrdset_done(st_directory_services_threads);
+    }
+}
+
 static void netdata_ad_bind(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA ldapLastBindTimeSecondsTotal = { .key = "DAP Bind Time" };
     static COUNTER_DATA bindsTotal = { .key = "DS Server Binds/sec" };
@@ -344,6 +381,7 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     static void (*doAD[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_ad_cache_lookups,
         netdata_ad_cache_hits,
+        netdata_ad_service_threads_in_use,
         netdata_ad_bind,
         netdata_ad_searches,
         netdata_ad_atq,
@@ -395,8 +433,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     // Replication sync
     static COUNTER_DATA replicationSyncRequestsTotal = { .key = "DRA Sync Requests Made" };
     static COUNTER_DATA replicationSyncRequestsTotal = { .key = "DRA Sync Requests Successful" };
-
-    static COUNTER_DATA directoryServiceThreads = { .key = "DS Threads in Use" };
 
     return true;
 }
