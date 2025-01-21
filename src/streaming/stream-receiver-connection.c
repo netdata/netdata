@@ -236,7 +236,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
     stream_select_receiver_compression_algorithm(rpt);
 
     {
-        // netdata_log_info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+        // netdata_log_info("STREAM RCV %s [from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
         char initial_response[HTTP_HEADER_SIZE];
         if (stream_has_capability(rpt, STREAM_CAP_VCAPS)) {
             log_receiver_capabilities(rpt);
@@ -656,7 +656,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             // we can proceed with this connection
             receiver_stale = false;
 
-            nd_log_daemon(NDLP_NOTICE, "STREAM '%s' [receive from [%s]:%s]: "
+            nd_log_daemon(NDLP_NOTICE, "STREAM RCV '%s' [from [%s]:%s]: "
                                        "stopped previous stale receiver to accept this one."
                           , rpt->hostname
                           , rpt->remote_ip, rpt->remote_port);
