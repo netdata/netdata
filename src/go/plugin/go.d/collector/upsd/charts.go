@@ -337,6 +337,8 @@ func (c *Collector) addUPSCharts(ups upsUnit) {
 		{varBatteryVoltage, upsBatteryVoltageChartTmpl.ID},
 		{varBatteryVoltageNominal, upsBatteryVoltageNominalChartTmpl.ID},
 
+		{varUpsLoad, upsLoadChartTmpl.ID},
+		{varUpsLoad, upsLoadUsageChartTmpl.ID},
 		{varUpsTemperature, upsTemperatureChartTmpl.ID},
 
 		{varInputVoltage, upsInputVoltageChartTmpl.ID},
