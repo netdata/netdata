@@ -8,6 +8,43 @@ static void initialize(void) {
 }
 
 static void netdata_ad_cache_hits(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA nameCacheLookupsTotal = { .key = "DS Name Cache hit rate,secondvalue" };
+
+    static RRDSET *st_name_cache_lookups_total = NULL;
+    static RRDDIM *rd_name_cache_lookups_total = NULL;
+
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &nameCacheLookupsTotal)) {
+        if (unlikely(!st_name_cache_hits_total)) {
+            st_name_cache_lookups_total =  rrdset_create_localhost("ad"
+                                                                  , "name_cache_lookups"
+                                                                  , NULL
+                                                                  , "database"
+                                                                  , "ad.name_cache_lookups"
+                                                                  , "Name cache lookups"
+                                                                  , "lookups/s"
+                                                                  , PLUGIN_WINDOWS_NAME
+                                                                  , "PerflibAD"
+                                                                  , PRIO_AD_CACHE_LOOKUP_TOTAL
+                                                                  , update_every
+                                                                  , RRDSET_TYPE_LINE
+            );
+
+            rd_name_cache_lookups_total = rrddim_add(stname_cache_lookups_totall,
+                                                     "lookups",
+                                                     NULL,
+                                                     1,
+                                                     1,
+                                                     RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_name_cache_lookups_total,
+                              rd_name_cache_lookups_total,
+                              (collected_number)nameCacheLookupsTotal.current.Data);
+        rrdset_done(st_name_cache_lookups_total);
+    }
+}
+
+static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA nameCacheHitsTotal  = { .key = "DS Name Cache hit rate" };
 
     static RRDSET *st_name_cache_hits_total = NULL;
@@ -199,6 +236,7 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         return false;
 
     static void (*doAD[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
+        netdata_ad_cache_lookups,
         netdata_ad_cache_hits,
         netdata_ad_atq,
         netdata_ad_op_total,
@@ -254,7 +292,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     static COUNTER_DATA ldapLastBindTimeSecondsTotal = { .key = "DAP Bind Time" };
     static COUNTER_DATA bindsTotal = { .key = "DS Server Binds/sec" };
     static COUNTER_DATA ldapSearchesTotal = { .key = "LDAP Searches/sec" };
-    static COUNTER_DATA nameCacheLookupsTotal = { .key = "DS Name Cache hit rate,secondvalue" };
 
     return true;
 }
