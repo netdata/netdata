@@ -52,9 +52,10 @@ The following operators can be used to compare label values:
 
 ## Rule Evaluation Order
 
-- Inclusion rules are checked first
-- Exclusion rules are checked second
-  If both match, exclusion wins
+- Exclusion rules are checked first
+- Inclusion rules are checked second
+
+If both match, exclusion wins
 
 ## Creating Rules
 
