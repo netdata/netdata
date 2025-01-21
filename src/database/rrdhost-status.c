@@ -97,9 +97,7 @@ static NETDATA_DOUBLE rrdhost_sender_replication_completion_unsafe(RRDHOST *host
 }
 
 RRDHOST_INGEST_STATUS rrdhost_ingestion_status(RRDHOST *host) {
-    RRDHOST_STATUS status;
-    rrdhost_status(host, now_realtime_sec(), &status);
-    return status.ingest.status;
+    return rrdhost_get_ingest_status(host, now_realtime_sec());
 }
 
 int16_t rrdhost_ingestion_hops(RRDHOST *host) {
@@ -317,4 +315,69 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     }
     else
         s->health.status = RRDHOST_HEALTH_STATUS_DISABLED;
+}
+
+
+// Minimal function to get the ingest status only
+RRDHOST_INGEST_STATUS rrdhost_get_ingest_status(RRDHOST *host, time_t now) {
+    RRDHOST_FLAGS flags = __atomic_load_n(&host->flags, __ATOMIC_RELAXED);
+    bool online = rrdhost_is_online(host);
+
+    // Initialize ingest status variables
+    RRDHOST_INGEST_STATUS ingest_status;
+    time_t ingest_since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
+    time_t db_last_time_s;
+
+    // Database state
+    time_t first_time_s, last_time_s;
+    rrdhost_retention(host, now, online, &first_time_s, &last_time_s);
+    db_last_time_s = last_time_s;
+
+    uint32_t metrics = __atomic_load_n(&host->rrdctx.metrics_count, __ATOMIC_RELAXED);
+    uint32_t instances = __atomic_load_n(&host->rrdctx.instances_count, __ATOMIC_RELAXED);
+    uint32_t contexts = __atomic_load_n(&host->rrdctx.contexts_count, __ATOMIC_RELAXED);
+
+    bool db_initializing = !first_time_s || !last_time_s || !metrics || !instances || !contexts ||
+                           (flags & RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
+
+    uint32_t collected_metrics = __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
+
+    // Replication state, if set in progress due to zero collected metrics, no need to
+    // get the receiver lock
+    bool replication_in_progress = (!collected_metrics);
+    uint32_t replication_instances = 0;
+
+    if (!replication_in_progress) {
+        rrdhost_receiver_lock(host);
+        if (host->receiver && rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE)) {
+            replication_instances = rrdhost_receiver_replicating_charts(host);
+            replication_in_progress = replication_instances > 0;
+        }
+        rrdhost_receiver_unlock(host);
+    }
+
+    // Compute ingest status
+    if (online) {
+        if (db_initializing) {
+            ingest_status = RRDHOST_INGEST_STATUS_INITIALIZING;
+        } else if (rrdhost_is_local(host)) {
+            ingest_status = RRDHOST_INGEST_STATUS_ONLINE;
+            ingest_since = netdata_start_time;
+        } else {
+            if (replication_in_progress || !collected_metrics) {
+                ingest_status = RRDHOST_INGEST_STATUS_REPLICATING;
+            } else {
+                ingest_status = RRDHOST_INGEST_STATUS_ONLINE;
+            }
+        }
+    } else {
+        if (!ingest_since) {
+            ingest_status = RRDHOST_INGEST_STATUS_ARCHIVED;
+            ingest_since = db_last_time_s;
+        } else {
+            ingest_status = RRDHOST_INGEST_STATUS_OFFLINE;
+        }
+    }
+
+    return ingest_status;
 }
