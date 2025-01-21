@@ -81,6 +81,43 @@ static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TY
     }
 }
 
+static void netdata_ad_searches(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA ldapSearchesTotal = { .key = "LDAP Searches/sec" };
+
+    static RRDSET *st_ldap_searches_total = NULL;
+    static RRDDIM *rd_ldap_searches_total = NULL;
+
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &ldapSearchesTotal)) {
+        if (unlikely(!st_name_cache_hits_total)) {
+            st_ldap_searches_total =  rrdset_create_localhost("ad"
+                                                             , "ldap_searches"
+                                                             , NULL
+                                                             , "ldap"
+                                                             , "ad.ldap_searches"
+                                                             , "LDAP client search operations"
+                                                             , "searches/s"
+                                                             , PLUGIN_WINDOWS_NAME
+                                                             , "PerflibAD"
+                                                             , PRIO_AD_LDAP_SEARCHES_TOTAL
+                                                             , update_every
+                                                             , RRDSET_TYPE_LINE
+            );
+
+            rd_ldap_searches_total = rrddim_add(st_ldap_searches_total,
+                                                "searches",
+                                                NULL,
+                                                1,
+                                                1,
+                                                RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_ldap_searches_total,
+                              rd_ldap_searches_total,
+                              (collected_number)ldapSearchesTotal.current.Data);
+        rrdset_done(st_ldap_searches_total);
+    }
+}
+
 static void netdata_ad_bind(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA ldapLastBindTimeSecondsTotal = { .key = "DAP Bind Time" };
     static COUNTER_DATA bindsTotal = { .key = "DS Server Binds/sec" };
@@ -308,6 +345,7 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         netdata_ad_cache_lookups,
         netdata_ad_cache_hits,
         netdata_ad_bind,
+        netdata_ad_searches,
         netdata_ad_atq,
         netdata_ad_op_total,
 
@@ -359,7 +397,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     static COUNTER_DATA replicationSyncRequestsTotal = { .key = "DRA Sync Requests Successful" };
 
     static COUNTER_DATA directoryServiceThreads = { .key = "DS Threads in Use" };
-    static COUNTER_DATA ldapSearchesTotal = { .key = "LDAP Searches/sec" };
 
     return true;
 }
