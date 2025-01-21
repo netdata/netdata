@@ -7,6 +7,43 @@ static void initialize(void) {
     ;
 }
 
+static void netdata_ad_cache_hits(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA nameCacheHitsTotal  = { .key = "DS Name Cache hit rate" };
+
+    static RRDSET *st_name_cache_hits_total = NULL;
+    static RRDDIM *rd_name_cache_hits_total = NULL;
+
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &nameCacheHitsTotal)) {
+        if (unlikely(!st_name_cache_hits_total)) {
+            st_name_cache_hits_total =  rrdset_create_localhost("ad"
+                                                               , "name_cache_hits"
+                                                               , NULL
+                                                               , "database"
+                                                               , "ad.name_cache_hits"
+                                                               , "Name cache hits"
+                                                               , "hits/s"
+                                                               , PLUGIN_WINDOWS_NAME
+                                                               , "PerflibAD"
+                                                               , PRIO_AD_CACHE_HITS_TOTAL
+                                                               , update_every
+                                                               , RRDSET_TYPE_LINE
+            );
+
+            rd_name_cache_hits_total = rrddim_add(st_name_cache_hits_total,
+                                                  "hits",
+                                                  NULL,
+                                                  1,
+                                                  1,
+                                                  RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_name_cache_hits_total,
+                              rd_name_cache_hits_total,
+                              (collected_number)nameCacheHitsTotal.current.Data);
+        rrdset_done(st_name_cache_hits_total);
+    }
+}
+
 static void netdata_ad_atq(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA atqAverageRequestLatency = { .key = "ATQ Request Latency" };
     static COUNTER_DATA atqOutstandingRequests = { .key = "ATQ Outstanding Queued Requests" };
@@ -162,6 +199,7 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         return false;
 
     static void (*doAD[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
+        netdata_ad_cache_hits,
         netdata_ad_atq,
         netdata_ad_op_total,
 
@@ -217,7 +255,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     static COUNTER_DATA bindsTotal = { .key = "DS Server Binds/sec" };
     static COUNTER_DATA ldapSearchesTotal = { .key = "LDAP Searches/sec" };
     static COUNTER_DATA nameCacheLookupsTotal = { .key = "DS Name Cache hit rate,secondvalue" };
-    static COUNTER_DATA nameCacheHitsTotal  = { .key = "DS Name Cache hit rate" };
 
     return true;
 }
