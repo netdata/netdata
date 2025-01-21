@@ -640,6 +640,16 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         }
         rrd_rdunlock();
 
+        if (receiver_stale && string_strcmp(host->hostname, rpt->hostname) != 0) {
+            stream_receiver_log_status(
+                rpt,
+                "rejecting streaming connection; machine GUID is connected with a different hostname",
+                STREAM_HANDSHAKE_PARENT_DENIED_ACCESS, NDLP_WARNING);
+
+            stream_receiver_free(rpt);
+            return stream_receiver_response_permission_denied(w);
+        }
+
         if (receiver_stale &&
             stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_RCV_DISCONNECT_STALE_RECEIVER)) {
             // we stopped the receiver

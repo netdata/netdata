@@ -1213,16 +1213,18 @@ bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE rea
 
     rrdhost_receiver_lock(host);
 
-    if(host->receiver) {
-        if(!__atomic_load_n(&host->receiver->exit.shutdown, __ATOMIC_ACQUIRE)) {
-            receiver_set_exit_reason(host->receiver, reason, true);
-            __atomic_store_n(&host->receiver->exit.shutdown, true, __ATOMIC_RELEASE);
-            shutdown(host->receiver->sock.fd, SHUT_RDWR);
+    struct receiver_state *rpt = host->receiver;
+
+    if(rpt) {
+        if(!__atomic_load_n(&rpt->exit.shutdown, __ATOMIC_ACQUIRE)) {
+            receiver_set_exit_reason(rpt, reason, true);
+            __atomic_store_n(&rpt->exit.shutdown, true, __ATOMIC_RELEASE);
+            shutdown(rpt->sock.fd, SHUT_RDWR);
         }
     }
 
     int count = 2000;
-    while (host->receiver && count-- > 0) {
+    while (host->receiver == rpt && count-- > 0) {
         rrdhost_receiver_unlock(host);
 
         // let the lock for the receiver thread to exit
@@ -1231,11 +1233,11 @@ bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE rea
         rrdhost_receiver_lock(host);
     }
 
-    if(host->receiver)
+    if(host->receiver == rpt)
         netdata_log_error("STREAM RCV[x] '%s' [from [%s]:%s]: "
               "streaming thread takes too long to stop, giving up..."
               , rrdhost_hostname(host)
-              , host->receiver->remote_ip, host->receiver->remote_port);
+              , rpt->remote_ip, rpt->remote_port);
     else
         ret = true;
 
