@@ -54,7 +54,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->name);
     if(!st->name)
         st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->id);
-    rrdset_index_add_name(host, st);
 
     st->parts.id = string_strdupz(ctr->id);
     st->parts.type = string_strdupz(ctr->type);
@@ -273,6 +272,8 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         if (ctr->react_action & RRDSET_REACT_NEW) {
             if(unlikely(rrdcontext_find_chart_uuid(st,  &st->chart_uuid)))
                 uuid_generate(st->chart_uuid);
+
+            rrdset_index_add_name(host, st);
         }
         rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_UPDATE);
