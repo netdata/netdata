@@ -81,6 +81,75 @@ static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TY
     }
 }
 
+static void netdata_ad_bind(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA ldapLastBindTimeSecondsTotal = { .key = "DAP Bind Time" };
+    static COUNTER_DATA bindsTotal = { .key = "DS Server Binds/sec" };
+
+    static RRDSET *st_ldap_last_bind_time_seconds_total = NULL;
+    static RRDDIM *rd_ldap_last_bind_time_seconds_total = NULL;
+    static RRDSET *st_binds_total = NULL;
+    static RRDDIM *rd_binds_total = NULL;
+
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &ldapLastBindTimeSecondsTotal)) {
+        if (unlikely(!st_ldap_last_bind_time_seconds_total)) {
+            st_ldap_last_bind_time_seconds_total =  rrdset_create_localhost("ad"
+                                                                           , "ldap_last_bind_time"
+                                                                           , NULL
+                                                                           , "bind"
+                                                                           , "ad.ldap_last_bind_time"
+                                                                           , "LDAP last successful bind time"
+                                                                           , "seconds"
+                                                                           , PLUGIN_WINDOWS_NAME
+                                                                           , "PerflibAD"
+                                                                           , PRIO_AD_BIND_TIME
+                                                                           , update_every
+                                                                           , RRDSET_TYPE_LINE
+            );
+
+            rd_ldap_last_bind_time_seconds_total = rrddim_add(st_ldap_last_bind_time_seconds_total,
+                                                              "last_bind",
+                                                              NULL,
+                                                              1,
+                                                              1,
+                                                              RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st_ldap_last_bind_time_seconds_total,
+                              rd_ldap_last_bind_time_seconds_total,
+                              (collected_number)ldapLastBindTimeSecondsTotal.current.Data);
+        rrdset_done(st_ldap_last_bind_time_seconds_total);
+    }
+
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &bindsTotal)) {
+        if (unlikely(!st_binds_total)) {
+            st_binds_total = rrdset_create_localhost("ad"
+                                                     , "binds"
+                                                     , NULL
+                                                     , "bind"
+                                                     , "ad.binds"
+                                                     , "Successful binds"
+                                                     , "bind/s"
+                                                     , PLUGIN_WINDOWS_NAME
+                                                     , "PerflibAD"
+                                                     , PRIO_AD_BIND_TOTAL
+                                                     , update_every
+                                                     , RRDSET_TYPE_LINE);
+
+            rd_binds_total = rrddim_add(st_binds_total,
+                                        "binds",
+                                        NULL,
+                                        1,
+                                        1,
+                                        RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_binds_total,
+                              rd_binds_total,
+                              (collected_number)bindsTotal.current.Data);
+        rrdset_done(st_binds_total);
+    }
+}
+
 static void netdata_ad_atq(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA atqAverageRequestLatency = { .key = "ATQ Request Latency" };
     static COUNTER_DATA atqOutstandingRequests = { .key = "ATQ Outstanding Queued Requests" };
@@ -238,6 +307,7 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     static void (*doAD[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_ad_cache_lookups,
         netdata_ad_cache_hits,
+        netdata_ad_bind,
         netdata_ad_atq,
         netdata_ad_op_total,
 
@@ -289,8 +359,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     static COUNTER_DATA replicationSyncRequestsTotal = { .key = "DRA Sync Requests Successful" };
 
     static COUNTER_DATA directoryServiceThreads = { .key = "DS Threads in Use" };
-    static COUNTER_DATA ldapLastBindTimeSecondsTotal = { .key = "DAP Bind Time" };
-    static COUNTER_DATA bindsTotal = { .key = "DS Server Binds/sec" };
     static COUNTER_DATA ldapSearchesTotal = { .key = "LDAP Searches/sec" };
 
     return true;
