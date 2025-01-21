@@ -105,7 +105,7 @@ static inline usec_t randomize_wait_ut(time_t min, time_t max) {
 }
 
 void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
-    usec_t until_ut = randomize_wait_ut(5, stream_send.parents.reconnect_delay_s);
+    usec_t until_ut = now_realtime_usec();
     rw_spinlock_write_lock(&host->stream.snd.parents.spinlock);
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
         d->postpone_until_ut = until_ut;
@@ -610,10 +610,12 @@ bool stream_parent_connect_to_one_unsafe(
                 case RRDHOST_INGEST_TYPE_VIRTUAL:
                 case RRDHOST_INGEST_TYPE_LOCALHOST:
                     d->reason = STREAM_HANDSHAKE_PARENT_IS_LOCALHOST;
+                    d->since_ut = now_ut;
+                    d->postpone_until_ut = randomize_wait_ut(3600, 7200);
+
                     if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, 1)) {
                         // we passed hops == 1, to make sure this succeeds only when the parent
                         // is the origin child of this node
-                        d->since_ut = now_ut;
                         d->banned_permanently = true;
                         skipped_not_useful++;
                         nd_log(NDLS_DAEMON, NDLP_INFO,
@@ -636,6 +638,8 @@ bool stream_parent_connect_to_one_unsafe(
             switch(d->remote.ingest_status) {
                 case RRDHOST_INGEST_STATUS_INITIALIZING:
                     d->reason = STREAM_HANDSHAKE_PARENT_IS_INITIALIZING;
+                    d->since_ut = now_ut;
+                    d->postpone_until_ut = randomize_wait_ut(30, 60);
                     pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                     skip = true;
                     break;
@@ -643,9 +647,12 @@ bool stream_parent_connect_to_one_unsafe(
                 case RRDHOST_INGEST_STATUS_REPLICATING:
                 case RRDHOST_INGEST_STATUS_ONLINE:
                     d->reason = STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED;
+                    d->since_ut = now_ut;
+                    d->postpone_until_ut = randomize_wait_ut(30, 60);
+
                     pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                     if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, host->sender->hops)) {
-                        d->since_ut = now_ut;
+                        d->postpone_until_ut = randomize_wait_ut(3600, 7200);
                         d->banned_for_this_session = true;
                         skipped_not_useful++;
                         nd_log(NDLS_DAEMON, NDLP_INFO,
@@ -655,11 +662,11 @@ bool stream_parent_connect_to_one_unsafe(
                     }
                     else {
                         skip = true;
-
-                        if(!netdata_conf_is_parent())
+                        if(!netdata_conf_is_parent()) {
                             nd_log(NDLS_DAEMON, NDLP_INFO,
                                    "STREAM PARENTS '%s': destination '%s' reports I am already connected.",
                                    rrdhost_hostname(host), string2str(d->destination));
+                        }
                     }
                     break;
 
