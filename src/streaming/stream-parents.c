@@ -105,7 +105,7 @@ static inline usec_t randomize_wait_ut(time_t min, time_t max) {
 }
 
 void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
-    usec_t until_ut = now_realtime_usec();
+    usec_t until_ut = randomize_wait_ut(stream_send.parents.reconnect_delay_s / 2, stream_send.parents.reconnect_delay_s + 5);
     rw_spinlock_write_lock(&host->stream.snd.parents.spinlock);
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
         d->postpone_until_ut = until_ut;
@@ -646,12 +646,10 @@ bool stream_parent_connect_to_one_unsafe(
 
                 case RRDHOST_INGEST_STATUS_REPLICATING:
                 case RRDHOST_INGEST_STATUS_ONLINE:
-                    d->reason = STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED;
-                    d->since_ut = now_ut;
-                    d->postpone_until_ut = randomize_wait_ut(30, 60);
-
                     pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                     if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, host->sender->hops)) {
+                        d->reason = STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED;
+                        d->since_ut = now_ut;
                         d->postpone_until_ut = randomize_wait_ut(3600, 7200);
                         d->banned_for_this_session = true;
                         skipped_not_useful++;
