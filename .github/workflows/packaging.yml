@@ -274,14 +274,6 @@ jobs:
                      -e VERSION=${{ needs.version-check.outputs.version }} -e DISTRO_VERSION=${{ matrix.version }} \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }} \
                      /netdata/.github/scripts/pkg-test.sh
-      - name: SSH setup
-        id: ssh-setup
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
-          name: id_ecdsa
-          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
       - name: Import GPG Keys
         id: import-keys
         if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
@@ -293,6 +285,14 @@ jobs:
         if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
         shell: bash
         run: .github/scripts/deb-sign.sh artifacts ${{ steps.import-keys.outputs.fingerprint }}
+      - name: SSH setup
+        id: ssh-setup
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
       - name: Upload to packages.netdata.cloud
         id: package-upload
         continue-on-error: true
@@ -328,11 +328,10 @@ jobs:
               Fetch images: ${{ steps.fetch-images.outcome }}
               Build: ${{ steps.build.outcome }}
               Test: ${{ steps.test.outcome }}
-              Publish to PackageCloud: ${{ steps.upload.outcome }}
-              Import SSH Key: ${{ steps.ssh-setup.outcome }}
-              Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
               Import GPG Keys: ${{ steps.import-keys.outcome }}
               Sign DEB Packages: ${{ steps.sign-deb.outcome }}
+              Import SSH Key: ${{ steps.ssh-setup.outcome }}
+              Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
               Publish to packages2.netdata.cloud: ${{ steps.package2-upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-

@@ -119,7 +119,7 @@ jobs:
 
   matrix:
     name: Generate Docker Build Matrix
-    runs-on: ubunut-latest
+    runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:

@@ -414,7 +414,7 @@ jobs:
           SLACK_TITLE: 'Windows build failed:'
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
-              ${{ github.repository }}: Updater checks for ${{ matrix.distro }} failed.
+              ${{ github.repository }}: Windows build failed.
               Checkout: ${{ steps.checkout.outcome }}
               Set Up Dependencies: ${{ steps.deps.outcome }}
               Build Netdata: ${{ steps.build.outcome }}
@@ -712,10 +712,10 @@ jobs:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Updater checks for ${{ matrix.distro }} failed:'
+          SLACK_TITLE: 'Updater checks  failed:'
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
-              ${{ github.repository }}: Updater checks for ${{ matrix.distro }} failed.
+              ${{ github.repository }}: Updater checks for failed.
               Checkout: ${{ steps.checkout.outcome }}
               Fetch artifacts: ${{ steps.fetch-artifacts.outcome }}
               Prepare artifact directory: ${{ steps.prepare.outcome }}
@@ -1035,7 +1035,7 @@ jobs:
               ${{ github.repository }}: Build tests for ${{ matrix.distro }} failed.
               Checkout: ${{ steps.checkout.outcome }}
               Set up Buildx: ${{ steps.buildx.outcome }}
-              Build test environment: ${{ steps.build1.outcome }}
+              Build test environment: ${{ steps.build.outcome }}
               netdata-installer: ${{ steps.build-cloud.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
