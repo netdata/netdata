@@ -118,6 +118,79 @@ static void netdata_ad_searches(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
     }
 }
 
+static void netdata_ad_properties(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA replicationInboundPropertiesUpdatedTotal = { .key = "DRA Inbound Properties Applied/sec" };
+    static COUNTER_DATA replicationInboundPropertiesFilteredTotal = { .key = "DRA Inbound Properties Filtered/sec" };
+
+    static RRDSET *st_dra_replication_properties_updated = NULL;
+    static RRDDIM *rd_dra_replication_properties_updated = NULL;
+    static RRDSET *st_dra_replication_properties_filtered = NULL;
+    static RRDDIM *rd_dra_replication_properties_filtered = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundPropertiesUpdatedTotal)) {
+        goto totalPropertyChart;
+    }
+
+    if (unlikely(!st_dra_replication_properties_updated)) {
+        st_dra_replication_properties_updated = rrdset_create_localhost("ad"
+                                                                        , "dra_replication_properties_updated"
+                                                                        , NULL
+                                                                        , "replication"
+                                                                        , "ad.dra_replication_properties_updated"
+                                                                        , "DRA replication properties updated"
+                                                                        , "properties/s"
+                                                                        , PLUGIN_WINDOWS_NAME
+                                                                        , "PerflibAD"
+                                                                        , PRIO_AD_REPLICATION_PROPERTY_UPDATED
+                                                                        , update_every
+                                                                        , RRDSET_TYPE_LINE);
+
+        rd_dra_replication_properties_updated = rrddim_add(st_dra_replication_properties_updated,
+                                                           "inbound",
+                                                           NULL,
+                                                           1,
+                                                           1,
+                                                           RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_dra_replication_properties_updated,
+                          rd_dra_replication_properties_updated,
+                          (collected_number)replicationInboundPropertiesUpdatedTotal.current.Data);
+    rrdset_done(st_dra_replication_properties_updated);
+
+totalPropertyChart:
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundPropertiesFilteredTotal)) {
+        return;
+    }
+
+    if (unlikely(!st_dra_replication_properties_filtered)) {
+        st_dra_replication_properties_filtered = rrdset_create_localhost("ad"
+                                                                         , "dra_replication_properties_filtered"
+                                                                         , NULL
+                                                                         , "replication"
+                                                                         , "ad.dra_replication_properties_filtered"
+                                                                         , "DRA replication properties filtered"
+                                                                         , "properties/s"
+                                                                         , PLUGIN_WINDOWS_NAME
+                                                                         , "PerflibAD"
+                                                                         , PRIO_AD_REPLICATION_PROPERTY_FILTERED
+                                                                         , update_every
+                                                                         , RRDSET_TYPE_LINE);
+
+        rd_dra_replication_properties_filtered = rrddim_add(st_dra_replication_properties_filtered,
+                                                            "inbound",
+                                                            NULL,
+                                                            1,
+                                                            1,
+                                                            RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_dra_replication_properties_filtered,
+                          rd_dra_replication_properties_filtered,
+                          (collected_number)replicationInboundPropertiesFilteredTotal.current.Data);
+    rrdset_done(st_dra_replication_properties_filtered);
+}
+
 static void netdata_ad_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA replicationSyncPending = { .key = "DRA Pending Replication Synchronizations" };
     static COUNTER_DATA replicationSyncRequestsTotal = { .key = "DRA Sync Requests Made" };
@@ -453,6 +526,8 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     static void (*doAD[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_ad_cache_lookups,
+        netdata_ad_properties,
+        netdata_ad_sync,
         netdata_ad_cache_hits,
         netdata_ad_service_threads_in_use,
         netdata_ad_bind,
@@ -494,8 +569,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     // Replication
     static COUNTER_DATA replicationInboundObjectsFilteringTotal = { .key = "DRA Inbound Objects Filtered/sec" };
-    static COUNTER_DATA replicationInboundPropertiesFilteredTotal = { .key = "DRA Inbound Properties Filtered/sec" };
-    static COUNTER_DATA replicationInboundPropertiesUpdatedTotal = { .key = "DRA Inbound Properties Total/sec" };
     static COUNTER_DATA replicationInboundSyncObjectsRemaining = { .key = "DRA Inbound Full Sync Objects Remaining" };
 
     static COUNTER_DATA replicationDataInterSiteBytesTotal = { .key = "DRA Inbound Bytes Compressed (Between Sites, After Compression)/sec" };
