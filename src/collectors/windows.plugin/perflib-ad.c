@@ -194,11 +194,14 @@ totalPropertyChart:
 static void netdata_ad_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA replicationSyncPending = { .key = "DRA Pending Replication Synchronizations" };
     static COUNTER_DATA replicationSyncRequestsTotal = { .key = "DRA Sync Requests Made" };
+    static COUNTER_DATA replicationPendingSyncs = { .key = "DRA Pending Replication Synchronizations" };
 
     static RRDSET *st_dra_replication_pending_syncs = NULL;
     static RRDDIM *rd_dra_replication_pending_syncs = NULL;
     static RRDSET *st_dra_replication_sync_requests = NULL;
     static RRDDIM *rd_dra_replication_sync_requests = NULL;
+    static RRDSET *st_dra_replication_sync_objects_remaining = NULL;
+    static RRDDIM *rd_dra_replication_sync_objects_remaining = NULL;
 
     if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationSyncPending)) {
         goto totalSyncChart;
@@ -233,7 +236,7 @@ static void netdata_ad_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
 
 totalSyncChart:
     if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationSyncRequestsTotal)) {
-        return;
+        goto RemainingSyncChart;
     }
 
     if (unlikely(!st_dra_replication_sync_requests)) {
@@ -262,6 +265,38 @@ totalSyncChart:
                           rd_dra_replication_sync_requests,
                           (collected_number)replicationSyncRequestsTotal.current.Data);
     rrdset_done(st_dra_replication_sync_requests);
+
+RemainingSyncChart:
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationPendingSyncs)) {
+        return;
+    }
+
+    if (unlikely(!st_dra_replication_sync_objects_remaining)) {
+        st_dra_replication_sync_objects_remaining = rrdset_create_localhost("ad"
+                                                                            , "dra_replication_sync_objects_remaining"
+                                                                            , NULL
+                                                                            , "replication"
+                                                                            , "ad.dra_replication_sync_objects_remaining"
+                                                                            , "DRA replication full sync objects remaining"
+                                                                            , "objects"
+                                                                            , PLUGIN_WINDOWS_NAME
+                                                                            , "PerflibAD"
+                                                                            , PRIO_AD_SYNC_OBJECTS_REMAINING
+                                                                            , update_every
+                                                                            , RRDSET_TYPE_LINE);
+
+        rd_dra_replication_sync_objects_remaining = rrddim_add(st_dra_replication_sync_objects_remaining,
+                                                               "request",
+                                                               NULL,
+                                                               1,
+                                                               1,
+                                                               RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_dra_replication_sync_objects_remaining,
+                          rd_dra_replication_sync_objects_remaining,
+                          (collected_number)replicationPendingSyncs.current.Data);
+    rrdset_done(st_dra_replication_sync_objects_remaining);
 }
 
 static void netdata_ad_service_threads_in_use(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
@@ -573,8 +608,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     static COUNTER_DATA replicationDataInterSiteBytesTotal = { .key = "DRA Inbound Bytes Compressed (Between Sites, After Compression)/sec" };
     static COUNTER_DATA replicationDataIntraSiteBytesTotal = { .key = "DRA Inbound Bytes Not Compressed (Within Site)/sec"};
-
-    static COUNTER_DATA replicationPendingSyncs = { .key = "DRA Pending Replication Synchronizations" };
 
     return true;
 }
