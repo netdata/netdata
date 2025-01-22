@@ -646,7 +646,6 @@ bool stream_parent_connect_to_one_unsafe(
 
                 case RRDHOST_INGEST_STATUS_REPLICATING:
                 case RRDHOST_INGEST_STATUS_ONLINE:
-                    pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                     if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, host->sender->hops)) {
                         d->reason = STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED;
                         d->since_ut = now_ut;
@@ -656,6 +655,7 @@ bool stream_parent_connect_to_one_unsafe(
                         nd_log(NDLS_DAEMON, NDLP_INFO,
                                "STREAM PARENTS '%s': destination '%s' is banned for this session, because it is in our path before us.",
                                rrdhost_hostname(host), string2str(d->destination));
+                        pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                         continue;
                     }
 //                    else {
@@ -804,6 +804,7 @@ bool stream_parent_connect_to_one_unsafe(
 
         d->since_ut = now_ut;
         d->attempts++;
+        pulse_host_status(host, PULSE_HOST_STATUS_SND_CONNECTING, 0);
         if (nd_sock_connect_to_this(sender_sock, string2str(d->destination),
                                     default_port, timeout, stream_parent_is_ssl(d))) {
 

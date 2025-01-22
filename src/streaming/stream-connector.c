@@ -268,7 +268,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     s->sock.verify_certificate = netdata_ssl_validate_certificate_sender;
     s->sock.ctx = netdata_ssl_streaming_sender_ctx;
 
-    pulse_host_status(s->host, PULSE_HOST_STATUS_SND_CONNECTING, 0);
+    pulse_host_status(s->host, PULSE_HOST_STATUS_SND_PENDING, 0);
     if(!stream_parent_connect_to_one(
             &s->sock, host, default_port, timeout,
             s->remote_ip, sizeof(s->remote_ip) - 1,
@@ -453,7 +453,7 @@ void stream_connector_requeue(struct sender_state *s) {
     SENDERS_SET(&sc->queue.senders, (Word_t)s, s);
     spinlock_unlock(&sc->queue.spinlock);
 
-    pulse_host_status(s->host, PULSE_HOST_STATUS_SND_CONNECTING, 0);
+    pulse_host_status(s->host, PULSE_HOST_STATUS_SND_PENDING, 0);
 
     // signal the connector to catch the job
     completion_mark_complete_a_job(&sc->completion);
