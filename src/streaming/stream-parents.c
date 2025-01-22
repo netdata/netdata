@@ -606,10 +606,12 @@ bool stream_parent_connect_to_one_unsafe(
                 case RRDHOST_INGEST_TYPE_VIRTUAL:
                 case RRDHOST_INGEST_TYPE_LOCALHOST:
                     d->reason = STREAM_HANDSHAKE_ERROR_LOCALHOST;
+                    d->since_ut = now_ut;
+                    d->postpone_until_ut = randomize_wait_ut(3600, 7200);
+
                     if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, 1)) {
                         // we passed hops == 1, to make sure this succeeds only when the parent
                         // is the origin child of this node
-                        d->since_ut = now_ut;
                         d->banned_permanently = true;
                         skipped_not_useful++;
                         nd_log(NDLS_DAEMON, NDLP_INFO,
@@ -630,6 +632,8 @@ bool stream_parent_connect_to_one_unsafe(
             switch(d->remote.ingest_status) {
                 case RRDHOST_INGEST_STATUS_INITIALIZING:
                     d->reason = STREAM_HANDSHAKE_INITIALIZATION;
+                    d->since_ut = now_ut;
+                    d->postpone_until_ut = randomize_wait_ut(30, 60);
                     skip = true;
                     break;
 
@@ -638,6 +642,7 @@ bool stream_parent_connect_to_one_unsafe(
                     d->reason = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED;
                     if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, host->sender->hops)) {
                         d->since_ut = now_ut;
+                        d->postpone_until_ut = randomize_wait_ut(3600, 7200);
                         d->banned_for_this_session = true;
                         skipped_not_useful++;
                         nd_log(NDLS_DAEMON, NDLP_INFO,
@@ -645,8 +650,6 @@ bool stream_parent_connect_to_one_unsafe(
                                rrdhost_hostname(host), string2str(d->destination));
                         continue;
                     }
-                    else
-                        skip = true;
                     break;
 
                 default:
