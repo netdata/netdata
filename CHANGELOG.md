@@ -1,12 +1,15 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v2.2.0](https://github.com/netdata/netdata/tree/v2.2.0) (2025-01-22)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.1.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.1.1...v2.2.0)
 
 **Merged pull requests:**
 
+- control stream-info requests rate [\#19458](https://github.com/netdata/netdata/pull/19458) ([ktsaou](https://github.com/ktsaou))
+- fix\(go.d/upsd\): remove UPS load charts if UPS load not found [\#19457](https://github.com/netdata/netdata/pull/19457) ([ilyam8](https://github.com/ilyam8))
 - Simplify the rrdhost\_ingestion\_status call [\#19456](https://github.com/netdata/netdata/pull/19456) ([stelfrag](https://github.com/stelfrag))
+- Fix up handling of libunwind in CMake. [\#19451](https://github.com/netdata/netdata/pull/19451) ([Ferroin](https://github.com/Ferroin))
 - Revert libunwind being enabled in Docker and DEB builds. [\#19450](https://github.com/netdata/netdata/pull/19450) ([Ferroin](https://github.com/Ferroin))
 - Do not run queries synchronously in the event loop [\#19448](https://github.com/netdata/netdata/pull/19448) ([stelfrag](https://github.com/stelfrag))
 - Cleanup metadata event loop [\#19447](https://github.com/netdata/netdata/pull/19447) ([stelfrag](https://github.com/stelfrag))
@@ -469,11 +472,6 @@
 - docs: fix broken links in metadata [\#18915](https://github.com/netdata/netdata/pull/18915) ([ilyam8](https://github.com/ilyam8))
 - Update CI to generate MSI installer for Windows using WiX. [\#18914](https://github.com/netdata/netdata/pull/18914) ([Ferroin](https://github.com/Ferroin))
 - Fix potential wait forever in mqtt loop [\#18913](https://github.com/netdata/netdata/pull/18913) ([stelfrag](https://github.com/stelfrag))
-- add `dagster` to apps\_groups.conf [\#18912](https://github.com/netdata/netdata/pull/18912) ([andrewm4894](https://github.com/andrewm4894))
-- Installation section simplification [\#18911](https://github.com/netdata/netdata/pull/18911) ([Ancairon](https://github.com/Ancairon))
-- fix\(debugfs/extfrag\): add zone label [\#18910](https://github.com/netdata/netdata/pull/18910) ([ilyam8](https://github.com/ilyam8))
-- proc.plugin: log as info if a dir not exists [\#18909](https://github.com/netdata/netdata/pull/18909) ([ilyam8](https://github.com/ilyam8))
-- uninstall docs edits [\#18908](https://github.com/netdata/netdata/pull/18908) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
