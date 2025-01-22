@@ -74,30 +74,33 @@ struct aclk_sync_config_s {
     SPINLOCK cmd_queue_lock;
     uint32_t aclk_jobs_pending;
     struct aclk_database_cmd *cmd_base;
+    ARAL *ar;
 } aclk_sync_config = { 0 };
 
 static struct aclk_database_cmd aclk_database_deq_cmd(void)
 {
     struct aclk_database_cmd ret = { 0 };
+    struct aclk_database_cmd *to_free = NULL;
 
     spinlock_lock(&aclk_sync_config.cmd_queue_lock);
     if(aclk_sync_config.cmd_base) {
         struct aclk_database_cmd *t = aclk_sync_config.cmd_base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(aclk_sync_config.cmd_base, t, prev, next);
         ret = *t;
-        freez(t);
+        to_free = t;
     }
     else {
         ret.opcode = ACLK_DATABASE_NOOP;
     }
     spinlock_unlock(&aclk_sync_config.cmd_queue_lock);
+    aral_freez(aclk_sync_config.ar, to_free);
 
     return ret;
 }
 
 static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
 {
-    struct aclk_database_cmd *t = mallocz(sizeof(*t));
+    struct aclk_database_cmd *t = aral_mallocz(aclk_sync_config.ar);
     *t = *cmd;
     t->prev = t->next = NULL;
 
@@ -365,7 +368,7 @@ static void after_aclk_run_query_job(uv_work_t *req, int status __maybe_unused)
     freez(payload);
 }
 
-static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query, bool is_worker)
+static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query)
 {
     if (query->type == UNKNOWN || query->type >= ACLK_QUERY_TYPE_COUNT) {
         error_report("Unknown query in query queue. %u", query->type);
@@ -380,14 +383,12 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
 
 // Incoming : cloud -> agent
         case HTTP_API_V2:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
+            worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
             http_api_v2(config->client, query);
             ok_to_send = false;
             break;
         case CTX_CHECKPOINT:;
-            if (is_worker)
-                worker_is_busy(UV_EVENT_CTX_CHECKPOINT);
+            worker_is_busy(UV_EVENT_CTX_CHECKPOINT);
             cmd = query->data.payload;
             rrdcontext_hub_checkpoint_command(cmd);
             freez(cmd->claim_id);
@@ -396,8 +397,7 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             ok_to_send = false;
             break;
         case CTX_STOP_STREAMING:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_CTX_STOP_STREAMING);
+            worker_is_busy(UV_EVENT_CTX_STOP_STREAMING);
             cmd = query->data.payload;
             rrdcontext_hub_stop_streaming_command(cmd);
             freez(cmd->claim_id);
@@ -406,29 +406,25 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             ok_to_send = false;
             break;
         case SEND_NODE_INSTANCES:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_SEND_NODE_INSTANCES);
+            worker_is_busy(UV_EVENT_SEND_NODE_INSTANCES);
             aclk_send_node_instances();
             ok_to_send = false;
             break;
         case ALERT_START_STREAMING:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_ALERT_START_STREAMING);
+            worker_is_busy(UV_EVENT_ALERT_START_STREAMING);
             aclk_start_alert_streaming(query->data.node_id, query->version);
             freez(query->data.node_id);
             ok_to_send = false;
             break;
         case ALERT_CHECKPOINT:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_ALERT_CHECKPOINT);
+            worker_is_busy(UV_EVENT_ALERT_CHECKPOINT);
             aclk_alert_version_check(query->data.node_id, query->claim_id, query->version);
             freez(query->data.node_id);
             freez(query->claim_id);
             ok_to_send = false;
             break;
         case CREATE_NODE_INSTANCE:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_CREATE_NODE_INSTANCE);
+            worker_is_busy(UV_EVENT_CREATE_NODE_INSTANCE);
             create_node_instance_result_job(query->machine_guid, query->data.node_id);
             freez(query->data.node_id);
             freez(query->machine_guid);
@@ -437,36 +433,28 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
 
 // Outgoing: agent -> cloud
         case ALARM_PROVIDE_CFG:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_ALARM_PROVIDE_CFG);
+            worker_is_busy(UV_EVENT_ALARM_PROVIDE_CFG);
             break;
         case ALARM_SNAPSHOT:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_ALARM_SNAPSHOT);
+            worker_is_busy(UV_EVENT_ALARM_SNAPSHOT);
             break;
         case REGISTER_NODE:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_REGISTER_NODE);
+            worker_is_busy(UV_EVENT_REGISTER_NODE);
             break;
         case UPDATE_NODE_COLLECTORS:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_UPDATE_NODE_COLLECTORS);
+            worker_is_busy(UV_EVENT_UPDATE_NODE_COLLECTORS);
             break;
         case UPDATE_NODE_INFO:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_UPDATE_NODE_INFO);
+            worker_is_busy(UV_EVENT_UPDATE_NODE_INFO);
             break;
         case CTX_SEND_SNAPSHOT:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT);
+            worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT);
             break;
         case CTX_SEND_SNAPSHOT_UPD:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT_UPD);
+            worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT_UPD);
             break;
         case NODE_STATE_UPDATE:
-            if (is_worker)
-                worker_is_busy(UV_EVENT_NODE_STATE_UPDATE);
+            worker_is_busy(UV_EVENT_NODE_STATE_UPDATE);
             break;
         default:
             nd_log_daemon(NDLP_ERR, "Unknown msg type %u; ignoring", query->type);
@@ -488,7 +476,7 @@ static void aclk_run_query_job(uv_work_t *req)
     struct aclk_sync_config_s *config = payload->config;
     aclk_query_t query = (aclk_query_t) payload->data;
 
-    aclk_run_query(config, query, true);
+    aclk_run_query(config, query);
     worker_is_idle();
 }
 
@@ -516,13 +504,13 @@ static void aclk_execute_batch(uv_work_t *req)
     size_t entries = aclk_query_batch->count;
     Word_t Index = 0;
     bool first = true;
-    Pvoid_t *PValue;
-    while ((PValue = JudyLFirstThenNext(aclk_query_batch->JudyL, &Index, &first))) {
-        if (!*PValue)
+    Pvoid_t *Pvalue;
+    while ((Pvalue = JudyLFirstThenNext(aclk_query_batch->JudyL, &Index, &first))) {
+        if (!*Pvalue)
             continue;
 
-        aclk_query_t query = *PValue;
-        aclk_run_query(config, query, true);
+        aclk_query_t query = *Pvalue;
+        aclk_run_query(config, query);
     }
 
     (void) JudyLFreeArray(&aclk_query_batch->JudyL, PJE0);
@@ -611,6 +599,8 @@ static void aclk_synchronization(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
     uv_thread_set_name_np("ACLKSYNC");
+    config->ar = aral_by_size_acquire(sizeof(struct aclk_database_cmd));
+
     worker_register("ACLKSYNC");
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
@@ -864,6 +854,8 @@ static void aclk_synchronization(void *arg)
     uv_run(loop, UV_RUN_NOWAIT);
 
     (void) uv_loop_close(loop);
+
+    aral_by_size_release(config->ar);
 
     worker_unregister();
     service_exits();
