@@ -191,6 +191,107 @@ totalPropertyChart:
     rrdset_done(st_dra_replication_properties_filtered);
 }
 
+static void netdata_ad_compressed_traffic(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA replicationInboundDataInterSiteBytesTotal = { .key = "DRA Inbound Bytes Compressed (Between Sites, After Compression)/sec" };
+    static COUNTER_DATA replicationOutboundDataInterSiteBytesTotal = { .key = "DRA Outbound Bytes Compressed (Between Sites, After Compression)/sec" };
+
+    static COUNTER_DATA replicationDataInboundIntraSiteBytesTotal = { .key = "DRA Outbound Bytes Compressed (Between Sites, After Compression)/sec"};
+    static COUNTER_DATA replicationDataOutboundIntraSiteBytesTotal = { .key = "DRA Outbound Bytes Not Compressed (Within Site)/sec"};
+
+    static RRDSET *st_dra_replication_intersite_compressed_traffic = NULL;
+    static RRDDIM *rd_replication_data_intersite_bytes_total_inbound = NULL;
+    static RRDDIM *rd_replication_data_intersite_bytes_total_outbound = NULL;
+
+    static RRDSET *st_dra_replication_intrasite_compressed_traffic = NULL;
+    static RRDDIM *rd_replication_data_intrasite_bytes_total_inbound = NULL;
+    static RRDDIM *rd_replication_data_intrasite_bytes_total_outbound = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundDataInterSiteBytesTotal) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &replicationOutboundDataInterSiteBytesTotal)) {
+        goto intraChart;
+    }
+
+    if (unlikely(!st_dra_replication_intersite_compressed_traffic)) {
+        st_dra_replication_intersite_compressed_traffic = rrdset_create_localhost("ad"
+                                                                                  , "dra_replication_intersite_compressed_traffic"
+                                                                                  , NULL
+                                                                                  , "replication"
+                                                                                  , "ad.dra_replication_intersite_compressed_traffic"
+                                                                                  , "DRA replication compressed traffic withing site"
+                                                                                  , "bytes/s"
+                                                                                  , PLUGIN_WINDOWS_NAME
+                                                                                  , "PerflibAD"
+                                                                                  , PRIO_AD_REPLICATION_INTERSITE_COMPRESSED
+                                                                                  , update_every
+                                                                                  , RRDSET_TYPE_AREA);
+
+        rd_replication_data_intersite_bytes_total_inbound = rrddim_add(st_dra_replication_intersite_compressed_traffic,
+                                                                       "inbound",
+                                                                       NULL,
+                                                                       1,
+                                                                       1,
+                                                                       RRD_ALGORITHM_INCREMENTAL);
+
+        rd_replication_data_intersite_bytes_total_outbound = rrddim_add(st_dra_replication_intersite_compressed_traffic,
+                                                                        "outbound",
+                                                                        NULL,
+                                                                        -1,
+                                                                        1,
+                                                                        RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_dra_replication_intersite_compressed_traffic,
+                          rd_replication_data_intersite_bytes_total_inbound,
+                          (collected_number)replicationInboundDataInterSiteBytesTotal.current.Data);
+    rrddim_set_by_pointer(st_dra_replication_intersite_compressed_traffic,
+                          rd_replication_data_intersite_bytes_total_outbound,
+                          (collected_number)replicationOutboundDataInterSiteBytesTotal.current.Data);
+    rrdset_done(st_dra_replication_intersite_compressed_traffic);
+
+intraChart:
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationDataInboundIntraSiteBytesTotal) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &replicationDataOutboundIntraSiteBytesTotal)) {
+        return;
+    }
+
+    if (unlikely(!st_dra_replication_intrasite_compressed_traffic)) {
+        st_dra_replication_intrasite_compressed_traffic = rrdset_create_localhost("ad"
+                                                                                  , "dra_replication_intrasite_compressed_traffic"
+                                                                                  , NULL
+                                                                                  , "replication"
+                                                                                  , "ad.dra_replication_intrasite_compressed_traffic"
+                                                                                  , "DRA replication compressed traffic between sites"
+                                                                                  , "bytes/s"
+                                                                                  , PLUGIN_WINDOWS_NAME
+                                                                                  , "PerflibAD"
+                                                                                  , PRIO_AD_REPLICATION_INTRASITE_COMPRESSED
+                                                                                  , update_every
+                                                                                  , RRDSET_TYPE_LINE);
+
+        rd_replication_data_intrasite_bytes_total_inbound = rrddim_add(st_dra_replication_intrasite_compressed_traffic,
+                                                                       "inbound",
+                                                                       NULL,
+                                                                       1,
+                                                                       1,
+                                                                       RRD_ALGORITHM_INCREMENTAL);
+
+        rd_replication_data_intrasite_bytes_total_outbound = rrddim_add(st_dra_replication_intrasite_compressed_traffic,
+                                                                        "outbound",
+                                                                        NULL,
+                                                                        -1,
+                                                                        1,
+                                                                        RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_dra_replication_intrasite_compressed_traffic,
+                          rd_replication_data_intrasite_bytes_total_inbound,
+                          (collected_number)replicationDataInboundIntraSiteBytesTotal.current.Data);
+    rrddim_set_by_pointer(st_dra_replication_intrasite_compressed_traffic,
+                          rd_replication_data_intrasite_bytes_total_outbound,
+                          (collected_number)replicationDataOutboundIntraSiteBytesTotal.current.Data);
+    rrdset_done(st_dra_replication_intrasite_compressed_traffic);
+}
+
 static void netdata_ad_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA replicationSyncPending = { .key = "DRA Pending Replication Synchronizations" };
     static COUNTER_DATA replicationSyncRequestsTotal = { .key = "DRA Sync Requests Made" };
@@ -562,6 +663,7 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     static void (*doAD[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_ad_cache_lookups,
         netdata_ad_properties,
+        netdata_ad_compressed_traffic,
         netdata_ad_sync,
         netdata_ad_cache_hits,
         netdata_ad_service_threads_in_use,
@@ -605,9 +707,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     // Replication
     static COUNTER_DATA replicationInboundObjectsFilteringTotal = { .key = "DRA Inbound Objects Filtered/sec" };
     static COUNTER_DATA replicationInboundSyncObjectsRemaining = { .key = "DRA Inbound Full Sync Objects Remaining" };
-
-    static COUNTER_DATA replicationDataInterSiteBytesTotal = { .key = "DRA Inbound Bytes Compressed (Between Sites, After Compression)/sec" };
-    static COUNTER_DATA replicationDataIntraSiteBytesTotal = { .key = "DRA Inbound Bytes Not Compressed (Within Site)/sec"};
 
     return true;
 }
