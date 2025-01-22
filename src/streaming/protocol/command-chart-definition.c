@@ -117,8 +117,10 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
                        (unsigned long long)now);
 
         RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-        if(!(old & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS))
-            rrdhost_sender_replicating_charts_plus_one(st->rrdhost);
+        if(!(old & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
+            if(rrdhost_sender_replicating_charts_plus_one(st->rrdhost) == 1)
+                pulse_host_status(st->rrdhost, PULSE_HOST_STATUS_SND_REPLICATING, 0);
+        }
 
         replication_progress = true;
 

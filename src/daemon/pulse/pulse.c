@@ -19,8 +19,9 @@
 #define WORKER_JOB_REGISTRY             13
 #define WORKER_JOB_ARAL                 14
 #define WORKER_JOB_NETWORK              15
+#define WORKER_JOB_PARENTS              16
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 16
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 17
 #error "WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 14"
 #endif
 
@@ -46,6 +47,7 @@ static void pulse_register_workers(void) {
     worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
     worker_register_job_name(WORKER_JOB_ARAL, "aral");
     worker_register_job_name(WORKER_JOB_NETWORK, "network");
+    worker_register_job_name(WORKER_JOB_PARENTS, "parents");
 }
 
 static void pulse_cleanup(void *pptr)
@@ -143,6 +145,9 @@ void *pulse_thread_main(void *ptr) {
 
         worker_is_busy(WORKER_JOB_ARAL);
         pulse_aral_do(pulse_extended_enabled);
+
+        worker_is_busy(WORKER_JOB_PARENTS);
+        pulse_parents_do(pulse_extended_enabled);
 
         // keep this last to have access to the memory counters
         // exposed by everyone else

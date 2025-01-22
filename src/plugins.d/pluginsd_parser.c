@@ -207,6 +207,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     object_state_activate(&host->state_id);
     ml_host_start(host);
     dyncfg_host_init(host);
+    pulse_host_status(host, 0, 0); // this will detect the receiver status
 
     if(host->rrdlabels) {
         rrdlabels_migrate_to_these(host->rrdlabels, parser->user.host_define.rrdlabels);

@@ -84,7 +84,7 @@ static bool is_a_blocked_parent(STREAM_PARENT *d) {
 // --------------------------------------------------------------------------------------------------------------------
 
 STREAM_HANDSHAKE stream_parent_get_disconnect_reason(STREAM_PARENT *d) {
-    if(!d) return STREAM_HANDSHAKE_INTERNAL_ERROR;
+    if(!d) return STREAM_HANDSHAKE_PARENT_INTERNAL_ERROR;
     return d->reason;
 }
 
@@ -105,7 +105,7 @@ static inline usec_t randomize_wait_ut(time_t min, time_t max) {
 }
 
 void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
-    usec_t until_ut = randomize_wait_ut(5, stream_send.parents.reconnect_delay_s);
+    usec_t until_ut = randomize_wait_ut(stream_send.parents.reconnect_delay_s / 2, stream_send.parents.reconnect_delay_s + 5);
     rw_spinlock_write_lock(&host->stream.snd.parents.spinlock);
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
         d->postpone_until_ut = until_ut;
@@ -233,39 +233,39 @@ cleanup:
 static void stream_parent_nd_sock_error_to_reason(STREAM_PARENT *d, ND_SOCK *sock) {
     switch (sock->error) {
         case ND_SOCK_ERR_CONNECTION_REFUSED:
-            d->reason = STREAM_HANDSHAKE_CONNECTION_REFUSED;
+            d->reason = STREAM_HANDSHAKE_SP_CONNECTION_REFUSED;
             d->postpone_until_ut = randomize_wait_ut(30, 60);
             block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_CANNOT_RESOLVE_HOSTNAME:
-            d->reason = STREAM_HANDSHAKE_CANT_RESOLVE_HOSTNAME;
+            d->reason = STREAM_HANDSHAKE_SP_CANT_RESOLVE_HOSTNAME;
             d->postpone_until_ut = randomize_wait_ut(30, 60);
             block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_NO_HOST_IN_DEFINITION:
-            d->reason = STREAM_HANDSHAKE_NO_HOST_IN_DESTINATION;
+            d->reason = STREAM_HANDSHAKE_SP_NO_HOST_IN_DESTINATION;
             d->banned_for_this_session = true;
             d->postpone_until_ut = randomize_wait_ut(30, 60);
             block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_TIMEOUT:
-            d->reason = STREAM_HANDSHAKE_CONNECT_TIMEOUT;
+            d->reason = STREAM_HANDSHAKE_SP_CONNECT_TIMEOUT;
             d->postpone_until_ut = randomize_wait_ut(300, d->remote.nodes < 10 ? 600 : 900);
             block_parent_for_all_nodes(d, 300);
             break;
 
         case ND_SOCK_ERR_SSL_INVALID_CERTIFICATE:
-            d->reason = STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE;
+            d->reason = STREAM_HANDSHAKE_CONNECT_INVALID_CERTIFICATE;
             d->postpone_until_ut = randomize_wait_ut(300, 600);
             block_parent_for_all_nodes(d, 300);
             break;
 
         case ND_SOCK_ERR_SSL_CANT_ESTABLISH_SSL_CONNECTION:
         case ND_SOCK_ERR_SSL_FAILED_TO_OPEN:
-            d->reason = STREAM_HANDSHAKE_ERROR_SSL_ERROR;
+            d->reason = STREAM_HANDSHAKE_CONNECT_SSL_ERROR;
             d->postpone_until_ut = randomize_wait_ut(60, 180);
             block_parent_for_all_nodes(d, 60);
             break;
@@ -274,19 +274,21 @@ static void stream_parent_nd_sock_error_to_reason(STREAM_PARENT *d, ND_SOCK *soc
         case ND_SOCK_ERR_POLL_ERROR:
         case ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET:
         case ND_SOCK_ERR_UNKNOWN_ERROR:
-            d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+            d->reason = STREAM_HANDSHAKE_PARENT_INTERNAL_ERROR;
             d->postpone_until_ut = randomize_wait_ut(30, 60);
             break;
 
         case ND_SOCK_ERR_THREAD_CANCELLED:
         case ND_SOCK_ERR_NO_DESTINATION_AVAILABLE:
-            d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+            d->reason = STREAM_HANDSHAKE_PARENT_INTERNAL_ERROR;
             d->postpone_until_ut = randomize_wait_ut(30, 60);
             break;
     }
 }
 
 int stream_info_to_json_v1(BUFFER *wb, const char *machine_guid) {
+    pulse_parent_stream_info_received_request();
+
     buffer_reset(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -386,8 +388,10 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
            "STREAM PARENTS '%s': fetching stream info from '%s'...",
            hostname, string2str(d->destination));
 
+    pulse_stream_info_sent_request();
+
     // Establish connection
-    d->reason = STREAM_HANDSHAKE_CONNECTING;
+    d->reason = STREAM_HANDSHAKE_SP_CONNECTING;
     if (!nd_sock_connect_to_this(&sock, string2str(d->destination), default_port, 5, ssl)) {
         d->selection.info = false;
         stream_parent_nd_sock_error_to_reason(d, &sock);
@@ -424,7 +428,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
                    "STREAM PARENTS '%s': stream info receive buffer is full while receiving response from '%s'",
                    hostname, string2str(d->destination));
             d->selection.info = false;
-            d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+            d->reason = STREAM_HANDSHAKE_PARENT_INTERNAL_ERROR;
             return false;
         }
 
@@ -465,7 +469,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
                        hostname, string2str(d->destination));
 
                 d->selection.info = false;
-                d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+                d->reason = STREAM_HANDSHAKE_PARENT_INTERNAL_ERROR;
                 return false;
             }
             content_length = strtoul(content_length_ptr + strlen("Content-Length: "), NULL, 10);
@@ -475,7 +479,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
                        hostname, string2str(d->destination));
 
                 d->selection.info = false;
-                d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+                d->reason = STREAM_HANDSHAKE_PARENT_INTERNAL_ERROR;
                 return false;
             }
         }
@@ -485,7 +489,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
     CLEAN_JSON_OBJECT *jobj = json_tokener_parse(payload_start);
     if (!jobj) {
         d->selection.info = false;
-        d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
+        d->reason = STREAM_HANDSHAKE_SP_NO_STREAM_INFO;
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM PARENTS '%s': failed to parse stream info response from '%s', JSON data: %s",
                hostname, string2str(d->destination), payload_start);
@@ -496,7 +500,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
 
     if(!stream_info_json_parse_v1(jobj, "", d, error)) {
         d->selection.info = false;
-        d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
+        d->reason = STREAM_HANDSHAKE_SP_NO_STREAM_INFO;
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM PARENTS '%s': failed to extract fields from JSON stream info response from '%s': %s"
                " - JSON data: %s",
@@ -605,7 +609,7 @@ bool stream_parent_connect_to_one_unsafe(
             switch(d->remote.ingest_type) {
                 case RRDHOST_INGEST_TYPE_VIRTUAL:
                 case RRDHOST_INGEST_TYPE_LOCALHOST:
-                    d->reason = STREAM_HANDSHAKE_ERROR_LOCALHOST;
+                    d->reason = STREAM_HANDSHAKE_PARENT_IS_LOCALHOST;
                     d->since_ut = now_ut;
                     d->postpone_until_ut = randomize_wait_ut(3600, 7200);
 
@@ -619,8 +623,10 @@ bool stream_parent_connect_to_one_unsafe(
                                rrdhost_hostname(host), string2str(d->destination));
                         continue;
                     }
-                    else
+                    else {
+                        pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                         skip = true;
+                    }
                     break;
 
                 default:
@@ -631,16 +637,17 @@ bool stream_parent_connect_to_one_unsafe(
 
             switch(d->remote.ingest_status) {
                 case RRDHOST_INGEST_STATUS_INITIALIZING:
-                    d->reason = STREAM_HANDSHAKE_INITIALIZATION;
+                    d->reason = STREAM_HANDSHAKE_PARENT_IS_INITIALIZING;
                     d->since_ut = now_ut;
                     d->postpone_until_ut = randomize_wait_ut(30, 60);
+                    pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                     skip = true;
                     break;
 
                 case RRDHOST_INGEST_STATUS_REPLICATING:
                 case RRDHOST_INGEST_STATUS_ONLINE:
-                    d->reason = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED;
                     if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, host->sender->hops)) {
+                        d->reason = STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED;
                         d->since_ut = now_ut;
                         d->postpone_until_ut = randomize_wait_ut(3600, 7200);
                         d->banned_for_this_session = true;
@@ -648,8 +655,17 @@ bool stream_parent_connect_to_one_unsafe(
                         nd_log(NDLS_DAEMON, NDLP_INFO,
                                "STREAM PARENTS '%s': destination '%s' is banned for this session, because it is in our path before us.",
                                rrdhost_hostname(host), string2str(d->destination));
+                        pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
                         continue;
                     }
+//                    else {
+//                        skip = true;
+//                        if(!netdata_conf_is_parent()) {
+//                            nd_log(NDLS_DAEMON, NDLP_INFO,
+//                                   "STREAM PARENTS '%s': destination '%s' reports I am already connected.",
+//                                   rrdhost_hostname(host), string2str(d->destination));
+//                        }
+//                    }
                     break;
 
                 default:
@@ -657,6 +673,8 @@ bool stream_parent_connect_to_one_unsafe(
                     break;
             }
         }
+        else
+            pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
 
         if(skip) {
             skipped_but_useful++;
@@ -786,6 +804,7 @@ bool stream_parent_connect_to_one_unsafe(
 
         d->since_ut = now_ut;
         d->attempts++;
+        pulse_host_status(host, PULSE_HOST_STATUS_SND_CONNECTING, 0);
         if (nd_sock_connect_to_this(sender_sock, string2str(d->destination),
                                     default_port, timeout, stream_parent_is_ssl(d))) {
 
@@ -810,6 +829,7 @@ bool stream_parent_connect_to_one_unsafe(
         }
         else {
             stream_parent_nd_sock_error_to_reason(d, sender_sock);
+            pulse_sender_connection_failed(string2str(d->destination), d->reason);
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM PARENTS '%s': stream connection to '%s' failed (default port: %d): %s",
                    rrdhost_hostname(host),

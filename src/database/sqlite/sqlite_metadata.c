@@ -1918,6 +1918,7 @@ static void restore_host_context(void *arg)
     nd_log_daemon(NDLP_DEBUG, "Contexts for host %s loaded in %s", rrdhost_hostname(host), load_duration);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
+    pulse_host_status(host, 0, 0); // this will detect the receiver status
 
     aclk_queue_node_info(host, false);
 
