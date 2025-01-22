@@ -284,7 +284,7 @@ static void chart_by_reason(struct by_reason *b, const char *id, const char *con
     rrdset_done(b->st);
 }
 
-void pulse_parents_do(bool extended __maybe_unused) {
+void pulse_parents_do(bool extended) {
     if(netdata_conf_is_parent()) {
         {
             static RRDSET *st_nodes = NULL;
@@ -335,8 +335,20 @@ void pulse_parents_do(bool extended __maybe_unused) {
             rrdset_done(st_nodes);
         }
 
-        chart_by_reason(&p.parent.events_by_reason, "streaming_rejections_inbound", "netdata.streaming_events_inbound", "Inbound Streaming Events", 130151);
-        chart_by_reason(&p.parent.disconnects_by_reason, "streaming_disconnects_inbound", "netdata.streaming_events_inbound", "Inbound Streaming Events", 130151);
+        if(extended) {
+            chart_by_reason(
+                &p.parent.events_by_reason,
+                "streaming_rejections_inbound",
+                "netdata.streaming_events_inbound",
+                "Inbound Streaming Events",
+                130151);
+            chart_by_reason(
+                &p.parent.disconnects_by_reason,
+                "streaming_disconnects_inbound",
+                "netdata.streaming_events_inbound",
+                "Inbound Streaming Events",
+                130151);
+        }
     }
 
     if(stream_conf_is_child()) {
@@ -386,8 +398,25 @@ void pulse_parents_do(bool extended __maybe_unused) {
             rrdset_done(st_nodes);
         }
 
-        chart_by_reason(&p.sender.stream_info_failed_by_reason, "streaming_info_failed_outbound", "netdata.streaming_events_outbound", "Outbound Streaming Events", 130152);
-        chart_by_reason(&p.sender.events_by_reason, "streaming_rejections_outbound", "netdata.streaming_events_outbound", "Outbound Streaming Events", 130152);
-        chart_by_reason(&p.sender.disconnects_by_reason, "streaming_disconnects_outbound", "netdata.streaming_events_outbound", "Outbound Streaming Events", 130152);
+        if(extended) {
+            chart_by_reason(
+                &p.sender.stream_info_failed_by_reason,
+                "streaming_info_failed_outbound",
+                "netdata.streaming_events_outbound",
+                "Outbound Streaming Events",
+                130152);
+            chart_by_reason(
+                &p.sender.events_by_reason,
+                "streaming_rejections_outbound",
+                "netdata.streaming_events_outbound",
+                "Outbound Streaming Events",
+                130152);
+            chart_by_reason(
+                &p.sender.disconnects_by_reason,
+                "streaming_disconnects_outbound",
+                "netdata.streaming_events_outbound",
+                "Outbound Streaming Events",
+                130152);
+        }
     }
 }
