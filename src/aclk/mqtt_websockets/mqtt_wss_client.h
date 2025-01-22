@@ -15,6 +15,8 @@
 #define MQTT_WSS_ERR_MSG_TOO_BIG    -6      // Message size too big for server
 #define MQTT_WSS_ERR_CANT_DO        -8      // if client was initialized with MQTT 3 but MQTT 5 feature
                                             // was requested by user of library
+#define MQTT_WSS_ERR_POLL_FAILED    -9
+#define MQTT_WSS_ERR_REMOTE_CLOSED  -10
 
 typedef struct mqtt_wss_client_struct *mqtt_wss_client;
 

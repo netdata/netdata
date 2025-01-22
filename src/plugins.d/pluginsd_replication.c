@@ -57,7 +57,9 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
         st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
 
     if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
-        rrdhost_receiver_replicating_charts_plus_one(st->rrdhost);
+        if(rrdhost_receiver_replicating_charts_plus_one(st->rrdhost) == 1)
+            pulse_host_status(host, PULSE_HOST_STATUS_RCV_REPLICATING, 0);
+
         __atomic_add_fetch(&host->stream.rcv.status.replication.counter_in, 1, __ATOMIC_RELAXED);
 
 #ifdef REPLICATION_TRACKING
@@ -454,9 +456,10 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
             st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED,
             RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS | RRDSET_FLAG_SYNC_CLOCK);
 
-        if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
-            rrdhost_receiver_replicating_charts_minus_one(st->rrdhost);
-
+        if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED)) {
+            if(rrdhost_receiver_replicating_charts_minus_one(st->rrdhost) == 0)
+                pulse_host_status(host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
+        }
         else
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                 "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_END " "

@@ -65,7 +65,7 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
 }
 #endif
 
-static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why);
+static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, STREAM_HANDSHAKE reason);
 
 // When a child disconnects this is the maximum we will wait
 // before we update the cloud that the child is offline
@@ -297,8 +297,8 @@ static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAK
 }
 
 static inline bool receiver_should_stop(struct receiver_state *rpt) {
-    if(unlikely(__atomic_load_n(&rpt->exit.shutdown, __ATOMIC_RELAXED))) {
-        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
+    if(unlikely(__atomic_load_n(&rpt->exit.shutdown, __ATOMIC_ACQUIRE))) {
+        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP, false);
         return true;
     }
 
@@ -331,7 +331,7 @@ void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state 
                sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
                stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
 
-        stream_receiver_remove(sth, rpt, "receiver send buffer overflow");
+        stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW);
         return;
     }
 
@@ -350,19 +350,23 @@ static ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE ty
     bool was_empty = stats->bytes_outstanding == 0;
     struct stream_opcode msg = rpt->thread.send_to_child.msg;
     msg.opcode = STREAM_OPCODE_NONE;
+    msg.reason = 0;
 
     size_t size = strlen(txt);
     ssize_t rc = (ssize_t)size;
     if(!stream_circular_buffer_add_unsafe(scb, txt, size, size, type, true)) {
         // should never happen, because of autoscaling
         msg.opcode = STREAM_OPCODE_RECEIVER_BUFFER_OVERFLOW;
+        msg.reason = STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW;
         rc = -1;
     }
     else {
         stream_receiver_log_payload(rpt, txt, type, false);
 
-        if(was_empty)
+        if(was_empty) {
             msg.opcode = STREAM_OPCODE_RECEIVER_POLLOUT;
+            msg.opcode = 0;
+        }
     }
 
     spinlock_unlock(&rpt->thread.send_to_child.spinlock);
@@ -487,6 +491,8 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     parser->h2o_ctx = rpt->h2o_ctx;
 #endif
 
+    pulse_host_status(rpt->host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
+
     // keep this last - it needs everything ready since to sends data to the child
     stream_receiver_send_node_and_claim_id_to_child(rpt->host);
 }
@@ -504,7 +510,7 @@ void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *s
     }
 }
 
-static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why) {
+static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, STREAM_HANDSHAKE reason) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     ND_LOG_STACK lgs[] = {
@@ -530,7 +536,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
            , rpt->remote_ip ? rpt->remote_ip : "-"
            , rpt->remote_port ? rpt->remote_port : "-"
            , count
-           , why ? why : "");
+           , stream_handshake_error_to_string(reason));
 
     internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) == NULL,
                    "Receiver to be removed is not found in the list of receivers");
@@ -555,16 +561,17 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     }
 
     stream_thread_node_removed(rpt->host);
+    pulse_host_status(rpt->host, PULSE_HOST_STATUS_RCV_OFFLINE, reason);
 
     // set a default exit reason, if not set
-    receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
+    receiver_set_exit_reason(rpt, reason, false);
 
     // in case we are connected to netdata cloud,
     // we inform cloud that a child got disconnected
     uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(rpt->host);
     schedule_node_state_update(rpt->host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
 
-    rrdhost_clear_receiver(rpt);
+    rrdhost_clear_receiver(rpt, reason);
     rrdhost_set_is_parent_label();
 
     stream_receiver_free(rpt);
@@ -617,8 +624,8 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
 
                         while (buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
                             if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
-                                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                                stream_receiver_remove(sth, rpt, "parser action failed");
+                                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED, false);
+                                stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                                 *removed = true;
                                 return -1;
                             }
@@ -631,8 +638,8 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
                         break;
 
                     else {
-                        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                        stream_receiver_remove(sth, rpt, "receiver decompressor failed");
+                        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED, false);
+                        stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
                         *removed = true;
                         return -1;
                     }
@@ -641,16 +648,17 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             else if (feed_rc == DECOMPRESS_NEED_MORE_DATA)
                 break;
             else {
-                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                stream_receiver_remove(sth, rpt, "receiver compressed data invalid");
+                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED, false);
+                stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
                 *removed = true;
                 return -1;
             }
         }
 
         if(receiver_should_stop(rpt)) {
-            receiver_set_exit_reason(rpt, rpt->exit.reason, false);
-            stream_receiver_remove(sth, rpt, "received stop signal");
+            STREAM_HANDSHAKE reason = rpt->exit.reason ? rpt->exit.reason : STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP;
+            receiver_set_exit_reason(rpt, reason, false);
+            stream_receiver_remove(sth, rpt, reason);
             *removed = true;
             return -1;
         }
@@ -662,8 +670,8 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
 
         while(buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
             if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
-                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                stream_receiver_remove(sth, rpt, "parser action failed");
+                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED, false);
+                stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                 *removed = true;
                 return -1;
             }
@@ -727,32 +735,29 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
         spinlock_unlock(&rpt->thread.send_to_child.spinlock);
 
         if (status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED) {
-            const char *disconnect_reason;
             STREAM_HANDSHAKE reason;
 
             if(status == EVLOOP_STATUS_SOCKET_ERROR) {
                 worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_SEND_ERROR);
-                disconnect_reason = "socket reports error while writing";
                 reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED;
             }
             else /* if(status == EVLOOP_STATUS_SOCKET_CLOSED) */ {
                 worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED);
-                disconnect_reason = "socket reports EOF (closed by child)";
-                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END;
+                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE;
             }
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s (%zd, on fd %d) - closing receiver connection - "
                    "we have sent %zu bytes in %zu operations.",
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
-                   disconnect_reason, rc, rpt->sock.fd, stats->bytes_sent, stats->sends);
+                   stream_handshake_error_to_string(reason), rc, rpt->sock.fd, stats->bytes_sent, stats->sends);
 
             receiver_set_exit_reason(rpt, reason, false);
 
             if(process_opcodes_and_enable_removal) {
                 // this is not executed from the opcode handling mechanism
                 // so we can safely remove the receiver.
-                stream_receiver_remove(sth, rpt, disconnect_reason);
+                stream_receiver_remove(sth, rpt, reason);
             }
             else {
                  // protection against this case:
@@ -816,26 +821,24 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
         }
 
         if(status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED) {
-            const char *disconnect_reason;
             STREAM_HANDSHAKE reason;
 
             if(status == EVLOOP_STATUS_SOCKET_ERROR) {
                 worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_RECEIVE_ERROR);
                 reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED;
-                disconnect_reason = "error during receive";
             }
             else /* if(status == EVLOOP_STATUS_SOCKET_CLOSED) */ {
                 worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED);
-                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END;
-                disconnect_reason = "socket reports EOF (closed by child)";
+                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE;
             }
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s (fd %d) - closing receiver connection.",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, disconnect_reason, rpt->sock.fd);
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+                   stream_handshake_error_to_string(reason), rpt->sock.fd);
 
             receiver_set_exit_reason(rpt, reason, false);
-            stream_receiver_remove(sth, rpt, disconnect_reason);
+            stream_receiver_remove(sth, rpt, reason);
         }
         else if(status == EVLOOP_STATUS_CONTINUE && process_opcodes && stream_thread_process_opcodes(sth, &rpt->thread.meta))
             status = EVLOOP_STATUS_OPCODE_ON_ME;
@@ -860,33 +863,26 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
     ND_LOG_STACK_PUSH(lgs);
 
     if (receiver_should_stop(rpt)) {
-        receiver_set_exit_reason(rpt, rpt->exit.reason, false);
-        stream_receiver_remove(sth, rpt, "received stop signal");
+        STREAM_HANDSHAKE reason = rpt->exit.reason ? rpt->exit.reason : STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP;
+        receiver_set_exit_reason(rpt, reason, false);
+        stream_receiver_remove(sth, rpt, reason);
         return false;
     }
 
     if (unlikely(events & (ND_POLL_ERROR | ND_POLL_HUP | ND_POLL_INVALID))) {
         // we have errors on this socket
 
-        worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
+        worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_SOCKET_ERROR);
 
-        char *error = "unknown error";
-
-        if (events & ND_POLL_ERROR)
-            error = "socket reports errors";
-        else if (events & ND_POLL_HUP)
-            error = "connection closed by remote end (HUP)";
-        else if (events & ND_POLL_INVALID)
-            error = "connection is invalid";
-
-        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR);
+        STREAM_HANDSHAKE reason = events & ND_POLL_HUP ? STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE : STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR;
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s - closing connection",
-               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, error);
+               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+               stream_handshake_error_to_string(reason));
 
-        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, false);
-        stream_receiver_remove(sth, rpt, error);
+        receiver_set_exit_reason(rpt, reason, false);
+        stream_receiver_remove(sth, rpt, reason);
         return false;
     }
 
@@ -938,7 +934,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             };
             ND_LOG_STACK_PUSH(lgs);
 
-            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
+            worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_TIMEOUT);
 
             char duration[RFC3339_MAX_LENGTH];
             duration_snprintf(duration, sizeof(duration), (int64_t)(now_monotonic_usec() - rpt->thread.last_traffic_ut), "us", true);
@@ -954,8 +950,8 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, timeout_s,
                    stats.bytes_sent, stats.sends, duration, pending, stats.buffer_ratio);
 
-            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_TIMEOUT, false);
-            stream_receiver_remove(sth, rpt, "timeout");
+            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_TIMEOUT, false);
+            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_TIMEOUT);
             continue;
         }
 
@@ -1046,8 +1042,8 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
                    __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED),
                    __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED));
 
-            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_REPLICATION_STALLED, false);
-            stream_receiver_remove(sth, rpt, "replication reception stalled");
+            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_REPLICATION_STALLED, false);
+            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_REPLICATION_STALLED);
         }
 
         rpt->replication.last_checked_ut = rpt->replication.last_progress_ut;
@@ -1061,8 +1057,8 @@ void stream_receiver_cleanup(struct stream_thread *sth) {
          m = META_NEXT(&sth->run.meta, &idx)) {
         if (m->type != POLLFD_TYPE_RECEIVER) continue;
         struct receiver_state *rpt = m->rpt;
-        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
-        stream_receiver_remove(sth, rpt, "shutdown");
+        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, true);
+        stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN);
     }
 }
 
@@ -1110,7 +1106,8 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         host->receiver = rpt;
         rpt->host = host;
 
-        __atomic_store_n(&rpt->exit.shutdown, false, __ATOMIC_RELAXED);
+        rpt->exit.reason = 0;
+        __atomic_store_n(&rpt->exit.shutdown, false, __ATOMIC_RELEASE);
         host->stream.rcv.status.last_connected = now_realtime_sec();
         host->stream.rcv.status.last_disconnected = 0;
         host->stream.rcv.status.last_chart = 0;
@@ -1139,7 +1136,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdhost_flag_set(rpt->host, RRDHOST_FLAG_COLLECTOR_ONLINE);
         aclk_queue_node_info(rpt->host, true);
 
-        rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_PREPARING);
+        rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_SP_PREPARING);
 
         set_this = true;
     }
@@ -1155,7 +1152,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     return set_this;
 }
 
-void rrdhost_clear_receiver(struct receiver_state *rpt) {
+void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason) {
     RRDHOST *host = rpt->host;
     if(!host) return;
 
@@ -1176,13 +1173,13 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
                 rrdhost_set_health_evloop_iteration(host);
                 ml_host_stop(host);
                 stream_path_child_disconnected(host);
-                stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
+                stream_sender_signal_to_stop_and_wait(host, reason, false);
                 rrdcontext_host_child_disconnected(host);
 
                 if (rpt->config.health.enabled)
                     rrdcalc_child_disconnected(host);
 
-                rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT);
+                rrdhost_stream_parents_reset(host, reason);
             }
             rrdhost_receiver_lock(host);
 
@@ -1191,7 +1188,8 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
             stream_receiver_replication_reset(host);
             streaming_receiver_disconnected();
 
-            __atomic_store_n(&host->receiver->exit.shutdown, false, __ATOMIC_RELAXED);
+            host->receiver->exit.reason = 0;
+            __atomic_store_n(&host->receiver->exit.shutdown, false, __ATOMIC_RELEASE);
             host->stream.rcv.status.check_obsolete = false;
             host->stream.rcv.status.last_connected = 0;
             host->stream.rcv.status.last_disconnected = now_realtime_sec();
@@ -1215,16 +1213,18 @@ bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE rea
 
     rrdhost_receiver_lock(host);
 
-    if(host->receiver) {
-        if(!__atomic_load_n(&host->receiver->exit.shutdown, __ATOMIC_RELAXED)) {
-            __atomic_store_n(&host->receiver->exit.shutdown, true, __ATOMIC_RELAXED);
-            receiver_set_exit_reason(host->receiver, reason, true);
-            shutdown(host->receiver->sock.fd, SHUT_RDWR);
+    struct receiver_state *rpt = host->receiver;
+
+    if(rpt) {
+        if(!__atomic_load_n(&rpt->exit.shutdown, __ATOMIC_ACQUIRE)) {
+            receiver_set_exit_reason(rpt, reason, true);
+            __atomic_store_n(&rpt->exit.shutdown, true, __ATOMIC_RELEASE);
+            shutdown(rpt->sock.fd, SHUT_RDWR);
         }
     }
 
     int count = 2000;
-    while (host->receiver && count-- > 0) {
+    while (host->receiver == rpt && count-- > 0) {
         rrdhost_receiver_unlock(host);
 
         // let the lock for the receiver thread to exit
@@ -1233,11 +1233,11 @@ bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE rea
         rrdhost_receiver_lock(host);
     }
 
-    if(host->receiver)
+    if(host->receiver == rpt)
         netdata_log_error("STREAM RCV[x] '%s' [from [%s]:%s]: "
               "streaming thread takes too long to stop, giving up..."
               , rrdhost_hostname(host)
-              , host->receiver->remote_ip, host->receiver->remote_port);
+              , rpt->remote_ip, rpt->remote_port);
     else
         ret = true;
 

@@ -5,6 +5,46 @@
 
 #include "libnetdata/libnetdata.h"
 
+typedef enum https_client_resp {
+    HTTPS_CLIENT_RESP_OK = 0,
+
+    // all the ND_SOCK_ERR_XXX are place here
+
+    HTTPS_CLIENT_RESP_UNKNOWN_ERROR = ND_SOCK_ERR_MAX,
+    HTTPS_CLIENT_RESP_NO_MEM,
+    HTTPS_CLIENT_RESP_NONBLOCK_FAILED,
+    HTTPS_CLIENT_RESP_PROXY_NOT_200,
+    HTTPS_CLIENT_RESP_NO_SSL_CTX,
+    HTTPS_CLIENT_RESP_NO_SSL_VERIFY_PATHS,
+    HTTPS_CLIENT_RESP_NO_SSL_NEW,
+    HTTPS_CLIENT_RESP_NO_TLS_SNI,
+    HTTPS_CLIENT_RESP_SSL_CONNECT_FAILED,
+    HTTPS_CLIENT_RESP_SSL_START_FAILED,
+    HTTPS_CLIENT_RESP_UNKNOWN_REQUEST_TYPE,
+    HTTPS_CLIENT_RESP_HEADER_WRITE_FAILED,
+    HTTPS_CLIENT_RESP_PAYLOAD_WRITE_FAILED,
+    HTTPS_CLIENT_RESP_POLL_ERROR,
+    HTTPS_CLIENT_RESP_TIMEOUT,
+    HTTPS_CLIENT_RESP_READ_ERROR,
+    HTTPS_CLIENT_RESP_PARSE_ERROR,
+    HTTPS_CLIENT_RESP_ENV_AGENT_NOT_CLAIMED,
+    HTTPS_CLIENT_RESP_ENV_NOT_200,
+    HTTPS_CLIENT_RESP_ENV_EMPTY,
+    HTTPS_CLIENT_RESP_ENV_NOT_JSON,
+    HTTPS_CLIENT_RESP_OTP_CHALLENGE_NOT_200,
+    HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID,
+    HTTPS_CLIENT_RESP_OTP_PASSWORD_NOT_201,
+    HTTPS_CLIENT_RESP_OTP_PASSWORD_EMPTY,
+    HTTPS_CLIENT_RESP_OTP_PASSWORD_NOT_JSON,
+    HTTPS_CLIENT_RESP_OTP_AGENT_NOT_CLAIMED,
+    HTTPS_CLIENT_RESP_OTP_CHALLENGE_DECRYPTION_FAILED,
+
+    // terminator
+    HTTPS_CLIENT_RESP_MAX,
+} https_client_resp_t;
+
+ENUM_STR_DEFINE_FUNCTIONS_EXTERN(https_client_resp_t);
+
 typedef enum http_req_type {
     HTTP_REQ_GET = 0,
     HTTP_REQ_POST,
@@ -75,7 +115,7 @@ void https_req_response_free(https_req_response_t *res);
         .proxy_port = 8080                          \
     }
 
-int https_request(https_req_t *request, https_req_response_t *response, bool *fallback_ipv4);
+https_client_resp_t https_request(https_req_t *request, https_req_response_t *response, bool *fallback_ipv4);
 
 // we expose previously internal parser as this is usefull also from
 // other parts of the code
