@@ -170,6 +170,25 @@ func TestCollector_Collect(t *testing.T) {
 				"ups_cp1500_ups.status.RB":           0,
 				"ups_cp1500_ups.status.TRIM":         0,
 				"ups_cp1500_ups.status.other":        0,
+				"ups_cp1600_battery.charge":          10000,
+				"ups_cp1600_battery.runtime":         197000,
+				"ups_cp1600_battery.voltage":         5480,
+				"ups_cp1600_battery.voltage.nominal": 4800,
+				"ups_cp1600_ups.status.BOOST":        0,
+				"ups_cp1600_ups.status.BYPASS":       0,
+				"ups_cp1600_ups.status.CAL":          0,
+				"ups_cp1600_ups.status.CHRG":         0,
+				"ups_cp1600_ups.status.DISCHRG":      0,
+				"ups_cp1600_ups.status.FSD":          0,
+				"ups_cp1600_ups.status.HB":           0,
+				"ups_cp1600_ups.status.LB":           0,
+				"ups_cp1600_ups.status.OB":           0,
+				"ups_cp1600_ups.status.OFF":          0,
+				"ups_cp1600_ups.status.OL":           1,
+				"ups_cp1600_ups.status.OVER":         0,
+				"ups_cp1600_ups.status.RB":           0,
+				"ups_cp1600_ups.status.TRIM":         0,
+				"ups_cp1600_ups.status.other":        0,
 				"ups_pr3000_battery.charge":          10000,
 				"ups_pr3000_battery.runtime":         110800,
 				"ups_pr3000_battery.voltage":         5990,
@@ -196,7 +215,7 @@ func TestCollector_Collect(t *testing.T) {
 				"ups_pr3000_ups.status.TRIM":         0,
 				"ups_pr3000_ups.status.other":        0,
 			},
-			wantCharts:           20,
+			wantCharts:           25,
 			wantConnConnect:      true,
 			wantConnDisconnect:   false,
 			wantConnAuthenticate: false,
@@ -255,30 +274,16 @@ func TestCollector_Collect(t *testing.T) {
 			mx := collr.Collect(context.Background())
 
 			assert.Equal(t, test.wantCollected, mx)
+
 			assert.Equalf(t, test.wantCharts, len(*collr.Charts()), "number of charts")
 			if len(test.wantCollected) > 0 {
-				ensureCollectedHasAllChartsDims(t, collr, mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
+
 			assert.Equalf(t, test.wantConnConnect, mock.calledConnect, "calledConnect")
 			assert.Equalf(t, test.wantConnDisconnect, mock.calledDisconnect, "calledDisconnect")
 			assert.Equal(t, test.wantConnAuthenticate, mock.calledAuthenticate, "calledAuthenticate")
 		})
-	}
-}
-
-func ensureCollectedHasAllChartsDims(t *testing.T, collr *Collector, mx map[string]int64) {
-	for _, chart := range *collr.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
 	}
 }
 
@@ -439,6 +444,50 @@ func (m *mockUpsdConn) upsUnits() ([]upsUnit, error) {
 				"ups.timer.shutdown":            "-60",
 				"ups.timer.start":               "-60",
 				"ups.vendorid":                  "0764",
+			},
+		},
+		{
+			name: "cp1600",
+			vars: map[string]string{
+				"battery.charge":                "100",
+				"battery.charge.low":            "10",
+				"battery.charge.warning":        "50",
+				"battery.runtime":               "1970",
+				"battery.runtime.low":           "150",
+				"battery.type":                  "PbAc",
+				"battery.voltage":               "54.8",
+				"battery.voltage.nominal":       "48.0",
+				"device.mfr":                    "American Power Conversion",
+				"device.model":                  "Smart-UPS X 1500",
+				"device.serial":                 "****************",
+				"device.type":                   "ups",
+				"driver.name":                   "usbhid-ups",
+				"driver.parameter.bus":          "001",
+				"driver.parameter.pollfreq":     "30",
+				"driver.parameter.pollinterval": "2",
+				"driver.parameter.port":         "auto",
+				"driver.parameter.product":      "Smart-UPS X 1500 FW:UPS 09.8 / ID=20",
+				"driver.parameter.productid":    "0003",
+				"driver.parameter.serial":       "****************",
+				"driver.parameter.synchronous":  "auto",
+				"driver.parameter.vendor":       "American Power Conversion",
+				"driver.parameter.vendorid":     "051D",
+				"driver.version":                "2.8.0",
+				"driver.version.data":           "APC HID 0.98",
+				"driver.version.internal":       "0.47",
+				"driver.version.usb":            "libusb-1.0.26 (API: 0x1000109)",
+				"ups.beeper.status":             "enabled",
+				"ups.delay.shutdown":            "20",
+				"ups.firmware":                  "UPS 09.8 / ID=20",
+				"ups.mfr":                       "American Power Conversion",
+				"ups.mfr.date":                  "2019/01/12",
+				"ups.model":                     "Smart-UPS X 1500",
+				"ups.productid":                 "0003",
+				"ups.serial":                    "****************",
+				"ups.status":                    "OL",
+				"ups.timer.reboot":              "-1",
+				"ups.timer.shutdown":            "-1",
+				"ups.vendorid":                  "051d",
 			},
 		},
 	}
