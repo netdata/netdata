@@ -526,6 +526,30 @@ static void aclk_execute_batch(uv_work_t *req)
     worker_is_idle();
 }
 
+struct worker_data {
+    uv_work_t request;
+    void *payload;
+    struct aclk_sync_config_s *config;
+};
+
+static void after_do_unregister_node(uv_work_t *req, int status __maybe_unused)
+{
+    struct worker_data *data = req->data;
+    freez(data);
+}
+
+static void do_unregister_node(uv_work_t *req)
+{
+    register_libuv_worker_jobs();
+
+    struct worker_data *data =  req->data;
+
+    worker_is_busy(UV_EVENT_UNREGISTER_NODE);
+
+    sql_unregister_node(data->payload);
+
+    worker_is_idle();
+}
 
 static void node_update_timer_cb(uv_timer_t *handle)
 {
@@ -545,14 +569,9 @@ static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
     uv_close(handle, NULL);  // Automatically close and free the handle
 }
 
-struct alert_push_data {
-    uv_work_t request;
-    struct aclk_sync_config_s *config;
-};
-
 static void after_start_alert_push(uv_work_t *req, int status __maybe_unused)
 {
-    struct alert_push_data *data = req->data;
+    struct worker_data *data = req->data;
     struct aclk_sync_config_s *config = data->config;
 
     config->alert_push_running = false;
@@ -633,7 +652,7 @@ static void aclk_synchronization(void *arg)
     int query_thread_count = netdata_conf_cloud_query_threads();
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
 
-    struct alert_push_data *data;
+    struct worker_data *data;
     aclk_query_t query;
     struct judy_list_t *aclk_query_batch = NULL;
     struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));;
@@ -710,7 +729,15 @@ static void aclk_synchronization(void *arg)
                     break;
 
                 case ACLK_DATABASE_NODE_UNREGISTER:
-                    sql_unregister_node(cmd.param[0]);
+                    data = mallocz(sizeof(*data));
+                    data->request.data = data;
+                    data->config = config;
+                    data->payload = cmd.param[0];
+
+                    if (uv_queue_work(loop, &data->request, do_unregister_node, after_do_unregister_node)) {
+                        freez(data->payload);
+                        freez(data);
+                    }
                     break;
                     // ALERTS
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:
