@@ -24,39 +24,46 @@ else
     exit 1
 fi
 
-DOCKER_IMAGE_NAME="netdata/static-builder:v1"
-
-if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
-    ${docker} run --rm --privileged tonistiigi/binfmt:master --install all || exit 1
-fi
-
 case "${BUILDARCH}" in
     x86_64) # x86-64-v2 equivalent
+        QEMU_ARCH="x86_64"
         QEMU_CPU="Nehalem-v2"
         TUNING_FLAGS="-march=x86-64"
         GOAMD64="v1"
         ;;
     armv6l) # Raspberry Pi 1 equivalent
+        QEMU_ARCH="arm"
         QEMU_CPU="arm1176"
         TUNING_FLAGS="-march=armv6zk -mtune=arm1176jzf-s"
         GOARM="6"
         ;;
     armv7l) # Baseline ARMv7 CPU
+        QEMU_ARCH="arm"
         QEMU_CPU="cortex-a7"
         TUNING_FLAGS="-march=armv7-a"
         GOARM="7"
         ;;
     aarch64) # Baseline ARMv8 CPU
+        QEMU_ARCH="aarch64"
         QEMU_CPU="cortex-a53"
         TUNING_FLAGS="-march=armv8-a"
         GOARM64="v8.0"
         ;;
     ppc64le) # Baseline POWER8+ CPU
+        QEMU_ARCH="ppc64le"
         QEMU_CPU="power8nvl"
         TUNING_FLAGS="-mcpu=power8 -mtune=power9"
         GOPPC64="power8"
         ;;
 esac
+
+[ -f "/proc/sys/fs/binfmt_misc/qemu-${QEMU_ARCH}" ] && SKIP_EMULATION=1
+
+if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
+    ${docker} run --rm --privileged tonistiigi/binfmt:master --install "${QEMU_ARCH}" || exit 1
+fi
+
+DOCKER_IMAGE_NAME="netdata/static-builder:v1"
 
 if ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
     if ${docker} image inspect "${DOCKER_IMAGE_NAME}" | grep -q 'Variant'; then
