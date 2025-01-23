@@ -898,6 +898,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             client->poll_fds[POLLFD_SOCKET].events |= POLLIN;
             break;
 
+        case WS_CLIENT_CONNECTION_REMOTE_CLOSED:
+            return MQTT_WSS_ERR_REMOTE_CLOSED;
+
         case WS_CLIENT_CONNECTION_CLOSED:
             return MQTT_WSS_ERR_CONN_DROP;
 

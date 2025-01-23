@@ -3,19 +3,21 @@
 #ifndef WS_CLIENT_H
 #define WS_CLIENT_H
 
-#define WS_CLIENT_NEED_MORE_BYTES     0x10
-#define WS_CLIENT_PARSING_DONE        0x11
-#define WS_CLIENT_CONNECTION_CLOSED   0x12
-#define WS_CLIENT_PROTOCOL_ERROR     -0x10
-#define WS_CLIENT_BUFFER_FULL        -0x11
-#define WS_CLIENT_INTERNAL_ERROR     -0x12
+#define WS_CLIENT_NEED_MORE_BYTES            0x10
+#define WS_CLIENT_PARSING_DONE               0x11
+#define WS_CLIENT_CONNECTION_CLOSED          0x12
+#define WS_CLIENT_CONNECTION_REMOTE_CLOSED   0x13
+#define WS_CLIENT_PROTOCOL_ERROR            -0x10
+#define WS_CLIENT_BUFFER_FULL               -0x11
+#define WS_CLIENT_INTERNAL_ERROR            -0x12
 
 enum websocket_client_conn_state {
     WS_RAW = 0,
     WS_HANDSHAKE,
     WS_ESTABLISHED,
     WS_ERROR,        // connection has to be restarted if this is reached
-    WS_CONN_CLOSED_GRACEFUL
+    WS_CONN_CLOSED_GRACEFUL,
+    WS_CONN_CLOSED_GRACEFUL_BY_REMOTE,
 };
 
 enum websocket_client_hdr_parse_state {
@@ -77,6 +79,7 @@ typedef struct websocket_client {
     struct ws_rx {
         enum websocket_client_rx_ws_parse_state parse_state;
         enum websocket_opcode opcode;
+        bool remote_closed;
         uint64_t payload_length;
         uint64_t payload_processed;
         union {
