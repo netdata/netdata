@@ -7,6 +7,135 @@ static void initialize(void) {
     ;
 }
 
+static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA directoryPercReadsFromDCA = { .key = "DS % Reads from DRA" };
+    static COUNTER_DATA directoryPercReadsFromKCC = { .key = "DS % Reads from KCC" };
+    static COUNTER_DATA directoryPercReadsFromLSA = { .key = "DS % Reads from LSA" };
+    static COUNTER_DATA directoryPercReadsFromNSPI = { .key = "DS % Reads from NSPI" };
+    static COUNTER_DATA directoryPercReadsFromNTDSAPI = { .key = "DS % Reads from NTDSAPI" };
+    static COUNTER_DATA directoryPercReadsFromSAM = { .key = "DS % Reads from SAM" };
+    static COUNTER_DATA directoryPercReadsOther = { .key = "DS % Reads from Other" };
+
+    static COUNTER_DATA directoryPercSearchesFromDCA = { .key = "DS % Searches from DRA" };
+    static COUNTER_DATA directoryPercSearchesFromKCC = { .key = "DS % Searches from KCC" };
+    static COUNTER_DATA directoryPercSearchesFromLSA = { .key = "DS % Searches from LSA" };
+    static COUNTER_DATA directoryPercSearchesFromNSPI = { .key = "DS % Searches from NSPI" };
+    static COUNTER_DATA directoryPercSearchesFromNTDSAPI = { .key = "DS % Searches from NTDSAPI" };
+    static COUNTER_DATA directoryPercSearchesFromSAM = { .key = "DS % Searches from SAM" };
+    static COUNTER_DATA directoryPercSearchesOther = { .key = "DS % Searches from Other" };
+
+    static COUNTER_DATA directoryPercWritesFromDCA = { .key = "DS % Writes from DRA" };
+    static COUNTER_DATA directoryPercWritesFromKCC = { .key = "DS % Writes from KCC" };
+    static COUNTER_DATA directoryPercWritesFromLSA = { .key = "DS % Writes from LSA" };
+    static COUNTER_DATA directoryPercWritesFromNSPI = { .key = "DS % Writes from NSPI" };
+    static COUNTER_DATA directoryPercWritesFromNTDSAPI = { .key = "DS % Writes from NTDSAPI" };
+    static COUNTER_DATA directoryPercWritesFromSAM = { .key = "DS % Writes from SAM" };
+    static COUNTER_DATA directoryPercWritesOther = { .key = "DS % Writes from Other" };
+
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercReadsFromDCA);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercReadsFromKCC);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercReadsFromLSA);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercReadsFromNSPI);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercReadsFromNTDSAPI);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercReadsFromSAM);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercReadsOther);
+
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesFromDCA);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesFromKCC);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesFromLSA);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesFromNSPI);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesFromNTDSAPI);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesFromSAM);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesOther);
+
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromDCA);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromKCC);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromLSA);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromNSPI);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromNTDSAPI);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromSAM);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesOther);
+
+    static RRDSET *st_directory_operation_total = NULL;
+    static RRDDIM *rd_directory_operation_total_read = NULL;
+    static RRDDIM *rd_directory_operation_total_write = NULL;
+    static RRDDIM *rd_directory_operation_total_search = NULL;
+
+
+    if (unlikely(!st_directory_operation_total)) {
+        st_directory_operation_total = rrdset_create_localhost("ad"
+                                                               , "directory_operations_read"
+                                                               , NULL
+                                                               , "database"
+                                                               , "ad.directory_operations"
+                                                               , "AD directory operations"
+                                                               , "operations/s"
+                                                               , PLUGIN_WINDOWS_NAME
+                                                               , "PerflibAD"
+                                                               , PRIO_AD_DIROPERATIONS_TOTAL
+                                                               , update_every
+                                                               , RRDSET_TYPE_LINE);
+
+        rd_directory_operation_total_read = rrddim_add(st_directory_operation_total,
+                                                     "read",
+                                                     NULL,
+                                                     1,
+                                                     1,
+                                                     RRD_ALGORITHM_INCREMENTAL);
+
+        rd_directory_operation_total_write = rrddim_add(st_directory_operation_total,
+                                                        "write",
+                                                        NULL,
+                                                        1,
+                                                        1,
+                                                        RRD_ALGORITHM_INCREMENTAL);
+
+        rd_directory_operation_total_search = rrddim_add(st_directory_operation_total,
+                                                        "search",
+                                                        NULL,
+                                                        1,
+                                                        1,
+                                                        RRD_ALGORITHM_INCREMENTAL);
+    }
+    collected_number readValue = directoryPercReadsFromDCA.current.Data +
+                                 directoryPercReadsFromKCC.current.Data +
+                                 directoryPercReadsFromLSA.current.Data +
+                                 directoryPercReadsFromNSPI.current.Data +
+                                 directoryPercReadsFromNTDSAPI.current.Data +
+                                 directoryPercReadsFromSAM.current.Data +
+                                 directoryPercReadsOther.current.Data ;
+
+    collected_number writeValue = directoryPercWritesFromDCA.current.Data +
+                                 directoryPercWritesFromKCC.current.Data +
+                                 directoryPercWritesFromLSA.current.Data +
+                                 directoryPercWritesFromNSPI.current.Data +
+                                 directoryPercWritesFromNTDSAPI.current.Data +
+                                 directoryPercWritesFromSAM.current.Data +
+                                 directoryPercWritesOther.current.Data ;
+
+    collected_number searchValue = directoryPercSearchesFromDCA.current.Data +
+                                  directoryPercSearchesFromKCC.current.Data +
+                                  directoryPercSearchesFromLSA.current.Data +
+                                  directoryPercSearchesFromNSPI.current.Data +
+                                  directoryPercSearchesFromNTDSAPI.current.Data +
+                                  directoryPercSearchesFromSAM.current.Data +
+                                  directoryPercSearchesOther.current.Data ;
+
+    rrddim_set_by_pointer(st_directory_operation_total,
+                          rd_directory_operation_total_read,
+                          readValue);
+
+    rrddim_set_by_pointer(st_directory_operation_total,
+                          rd_directory_operation_total_write,
+                          writeValue);
+
+    rrddim_set_by_pointer(st_directory_operation_total,
+                          rd_directory_operation_total_search,
+                          searchValue);
+
+    rrdset_done(st_database_operation_total);
+}
+
 static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA nameCacheLookupsTotal = { .key = "DS Name Cache hit rate,secondvalue" };
 
@@ -661,6 +790,7 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         return false;
 
     static void (*doAD[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
+        netdata_ad_directory,
         netdata_ad_cache_lookups,
         netdata_ad_properties,
         netdata_ad_compressed_traffic,
@@ -678,31 +808,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     for (int i = 0; doAD[i]; i++)
         doAD[i](pDataBlock, pObjectType, update_every);
-
-    /* TODO : Compare with dumpto confirm
-    static COUNTER_DATA directoryReadsPerSec = { .key = "DS Directory Reads/sec" };
-    static COUNTER_DATA directoryPercReadsFromDCA = { .key = "DS % Reads from DRA" };
-    static COUNTER_DATA directoryPercReadsFromKCC = { .key = "DS % Reads from KCC" };
-    static COUNTER_DATA directoryPercReadsFromLSA = { .key = "DS % Reads from LSA" };
-    static COUNTER_DATA directoryPercReadsFromNSPI = { .key = "DS % Reads from NSPI" };
-    static COUNTER_DATA directoryPercReadsFromNTDSAPI = { .key = "DS % Reads from NTDSAPI" };
-    static COUNTER_DATA directoryPercReadsFromSAM = { .key = "DS % Reads from SAM" };
-    static COUNTER_DATA directoryPercReadsOther = { .key = "DS % Reads from Other" };
-    static COUNTER_DATA directoryPercSearchesFromDCA = { .key = "DS % Searches from DRA" };
-    static COUNTER_DATA directoryPercSearchesFromKCC = { .key = "DS % Searches from KCC" };
-    static COUNTER_DATA directoryPercSearchesFromLSA = { .key = "DS % Searches from LSA" };
-    static COUNTER_DATA directoryPercSearchesFromNSPI = { .key = "DS % Searches from NSPI" };
-    static COUNTER_DATA directoryPercSearchesFromNTDSAPI = { .key = "DS % Searches from NTDSAPI" };
-    static COUNTER_DATA directoryPercSearchesFromSAM = { .key = "DS % Searches from SAM" };
-    static COUNTER_DATA directoryPercSearchesOther = { .key = "DS % Searches from Other" };
-    static COUNTER_DATA directoryPercWritesFromDCA = { .key = "DS % Writes from DRA" };
-    static COUNTER_DATA directoryPercWritesFromKCC = { .key = "DS % Writes from KCC" };
-    static COUNTER_DATA directoryPercWritesFromLSA = { .key = "DS % Writes from LSA" };
-    static COUNTER_DATA directoryPercWritesFromNSPI = { .key = "DS % Writes from NSPI" };
-    static COUNTER_DATA directoryPercWritesFromNTDSAPI = { .key = "DS % Writes from NTDSAPI" };
-    static COUNTER_DATA directoryPercWritesFromSAM = { .key = "DS % Writes from SAM" };
-    static COUNTER_DATA directoryPercWritesOther = { .key = "DS % Writes from Other" };
-    */
 
     return true;
 }
