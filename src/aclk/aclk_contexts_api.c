@@ -6,7 +6,7 @@
 
 void aclk_send_contexts_snapshot(contexts_snapshot_t data)
 {
-    aclk_query_t query = aclk_query_new(PROTO_BIN_MESSAGE);
+    aclk_query_t query = aclk_query_new(CTX_SEND_SNAPSHOT);
     query->data.bin_payload.topic = ACLK_TOPICID_CTXS_SNAPSHOT;
     query->data.bin_payload.payload = contexts_snapshot_2bin(data, &query->data.bin_payload.size);
     query->data.bin_payload.msg_name = "ContextsSnapshot";
@@ -15,7 +15,7 @@ void aclk_send_contexts_snapshot(contexts_snapshot_t data)
 
 void aclk_send_contexts_updated(contexts_updated_t data)
 {
-    aclk_query_t query = aclk_query_new(PROTO_BIN_MESSAGE);
+    aclk_query_t query = aclk_query_new(CTX_SEND_SNAPSHOT_UPD);
     query->data.bin_payload.topic = ACLK_TOPICID_CTXS_UPDATED;
     query->data.bin_payload.payload = contexts_updated_2bin(data, &query->data.bin_payload.size);
     query->data.bin_payload.msg_name = "ContextsUpdated";

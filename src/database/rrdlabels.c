@@ -1577,6 +1577,10 @@ int rrdlabels_unittest_sanitization() {
     const unsigned char invalid5[] = "app.clewd修改\xe7\x89_fd_open_limits";
     errors += rrdlabels_unittest_sanitize_value((const char *)invalid5, "app.clewd修改e789_fd_open_limits");
 
+    // invalid UTF8 No 6
+    const unsigned char invalid6[] = "\260\327\312\300\322\242";
+    errors += rrdlabels_unittest_sanitize_value((const char *)invalid6, "d7cac0Ң");
+
     return errors;
 }
 

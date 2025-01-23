@@ -23,6 +23,7 @@
 #include "sleep.h"
 #include "uuid_generate.h"
 #include "setenv.h"
+#include "hostname.h"
 #include "os-freebsd-wrappers.h"
 #include "os-macos-wrappers.h"
 #include "os-windows-wrappers.h"

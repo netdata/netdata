@@ -68,6 +68,7 @@
 #cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
 #cmakedefine HAVE_LIBCURL
+#cmakedefine HAVE_LIBICONV
 
 #cmakedefine HAVE_ARC4RANDOM_BUF
 #cmakedefine HAVE_ARC4RANDOM_UNIFORM

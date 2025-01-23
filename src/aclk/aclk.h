@@ -7,6 +7,8 @@
 #include "aclk_util.h"
 //#include "aclk_rrdhost_state.h"
 
+#include "https_client.h"
+
 // How many MQTT PUBACKs we need to get to consider connection
 // stable for the purposes of TBEB (truncated binary exponential backoff)
 #define ACLK_PUBACKS_CONN_STABLE 3
@@ -18,26 +20,35 @@ typedef enum {
     ACLK_PING_TIMEOUT = 3
 } ACLK_DISCONNECT_ACTION;
 
-typedef enum __attribute__((packed)) {
+typedef enum {
     ACLK_STATUS_CONNECTED = 0,
-    ACLK_STATUS_NONE,
+
+    // ND_SOCK_ERR_XXX is included here
+    // HTTPS_CLIENT_RESP_XXX is included here
+
+    ACLK_STATUS_OFFLINE                   = HTTPS_CLIENT_RESP_MAX,
     ACLK_STATUS_DISABLED,
-    ACLK_STATUS_NO_CLOUD_URL,
-    ACLK_STATUS_INVALID_CLOUD_URL,
-    ACLK_STATUS_NOT_CLAIMED,
-    ACLK_STATUS_ENV_ENDPOINT_UNREACHABLE,
-    ACLK_STATUS_ENV_RESPONSE_NOT_200,
-    ACLK_STATUS_ENV_RESPONSE_EMPTY,
-    ACLK_STATUS_ENV_RESPONSE_NOT_JSON,
-    ACLK_STATUS_ENV_FAILED,
+    ACLK_STATUS_CANT_CONNECT_NO_CLOUD_URL,
+    ACLK_STATUS_CANT_CONNECT_INVALID_CLOUD_URL,
     ACLK_STATUS_BLOCKED,
     ACLK_STATUS_NO_OLD_PROTOCOL,
     ACLK_STATUS_NO_PROTOCOL_CAPABILITY,
     ACLK_STATUS_INVALID_ENV_AUTH_URL,
     ACLK_STATUS_INVALID_ENV_TRANSPORT_IDX,
     ACLK_STATUS_INVALID_ENV_TRANSPORT_URL,
-    ACLK_STATUS_INVALID_OTP,
     ACLK_STATUS_NO_LWT_TOPIC,
+
+    // disconnection reasons
+    ACLK_STATUS_OFFLINE_CLOUD_REQUESTED_DISCONNECT,
+    ACLK_STATUS_OFFLINE_PING_TIMEOUT,
+    ACLK_STATUS_OFFLINE_RELOADING_CONFIG,
+    ACLK_STATUS_OFFLINE_POLL_ERROR,
+    ACLK_STATUS_OFFLINE_CLOSED_BY_REMOTE,
+    ACLK_STATUS_OFFLINE_SOCKET_ERROR,
+    ACLK_STATUS_OFFLINE_MQTT_PROTOCOL_ERROR,
+    ACLK_STATUS_OFFLINE_WS_PROTOCOL_ERROR,
+    ACLK_STATUS_OFFLINE_MESSAGE_TOO_BIG,
+
 } ACLK_STATUS;
 
 extern ACLK_STATUS aclk_status;
@@ -93,5 +104,8 @@ char *aclk_state(void);
 char *aclk_state_json(void);
 void add_aclk_host_labels(void);
 void aclk_queue_node_info(RRDHOST *host, bool immediate);
+
+struct mqtt_wss_stats aclk_statistics(void);
+void aclk_status_set(ACLK_STATUS status);
 
 #endif /* ACLK_H */

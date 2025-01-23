@@ -18,8 +18,10 @@
 #define WORKER_JOB_MALLOC_TRACE         12
 #define WORKER_JOB_REGISTRY             13
 #define WORKER_JOB_ARAL                 14
+#define WORKER_JOB_NETWORK              15
+#define WORKER_JOB_PARENTS              16
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 15
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 17
 #error "WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 14"
 #endif
 
@@ -44,6 +46,8 @@ static void pulse_register_workers(void) {
     worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
     worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
     worker_register_job_name(WORKER_JOB_ARAL, "aral");
+    worker_register_job_name(WORKER_JOB_NETWORK, "network");
+    worker_register_job_name(WORKER_JOB_PARENTS, "parents");
 }
 
 static void pulse_cleanup(void *pptr)
@@ -71,6 +75,7 @@ void *pulse_thread_main(void *ptr) {
     }
 
     pulse_aral_init();
+    aclk_time_histogram_init();
 
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
@@ -99,6 +104,9 @@ void *pulse_thread_main(void *ptr) {
         worker_is_busy(WORKER_JOB_QUERIES);
         pulse_queries_do(pulse_extended_enabled);
 
+        worker_is_busy(WORKER_JOB_NETWORK);
+        pulse_network_do(pulse_extended_enabled);
+
         worker_is_busy(WORKER_JOB_ML);
         pulse_ml_do(pulse_extended_enabled);
 
@@ -112,6 +120,7 @@ void *pulse_thread_main(void *ptr) {
         if(dbengine_enabled) {
             worker_is_busy(WORKER_JOB_DBENGINE);
             pulse_dbengine_do(pulse_extended_enabled);
+            dbengine_retention_statistics(pulse_extended_enabled);
         }
 #endif
 
@@ -136,6 +145,9 @@ void *pulse_thread_main(void *ptr) {
 
         worker_is_busy(WORKER_JOB_ARAL);
         pulse_aral_do(pulse_extended_enabled);
+
+        worker_is_busy(WORKER_JOB_PARENTS);
+        pulse_parents_do(pulse_extended_enabled);
 
         // keep this last to have access to the memory counters
         // exposed by everyone else

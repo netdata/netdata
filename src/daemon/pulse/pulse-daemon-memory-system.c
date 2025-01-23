@@ -107,7 +107,7 @@ cleanup:
 }
 #endif // HAVE_C_MALLOC_INFO
 
-void pulse_daemon_memory_system_do(bool extended) {
+void pulse_daemon_memory_system_do(bool extended __maybe_unused) {
 
 #ifdef HAVE_C_MALLOC_INFO
     size_t glibc_arenas, glibc_allocated_arenas, glibc_unused_fast, glibc_unused_rest, glibc_allocated_mmap;
@@ -255,8 +255,8 @@ void pulse_daemon_memory_system_do(bool extended) {
             rd_glibc = rrddim_add(st_maps, "glibc", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(st_maps, rd_glibc, (collected_number)netdata_mmaps);
-        rrddim_set_by_pointer(st_maps, rd_netdata, (collected_number)glibc_mmaps);
+        rrddim_set_by_pointer(st_maps, rd_glibc, (collected_number)glibc_mmaps);
+        rrddim_set_by_pointer(st_maps, rd_netdata, (collected_number)netdata_mmaps);
 
         rrdset_done(st_maps);
     }

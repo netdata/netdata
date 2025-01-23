@@ -2,6 +2,7 @@ name: "Netdata Agent: Feature request"
 description: "Submit a feature request and help us improve our free and open-source Netdata Agent"
 title: "[Feat]: "
 labels: ["feature request", "needs triage"]
+type: "feature"
 body:
   - type: markdown
     attributes:

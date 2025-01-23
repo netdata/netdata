@@ -5,10 +5,12 @@
 #endif
 
 #include "libnetdata/libnetdata.h"
+void pulse_aclk_sent_message_acked(usec_t usec, size_t len);
 
 #include "common_internal.h"
 #include "mqtt_constants.h"
 #include "mqtt_ng.h"
+#include "aclk_mqtt_workers.h"
 
 #define SMALL_STRING_DONT_FRAGMENT_LIMIT 128
 
@@ -31,14 +33,13 @@
 
 typedef uint16_t buffer_frag_flag_t;
 struct buffer_fragment {
-    size_t len;
-    size_t sent;
+    uint32_t len;
+    uint32_t sent;
     buffer_frag_flag_t flags;
+    uint16_t packet_id;
     void (*free_fnc)(void *ptr);
     unsigned char *data;
-
-    uint16_t packet_id;
-
+    usec_t sent_monotonic_ut;
     struct buffer_fragment *next;
 };
 
@@ -1851,6 +1852,7 @@ static int mqtt_ng_next_to_send(struct mqtt_ng_client *client) {
     if ( client->ping_pending && (!frag || (frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD && frag->sent == 0)) ) {
         client->ping_pending = 0;
         ping_frag.sent = 0;
+        ping_frag.sent_monotonic_ut = 0;
         client->main_buffer.sending_frag = &ping_frag;
         return 0;
     }
@@ -1865,6 +1867,8 @@ static int mqtt_ng_next_to_send(struct mqtt_ng_client *client) {
 // nothing could be written anymore
 // return 1 if last fragment of a message was fully sent
 static int send_fragment(struct mqtt_ng_client *client) {
+    worker_is_busy(WORKER_ACLK_SEND_FRAGMENT);
+
     struct buffer_fragment *frag = client->main_buffer.sending_frag;
 
     // for readability
@@ -1878,6 +1882,7 @@ static int send_fragment(struct mqtt_ng_client *client) {
     else
         nd_log(NDLS_DAEMON, NDLP_WARNING, "This fragment was fully sent already. This should not happen!");
 
+    frag->sent_monotonic_ut = now_monotonic_usec();
     frag->sent += processed;
     if (frag->sent != frag->len)
         return -1;
@@ -1925,6 +1930,7 @@ static void mark_message_for_gc(struct buffer_fragment *frag)
 
 static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
 {
+    size_t reclaimable = 0;
     LOCK_HDR_BUFFER(&client->main_buffer);
     struct buffer_fragment *frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
     while (frag) {
@@ -1934,10 +1940,20 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
                 UNLOCK_HDR_BUFFER(&client->main_buffer);
                 return 1;
             }
+            pulse_aclk_sent_message_acked(frag->sent_monotonic_ut, frag->len);
             mark_message_for_gc(frag);
+
+            size_t used = BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer);
+            if (reclaimable >= (used / 4))
+                transaction_buffer_garbage_collect(&client->main_buffer);
+
             UNLOCK_HDR_BUFFER(&client->main_buffer);
             return 0;
         }
+
+        if(frag_is_marked_for_gc(frag))
+            reclaimable += FRAG_SIZE_IN_BUFFER(frag);
+
         frag = frag->next;
     }
     nd_log(NDLS_DAEMON, NDLP_ERR, "Received packet_id (%" PRIu16 ") is unknown!", packet_id);
@@ -1963,6 +1979,8 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
     uint8_t ctrl_packet_type = get_control_packet_type(client->parser.mqtt_control_packet_type);
     switch (ctrl_packet_type) {
         case MQTT_CPT_CONNACK:
+            worker_is_busy(WORKER_ACLK_CPT_CONNACK);
+
             LOCK_HDR_BUFFER(&client->main_buffer);
             mark_message_for_gc(client->connect_msg);
             UNLOCK_HDR_BUFFER(&client->main_buffer);
@@ -1991,6 +2009,8 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
             return MQTT_NG_CLIENT_SERVER_RETURNED_ERROR;
 
         case MQTT_CPT_PUBACK:
+            worker_is_busy(WORKER_ACLK_CPT_PUBACK);
+
             if (mark_packet_acked(client, client->parser.mqtt_packet.puback.packet_id))
                 return MQTT_NG_CLIENT_PROTOCOL_ERROR;
             if (client->puback_callback)
@@ -1998,14 +2018,18 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
             break;
 
         case MQTT_CPT_PINGRESP:
+            worker_is_busy(WORKER_ACLK_CPT_PINGRESP);
+            pulse_aclk_sent_message_acked(ping_frag.sent_monotonic_ut, ping_frag.len);
             break;
 
         case MQTT_CPT_SUBACK:
+            worker_is_busy(WORKER_ACLK_CPT_SUBACK);
             if (mark_packet_acked(client, client->parser.mqtt_packet.suback.packet_id))
                 return MQTT_NG_CLIENT_PROTOCOL_ERROR;
             break;
 
         case MQTT_CPT_PUBLISH:
+            worker_is_busy(WORKER_ACLK_CPT_PUBLISH);
             pub = &client->parser.mqtt_packet.publish;
 
             if (pub->qos > 1) {
@@ -2038,8 +2062,11 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                 }
             }
 
-            if (client->msg_callback)
+            if (client->msg_callback) {
+                worker_is_busy(WORKER_ACLK_MSG_CALLBACK);
                 client->msg_callback(pub->topic, pub->data, pub->data_len, pub->qos);
+            }
+
             // in case we have property topic alias and we have topic we take over the string
             // and add pointer to it into topic alias list
             if (prop == NULL)
@@ -2048,11 +2075,13 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
             return MQTT_NG_CLIENT_WANT_WRITE;
 
         case MQTT_CPT_DISCONNECT:
+            worker_is_busy(WORKER_ACLK_CPT_DISCONNECT);
             nd_log(NDLS_DAEMON, NDLP_INFO, "Got MQTT DISCONNECT control packet from server. Reason code: %d", (int)client->parser.mqtt_packet.disconnect.reason_code);
             client->client_state = MQTT_STATE_DISCONNECTED;
             break;
 
         default:
+            worker_is_busy(WORKER_ACLK_CPT_UNKNOWN);
             nd_log(NDLS_DAEMON, NDLP_INFO, "Got unknown control packet %u from server", ctrl_packet_type);
             break;
     }
@@ -2068,19 +2097,26 @@ int mqtt_ng_sync(struct mqtt_ng_client *client)
     if (client->client_state == MQTT_STATE_ERROR)
         return 1;
 
+    worker_is_busy(WORKER_ACLK_TRY_SEND_ALL);
+
     LOCK_HDR_BUFFER(&client->main_buffer);
     try_send_all(client);
     UNLOCK_HDR_BUFFER(&client->main_buffer);
 
     int rc;
 
+    worker_is_busy(WORKER_ACLK_HANDLE_INCOMING);
     while ((rc = handle_incoming_traffic(client)) != MQTT_NG_CLIENT_NEED_MORE_BYTES) {
         if (rc < 0)
             break;
         if (rc == MQTT_NG_CLIENT_WANT_WRITE) {
+            worker_is_busy(WORKER_ACLK_TRY_SEND_ALL);
+
             LOCK_HDR_BUFFER(&client->main_buffer);
             try_send_all(client);
             UNLOCK_HDR_BUFFER(&client->main_buffer);
+
+            worker_is_busy(WORKER_ACLK_HANDLE_INCOMING);
         }
     }
 

@@ -5,7 +5,6 @@
 
 #include "common_public.h"
 
-
 #define MQTT_WSS_OK                 0       // All OK call me at your earliest convinience
 #define MQTT_WSS_OK_TO              1       // All OK, poll timeout you requested when calling mqtt_wss_service expired
                                             //you might want to know if timeout
@@ -16,6 +15,8 @@
 #define MQTT_WSS_ERR_MSG_TOO_BIG    -6      // Message size too big for server
 #define MQTT_WSS_ERR_CANT_DO        -8      // if client was initialized with MQTT 3 but MQTT 5 feature
                                             // was requested by user of library
+#define MQTT_WSS_ERR_POLL_FAILED    -9
+#define MQTT_WSS_ERR_REMOTE_CLOSED  -10
 
 typedef struct mqtt_wss_client_struct *mqtt_wss_client;
 
@@ -58,7 +59,7 @@ int mqtt_wss_connect(
     int ssl_flags,
     const struct mqtt_wss_proxy *proxy,
     bool *fallback_ipv4);
-int mqtt_wss_service(mqtt_wss_client client, int timeout_ms);
+int mqtt_wss_service(mqtt_wss_client client, int t_ms);
 void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms);
 
 // we redefine this instead of using MQTT-C flags as in future
@@ -141,6 +142,7 @@ struct mqtt_wss_stats {
 };
 
 struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client);
+void mqtt_wss_reset_stats(mqtt_wss_client client);
 
 #ifdef MQTT_WSS_DEBUG
 #include <openssl/ssl.h>

@@ -124,6 +124,7 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
                 CLAIM_ID claim_id = rrdhost_claim_id_get(localhost);
                 buffer_json_member_add_string(wb, "claim_id", claim_id.str);
                 buffer_json_member_add_string(wb, "url", cloud_config_url_get());
+                buffer_json_member_add_string(wb, "reason", cloud_status_aclk_offline_reason());
                 break;
             }
         }

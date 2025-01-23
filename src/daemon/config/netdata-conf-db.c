@@ -320,7 +320,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++)
         rrdeng_readiness_wait(multidb_ctx[tier]);
 
-    calculate_tier_disk_space_percentage();
+    rrdeng_calculate_tier_disk_space_percentage();
 
     dbengine_enabled = true;
 #else

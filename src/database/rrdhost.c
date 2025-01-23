@@ -498,9 +498,8 @@ RRDHOST *rrdhost_create(
     );
 
     if(!archived) {
-        metaqueue_host_update_info(host);
+        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         rrdhost_load_rrdcontext_data(host);
-//        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         ml_host_new(host);
     } else
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
@@ -811,7 +810,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     stream_sender_structures_free(host);
 
     if (netdata_exit || force)
-        stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP);
+        stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP);
 
 
     // ------------------------------------------------------------------------
@@ -868,6 +867,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->hostname);
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
+    pulse_host_status(host, PULSE_HOST_STATUS_DELETED, 0);
     freez(host);
 }
 
