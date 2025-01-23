@@ -849,6 +849,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [OpenROADM devices](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/openroadm_devices.md)
 
+- [Optical modules](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/ethtool/integrations/optical_modules.md)
+
 - [RIPE Atlas](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/ripe_atlas.md)
 
 - [SONiC NOS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/sonic_nos.md)

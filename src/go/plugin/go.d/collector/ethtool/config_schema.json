@@ -1,0 +1,45 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Ethtool collector configuration",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for executing the binary, specified in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 2
+      },
+      "optical_interfaces": {
+        "title": "Optical Interfaces",
+        "description": "Space-separated list of optical interface names which must have optical transceiver modules with [DDM](https://en.wikipedia.org/wiki/Small_Form-factor_Pluggable#Digital_diagnostics_monitoring).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "optical_interfaces"
+    ],
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "optical_interfaces": {
+      "ui:placeholder": "enp1s0 enp1s1 enp2s0"
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    }
+  }
+}

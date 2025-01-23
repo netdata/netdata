@@ -3,6 +3,30 @@
 
 include_guard()
 
+# Fix up CMAKE_SYSTEM_PROCESSOR to actually match the build target
+function(netdata_fixup_system_processor)
+  if(OS_WINDOWS)
+    return()
+  endif()
+
+  if(CMAKE_TOOLCHAIN_FILE)
+    return()
+  endif()
+
+  execute_process(
+    COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS} -dumpmachine
+    COMMAND cut -f 1 -d -
+    RESULT_VARIABLE return_code
+    OUTPUT_VARIABLE output_data
+  )
+
+  if(return_code EQUAL 0)
+    set(CMAKE_SYSTEM_PROCESSOR "${output_data}" PARENT_SCOPE)
+  else()
+    message(WARNING "Failed to detect target processor architecture, using CMake default")
+  endif()
+endfunction()
+
 # Determine the version of the host kernel.
 #
 # Only works on UNIX-like systems, stores the version in the cache

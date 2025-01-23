@@ -54,7 +54,7 @@ On the child node, edit `netdata.conf` by using the [edit-config](/docs/netdata-
     enabled = no
 [web]
     # Disable remote access to the local dashboard
-    bind to = lo
+    bind to = localhost
 [plugins]
     # Uncomment the following line to disable all external plugins on extreme IoT cases by default.
     # enable running new plugins = no

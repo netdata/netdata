@@ -17,6 +17,7 @@ extern bool pulse_extended_enabled;
 #include "pulse-daemon-memory.h"
 #include "pulse-sqlite3.h"
 #include "pulse-db-dbengine.h"
+#include "pulse-db-dbengine-retention.h"
 #include "pulse-db-rrd.h"
 #include "pulse-string.h"
 #include "pulse-heartbeat.h"
@@ -24,6 +25,8 @@ extern bool pulse_extended_enabled;
 #include "pulse-workers.h"
 #include "pulse-trace-allocations.h"
 #include "pulse-aral.h"
+#include "pulse-network.h"
+#include "pulse-parents.h"
 
 void *pulse_thread_main(void *ptr);
 void *pulse_thread_sqlite3_main(void *ptr);

@@ -95,6 +95,9 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
     "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
 
+    "CREATE TABLE IF NOT EXISTS ctx_metadata_cleanup (id INTEGER PRIMARY KEY, host_id BLOB, context TEXT NOT NULL, date_created INT NOT NULL, "
+    "UNIQUE (host_id, context))",
+
     NULL
 };
 
@@ -103,6 +106,7 @@ const char *database_cleanup[] = {
     "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host)",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host)",
     "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host)",
+    "DELETE FROM ctx_metadata_cleanup WHERE host_id NOT IN (SELECT host_id FROM host)",
     "DROP TRIGGER IF EXISTS tr_dim_del",
     "DROP INDEX IF EXISTS ind_d1",
     "DROP INDEX IF EXISTS ind_c1",
@@ -189,12 +193,12 @@ enum metadata_opcode {
     METADATA_DATABASE_NOOP = 0,
     METADATA_DEL_DIMENSION,
     METADATA_STORE_CLAIM_ID,
-    METADATA_ADD_HOST_INFO,
     METADATA_SCAN_HOSTS,
     METADATA_LOAD_HOST_CONTEXT,
     METADATA_DELETE_HOST_CHART_LABELS,
     METADATA_ADD_HOST_AE,
     METADATA_DEL_HOST_AE,
+    METADATA_ADD_CTX_CLEANUP,
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
     METADATA_UNITTEST,
@@ -282,6 +286,110 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
     stream_path_node_id_updated(host);
 }
 
+struct host_ctx_cleanup_s {
+    nd_uuid_t host_uuid;
+    STRING *context;
+};
+
+#define CTX_DELETE_CONTEXT_META_CLEANUP_ITEM "DELETE FROM ctx_metadata_cleanup WHERE host_id = @host_id AND context = @context"
+
+static void ctx_delete_metadata_cleanup_context(sqlite3_stmt **res, nd_uuid_t *host_uuid, const char *context)
+{
+//    char host_str[UUID_STR_LEN];
+//    uuid_unparse_lower(*host_uuid, host_str);
+//    nd_log_daemon(NDLP_INFO, "Will delete context %s for host %s because it was checked", context, host_str);
+//    return;
+
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, CTX_DELETE_CONTEXT_META_CLEANUP_ITEM, res))
+            return;
+    }
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_text(*res, ++param, context, -1, SQLITE_STATIC));
+
+    param = 0;
+    int rc = sqlite3_step_monitored(*res);
+    if (rc != SQLITE_DONE)
+        error_report("Failed to delete context check entry, rc = %d", rc);
+
+done:
+    REPORT_BIND_FAIL(*res, param);
+    SQLITE_RESET(*res);
+}
+
+#define CTX_GET_CONTEXT_META_CLEANUP_LIST "SELECT context FROM ctx_metadata_cleanup WHERE host_id = @host_id"
+
+static void ctx_get_context_list_to_cleanup(nd_uuid_t *host_uuid, void (*cleanup_cb)(Pvoid_t JudyL, void *data), void *data)
+{
+    if (unlikely(!host_uuid))
+        return;
+
+    sqlite3_stmt *res = NULL;
+
+    if (!PREPARE_STATEMENT(db_meta, CTX_GET_CONTEXT_META_CLEANUP_LIST, &res))
+        return;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
+    param = 0;
+
+    const char *context;
+    Pvoid_t CTX_JudyL = NULL;
+    Pvoid_t *Pvalue;
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        context = (char *) sqlite3_column_text(res, 0);
+        STRING *ctx = string_strdupz(context);
+        Pvalue = JudyLIns(&CTX_JudyL, (Word_t) ctx, PJE0);
+        if (*Pvalue)
+            string_freez(ctx);
+        else
+            *(int *)Pvalue = 1;
+    }
+
+    if (CTX_JudyL) {
+        cleanup_cb(CTX_JudyL, data);
+
+        bool first = true;
+        Word_t Index = 0;
+        while ((Pvalue = JudyLFirstThenNext(CTX_JudyL, &Index, &first))) {
+            STRING *ctx = (STRING *) Index;
+            string_freez(ctx);
+        }
+    }
+    (void)JudyLFreeArray(&CTX_JudyL, PJE0);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+}
+
+#define SQL_SCHEDULE_HOST_CTX_CLEANUP                                                                                  \
+    "INSERT INTO ctx_metadata_cleanup (host_id, context, date_created) "                                           \
+    "VALUES (@host_id, @context, UNIXEPOCH()) ON CONFLICT DO UPDATE SET date_created = excluded.date_created; END"
+
+// Schedule context cleanup for host
+static void sql_schedule_host_ctx_cleanup(sqlite3_stmt **res, nd_uuid_t *host_id, const char *context)
+{
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, SQL_SCHEDULE_HOST_CTX_CLEANUP, res))
+            return;
+    }
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_text(*res, ++param, context, -1, SQLITE_STATIC));
+
+    param = 0;
+    int rc = execute_insert(*res);
+    if (rc != SQLITE_DONE)
+        error_report("Failed to host context check data, rc = %d", rc);
+done:
+    REPORT_BIND_FAIL(*res, param);
+    SQLITE_RESET(*res);
+}
+
 #define SQL_SET_HOST_LABEL                                                                                             \
     "INSERT INTO host_label (host_id, source_type, label_key, label_value, date_created) "                             \
     "VALUES (@host_id, @source_type, @label_key, @label_value, UNIXEPOCH()) ON CONFLICT (host_id, label_key) "         \
@@ -314,7 +422,6 @@ done:
     SQLITE_FINALIZE(res);
     return status;
 }
-
 
 #define SQL_UPDATE_NODE_ID  "UPDATE node_instance SET node_id = @node_id WHERE host_id = @host_id"
 
@@ -1297,6 +1404,8 @@ static void check_dimension_metadata(struct metadata_wc *wc)
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Checking dimensions starting after row %" PRIu64, last_row_id);
 
+    worker_is_busy(UV_EVENT_DIMENSION_CLEANUP);
+
     bool more_to_do = run_cleanup_loop(
         res,
         wc,
@@ -1328,6 +1437,8 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         (long long)(next_execution_t - now));
 
     SQLITE_FINALIZE(res);
+
+    worker_is_idle();
 }
 
 static void check_chart_metadata(struct metadata_wc *wc)
@@ -1417,6 +1528,8 @@ static void check_label_metadata(struct metadata_wc *wc)
     sqlite3_stmt *check_res = NULL;
     sqlite3_stmt *action_res = NULL;
 
+    worker_is_busy(UV_EVENT_CHART_LABEL_CLEANUP);
+
     bool more_to_do = run_cleanup_loop(
         res,
         wc,
@@ -1451,6 +1564,8 @@ static void check_label_metadata(struct metadata_wc *wc)
         (long long)(next_execution_t - now));
 
     SQLITE_FINALIZE(res);
+
+    worker_is_idle();
 }
 
 
@@ -1600,6 +1715,8 @@ static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
 {
     struct metadata_wc *wc = &metasync_worker;
 
+    bool can_continue = false;
+
     if (!*res) {
         if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_CTX_CHART_DIM_LIST, res))
             return false;
@@ -1610,8 +1727,7 @@ static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
 
     sqlite3_stmt *dim_del_stmt = NULL;
 
-    bool can_continue = true;
-
+    can_continue = true;
     while (can_continue && sqlite3_step_monitored(*res) == SQLITE_ROW) {
         if (sqlite3_column_bytes(*res, 0) != sizeof(nd_uuid_t))
             continue;
@@ -1702,19 +1818,21 @@ void run_metadata_cleanup(struct metadata_wc *wc)
     time_t now = now_realtime_sec();
 
     if (!next_context_list_cleanup)
-        next_context_list_cleanup = now + METADATA_MAINTENANCE_FIRST_CHECK;
+        next_context_list_cleanup = now + 5;
 
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
        return;
 
     if (next_context_list_cleanup < now && sql_metadata_wal_size_acceptable()) {
         RRDHOST *host;
+        worker_is_busy(UV_EVENT_CTX_CLEANUP);
         dfe_start_reentrant(rrdhost_root_index, host) {
             ctx_get_context_list_to_cleanup(&host->host_id.uuid, cleanup_host_context_metadata, host);
             if (metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN) || false == sql_metadata_wal_size_acceptable())
                 break;
         }
         dfe_done(host);
+        worker_is_idle();
         next_context_list_cleanup = now_realtime_sec() + METADATA_MAINTENANCE_CTX_CLEAN_REPEAT;
     }
 
@@ -1739,6 +1857,8 @@ struct scan_metadata_payload {
     struct metadata_wc *wc;
     void *chart_label_cleanup;
     void *pending_alert_list;
+    void *pending_ctx_cleanup_list;
+    void *pending_uuid_deletion;
     BUFFER *work_buffer;
     uint32_t max_count;
 };
@@ -1798,6 +1918,7 @@ static void restore_host_context(void *arg)
     nd_log_daemon(NDLP_DEBUG, "Contexts for host %s loaded in %s", rrdhost_hostname(host), load_duration);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
+    pulse_host_status(host, 0, 0); // this will detect the receiver status
 
     aclk_queue_node_info(host, false);
 
@@ -2071,10 +2192,91 @@ struct judy_list_t {
     Word_t count;
 };
 
+static void do_pending_uuid_deletion(struct metadata_wc *wc, struct judy_list_t *pending_uuid_deletion)
+{
+    if (!pending_uuid_deletion)
+        return;
+
+    worker_is_busy(UV_EVENT_UUID_DELETION);
+
+    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
+
+    size_t entries = pending_uuid_deletion->count;
+    Word_t Index = 0;
+    bool first = true;
+    Pvoid_t *PValue;
+    while ((PValue = JudyLFirstThenNext(pending_uuid_deletion->JudyL, &Index, &first))) {
+        if (!*PValue)
+            continue;
+
+        if (metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))
+            break;
+
+        nd_uuid_t *uuid = *PValue;
+        if (dimension_can_be_deleted(uuid, NULL, false))
+            delete_dimension_uuid(uuid, NULL, false);
+
+        freez(uuid);
+    }
+    (void) JudyLFreeArray(&pending_uuid_deletion->JudyL, PJE0);
+    freez(pending_uuid_deletion);
+
+    usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
+    nd_log_daemon(
+        NDLP_DEBUG,
+        "Processed %zu dimension delete items in %0.2f ms",
+        entries,
+        (double)(ended_ut - started_ut) / USEC_PER_MS);
+
+    worker_is_idle();
+}
+
+static void store_ctx_cleanup_list(struct metadata_wc *wc, struct judy_list_t *pending_ctx_cleanup_list)
+{
+    if (!pending_ctx_cleanup_list)
+        return;
+
+    worker_is_busy(UV_EVENT_CTX_CLEANUP_SCHEDULE);
+
+    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
+
+    size_t entries = pending_ctx_cleanup_list->count;
+    Word_t Index = 0;
+    bool first = true;
+    Pvoid_t *PValue;
+    sqlite3_stmt *res = NULL;
+    while ((PValue = JudyLFirstThenNext(pending_ctx_cleanup_list->JudyL, &Index, &first))) {
+        if (!*PValue)
+            continue;
+
+        if (metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))
+            break;
+
+        struct host_ctx_cleanup_s *ctx_cleanup = *PValue;
+        sql_schedule_host_ctx_cleanup(&res, &ctx_cleanup->host_uuid, string2str(ctx_cleanup->context));
+        string_freez(ctx_cleanup->context);
+        freez(ctx_cleanup);
+    }
+    (void) JudyLFreeArray(&pending_ctx_cleanup_list->JudyL, PJE0);
+    freez(pending_ctx_cleanup_list);
+    SQLITE_FINALIZE(res);
+
+    usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
+    nd_log_daemon(
+        NDLP_DEBUG,
+        "Stored %zu host context cleanup items in %0.2f ms",
+        entries,
+        (double)(ended_ut - started_ut) / USEC_PER_MS);
+
+    worker_is_idle();
+}
+
 static void store_alert_transitions(struct judy_list_t *pending_alert_list)
 {
     if (!pending_alert_list)
         return;
+
+    worker_is_busy(UV_EVENT_STORE_ALERT_TRANSITIONS);
 
     usec_t started_ut = now_monotonic_usec(); (void)started_ut;
 
@@ -2103,18 +2305,25 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list)
         "Stored and processed %zu alert transitions in %0.2f ms",
         entries,
         (double)(ended_ut - started_ut) / USEC_PER_MS);
+
+    worker_is_idle();
 }
 
-static void do_chart_label_cleanup(struct judy_list_t *cl_cleanup_data)
+static void do_chart_label_cleanup(struct metadata_wc *wc, struct judy_list_t *cl_cleanup_data)
 {
     if (!cl_cleanup_data)
         return;
+
+    worker_is_busy(UV_EVENT_CHART_LABEL_CLEANUP);
 
     Word_t Index = 0;
     bool first = true;
     Pvoid_t *PValue;
     while ((PValue = JudyLFirstThenNext(cl_cleanup_data->JudyL, &Index, &first))) {
         char *machine_guid = *PValue;
+
+        if (metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))
+            break;
 
         RRDHOST *host = rrdhost_find_by_guid(machine_guid);
         if (likely(!host)) {
@@ -2127,6 +2336,8 @@ static void do_chart_label_cleanup(struct judy_list_t *cl_cleanup_data)
     }
     JudyLFreeArray(&cl_cleanup_data->JudyL, PJE0);
     freez(cl_cleanup_data);
+
+    worker_is_idle();
 }
 
 // Worker thread to scan hosts for pending metadata to store
@@ -2146,7 +2357,8 @@ static void start_metadata_hosts(uv_work_t *req)
     usec_t started_ut = now_monotonic_usec(); (void)started_ut;
 
     store_alert_transitions((struct judy_list_t *)data->pending_alert_list);
-    do_chart_label_cleanup((struct judy_list_t *)data->chart_label_cleanup);
+    store_ctx_cleanup_list(wc, (struct judy_list_t *)data->pending_ctx_cleanup_list);
+    do_chart_label_cleanup(wc, (struct judy_list_t *)data->chart_label_cleanup);
 
     bool run_again = false;
     worker_is_busy(UV_EVENT_METADATA_STORE);
@@ -2235,8 +2447,11 @@ static void start_metadata_hosts(uv_work_t *req)
         "Checking all hosts completed in %0.2f ms",
         (double)(all_ended_ut - all_started_ut) / USEC_PER_MS);
 
-    if (likely(!run_again))
+    do_pending_uuid_deletion(wc, (struct judy_list_t *)data->pending_uuid_deletion);
+
+    if (likely(!run_again)) {
         run_metadata_cleanup(wc);
+    }
 
     wc->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_INTERVAL;
     worker_is_idle();
@@ -2245,11 +2460,15 @@ static void start_metadata_hosts(uv_work_t *req)
 static void metadata_event_loop(void *arg)
 {
     worker_register("METASYNC");
-    worker_register_job_name(METADATA_DATABASE_NOOP,        "noop");
-    worker_register_job_name(METADATA_DEL_DIMENSION,        "delete dimension");
-    worker_register_job_name(METADATA_STORE_CLAIM_ID,       "add claim id");
-    worker_register_job_name(METADATA_ADD_HOST_INFO,        "add host info");
-    worker_register_job_name(METADATA_MAINTENANCE,          "maintenance");
+    worker_register_job_name(METADATA_DATABASE_NOOP, "noop");
+    worker_register_job_name(METADATA_DEL_DIMENSION, "delete dimension");
+    worker_register_job_name(METADATA_STORE_CLAIM_ID, "add claim id");
+    worker_register_job_name(METADATA_ADD_CTX_CLEANUP, "host ctx cleanup");
+    worker_register_job_name(METADATA_SCAN_HOSTS, "host metadata store");
+    worker_register_job_name(METADATA_LOAD_HOST_CONTEXT, "host load context");
+    worker_register_job_name(METADATA_DELETE_HOST_CHART_LABELS, "delete host labels");
+    worker_register_job_name(METADATA_ADD_HOST_AE, "add host alert entry");
+    worker_register_job_name(METADATA_DEL_HOST_AE, "delete host alert entry");
 
     int ret;
     uv_loop_t *loop;
@@ -2298,6 +2517,8 @@ static void metadata_event_loop(void *arg)
     struct judy_list_t *cl_cleanup_data = NULL;
     Pvoid_t *PValue;
     struct judy_list_t *pending_ae_list = NULL;
+    struct judy_list_t *pending_ctx_cleanup_list = NULL;
+    struct judy_list_t *pending_uuid_deletion = NULL;
 
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
         nd_uuid_t  *uuid;
@@ -2331,18 +2552,26 @@ static void metadata_event_loop(void *arg)
                     break;
                 case METADATA_DEL_DIMENSION:
                     uuid = (nd_uuid_t *) cmd.param[0];
-                    if (likely(dimension_can_be_deleted(uuid, NULL, false)))
-                        delete_dimension_uuid(uuid, NULL, false);
-                    freez(uuid);
+                    if (!pending_uuid_deletion)
+                        pending_uuid_deletion = callocz(1, sizeof(*pending_uuid_deletion));
+
+                    PValue = JudyLIns(&pending_uuid_deletion->JudyL, ++pending_uuid_deletion->count, PJE0);
+                    if (PValue)
+                        *PValue = uuid;
                     break;
                 case METADATA_STORE_CLAIM_ID:
                     store_claim_id((nd_uuid_t *) cmd.param[0], (nd_uuid_t *) cmd.param[1]);
                     freez((void *) cmd.param[0]);
                     freez((void *) cmd.param[1]);
                     break;
-                case METADATA_ADD_HOST_INFO:
-                    host = (RRDHOST *) cmd.param[0];
-                    store_host_and_system_info(host, NULL);
+
+                case METADATA_ADD_CTX_CLEANUP:
+                    if (!pending_ctx_cleanup_list)
+                        pending_ctx_cleanup_list = callocz(1, sizeof(*pending_ctx_cleanup_list));
+
+                    PValue = JudyLIns(&pending_ctx_cleanup_list->JudyL, ++pending_ctx_cleanup_list->count, PJE0);
+                    if (PValue)
+                        *PValue = (void *)cmd.param[0];
                     break;
                 case METADATA_SCAN_HOSTS:
                     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_PROCESSING)))
@@ -2356,9 +2585,14 @@ static void metadata_event_loop(void *arg)
                     data->wc = wc;
                     data->chart_label_cleanup = cl_cleanup_data;
                     data->pending_alert_list = pending_ae_list;
+                    data->pending_ctx_cleanup_list = pending_ctx_cleanup_list;
+                    data->pending_uuid_deletion = pending_uuid_deletion;
+
                     data->work_buffer = work_buffer;
                     cl_cleanup_data = NULL;
                     pending_ae_list = NULL;
+                    pending_ctx_cleanup_list = NULL;
+                    pending_uuid_deletion = NULL;
 
                     if (unlikely(cmd.completion)) {
                         data->max_count = 0;            // 0 will process all pending updates
@@ -2373,11 +2607,13 @@ static void metadata_event_loop(void *arg)
                         cmd.completion = wc->scan_complete;
                         cl_cleanup_data = data->chart_label_cleanup;
                         pending_ae_list = data->pending_alert_list;
+                        pending_ctx_cleanup_list = data->pending_ctx_cleanup_list;
+                        pending_uuid_deletion = data->pending_uuid_deletion;
                         freez(data);
                         metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
                     }
                     break;
-                case METADATA_LOAD_HOST_CONTEXT:;
+                case METADATA_LOAD_HOST_CONTEXT:
                     if (unittest_running)
                         break;
 
@@ -2412,7 +2648,7 @@ static void metadata_event_loop(void *arg)
                     if (PValue)
                         *PValue = (void *)ae;
                     break;
-                case METADATA_DEL_HOST_AE:;
+                case METADATA_DEL_HOST_AE:
                     (void) JudyLIns(&wc->ae_DelJudyL, (Word_t) (void *) cmd.param[0], PJE0);
                     break;
                 case METADATA_UNITTEST:;
@@ -2448,6 +2684,40 @@ static void metadata_event_loop(void *arg)
         completion_destroy(wc->scan_complete);
         freez(wc->scan_complete);
     }
+
+    Word_t Index;
+    bool first;
+
+    if (cl_cleanup_data) {
+        Index = 0;
+        first = true;
+        while ((PValue = JudyLFirstThenNext(cl_cleanup_data->JudyL, &Index, &first))) {
+            char *machine_guid = *PValue;
+            freez(machine_guid);
+        }
+        JudyLFreeArray(&cl_cleanup_data->JudyL, PJE0);
+        freez(cl_cleanup_data);
+    }
+
+    if (pending_ae_list) {
+        (void)JudyLFreeArray(&pending_ae_list->JudyL, PJE0);
+        freez(pending_ae_list);
+    }
+
+    if (pending_ctx_cleanup_list) {
+        Index = 0;
+        first = true;
+        while ((PValue = JudyLFirstThenNext(pending_ctx_cleanup_list->JudyL, &Index, &first))) {
+            if (!*PValue)
+                continue;
+            struct host_ctx_cleanup_s *ctx_cleanup = *PValue;
+            string_freez(ctx_cleanup->context);
+            freez(ctx_cleanup);
+        }
+        (void)JudyLFreeArray(&pending_ctx_cleanup_list->JudyL, PJE0);
+        freez(pending_ctx_cleanup_list);
+    }
+
     metadata_free_cmd_queue(wc);
     return;
 
@@ -2584,13 +2854,6 @@ void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid)
     queue_metadata_cmd(METADATA_STORE_CLAIM_ID, local_host_uuid, local_claim_uuid);
 }
 
-void metaqueue_host_update_info(RRDHOST *host)
-{
-    if (unlikely(!metasync_worker.loop))
-        return;
-    queue_metadata_cmd(METADATA_ADD_HOST_INFO, host, NULL);
-}
-
 void metaqueue_ml_load_models(RRDDIM *rd)
 {
     rrddim_flag_set(rd, RRDDIM_FLAG_ML_MODEL_LOAD);
@@ -2614,6 +2877,19 @@ void metadata_delete_host_chart_labels(char *machine_guid)
     // Node machine guid is already strdup-ed
     queue_metadata_cmd(METADATA_DELETE_HOST_CHART_LABELS, machine_guid, NULL);
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Queued command delete chart labels for host %s", machine_guid);
+}
+
+void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context)
+{
+    if (unlikely(!metasync_worker.loop))
+        return;
+
+    struct host_ctx_cleanup_s *ctx_cleanup = mallocz(sizeof(*ctx_cleanup));
+
+    uuid_copy(ctx_cleanup->host_uuid, *host_uuid);
+    ctx_cleanup->context = string_strdupz(context);
+
+    queue_metadata_cmd(METADATA_ADD_CTX_CLEANUP, ctx_cleanup, NULL);
 }
 
 void metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae)

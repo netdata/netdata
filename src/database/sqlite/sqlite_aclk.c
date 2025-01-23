@@ -11,6 +11,55 @@ void sanity_check(void) {
 #include "sqlite_aclk_node.h"
 #include "../aclk_query_queue.h"
 #include "../aclk_query.h"
+#include "../aclk_capas.h"
+
+static void create_node_instance_result_job(const char *machine_guid, const char *node_id)
+{
+    nd_uuid_t host_uuid, node_uuid;
+
+    if (uuid_parse(machine_guid, host_uuid)) {
+        netdata_log_error("Error parsing machine_guid provided by CreateNodeInstanceResult");
+        return;
+    }
+
+    if (uuid_parse(node_id, node_uuid)) {
+        netdata_log_error("Error parsing node_id provided by CreateNodeInstanceResult");
+        return;
+    }
+
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
+    if (unlikely(!host)) {
+        netdata_log_error("Cannot find machine_guid provided by CreateNodeInstanceResult");
+        return;
+    }
+
+    sql_update_node_id(&host_uuid, &node_uuid);
+
+    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
+    node_instance_connection_t node_state_update = {
+        .hops = 1,
+        .live = 0,
+        .queryable = 1,
+        .session_id = aclk_session_newarch,
+        .node_id = node_id,
+        .capabilities = NULL};
+
+    node_state_update.live = rrdhost_is_local(host) ? 1 : 0;
+    node_state_update.hops = rrdhost_ingestion_hops(host);
+    node_state_update.capabilities = aclk_get_node_instance_capas(host);
+    schedule_node_state_update(host, 5000);
+
+    CLAIM_ID claim_id = claim_id_get();
+    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
+    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
+
+    freez((void *)node_state_update.capabilities);
+
+    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
+    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
+
+    aclk_add_job(query);
+}
 
 struct aclk_sync_config_s {
     uv_thread_t thread;
@@ -21,32 +70,37 @@ struct aclk_sync_config_s {
     mqtt_wss_client client;
     int aclk_queries_running;
     bool alert_push_running;
+    bool aclk_batch_job_is_running;
     SPINLOCK cmd_queue_lock;
+    uint32_t aclk_jobs_pending;
     struct aclk_database_cmd *cmd_base;
+    ARAL *ar;
 } aclk_sync_config = { 0 };
 
 static struct aclk_database_cmd aclk_database_deq_cmd(void)
 {
     struct aclk_database_cmd ret = { 0 };
+    struct aclk_database_cmd *to_free = NULL;
 
     spinlock_lock(&aclk_sync_config.cmd_queue_lock);
     if(aclk_sync_config.cmd_base) {
         struct aclk_database_cmd *t = aclk_sync_config.cmd_base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(aclk_sync_config.cmd_base, t, prev, next);
         ret = *t;
-        freez(t);
+        to_free = t;
     }
     else {
         ret.opcode = ACLK_DATABASE_NOOP;
     }
     spinlock_unlock(&aclk_sync_config.cmd_queue_lock);
+    aral_freez(aclk_sync_config.ar, to_free);
 
     return ret;
 }
 
 static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
 {
-    struct aclk_database_cmd *t = mallocz(sizeof(*t));
+    struct aclk_database_cmd *t = aral_mallocz(aclk_sync_config.ar);
     *t = *cmd;
     t->prev = t->next = NULL;
 
@@ -153,6 +207,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 
         host->rrdlabels = sql_load_host_labels((nd_uuid_t *)argv[IDX_HOST_ID]);
         host->stream.snd.status.last_connected = last_connected;
+
+        pulse_host_status(host, 0, 0); // this will detect the receiver status
     }
 
     (*number_of_chidren)++;
@@ -269,6 +325,11 @@ static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_un
     return 0;
 }
 
+struct judy_list_t {
+    Pvoid_t JudyL;
+    Word_t count;
+};
+
 static void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
@@ -281,10 +342,16 @@ static void timer_cb(uv_timer_t *handle)
 {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
+    struct aclk_sync_config_s *config = handle->data;
 
     struct aclk_database_cmd cmd = { 0 };
     if (aclk_online_for_alerts()) {
         cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
+        aclk_database_enq_cmd(&cmd);
+    }
+
+    if (config->aclk_jobs_pending > 0) {
+        cmd.opcode = ACLK_QUERY_BATCH_EXECUTE;
         aclk_database_enq_cmd(&cmd);
     }
 }
@@ -310,19 +377,102 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
         return;
     }
 
-    if (query->type == HTTP_API_V2) {
-        http_api_v2(config->client, query);
-    } else {
-        send_bin_msg(config->client, query);
+    struct ctxs_checkpoint *cmd;
+
+    bool ok_to_send = true;
+
+    switch (query->type) {
+
+// Incoming : cloud -> agent
+        case HTTP_API_V2:
+            worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
+            http_api_v2(config->client, query);
+            ok_to_send = false;
+            break;
+        case CTX_CHECKPOINT:;
+            worker_is_busy(UV_EVENT_CTX_CHECKPOINT);
+            cmd = query->data.payload;
+            rrdcontext_hub_checkpoint_command(cmd);
+            freez(cmd->claim_id);
+            freez(cmd->node_id);
+            freez(cmd);
+            ok_to_send = false;
+            break;
+        case CTX_STOP_STREAMING:
+            worker_is_busy(UV_EVENT_CTX_STOP_STREAMING);
+            cmd = query->data.payload;
+            rrdcontext_hub_stop_streaming_command(cmd);
+            freez(cmd->claim_id);
+            freez(cmd->node_id);
+            freez(cmd);
+            ok_to_send = false;
+            break;
+        case SEND_NODE_INSTANCES:
+            worker_is_busy(UV_EVENT_SEND_NODE_INSTANCES);
+            aclk_send_node_instances();
+            ok_to_send = false;
+            break;
+        case ALERT_START_STREAMING:
+            worker_is_busy(UV_EVENT_ALERT_START_STREAMING);
+            aclk_start_alert_streaming(query->data.node_id, query->version);
+            freez(query->data.node_id);
+            ok_to_send = false;
+            break;
+        case ALERT_CHECKPOINT:
+            worker_is_busy(UV_EVENT_ALERT_CHECKPOINT);
+            aclk_alert_version_check(query->data.node_id, query->claim_id, query->version);
+            freez(query->data.node_id);
+            freez(query->claim_id);
+            ok_to_send = false;
+            break;
+        case CREATE_NODE_INSTANCE:
+            worker_is_busy(UV_EVENT_CREATE_NODE_INSTANCE);
+            create_node_instance_result_job(query->machine_guid, query->data.node_id);
+            freez(query->data.node_id);
+            freez(query->machine_guid);
+            ok_to_send = false;
+            break;
+
+// Outgoing: agent -> cloud
+        case ALARM_PROVIDE_CFG:
+            worker_is_busy(UV_EVENT_ALARM_PROVIDE_CFG);
+            break;
+        case ALARM_SNAPSHOT:
+            worker_is_busy(UV_EVENT_ALARM_SNAPSHOT);
+            break;
+        case REGISTER_NODE:
+            worker_is_busy(UV_EVENT_REGISTER_NODE);
+            break;
+        case UPDATE_NODE_COLLECTORS:
+            worker_is_busy(UV_EVENT_UPDATE_NODE_COLLECTORS);
+            break;
+        case UPDATE_NODE_INFO:
+            worker_is_busy(UV_EVENT_UPDATE_NODE_INFO);
+            break;
+        case CTX_SEND_SNAPSHOT:
+            worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT);
+            break;
+        case CTX_SEND_SNAPSHOT_UPD:
+            worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT_UPD);
+            break;
+        case NODE_STATE_UPDATE:
+            worker_is_busy(UV_EVENT_NODE_STATE_UPDATE);
+            break;
+        default:
+            nd_log_daemon(NDLP_ERR, "Unknown msg type %u; ignoring", query->type);
+            ok_to_send = false;
+            break;
     }
+
+    if (ok_to_send)
+        send_bin_msg(config->client, query);
+
     aclk_query_free(query);
 }
 
 static void aclk_run_query_job(uv_work_t *req)
 {
     register_libuv_worker_jobs();
-
-    worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
 
     struct aclk_query_payload *payload =  req->data;
     struct aclk_sync_config_s *config = payload->config;
@@ -331,6 +481,51 @@ static void aclk_run_query_job(uv_work_t *req)
     aclk_run_query(config, query);
     worker_is_idle();
 }
+
+static void after_aclk_execute_batch(uv_work_t *req, int status __maybe_unused)
+{
+    struct aclk_query_payload *payload = req->data;
+    struct aclk_sync_config_s *config = payload->config;
+    config->aclk_batch_job_is_running = false;
+    freez(payload);
+}
+
+static void aclk_execute_batch(uv_work_t *req)
+{
+    register_libuv_worker_jobs();
+
+    struct aclk_query_payload *payload =  req->data;
+    struct aclk_sync_config_s *config = payload->config;
+    struct judy_list_t *aclk_query_batch = payload->data;
+
+    if (!aclk_query_batch)
+        return;
+
+    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
+
+    size_t entries = aclk_query_batch->count;
+    Word_t Index = 0;
+    bool first = true;
+    Pvoid_t *Pvalue;
+    while ((Pvalue = JudyLFirstThenNext(aclk_query_batch->JudyL, &Index, &first))) {
+        if (!*Pvalue)
+            continue;
+
+        aclk_query_t query = *Pvalue;
+        aclk_run_query(config, query);
+    }
+
+    (void) JudyLFreeArray(&aclk_query_batch->JudyL, PJE0);
+    freez(aclk_query_batch);
+
+    usec_t ended_ut = now_monotonic_usec();
+    (void)ended_ut;
+    nd_log_daemon(
+        NDLP_DEBUG, "Processed %zu ACLK commands in %0.2f ms", entries, (double)(ended_ut - started_ut) / USEC_PER_MS);
+
+    worker_is_idle();
+}
+
 
 static void node_update_timer_cb(uv_timer_t *handle)
 {
@@ -378,18 +573,48 @@ static void start_alert_push(uv_work_t *req __maybe_unused)
     worker_is_idle();
 }
 
+#define MAX_ACLK_BATCH_JOBS_IN_QUEUE (20)
+
+#define MAX_BATCH_SIZE (64)
+
+// Take a query, and try to schedule it in a worker
+// Update config->aclk_queries_running if success
+// config->aclk_queries_running is only accessed from the vent loop
+// On failure: free the payload
+
+int schedule_query_in_worker(uv_loop_t *loop, struct aclk_sync_config_s *config, aclk_query_t query) {
+    struct aclk_query_payload *payload = mallocz(sizeof(*payload));
+    payload->request.data = payload;
+    payload->config = config;
+    payload->data = query;
+    config->aclk_queries_running++;
+    int rc = uv_queue_work(loop, &payload->request, aclk_run_query_job, after_aclk_run_query_job);
+    if (rc) {
+        config->aclk_queries_running--;
+        freez(payload);
+    }
+    return rc;
+}
+
+
 static void aclk_synchronization(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
     uv_thread_set_name_np("ACLKSYNC");
+    config->ar = aral_by_size_acquire(sizeof(struct aclk_database_cmd));
+
     worker_register("ACLKSYNC");
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
-    worker_register_job_name(ACLK_DATABASE_NOOP,                 "noop");
-    worker_register_job_name(ACLK_DATABASE_NODE_STATE,           "node state");
-    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
-    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
-    worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,            "aclk query execute sync");
+    worker_register_job_name(ACLK_DATABASE_NOOP,                "noop");
+    worker_register_job_name(ACLK_DATABASE_NODE_STATE,          "node state");
+    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,          "alert push");
+    worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,   "alert conf push");
+    worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,           "aclk query execute sync");
+    worker_register_job_name(ACLK_QUERY_BATCH_EXECUTE,          "aclk batch execute");
+    worker_register_job_name(ACLK_QUERY_BATCH_ADD,              "aclk batch add");
+    worker_register_job_name(ACLK_MQTT_WSS_CLIENT,              "config mqtt client");
+    worker_register_job_name(ACLK_DATABASE_NODE_UNREGISTER,     "unregister node");
 
     uv_loop_t *loop = &config->loop;
     fatal_assert(0 == uv_loop_init(loop));
@@ -409,29 +634,48 @@ static void aclk_synchronization(void *arg)
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
 
     struct alert_push_data *data;
+    aclk_query_t query;
+    struct judy_list_t *aclk_query_batch = NULL;
+    struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));;
+    size_t pending_queries = 0;
 
+    Pvoid_t *Pvalue;
+    struct aclk_query_payload *payload;
+
+    unsigned cmd_batch_size;
     while (likely(service_running(SERVICE_ACLK))) {
         enum aclk_database_opcode opcode;
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
 
         /* wait for commands */
+        cmd_batch_size = 0;
         do {
+            if (unlikely(cmd_batch_size >= MAX_BATCH_SIZE))
+                break;
+
             struct aclk_database_cmd cmd = aclk_database_deq_cmd();
 
             if (unlikely(!service_running(SERVICE_ACLK)))
                 break;
 
+            ++cmd_batch_size;
             opcode = cmd.opcode;
 
             if(likely(opcode != ACLK_DATABASE_NOOP && opcode != ACLK_QUERY_EXECUTE))
                 worker_is_busy(opcode);
 
+            // Check if we have pending commands to execute
+            if (opcode == ACLK_DATABASE_NOOP && pending_queries && config->aclk_queries_running < query_thread_count) {
+                opcode = ACLK_QUERY_EXECUTE;
+                cmd.param[0] = NULL;
+            }
+
             switch (opcode) {
                 case ACLK_DATABASE_NOOP:
                     /* the command queue was empty, do nothing */
                     break;
-// NODE STATE
+                    // NODE STATE
                 case ACLK_DATABASE_NODE_STATE:;
                     RRDHOST *host = cmd.param[0];
                     struct aclk_sync_cfg_t *ahc = host->aclk_config;
@@ -489,28 +733,109 @@ static void aclk_synchronization(void *arg)
                     }
                     break;
                 case ACLK_MQTT_WSS_CLIENT:
-                    config->client = (mqtt_wss_client) cmd.param[0];
+                    config->client = (mqtt_wss_client)cmd.param[0];
                     break;
 
-                case ACLK_QUERY_EXECUTE:;
-                    aclk_query_t query = (aclk_query_t)cmd.param[0];
+                case ACLK_QUERY_EXECUTE:
+                    query = (aclk_query_t)cmd.param[0];
 
-                    struct aclk_query_payload *payload = NULL;
-                    config->aclk_queries_running++;
-                    bool execute_now = (config->aclk_queries_running > query_thread_count);
-                    if (!execute_now) {
-                        payload = mallocz(sizeof(*payload));
-                        payload->request.data = payload;
-                        payload->config = config;
-                        payload->data = query;
-                        execute_now = uv_queue_work(loop, &payload->request, aclk_run_query_job, after_aclk_run_query_job);
+                    bool too_busy = (config->aclk_queries_running >= query_thread_count);
+
+                    // If we are busy and it's just a ping to run, leave
+                    if (too_busy && !query)
+                        break;
+
+                    // if we are busy (we have a query) store it and leave
+                    if (too_busy) {
+                        Pvalue = JudyLIns(&aclk_query_execute->JudyL, ++aclk_query_execute->count, PJE0);
+                        if (Pvalue != PJERR) {
+                            *Pvalue = query;
+                            pending_queries++;
+                        } else
+                            nd_log_daemon(NDLP_ERR, "Failed to add ACLK command to the pending commands Judy");
+                        break;
                     }
 
-                    if (execute_now) {
-                        worker_is_busy(ACLK_QUERY_EXECUTE_SYNC);
-                        aclk_run_query(config, query);
+                    // Here: we are not busy
+                    // If we have query it was a normal incoming command
+                    // if we dont, it was a ping from the callback
+
+                    // Lets try to queue as many of the pending commands
+                    while(!too_busy && pending_queries && config->aclk_queries_running < query_thread_count) {
+
+                        Word_t Index = 0;
+                        Pvalue = JudyLFirst(aclk_query_execute->JudyL, &Index, PJE0);
+
+                        // We have nothing, leave
+                        if (Pvalue == NULL)
+                            break;
+                        aclk_query_t query_in_queue = *Pvalue;
+
+                        // Schedule it and increase running
+                        too_busy = schedule_query_in_worker(loop, config, query_in_queue);
+
+                        // It was scheduled in worker, remove it from pending
+                        if (!too_busy) {
+                            pending_queries--;
+                            (void)JudyLDel(&aclk_query_execute->JudyL, Index, PJE0);
+                        }
+                    }
+
+                    // Was it just a ping to run? leave
+                    if (!query)
+                        break;
+
+                    // We have a query, if not busy lets run it
+                    if (!too_busy)
+                        too_busy = schedule_query_in_worker(loop, config, query);
+
+                    // We were either busy, or failed to start worker, schedule for later
+                    if (too_busy) {
+                        Pvalue = JudyLIns(&aclk_query_execute->JudyL, ++aclk_query_execute->count, PJE0);
+                        if (Pvalue != PJERR) {
+                            *Pvalue = query;
+                            pending_queries++;
+                        }
+                        else
+                            nd_log_daemon(NDLP_ERR, "Failed to add ACLK command to the pending commands Judy");
+                    }
+                    break;
+
+// Note: The following two opcodes must be in this order
+                case ACLK_QUERY_BATCH_ADD:
+                    query = (aclk_query_t)cmd.param[0];
+                    if (!query)
+                        break;
+
+                    if (!aclk_query_batch)
+                        aclk_query_batch = callocz(1, sizeof(*aclk_query_batch));
+
+                    Pvalue = JudyLIns(&aclk_query_batch->JudyL, ++aclk_query_batch->count, PJE0);
+                    if (Pvalue)
+                        *Pvalue = query;
+
+                    config->aclk_jobs_pending++;
+                    if (aclk_query_batch->count < MAX_ACLK_BATCH_JOBS_IN_QUEUE || config->aclk_batch_job_is_running)
+                        break;
+                    // fall through
+                case ACLK_QUERY_BATCH_EXECUTE:
+                    if (!aclk_query_batch || config->aclk_batch_job_is_running)
+                        break;
+
+                    payload = mallocz(sizeof(*payload));
+                    payload->request.data = payload;
+                    payload->config = config;
+                    payload->data = aclk_query_batch;
+
+                    config->aclk_batch_job_is_running = true;
+                    config->aclk_jobs_pending -= aclk_query_batch->count;
+                    aclk_query_batch = NULL;
+
+                    if (uv_queue_work(loop, &payload->request, aclk_execute_batch, after_aclk_execute_batch)) {
+                        aclk_query_batch = payload->data;
+                        config->aclk_jobs_pending += aclk_query_batch->count;
                         freez(payload);
-                        config->aclk_queries_running--;
+                        config->aclk_batch_job_is_running = false;
                     }
                     break;
 
@@ -531,6 +856,8 @@ static void aclk_synchronization(void *arg)
     uv_run(loop, UV_RUN_NOWAIT);
 
     (void) uv_loop_close(loop);
+
+    aral_by_size_release(config->ar);
 
     worker_unregister();
     service_exits();
@@ -637,6 +964,14 @@ void aclk_execute_query(aclk_query_t query)
         return;
 
     queue_aclk_sync_cmd(ACLK_QUERY_EXECUTE, query, NULL);
+}
+
+void aclk_add_job(aclk_query_t query)
+{
+    if (unlikely(!aclk_sync_config.initialized))
+        return;
+
+    queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
 }
 
 void aclk_query_init(mqtt_wss_client client) {

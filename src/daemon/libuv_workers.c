@@ -55,11 +55,33 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_METADATA_STORE, "metadata store host");
     worker_register_job_name(UV_EVENT_METADATA_CLEANUP, "metadata cleanup");
     worker_register_job_name(UV_EVENT_METADATA_ML_LOAD, "metadata load ml models");
+    worker_register_job_name(UV_EVENT_CTX_CLEANUP_SCHEDULE, "metadata ctx cleanup schedule");
+    worker_register_job_name(UV_EVENT_CTX_CLEANUP, "metadata ctx cleanup");
+    worker_register_job_name(UV_EVENT_STORE_ALERT_TRANSITIONS, "metadata store alert transitions");
+    worker_register_job_name(UV_EVENT_CHART_LABEL_CLEANUP, "metadata chart label cleanup");
+    worker_register_job_name(UV_EVENT_UUID_DELETION, "metadata dimension deletion");
+    worker_register_job_name(UV_EVENT_DIMENSION_CLEANUP, "metadata dimension cleanup");
+    worker_register_job_name(UV_EVENT_CHART_CLEANUP, "metadata chart cleanup");
 
     // aclk_sync
     worker_register_job_name(UV_EVENT_ACLK_NODE_INFO, "aclk host node info");
     worker_register_job_name(UV_EVENT_ACLK_ALERT_PUSH, "aclk alert push");
     worker_register_job_name(UV_EVENT_ACLK_QUERY_EXECUTE, "aclk query execute");
+    // aclk
+    worker_register_job_name(UV_EVENT_CTX_STOP_STREAMING, "ctx stop streaming");
+    worker_register_job_name(UV_EVENT_CTX_CHECKPOINT, "ctx version check");
+    worker_register_job_name(UV_EVENT_ALARM_PROVIDE_CFG, "send alarm config");
+    worker_register_job_name(UV_EVENT_ALARM_SNAPSHOT, "alert snapshot");
+    worker_register_job_name(UV_EVENT_REGISTER_NODE, "register node");
+    worker_register_job_name(UV_EVENT_UPDATE_NODE_COLLECTORS, "update collectors");
+    worker_register_job_name(UV_EVENT_UPDATE_NODE_INFO, "send node info");
+    worker_register_job_name(UV_EVENT_CTX_SEND_SNAPSHOT, "ctx send snapshot");
+    worker_register_job_name(UV_EVENT_CTX_SEND_SNAPSHOT_UPD, "ctx send update");
+    worker_register_job_name(UV_EVENT_NODE_STATE_UPDATE, "node state update");
+    worker_register_job_name(UV_EVENT_SEND_NODE_INSTANCES, "send node instances");
+    worker_register_job_name(UV_EVENT_ALERT_START_STREAMING, "alert start streaming");
+    worker_register_job_name(UV_EVENT_ALERT_CHECKPOINT, "alert checkpoint");
+    worker_register_job_name(UV_EVENT_CREATE_NODE_INSTANCE, "create node instance");
 
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");

@@ -4,6 +4,7 @@
 
 #include "ws_client.h"
 #include "common_internal.h"
+#include "aclk_mqtt_workers.h"
 
 const char *websocket_upgrage_hdr = "GET /mqtt HTTP/1.1\x0D\x0A"
                               "Host: %s\x0D\x0A"
@@ -623,10 +624,12 @@ int ws_client_process(ws_client *client)
     int ret;
     switch(client->state) {
         case WS_RAW:
+            worker_is_busy(WORKER_ACLK_PROCESS_RAW);
             if (ws_client_start_handshake(client))
                 return WS_CLIENT_INTERNAL_ERROR;
             return WS_CLIENT_NEED_MORE_BYTES;
         case WS_HANDSHAKE:
+            worker_is_busy(WORKER_ACLK_PROCESS_HANDSHAKE);
             do {
                 ret = ws_client_parse_handshake_resp(client);
                 if (ret == WS_CLIENT_PROTOCOL_ERROR)
@@ -636,6 +639,7 @@ int ws_client_process(ws_client *client)
             } while (!ret);
             break;
         case WS_ESTABLISHED:
+            worker_is_busy(WORKER_ACLK_PROCESS_ESTABLISHED);
             do {
                 ret = ws_client_process_rx_ws(client);
                 switch(ret) {
@@ -655,12 +659,15 @@ int ws_client_process(ws_client *client)
             } while (!ret || ret == WS_CLIENT_PARSING_DONE);
             break;
         case WS_ERROR:
+            worker_is_busy(WORKER_ACLK_PROCESS_ERROR);
             nd_log(NDLS_DAEMON, NDLP_ERR, "ws_client is in error state. Restart the connection!");
             return WS_CLIENT_PROTOCOL_ERROR;
         case WS_CONN_CLOSED_GRACEFUL:
+            worker_is_busy(WORKER_ACLK_PROCESS_CLOSED_GRACEFULLY);
             nd_log(NDLS_DAEMON, NDLP_ERR, "Connection has been gracefully closed. Calling this is useless (and probably bug) until you reconnect again.");
             return WS_CLIENT_CONNECTION_CLOSED;
         default:
+            worker_is_busy(WORKER_ACLK_PROCESS_UNKNOWN);
             nd_log(NDLS_DAEMON, NDLP_CRIT, "Unknown connection state! Probably memory corruption.");
             return WS_CLIENT_INTERNAL_ERROR;
     }

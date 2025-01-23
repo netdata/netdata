@@ -12,6 +12,8 @@ project(netdata
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
 include(CMakeDependentOption)
+include(NetdataUtil)
+netdata_fixup_system_processor()
 
 if(DEFINED BUILD_SHARED_LIBS)
     if(NOT BUILD_SHARED_LIBS)
@@ -987,6 +989,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/memory/alignment.h
         src/libnetdata/os/get_system_pagesize.c
         src/libnetdata/os/get_system_pagesize.h
+        src/libnetdata/os/hostname.c
+        src/libnetdata/os/hostname.h
 )
 
 set(LIBH2O_FILES
@@ -1166,6 +1170,12 @@ set(DAEMON_FILES
         src/daemon/config/netdata-conf-profile.c
         src/daemon/config/netdata-conf-profile.h
         src/daemon/pulse/pulse-daemon-memory-system.c
+        src/daemon/pulse/pulse-network.c
+        src/daemon/pulse/pulse-network.h
+        src/daemon/pulse/pulse-db-dbengine-retention.c
+        src/daemon/pulse/pulse-db-dbengine-retention.h
+        src/daemon/pulse/pulse-parents.c
+        src/daemon/pulse/pulse-parents.h
 )
 
 set(H2O_FILES
@@ -1896,6 +1906,7 @@ set(MQTT_WEBSOCKETS_FILES
         src/aclk/mqtt_websockets/common_public.c
         src/aclk/mqtt_websockets/common_public.h
         src/aclk/mqtt_websockets/common_internal.h
+        src/aclk/mqtt_websockets/aclk_mqtt_workers.h
 )
 
 set(ACLK_PROTO_DEFS
@@ -2160,11 +2171,13 @@ if(ENABLE_LIBUNWIND)
 
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
       target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-x86_64)
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^i?.86")
+      target_link_libraries(libnetdata PUBLIC PkgCOnfig::LIBUNWIND -lunwind-x86)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(arm64)|(aarch64)")
       target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-aarch64)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
       target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-arm)
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "powerpc|ppc")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "p(ower)?pc64")
       target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-ppc64)
     else()
       message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR} for libunwind. Stack traces may not work.")

@@ -9,10 +9,10 @@
 #include "streaming/stream-receiver-internals.h"
 #endif
 
-#define WORKER_PARSER_FIRST_JOB 36
+#define WORKER_PARSER_FIRST_JOB 35
 
 // this has to be in-sync with the same at stream-thread.c
-#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION 25
+#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION 24
 
 // this controls the max response size of a function
 #define PLUGINSD_MAX_DEFERRED_SIZE (100 * 1024 * 1024)

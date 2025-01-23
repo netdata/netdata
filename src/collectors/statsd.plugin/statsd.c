@@ -965,6 +965,8 @@ static int statsd_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
                     d->len += rc;
                     statsd.tcp_socket_reads++;
                     statsd.tcp_bytes_read += rc;
+
+                    pulse_statsd_received_bytes(rc);
                 }
 
                 if(likely(d->len > 0)) {
@@ -1016,12 +1018,15 @@ static int statsd_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
                     statsd.udp_socket_reads++;
                     statsd.udp_packets_received += rc;
 
-                    size_t i;
+                    size_t i, total_size = 0;
                     for (i = 0; i < (size_t)rc; ++i) {
                         size_t len = (size_t)d->msgs[i].msg_len;
                         statsd.udp_bytes_read += len;
+                        total_size += len;
                         statsd_process(d->msgs[i].msg_hdr.msg_iov->iov_base, len, 0);
                     }
+
+                    pulse_statsd_received_bytes(total_size);
                 }
             } while (rc != -1);
 
@@ -1043,6 +1048,8 @@ static int statsd_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
                     statsd.udp_packets_received++;
                     statsd.udp_bytes_read += rc;
                     statsd_process(d->buffer, (size_t) rc, 0);
+
+                    pulse_statsd_received_bytes(rc);
                 }
             } while (rc != -1);
 #endif

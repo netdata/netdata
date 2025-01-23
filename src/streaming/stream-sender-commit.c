@@ -195,6 +195,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 
     if (enable_sending) {
         msg.opcode = STREAM_OPCODE_SENDER_POLLOUT;
+        msg.reason = 0;
         stream_sender_send_opcode(s, msg);
     }
 
@@ -205,6 +206,7 @@ overflow_with_lock: {
         stream_sender_unlock(s);
         waitq_release(&s->waitq);
         msg.opcode = STREAM_OPCODE_SENDER_BUFFER_OVERFLOW;
+        msg.reason = STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW;
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
@@ -221,6 +223,7 @@ compression_failed_with_lock: {
         stream_sender_unlock(s);
         waitq_release(&s->waitq);
         msg.opcode = STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION;
+        msg.reason = STREAM_HANDSHAKE_SND_DISCONNECT_COMPRESSION_FAILED;
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,

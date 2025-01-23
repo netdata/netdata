@@ -1,0 +1,129 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-ethtool
+      plugin_name: go.d.plugin
+      module_name: ethtool
+      monitored_instance:
+        name: Optical modules
+        link: ""
+        icon_filename: network-wired.svg
+        categories:
+          - data-collection.networking-stack-and-network-interfaces
+      keywords:
+        - sfp
+        - ddm
+        - optic
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: >
+          This collector monitors optical transceiver modules' diagnostic parameters 
+          (temperature, voltage, laser bias current, transmit/receive power levels) from network interfaces 
+          equipped with modules that support Digital Diagnostic Monitoring (DDM).
+          It relies on the [`ethtool`](https://man7.org/linux/man-pages/man8/ethtool.8.html) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+        method_description: ""
+      supported_platforms:
+        include: [Linux]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/ethtool.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: Timeout for executing the binary, specified in seconds.
+              default_value: 2
+              required: false
+            - name: optical_interfaces
+              description: Space-separated list of optical interface names which must have optical transceiver modules with [DDM](https://en.wikipedia.org/wiki/Small_Form-factor_Pluggable#Digital_diagnostics_monitoring).
+              default_value: ""
+              required: true
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom binary path
+              description: The executable is not in the directories specified in the PATH environment variable.
+              config: |
+                jobs:
+                  - name: ethtool
+                    binary_path: /usr/local/sbin/ethtool
+                    optical_interfaces: "enp1s0 enp1s1 enp2s0"
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Optical Transceiver Module
+          description: Metrics collected from optical transceiver modules that support Digital Diagnostic Monitoring (DDM).
+          labels:
+            - name: iface
+              description: Network interface name where the optical transceiver module is installed.
+          metrics:
+            - name: ethtool.optical_module_receiver_signal_power
+              description: Module Receiver Signal Average Optical Power
+              unit: 'dBm'
+              chart_type: line
+              dimensions:
+                - name: rx_power
+            - name: ethtool.optical_module_laser_output_power
+              description: Module Laser Output Power
+              unit: 'dBm'
+              chart_type: line
+              dimensions:
+                - name: tx_power
+            - name: ethtool.optical_module_laser_bias_current
+              description: Module Laser Bias Current
+              unit: 'mA'
+              chart_type: line
+              dimensions:
+                - name: bias_current
+            - name: ethtool.optical_module_temperature
+              description: Module Temperature
+              unit: 'Celsius'
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: ethtool.optical_module_voltage
+              description: Module Voltage
+              unit: 'Volts'
+              chart_type: line
+              dimensions:
+                - name: voltage

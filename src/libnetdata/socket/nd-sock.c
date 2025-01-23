@@ -3,19 +3,19 @@
 #include "libnetdata/libnetdata.h"
 
 ENUM_STR_MAP_DEFINE(ND_SOCK_ERROR) = {
-    { .id = ND_SOCK_ERR_NONE,                               .name = "NONE", },
-    { .id = ND_SOCK_ERR_CONNECTION_REFUSED,                 .name = "CONNECTION REFUSED", },
-    { .id = ND_SOCK_ERR_CANNOT_RESOLVE_HOSTNAME,            .name = "CANNOT RESOLVE HOSTNAME", },
-    { .id = ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET,            .name = "FAILED TO CREATE SOCKET", },
-    { .id = ND_SOCK_ERR_NO_HOST_IN_DEFINITION,              .name = "NO HOST IN DEFINITION", },
-    { .id = ND_SOCK_ERR_POLL_ERROR,                         .name = "POLL ERROR", },
-    { .id = ND_SOCK_ERR_TIMEOUT,                            .name = "TIMEOUT", },
-    { .id = ND_SOCK_ERR_SSL_CANT_ESTABLISH_SSL_CONNECTION,  .name = "CANT ESTABLISH SSL CONNECTION", },
-    { .id = ND_SOCK_ERR_SSL_INVALID_CERTIFICATE,            .name = "INVALID SSL CERTIFICATE", },
-    { .id = ND_SOCK_ERR_SSL_FAILED_TO_OPEN,                 .name = "FAILED TO OPEN SSL", },
-    { .id = ND_SOCK_ERR_THREAD_CANCELLED,                   .name = "THREAD CANCELLED", },
-    { .id = ND_SOCK_ERR_NO_DESTINATION_AVAILABLE,                .name = "NO PARENT AVAILABLE", },
-    { .id = ND_SOCK_ERR_UNKNOWN_ERROR,                      .name = "UNKNOWN ERROR", },
+    { .id = ND_SOCK_ERR_NONE,                               .name = "no socket error", },
+    { .id = ND_SOCK_ERR_CONNECTION_REFUSED,                 .name = "connection refused", },
+    { .id = ND_SOCK_ERR_CANNOT_RESOLVE_HOSTNAME,            .name = "cannot resolve hostname", },
+    { .id = ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET,            .name = "cannot create socket", },
+    { .id = ND_SOCK_ERR_NO_HOST_IN_DEFINITION,              .name = "no host in definition", },
+    { .id = ND_SOCK_ERR_POLL_ERROR,                         .name = "socket poll() error", },
+    { .id = ND_SOCK_ERR_TIMEOUT,                            .name = "timeout", },
+    { .id = ND_SOCK_ERR_SSL_CANT_ESTABLISH_SSL_CONNECTION,  .name = "cannot establish SSL connection", },
+    { .id = ND_SOCK_ERR_SSL_INVALID_CERTIFICATE,            .name = "invalid SSL certification", },
+    { .id = ND_SOCK_ERR_SSL_FAILED_TO_OPEN,                 .name = "failed to open SSL", },
+    { .id = ND_SOCK_ERR_THREAD_CANCELLED,                  .name = "thread cancelled", },
+    { .id = ND_SOCK_ERR_NO_DESTINATION_AVAILABLE,          .name = "no destination available", },
+    { .id = ND_SOCK_ERR_UNKNOWN_ERROR,                     .name = "unknown error", },
 
     // terminator
     { .name = NULL, .id = 0 }

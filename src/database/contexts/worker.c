@@ -326,8 +326,11 @@ void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs) {
                                             string2str(rc->id),
                                             rrdhost_hostname(host));
                             }
+
+                            dictionary_garbage_collect(ri->rrdmetrics);
                         }
                 dfe_done(ri);
+                dictionary_garbage_collect(rc->rrdinstances);
 
                 if(unlikely(rrdcontext_should_be_deleted(rc))) {
                     if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
@@ -351,6 +354,8 @@ void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs) {
                 rrdcontext_unlock(rc);
             }
     dfe_done(rc);
+
+    dictionary_garbage_collect(host->rrdctx.contexts);
 }
 
 static void rrdcontext_garbage_collect_for_all_hosts(void) {
@@ -402,7 +407,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
     if(dictionary_entries(ri->rrdmetrics) > 0) {
         RRDMETRIC *rm;
         dfe_start_read((DICTIONARY *)ri->rrdmetrics, rm) {
-                    if(unlikely(!service_running(SERVICE_CONTEXT))) break;
+                    if(unlikely(worker_jobs && !service_running(SERVICE_CONTEXT))) break;
 
                     RRD_FLAGS reason_to_pass = reason;
                     if(rrd_flag_check(ri, RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION))
@@ -511,7 +516,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
         dfe_start_reentrant(rc->rrdinstances, ri) {
-                    if(unlikely(!service_running(SERVICE_CONTEXT))) break;
+                    if(unlikely(worker_jobs && !service_running(SERVICE_CONTEXT))) break;
 
                     RRD_FLAGS reason_to_pass = reason;
                     if(rrd_flag_check(rc, RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION))
@@ -694,6 +699,16 @@ void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function _
 static void rrdcontext_dequeue_from_post_processing(RRDCONTEXT *rc) {
     if(unlikely(!rc->rrdhost->rrdctx.pp_queue)) return;
     dictionary_del(rc->rrdhost->rrdctx.pp_queue, string2str(rc->id));
+}
+
+void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc) {
+    rrdcontext_dequeue_from_post_processing(rc);
+    rrdcontext_post_process_updates(rc, false, RRD_FLAG_NONE, false);
+}
+
+void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc) {
+    rrdcontext_dequeue_from_post_processing(rc);
+    dictionary_del(host->rrdctx.contexts, string2str(rc->id));
 }
 
 static void rrdcontext_post_process_queued_contexts(RRDHOST *host) {

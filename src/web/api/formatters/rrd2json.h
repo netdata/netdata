@@ -18,8 +18,6 @@
 
 #include "web/server/web_client.h"
 
-#define HOSTNAME_MAX 1024
-
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
