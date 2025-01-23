@@ -22,6 +22,22 @@ void object_state_activate(OBJECT_STATE *os) {
         &os->state_refcount, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
 }
 
+void object_state_activate_if_not_activated(OBJECT_STATE *os) {
+    __atomic_add_fetch(&os->state_id, 1, __ATOMIC_RELAXED);
+
+    REFCOUNT expected = __atomic_load_n(&os->state_refcount, __ATOMIC_RELAXED);
+    REFCOUNT desired;
+
+    do {
+        if(expected != OBJECT_STATE_DEACTIVATED)
+            return;
+
+        desired = 0;
+
+    } while(!__atomic_compare_exchange_n(
+        &os->state_refcount, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
+}
+
 void object_state_deactivate(OBJECT_STATE *os) {
     __atomic_add_fetch(&os->state_id, 1, __ATOMIC_RELAXED);
 
