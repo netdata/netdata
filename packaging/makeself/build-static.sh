@@ -27,12 +27,7 @@ fi
 DOCKER_IMAGE_NAME="netdata/static-builder:v1"
 
 if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
-    if [ "$(uname -m)" = "x86_64" ]; then
-        ${docker} run --rm --privileged multiarch/qemu-user-static --reset -p yes || exit 1
-    else
-        echo "Automatic cross-architecture builds are only supported on x86_64 hosts."
-        exit 1
-    fi
+    ${docker} run --rm --privileged tonistiigi/binfmt:master --install all || exit 1
 fi
 
 case "${BUILDARCH}" in
