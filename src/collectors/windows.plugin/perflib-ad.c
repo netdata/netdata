@@ -7,7 +7,7 @@ static void initialize(void) {
     ;
 }
 
-static void netdata_ad_cache_hits(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA nameCacheLookupsTotal = { .key = "DS Name Cache hit rate,secondvalue" };
 
     static RRDSET *st_name_cache_lookups_total = NULL;
@@ -44,7 +44,7 @@ static void netdata_ad_cache_hits(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
     }
 }
 
-static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+static void netdata_ad_cache_hits(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA nameCacheHitsTotal  = { .key = "DS Name Cache hit rate" };
 
     static RRDSET *st_name_cache_hits_total = NULL;
@@ -703,10 +703,6 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     static COUNTER_DATA directoryPercWritesFromSAM = { .key = "DS % Writes from SAM" };
     static COUNTER_DATA directoryPercWritesOther = { .key = "DS % Writes from Other" };
     */
-
-    // Replication
-    static COUNTER_DATA replicationInboundObjectsFilteringTotal = { .key = "DRA Inbound Objects Filtered/sec" };
-    static COUNTER_DATA replicationInboundSyncObjectsRemaining = { .key = "DRA Inbound Full Sync Objects Remaining" };
 
     return true;
 }
