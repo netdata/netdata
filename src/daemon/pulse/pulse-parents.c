@@ -35,6 +35,7 @@ struct {
         ssize_t nodes_offline;
         ssize_t nodes_waiting;
         ssize_t nodes_replicating;
+        ssize_t nodes_replication_waiting;
         ssize_t nodes_running;
     } parent;
 
@@ -137,6 +138,10 @@ static void pulse_host_add_sub_status(PULSE_HOST_STATUS status, ssize_t val, STR
                 reason = 0;
                 break;
 
+            case PULSE_HOST_STATUS_RCV_REPLICATION_WAIT:
+                __atomic_add_fetch(&p.parent.nodes_replication_waiting, val, __ATOMIC_RELAXED);
+                break;
+
             case PULSE_HOST_STATUS_RCV_REPLICATING:
                 __atomic_add_fetch(&p.parent.nodes_replicating, val, __ATOMIC_RELAXED);
                 break;
@@ -191,7 +196,7 @@ void pulse_host_status(RRDHOST *host, PULSE_HOST_STATUS status, STREAM_HANDSHAKE
         status = pulse_host_detect_receiver_status(host);
 
     PULSE_HOST_STATUS basic = PULSE_HOST_STATUS_LOCAL|PULSE_HOST_STATUS_VIRTUAL| PULSE_HOST_STATUS_LOADING |PULSE_HOST_STATUS_ARCHIVED|PULSE_HOST_STATUS_DELETED;
-    PULSE_HOST_STATUS rcv = PULSE_HOST_STATUS_RCV_OFFLINE|PULSE_HOST_STATUS_RCV_WAITING|PULSE_HOST_STATUS_RCV_REPLICATING|PULSE_HOST_STATUS_RCV_RUNNING;
+    PULSE_HOST_STATUS rcv = PULSE_HOST_STATUS_RCV_OFFLINE|PULSE_HOST_STATUS_RCV_WAITING|PULSE_HOST_STATUS_RCV_REPLICATING|PULSE_HOST_STATUS_RCV_REPLICATION_WAIT|PULSE_HOST_STATUS_RCV_RUNNING;
     PULSE_HOST_STATUS snd = PULSE_HOST_STATUS_SND_OFFLINE|PULSE_HOST_STATUS_SND_PENDING|PULSE_HOST_STATUS_SND_CONNECTING|PULSE_HOST_STATUS_SND_WAITING|PULSE_HOST_STATUS_SND_REPLICATING|PULSE_HOST_STATUS_SND_RUNNING|PULSE_HOST_STATUS_SND_NO_DST;
 
     if(status & basic)
@@ -294,6 +299,7 @@ void pulse_parents_do(bool extended) {
             static RRDDIM *rd_archived = NULL;
             static RRDDIM *rd_offline = NULL;
             static RRDDIM *rd_waiting = NULL;
+            static RRDDIM *rd_replication_waiting = NULL;
             static RRDDIM *rd_replicating = NULL;
             static RRDDIM *rd_running = NULL;
 
@@ -319,6 +325,7 @@ void pulse_parents_do(bool extended) {
                 rd_archived = rrddim_add(st_nodes, "stale archived", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_offline = rrddim_add(st_nodes, "stale disconnected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_waiting = rrddim_add(st_nodes, "waiting", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_replication_waiting = rrddim_add(st_nodes, "waiting replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_replicating = rrddim_add(st_nodes, "replicating", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_running = rrddim_add(st_nodes, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
@@ -329,6 +336,7 @@ void pulse_parents_do(bool extended) {
             rrddim_set_by_pointer(st_nodes, rd_archived, (collected_number)__atomic_load_n(&p.parent.nodes_archived, __ATOMIC_RELAXED));
             rrddim_set_by_pointer(st_nodes, rd_offline, (collected_number)__atomic_load_n(&p.parent.nodes_offline, __ATOMIC_RELAXED));
             rrddim_set_by_pointer(st_nodes, rd_waiting, (collected_number)__atomic_load_n(&p.parent.nodes_waiting, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(st_nodes, rd_replication_waiting, (collected_number)__atomic_load_n(&p.parent.nodes_replication_waiting, __ATOMIC_RELAXED));
             rrddim_set_by_pointer(st_nodes, rd_replicating, (collected_number)__atomic_load_n(&p.parent.nodes_replicating, __ATOMIC_RELAXED));
             rrddim_set_by_pointer(st_nodes, rd_running, (collected_number)__atomic_load_n(&p.parent.nodes_running, __ATOMIC_RELAXED));
 
