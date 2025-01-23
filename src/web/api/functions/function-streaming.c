@@ -22,6 +22,30 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
     size_t max_db_metrics = 0, max_db_instances = 0, max_db_contexts = 0;
     size_t max_collection_replication_instances = 0, max_streaming_replication_instances = 0;
     size_t max_ml_anomalous = 0, max_ml_normal = 0, max_ml_trained = 0, max_ml_pending = 0, max_ml_silenced = 0;
+
+    time_t
+        max_db_duration,
+        max_db_from,
+        max_db_to,
+        max_in_age,
+        max_out_age,
+        max_out_attempt_age;
+
+    uint64_t
+        max_in_since,
+        max_out_since,
+        max_out_attempt_since;
+
+    int16_t
+        max_in_hops,
+        max_out_hops;
+
+    int
+        max_in_local_port,
+        max_in_remote_port,
+        max_out_local_port,
+        max_out_remote_port;
+
     {
         RRDHOST *host;
         dfe_start_read(rrdhost_root_index, host) {
@@ -53,11 +77,18 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
             // retention
             buffer_json_add_array_item_string(wb, rrdhost_hostname(s.host)); // Node
-            buffer_json_add_array_item_uint64(wb, s.db.first_time_s * MSEC_PER_SEC); // dbFrom
-            buffer_json_add_array_item_uint64(wb, s.db.last_time_s * MSEC_PER_SEC); // dbTo
 
-            if(s.db.first_time_s && s.db.last_time_s && s.db.last_time_s > s.db.first_time_s)
-                buffer_json_add_array_item_uint64(wb, s.db.last_time_s - s.db.first_time_s); // dbDuration
+            buffer_json_add_array_item_uint64(wb, s.db.first_time_s * MSEC_PER_SEC); // dbFrom
+            if(s.db.first_time_s > max_db_from) max_db_from = s.db.first_time_s;
+
+            buffer_json_add_array_item_uint64(wb, s.db.last_time_s * MSEC_PER_SEC); // dbTo
+            if(s.db.last_time_s > max_db_to) max_db_to = s.db.last_time_s;
+
+            if(s.db.first_time_s && s.db.last_time_s && s.db.last_time_s > s.db.first_time_s) {
+                time_t db_duration = s.db.last_time_s - s.db.first_time_s;
+                buffer_json_add_array_item_uint64(wb, db_duration); // dbDuration
+                if(db_duration > max_db_duration) max_db_duration = db_duration;
+            }
             else
                 buffer_json_add_array_item_string(wb, NULL); // dbDuration
 
@@ -72,21 +103,34 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
             // collection
             if(s.ingest.since) {
-                buffer_json_add_array_item_uint64(wb, s.ingest.since * MSEC_PER_SEC); // InSince
-                buffer_json_add_array_item_time_t(wb, s.now - s.ingest.since); // InAge
+                uint64_t in_since = s.ingest.since * MSEC_PER_SEC;
+                buffer_json_add_array_item_uint64(wb, in_since); // InSince
+                if(in_since > max_in_since) max_in_since = in_since;
+
+                time_t in_age = s.now - s.ingest.since;
+                buffer_json_add_array_item_time_t(wb, in_age); // InAge
+                if(in_age > max_in_age) max_in_age = in_age;
             }
             else {
                 buffer_json_add_array_item_string(wb, NULL); // InSince
                 buffer_json_add_array_item_string(wb, NULL); // InAge
             }
             buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(s.ingest.reason)); // InReason
+
             buffer_json_add_array_item_int64(wb, s.ingest.hops); // InHops
+            if(s.ingest.hops > max_in_hops) max_in_hops = s.ingest.hops;
+
             buffer_json_add_array_item_double(wb, s.ingest.replication.completion); // InReplCompletion
             buffer_json_add_array_item_uint64(wb, s.ingest.replication.instances); // InReplInstances
             buffer_json_add_array_item_string(wb, s.ingest.peers.local.ip); // InLocalIP
+
             buffer_json_add_array_item_uint64(wb, s.ingest.peers.local.port); // InLocalPort
+            if(s.ingest.peers.local.port > max_in_local_port) max_in_local_port = s.ingest.peers.local.port;
+
             buffer_json_add_array_item_string(wb, s.ingest.peers.peer.ip); // InRemoteIP
             buffer_json_add_array_item_uint64(wb, s.ingest.peers.peer.port); // InRemotePort
+            if(s.ingest.peers.peer.port > max_in_remote_port) max_in_remote_port = s.ingest.peers.peer.port;
+
             buffer_json_add_array_item_string(wb, s.ingest.ssl ? "SSL" : "PLAIN"); // InSSL
             stream_capabilities_to_json_array(wb, s.ingest.capabilities, NULL); // InCapabilities
 
@@ -96,21 +140,33 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
             // streaming
             if(s.stream.since) {
-                buffer_json_add_array_item_uint64(wb, s.stream.since * MSEC_PER_SEC); // OutSince
-                buffer_json_add_array_item_time_t(wb, s.now - s.stream.since); // OutAge
+                uint64_t out_since = s.stream.since * MSEC_PER_SEC;
+                buffer_json_add_array_item_uint64(wb, out_since); // OutSince
+                if(out_since > max_out_since) max_out_since = out_since;
+
+                time_t out_age = s.now - s.stream.since;
+                buffer_json_add_array_item_time_t(wb, out_age); // OutAge
+                if(out_age > max_out_age) max_out_age = out_age;
             }
             else {
                 buffer_json_add_array_item_string(wb, NULL); // OutSince
                 buffer_json_add_array_item_string(wb, NULL); // OutAge
             }
             buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(s.stream.reason)); // OutReason
+
             buffer_json_add_array_item_uint64(wb, s.stream.hops); // OutHops
+            if(s.stream.hops > max_out_hops) max_out_hops = s.stream.hops;
+
             buffer_json_add_array_item_double(wb, s.stream.replication.completion); // OutReplCompletion
             buffer_json_add_array_item_uint64(wb, s.stream.replication.instances); // OutReplInstances
             buffer_json_add_array_item_string(wb, s.stream.peers.local.ip); // OutLocalIP
             buffer_json_add_array_item_uint64(wb, s.stream.peers.local.port); // OutLocalPort
+            if(s.stream.peers.local.port > max_out_local_port) max_out_local_port = s.stream.peers.local.port;
+
             buffer_json_add_array_item_string(wb, s.stream.peers.peer.ip); // OutRemoteIP
             buffer_json_add_array_item_uint64(wb, s.stream.peers.peer.port); // OutRemotePort
+            if(s.stream.peers.peer.port > max_out_remote_port) max_out_remote_port = s.stream.peers.peer.port;
+
             buffer_json_add_array_item_string(wb, s.stream.ssl ? "SSL" : "PLAIN"); // OutSSL
             buffer_json_add_array_item_string(wb, s.stream.compression ? "COMPRESSED" : "UNCOMPRESSED"); // OutCompression
             stream_capabilities_to_json_array(wb, s.stream.capabilities, NULL); // OutCapabilities
@@ -128,8 +184,13 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                 buffer_json_add_array_item_string(wb, NULL); // OutAttemptAge
             }
             else {
-                buffer_json_add_array_item_uint64(wb, last_attempt / USEC_PER_MS); // OutAttemptSince
-                buffer_json_add_array_item_time_t(wb, s.now - (time_t)(last_attempt / USEC_PER_SEC)); // OutAttemptAge
+                uint64_t out_attempt_since = last_attempt / USEC_PER_MS;
+                buffer_json_add_array_item_uint64(wb, out_attempt_since); // OutAttemptSince
+                if(out_attempt_since > max_out_attempt_since) max_out_attempt_since = out_attempt_since;
+
+                time_t out_attempt_age = s.now - (time_t)(last_attempt / USEC_PER_SEC);
+                buffer_json_add_array_item_time_t(wb, out_attempt_age); // OutAttemptAge
+                if(out_attempt_age > max_out_attempt_age) max_out_attempt_age = out_attempt_age;
             }
 
             // ML
@@ -184,19 +245,19 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbFrom", "DB Data Retention From",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_db_from * MSEC_PER_SEC, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbTo", "DB Data Retention To",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_db_to * MSEC_PER_SEC, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbDuration", "DB Data Retention Duration",
                                     RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_db_duration, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
@@ -243,13 +304,13 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
         buffer_rrdf_table_add_field(wb, field_id++, "InSince", "Last Data Collection Status Change",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    0, NULL, (double)max_in_since, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InAge", "Last Data Collection Online Status Change Age",
                                     RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_in_age, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
@@ -261,7 +322,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
         buffer_rrdf_table_add_field(wb, field_id++, "InHops", "Data Collection Distance Hops from Origin Node",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_in_hops, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
@@ -286,7 +347,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
         buffer_rrdf_table_add_field(wb, field_id++, "InLocalPort", "Inbound Local Port",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_in_local_port, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
@@ -298,7 +359,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
         buffer_rrdf_table_add_field(wb, field_id++, "InRemotePort", "Inbound Remote Port",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_in_remote_port, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
@@ -336,13 +397,13 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutSince", "Last Streaming Status Change",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    0, NULL, (double)max_out_since, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutAge", "Last Streaming Status Change Age",
                                     RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_out_age, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
@@ -354,7 +415,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutHops", "Streaming Distance Hops from Origin Node",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_out_hops, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
@@ -391,7 +452,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutRemotePort", "Outbound Remote Port",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_out_remote_port, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
@@ -454,14 +515,14 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
         buffer_rrdf_table_add_field(wb, field_id++, "OutAttemptSince",
                                     "Last Outbound Connection Attempt Status Change Time",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    0, NULL, (double)max_out_attempt_since, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutAttemptAge",
                                     "Last Outbound Connection Attempt Status Change Age",
                                     RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    0, NULL, (double)max_out_attempt_age, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
