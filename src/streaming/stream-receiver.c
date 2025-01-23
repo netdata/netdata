@@ -491,7 +491,10 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     parser->h2o_ctx = rpt->h2o_ctx;
 #endif
 
-    pulse_host_status(rpt->host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
+    if(stream_receive.replication.enabled)
+        pulse_host_status(rpt->host, PULSE_HOST_STATUS_RCV_REPLICATION_WAIT, 0);
+    else
+        pulse_host_status(rpt->host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
 
     // keep this last - it needs everything ready since to sends data to the child
     stream_receiver_send_node_and_claim_id_to_child(rpt->host);
