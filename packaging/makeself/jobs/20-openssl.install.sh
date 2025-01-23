@@ -38,6 +38,7 @@ cd "${NETDATA_MAKESELF_PATH}/tmp/openssl" || exit 1
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     case "${BUILDARCH}" in
         armv6l|armv7l) TARGET='linux-armv4' ;;
+        ppc64le) TARGET='linux-ppc64le' ;;
         *) TARGET= ;;
     esac
 
