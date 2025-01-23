@@ -113,7 +113,7 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
     dfe_start_read(host->rrdctx.contexts, rc) {
         rrdcontext_recalculate_context_retention(rc, reason, worker_jobs);
 
-        if(!first_time_s || rc->first_time_s < first_time_s)
+        if(!first_time_s || (rc->first_time_s && rc->first_time_s < first_time_s))
             first_time_s = rc->first_time_s;
 
         if(!last_time_s || rc->last_time_s > last_time_s)
