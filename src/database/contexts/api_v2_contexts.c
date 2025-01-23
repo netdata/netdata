@@ -366,7 +366,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
 
     if(ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES)) {
         RRDHOST_STATUS s;
-        rrdhost_status(host, ctl->now, &s);
+        rrdhost_status(host, ctl->now, &s, RRDHOST_STATUS_ALL);
 
         if (ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH)) {
             buffer_json_member_add_string(wb, "v", rrdhost_program_version(host));
