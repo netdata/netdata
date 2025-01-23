@@ -128,6 +128,8 @@ static inline RRDHOST_DB_STATUS rrdhost_status_db(RRDHOST *host, time_t now, RRD
 
 
     if(s) {
+        s->db.status = status;
+
         s->db.first_time_s = first_time_s;
         s->db.last_time_s = last_time_s;
         s->db.status = status;
@@ -178,6 +180,8 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
     if(s) {
         if(status == RRDHOST_INGEST_STATUS_ARCHIVED)
             since = s->db.last_time_s;
+
+        s->ingest.status = status;
 
         s->ingest.since = since ? since : netdata_start_time;
         s->ingest.reason = reason;
