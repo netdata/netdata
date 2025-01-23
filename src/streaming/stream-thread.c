@@ -524,6 +524,8 @@ void *stream_thread(void *ptr) {
         usec_t now_ut = now_monotonic_usec();
 
         if(now_ut - last_dequeue_ut >= 100 * USEC_PER_MS) {
+            last_dequeue_ut = now_ut;
+
             worker_is_busy(WORKER_STREAM_JOB_DEQUEUE);
 
             stream_thread_messages_resize(sth);
@@ -538,40 +540,40 @@ void *stream_thread(void *ptr) {
 
             receivers_waiting = sth->queue.receivers_waiting;
             spinlock_unlock(&sth->queue.spinlock);
-            last_dequeue_ut = now_ut;
-        }
 
-        if(now_ut - last_check_all_nodes_ut >= nd_profile.update_every * USEC_PER_SEC) {
-            worker_is_busy(WORKER_STREAM_JOB_LIST);
 
-            // periodically check the entire list of nodes
-            // this detects unresponsive parents too (timeout)
-            stream_sender_check_all_nodes_from_poll(sth, now_ut);
-            stream_receiver_check_all_nodes_from_poll(sth, now_ut);
+            if(now_ut - last_check_all_nodes_ut >= nd_profile.update_every * USEC_PER_SEC) {
+                last_check_all_nodes_ut = now_ut;
 
-            worker_set_metric(WORKER_SENDER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
-            worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes_count);
+                worker_is_busy(WORKER_STREAM_JOB_LIST);
 
-            worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
-            worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
-            worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
+                // periodically check the entire list of nodes
+                // this detects unresponsive parents too (timeout)
+                stream_sender_check_all_nodes_from_poll(sth, now_ut);
+                stream_receiver_check_all_nodes_from_poll(sth, now_ut);
 
-            worker_set_metric(WORKER_STREAM_JOB_RECEIVERS_WAITING_LIST_SIZE, (NETDATA_DOUBLE)receivers_waiting);
-            worker_set_metric(WORKER_STREAM_JOB_SEND_MISSES, (NETDATA_DOUBLE)sth->snd.send_misses);
-            replay_entries = 0;
-            sth->snd.bytes_received = 0;
-            sth->snd.bytes_sent = 0;
+                worker_set_metric(WORKER_SENDER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
+                worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes_count);
 
-            last_check_all_nodes_ut = now_ut;
-        }
+                worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
+                worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
+                worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
 
-        if(now_ut - last_check_replication_ut >= 10 * 60 * USEC_PER_SEC) {
-            worker_is_busy(WORKER_STREAM_JOB_LIST);
+                worker_set_metric(WORKER_STREAM_JOB_RECEIVERS_WAITING_LIST_SIZE, (NETDATA_DOUBLE)receivers_waiting);
+                worker_set_metric(WORKER_STREAM_JOB_SEND_MISSES, (NETDATA_DOUBLE)sth->snd.send_misses);
+                replay_entries = 0;
+                sth->snd.bytes_received = 0;
+                sth->snd.bytes_sent = 0;
 
-            stream_sender_replication_check_from_poll(sth, now_ut);
-            stream_receiver_replication_check_from_poll(sth, now_ut);
+                if(now_ut - last_check_replication_ut >= 10 * 60 * USEC_PER_SEC) {
+                    last_check_replication_ut = now_ut;
 
-            last_check_replication_ut = now_ut;
+                    worker_is_busy(WORKER_STREAM_JOB_LIST);
+
+                    stream_sender_replication_check_from_poll(sth, now_ut);
+                    stream_receiver_replication_check_from_poll(sth, now_ut);
+                }
+            }
         }
 
         worker_is_idle();

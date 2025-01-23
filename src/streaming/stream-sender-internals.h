@@ -85,8 +85,7 @@ struct sender_state {
     } exit;
 
     struct {
-        uint32_t last_counter_in;               // copy from the host, to detect progress
-        uint32_t last_counter_out;              // copy from the host, to detect progress
+        uint32_t last_counter_sum;              // copy from the host, to detect progress
         usec_t last_progress_ut;                // last time we found some progress (monotonic)
         usec_t last_checked_ut;                 // last time we checked for stalled progress (monotonic)
 
