@@ -714,7 +714,7 @@ RRDHOST *rrdhost_find_or_create(
                 , system_info
                 , 0
                 , archived
-        );
+         );
     }
     else {
         if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
@@ -765,9 +765,8 @@ bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t no
 }
 
 bool rrdhost_should_run_health(RRDHOST *host) {
-    if (!host->health.enabled ||
-        !rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE) ||
-        rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))
+    if (!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE) ||
+        rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN) || rrdhost_ingestion_status(host) != RRDHOST_INGEST_STATUS_ONLINE)
         return false;
 
     return true;
