@@ -246,19 +246,19 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
         buffer_rrdf_table_add_field(wb, field_id++, "dbFrom", "DB Data Retention From",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, (double)max_db_from * MSEC_PER_SEC, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbTo", "DB Data Retention To",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, (double)max_db_to * MSEC_PER_SEC, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbDuration", "DB Data Retention Duration",
                                     RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
                                     0, NULL, (double)max_db_duration, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbMetrics", "Time-series Metrics in the DB",
@@ -305,7 +305,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
         buffer_rrdf_table_add_field(wb, field_id++, "InSince", "Last Data Collection Status Change",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, (double)max_in_since, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InAge", "Last Data Collection Online Status Change Age",
@@ -398,7 +398,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
         buffer_rrdf_table_add_field(wb, field_id++, "OutSince", "Last Streaming Status Change",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, (double)max_out_since, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutAge", "Last Streaming Status Change Age",
@@ -441,7 +441,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
         buffer_rrdf_table_add_field(wb, field_id++, "OutLocalPort", "Outbound Local Port",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutRemoteIP", "Outbound Remote IP",
@@ -516,7 +516,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                                     "Last Outbound Connection Attempt Status Change Time",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, (double)max_out_attempt_since, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutAttemptAge",
