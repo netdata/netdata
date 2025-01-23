@@ -194,8 +194,7 @@ jobs:
           - armv7l
           - aarch64
           - ppc64le
-      strategy:
-        fail-fast: false
+      fail-fast: false
     steps:
       - name: Skip Check
         id: skip
