@@ -229,7 +229,7 @@ jobs:
           key: ${{ steps.cache-key.outputs.key }}
       - name: Set up QEMU
         id: qemu
-        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64' && needs.file-check.outputs.run == 'true'
+        if: needs.file-check.outputs.run == 'true'
         run: |
           sudo apt-get update
           sudo apt-get upgrade -y
