@@ -254,7 +254,7 @@ static void chart_by_reason(struct by_reason *b, const char *id, const char *con
             , "Streaming"
             , context
             , title
-            , "events"
+            , "events/s"
             , "netdata"
             , "pulse"
             , priority
@@ -316,8 +316,8 @@ void pulse_parents_do(bool extended) {
                 rd_local = rrddim_add(st_nodes, "local", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_virtual = rrddim_add(st_nodes, "virtual", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_loading = rrddim_add(st_nodes, "loading", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_archived = rrddim_add(st_nodes, "stale", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_offline = rrddim_add(st_nodes, "offline", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_archived = rrddim_add(st_nodes, "stale archived", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_offline = rrddim_add(st_nodes, "stale disconnected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_waiting = rrddim_add(st_nodes, "waiting", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_replicating = rrddim_add(st_nodes, "replicating", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_running = rrddim_add(st_nodes, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
