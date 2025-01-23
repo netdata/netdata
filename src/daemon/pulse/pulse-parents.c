@@ -59,7 +59,7 @@ struct {
 
 static PULSE_HOST_STATUS pulse_host_detect_receiver_status(RRDHOST *host) {
     RRDHOST_STATUS status = { 0 };
-    rrdhost_status(host, now_realtime_sec(), &status);
+    rrdhost_status(host, now_realtime_sec(), &status, RRDHOST_STATUS_BASIC);
 
     PULSE_HOST_STATUS rc = 0;
 

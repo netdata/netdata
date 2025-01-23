@@ -298,7 +298,7 @@ int stream_info_to_json_v1(BUFFER *wb, const char *machine_guid) {
     if(!machine_guid || !*machine_guid || !(host = rrdhost_find_by_guid(machine_guid)))
         ret = HTTP_RESP_NOT_FOUND;
     else
-        rrdhost_status(host, now_realtime_sec(), &status);
+        rrdhost_status(host, now_realtime_sec(), &status, RRDHOST_STATUS_BASIC);
 
     buffer_json_member_add_uint64(wb, "version", 1);
     buffer_json_member_add_uint64(wb, "status", ret);

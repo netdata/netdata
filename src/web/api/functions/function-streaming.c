@@ -50,7 +50,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
         RRDHOST *host;
         dfe_start_read(rrdhost_root_index, host) {
             RRDHOST_STATUS s;
-            rrdhost_status(host, now, &s);
+            rrdhost_status(host, now, &s, RRDHOST_STATUS_ALL);
             buffer_json_add_array_item_array(wb);
 
             if(s.db.metrics > max_db_metrics)

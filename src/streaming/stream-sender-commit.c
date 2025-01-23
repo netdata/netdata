@@ -76,11 +76,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     if (unlikely(!src || !src_len))
         return;
 
-    waitq_acquire(
-        &s->waitq,
-        (s->host->stream.rcv.status.tid == gettid_cached() || s->host->stream.snd.status.tid == gettid_cached()) ?
-            WAITQ_PRIO_HIGH :
-            WAITQ_PRIO_NORMAL);
+    waitq_acquire(&s->waitq, (rrdhost_is_this_a_stream_thread(s->host)) ? WAITQ_PRIO_HIGH : WAITQ_PRIO_NORMAL);
     stream_sender_lock(s);
 
     // copy the sequence number of sender buffer recreates, while having our lock
