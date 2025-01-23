@@ -1221,23 +1221,25 @@ bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE rea
             __atomic_store_n(&rpt->exit.shutdown, true, __ATOMIC_RELEASE);
             shutdown(rpt->sock.fd, SHUT_RDWR);
         }
+
+        int count = 2000;
+        while (host->receiver == rpt && count-- > 0) {
+            rrdhost_receiver_unlock(host);
+
+            // let the lock for the receiver thread to exit
+            sleep_usec(1 * USEC_PER_MS);
+
+            rrdhost_receiver_lock(host);
+        }
+
+        if(host->receiver == rpt)
+            netdata_log_error("STREAM RCV[x] '%s' [from [%s]:%s]: "
+                              "streaming thread takes too long to stop, giving up..."
+                              , rrdhost_hostname(host)
+                                  , rpt->remote_ip, rpt->remote_port);
+        else
+            ret = true;
     }
-
-    int count = 2000;
-    while (host->receiver == rpt && count-- > 0) {
-        rrdhost_receiver_unlock(host);
-
-        // let the lock for the receiver thread to exit
-        sleep_usec(1 * USEC_PER_MS);
-
-        rrdhost_receiver_lock(host);
-    }
-
-    if(host->receiver == rpt)
-        netdata_log_error("STREAM RCV[x] '%s' [from [%s]:%s]: "
-              "streaming thread takes too long to stop, giving up..."
-              , rrdhost_hostname(host)
-              , rpt->remote_ip, rpt->remote_port);
     else
         ret = true;
 
