@@ -133,7 +133,7 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
                           rd_directory_operation_total_search,
                           searchValue);
 
-    rrdset_done(st_database_operation_total);
+    rrdset_done(st_directory_operation_total);
 }
 
 static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
@@ -143,7 +143,7 @@ static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TY
     static RRDDIM *rd_name_cache_lookups_total = NULL;
 
     if(perflibGetObjectCounter(pDataBlock, pObjectType, &nameCacheLookupsTotal)) {
-        if (unlikely(!st_name_cache_hits_total)) {
+        if (unlikely(!st_name_cache_lookups_total)) {
             st_name_cache_lookups_total =  rrdset_create_localhost("ad"
                                                                   , "name_cache_lookups"
                                                                   , NULL
@@ -158,7 +158,7 @@ static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TY
                                                                   , RRDSET_TYPE_LINE
             );
 
-            rd_name_cache_lookups_total = rrddim_add(stname_cache_lookups_totall,
+            rd_name_cache_lookups_total = rrddim_add(st_name_cache_lookups_total,
                                                      "lookups",
                                                      NULL,
                                                      1,
@@ -217,7 +217,7 @@ static void netdata_ad_searches(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
     static RRDDIM *rd_ldap_searches_total = NULL;
 
     if(perflibGetObjectCounter(pDataBlock, pObjectType, &ldapSearchesTotal)) {
-        if (unlikely(!st_name_cache_hits_total)) {
+        if (unlikely(!st_ldap_searches_total)) {
             st_ldap_searches_total =  rrdset_create_localhost("ad"
                                                              , "ldap_searches"
                                                              , NULL
