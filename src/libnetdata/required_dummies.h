@@ -3,6 +3,10 @@
 #ifndef NETDATA_LIB_DUMMIES_H
 #define NETDATA_LIB_DUMMIES_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // callback required by fatal()
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data)
 {
@@ -21,5 +25,9 @@ void rrd_collector_finished(void){}
 
 // required by get_system_cpus()
 const char *netdata_configured_host_prefix = "";
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // NETDATA_LIB_DUMMIES_H
