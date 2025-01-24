@@ -11,7 +11,7 @@
     - smseagle
   overview:
     notification_description: |
-      Forward notifications to SMSEagle device to send them as SMS, MMS or queue as different types of calls.
+      Forward notifications to SMSEagle device to send SMS, MMS, wake-up call or text to speech call.
     notification_limitations: ''
   setup:
     prerequisites:
@@ -69,7 +69,7 @@
             description: ""
             required: true
             detailed_description: |
-              Choose a type of message/call. Available types: sms, mms, ring, tts, tts_advanced. Be aware that some types require additional parameters to be set.
+              Choose a type of message/call. Available types: sms, mms, ring (wake-up call), tts (text-to-speech call), tts_advanced (multilanguage text-to-speech call). Be aware that some types require additional parameters to be set.
           - name: 'SMSEAGLE_CALL_DURATION'
             default_value: '10'
             description: ""
