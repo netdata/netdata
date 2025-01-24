@@ -1385,7 +1385,6 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
         max_row_id = get_max_dim_row_id();
         nd_log(NDLS_DAEMON, NDLP_INFO, "Dimension metadata check has been scheduled to run (max id = %lu)", max_row_id);
-
     }
 
     if (next_execution_t && next_execution_t > now)
@@ -1476,7 +1475,7 @@ static void check_chart_metadata(struct metadata_wc *wc)
         return;
 
     if (max_row_id && last_row_id >= max_row_id) {
-        nd_log(NDLS_DAEMON, NDLP_INFO, "Chart check completed");
+        nd_log(NDLS_DAEMON, NDLP_INFO, "Chart metadata check completed");
         check_completed = true;
         return;
     }
