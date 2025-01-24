@@ -40,11 +40,17 @@ set -euo pipefail
 
 # -----------------------------------------------------------------------------
 
+cache_path() {
+  local key="${1}"
+  echo "${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
+}
+
 fetch() {
   local dir="${1}" url="${2}" sha256="${3}" key="${4}"
   local tar
   tar="$(basename "${2}")"
-  local cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
+  local cache
+  cache="$(cache_path "${key}")"
 
   if [ -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]; then
     rm -rf "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
@@ -84,20 +90,21 @@ fetch() {
 }
 
 store_cache() {
-    key="${1}"
-    src="${2}"
+  local key="${1}"
+  local src="${2}"
 
-    cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
+  local cache
+  cache="$(cache_path "${key}")"
 
-    if [ "${CACHE_HIT:-0}" -eq 0 ]; then
-        if [ -d "${cache}" ]; then
-            rm -rf "${cache}"
-        fi
-
-        mkdir -p "${cache}"
-
-        cp -a "${src}" "${cache}"
+  if [ "${CACHE_HIT:-0}" -eq 0 ]; then
+    if [ -d "${cache}" ]; then
+      rm -rf "${cache}"
     fi
+
+    mkdir -p "${cache}"
+
+    cp -a "${src}" "${cache}"
+  fi
 }
 
 # -----------------------------------------------------------------------------

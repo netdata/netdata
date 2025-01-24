@@ -23,7 +23,7 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libunwind" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
 fi
 
-cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/libunwind"
+cache="$(cache_path)"
 
 if [ -d "${cache}" ]; then
   echo "Found cached copy of build directory for libunwind, using it."

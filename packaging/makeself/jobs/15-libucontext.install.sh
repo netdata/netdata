@@ -23,7 +23,7 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libucontext" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libucontext"
 fi
 
-cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/libucontext"
+cache="$(cache_path libucontext)"
 
 if [ -d "${cache}" ]; then
   echo "Found cached copy of build directory for libucontext, using it."
