@@ -498,3 +498,64 @@ void rrdhost_system_info_to_node_info(struct rrdhost_system_info *system_info, s
     node_info->data.ml_info.ml_capable = system_info->ml_capable;
     node_info->data.ml_info.ml_enabled = system_info->ml_enabled;
 }
+
+void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_system_info *system_info) {
+    if(system_info) {
+        buffer_json_add_array_item_string(wb, system_info->host_os_name ? system_info->host_os_name : "");
+        buffer_json_add_array_item_string(wb, system_info->host_os_id ? system_info->host_os_id : "");
+        buffer_json_add_array_item_string(wb, system_info->host_os_id_like ? system_info->host_os_id_like : "");
+        buffer_json_add_array_item_string(wb, system_info->host_os_version ? system_info->host_os_version : "");
+        buffer_json_add_array_item_string(wb, system_info->host_os_version_id ? system_info->host_os_version_id : "");
+        buffer_json_add_array_item_string(wb, system_info->host_os_detection ? system_info->host_os_detection : "");
+        buffer_json_add_array_item_string(wb, system_info->host_cores ? system_info->host_cores : "");
+        buffer_json_add_array_item_string(wb, system_info->host_disk_space ? system_info->host_disk_space : "");
+        buffer_json_add_array_item_string(wb, system_info->host_cpu_freq ? system_info->host_cpu_freq : "");
+        buffer_json_add_array_item_string(wb, system_info->host_ram_total ? system_info->host_ram_total : "");
+        buffer_json_add_array_item_string(wb, system_info->container_os_name ? system_info->container_os_name : "");
+        buffer_json_add_array_item_string(wb, system_info->container_os_id ? system_info->container_os_id : "");
+        buffer_json_add_array_item_string(wb, system_info->container_os_id_like ? system_info->container_os_id_like : "");
+        buffer_json_add_array_item_string(wb, system_info->container_os_version ? system_info->container_os_version : "");
+        buffer_json_add_array_item_string(wb, system_info->container_os_version_id ? system_info->container_os_version_id : "");
+        buffer_json_add_array_item_string(wb, system_info->container_os_detection ? system_info->container_os_detection : "");
+        buffer_json_add_array_item_string(wb, system_info->is_k8s_node ? system_info->is_k8s_node : "");
+        buffer_json_add_array_item_string(wb, system_info->kernel_name ? system_info->kernel_name : "");
+        buffer_json_add_array_item_string(wb, system_info->kernel_version ? system_info->kernel_version : "");
+        buffer_json_add_array_item_string(wb, system_info->architecture ? system_info->architecture : "");
+        buffer_json_add_array_item_string(wb, system_info->virtualization ? system_info->virtualization : "");
+        buffer_json_add_array_item_string(wb, system_info->virt_detection ? system_info->virt_detection : "");
+        buffer_json_add_array_item_string(wb, system_info->container ? system_info->container : "");
+        buffer_json_add_array_item_string(wb, system_info->container_detection ? system_info->container_detection : "");
+        buffer_json_add_array_item_string(wb, system_info->cloud_provider_type ? system_info->cloud_provider_type : "");
+        buffer_json_add_array_item_string(wb, system_info->cloud_instance_type ? system_info->cloud_instance_type : "");
+        buffer_json_add_array_item_string(wb, system_info->cloud_instance_region ? system_info->cloud_instance_region : "");
+    }
+    else {
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+        buffer_json_add_array_item_string(wb, "");
+    }
+}
