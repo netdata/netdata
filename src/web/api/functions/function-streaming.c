@@ -2,6 +2,19 @@
 
 #include "function-streaming.h"
 
+#define GROUP_BY_COLUMN(name, descr) \
+    buffer_json_member_add_object(wb, name);\
+    {\
+        buffer_json_member_add_string(wb, "name", descr);\
+        buffer_json_member_add_array(wb, "columns");\
+        {\
+            buffer_json_add_array_item_string(wb, name);\
+        }\
+        buffer_json_array_close(wb);\
+    }\
+    buffer_json_object_close(wb);
+
+
 int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused, const char *source __maybe_unused) {
 
     time_t now = now_realtime_sec();
@@ -822,71 +835,36 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
     buffer_json_member_add_object(wb, "group_by");
     {
-        buffer_json_member_add_object(wb, "Node");
-        {
-            buffer_json_member_add_string(wb, "name", "Node");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Node");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
+        GROUP_BY_COLUMN("OSName", "O/S Name");
+        GROUP_BY_COLUMN("OSId", "O/S ID");
+        GROUP_BY_COLUMN("OSIdLike", "O/S ID Like");
+        GROUP_BY_COLUMN("OSVersion", "O/S Version");
+        GROUP_BY_COLUMN("OSVersionId", "O/S Version ID");
+        GROUP_BY_COLUMN("OSDetection", "O/S Detection");
+        GROUP_BY_COLUMN("CPUCores", "CPU Cores");
+        GROUP_BY_COLUMN("ContainerOSName", "Container O/S Name");
+        GROUP_BY_COLUMN("ContainerOSId", "Container O/S ID");
+        GROUP_BY_COLUMN("ContainerOSIdLike", "Container O/S ID Like");
+        GROUP_BY_COLUMN("ContainerOSVersion", "Container O/S Version");
+        GROUP_BY_COLUMN("ContainerOSVersionId", "Container O/S Version ID");
+        GROUP_BY_COLUMN("ContainerOSDetection", "Container O/S Detection");
+        GROUP_BY_COLUMN("IsK8sNode", "Kubernetes Nodes");
+        GROUP_BY_COLUMN("KernelName", "Kernel Name");
+        GROUP_BY_COLUMN("KernelVersion", "Kernel Version");
+        GROUP_BY_COLUMN("Architecture", "Architecture");
+        GROUP_BY_COLUMN("Virtualization", "Virtualization Technology");
+        GROUP_BY_COLUMN("VirtDetection", "Virtualization Detection");
+        GROUP_BY_COLUMN("Container", "Container");
+        GROUP_BY_COLUMN("ContainerDetection", "Container Detection");
+        GROUP_BY_COLUMN("CloudProviderType", "Cloud Provider Type");
+        GROUP_BY_COLUMN("CloudInstanceType", "Cloud Instance Type");
+        GROUP_BY_COLUMN("CloudInstanceRegion", "Cloud Instance Region");
 
-        buffer_json_member_add_object(wb, "InStatus");
-        {
-            buffer_json_member_add_string(wb, "name", "Nodes by Collection Status");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "InStatus");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "OutStatus");
-        {
-            buffer_json_member_add_string(wb, "name", "Nodes by Streaming Status");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "OutStatus");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "MlStatus");
-        {
-            buffer_json_member_add_string(wb, "name", "Nodes by ML Status");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "MlStatus");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "InRemoteIP");
-        {
-            buffer_json_member_add_string(wb, "name", "Nodes by Inbound IP");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "InRemoteIP");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "OutRemoteIP");
-        {
-            buffer_json_member_add_string(wb, "name", "Nodes by Outbound IP");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "OutRemoteIP");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
+        GROUP_BY_COLUMN("InStatus", "Collection Status");
+        GROUP_BY_COLUMN("OutStatus", "Streaming Status");
+        GROUP_BY_COLUMN("MlStatus", "ML Status");
+        GROUP_BY_COLUMN("InRemoteIP", "Inbound IP");
+        GROUP_BY_COLUMN("OutRemoteIP", "Outbound IP");
     }
     buffer_json_object_close(wb); // group_by
 
