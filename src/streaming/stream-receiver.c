@@ -404,7 +404,7 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
                "STREAM RCV '%s' [from [%s]:%s]: failed to set non-blocking mode on socket %d",
                rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
 
-    rpt->host->stream.rcv.status.tid = gettid_cached();
+    __atomic_store_n(&rpt->host->stream.rcv.status.tid, gettid_cached(), __ATOMIC_RELAXED);
     rpt->thread.meta.type = POLLFD_TYPE_RECEIVER;
     rpt->thread.meta.rpt = rpt;
 
@@ -491,7 +491,10 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     parser->h2o_ctx = rpt->h2o_ctx;
 #endif
 
-    pulse_host_status(rpt->host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
+    if(stream_receive.replication.enabled)
+        pulse_host_status(rpt->host, PULSE_HOST_STATUS_RCV_REPLICATION_WAIT, 0);
+    else
+        pulse_host_status(rpt->host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
 
     // keep this last - it needs everything ready since to sends data to the child
     stream_receiver_send_node_and_claim_id_to_child(rpt->host);
@@ -547,7 +550,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd))
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to delete receiver socket from nd_poll()");
 
-    rpt->host->stream.rcv.status.tid = 0;
+    __atomic_store_n(&rpt->host->stream.rcv.status.tid, 0, __ATOMIC_RELAXED);
 
     // make sure send_to_plugin() will not write any data to the socket (or wait for it to finish)
     if(parser) {
@@ -967,19 +970,18 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
 static bool stream_receiver_did_replication_progress(struct receiver_state *rpt) {
     RRDHOST *host = rpt->host;
 
-    size_t my_counter_in = __atomic_load_n(&rpt->replication.last_counter_in, __ATOMIC_RELAXED);
-    size_t my_counter_out = __atomic_load_n(&rpt->replication.last_counter_out, __ATOMIC_RELAXED);
-    size_t host_counter_in = __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED);
-    size_t host_counter_out = __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED);
-    if(my_counter_in != host_counter_in || my_counter_out != host_counter_out) {
+    size_t host_counter_sum =
+        __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED) +
+        __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED);
+
+    if(rpt->replication.last_counter_sum != host_counter_sum) {
         // there has been some progress
-        __atomic_store_n(&rpt->replication.last_counter_in, __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
-        __atomic_store_n(&rpt->replication.last_counter_out, __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
+        rpt->replication.last_counter_sum = host_counter_sum;
         rpt->replication.last_progress_ut = now_monotonic_usec();
         return true;
     }
 
-    if(!my_counter_in || !my_counter_out)
+    if(!host_counter_sum)
         // we have not started yet
         return true;
 
@@ -1221,23 +1223,25 @@ bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE rea
             __atomic_store_n(&rpt->exit.shutdown, true, __ATOMIC_RELEASE);
             shutdown(rpt->sock.fd, SHUT_RDWR);
         }
+
+        int count = 2000;
+        while (host->receiver == rpt && count-- > 0) {
+            rrdhost_receiver_unlock(host);
+
+            // let the lock for the receiver thread to exit
+            sleep_usec(1 * USEC_PER_MS);
+
+            rrdhost_receiver_lock(host);
+        }
+
+        if(host->receiver == rpt)
+            netdata_log_error("STREAM RCV[x] '%s' [from [%s]:%s]: "
+                              "streaming thread takes too long to stop, giving up..."
+                              , rrdhost_hostname(host)
+                                  , rpt->remote_ip, rpt->remote_port);
+        else
+            ret = true;
     }
-
-    int count = 2000;
-    while (host->receiver == rpt && count-- > 0) {
-        rrdhost_receiver_unlock(host);
-
-        // let the lock for the receiver thread to exit
-        sleep_usec(1 * USEC_PER_MS);
-
-        rrdhost_receiver_lock(host);
-    }
-
-    if(host->receiver == rpt)
-        netdata_log_error("STREAM RCV[x] '%s' [from [%s]:%s]: "
-              "streaming thread takes too long to stop, giving up..."
-              , rrdhost_hostname(host)
-              , rpt->remote_ip, rpt->remote_port);
     else
         ret = true;
 

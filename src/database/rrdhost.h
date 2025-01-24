@@ -357,10 +357,15 @@ extern RRDHOST *localhost;
     rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)                                                     \
     )
 
-#define rrdhost_is_online(host) (                                                                               \
-    rrdhost_is_local(host) ||                                                                                   \
-    (rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE) && !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) \
- )
+#define rrdhost_is_online_flags(flags) ((flags & RRDHOST_FLAG_COLLECTOR_ONLINE) && !(flags & RRDHOST_FLAG_ORPHAN))
+
+static inline bool rrdhost_is_online(RRDHOST *host) {
+    if(rrdhost_is_local(host))
+        return true;
+
+    RRDHOST_FLAGS flags = rrdhost_flag_get(host);
+    return rrdhost_is_online_flags(flags);
+}
 
 bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now);
 

@@ -75,13 +75,14 @@ void ws_client_reset(ws_client *client)
     client->state = WS_RAW;
     client->hs.hdr_state = WS_HDR_HTTP;
     client->rx.parse_state = WS_FIRST_2BYTES;
+    client->rx.remote_closed = false;
 }
 
 #define MAX_HTTP_HDR_COUNT 128
 int ws_client_add_http_header(ws_client *client, struct http_header *hdr)
 {
     if (client->hs.hdr_count > MAX_HTTP_HDR_COUNT) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Too many HTTP response header fields");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Too many HTTP response header fields");
         return -1;
     }
 
@@ -114,8 +115,10 @@ int ws_client_start_handshake(ws_client *client)
     const EVP_MD *md;
     int rc = 1;
 
+    client->rx.remote_closed = false;
+
     if(!client->host || !*client->host) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Hostname has not been set. We should not be able to come here!");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Hostname has not been set. We should not be able to come here!");
         return 1;
     }
 
@@ -129,13 +132,13 @@ int ws_client_start_handshake(ws_client *client)
     md_ctx = EVP_MD_CTX_new();
 #endif
     if (md_ctx == NULL) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Can't create EVP_MD context");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Can't create EVP_MD context");
         return 1;
     }
 
     md = EVP_sha1();  // Use SHA-1 for WebSocket handshake
     if (!md) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Unknown message digest SHA-1");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Unknown message digest SHA-1");
         goto exit_with_error;
     }
 
@@ -144,7 +147,7 @@ int ws_client_start_handshake(ws_client *client)
     // Format and push the upgrade header to the write buffer
     size_t bytes = snprintf(second, TEMP_BUF_SIZE, websocket_upgrage_hdr, *client->host, nonce_b64);
     if(rbuf_bytes_free(client->buf_write) < bytes) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Write buffer capacity too low.");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Write buffer capacity too low.");
         goto exit_with_error;
     }
     rbuf_push(client->buf_write, second, bytes);
@@ -155,17 +158,17 @@ int ws_client_start_handshake(ws_client *client)
     bytes = snprintf(second, TEMP_BUF_SIZE, "%s%s", nonce_b64, mqtt_protoid);
 
     if (!EVP_DigestInit_ex(md_ctx, md, NULL)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to initialize digest context");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Failed to initialize digest context");
         goto exit_with_error;
     }
 
     if (!EVP_DigestUpdate(md_ctx, second, bytes)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to update digest");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Failed to update digest");
         goto exit_with_error;
     }
 
     if (!EVP_DigestFinal_ex(md_ctx, digest, &md_len)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to finalize digest");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Failed to finalize digest");
         goto exit_with_error;
     }
 
@@ -187,7 +190,7 @@ exit_with_error:
 
 #define BUF_READ_MEMCMP_CONST(const, err)                                                                              \
     if (rbuf_memcmp_n(client->buf_read, const, strlen(const))) {                                                       \
-        nd_log(NDLS_DAEMON, NDLP_ERR, err);                                                                                                    \
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: %s", err);                                                                \
         rbuf_flush(client->buf_read);                                                                                  \
         return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
     }
@@ -213,7 +216,7 @@ exit_with_error:
 
 #define HTTP_HDR_LINE_CHECK_LIMIT(x)                                                                                   \
     if ((x) >= MAX_HTTP_LINE_LENGTH) {                                                                                 \
-        nd_log(NDLS_DAEMON, NDLP_ERR, "HTTP line received is too long. Maximum is %d", MAX_HTTP_LINE_LENGTH);                                  \
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP line received is too long. Maximum is %d", MAX_HTTP_LINE_LENGTH);                                  \
         return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
     }
 
@@ -236,13 +239,13 @@ int ws_client_parse_handshake_resp(ws_client *client)
             BUF_READ_CHECK_AT_LEAST(HTTP_SC_LENGTH); // "XXX " http return code
             rbuf_pop(client->buf_read, buf, HTTP_SC_LENGTH);
             if (buf[HTTP_SC_LENGTH - 1] != 0x20) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "HTTP status code received is not terminated by space (0x20)");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP status code received is not terminated by space (0x20)");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
             buf[HTTP_SC_LENGTH - 1] = 0;
             client->hs.http_code = atoi(buf);
             if (client->hs.http_code < 100 || client->hs.http_code >= 600) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "HTTP status code received not in valid range 100-600");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP status code received not in valid range 100-600");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
             client->hs.hdr_state = WS_HDR_ENDLINE;
@@ -281,16 +284,16 @@ int ws_client_parse_handshake_resp(ws_client *client)
 
             ptr = rbuf_find_bytes(client->buf_read, HTTP_HDR_SEPARATOR, strlen(HTTP_HDR_SEPARATOR), &idx_sep);
             if (!ptr || idx_sep > idx_crlf) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Expected HTTP hdr field key/value separator \": \" before endline in non empty HTTP header line");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Expected HTTP hdr field key/value separator \": \" before endline in non empty HTTP header line");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
             if (idx_crlf == idx_sep + (int)strlen(HTTP_HDR_SEPARATOR)) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "HTTP Header value cannot be empty");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP Header value cannot be empty");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
             if (idx_sep > HTTP_HEADER_NAME_MAX_LEN) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "HTTP header too long (%d)", idx_sep);
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP header too long (%d)", idx_sep);
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
@@ -312,7 +315,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
 
             if (!strcmp(hdr->key, WS_CONN_ACCEPT)) {
                 if (strcmp(client->hs.nonce_reply, hdr->value)) {
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "Received NONCE \"%s\" does not match expected nonce of \"%s\"", hdr->value, client->hs.nonce_reply);
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Received NONCE \"%s\" does not match expected nonce of \"%s\"", hdr->value, client->hs.nonce_reply);
                     return WS_CLIENT_PROTOCOL_ERROR;
                 }
                 client->hs.nonce_matched = 1;
@@ -322,21 +325,21 @@ int ws_client_parse_handshake_resp(ws_client *client)
 
         case WS_HDR_PARSE_DONE:
             if (!client->hs.nonce_matched) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Missing " WS_CONN_ACCEPT " header");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Missing " WS_CONN_ACCEPT " header");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
             if (client->hs.http_code != 101) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "HTTP return code not 101. Received %d with msg \"%s\".", client->hs.http_code, client->hs.http_reply_msg);
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP return code not 101. Received %d with msg \"%s\".", client->hs.http_code, client->hs.http_reply_msg);
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
             client->state = WS_ESTABLISHED;
             client->hs.hdr_state = WS_HDR_ALL_DONE;
-            nd_log(NDLS_DAEMON, NDLP_INFO, "Websocket Connection Accepted By Server");
+            nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: Websocket Connection Accepted By Server");
             return WS_CLIENT_PARSING_DONE;
 
         case WS_HDR_ALL_DONE:
-            nd_log(NDLS_DAEMON, NDLP_CRIT, "This is error we should never come here!");
+            nd_log(NDLS_DAEMON, NDLP_CRIT, "ACLK: This is error we should never come here!");
             return WS_CLIENT_PROTOCOL_ERROR;
     }
     return 0;
@@ -437,13 +440,13 @@ static int check_opcode(enum websocket_opcode oc)
         case WS_OP_PING:
             return 0;
         case WS_OP_CONTINUATION_FRAME:
-            nd_log(NDLS_DAEMON, NDLP_ERR, "WS_OP_CONTINUATION_FRAME NOT IMPLEMENTED YET!!!!");
+            nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WS_OP_CONTINUATION_FRAME NOT IMPLEMENTED YET!!!!");
             return 0;
         case WS_OP_TEXT_FRAME:
-            nd_log(NDLS_DAEMON, NDLP_ERR, "WS_OP_TEXT_FRAME NOT IMPLEMENTED YET!!!!");
+            nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WS_OP_TEXT_FRAME NOT IMPLEMENTED YET!!!!");
             return 0;
         case WS_OP_PONG:
-            nd_log(NDLS_DAEMON, NDLP_ERR, "WS_OP_PONG NOT IMPLEMENTED YET!!!!");
+            nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WS_OP_PONG NOT IMPLEMENTED YET!!!!");
             return 0;
         default:
             return WS_CLIENT_PROTOCOL_ERROR;
@@ -480,7 +483,7 @@ int ws_client_process_rx_ws(ws_client *client)
             client->rx.opcode = buf[0] & (char)~BYTE_MSB;
 
             if (!(buf[0] & (char)~WS_FINAL_FRAG)) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Not supporting fragmented messages yet!");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Not supporting fragmented messages yet!");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
@@ -488,7 +491,7 @@ int ws_client_process_rx_ws(ws_client *client)
                 return WS_CLIENT_PROTOCOL_ERROR;
 
             if (buf[1] & (char)WS_PAYLOAD_MASKED) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Mask is not allowed in Server->Client Websocket direction.");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Mask is not allowed in Server->Client Websocket direction.");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
@@ -538,11 +541,12 @@ int ws_client_process_rx_ws(ws_client *client)
             // b) 2byte reason code
             // c) 2byte reason code followed by message
             if (client->rx.payload_length == 1) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "WebScoket CONNECTION_CLOSE can't have payload of size 1");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebScoket CONNECTION_CLOSE can't have payload of size 1");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
+            client->rx.remote_closed = true;
             if (!client->rx.payload_length) {
-                nd_log(NDLS_DAEMON, NDLP_INFO, "WebSocket server closed the connection without giving reason.");
+                nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: WebSocket server closed the connection without giving reason.");
                 client->rx.parse_state = WS_PACKET_DONE;
                 break;
             }
@@ -555,8 +559,9 @@ int ws_client_process_rx_ws(ws_client *client)
             client->rx.specific_data.op_close.ec = be16toh(*((uint16_t *)buf));
             client->rx.payload_processed += sizeof(uint16_t);
 
+            client->rx.remote_closed = true;
             if(client->rx.payload_processed == client->rx.payload_length) {
-                nd_log(NDLS_DAEMON, NDLP_INFO, "WebSocket server closed the connection with EC=%d. Without message.",
+                nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: WebSocket server closed the connection with EC=%d. Without message.",
                     client->rx.specific_data.op_close.ec);
                 client->rx.parse_state = WS_PACKET_DONE;
                 break;
@@ -575,23 +580,24 @@ int ws_client_process_rx_ws(ws_client *client)
                                                          client->rx.payload_length - client->rx.payload_processed);
             }
             client->rx.specific_data.op_close.reason[client->rx.payload_length] = 0;
-            nd_log(NDLS_DAEMON, NDLP_INFO, "WebSocket server closed the connection with EC=%d and reason \"%s\"",
+            nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: WebSocket server closed the connection with EC=%d and reason \"%s\"",
                 client->rx.specific_data.op_close.ec,
                 client->rx.specific_data.op_close.reason);
             freez(client->rx.specific_data.op_close.reason);
+            client->rx.remote_closed = true;
             client->rx.specific_data.op_close.reason = NULL;
             client->rx.parse_state = WS_PACKET_DONE;
             break;
         case WS_PAYLOAD_SKIP_UNKNOWN_PAYLOAD:
             BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);
-            nd_log(NDLS_DAEMON, NDLP_WARNING, "Skipping Websocket Packet of unsupported/unknown type");
+            nd_log(NDLS_DAEMON, NDLP_WARNING, "ACLK: Skipping Websocket Packet of unsupported/unknown type");
             if (client->rx.payload_length)
                 rbuf_bump_tail(client->buf_read, client->rx.payload_length);
             client->rx.parse_state = WS_PACKET_DONE;
             return WS_CLIENT_PARSING_DONE;
         case WS_PAYLOAD_PING_REQ_PAYLOAD:
             if (client->rx.payload_length > rbuf_get_capacity(client->buf_read) / 2) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Ping arrived with payload which is too big!");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Ping arrived with payload which is too big!");
                 return WS_CLIENT_INTERNAL_ERROR;
             }
             BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);
@@ -601,7 +607,7 @@ int ws_client_process_rx_ws(ws_client *client)
             // then attempt to send as soon as buffer space clears up
             size = ws_client_send(client, WS_OP_PONG, client->rx.specific_data.ping_msg, client->rx.payload_length);
             if (size != client->rx.payload_length) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Unable to send the PONG as one packet back. Closing connection.");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Unable to send the PONG as one packet back. Closing connection.");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
             client->rx.parse_state = WS_PACKET_DONE;
@@ -609,11 +615,15 @@ int ws_client_process_rx_ws(ws_client *client)
         case WS_PACKET_DONE:
             client->rx.parse_state = WS_FIRST_2BYTES;
             client->rx.payload_processed = 0;
-            if (client->rx.opcode == WS_OP_CONNECTION_CLOSE)
-                return WS_CLIENT_CONNECTION_CLOSED;
+            if (client->rx.opcode == WS_OP_CONNECTION_CLOSE) {
+                if(client->rx.remote_closed)
+                    return WS_CLIENT_CONNECTION_REMOTE_CLOSED;
+                else
+                    return WS_CLIENT_CONNECTION_CLOSED;
+            }
             return WS_CLIENT_PARSING_DONE;
         default:
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Unknown parse state");
+            nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Unknown parse state");
             return WS_CLIENT_INTERNAL_ERROR;
     }
     return 0;
@@ -646,6 +656,9 @@ int ws_client_process(ws_client *client)
                     case WS_CLIENT_PROTOCOL_ERROR:
                         client->state = WS_ERROR;
                         break;
+                    case WS_CLIENT_CONNECTION_REMOTE_CLOSED:
+                        client->state = WS_CONN_CLOSED_GRACEFUL_BY_REMOTE;
+                        break;
                     case WS_CLIENT_CONNECTION_CLOSED:
                         client->state = WS_CONN_CLOSED_GRACEFUL;
                         break;
@@ -660,15 +673,19 @@ int ws_client_process(ws_client *client)
             break;
         case WS_ERROR:
             worker_is_busy(WORKER_ACLK_PROCESS_ERROR);
-            nd_log(NDLS_DAEMON, NDLP_ERR, "ws_client is in error state. Restart the connection!");
+            nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: ws_client is in error state. Restart the connection!");
             return WS_CLIENT_PROTOCOL_ERROR;
         case WS_CONN_CLOSED_GRACEFUL:
             worker_is_busy(WORKER_ACLK_PROCESS_CLOSED_GRACEFULLY);
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Connection has been gracefully closed. Calling this is useless (and probably bug) until you reconnect again.");
+            nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Connection has been gracefully closed.");
             return WS_CLIENT_CONNECTION_CLOSED;
+        case WS_CONN_CLOSED_GRACEFUL_BY_REMOTE:
+            worker_is_busy(WORKER_ACLK_PROCESS_CLOSED_GRACEFULLY);
+            nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Connection has been gracefully closed by remote end.");
+            return WS_CLIENT_CONNECTION_REMOTE_CLOSED;
         default:
             worker_is_busy(WORKER_ACLK_PROCESS_UNKNOWN);
-            nd_log(NDLS_DAEMON, NDLP_CRIT, "Unknown connection state! Probably memory corruption.");
+            nd_log(NDLS_DAEMON, NDLP_CRIT, "ACLK: Unknown connection state! Probably memory corruption.");
             return WS_CLIENT_INTERNAL_ERROR;
     }
     return ret;

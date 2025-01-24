@@ -82,6 +82,7 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_ALERT_START_STREAMING, "alert start streaming");
     worker_register_job_name(UV_EVENT_ALERT_CHECKPOINT, "alert checkpoint");
     worker_register_job_name(UV_EVENT_CREATE_NODE_INSTANCE, "create node instance");
+    worker_register_job_name(UV_EVENT_UNREGISTER_NODE, "unregister node locally");
 
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
