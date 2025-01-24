@@ -13,7 +13,7 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/curl" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/curl"
 fi
 
-cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/curl"
+cache="$(cache_path curl)"
 
 if [ -d "${cache}" ]; then
   echo "Found cached copy of build directory for curl, using it."
