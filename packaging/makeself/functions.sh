@@ -42,7 +42,7 @@ set -euo pipefail
 
 cache_path() {
   local key="${1}"
-  echo "${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
+  echo "${NETDATA_SOURCE_PATH}/artifacts/cache/v2/${BUILDARCH}/${key}"
 }
 
 fetch() {
