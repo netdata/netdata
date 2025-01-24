@@ -24,27 +24,27 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
     size_t max_ml_anomalous = 0, max_ml_normal = 0, max_ml_trained = 0, max_ml_pending = 0, max_ml_silenced = 0;
 
     time_t
-        max_db_duration,
-        max_db_from,
-        max_db_to,
-        max_in_age,
-        max_out_age,
-        max_out_attempt_age;
+        max_db_duration = 0,
+        max_db_from = 0,
+        max_db_to = 0,
+        max_in_age = 0,
+        max_out_age = 0,
+        max_out_attempt_age = 0;
 
     uint64_t
-        max_in_since,
-        max_out_since,
-        max_out_attempt_since;
+        max_in_since = 0,
+        max_out_since = 0,
+        max_out_attempt_since = 0;
 
     int16_t
-        max_in_hops,
-        max_out_hops;
+        max_in_hops = -1,
+        max_out_hops = -1;
 
     int
-        max_in_local_port,
-        max_in_remote_port,
-        max_out_local_port,
-        max_out_remote_port;
+        max_in_local_port = 0,
+        max_in_remote_port = 0,
+        max_out_local_port = 0,
+        max_out_remote_port = 0;
 
     {
         RRDHOST *host;
@@ -75,9 +75,13 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                         s.stream.sent_bytes_on_this_connection_per_type[i];
             }
 
-            // retention
-            buffer_json_add_array_item_string(wb, rrdhost_hostname(s.host)); // Node
+            // Node
+            buffer_json_add_array_item_string(wb, rrdhost_hostname(s.host));
 
+            // System Info
+            rrdhost_system_info_to_streaming_function_array(wb, s.host->system_info);
+
+            // retention
             buffer_json_add_array_item_uint64(wb, s.db.first_time_s * MSEC_PER_SEC); // dbFrom
             if(s.db.first_time_s > max_db_from) max_db_from = s.db.first_time_s;
 
@@ -122,7 +126,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
             buffer_json_add_array_item_double(wb, s.ingest.replication.completion); // InReplCompletion
             buffer_json_add_array_item_uint64(wb, s.ingest.replication.instances); // InReplInstances
-            buffer_json_add_array_item_string(wb, s.ingest.peers.local.ip); // InLocalIP
+            buffer_json_add_array_item_string(wb, s.ingest.type == RRDHOST_INGEST_TYPE_LOCALHOST || s.ingest.type == RRDHOST_INGEST_TYPE_VIRTUAL ? "localhost" : s.ingest.peers.local.ip); // InLocalIP
 
             buffer_json_add_array_item_uint64(wb, s.ingest.peers.local.port); // InLocalPort
             if(s.ingest.peers.local.port > max_in_local_port) max_in_local_port = s.ingest.peers.local.port;
@@ -154,7 +158,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
             }
             buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(s.stream.reason)); // OutReason
 
-            buffer_json_add_array_item_uint64(wb, s.stream.hops); // OutHops
+            buffer_json_add_array_item_int64(wb, s.stream.hops); // OutHops
             if(s.stream.hops > max_out_hops) max_out_hops = s.stream.hops;
 
             buffer_json_add_array_item_double(wb, s.stream.replication.completion); // OutReplCompletion
@@ -241,6 +245,195 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "OSName", "The name of the host's operating system",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "OSId", "The identifier of the host's operating system",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "OSIdLike", "The ID-like string for the host's OS",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "OSVersion", "The version of the host's operating system",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "OSVersionId", "The version identifier of the host's OS",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "OSDetection", "Details about host OS detection",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CPUCores", "The number of CPU cores in the host",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "DiskSpace", "The total disk space available on the host",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CPUFreq", "The CPU frequency of the host",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "RAMTotal", "The total RAM available on the host",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ContainerOSName", "The name of the container's operating system",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ContainerOSId", "The identifier of the container's operating system",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ContainerOSIdLike", "The ID-like string for the container's OS",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ContainerOSVersion", "The version of the container's OS",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ContainerOSVersionId", "The version identifier of the container's OS",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ContainerOSDetection", "Details about container OS detection",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "IsK8sNode", "Whether this node is part of a Kubernetes cluster",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "KernelName", "The kernel name",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "KernelVersion", "The kernel version",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Architecture", "The system architecture",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Virtualization", "The virtualization technology in use",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "VirtDetection", "Details about virtualization detection",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Container", "Container type information",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ContainerDetection", "Details about container detection",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CloudProviderType", "The type of cloud provider",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CloudInstanceType", "The type of cloud instance",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CloudInstanceRegion", "The region of the cloud instance",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
                                     NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbFrom", "DB Data Retention From",
