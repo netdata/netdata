@@ -145,7 +145,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | hosts | Network hosts. |  | yes |
 | network | Allows configuration of DNS resolution. Supported options: ip (select IPv4 or IPv6), ip4 (select IPv4), ip6 (select IPv6). | ip | no |
 | interface | The network device name (e.g., `eth0`, `wlan0`) used as the source for ICMP echo requests. |  | no |
-| privileged | Ping packets type. "no" means send an "unprivileged" UDP ping,  "yes" - raw ICMP ping. | yes | no |
+| privileged | Ping packets type. "yes" means raw ICMP ping, "no" - "unprivileged" UDP ping. | yes | yes |
 | packets | Number of ping packets to send. | 5 | no |
 | interval | Timeout between sending ping packets. | 100ms | no |
 
