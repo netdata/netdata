@@ -69,19 +69,6 @@ enum cachestat_tables {
     NETDATA_CACHESTAT_CTRL
 };
 
-typedef struct netdata_cachestat_pid {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
-} netdata_cachestat_pid_t;
-
 typedef struct __attribute__((packed)) netdata_cachestat {
     uint32_t add_to_page_cache_lru;
     uint32_t mark_page_accessed;

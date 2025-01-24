@@ -31,17 +31,6 @@ typedef struct __attribute__((packed)) netdata_publish_swap {
     uint32_t write;
 } netdata_publish_swap_t;
 
-typedef struct netdata_ebpf_swap {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t read;
-    uint32_t write;
-} netdata_ebpf_swap_t;
-
 enum swap_tables {
     NETDATA_PID_SWAP_TABLE,
     NETDATA_SWAP_CONTROLLER,
