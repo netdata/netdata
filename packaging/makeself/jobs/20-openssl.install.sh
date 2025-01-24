@@ -21,7 +21,7 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/openssl" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/openssl"
 fi
 
-cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/openssl"
+cache="$(cache_path openssl)"
 
 if [ -d "${cache}" ]; then
   echo "Found cached copy of build directory for openssl, using it."
