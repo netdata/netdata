@@ -6,13 +6,15 @@
 
 cd "${NETDATA_SOURCE_PATH}" || exit 1
 
+COMMON_CFLAGS="-static -I/libunwind-static/include -I/openssl-static/include -I/libmnl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/curl-local/include/curl -pipe"
+
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
-  export CFLAGS="${TUNING_FLAGS} -ffunction-sections -fdata-sections -static -O2 -funroll-loops -DNETDATA_STATIC_BUILD=1 -I/libunwind-static/include -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/curl-local/include/curl -I/usr/include/libmnl -pipe"
+  export CFLAGS="${TUNING_FLAGS} ${COMMON_CFLAGS} -ffunction-sections -fdata-sections -O2 -funroll-loops"
 else
-  export CFLAGS="${TUNING_FLAGS} -static -O1 -pipe -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_STATIC_BUILD=1 -DNETDATA_INTERNAL_CHECKS=1 -I/libunwind-static/include -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/curl-local/include/curl -I/usr/include/libmnl"
+  export CFLAGS="${TUNING_FLAGS} ${COMMON_CFLAGS} -O1 -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1"
 fi
 
-export LDFLAGS="-Wl,--gc-sections -static -L/libuwnind-static/lib -L/openssl-static/lib64 -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl -L/usr/lib -lzstd -L/curl-local/lib"
+export LDFLAGS="-Wl,--gc-sections -static -L/libuwnind-static/lib -L/openssl-static/lib64 -L/libmnl-static/lib -L/libnetfilter-acct-static/lib -L/curl-local/lib"
 
 # We export this to 'yes', installer sets this to .environment.
 # The updater consumes this one, so that it can tell whether it should update a static install or a non-static one
@@ -21,11 +23,8 @@ export IS_NETDATA_STATIC_BINARY="yes"
 # Set eBPF LIBC to "static" to bundle the `-static` variant of the kernel-collector
 export EBPF_LIBC="static"
 export PKG_CONFIG="pkg-config --static"
-export PKG_CONFIG_PATH="/libunwind-static/lib/pkgconfig:/openssl-static/lib64/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig:/curl-local/lib/pkgconfig"
+export PKG_CONFIG_PATH="/libunwind-static/lib/pkgconfig:/openssl-static/lib64/pkgconfig:/libmnl-static/lib/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig:/curl-local/lib/pkgconfig"
 
-# Set correct CMake flags for building against non-System OpenSSL
-# See: https://github.com/warmcat/libwebsockets/blob/master/READMEs/README.build.md
-export CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=/openssl-static -DOPENSSL_LIBRARIES=/openssl-static/lib64 -DCMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE=/openssl-static -DLWS_OPENSSL_INCLUDE_DIRS=/openssl-static/include -DLWS_OPENSSL_LIBRARIES=/openssl-static/lib64/libssl.a;/openssl-static/lib64/libcrypto.a"
 [ "${BUILDARCH}" != "ppc64le" ] && export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBUNWIND=ON"
 
 run ./netdata-installer.sh \

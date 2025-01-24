@@ -2346,7 +2346,17 @@ else()
 endif()
 
 # uv
-pkg_check_modules(LIBUV REQUIRED libuv)
+if(STATIC_BUILD)
+  # Deal with questionable design choices upstream...
+  pkg_check_modules(LIBUV libuv_a)
+
+  if(NOT LIBUV_FOUND)
+      pkg_check_modules(LIBUV REQUIRED libuv)
+  endif()
+else()
+  pkg_check_modules(LIBUV REQUIRED libuv)
+endif()
+
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBUV_INCLUDE_DIRS})
 target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
