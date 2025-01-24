@@ -37,9 +37,9 @@ require (
 	github.com/lmittmann/tint v1.0.6
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mattn/go-xmlrpc v0.0.3
-	github.com/miekg/dns v1.1.62
+	github.com/miekg/dns v1.1.63
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/prometheus-community/pro-bing v0.5.0
+	github.com/prometheus-community/pro-bing v0.6.0
 	github.com/prometheus/common v0.62.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/redis/go-redis/v9 v9.7.0
