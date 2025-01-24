@@ -1,5 +1,5 @@
 # CMake configuration for libsensors
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16.0...3.30)
 
 # Add static library for libsensors
 add_library(vendored_libsensors STATIC
