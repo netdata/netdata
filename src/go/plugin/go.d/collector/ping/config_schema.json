@@ -13,9 +13,9 @@
       },
       "privileged": {
         "title": "Privileged mode",
-        "description": "If unset, sends unprivileged UDP ping packets (require [additional configuration](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ping#overview)); otherwise, sends raw ICMP ping packets ([not recommended](https://github.com/netdata/netdata/issues/15410)).",
+        "description": "If set, sends raw ICMP ping packets; otherwise, sends unprivileged UDP ping packets (require [additional configuration](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ping#overview)).",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "hosts": {
         "title": "Network hosts",
