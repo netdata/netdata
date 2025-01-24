@@ -636,6 +636,10 @@ static void netdata_adcs_signed_certificate_timetamp_list_processing(struct adcs
                           ac->rd_adcs_signed_certificate_timestamp_list_processing_time_seconds,
                           (collected_number)ac->ADCSSignedCertTimestampListProcessingTime.current.Data);
     rrdset_done(ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds);
+=======
+static void initialize(void) {
+    ;
+>>>>>>> 59ee13ffd (adcs_metrics: Add basis for new module)
 }
 
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
@@ -643,6 +647,7 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     if (!pObjectType)
         return false;
 
+<<<<<<< HEAD
     static void (*doADCS[])(struct adcs_certificate *, PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_adcs_requests,
         netdata_adcs_requests_processing_time,
