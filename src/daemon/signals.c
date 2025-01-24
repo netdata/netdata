@@ -143,9 +143,7 @@ void nd_process_signals(void) {
                             case NETDATA_SIGNAL_EXIT_CLEANLY:
                                 nd_log_limits_unlimited();
                                 netdata_log_info("SIGNAL: Received %s. Cleaning up to exit...", name);
-                                commands_exit();
-                                netdata_cleanup_and_exit(0, NULL, NULL, NULL);
-                                exit(0);
+                                execute_command(CMD_EXIT, NULL, NULL);
                                 break;
 
                             case NETDATA_SIGNAL_FATAL:
