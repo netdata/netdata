@@ -230,8 +230,11 @@ jobs:
           fi
       - name: Setup QEMU
         id: qemu
-        if: matrix.platform != 'linux/amd64' && matrix.platform != 'linux/i386' && needs.file-check.outputs.run == 'true'
-        uses: docker/setup-qemu-action@v3
+        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64' && needs.file-check.outputs.run == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get upgrade -y
+          sudo apt-get install -y qemu-user-static
       - name: Fetch images
         id: fetch-images
         if: needs.file-check.outputs.run == 'true'

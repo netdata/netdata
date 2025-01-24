@@ -153,7 +153,10 @@ jobs:
       - name: Setup QEMU
         id: qemu
         if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64' && needs.file-check.outputs.run == 'true'
-        uses: docker/setup-qemu-action@v3
+        run: |
+          sudo apt-get update
+          sudo apt-get upgrade -y
+          sudo apt-get install -y qemu-user-static
       - name: Setup Buildx
         id: prepare
         if: needs.file-check.outputs.run == 'true'
