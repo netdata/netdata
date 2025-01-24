@@ -225,13 +225,16 @@ static void ebpf_update_process_cgroup()
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            ebpf_publish_process_t *out = &pids->ps;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_PROCESS_IDX);
-            ebpf_publish_process_t *in = local_pid->process;
-            if (!in)
-                continue;
+            ebpf_process_stat_t *out = &pids->ps;
 
-            memcpy(out, in, sizeof(ebpf_publish_process_t));
+            netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+            ebpf_process_stat_t *in = &local_pid->process;
+
+            out->release_call = in->release_call;
+            out->task_err = in->task_err;
+            out->create_thread = in->create_thread;
+            out->create_process = in->create_process;
+            out->exit_call = in->exit_call;
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -687,7 +690,7 @@ static void ebpf_process_disable_tracepoints()
  */
 static void ebpf_process_exit(void *pptr)
 {
-    pids_fd[EBPF_PIDS_PROCESS_IDX] = -1;
+    pids_fd[NETDATA_EBPF_PIDS_PROCESS_IDX] = -1;
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
 
@@ -747,13 +750,13 @@ static void ebpf_process_exit(void *pptr)
  * @param ps  structure used to store data
  * @param pids input data
  */
-static void ebpf_process_sum_cgroup_pids(ebpf_publish_process_t *ps, struct pid_on_target2 *pids)
+static void ebpf_process_sum_cgroup_pids(ebpf_process_stat_t *ps, struct pid_on_target2 *pids)
 {
-    ebpf_publish_process_t accumulator;
+    ebpf_process_stat_t accumulator;
     memset(&accumulator, 0, sizeof(accumulator));
 
     while (pids) {
-        ebpf_publish_process_t *pps = &pids->ps;
+        ebpf_process_stat_t *pps = &pids->ps;
 
         accumulator.exit_call += pps->exit_call;
         accumulator.release_call += pps->release_call;
@@ -782,7 +785,7 @@ static void ebpf_process_sum_cgroup_pids(ebpf_publish_process_t *ps, struct pid_
  * @param values structure with values that will be sent to netdata
  * @param em   the structure with thread information
  */
-static void ebpf_send_specific_process_data(char *type, ebpf_publish_process_t *values, ebpf_module_t *em)
+static void ebpf_send_specific_process_data(char *type, ebpf_process_stat_t *values, ebpf_module_t *em)
 {
     ebpf_write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_PROCESS, "");
     write_chart_dimension(process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK].name,
@@ -1114,6 +1117,110 @@ void ebpf_process_update_cgroup_algorithm()
 }
 
 /**
+ * Process Accumulator
+ *
+ * Sum all values read from kernel and store in the first address.
+ *
+ * @param out the vector with read values.
+ * @param maps_per_core do I need to read all cores?
+ */
+void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
+{
+    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
+    ebpf_process_stat_t *total = &out[0];
+    uint64_t ct = total->ct;
+    for (i = 1; i < end; i++) {
+        ebpf_process_stat_t *w = &out[i];
+        total->exit_call += w->exit_call;
+        total->task_err += w->task_err;
+        total->create_thread += w->create_thread;
+        total->create_process += w->create_process;
+        total->release_call += w->release_call;
+
+        if (w->ct > ct)
+            ct = w->ct;
+    }
+    total->ct = ct;
+}
+
+/**
+ * Sum values for pid
+ *
+ * @param structure to store result.
+ * @param root the structure with all available PIDs
+ */
+void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_pid_on_target *root)
+{
+    memset(process, 0, sizeof(ebpf_process_stat_t));
+    for (; root; root = root->next) {
+        int32_t pid = root->pid;
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+        ebpf_process_stat_t *in = &local_pid->process;
+
+        process->task_err += in->task_err;
+        process->release_call += in->release_call;
+        process->exit_call += in->exit_call;
+        process->create_thread += in->create_thread;
+        process->create_process += in->create_process;
+    }
+}
+
+/**
+ * Collect data for all process
+ *
+ * Read data from hash table and store it in appropriate vectors.
+ * It also creates the link between targets and PIDs.
+ *
+ * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
+ * @param maps_per_core         do I have hash maps per core?
+ */
+void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
+{
+    if (shm_mutex_ebpf_integration == SEM_FAILED)
+        return;
+
+    pids_fd[NETDATA_EBPF_PIDS_PROCESS_IDX] = tbl_pid_stats_fd;
+    size_t length =  sizeof(ebpf_process_stat_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
+
+    uint32_t key = 0, next_key = 0;
+    sem_wait(shm_mutex_ebpf_integration);
+    while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
+        if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
+            goto end_process_loop;
+        }
+
+        ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
+
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[key];
+        ebpf_process_stat_t *w = &local_pid->process;
+
+        if (!w->ct || w->ct != process_stat_vector[0].ct) {
+            local_pid->thread_collecting |= NETDATA_EBPF_PIDS_PROCESS_IDX;
+            memcpy(w, &process_stat_vector[0], sizeof(*w));
+        } else {
+            if (local_pid->process.release_call || kill((pid_t)key, 0)) { // No PID found
+                netdata_integration_release_pid(local_pid, tbl_pid_stats_fd, key, NETDATA_EBPF_PIDS_PROCESS_IDX);
+            }
+        }
+
+end_process_loop:
+        memset(process_stat_vector, 0, length);
+        key = next_key;
+    }
+    sem_post(shm_mutex_ebpf_integration);
+
+    struct ebpf_target *w;
+    for (w = apps_groups_root_target; w; w = w->next) {
+        if (unlikely(!(w->processes)))
+            continue;
+
+        ebpf_process_sum_values_for_pids(&w->process, w->root_pid);
+    }
+}
+
+/**
  * Main loop for this collector.
  *
  * @param em   the structure with thread information
@@ -1137,6 +1244,7 @@ static void process_collector(ebpf_module_t *em)
     memset(stats, 0, sizeof(em->hash_table_stats));
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
+    int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
 
@@ -1152,6 +1260,8 @@ static void process_collector(ebpf_module_t *em)
             pthread_mutex_lock(&collect_data_mutex);
 
             if (ebpf_all_pids_count > 0) {
+                collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
+
                 if (cgroups && shm_ebpf_cgroup.header) {
                     ebpf_update_process_cgroup();
                 }
