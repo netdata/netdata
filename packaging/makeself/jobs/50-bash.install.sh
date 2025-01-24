@@ -20,8 +20,8 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run ./configure \
         --prefix="${NETDATA_INSTALL_PATH}" \
         --without-bash-malloc \
+        --with-installed-readline \
         --enable-static-link \
-        --enable-net-redirections \
         --enable-array-variables \
         --disable-progcomp \
         --disable-profiling \
