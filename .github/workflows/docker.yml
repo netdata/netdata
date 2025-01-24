@@ -129,8 +129,7 @@ jobs:
           - linux/arm/v7
           - linux/arm64
           - linux/ppc64le
-      # Fail fast on releases, but run everything to completion on other triggers.
-      fail-fast: ${{ github.event_name == 'workflow_dispatch' }}
+      fail-fast: false
     steps:
       - name: Skip Check
         id: skip

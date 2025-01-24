@@ -313,7 +313,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         s->thread.msg.session = os_random32();
         s->thread.msg.meta = &s->thread.meta;
 
-        s->host->stream.snd.status.tid = gettid_cached();
+        __atomic_store_n(&s->host->stream.snd.status.tid, gettid_cached(), __ATOMIC_RELAXED);
         s->host->stream.snd.status.connections++;
         s->last_state_since_t = now_realtime_sec();
 
@@ -425,7 +425,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     s->thread.msg.session = 0;
     s->thread.msg.meta = NULL;
 
-    s->host->stream.snd.status.tid = 0;
+    __atomic_store_n(&s->host->stream.snd.status.tid, 0, __ATOMIC_RELAXED);
     stream_sender_unlock(s);
 
     stream_sender_log_disconnection(sth, s, reason, receiver_reason);
@@ -528,19 +528,18 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
 static bool stream_sender_did_replication_progress(struct sender_state *s) {
     RRDHOST *host = s->host;
 
-    size_t my_counter_in = __atomic_load_n(&s->replication.last_counter_in, __ATOMIC_RELAXED);
-    size_t my_counter_out = __atomic_load_n(&s->replication.last_counter_out, __ATOMIC_RELAXED);
-    size_t host_counter_in = __atomic_load_n(&host->stream.snd.status.replication.counter_in, __ATOMIC_RELAXED);
-    size_t host_counter_out = __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED);
-    if(my_counter_in != host_counter_in || my_counter_out != host_counter_out) {
+    size_t host_counter_sum =
+        __atomic_load_n(&host->stream.snd.status.replication.counter_in, __ATOMIC_RELAXED) +
+        __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED);
+
+    if(s->replication.last_counter_sum != host_counter_sum) {
         // there has been some progress
-        __atomic_store_n(&s->replication.last_counter_in, __atomic_load_n(&host->stream.snd.status.replication.counter_in, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
-        __atomic_store_n(&s->replication.last_counter_out, __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
+        s->replication.last_counter_sum = host_counter_sum;
         s->replication.last_progress_ut = now_monotonic_usec();
         return true;
     }
 
-    if(!my_counter_in || !my_counter_out)
+    if(!host_counter_sum)
         // we have not started yet
         return true;
 

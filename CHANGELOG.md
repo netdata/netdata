@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- optimized rrdhost\_status [\#19472](https://github.com/netdata/netdata/pull/19472) ([ktsaou](https://github.com/ktsaou))
+- Unregister node from the agent to run in a worker thread [\#19471](https://github.com/netdata/netdata/pull/19471) ([stelfrag](https://github.com/stelfrag))
+- fix crash when cleaning up virtual nodes [\#19467](https://github.com/netdata/netdata/pull/19467) ([ktsaou](https://github.com/ktsaou))
+- streaming nodes accounting [\#19466](https://github.com/netdata/netdata/pull/19466) ([ktsaou](https://github.com/ktsaou))
+- Don’t fail fast on static builds and Docker builds. [\#19465](https://github.com/netdata/netdata/pull/19465) ([Ferroin](https://github.com/Ferroin))
+- Child should be online before initializing health [\#19463](https://github.com/netdata/netdata/pull/19463) ([stelfrag](https://github.com/stelfrag))
 - Use aral in ACLK [\#19459](https://github.com/netdata/netdata/pull/19459) ([stelfrag](https://github.com/stelfrag))
 - Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
 
@@ -472,13 +478,6 @@
 - chore\(go.d/nvidia\_smi\): remove use\_csv\_format \(deprecated\) from config [\#18924](https://github.com/netdata/netdata/pull/18924) ([ilyam8](https://github.com/ilyam8))
 - Docs: small fixes and pass on sizing Agents [\#18923](https://github.com/netdata/netdata/pull/18923) ([Ancairon](https://github.com/Ancairon))
 - go.d/portcheck: separate tabs for tcp/upd ports [\#18922](https://github.com/netdata/netdata/pull/18922) ([ilyam8](https://github.com/ilyam8))
-- Update Libbpf [\#18921](https://github.com/netdata/netdata/pull/18921) ([thiagoftsm](https://github.com/thiagoftsm))
-- build\(deps\): bump github.com/fsnotify/fsnotify from 1.7.0 to 1.8.0 in /src/go [\#18920](https://github.com/netdata/netdata/pull/18920) ([dependabot[bot]](https://github.com/apps/dependabot))
-- log2journal now uses libnetdata [\#18919](https://github.com/netdata/netdata/pull/18919) ([ktsaou](https://github.com/ktsaou))
-- docs: fix ui license link [\#18918](https://github.com/netdata/netdata/pull/18918) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18917](https://github.com/netdata/netdata/pull/18917) ([netdatabot](https://github.com/netdatabot))
-- Switch DEB/RPM repositories to new subdomain. [\#18916](https://github.com/netdata/netdata/pull/18916) ([Ferroin](https://github.com/Ferroin))
-- docs: fix broken links in metadata [\#18915](https://github.com/netdata/netdata/pull/18915) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
