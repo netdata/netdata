@@ -63,7 +63,7 @@ if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
     ${docker} run --rm --privileged tonistiigi/binfmt:master --install "${QEMU_ARCH}" || exit 1
 fi
 
-DOCKER_IMAGE_NAME="netdata/static-builder:v1"
+DOCKER_IMAGE_NAME="netdata/static-builder:v2"
 
 if ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
     if ${docker} image inspect "${DOCKER_IMAGE_NAME}" | grep -q 'Variant'; then
