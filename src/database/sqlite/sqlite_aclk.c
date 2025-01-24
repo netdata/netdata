@@ -298,14 +298,10 @@ static void sql_unregister_node(char *machine_guid)
     param = 0;
 
     rc = sqlite3_step_monitored(res);
-    if (unlikely(rc != SQLITE_DONE)) {
+    if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to execute command to remove host node id");
-    } else {
-       // node: machine guid will be freed after processing
+    else
        invalidate_host_last_connected(&host_uuid);
-       metadata_delete_host_chart_labels(machine_guid);
-       machine_guid = NULL;
-    }
 
 done:
     REPORT_BIND_FAIL(res, param);
