@@ -36,8 +36,14 @@ fi
 cd "${NETDATA_MAKESELF_PATH}/tmp/openssl" || exit 1
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
+    case "${BUILDARCH}" in
+        armv6l|armv7l) TARGET='linux-armv4' ;;
+        ppc64le) TARGET='linux-ppc64le' ;;
+        *) TARGET= ;;
+    esac
+
     sed -i "s/disable('static', 'pic', 'threads');/disable('static', 'pic');/" Configure
-    run ./config -static threads no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl
+    run ./config -static threads no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl $TARGET
     run make -j "$(nproc)"
 fi
 
