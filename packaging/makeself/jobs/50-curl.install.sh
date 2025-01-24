@@ -38,6 +38,8 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
 
     run ./configure \
         --prefix="/curl-local" \
+        --with-ca-bundle=/opt/netdata/etc/ssl/certs/ca-certificates.crt \
+        --with-ca-path=/opt/netdata/etc/ssl/certs \
         --enable-optimize \
         --disable-shared \
         --enable-static \
@@ -55,10 +57,12 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
         --disable-gopher \
         --enable-ipv6 \
         --enable-cookies \
+        --enable-openssl-auto-load-config \
+        --disable-docs \
         --with-ca-fallback \
         --with-openssl \
-        --with-ca-bundle=/opt/netdata/etc/ssl/certs/ca-certificates.crt \
-        --with-ca-path=/opt/netdata/etc/ssl/certs \
+        --without-libpsl \
+        --without-brotli \
         --disable-dependency-tracking
 
     # Curl autoconf does not honour the curl_LDFLAGS environment variable
