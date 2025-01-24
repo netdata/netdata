@@ -816,10 +816,10 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 
         if (errno == EINTR) {
             nd_log(NDLS_DAEMON, NDLP_WARNING, "poll interrupted by EINTR");
-            return 0;
+            return MQTT_WSS_OK;
         }
         nd_log(NDLS_DAEMON, NDLP_ERR, "poll error \"%s\"", strerror(errno));
-        return -2;
+        return MQTT_WSS_ERR_POLL_FAILED;
     }
     worker_is_busy(WORKER_ACLK_POLL_OK);
 
@@ -842,7 +842,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             }
             // if poll timed out and user requested timeout was being used
             // return here let user do his work and he will call us back soon
-            return 0;
+            return MQTT_WSS_OK;
         }
     }
 
@@ -865,12 +865,20 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             int errnobkp = errno;
             ret = SSL_get_error(client->ssl, ret);
             set_socket_pollfds(client, ret);
+
             if (ret != SSL_ERROR_WANT_READ &&
                 ret != SSL_ERROR_WANT_WRITE) {
                 worker_is_busy(WORKER_ACLK_RX_ERROR);
                 nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_read error: %d %s", ret, util_openssl_ret_err(ret));
+
+                if (ret == SSL_ERROR_ZERO_RETURN) {
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_read connection closed by remote end");
+                    return MQTT_WSS_ERR_REMOTE_CLOSED;
+                }
+
                 if (ret == SSL_ERROR_SYSCALL)
                     nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_read SYSCALL errno: %d %s", errnobkp, strerror(errnobkp));
+
                 return MQTT_WSS_ERR_CONN_DROP;
             }
         }
@@ -889,6 +897,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         case WS_CLIENT_NEED_MORE_BYTES:
             client->poll_fds[POLLFD_SOCKET].events |= POLLIN;
             break;
+
+        case WS_CLIENT_CONNECTION_REMOTE_CLOSED:
+            return MQTT_WSS_ERR_REMOTE_CLOSED;
 
         case WS_CLIENT_CONNECTION_CLOSED:
             return MQTT_WSS_ERR_CONN_DROP;
@@ -935,8 +946,15 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
                 ret != SSL_ERROR_WANT_WRITE) {
                 worker_is_busy(WORKER_ACLK_TX_ERROR);
                 nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_write error: %d %s", ret, util_openssl_ret_err(ret));
+
+                if (ret == SSL_ERROR_ZERO_RETURN) {
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_write connection closed by remote end");
+                    return MQTT_WSS_ERR_REMOTE_CLOSED;
+                }
+
                 if (ret == SSL_ERROR_SYSCALL)
                     nd_log(NDLS_DAEMON, NDLP_ERR, "SSL_write SYSCALL errno: %d %s", errnobkp, strerror(errnobkp));
+
                 return MQTT_WSS_ERR_CONN_DROP;
             }
         }

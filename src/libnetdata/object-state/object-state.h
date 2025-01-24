@@ -23,6 +23,7 @@ OBJECT_STATE_ID object_state_id(OBJECT_STATE *os);
 // increments the object's state id
 // enables using the object - users may acquire and release the object
 void object_state_activate(OBJECT_STATE *os);
+void object_state_activate_if_not_activated(OBJECT_STATE *os);
 
 // increments the object's state id
 // prevents users from acquiring it, and waits until all of its holders have released it

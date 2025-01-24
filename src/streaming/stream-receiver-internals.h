@@ -78,8 +78,7 @@ struct receiver_state {
     } thread;
 
     struct {
-        uint32_t last_counter_in;   // copy from the host, to detect progress
-        uint32_t last_counter_out;  // copy from the host, to detect progress
+        uint32_t last_counter_sum;  // copy from the host, to detect progress
         usec_t last_progress_ut;    // last time we found some progress (monotonic)
         usec_t last_checked_ut;     // last time we checked for stalled progress (monotonic)
 
@@ -112,8 +111,8 @@ struct receiver_state {
 #endif
 
 bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt);
-void rrdhost_clear_receiver(struct receiver_state *rpt);
-void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority);
+void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason);
+void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, STREAM_HANDSHAKE reason, ND_LOG_FIELD_PRIORITY priority);
 
 void stream_receiver_free(struct receiver_state *rpt);
 bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE reason);

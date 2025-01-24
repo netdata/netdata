@@ -62,7 +62,7 @@ void stream_sender_structures_free(struct rrdhost *host) {
     if (unlikely(!host->sender)) return;
 
     // stop a possibly running thread
-    stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true);
+    stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP, true);
     stream_circular_buffer_destroy(host->sender->scb);
     host->sender->scb = NULL;
     waitq_destroy(&host->sender->waitq);
@@ -110,10 +110,12 @@ void stream_sender_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHAK
     struct stream_opcode msg = host->sender->thread.msg;
     stream_sender_unlock(host->sender);
 
-    if(reason == STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT)
-        msg.opcode = STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT;
-    else
+    if(reason == STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP)
         msg.opcode = STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP;
+    else
+        msg.opcode = STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT;
+    msg.reason = reason;
+
     stream_sender_send_opcode(host->sender, msg);
 
     while(wait && rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_ADDED))

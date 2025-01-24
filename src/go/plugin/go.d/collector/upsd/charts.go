@@ -334,6 +334,9 @@ func (c *Collector) addUPSCharts(ups upsUnit) {
 
 	var removed []string
 	for _, v := range []struct{ v, id string }{
+		{varUpsLoad, upsLoadChartTmpl.ID},
+		{varUpsLoad, upsLoadUsageChartTmpl.ID},
+
 		{varBatteryVoltage, upsBatteryVoltageChartTmpl.ID},
 		{varBatteryVoltageNominal, upsBatteryVoltageNominalChartTmpl.ID},
 
@@ -362,6 +365,7 @@ func (c *Collector) addUPSCharts(ups upsUnit) {
 	c.Debugf("UPS '%s' no metrics: %v", ups.name, removed)
 
 	name := cleanUpsName(ups.name)
+
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, name)
 		chart.Labels = []module.Label{

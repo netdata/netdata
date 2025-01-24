@@ -85,8 +85,7 @@ struct sender_state {
     } exit;
 
     struct {
-        uint32_t last_counter_in;               // copy from the host, to detect progress
-        uint32_t last_counter_out;              // copy from the host, to detect progress
+        uint32_t last_counter_sum;              // copy from the host, to detect progress
         usec_t last_progress_ut;                // last time we found some progress (monotonic)
         usec_t last_checked_ut;                 // last time we checked for stalled progress (monotonic)
 
@@ -152,7 +151,7 @@ bool stream_connector_is_signaled_to_stop(struct sender_state *s);
 
 void stream_sender_on_connect(struct sender_state *s);
 
-void stream_sender_remove(struct sender_state *s);
+void stream_sender_remove(struct sender_state *s, STREAM_HANDSHAKE reason);
 
 #ifdef NETDATA_LOG_STREAM_SENDER
 void stream_sender_log_payload(struct sender_state *s, BUFFER *payload, STREAM_TRAFFIC_TYPE type, bool inbound);

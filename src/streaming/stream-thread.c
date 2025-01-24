@@ -142,6 +142,8 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
                     if (sth->messages.array[i].meta == &rpt->thread.meta) {
                         rpt->thread.send_to_child.msg_slot = i;
                         sth->messages.array[rpt->thread.send_to_child.msg_slot].opcode |= msg.opcode;
+                        if(msg.reason)
+                            sth->messages.array[rpt->thread.send_to_child.msg_slot].reason = msg.reason;
                         spinlock_unlock(&sth->messages.spinlock);
                         internal_fatal(true, "the stream opcode queue is full, but this receiver is already on slot %zu", i);
                         return;
@@ -158,9 +160,12 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
             rpt->thread.send_to_child.msg_slot = sth->messages.used++;
             sth->messages.array[rpt->thread.send_to_child.msg_slot] = msg;
         }
-        else
+        else {
             // the existing slot is good
             sth->messages.array[rpt->thread.send_to_child.msg_slot].opcode |= msg.opcode;
+            if(msg.reason)
+                sth->messages.array[rpt->thread.send_to_child.msg_slot].reason = msg.reason;
+        }
     }
     spinlock_unlock(&sth->messages.spinlock);
 
@@ -223,6 +228,8 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
                     if (sth->messages.array[i].meta == &s->thread.meta) {
                         s->thread.msg_slot = i;
                         sth->messages.array[s->thread.msg_slot].opcode |= msg.opcode;
+                        if(msg.reason)
+                            sth->messages.array[s->thread.msg_slot].reason = msg.reason;
                         spinlock_unlock(&sth->messages.spinlock);
                         internal_fatal(true, "the dispatcher message queue is full, but this sender is already on slot %zu", i);
                         return;
@@ -239,9 +246,12 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
             s->thread.msg_slot = sth->messages.used++;
             sth->messages.array[s->thread.msg_slot] = msg;
         }
-        else
+        else {
             // the existing slot is good
             sth->messages.array[s->thread.msg_slot].opcode |= msg.opcode;
+            if(msg.reason)
+                sth->messages.array[s->thread.msg_slot].reason = msg.reason;
+        }
     }
     spinlock_unlock(&sth->messages.spinlock);
 
@@ -395,7 +405,6 @@ void *stream_thread(void *ptr) {
     // both sender and receiver
     worker_register_job_name(WORKER_STREAM_JOB_SOCKET_RECEIVE, "receive");
     worker_register_job_name(WORKER_STREAM_JOB_SOCKET_SEND, "send");
-    worker_register_job_name(WORKER_STREAM_JOB_SOCKET_ERROR, "sock error");
 
     // receiver
     worker_register_job_name(WORKER_STREAM_JOB_COMPRESS, "compress");
@@ -409,8 +418,8 @@ void *stream_thread(void *ptr) {
 
     // disconnection reasons
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
+    worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
+    worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
     worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED, "disconnect remote closed");
     worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
     worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
@@ -515,6 +524,8 @@ void *stream_thread(void *ptr) {
         usec_t now_ut = now_monotonic_usec();
 
         if(now_ut - last_dequeue_ut >= 100 * USEC_PER_MS) {
+            last_dequeue_ut = now_ut;
+
             worker_is_busy(WORKER_STREAM_JOB_DEQUEUE);
 
             stream_thread_messages_resize(sth);
@@ -529,40 +540,40 @@ void *stream_thread(void *ptr) {
 
             receivers_waiting = sth->queue.receivers_waiting;
             spinlock_unlock(&sth->queue.spinlock);
-            last_dequeue_ut = now_ut;
-        }
 
-        if(now_ut - last_check_all_nodes_ut >= nd_profile.update_every * USEC_PER_SEC) {
-            worker_is_busy(WORKER_STREAM_JOB_LIST);
 
-            // periodically check the entire list of nodes
-            // this detects unresponsive parents too (timeout)
-            stream_sender_check_all_nodes_from_poll(sth, now_ut);
-            stream_receiver_check_all_nodes_from_poll(sth, now_ut);
+            if(now_ut - last_check_all_nodes_ut >= nd_profile.update_every * USEC_PER_SEC) {
+                last_check_all_nodes_ut = now_ut;
 
-            worker_set_metric(WORKER_SENDER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
-            worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes_count);
+                worker_is_busy(WORKER_STREAM_JOB_LIST);
 
-            worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
-            worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
-            worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
+                // periodically check the entire list of nodes
+                // this detects unresponsive parents too (timeout)
+                stream_sender_check_all_nodes_from_poll(sth, now_ut);
+                stream_receiver_check_all_nodes_from_poll(sth, now_ut);
 
-            worker_set_metric(WORKER_STREAM_JOB_RECEIVERS_WAITING_LIST_SIZE, (NETDATA_DOUBLE)receivers_waiting);
-            worker_set_metric(WORKER_STREAM_JOB_SEND_MISSES, (NETDATA_DOUBLE)sth->snd.send_misses);
-            replay_entries = 0;
-            sth->snd.bytes_received = 0;
-            sth->snd.bytes_sent = 0;
+                worker_set_metric(WORKER_SENDER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
+                worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes_count);
 
-            last_check_all_nodes_ut = now_ut;
-        }
+                worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
+                worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
+                worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
 
-        if(now_ut - last_check_replication_ut >= 10 * 60 * USEC_PER_SEC) {
-            worker_is_busy(WORKER_STREAM_JOB_LIST);
+                worker_set_metric(WORKER_STREAM_JOB_RECEIVERS_WAITING_LIST_SIZE, (NETDATA_DOUBLE)receivers_waiting);
+                worker_set_metric(WORKER_STREAM_JOB_SEND_MISSES, (NETDATA_DOUBLE)sth->snd.send_misses);
+                replay_entries = 0;
+                sth->snd.bytes_received = 0;
+                sth->snd.bytes_sent = 0;
 
-            stream_sender_replication_check_from_poll(sth, now_ut);
-            stream_receiver_replication_check_from_poll(sth, now_ut);
+                if(now_ut - last_check_replication_ut >= 10 * 60 * USEC_PER_SEC) {
+                    last_check_replication_ut = now_ut;
 
-            last_check_replication_ut = now_ut;
+                    worker_is_busy(WORKER_STREAM_JOB_LIST);
+
+                    stream_sender_replication_check_from_poll(sth, now_ut);
+                    stream_receiver_replication_check_from_poll(sth, now_ut);
+                }
+            }
         }
 
         worker_is_idle();
@@ -745,6 +756,8 @@ void stream_receiver_add_to_queue(struct receiver_state *rpt) {
     RECEIVERS_SET(&sth->queue.receivers, ++sth->queue.id, rpt);
     sth->queue.receivers_waiting++;
     spinlock_unlock(&sth->queue.spinlock);
+
+    pulse_host_status(rpt->host, PULSE_HOST_STATUS_RCV_WAITING, 0);
 }
 
 void stream_sender_add_to_queue(struct sender_state *s) {
@@ -759,6 +772,8 @@ void stream_sender_add_to_queue(struct sender_state *s) {
     spinlock_lock(&sth->queue.spinlock);
     SENDERS_SET(&sth->queue.senders, ++sth->queue.id, s);
     spinlock_unlock(&sth->queue.spinlock);
+
+    pulse_host_status(s->host, PULSE_HOST_STATUS_SND_WAITING, 0);
 }
 
 void stream_threads_cancel(void) {

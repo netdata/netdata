@@ -39,11 +39,23 @@ Clauses:
     Value: database
 ```
 
+### Comparison Operators
+
+The following operators can be used to compare label values:
+
+| Operator    | Description                                         |
+|:------------|:----------------------------------------------------|
+| equals      | Matches the exact value                             |
+| starts_with | Matches if the value begins with the specified text |
+| ends_with   | Matches if the value ends with the specified text   |
+| contains    | Matches if the text appears anywhere in the value   |
+
 ## Rule Evaluation Order
 
-- Inclusion rules are checked first
-- Exclusion rules are checked second
-  If both match, exclusion wins
+- Exclusion rules are evaluated first
+- Inclusion rules are evaluated second
+
+In cases where both an inclusion and exclusion rule match, the exclusion rule takes precedence.
 
 ## Creating Rules
 
@@ -67,3 +79,7 @@ Nodes can have multiple membership types in a Room:
 | STATIC and RULE | Both manual and Rule-based |
 
 You can view each Node's membership status in the Room's Nodes table under the "Membership" column.
+
+> **Note**
+>
+> Group membership can be either STATIC or RULE—these work independently. A node can belong to groups through STATIC assignments (added manually) or through RULE assignments (matched automatically). RULEs cannot override STATIC memberships, and removing a node's STATIC membership does not affect its RULE memberships.

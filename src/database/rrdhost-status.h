@@ -6,6 +6,16 @@
 #include "libnetdata/libnetdata.h"
 
 typedef enum __attribute__((packed)) {
+    RRDHOST_STATUS_BASIC    = 0,
+    RRDHOST_STATUS_STREAM   = (1 << 0),
+    RRDHOST_STATUS_ML       = (1 << 1),
+    RRDHOST_STATUS_DYNCFG   = (1 << 2),
+    RRDHOST_STATUS_HEALTH   = (1 << 3),
+} RRDHOST_STATUS_INFO;
+
+#define RRDHOST_STATUS_ALL (RRDHOST_STATUS_BASIC|RRDHOST_STATUS_STREAM|RRDHOST_STATUS_ML|RRDHOST_STATUS_DYNCFG|RRDHOST_STATUS_HEALTH)
+
+typedef enum __attribute__((packed)) {
     RRDHOST_DB_STATUS_INITIALIZING = 0,
     RRDHOST_DB_STATUS_QUERYABLE,
 } RRDHOST_DB_STATUS;
@@ -121,15 +131,15 @@ typedef struct rrdhost_status_t {
         STREAM_HANDSHAKE reason;
 
         struct {
-            size_t metrics; // currently collected
-            size_t instances; // currently collected
-            size_t contexts; // currently collected
+            uint32_t metrics; // currently collected
+            uint32_t instances; // currently collected
+            uint32_t contexts; // currently collected
         } collected;
 
         struct {
             bool in_progress;
             NETDATA_DOUBLE completion;
-            size_t instances;
+            uint32_t instances;
         } replication;
     } ingest;
 
@@ -165,7 +175,8 @@ typedef struct rrdhost_status_t {
     } health;
 } RRDHOST_STATUS;
 
-void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s);
+void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s, RRDHOST_STATUS_INFO info);
+RRDHOST_INGEST_STATUS rrdhost_get_ingest_status(RRDHOST *host, time_t now);
 RRDHOST_INGEST_STATUS rrdhost_ingestion_status(RRDHOST *host);
 int16_t rrdhost_ingestion_hops(RRDHOST *host);
 

@@ -37,5 +37,6 @@
 #define WORKER_ACLK_CPT_UNKNOWN                 31
 #define WORKER_ACLK_SEND_FRAGMENT               32
 #define WORKER_ACLK_MSG_CALLBACK                33
+#define WORKER_ACLK_WAITING_TO_CONNECT          34
 
 #endif //NETDATA_ACLK_MQTT_WORKERS_H
