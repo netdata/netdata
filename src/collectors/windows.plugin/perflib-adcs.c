@@ -65,6 +65,9 @@ static DICTIONARY *adcs_certificates = NULL;
 void dict_adcs_insert_certificate_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct adcs_certificate *ptr = value;
+    const char *name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+
+    ptr->name = strdupz(name);
 
     ptr->ADCSRequestsTotal.key = "Requests/sec";
     ptr->ADCSFailedRequestsTotal.key = "Failed Requests/sec";
@@ -89,10 +92,56 @@ static void initialize(void) {
     dictionary_register_insert_callback(adcs_certificates, dict_adcs_insert_certificate_cb, NULL);
 }
 
+static void netdata_adcs_requests(struct adcs_certificate *ac, PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ac->ADCSRequestsTotal)) {
+        return;
+    }
+
+    if  (!ac->st_adcs_requests_total) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_template%s_requests", ac->name);
+        ac->st_adcs_requests_total =  rrdset_create_localhost("adcs"
+                                                             , id
+                                                             , NULL
+                                                             , "requests"
+                                                             , "adcs.cert_template_requests"
+                                                             , "Certificate requests processed"
+                                                             , "requests/s"
+                                                             , PLUGIN_WINDOWS_NAME
+                                                             , "PerflibADCS"
+                                                             , PRIO_ADCS_CERT_REQUESTS_TOTAL
+                                                             , update_every
+                                                             , RRDSET_TYPE_LINE
+        );
+
+        ac->rd_adcs_requests_total = rrddim_add(ac->st_adcs_requests_total,
+                                                "requests",
+                                                NULL,
+                                                1,
+                                                1,
+                                                RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(ac->st_adcs_requests_total->rrdlabels, "cert_template", ac->name, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(ac->st_adcs_requests_total,
+                          ac->rd_adcs_requests_total,
+                          (collected_number)ac->ADCSRequestsTotal.current.Data);
+    rrdset_done(ac->st_adcs_requests_total);
+}
+
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
     if (!pObjectType)
         return false;
+
+    static void (*doADCS[])(struct adcs_certificate *, PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
+        netdata_adcs_requests,
+
+        // This must be the end
+        NULL
+    };
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
