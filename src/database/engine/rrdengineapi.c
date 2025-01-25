@@ -1003,6 +1003,21 @@ bool rrdeng_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *
     return true;
 }
 
+void rrdeng_metric_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    if (unlikely(!ctx)) {
+        netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
+        return;
+    }
+
+    METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t)ctx);
+    if (unlikely(!metric))
+        return;
+
+    mrg_metric_clear_retention(main_mrg, metric);
+    mrg_metric_release(main_mrg, metric);
+}
+
 uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *si) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return ctx->config.max_disk_space;

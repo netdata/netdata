@@ -19,6 +19,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_release = rrddim_metric_release,
             .metric_retention_by_id = rrddim_metric_retention_by_id,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
+            .metric_retention_delete_by_id = rrddim_retention_delete_by_id,
         }
     },
     {
@@ -33,6 +34,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_release = rrddim_metric_release,
             .metric_retention_by_id = rrddim_metric_retention_by_id,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
+            .metric_retention_delete_by_id = rrddim_retention_delete_by_id,
         }
     },
     {
@@ -47,6 +49,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_release = rrddim_metric_release,
             .metric_retention_by_id = rrddim_metric_retention_by_id,
             .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
+            .metric_retention_delete_by_id = rrddim_retention_delete_by_id,
         }
     },
 #ifdef ENABLE_DBENGINE
@@ -62,6 +65,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_release = rrdeng_metric_release,
             .metric_retention_by_id = rrdeng_metric_retention_by_id,
             .metric_retention_by_uuid = rrdeng_metric_retention_by_uuid,
+            .metric_retention_delete_by_id = rrdeng_metric_retention_delete_by_id,
         }
     },
 #endif

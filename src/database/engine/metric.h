@@ -53,7 +53,7 @@ bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric);
 
 Word_t mrg_metric_id(MRG *mrg, METRIC *metric);
 nd_uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric);
-UUIDMAP_ID mrg_metric_uuidmap_id_dup(MRG *mrg __maybe_unused, METRIC *metric);
+UUIDMAP_ID mrg_metric_uuidmap_id_dup(MRG *mrg, METRIC *metric);
 Word_t mrg_metric_section(MRG *mrg, METRIC *metric);
 
 bool mrg_metric_set_first_time_s(MRG *mrg, METRIC *metric, time_t first_time_s);
@@ -71,7 +71,8 @@ uint32_t mrg_metric_get_update_every_s(MRG *mrg, METRIC *metric);
 
 void mrg_metric_expand_retention(MRG *mrg, METRIC *metric, time_t first_time_s, time_t last_time_s, uint32_t update_every_s);
 void mrg_metric_get_retention(MRG *mrg, METRIC *metric, time_t *first_time_s, time_t *last_time_s, uint32_t *update_every_s);
-bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric);
+bool mrg_metric_has_zero_disk_retention(MRG *mrg, METRIC *metric);
+void mrg_metric_clear_retention(MRG *mrg, METRIC *metric);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 bool mrg_metric_set_writer(MRG *mrg, METRIC *metric);

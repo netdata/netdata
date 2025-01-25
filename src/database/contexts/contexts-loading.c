@@ -18,7 +18,7 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
 
     UUIDMAP_ID id = uuidmap_create(sd->dim_id);
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    get_metric_retention_by_id(host, id, &min_first_time_t, &max_last_time_t);
+    get_metric_retention_by_id(host, id, &min_first_time_t, &max_last_time_t, NULL);
     if((!min_first_time_t || min_first_time_t == LONG_MAX) && !max_last_time_t) {
         uuidmap_free(id);
         th_zero_retention_metrics++;

@@ -459,6 +459,12 @@ inline time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metri
     return mrg_metric_get_first_time_s_smart(mrg, metric);
 }
 
+void mrg_metric_clear_retention(MRG *mrg __maybe_unused, METRIC *metric) {
+    __atomic_store_n(&metric->first_time_s, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&metric->latest_time_s_clean, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&metric->latest_time_s_hot, 0, __ATOMIC_RELAXED);
+}
+
 inline void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, uint32_t *update_every_s) {
     time_t clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
     time_t hot = __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED);
@@ -490,7 +496,7 @@ inline bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *
 }
 
 // returns true when metric still has retention
-inline bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
+inline bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
     Word_t section = mrg_metric_section(mrg, metric);
     bool do_again = false;
     size_t countdown = 5;

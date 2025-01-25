@@ -60,6 +60,7 @@ typedef enum __attribute__ ((__packed__)) {
     RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 22), // this context is not used anymore
     RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 23), // this context changed because of a db rotation
 
+    RRD_FLAG_NO_TIER0_RETENTION                    = (1 << 28),
     RRD_FLAG_MERGED_COLLECTED_RI_TO_RC             = (1 << 29),
 
     // action to perform on an object
@@ -471,7 +472,7 @@ void rrdcontext_update_from_collected_rrdinstance(RRDINSTANCE *ri);
 
 void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs);
 
-void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_time_t, time_t *max_last_time_t);
+void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_time_t, time_t *max_last_time_t, bool *tier0_retention);
 
 void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc);
 void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc);

@@ -1179,7 +1179,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             zero_disk_retention++;
 
             // there is no retention for this metric
-            bool has_retention = mrg_metric_zero_disk_retention(main_mrg, uuid_first_t_entry->metric);
+            bool has_retention = mrg_metric_has_zero_disk_retention(main_mrg, uuid_first_t_entry->metric);
             if (!has_retention) {
                 time_t first_time_s = mrg_metric_get_first_time_s(main_mrg, uuid_first_t_entry->metric);
                 time_t last_time_s = mrg_metric_get_latest_time_s(main_mrg, uuid_first_t_entry->metric);

@@ -9,7 +9,7 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending _
 static void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
 
 static void rrdcontext_dequeue_from_post_processing(RRDCONTEXT *rc);
-static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
+static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
 
 static void rrdcontext_garbage_collect_for_all_hosts(void);
 
@@ -100,7 +100,10 @@ static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, 
 }
 
 void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs) {
-    rrdcontext_post_process_updates(rc, true, reason, worker_jobs);
+    bool forcefully_removed_instances = false;
+    do {
+        forcefully_removed_instances = rrdcontext_post_process_updates(rc, true, reason, worker_jobs);
+    } while(forcefully_removed_instances);
 }
 
 void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool worker_jobs) {
@@ -137,7 +140,7 @@ static void rrdcontext_recalculate_retention_all_hosts(void) {
 // ----------------------------------------------------------------------------
 // garbage collector
 
-void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_time_t, time_t *max_last_time_t) {
+void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_time_t, time_t *max_last_time_t, bool *tier0_retention) {
     *min_first_time_t = LONG_MAX;
     *max_last_time_t = 0;
 
@@ -152,6 +155,9 @@ void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_
             if (last_time_t > *max_last_time_t)
                 *max_last_time_t = last_time_t;
         }
+
+        if(tier == 0 && tier0_retention)
+            *tier0_retention = first_time_t || last_time_t;
     }
 }
 
@@ -161,9 +167,17 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
     if(rm->rrddim) {
         min_first_time_t = rrddim_first_entry_s(rm->rrddim);
         max_last_time_t = rrddim_last_entry_s(rm->rrddim);
+        rrd_flag_clear(rm, RRD_FLAG_NO_TIER0_RETENTION);
     }
-    else
-        get_metric_retention_by_id(rm->ri->rc->rrdhost, rm->uuid, &min_first_time_t, &max_last_time_t);
+    else {
+        bool tier0_retention;
+        get_metric_retention_by_id(rm->ri->rc->rrdhost, rm->uuid, &min_first_time_t, &max_last_time_t, &tier0_retention);
+
+        if(tier0_retention)
+            rrd_flag_clear(rm, RRD_FLAG_NO_TIER0_RETENTION);
+        else
+            rrd_flag_set(rm, RRD_FLAG_NO_TIER0_RETENTION);
+    }
 
     if((min_first_time_t == LONG_MAX || min_first_time_t == 0) && max_last_time_t == 0)
         return false;
@@ -402,7 +416,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
         worker_is_busy(WORKER_JOB_PP_INSTANCE);
 
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t metrics_active = 0, metrics_deleted = 0;
+    size_t metrics_active = 0, metrics_deleted = 0, metrics_no_tier0 = 0;
     bool live_retention = true, currently_collected = false;
     if(dictionary_entries(ri->rrdmetrics) > 0) {
         RRDMETRIC *rm;
@@ -417,6 +431,9 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
 
                     if(unlikely(!rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)))
                         live_retention = false;
+
+                    if(unlikely(rrd_flag_check(rm, RRD_FLAG_NO_TIER0_RETENTION)))
+                        metrics_no_tier0++;
 
                     if (unlikely((rrdmetric_should_be_deleted(rm)))) {
                         metrics_deleted++;
@@ -436,6 +453,11 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
                 }
         dfe_done(rm);
     }
+
+    if(metrics_no_tier0 && metrics_no_tier0 == metrics_active)
+        rrd_flag_set(ri, RRD_FLAG_NO_TIER0_RETENTION);
+    else
+        rrd_flag_clear(ri, RRD_FLAG_NO_TIER0_RETENTION);
 
     if(unlikely(live_retention && !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION)))
         rrd_flag_set(ri, RRD_FLAG_LIVE_RETENTION);
@@ -500,7 +522,36 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
     rrd_flag_unset_updated(ri);
 }
 
-static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs) {
+static bool rrdinstance_forcefully_ignore_retention(RRDCONTEXT *rc) {
+    RRDHOST *host = rc->rrdhost;
+
+    size_t deleted = 0;
+    RRDINSTANCE *ri;
+    dfe_start_read(rc->rrdinstances, ri) {
+        if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION))
+            continue;
+
+        RRDMETRIC *rm;
+        dfe_start_read(ri->rrdmetrics, rm) {
+            if(!rrd_flag_check(rm, RRD_FLAG_NO_TIER0_RETENTION))
+                fatal("Found metric with tier0 retention, while the instance does not have any");
+
+            for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+                STORAGE_ENGINE *eng = host->db[tier].eng;
+                eng->api.metric_retention_delete_by_id(host->db[tier].si, rm->uuid);
+            }
+            deleted++;
+        }
+        dfe_done(rm);
+    }
+    dfe_done(ri);
+
+    return deleted > 0;
+}
+
+static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs) {
+    bool ret = false;
+
     if(reason != RRD_FLAG_NONE)
         rrd_flag_set_updated(rc, reason);
 
@@ -511,7 +562,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     size_t min_priority_not_collected = LONG_MAX;
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t instances_active = 0, instances_deleted = 0;
+    size_t instances_active = 0, instances_deleted = 0, instances_no_tier0 = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
     if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
@@ -529,6 +580,9 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 
                     if(unlikely(live_retention && !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION)))
                         live_retention = false;
+
+                    if(unlikely(rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION)))
+                        instances_no_tier0++;
 
                     if (unlikely(rrdinstance_should_be_deleted(ri))) {
                         instances_deleted++;
@@ -570,6 +624,9 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                         max_last_time_t = ri->last_time_s;
                 }
         dfe_done(ri);
+
+        if(instances_no_tier0 >= 1000 && (100 * instances_no_tier0 / instances_active) > 50)
+            ret = rrdinstance_forcefully_ignore_retention(rc);
 
         if(min_priority_collected != LONG_MAX)
             // use the collected priority
@@ -669,6 +726,8 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 
     rrd_flag_unset_updated(rc);
     rrdcontext_unlock(rc);
+
+    return ret;
 }
 
 void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function __maybe_unused, RRD_FLAGS flags __maybe_unused) {

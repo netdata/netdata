@@ -66,6 +66,7 @@ typedef struct storage_engine_api {
     STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
     bool (*metric_retention_by_id)(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s);
     bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *si, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
+    void (*metric_retention_delete_by_id)(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 } STORAGE_ENGINE_API;
 
 typedef struct storage {
