@@ -265,39 +265,6 @@ typedef struct ebpf_network_viewer_options {
 
 extern ebpf_network_viewer_options_t network_viewer_opt;
 
-/**
- * Structure to store socket information
- */
-typedef struct netdata_socket {
-    char name[TASK_COMM_LEN];
-
-    // Timestamp
-    uint64_t first_timestamp;
-    uint64_t current_timestamp;
-    // Socket additional info
-    uint16_t protocol;
-    uint16_t family;
-    uint32_t external_origin;
-    struct {
-        uint32_t call_tcp_sent;
-        uint32_t call_tcp_received;
-        uint64_t tcp_bytes_sent;
-        uint64_t tcp_bytes_received;
-        uint32_t close;        //It is never used with UDP
-        uint32_t retransmit;   //It is never used with UDP
-        uint32_t ipv4_connect;
-        uint32_t ipv6_connect;
-        uint32_t state; // We do not have charts for it, because we are using network viewer plugin
-    } tcp;
-
-    struct {
-        uint32_t call_udp_sent;
-        uint32_t call_udp_received;
-        uint64_t udp_bytes_sent;
-        uint64_t udp_bytes_received;
-    } udp;
-} netdata_socket_t;
-
 typedef enum netdata_socket_flags {
     NETDATA_SOCKET_FLAGS_ALREADY_OPEN = (1<<0)
 } netdata_socket_flags_t;

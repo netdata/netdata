@@ -449,7 +449,7 @@ static void ebpf_obsolete_dc_global(ebpf_module_t *em)
  */
 static void ebpf_dcstat_exit(void *pptr)
 {
-    pids_fd[EBPF_PIDS_DCSTAT_IDX] = -1;
+    pids_fd[NETDATA_EBPF_PIDS_DCSTAT_IDX] = -1;
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
 
@@ -555,7 +555,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
 
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, cv->tgid, cv->name, EBPF_PIDS_DCSTAT_IDX);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, cv->tgid, cv->name, NETDATA_EBPF_PIDS_DCSTAT_IDX);
         netdata_publish_dcstat_t *publish = pid_stat->dc;
         if (!publish)
             pid_stat->dc = publish = ebpf_dcallocate_publish();
@@ -571,7 +571,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
             if (kill(key, 0)) { // No PID found
                 ebpf_reset_specific_pid_data(pid_stat);
             } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(pid_stat, fd, key, EBPF_PIDS_DCSTAT_IDX);
+                ebpf_release_pid_data(pid_stat, fd, key, NETDATA_EBPF_PIDS_DCSTAT_IDX);
                 ebpf_dc_release_publish(publish);
                 pid_stat->dc = NULL;
             }
@@ -597,7 +597,7 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
     memset(&publish->curr, 0, sizeof(netdata_publish_dcstat_pid_t));
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_DCSTAT_IDX);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_DCSTAT_IDX);
         netdata_publish_dcstat_t *w = pid_stat->dc;
         if (!w)
             continue;
@@ -651,7 +651,7 @@ void *ebpf_read_dcstat_thread(void *ptr)
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
-    pids_fd[EBPF_PIDS_DCSTAT_IDX] = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
+    pids_fd[NETDATA_EBPF_PIDS_DCSTAT_IDX] = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
@@ -783,7 +783,7 @@ static void ebpf_update_dc_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_DCSTAT_IDX);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_DCSTAT_IDX);
             netdata_publish_dcstat_t *in = local_pid->dc;
             if (!in)
                 continue;
