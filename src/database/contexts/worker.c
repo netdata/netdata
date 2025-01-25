@@ -522,27 +522,27 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
     rrd_flag_unset_updated(ri);
 }
 
-static bool rrdinstance_forcefully_ignore_retention(RRDCONTEXT *rc, size_t count) {
+static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count) {
     if(!count) return false;
-    
+
     RRDHOST *host = rc->rrdhost;
 
-    size_t deleted = 0;
+    size_t metrics_deleted = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION))
+        if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(ri) || ri->rrdset)
             continue;
 
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
-            if(!rrd_flag_check(rm, RRD_FLAG_NO_TIER0_RETENTION))
-                fatal("Found metric with tier0 retention, while the instance does not have any");
+            if(!rrd_flag_check(rm, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(rm) || rm->rrddim)
+                continue;
 
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
                 STORAGE_ENGINE *eng = host->db[tier].eng;
                 eng->api.metric_retention_delete_by_id(host->db[tier].si, rm->uuid);
             }
-            deleted++;
+            metrics_deleted++;
         }
         dfe_done(rm);
 
@@ -551,7 +551,7 @@ static bool rrdinstance_forcefully_ignore_retention(RRDCONTEXT *rc, size_t count
     }
     dfe_done(ri);
 
-    return deleted > 0;
+    return metrics_deleted > 0;
 }
 
 static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs) {
@@ -631,7 +631,7 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
         dfe_done(ri);
 
         if(instances_no_tier0 >= 1000 && instances_no_tier0 > instances_active && (100 * instances_no_tier0 / instances_active) > 50)
-            ret = rrdinstance_forcefully_ignore_retention(rc, instances_no_tier0 - instances_active);
+            ret = rrdinstance_forcefully_clear_retention(rc, instances_no_tier0 - instances_active);
 
         if(min_priority_collected != LONG_MAX)
             // use the collected priority
