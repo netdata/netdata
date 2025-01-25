@@ -91,6 +91,10 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
             // Node
             buffer_json_add_array_item_string(wb, rrdhost_hostname(s.host));
 
+            // AgentName and AgentVersion
+            buffer_json_add_array_item_string(wb, rrdhost_program_name(host));
+            buffer_json_add_array_item_string(wb, rrdhost_program_version(host));
+
             // System Info
             rrdhost_system_info_to_streaming_function_array(wb, s.host->system_info);
 
@@ -258,6 +262,20 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "AgentName", "The name of the Netdata agent",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "AgentVersion", "The version of the Netdata agent",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
                                     NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OSName", "The name of the host's operating system",
