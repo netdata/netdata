@@ -6,8 +6,15 @@
 
 **Merged pull requests:**
 
+- add system-info columns to streaming function [\#19482](https://github.com/netdata/netdata/pull/19482) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#19481](https://github.com/netdata/netdata/pull/19481) ([netdatabot](https://github.com/netdatabot))
+- chore\(go.d/ping\): set privileged by default for dyncfg jobs [\#19480](https://github.com/netdata/netdata/pull/19480) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/prometheus-community/pro-bing from 0.5.0 to 0.6.0 in /src/go [\#19477](https://github.com/netdata/netdata/pull/19477) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/docker/docker from 27.5.0+incompatible to 27.5.1+incompatible in /src/go [\#19476](https://github.com/netdata/netdata/pull/19476) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/miekg/dns from 1.1.62 to 1.1.63 in /src/go [\#19475](https://github.com/netdata/netdata/pull/19475) ([dependabot[bot]](https://github.com/apps/dependabot))
 - optimized rrdhost\_status [\#19472](https://github.com/netdata/netdata/pull/19472) ([ktsaou](https://github.com/ktsaou))
 - Unregister node from the agent to run in a worker thread [\#19471](https://github.com/netdata/netdata/pull/19471) ([stelfrag](https://github.com/stelfrag))
+- Use QEMU from the runner environment instead of an external copy. [\#19468](https://github.com/netdata/netdata/pull/19468) ([Ferroin](https://github.com/Ferroin))
 - fix crash when cleaning up virtual nodes [\#19467](https://github.com/netdata/netdata/pull/19467) ([ktsaou](https://github.com/ktsaou))
 - streaming nodes accounting [\#19466](https://github.com/netdata/netdata/pull/19466) ([ktsaou](https://github.com/ktsaou))
 - Don’t fail fast on static builds and Docker builds. [\#19465](https://github.com/netdata/netdata/pull/19465) ([Ferroin](https://github.com/Ferroin))
@@ -432,7 +439,6 @@
 - Tidy up CI to improve overall run times. [\#18957](https://github.com/netdata/netdata/pull/18957) ([Ferroin](https://github.com/Ferroin))
 - Balance streaming parents [\#18945](https://github.com/netdata/netdata/pull/18945) ([ktsaou](https://github.com/ktsaou))
 - added /api/v3/stream\_path [\#18943](https://github.com/netdata/netdata/pull/18943) ([ktsaou](https://github.com/ktsaou))
-- Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
@@ -472,12 +478,6 @@
 - Hyper collector fixes [\#18934](https://github.com/netdata/netdata/pull/18934) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18932](https://github.com/netdata/netdata/pull/18932) ([netdatabot](https://github.com/netdatabot))
 - better randomness for heartbeat [\#18930](https://github.com/netdata/netdata/pull/18930) ([ktsaou](https://github.com/ktsaou))
-- add randomness per thread to heartbeat [\#18929](https://github.com/netdata/netdata/pull/18929) ([ktsaou](https://github.com/ktsaou))
-- Improve the documentation on removing stale nodes [\#18927](https://github.com/netdata/netdata/pull/18927) ([ralphm](https://github.com/ralphm))
-- Docs: Changes to title and CPU requirements [\#18925](https://github.com/netdata/netdata/pull/18925) ([Ancairon](https://github.com/Ancairon))
-- chore\(go.d/nvidia\_smi\): remove use\_csv\_format \(deprecated\) from config [\#18924](https://github.com/netdata/netdata/pull/18924) ([ilyam8](https://github.com/ilyam8))
-- Docs: small fixes and pass on sizing Agents [\#18923](https://github.com/netdata/netdata/pull/18923) ([Ancairon](https://github.com/Ancairon))
-- go.d/portcheck: separate tabs for tcp/upd ports [\#18922](https://github.com/netdata/netdata/pull/18922) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
