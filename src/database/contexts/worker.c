@@ -630,7 +630,7 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                 }
         dfe_done(ri);
 
-        if(instances_no_tier0 >= 1000 && instances_no_tier0 > instances_active && (100 * instances_no_tier0 / instances_active) > 50)
+        if(instances_no_tier0 >= 10000 && instances_no_tier0 > instances_active && (100 * instances_no_tier0 / instances_active) > 50)
             ret = rrdinstance_forcefully_clear_retention(rc, instances_no_tier0 - instances_active);
 
         if(min_priority_collected != LONG_MAX)
