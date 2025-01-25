@@ -158,6 +158,9 @@ void http_parse_ctx_create(http_parse_ctx *ctx, enum http_parse_state parse_stat
 
 void http_parse_ctx_destroy(http_parse_ctx *ctx)
 {
+    if(!ctx->headers)
+        return;
+
     c_rhash_iter_t iter;
     const char *key;
 
@@ -169,6 +172,7 @@ void http_parse_ctx_destroy(http_parse_ctx *ctx)
     }
 
     c_rhash_destroy(ctx->headers);
+    ctx->headers = NULL;
 }
 
 #define POLL_TO_MS 100
