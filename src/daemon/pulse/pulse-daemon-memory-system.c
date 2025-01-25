@@ -42,8 +42,10 @@ static bool parse_malloc_info(size_t *arenas, size_t *allocated_arena, size_t *u
     char *t = malloc(1024);
 
     // Generate malloc_info XML
-    if(malloc_info(0, meminfo) != 0)
+    if(malloc_info(0, meminfo) != 0) {
+        free(t);
         goto cleanup;
+    }
 
     fflush(meminfo);
     fclose(meminfo);
