@@ -139,11 +139,13 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
     netdata_exit = 1;
 
-#ifdef ENABLE_DBENGINE
-    if(!ret && dbengine_enabled)
-        // flush all dirty pages asap
-        rrdeng_flush_everything_and_wait(false, false);
-#endif
+    // we cannot call this here, because we get a fatal
+    // that points are appended to pages not created by a collector
+//#ifdef ENABLE_DBENGINE
+//    if(!ret && dbengine_enabled)
+//        // flush all dirty pages asap
+//        rrdeng_flush_everything_and_wait(false, false);
+//#endif
 
     usec_t shutdown_start_time = now_monotonic_usec();
     watcher_shutdown_begin();
