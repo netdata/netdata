@@ -522,7 +522,9 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
     rrd_flag_unset_updated(ri);
 }
 
-static bool rrdinstance_forcefully_ignore_retention(RRDCONTEXT *rc) {
+static bool rrdinstance_forcefully_ignore_retention(RRDCONTEXT *rc, size_t count) {
+    if(!count) return false;
+    
     RRDHOST *host = rc->rrdhost;
 
     size_t deleted = 0;
@@ -543,6 +545,9 @@ static bool rrdinstance_forcefully_ignore_retention(RRDCONTEXT *rc) {
             deleted++;
         }
         dfe_done(rm);
+
+        if(--count == 0)
+            break;
     }
     dfe_done(ri);
 
@@ -625,8 +630,8 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                 }
         dfe_done(ri);
 
-        if(instances_no_tier0 >= 1000 && (100 * instances_no_tier0 / instances_active) > 50)
-            ret = rrdinstance_forcefully_ignore_retention(rc);
+        if(instances_no_tier0 >= 1000 && instances_no_tier0 > instances_active && (100 * instances_no_tier0 / instances_active) > 50)
+            ret = rrdinstance_forcefully_ignore_retention(rc, instances_no_tier0 - instances_active);
 
         if(min_priority_collected != LONG_MAX)
             // use the collected priority
