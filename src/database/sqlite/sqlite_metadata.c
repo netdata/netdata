@@ -178,8 +178,6 @@ sqlite3 *db_meta = NULL;
 #define METADATA_MAINTENANCE_REPEAT (60)            // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_MAINTENANCE_CTX_CLEAN_REPEAT (300) // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
-#define METADATA_DIM_CHECK_INTERVAL (3600)          // Repeat maintenance for dimensions
-#define METADATA_CHART_CHECK_INTERVAL (3600)        // Repeat maintenance for charts
 #define METADATA_LABEL_CHECK_INTERVAL (3600)        // Repeat maintenance for labels
 #define METADATA_RUNTIME_THRESHOLD (5)              // Run time threshold for cleanup task
 
@@ -1260,6 +1258,9 @@ static bool run_cleanup_loop(
 
     time_t start_running = now_monotonic_sec();
     bool time_expired = false;
+
+    uint32_t l_checked = 0;
+    uint32_t l_deleted = 0;
     while (!time_expired && sqlite3_step_monitored(res) == SQLITE_ROW) {
         if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
             break;
@@ -1269,12 +1270,17 @@ static bool run_cleanup_loop(
 
         if (rc == true) {
             action_cb((nd_uuid_t *)sqlite3_column_blob(res, 0), action_stmt, action_flag);
-            (*total_deleted)++;
+            l_deleted++;
+//            if (false == sql_metadata_wal_size_acceptable())
+//                (void) sqlite3_wal_checkpoint(db_meta, NULL);
         }
 
-        (*total_checked)++;
+        l_checked++;
         time_expired = ((now_monotonic_sec() - start_running) > METADATA_RUNTIME_THRESHOLD);
     }
+
+    (*total_checked) += l_checked;
+    (*total_deleted) += l_deleted;
     return time_expired;
 }
 
@@ -1349,13 +1355,11 @@ skip:
         SQLITE_FINALIZE(res);
 }
 
-#define SQL_GET_MAX_DIM_ROW_ID "SELECT MAX(rowid) FROM dimension"
-
-static uint64_t get_max_dim_row_id()
+static uint64_t get_rowid_from_statement(const char *sql)
 {
     sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_GET_MAX_DIM_ROW_ID, &res))
+    if (!PREPARE_STATEMENT(db_meta, sql, &res))
         return 0;
 
     uint64_t rowid = 0;
@@ -1369,31 +1373,36 @@ static uint64_t get_max_dim_row_id()
 }
 
 
-static void check_dimension_metadata(struct metadata_wc *wc)
+#define SQL_GET_MAX_DIM_ROW_ID "SELECT MAX(rowid) FROM dimension"
+
+static bool check_dimension_metadata(struct metadata_wc *wc)
 {
     static time_t next_execution_t = 0;
     static uint64_t last_row_id = 0;
     static uint64_t max_row_id = 0;
-    static bool check_completed = false;
-
-    if (check_completed)
-        return;
 
     time_t now = now_realtime_sec();
 
     if (!next_execution_t) {
         next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
-        max_row_id = get_max_dim_row_id();
+        max_row_id = get_rowid_from_statement(SQL_GET_MAX_DIM_ROW_ID);
         nd_log(NDLS_DAEMON, NDLP_INFO, "Dimension metadata check has been scheduled to run (max id = %lu)", max_row_id);
     }
 
     if (next_execution_t && next_execution_t > now)
-        return;
+        return true;
+
+    if (max_row_id && last_row_id >= max_row_id) {
+        nd_log_daemon(NDLP_INFO, "Dimension metadata check completed");
+        // For long running agents, check in a week
+        next_execution_t = now + 604800;
+        return true;
+    }
 
     sqlite3_stmt *res = NULL;
 
     if (!PREPARE_STATEMENT(db_meta, SELECT_DIMENSION_LIST, &res))
-        return;
+        return true;
 
     uint32_t total_checked = 0;
     uint32_t total_deleted = 0;
@@ -1415,45 +1424,24 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         false,
         false);
 
-    if (max_row_id && last_row_id >= max_row_id) {
-        nd_log_daemon(NDLP_INFO, "Dimension metadata check completed");
-        check_completed = true;
-    } else {
-        now = now_realtime_sec();
-        next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
-        nd_log_daemon(
-            NDLP_DEBUG,
-            "Dimensions checked %u, deleted %u. Checks will resume in %lld seconds",
-            total_checked,
-            total_deleted,
-            (long long)(next_execution_t - now));
-    }
+    now = now_realtime_sec();
+    next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
+    nd_log_daemon(
+        NDLP_DEBUG,
+        "Dimensions checked %u, deleted %u. Checks will resume in %d seconds",
+        total_checked,
+        total_deleted,
+        METADATA_MAINTENANCE_REPEAT);
 
     SQLITE_FINALIZE(res);
 
     worker_is_idle();
+    return false;
 }
 
 #define SQL_GET_MAX_CHART_ROW_ID "SELECT MAX(rowid) FROM chart"
 
-static uint64_t get_max_chart_row_id()
-{
-    sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SQL_GET_MAX_CHART_ROW_ID, &res))
-        return 0;
-
-    uint64_t rowid = 0;
-
-    if (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        rowid = sqlite3_column_int64(res, 0);
-    }
-
-    SQLITE_FINALIZE(res);
-    return rowid;
-}
-
-static void check_chart_metadata(struct metadata_wc *wc)
+static bool check_chart_metadata(struct metadata_wc *wc)
 {
     static time_t next_execution_t = 0;
     static uint64_t last_row_id = 0;
@@ -1461,29 +1449,29 @@ static void check_chart_metadata(struct metadata_wc *wc)
     static bool check_completed = false;
 
     if (check_completed)
-        return;
+        return true;
 
     time_t now = now_realtime_sec();
 
     if (!next_execution_t) {
         next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
-        max_row_id = get_max_chart_row_id();
+        max_row_id = get_rowid_from_statement(SQL_GET_MAX_CHART_ROW_ID);
         nd_log(NDLS_DAEMON, NDLP_INFO, "Chart metadata check has been scheduled to run (max id = %lu)", max_row_id);
     }
 
     if (next_execution_t && next_execution_t > now)
-        return;
+        return true;
 
     if (max_row_id && last_row_id >= max_row_id) {
         nd_log(NDLS_DAEMON, NDLP_INFO, "Chart metadata check completed");
         check_completed = true;
-        return;
+        return true;
     }
 
     sqlite3_stmt *res = NULL;
 
     if (!PREPARE_STATEMENT(db_meta, SELECT_CHART_LIST, &res))
-        return;
+        return true;
 
     uint32_t total_checked = 0;
     uint32_t total_deleted = 0;
@@ -1509,41 +1497,53 @@ static void check_chart_metadata(struct metadata_wc *wc)
     SQLITE_FINALIZE(check_res);
     SQLITE_FINALIZE(action_res);
 
-    if (max_row_id && last_row_id >= max_row_id) {
-        nd_log_daemon(NDLP_INFO, "Chart metadata check completed");
-        check_completed = true;
-    } else {
-        now = now_realtime_sec();
-        next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
-        nd_log_daemon(
-            NDLP_DEBUG,
-            "Charts checked %u, deleted %u. Checks will resume in %lld seconds",
-            total_checked,
-            total_deleted,
-            (long long)(next_execution_t - now));
-    }
+    now = now_realtime_sec();
+    next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
+    nd_log_daemon(
+        NDLP_DEBUG,
+        "Charts checked %u, deleted %u. Checks will resume in %d seconds",
+        total_checked,
+        total_deleted,
+        METADATA_MAINTENANCE_REPEAT);
 
     SQLITE_FINALIZE(res);
     worker_is_idle();
+    return false;
 }
 
-static void check_label_metadata(struct metadata_wc *wc)
+#define SQL_GET_MAX_CHART_LABEL_ROW_ID "SELECT MAX(rowid) FROM chart_label"
+
+static bool check_label_metadata(struct metadata_wc *wc)
 {
     static time_t next_execution_t = 0;
     static uint64_t last_row_id = 0;
+    static uint64_t max_row_id = 0;
+    static bool check_completed = false;
+
+    if (check_completed)
+        return true;
 
     time_t now = now_realtime_sec();
 
-    if (!next_execution_t)
+    if (!next_execution_t) {
         next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
+        max_row_id = get_rowid_from_statement(SQL_GET_MAX_CHART_LABEL_ROW_ID);
+        nd_log(NDLS_DAEMON, NDLP_INFO, "Chart label metadata check has been scheduled to run (max id = %lu)", max_row_id);
+    }
 
     if (next_execution_t && next_execution_t > now)
-        return;
+        return true;
+
+    if (max_row_id && last_row_id >= max_row_id) {
+        nd_log(NDLS_DAEMON, NDLP_INFO, "Chart label metadata check completed");
+        check_completed = true;
+        return true;
+    }
 
     sqlite3_stmt *res = NULL;
 
     if (!PREPARE_STATEMENT(db_meta, SELECT_CHART_LABEL_LIST, &res))
-        return;
+        return true;
 
     uint32_t total_checked = 0;
     uint32_t total_deleted = 0;
@@ -1555,7 +1555,7 @@ static void check_label_metadata(struct metadata_wc *wc)
 
     worker_is_busy(UV_EVENT_CHART_LABEL_CLEANUP);
 
-    bool more_to_do = run_cleanup_loop(
+    (void )run_cleanup_loop(
         res,
         wc,
         chart_can_be_deleted,
@@ -1572,25 +1572,19 @@ static void check_label_metadata(struct metadata_wc *wc)
     SQLITE_FINALIZE(action_res);
 
     now = now_realtime_sec();
-    if (more_to_do)
-        next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
-    else {
-        last_row_id = 0;
-        next_execution_t = now + METADATA_LABEL_CHECK_INTERVAL;
-    }
+    next_execution_t = now + METADATA_LABEL_CHECK_INTERVAL;
 
-    nd_log(
-        NDLS_DAEMON,
+    nd_log_daemon(
         NDLP_DEBUG,
-        "Chart labels checked %u, deleted %u. Checks will %s in %lld seconds",
+        "Chart labels checked %u, deleted %u. Checks will resume in %d seconds",
         total_checked,
         total_deleted,
-        last_row_id ? "resume" : "restart",
-        (long long)(next_execution_t - now));
+        METADATA_LABEL_CHECK_INTERVAL);
 
     SQLITE_FINALIZE(res);
 
     worker_is_idle();
+    return false;
 }
 
 static void cleanup_health_log(struct metadata_wc *wc)
@@ -1866,9 +1860,10 @@ void run_metadata_cleanup(struct metadata_wc *wc)
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
         return;
 
-    check_dimension_metadata(wc);
-    check_chart_metadata(wc);
-    check_label_metadata(wc);
+    if (check_dimension_metadata(wc))
+        if (check_chart_metadata(wc))
+            check_label_metadata(wc);
+
     cleanup_health_log(wc);
 
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
