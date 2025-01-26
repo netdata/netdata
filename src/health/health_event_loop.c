@@ -643,8 +643,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     }
 }
 
+__thread bool is_health_thread = false;
 static void health_event_loop(void) {
 
+    is_health_thread = true;
     while(service_running(SERVICE_HEALTH)) {
         if(!stream_control_health_should_be_running()) {
             worker_is_idle();
