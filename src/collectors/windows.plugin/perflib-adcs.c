@@ -151,6 +151,7 @@ static void netdata_adcs_requests_processing_time(struct adcs_certificate *ac,
                                                                               , NULL
                                                                               , "requests"
                                                                               , "adcs.cert_request_processing_time"
+                                                                              , "adcs.cert_template_request_processing_time"
                                                                               , "Certificate last request processing time"
                                                                               , "seconds"
                                                                               , PLUGIN_WINDOWS_NAME
