@@ -103,12 +103,12 @@ static void netdata_adcs_requests(struct adcs_certificate *ac,
     }
 
     if  (!ac->st_adcs_requests_total) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_template_%s_requests", ac->name);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_%s_requests", ac->name);
         ac->st_adcs_requests_total =  rrdset_create_localhost("adcs"
                                                              , id
                                                              , NULL
                                                              , "requests"
-                                                             , "adcs.cert_template_requests"
+                                                             , "adcs.cert_requests"
                                                              , "Certificate requests processed"
                                                              , "requests/s"
                                                              , PLUGIN_WINDOWS_NAME
@@ -125,7 +125,7 @@ static void netdata_adcs_requests(struct adcs_certificate *ac,
                                                 1,
                                                 RRD_ALGORITHM_INCREMENTAL);
 
-        rrdlabels_add(ac->st_adcs_requests_total->rrdlabels, "cert_template", ac->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(ac->st_adcs_requests_total->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(ac->st_adcs_requests_total,
@@ -145,12 +145,12 @@ static void netdata_adcs_requests_processing_time(struct adcs_certificate *ac,
     }
 
     if  (!ac->st_adcs_request_processing_time_seconds) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_template_%s_request_processing_time", ac->name);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_%s_request_processing_time", ac->name);
         ac->st_adcs_request_processing_time_seconds =  rrdset_create_localhost("adcs"
                                                                               , id
                                                                               , NULL
                                                                               , "requests"
-                                                                              , "adcs.cert_template_request_processing_time"
+                                                                              , "adcs.cert_request_processing_time"
                                                                               , "Certificate last request processing time"
                                                                               , "seconds"
                                                                               , PLUGIN_WINDOWS_NAME
@@ -167,7 +167,7 @@ static void netdata_adcs_requests_processing_time(struct adcs_certificate *ac,
                                                                  1000,
                                                                  RRD_ALGORITHM_ABSOLUTE);
 
-        rrdlabels_add(ac->st_adcs_request_processing_time_seconds->rrdlabels, "cert_template", ac->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(ac->st_adcs_request_processing_time_seconds->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(ac->st_adcs_request_processing_time_seconds,
@@ -187,12 +187,12 @@ static void netdata_adcs_retrievals(struct adcs_certificate *ac,
     }
 
     if  (!ac->st_adcs_retrievals_total) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_template_%s_retrievals", ac->name);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_%s_retrievals", ac->name);
         ac->st_adcs_retrievals_total =  rrdset_create_localhost("adcs"
                                                                , id
                                                                , NULL
                                                                , "retrievals"
-                                                               , "adcs.cert_template_retrievals"
+                                                               , "adcs.cert_retrievals"
                                                                , "Total of certificate retrievals"
                                                                , "retrievals/s"
                                                                , PLUGIN_WINDOWS_NAME
@@ -209,7 +209,7 @@ static void netdata_adcs_retrievals(struct adcs_certificate *ac,
                                                   1,
                                                   RRD_ALGORITHM_INCREMENTAL);
 
-        rrdlabels_add(ac->st_adcs_retrievals_total->rrdlabels, "cert_template", ac->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(ac->st_adcs_retrievals_total->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(ac->st_adcs_retrievals_total,
