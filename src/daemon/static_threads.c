@@ -66,6 +66,27 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = pulse_thread_sqlite3_main
     },
     {
+        .name = "PULSE-WORKERS",
+        .config_section = CONFIG_SECTION_PULSE,
+        .config_name = "extended",
+        .env_name = NULL,
+        .global_variable = &pulse_extended_enabled,
+        .enabled = 0, // the default value - it uses netdata.conf for users to enable it
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = pulse_thread_workers_main
+    },
+    {
+        .name = "PULSE-MEMORY",
+        .config_section = CONFIG_SECTION_PULSE,
+        .config_name = "extended",
+        .env_name = NULL,
+        .global_variable = &pulse_extended_enabled,
+        .enabled = 0, // the default value - it uses netdata.conf for users to enable it
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = pulse_thread_memory_extended_main},
+    {
         .name = "PLUGINSD",
         .config_section = NULL,
         .config_name = NULL,

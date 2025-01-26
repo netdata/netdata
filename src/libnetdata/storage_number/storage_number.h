@@ -130,7 +130,7 @@ static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) __attri
 #define MAX_INCREMENTAL_PERCENT_RATE 10
 
 
-static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) {
+static ALWAYS_INLINE NETDATA_DOUBLE unpack_storage_number(storage_number value) {
     extern NETDATA_DOUBLE unpack_storage_number_lut10x[4 * 8];
 
     if(unlikely(value == SN_EMPTY_SLOT))

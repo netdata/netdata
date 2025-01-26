@@ -324,7 +324,7 @@ static inline void storage_engine_query_init(
 
 STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh);
 STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *seqh);
-static inline STORAGE_POINT storage_engine_query_next_metric(struct storage_engine_query_handle *seqh) {
+static ALWAYS_INLINE STORAGE_POINT storage_engine_query_next_metric(struct storage_engine_query_handle *seqh) {
     internal_fatal(!is_valid_backend(seqh->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
@@ -336,7 +336,7 @@ static inline STORAGE_POINT storage_engine_query_next_metric(struct storage_engi
 
 int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *seqh);
 int rrddim_query_is_finished(struct storage_engine_query_handle *seqh);
-static inline int storage_engine_query_is_finished(struct storage_engine_query_handle *seqh) {
+static ALWAYS_INLINE int storage_engine_query_is_finished(struct storage_engine_query_handle *seqh) {
     internal_fatal(!is_valid_backend(seqh->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
