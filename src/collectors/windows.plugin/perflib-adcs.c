@@ -260,6 +260,48 @@ static void netdata_adcs_failed_requets(struct adcs_certificate *ac,
     rrdset_done(ac->st_adcs_failed_requests_total);
 }
 
+static void netdata_adcs_issued_requets(struct adcs_certificate *ac,
+                                        PERF_DATA_BLOCK *pDataBlock,
+                                        PERF_OBJECT_TYPE *pObjectType,
+                                        int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ac->ADCSIssuedRequestsTotal)) {
+        return;
+    }
+
+    if  (!ac->st_adcs_issued_requests_total) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_%s_issued_requests", ac->name);
+        ac->st_adcs_issued_requests_total =  rrdset_create_localhost("adcs"
+                                                                    , id
+                                                                    , NULL
+                                                                    , "requests"
+                                                                    , "adcs.cert_template_issued_requests"
+                                                                    , "Certificate issued requests processed"
+                                                                    , "requests/s"
+                                                                    , PLUGIN_WINDOWS_NAME
+                                                                    , "PerflibADCS"
+                                                                    , PRIO_ADCS_CERT_ISSUED_REQUESTS
+                                                                    , update_every
+                                                                    , RRDSET_TYPE_LINE
+        );
+
+        ac->rd_adcs_issued_requests_total = rrddim_add(ac->st_adcs_issued_requests_total,
+                                                       "issued",
+                                                       NULL,
+                                                       1,
+                                                       1,
+                                                       RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(ac->st_adcs_issued_requests_total->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(ac->st_adcs_issued_requests_total,
+                          ac->rd_adcs_issued_requests_total,
+                          (collected_number)ac->ADCSIssuedRequestsTotal.current.Data);
+    rrdset_done(ac->st_adcs_issued_requests_total);
+}
+
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
     if (!pObjectType)
@@ -270,6 +312,7 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         netdata_adcs_requests_processing_time,
         netdata_adcs_retrievals,
         netdata_adcs_failed_requets,
+        netdata_adcs_issued_requets,
 
         // This must be the end
         NULL
