@@ -92,7 +92,10 @@ static void initialize(void) {
     dictionary_register_insert_callback(adcs_certificates, dict_adcs_insert_certificate_cb, NULL);
 }
 
-static void netdata_adcs_requests(struct adcs_certificate *ac, PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_adcs_requests(struct adcs_certificate *ac,
+                                  PERF_DATA_BLOCK *pDataBlock,
+                                  PERF_OBJECT_TYPE *pObjectType,
+                                  int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
     if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ac->ADCSRequestsTotal)) {
@@ -100,7 +103,7 @@ static void netdata_adcs_requests(struct adcs_certificate *ac, PERF_DATA_BLOCK *
     }
 
     if  (!ac->st_adcs_requests_total) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_template%s_requests", ac->name);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_template_%s_requests", ac->name);
         ac->st_adcs_requests_total =  rrdset_create_localhost("adcs"
                                                              , id
                                                              , NULL
@@ -131,6 +134,48 @@ static void netdata_adcs_requests(struct adcs_certificate *ac, PERF_DATA_BLOCK *
     rrdset_done(ac->st_adcs_requests_total);
 }
 
+static void netdata_adcs_requests_processing_time(struct adcs_certificate *ac,
+                                                  PERF_DATA_BLOCK *pDataBlock,
+                                                  PERF_OBJECT_TYPE *pObjectType,
+                                                  int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ac->ADCSRequestProcessingTime)) {
+        return;
+    }
+
+    if  (!ac->st_adcs_request_processing_time_seconds) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_template_%s_request_processing_time", ac->name);
+        ac->st_adcs_request_processing_time_seconds =  rrdset_create_localhost("adcs"
+                                                                              , id
+                                                                              , NULL
+                                                                              , "requests"
+                                                                              , "adcs.cert_template_request_processing_time"
+                                                                              , "Certificate last request processing time"
+                                                                              , "seconds"
+                                                                              , PLUGIN_WINDOWS_NAME
+                                                                              , "PerflibADCS"
+                                                                              , PRIO_ADCS_CERT_REQUESTS_PROCESSING_TIME
+                                                                              , update_every
+                                                                              , RRDSET_TYPE_LINE
+        );
+
+        ac->rd_adcs_request_processing_time_seconds = rrddim_add(ac->st_adcs_request_processing_time_seconds,
+                                                                 "processing_time",
+                                                                 NULL,
+                                                                 1,
+                                                                 1000,
+                                                                 RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(ac->st_adcs_request_processing_time_seconds->rrdlabels, "cert_template", ac->name, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(ac->st_adcs_request_processing_time_seconds,
+                          ac->rd_adcs_request_processing_time_seconds,
+                          (collected_number)ac->ADCSRequestProcessingTime.current.Data);
+    rrdset_done(ac->st_adcs_request_processing_time_seconds);
+}
+
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
     if (!pObjectType)
@@ -138,6 +183,7 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     static void (*doADCS[])(struct adcs_certificate *, PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_adcs_requests,
+        netdata_adcs_requests_processing_time,
 
         // This must be the end
         NULL
@@ -158,6 +204,9 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                       windows_shared_buffer,
                                                       NULL,
                                                       sizeof(*ptr));
+
+        for (int i = 0; doADCS[i]; i++)
+            doADCS(ptr, pDataBlock, pObjectType, update_every);
     }
 
     return true;
