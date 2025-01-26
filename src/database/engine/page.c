@@ -260,17 +260,17 @@ static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition) {
     return ar;
 }
 
-static inline gorilla_writer_t *pgd_gorilla_writer_alloc(size_t partition) {
+static ALWAYS_INLINE gorilla_writer_t *pgd_gorilla_writer_alloc(size_t partition) {
     internal_fatal(partition >= pgd_alloc_globals.partitions, "invalid gorilla writer partition %zu", partition);
     return aral_mallocz_marked(pgd_alloc_globals.aral_gorilla_writer[partition]);
 }
 
-static inline gorilla_buffer_t *pgd_gorilla_buffer_alloc(size_t partition) {
+static ALWAYS_INLINE gorilla_buffer_t *pgd_gorilla_buffer_alloc(size_t partition) {
     internal_fatal(partition >= pgd_alloc_globals.partitions, "invalid gorilla buffer partition %zu", partition);
     return aral_mallocz_marked(pgd_alloc_globals.aral_gorilla_buffer[partition]);
 }
 
-static inline PGD *pgd_alloc(bool for_collector) {
+static ALWAYS_INLINE PGD *pgd_alloc(bool for_collector) {
     size_t partition = gettid_cached() % pgd_alloc_globals.partitions;
     PGD *pgd;
 
@@ -283,7 +283,7 @@ static inline PGD *pgd_alloc(bool for_collector) {
     return pgd;
 }
 
-static inline void *pgd_data_alloc(size_t size, size_t partition, bool for_collector) {
+static ALWAYS_INLINE void *pgd_data_alloc(size_t size, size_t partition, bool for_collector) {
     ARAL *ar = pgd_get_aral_by_size_and_partition(size, partition);
     if(ar) {
         int64_t padding = (int64_t)aral_requested_element_size(ar) - (int64_t)size;
@@ -298,7 +298,7 @@ static inline void *pgd_data_alloc(size_t size, size_t partition, bool for_colle
         return mallocz(size);
 }
 
-static void pgd_data_free(void *page, size_t size, size_t partition) {
+static ALWAYS_INLINE void pgd_data_free(void *page, size_t size, size_t partition) {
     ARAL *ar = pgd_get_aral_by_size_and_partition(size, partition);
     if(ar) {
         int64_t padding = (int64_t)aral_requested_element_size(ar) - (int64_t)size;
@@ -311,7 +311,7 @@ static void pgd_data_free(void *page, size_t size, size_t partition) {
     timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_TIER1_ARAL);
 }
 
-static void pgd_data_unmark(void *page, size_t size, size_t partition) {
+static ALWAYS_INLINE void pgd_data_unmark(void *page, size_t size, size_t partition) {
     if(!page) return;
 
     ARAL *ar = pgd_get_aral_by_size_and_partition(size, partition);
@@ -329,11 +329,11 @@ static size_t pgd_data_footprint(size_t size, size_t partition) {
 
 // ----------------------------------------------------------------------------
 
-void *dbengine_extent_alloc(size_t size) {
+ALWAYS_INLINE void *dbengine_extent_alloc(size_t size) {
     return pgd_data_alloc(size, 0, false);
 }
 
-void dbengine_extent_free(void *extent, size_t size) {
+ALWAYS_INLINE void dbengine_extent_free(void *extent, size_t size) {
     pgd_data_free(extent, size, 0);
 }
 
@@ -351,17 +351,6 @@ PGD *pgd_create(uint8_t type, uint32_t slots) {
     pg->slots = slots;
 
     switch (type) {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
-            uint32_t size = slots * page_type_size[type];
-
-            internal_fatal(!size || slots == 1,
-                      "DBENGINE: invalid number of slots (%u) or page type (%u)", slots, type);
-
-            pg->raw.size = size;
-            pg->raw.data = pgd_data_alloc(size, pg->partition, true);
-            break;
-        }
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             internal_fatal(slots == 1,
                       "DBENGINE: invalid number of slots (%u) or page type (%u)", slots, type);
@@ -379,6 +368,19 @@ PGD *pgd_create(uint8_t type, uint32_t slots) {
 
             break;
         }
+
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
+            uint32_t size = slots * page_type_size[type];
+
+            internal_fatal(!size || slots == 1,
+                           "DBENGINE: invalid number of slots (%u) or page type (%u)", slots, type);
+
+            pg->raw.size = size;
+            pg->raw.data = pgd_data_alloc(size, pg->partition, true);
+            break;
+        }
+
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, type);
             aral_freez(pgd_alloc_globals.aral_pgd[pg->partition], pg);
@@ -401,16 +403,6 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
 
     switch (type)
     {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
-            pg->used = size / page_type_size[type];
-            pg->slots = pg->used;
-
-            pg->raw.size = size;
-            pg->raw.data = pgd_data_alloc(size, pg->partition, false);
-            memcpy(pg->raw.data, base, size);
-            break;
-
         case RRDENG_PAGE_TYPE_GORILLA_32BIT:
             internal_fatal(size == 0, "Asked to create page with 0 data!!!");
             internal_fatal(size % sizeof(uint32_t), "Unaligned gorilla buffer size");
@@ -425,6 +417,16 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
             uint32_t total_entries = gorilla_buffer_patch((void *) pg->raw.data);
             pg->used = total_entries;
             pg->slots = pg->used;
+            break;
+
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+            pg->used = size / page_type_size[type];
+            pg->slots = pg->used;
+
+            pg->raw.size = size;
+            pg->raw.data = pgd_data_alloc(size, pg->partition, false);
+            memcpy(pg->raw.data, base, size);
             break;
 
         default:
@@ -446,11 +448,6 @@ void pgd_free(PGD *pg) {
 
     switch (pg->type)
     {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
-            pgd_data_free(pg->raw.data, pg->raw.size, pg->partition);
-            break;
-
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
             {
@@ -498,6 +495,12 @@ void pgd_free(PGD *pg) {
 
             break;
         }
+
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+            pgd_data_free(pg->raw.data, pg->raw.size, pg->partition);
+            break;
+
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
             break;
@@ -522,11 +525,6 @@ static void pgd_aral_unmark(PGD *pg) {
 
     switch (pg->type)
     {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
-            pgd_data_unmark(pg->raw.data, pg->raw.size, pg->partition);
-            break;
-
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
                 pgd_data_unmark(pg->raw.data, pg->raw.size, pg->partition);
@@ -550,6 +548,12 @@ static void pgd_aral_unmark(PGD *pg) {
 
             break;
         }
+
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+            pgd_data_unmark(pg->raw.data, pg->raw.size, pg->partition);
+            break;
+
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
             break;
@@ -564,12 +568,12 @@ static void pgd_aral_unmark(PGD *pg) {
 // ----------------------------------------------------------------------------
 // utility functions
 
-uint32_t pgd_type(PGD *pg)
+ALWAYS_INLINE uint32_t pgd_type(PGD *pg)
 {
     return pg->type;
 }
 
-bool pgd_is_empty(PGD *pg)
+ALWAYS_INLINE bool pgd_is_empty(PGD *pg)
 {
     if (!pg)
         return true;
@@ -586,7 +590,7 @@ bool pgd_is_empty(PGD *pg)
     return false;
 }
 
-uint32_t pgd_slots_used(PGD *pg)
+ALWAYS_INLINE uint32_t pgd_slots_used(PGD *pg)
 {
     if (!pg)
         return 0;
@@ -597,7 +601,7 @@ uint32_t pgd_slots_used(PGD *pg)
     return pg->used;
 }
 
-uint32_t pgd_capacity(PGD *pg) {
+ALWAYS_INLINE uint32_t pgd_capacity(PGD *pg) {
     if (!pg)
         return 0;
 
@@ -619,11 +623,6 @@ uint32_t pgd_memory_footprint(PGD *pg)
     size_t footprint = pgd_alloc_globals.sizeof_pgd;
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
-            footprint += pgd_data_footprint(pg->raw.size, pg->partition);
-            break;
-
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
                 footprint += pgd_data_footprint(pg->raw.size, pg->partition);
@@ -634,6 +633,11 @@ uint32_t pgd_memory_footprint(PGD *pg)
             }
             break;
         }
+
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+            footprint += pgd_data_footprint(pg->raw.size, pg->partition);
+            break;
 
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
@@ -655,11 +659,6 @@ uint32_t pgd_buffer_memory_footprint(PGD *pg)
     size_t footprint = 0;
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
-            footprint = pg->raw.size;
-            break;
-
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
                 footprint = pg->raw.size;
@@ -668,6 +667,11 @@ uint32_t pgd_buffer_memory_footprint(PGD *pg)
                 footprint = pg->gorilla.num_buffers * RRDENG_GORILLA_32BIT_BUFFER_SIZE;
             break;
         }
+
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+            footprint = pg->raw.size;
+            break;
 
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
@@ -688,14 +692,6 @@ uint32_t pgd_disk_footprint(PGD *pg)
     pgd_aral_unmark(pg);
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
-            uint32_t used_size = pg->used * page_type_size[pg->type];
-            internal_fatal(used_size > pg->raw.size, "Wrong disk footprint page size");
-            size = used_size;
-
-            break;
-        }
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR ||
                 pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING ||
@@ -723,6 +719,16 @@ uint32_t pgd_disk_footprint(PGD *pg)
 
             break;
         }
+
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
+            uint32_t used_size = pg->used * page_type_size[pg->type];
+            internal_fatal(used_size > pg->raw.size, "Wrong disk footprint page size");
+            size = used_size;
+
+            break;
+        }
+
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
             break;
@@ -741,10 +747,6 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
                    pgd_disk_footprint(pg), dst_size);
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
-            memcpy(dst, pg->raw.data, dst_size);
-            break;
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if ((pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING) == 0)
                 fatal("Copying to extent is supported only for PGDs that are scheduled for flushing.");
@@ -762,6 +764,12 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
                            pg, pg->gorilla.writer, dst_size, pg->gorilla.num_buffers);
             break;
         }
+
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+            memcpy(dst, pg->raw.data, dst_size);
+            break;
+
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
             break;
@@ -774,7 +782,7 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
 // data collection
 
 // returns additional memory that may have been allocated to store this point
-size_t pgd_append_point(PGD *pg,
+ALWAYS_INLINE size_t pgd_append_point(PGD *pg,
                       usec_t point_in_time_ut __maybe_unused,
                       NETDATA_DOUBLE n,
                       NETDATA_DOUBLE min_value,
@@ -799,31 +807,6 @@ size_t pgd_append_point(PGD *pg,
         fatal("Data collection on page already scheduled for flushing");
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT: {
-            storage_number *tier0_metric_data = (storage_number *)pg->raw.data;
-            storage_number t = pack_storage_number(n, flags);
-            tier0_metric_data[pg->used++] = t;
-
-            if ((pg->options & PAGE_OPTION_ALL_VALUES_EMPTY) && does_storage_number_exist(t))
-                pg->options &= ~PAGE_OPTION_ALL_VALUES_EMPTY;
-
-            break;
-        }
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
-            storage_number_tier1_t *tier12_metric_data = (storage_number_tier1_t *)pg->raw.data;
-            storage_number_tier1_t t;
-            t.sum_value = (float) n;
-            t.min_value = (float) min_value;
-            t.max_value = (float) max_value;
-            t.anomaly_count = anomaly_count;
-            t.count = count;
-            tier12_metric_data[pg->used++] = t;
-
-            if ((pg->options & PAGE_OPTION_ALL_VALUES_EMPTY) && fpclassify(n) != FP_NAN)
-                pg->options &= ~PAGE_OPTION_ALL_VALUES_EMPTY;
-
-            break;
-        }
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             pg->used++;
             storage_number t = pack_storage_number(n, flags);
@@ -848,6 +831,31 @@ size_t pgd_append_point(PGD *pg,
 
             break;
         }
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
+            storage_number_tier1_t *tier12_metric_data = (storage_number_tier1_t *)pg->raw.data;
+            storage_number_tier1_t t;
+            t.sum_value = (float) n;
+            t.min_value = (float) min_value;
+            t.max_value = (float) max_value;
+            t.anomaly_count = anomaly_count;
+            t.count = count;
+            tier12_metric_data[pg->used++] = t;
+
+            if ((pg->options & PAGE_OPTION_ALL_VALUES_EMPTY) && fpclassify(n) != FP_NAN)
+                pg->options &= ~PAGE_OPTION_ALL_VALUES_EMPTY;
+
+            break;
+        }
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT: {
+            storage_number *tier0_metric_data = (storage_number *)pg->raw.data;
+            storage_number t = pack_storage_number(n, flags);
+            tier0_metric_data[pg->used++] = t;
+
+            if ((pg->options & PAGE_OPTION_ALL_VALUES_EMPTY) && does_storage_number_exist(t))
+                pg->options &= ~PAGE_OPTION_ALL_VALUES_EMPTY;
+
+            break;
+        }
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
             break;
@@ -864,10 +872,6 @@ static void pgdc_seek(PGDC *pgdc, uint32_t position)
     PGD *pg = pgdc->pgd;
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
-            pgdc->slots = pgdc->pgd->used;
-            break;
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK) {
                 pgdc->slots = pgdc->pgd->slots;
@@ -900,6 +904,12 @@ static void pgdc_seek(PGDC *pgdc, uint32_t position)
 
             break;
         }
+
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+            pgdc->slots = pgdc->pgd->used;
+            break;
+
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
             break;
