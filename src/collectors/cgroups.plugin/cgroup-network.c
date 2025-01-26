@@ -634,6 +634,7 @@ int is_valid_path_symbol(char c) {
         case '_':   // underscore
         case '.':   // dot
         case ',':   // comma
+        case '@':   // systemd unit template specifier (/sys/fs/cgroup/machines.slice/systemd-nspawn@NAME.service)
             return 1;
 
         default:
