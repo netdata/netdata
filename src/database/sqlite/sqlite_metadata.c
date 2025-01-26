@@ -185,6 +185,7 @@ sqlite3 *db_meta = NULL;
 #define METADATA_HOST_CHECK_INTERVAL (5)            // Repeat check for pending metadata
 #define METADATA_MAX_BATCH_SIZE (512)               // Maximum commands to execute before running the event loop
 
+#define DATABASE_VACUUM_FREQUENCY_SECONDS (60)
 #define DATABASE_FREE_PAGES_THRESHOLD_PC (5)        // Percentage of free pages to trigger vacuum
 #define DATABASE_FREE_PAGES_VACUUM_PC (10)          // Percentage of free pages to vacuum
 
@@ -1707,26 +1708,32 @@ static void timer_cb(uv_timer_t* handle)
 
 void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc)
 {
-   int free_pages = get_free_page_count(database);
-   int total_pages = get_database_page_count(database);
+    static time_t next_run = 0;
 
-   if (!threshold)
-       threshold = DATABASE_FREE_PAGES_THRESHOLD_PC;
+    time_t now = now_realtime_sec();
+    if (next_run > now)
+        return;
 
-   if (!vacuum_pc)
-       vacuum_pc = DATABASE_FREE_PAGES_VACUUM_PC;
+    next_run = now + DATABASE_VACUUM_FREQUENCY_SECONDS;
 
-   if (free_pages > (total_pages * threshold / 100)) {
+    int free_pages = get_free_page_count(database);
+    int total_pages = get_database_page_count(database);
 
-       int do_free_pages = (int) (free_pages * vacuum_pc / 100);
-       nd_log(NDLS_DAEMON, NDLP_DEBUG, "%s: Freeing %d database pages", db_alias, do_free_pages);
+    if (!threshold)
+        threshold = DATABASE_FREE_PAGES_THRESHOLD_PC;
 
-       char sql[128];
-       snprintfz(sql, sizeof(sql) - 1, "PRAGMA incremental_vacuum(%d)", do_free_pages);
-       (void) db_execute(database, sql);
-   }
+    if (!vacuum_pc)
+        vacuum_pc = DATABASE_FREE_PAGES_VACUUM_PC;
+
+    if (free_pages > (total_pages * threshold / 100)) {
+        int do_free_pages = (int)(free_pages * vacuum_pc / 100);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "%s: Freeing %d database pages", db_alias, do_free_pages);
+
+        char sql[128];
+        snprintfz(sql, sizeof(sql) - 1, "PRAGMA incremental_vacuum(%d)", do_free_pages);
+        (void)db_execute(database, sql);
+    }
 }
-
 
 #define SQL_SELECT_HOST_CTX_CHART_DIM_LIST                                                                             \
     "SELECT d.dim_id, d.rowid FROM chart c, dimension d WHERE c.chart_id = d.chart_id AND c.rowid = @rowid"
