@@ -120,7 +120,8 @@ size_t dictionary_version(DICTIONARY *dict) {
 
     return __atomic_load_n(&dict->version, __ATOMIC_RELAXED);
 }
-size_t dictionary_entries(DICTIONARY *dict) {
+
+ALWAYS_INLINE size_t dictionary_entries(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
     // this is required for views to return the right number
@@ -131,6 +132,7 @@ size_t dictionary_entries(DICTIONARY *dict) {
 
     return entries;
 }
+
 size_t dictionary_referenced_items(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
@@ -742,11 +744,11 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONA
 // ----------------------------------------------------------------------------
 // get the name/value of an item
 
-const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+ALWAYS_INLINE const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     return item_get_name(item);
 }
 
-void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+ALWAYS_INLINE void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     if(likely(item))
         return item->shared->value;
 
