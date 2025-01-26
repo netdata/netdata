@@ -294,11 +294,6 @@ struct host_ctx_cleanup_s {
 
 static void ctx_delete_metadata_cleanup_context(sqlite3_stmt **res, nd_uuid_t *host_uuid, const char *context)
 {
-//    char host_str[UUID_STR_LEN];
-//    uuid_unparse_lower(*host_uuid, host_str);
-//    nd_log_daemon(NDLP_INFO, "Will delete context %s for host %s because it was checked", context, host_str);
-//    return;
-
     if (!*res) {
         if (!PREPARE_STATEMENT(db_meta, CTX_DELETE_CONTEXT_META_CLEANUP_ITEM, res))
             return;
@@ -1140,8 +1135,10 @@ static bool store_host_systeminfo(RRDHOST *host)
 
 static int store_chart_metadata(RRDSET *st, sqlite3_stmt **res)
 {
-    if (!PREPARE_STATEMENT(db_meta, SQL_STORE_CHART, res))
-        return 1;
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, SQL_STORE_CHART, res))
+            return 1;
+    }
 
     int rc =  SQLITE_DONE;
     int param = 0;
@@ -1181,8 +1178,10 @@ done:
 
 static bool store_dimension_metadata(RRDDIM *rd, sqlite3_stmt **res)
 {
-    if (!PREPARE_STATEMENT(db_meta, SQL_STORE_DIMENSION, res))
-        return 1;
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, SQL_STORE_DIMENSION, res))
+            return 1;
+    }
 
     int rc = SQLITE_DONE;
     int param = 0;
