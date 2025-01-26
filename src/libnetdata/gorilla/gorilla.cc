@@ -347,79 +347,81 @@ gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *gbuf)
     };
 }
 
-bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number)
-{
-    const uint32_t *data = gr->buffer->data;
+extern "C" {
+    ALWAYS_INLINE_ONLY bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number)
+    {
+        const uint32_t *data = gr->buffer->data;
 
-    if (gr->index + 1 > gr->entries) {
-        // We don't have any more entries to return. However, the writer
-        // might have updated the buffer's entries. We need to check once
-        // more in case more elements were added.
-        gr->entries = __atomic_load_n(&gr->buffer->header.entries, __ATOMIC_ACQUIRE);
-        gr->capacity = __atomic_load_n(&gr->buffer->header.nbits, __ATOMIC_ACQUIRE);
-
-        // if the reader's current buffer has not been updated, we need to
-        // check if it has a pointer to a next buffer.
         if (gr->index + 1 > gr->entries) {
-            gorilla_buffer_t *next_buffer = __atomic_load_n(&gr->buffer->header.next, __ATOMIC_ACQUIRE);
+            // We don't have any more entries to return. However, the writer
+            // might have updated the buffer's entries. We need to check once
+            // more in case more elements were added.
+            gr->entries = __atomic_load_n(&gr->buffer->header.entries, __ATOMIC_ACQUIRE);
+            gr->capacity = __atomic_load_n(&gr->buffer->header.nbits, __ATOMIC_ACQUIRE);
 
-            if (!next_buffer) {
-                // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n (No more buffers to read from)", gr->length, gr->buffer);
-                return false;
+            // if the reader's current buffer has not been updated, we need to
+            // check if it has a pointer to a next buffer.
+            if (gr->index + 1 > gr->entries) {
+                gorilla_buffer_t *next_buffer = __atomic_load_n(&gr->buffer->header.next, __ATOMIC_ACQUIRE);
+
+                if (!next_buffer) {
+                    // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n (No more buffers to read from)", gr->length, gr->buffer);
+                    return false;
+                }
+
+                // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n", gr->length, gr->buffer);
+                *gr = gorilla_reader_init(next_buffer);
+                return gorilla_reader_read(gr, number);
             }
-
-            // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n", gr->length, gr->buffer);
-            *gr = gorilla_reader_init(next_buffer);
-            return gorilla_reader_read(gr, number);
         }
-    }
 
-    // read the first number
-    if (gr->index == 0) {
-        bit_buffer_read(data, gr->position, number, bit_size<uint32_t>());
+        // read the first number
+        if (gr->index == 0) {
+            bit_buffer_read(data, gr->position, number, bit_size<uint32_t>());
+
+            gr->index++;
+            gr->position += bit_size<uint32_t>();
+            gr->prev_number = *number;
+            return true;
+        }
+
+        // process same-number bit
+        uint32_t is_same_number;
+        bit_buffer_read(data, gr->position, &is_same_number, 1);
+        gr->position++;
+
+        if (is_same_number) {
+            *number = gr->prev_number;
+            gr->index++;
+            return true;
+        }
+
+        // proceess same-xor-lzc bit
+        uint32_t xor_lzc = gr->prev_xor_lzc;
+
+        uint32_t same_xor_lzc;
+        bit_buffer_read(data, gr->position, &same_xor_lzc, 1);
+        gr->position++;
+
+        if (!same_xor_lzc) {
+            bit_buffer_read(data, gr->position, &xor_lzc, (bit_size<uint32_t>() == 32) ? 5 : 6);
+            gr->position += (bit_size<uint32_t>() == 32) ? 5 : 6;
+        }
+
+        // process the non-lzc suffix
+        uint32_t xor_value = 0;
+        bit_buffer_read(data, gr->position, &xor_value, bit_size<uint32_t>() - xor_lzc);
+        gr->position += bit_size<uint32_t>() - xor_lzc;
+
+        *number = (gr->prev_number ^ xor_value);
 
         gr->index++;
-        gr->position += bit_size<uint32_t>();
         gr->prev_number = *number;
+        gr->prev_xor_lzc = xor_lzc;
+        gr->prev_xor = xor_value;
+
         return true;
     }
-
-    // process same-number bit
-    uint32_t is_same_number;
-    bit_buffer_read(data, gr->position, &is_same_number, 1);
-    gr->position++;
-
-    if (is_same_number) {
-        *number = gr->prev_number;
-        gr->index++;
-        return true;
-    }
-
-    // proceess same-xor-lzc bit
-    uint32_t xor_lzc = gr->prev_xor_lzc;
-
-    uint32_t same_xor_lzc;
-    bit_buffer_read(data, gr->position, &same_xor_lzc, 1);
-    gr->position++;
-
-    if (!same_xor_lzc) {
-        bit_buffer_read(data, gr->position, &xor_lzc, (bit_size<uint32_t>() == 32) ? 5 : 6);
-        gr->position += (bit_size<uint32_t>() == 32) ? 5 : 6;
-    }
-
-    // process the non-lzc suffix
-    uint32_t xor_value = 0;
-    bit_buffer_read(data, gr->position, &xor_value, bit_size<uint32_t>() - xor_lzc);
-    gr->position += bit_size<uint32_t>() - xor_lzc;
-
-    *number = (gr->prev_number ^ xor_value);
-
-    gr->index++;
-    gr->prev_number = *number;
-    gr->prev_xor_lzc = xor_lzc;
-    gr->prev_xor = xor_value;
-
-    return true;
 }
 
 extern "C" {

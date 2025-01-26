@@ -338,9 +338,11 @@ typedef uint32_t uid_t;
 #ifdef __GNUC__
 #define UNUSED_FUNCTION(x) __attribute__((unused)) UNUSED_##x
 #define ALWAYS_INLINE inline __attribute__((always_inline))
+#define ALWAYS_INLINE_ONLY __attribute__((always_inline))
 #else
 #define UNUSED_FUNCTION(x) UNUSED_##x
 #define ALWAYS_INLINE inline
+#define ALWAYS_INLINE_ONLY
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
