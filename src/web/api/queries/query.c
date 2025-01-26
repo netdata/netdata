@@ -703,7 +703,7 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method)
     }
 }
 
-static inline void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING add_flush) {
+static ALWAYS_INLINE void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING add_flush) {
     switch(add_flush) {
         case RRDR_GROUPING_AVERAGE:
             tg_average_add(r, value);
@@ -760,7 +760,7 @@ static inline void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_T
     }
 }
 
-static inline NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, const RRDR_TIME_GROUPING add_flush) {
+static ALWAYS_INLINE NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, const RRDR_TIME_GROUPING add_flush) {
     switch(add_flush) {
         case RRDR_GROUPING_AVERAGE:
             return tg_average_flush(r, rrdr_value_options_ptr);

@@ -140,14 +140,14 @@ const char *aral_name(ARAL *ar) {
     return ar->config.name;
 }
 
-static inline void aral_element_given(ARAL *ar, ARAL_PAGE *page) {
+static ALWAYS_INLINE void aral_element_given(ARAL *ar, ARAL_PAGE *page) {
     if(ar->config.mmap.enabled || page->mapped)
         __atomic_add_fetch(&ar->stats->mmap.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
     else
         __atomic_add_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
 }
 
-static inline void aral_element_returned(ARAL *ar, ARAL_PAGE *page) {
+static ALWAYS_INLINE void aral_element_returned(ARAL *ar, ARAL_PAGE *page) {
     if(ar->config.mmap.enabled || page->mapped)
         __atomic_sub_fetch(&ar->stats->mmap.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
     else
@@ -207,12 +207,12 @@ struct aral_statistics *aral_get_statistics(ARAL *ar) {
     return ar->stats;
 }
 
-static inline void aral_lock_with_trace(ARAL *ar, const char *func) {
+static ALWAYS_INLINE void aral_lock_with_trace(ARAL *ar, const char *func) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
         spinlock_lock_with_trace(&ar->aral_lock.spinlock, func);
 }
 
-static inline void aral_unlock_with_trace(ARAL *ar, const char *func) {
+static ALWAYS_INLINE void aral_unlock_with_trace(ARAL *ar, const char *func) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
         spinlock_unlock_with_trace(&ar->aral_lock.spinlock, func);
 }
@@ -220,27 +220,27 @@ static inline void aral_unlock_with_trace(ARAL *ar, const char *func) {
 #define aral_lock(ar) aral_lock_with_trace(ar, __FUNCTION__)
 #define aral_unlock(ar) aral_unlock_with_trace(ar, __FUNCTION__)
 
-static inline void aral_page_available_lock(ARAL *ar, ARAL_PAGE *page) {
+static ALWAYS_INLINE void aral_page_available_lock(ARAL *ar, ARAL_PAGE *page) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
         spinlock_lock(&page->available.spinlock);
 }
 
-static inline void aral_page_available_unlock(ARAL *ar, ARAL_PAGE *page) {
+static ALWAYS_INLINE void aral_page_available_unlock(ARAL *ar, ARAL_PAGE *page) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
         spinlock_unlock(&page->available.spinlock);
 }
 
-static inline void aral_page_incoming_lock(ARAL *ar, ARAL_PAGE *page, size_t partition) {
+static ALWAYS_INLINE void aral_page_incoming_lock(ARAL *ar, ARAL_PAGE *page, size_t partition) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
         spinlock_lock(&page->incoming[partition].spinlock);
 }
 
-static inline void aral_page_incoming_unlock(ARAL *ar, ARAL_PAGE *page, size_t partition) {
+static ALWAYS_INLINE void aral_page_incoming_unlock(ARAL *ar, ARAL_PAGE *page, size_t partition) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
         spinlock_unlock(&page->incoming[partition].spinlock);
 }
 
-static inline bool aral_adders_trylock(ARAL *ar, bool marked) {
+static ALWAYS_INLINE bool aral_adders_trylock(ARAL *ar, bool marked) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS))) {
         size_t idx = mark_to_idx(marked);
         return spinlock_trylock(&ar->ops[idx].adders.spinlock);
@@ -249,14 +249,14 @@ static inline bool aral_adders_trylock(ARAL *ar, bool marked) {
     return true;
 }
 
-static inline void aral_adders_lock(ARAL *ar, bool marked) {
+static ALWAYS_INLINE void aral_adders_lock(ARAL *ar, bool marked) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS))) {
         size_t idx = mark_to_idx(marked);
         spinlock_lock(&ar->ops[idx].adders.spinlock);
     }
 }
 
-static inline void aral_adders_unlock(ARAL *ar, bool marked) {
+static ALWAYS_INLINE void aral_adders_unlock(ARAL *ar, bool marked) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS))) {
         size_t idx = mark_to_idx(marked);
         spinlock_unlock(&ar->ops[idx].adders.spinlock);
@@ -367,7 +367,7 @@ static inline ARAL_PAGE *find_page_with_allocation_internal_check(ARAL *ar, void
 // Tagging the pointer with the 'marked' flag
 
 // Retrieving the pointer and the 'marked' flag
-static ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *ptr, bool *marked) {
+static ALWAYS_INLINE ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *ptr, bool *marked) {
     uint8_t *data = ptr;
     uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.element_ptr_offset];
     uintptr_t tagged_page = __atomic_load_n(page_ptr, __ATOMIC_ACQUIRE);  // Atomically load the tagged pointer
@@ -403,7 +403,7 @@ static ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_have_aral_lock(AR
     return page;
 }
 
-static void aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *page, void *ptr, bool marked) {
+static ALWAYS_INLINE void aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *page, void *ptr, bool marked) {
     uint8_t *data = ptr;
     uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.element_ptr_offset];
     uintptr_t tagged_page = (uintptr_t)page;  // Cast the pointer to an integer
@@ -431,7 +431,7 @@ static inline void aral_free_validate_internal_check(ARAL *ar, ARAL_FREE *fr) {
 // --------------------------------------------------------------------------------------------------------------------
 // page size management
 
-static size_t aral_element_slot_size(size_t requested_element_size, bool usable) {
+static ALWAYS_INLINE size_t aral_element_slot_size(size_t requested_element_size, bool usable) {
     // we need to add a page pointer after the element
     // so, first align the element size to the pointer size
     size_t element_size = memory_alignment(requested_element_size, sizeof(uintptr_t));
@@ -456,7 +456,7 @@ size_t aral_optimal_malloc_page_size(void) {
     return ARAL_MAX_PAGE_SIZE_MALLOC;
 }
 
-static size_t aral_elements_in_page_size(ARAL *ar, size_t page_size) {
+static ALWAYS_INLINE size_t aral_elements_in_page_size(ARAL *ar, size_t page_size) {
     if(ar->config.mmap.enabled)
         return page_size / ar->config.element_size;
 
@@ -465,7 +465,7 @@ static size_t aral_elements_in_page_size(ARAL *ar, size_t page_size) {
     return remaining / ar->config.element_size;
 }
 
-static size_t aral_next_allocation_size___adders_lock_needed(ARAL *ar, bool marked) {
+static ALWAYS_INLINE size_t aral_next_allocation_size___adders_lock_needed(ARAL *ar, bool marked) {
     size_t idx = mark_to_idx(marked);
     size_t size = ar->ops[idx].adders.allocation_size;
 
@@ -583,7 +583,7 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
     return page;
 }
 
-void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+static void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     size_t idx = mark_to_idx(page->started_marked);
     __atomic_store_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, true, __ATOMIC_RELAXED);
 
@@ -636,7 +636,7 @@ void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_
     __atomic_sub_fetch(&ar->stats->structures.allocated_bytes, structures_size, __ATOMIC_RELAXED);
 }
 
-static inline ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+static ALWAYS_INLINE ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     size_t idx = mark_to_idx(marked);
     __atomic_add_fetch(&ar->ops[idx].atomic.allocators, 1, __ATOMIC_RELAXED);
     aral_lock(ar);
@@ -757,7 +757,7 @@ static inline ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool mar
     return page;
 }
 
-static void *aral_get_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *page, bool marked) {
+static ALWAYS_INLINE void *aral_get_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *page, bool marked) {
     // Try fast path first
     uint64_t slot = __atomic_fetch_add(&page->elements_segmented, 1, __ATOMIC_ACQUIRE);
     if (slot < page->max_elements) {
@@ -821,7 +821,7 @@ static inline void aral_add_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *pa
     aral_page_incoming_unlock(ar, page, partition);
 }
 
-void *aral_callocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+ALWAYS_INLINE void *aral_callocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     void *r = aral_mallocz_internal(ar, marked TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
     memset(r, 0, ar->config.requested_element_size);
     return r;
@@ -844,7 +844,7 @@ void *aral_mallocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEF
 }
 
 // returns true if it moved the page to the unmarked list
-static ARAL_PAGE **aral_remove_marked_allocation___aral_lock_needed(ARAL *ar, ARAL_PAGE **head_ptr, ARAL_PAGE *page) {
+static ALWAYS_INLINE ARAL_PAGE **aral_remove_marked_allocation___aral_lock_needed(ARAL *ar, ARAL_PAGE **head_ptr, ARAL_PAGE *page) {
     internal_fatal(!page->aral_lock.marked_elements, "marked elements refcount found zero");
     internal_fatal(!is_page_in_list(*head_ptr, page), "Page is not in this list");
 
