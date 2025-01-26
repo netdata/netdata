@@ -650,6 +650,7 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         netdata_adcs_failed_requets,
         netdata_adcs_issued_requets,
         netdata_adcs_pending_requets,
+        netdata_adcs_challenge_response,
 
         netdata_adcs_challenge_response,
 
