@@ -262,7 +262,7 @@ static inline char *sqlite3_text_strdupz_empty(sqlite3_stmt *res, int iCol) {
 
 #define SQL_UPDATE_ALERT_VERSION                                                                                       \
     "INSERT INTO alert_version (health_log_id, unique_id, status, version, date_submitted)"                            \
-    " VALUES (@health_log_id, @unique_id, @status, @version, UNIXEPOCH())"                                         \
+    " VALUES (@health_log_id, @unique_id, @status, @version, UNIXEPOCH())"                                             \
     " ON CONFLICT(health_log_id) DO UPDATE SET status = excluded.status, version = excluded.version, "                 \
     " unique_id=excluded.unique_id, date_submitted=excluded.date_submitted"
 
@@ -270,27 +270,32 @@ static inline char *sqlite3_text_strdupz_empty(sqlite3_stmt *res, int iCol) {
 // Store a new alert transition along with the version after sending to the cloud
 //   - Update an existing alert with the updated version, status, transition and date submitted
 //
-static void sql_update_alert_version(int64_t health_log_id, int64_t unique_id, RRDCALC_STATUS status, uint64_t version)
+static void sql_update_alert_version(
+    int64_t health_log_id,
+    int64_t unique_id,
+    RRDCALC_STATUS status,
+    uint64_t version,
+    sqlite3_stmt **res)
 {
-    sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION, &res))
-        return;
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION, res))
+            return;
+    }
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, status));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, version));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, health_log_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(*res, ++param, status));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, version));
 
     param = 0;
-    int rc = sqlite3_step_monitored(res);
+    int rc = sqlite3_step_monitored(*res);
     if (rc != SQLITE_DONE)
         error_report("Failed to execute sql_update_alert_version");
 
 done:
-    REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
+    REPORT_BIND_FAIL(*res, param);
+    SQLITE_RESET(*res);
 }
 
 #define SQL_SELECT_ALERT_TO_DUMMY                                                                                      \
@@ -318,6 +323,7 @@ static void commit_alert_events(RRDHOST *host)
     int64_t first_sequence_id = 0;
     int64_t last_sequence_id = 0;
 
+    sqlite3_stmt *res_version = NULL;
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
@@ -330,7 +336,9 @@ static void commit_alert_events(RRDHOST *host)
         RRDCALC_STATUS status = (RRDCALC_STATUS)sqlite3_column_int(res, 3);
         int64_t health_log_id = sqlite3_column_int64(res, 4);
 
-        sql_update_alert_version(health_log_id, unique_id, status, version);
+        // Prepare the statement on the first time (res_version) then reuse it
+        // finalize when we are done
+        sql_update_alert_version(health_log_id, unique_id, status, version, &res_version);
     }
 
     if (first_sequence_id)
@@ -469,21 +477,20 @@ void health_alarm_log_populate(
     " AND hl.host_id = @host_id AND aq.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
     " ORDER BY aq.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES
 
-static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
-
+static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stmt **res_version)
 {
     CLAIM_ID claim_id = claim_id_get();
 
     if (!claim_id_is_set(claim_id) || UUIDiszero(host->node_id))
         return;
 
-    sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_PUSH, &res))
-        return;
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_PUSH, res))
+            return;
+    }
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     char node_id_str[UUID_STR_LEN];
     uuid_unparse_lower(host->node_id.uuid, node_id_str);
@@ -498,8 +505,8 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
     param = 0;
     RRDCALC_STATUS status;
     struct aclk_sync_cfg_t *wc = host->aclk_config;
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        health_alarm_log_populate(&alarm_log, res, host, &status);
+    while (sqlite3_step_monitored(*res) == SQLITE_ROW) {
+        health_alarm_log_populate(&alarm_log, *res, host, &status);
         aclk_send_alarm_log_entry(&alarm_log);
         wc->alert_count++;
 
@@ -507,7 +514,9 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
         if (first_id == 0)
             first_id = last_id;
 
-        sql_update_alert_version(alarm_log.health_log_id, alarm_log.unique_id, status, alarm_log.version);
+        // The statement to set the version will be compiled once and reset when done
+        // out caller will finalize the statement to release resources
+        sql_update_alert_version(alarm_log.health_log_id, alarm_log.unique_id, status, alarm_log.version, res_version);
 
         destroy_alarm_log_entry(&alarm_log);
     }
@@ -528,8 +537,8 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
     }
 
 done:
-    REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
+    REPORT_BIND_FAIL(*res, param);
+    SQLITE_RESET(*res);
 }
 
 #define SQL_DELETE_PROCESSED_ROWS "DELETE FROM alert_queue WHERE host_id = @host_id AND rowid = @row"
@@ -668,6 +677,8 @@ void aclk_push_alert_events_for_all_hosts(void)
 {
     RRDHOST *host;
 
+    sqlite3_stmt *res = NULL;               // used to scan pending alerts to send
+    sqlite3_stmt *res_version = NULL;       // used to update the alert version
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS) ||
             rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
@@ -694,9 +705,11 @@ void aclk_push_alert_events_for_all_hosts(void)
             wc->send_snapshot = 0;
         }
         else
-            aclk_push_alert_event(host);
+            aclk_push_alert_event(host, &res, &res_version);
     }
     dfe_done(host);
+    SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res_version);
 }
 
 void aclk_send_alert_configuration(char *config_hash)
