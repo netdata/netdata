@@ -611,10 +611,24 @@ void call_the_helper(pid_t pid, const char *cgroup) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot execute cgroup-network helper script: %s", command);
 }
 
+int ishex(char c) {
+    return (c >= '0' && c <= '9') ||
+           (c >= 'a' && c <= 'f') ||
+           (c >= 'A' && c <= 'F');
+}
+
+int is_valid_hex_escape(const char *arg) {
+    fatal_assert(arg);
+
+    return (arg[0] == '\\') &&
+           (arg[1] == 'x') &&
+           ishex(arg[2]) &&
+           ishex(arg[3]);
+}
+
 int is_valid_path_symbol(char c) {
     switch(c) {
         case '/':   // path separators
-        case '\\':  // needed for virsh domains \x2d1\x2dname
         case ' ':   // space
         case '-':   // hyphen
         case '_':   // underscore
@@ -637,18 +651,16 @@ int verify_path(const char *path) {
 
     fatal_assert(path);
 
-    char c;
     const char *s = path;
-    while((c = *s++)) {
-        if(!( isalnum(c) || is_valid_path_symbol(c) )) {
+    while(*s != '\0') {
+        if (isalnum(*s) || is_valid_path_symbol(*s))
+            s += 1;
+        else if (*s == '\\' && is_valid_hex_escape(s))
+            s += 4;
+        else {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "invalid character in path '%s'", path);
             return -1;
         }
-    }
-
-    if(strstr(path, "\\") && !strstr(path, "\\x")) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "invalid escape sequence in path '%s'", path);
-        return 1;
     }
 
     if(strstr(path, "/../")) {
