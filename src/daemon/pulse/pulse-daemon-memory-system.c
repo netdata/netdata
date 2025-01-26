@@ -109,11 +109,12 @@ cleanup:
 }
 #endif // HAVE_C_MALLOC_INFO
 
-void pulse_daemon_memory_system_do(bool extended __maybe_unused) {
+void pulse_daemon_memory_system_do(bool extended) {
+    if(!extended) return;
 
 #ifdef HAVE_C_MALLOC_INFO
     size_t glibc_arenas, glibc_allocated_arenas, glibc_unused_fast, glibc_unused_rest, glibc_allocated_mmap;
-    if(extended && parse_malloc_info(&glibc_arenas, &glibc_allocated_arenas, &glibc_unused_fast, &glibc_unused_rest, &glibc_allocated_mmap)) {
+    if(parse_malloc_info(&glibc_arenas, &glibc_allocated_arenas, &glibc_unused_fast, &glibc_unused_rest, &glibc_allocated_mmap)) {
         if (glibc_arenas) {
             static RRDSET *st_arenas = NULL;
             static RRDDIM *rd_arenas = NULL;
@@ -185,7 +186,7 @@ void pulse_daemon_memory_system_do(bool extended __maybe_unused) {
 #ifdef HAVE_C_MALLINFO2
     struct mallinfo2 mi = mallinfo2();
     glibc_mmaps = mi.hblks;
-    if(extended && (mi.hblkhd || mi.fordblks)) {
+    if((mi.hblkhd || mi.fordblks)) {
         static RRDSET *st_mallinfo = NULL;
         static RRDDIM *rd_used_mmap = NULL;
         static RRDDIM *rd_used_arena = NULL;
