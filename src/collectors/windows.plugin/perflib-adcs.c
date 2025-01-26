@@ -165,7 +165,7 @@ static void netdata_adcs_requests_processing_time(struct adcs_certificate *ac,
                                                                  NULL,
                                                                  1,
                                                                  1000,
-                                                                 RRD_ALGORITHM_INCREMENTAL);
+                                                                 RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(ac->st_adcs_request_processing_time_seconds->rrdlabels, "cert_template", ac->name, RRDLABEL_SRC_AUTO);
     }
@@ -174,6 +174,48 @@ static void netdata_adcs_requests_processing_time(struct adcs_certificate *ac,
                           ac->rd_adcs_request_processing_time_seconds,
                           (collected_number)ac->ADCSRequestProcessingTime.current.Data);
     rrdset_done(ac->st_adcs_request_processing_time_seconds);
+}
+
+static void netdata_adcs_retrievals(struct adcs_certificate *ac,
+                                    PERF_DATA_BLOCK *pDataBlock,
+                                    PERF_OBJECT_TYPE *pObjectType,
+                                    int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ac->ADCSRetrievalsTotal)) {
+        return;
+    }
+
+    if  (!ac->st_adcs_retrievals_total) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_template_%s_retrievals", ac->name);
+        ac->st_adcs_retrievals_total =  rrdset_create_localhost("adcs"
+                                                               , id
+                                                               , NULL
+                                                               , "retrievals"
+                                                               , "adcs.cert_template_retrievals"
+                                                               , "Total of certificate retrievals"
+                                                               , "retrievals/s"
+                                                               , PLUGIN_WINDOWS_NAME
+                                                               , "PerflibADCS"
+                                                               , PRIO_ADCS_CERT_RETRIVALS
+                                                               , update_every
+                                                               , RRDSET_TYPE_LINE
+        );
+
+        ac->rd_adcs_retrievals_total = rrddim_add(ac->st_adcs_retrievals_total,
+                                                  "retrievals",
+                                                  NULL,
+                                                  1,
+                                                  1,
+                                                  RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(ac->st_adcs_retrievals_total->rrdlabels, "cert_template", ac->name, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(ac->st_adcs_retrievals_total,
+                          ac->rd_adcs_retrievals_total,
+                          (collected_number)ac->ADCSRetrievalsTotal.current.Data);
+    rrdset_done(ac->st_adcs_retrievals_total);
 }
 
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
