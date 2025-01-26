@@ -352,7 +352,7 @@ extern "C" {
     {
         const uint32_t *data = gr->buffer->data;
 
-        if (gr->index + 1 > gr->entries) {
+        while (gr->index + 1 > gr->entries) {
             // We don't have any more entries to return. However, the writer
             // might have updated the buffer's entries. We need to check once
             // more in case more elements were added.
@@ -371,8 +371,10 @@ extern "C" {
 
                 // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n", gr->length, gr->buffer);
                 *gr = gorilla_reader_init(next_buffer);
-                return gorilla_reader_read(gr, number);
+                data = gr->buffer->data;
             }
+            else
+                break;
         }
 
         // read the first number
