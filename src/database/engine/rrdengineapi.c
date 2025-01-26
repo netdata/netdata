@@ -487,7 +487,7 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, use
     return d;
 }
 
-static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
+static ALWAYS_INLINE void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
                                              const usec_t point_in_time_ut,
                                              const NETDATA_DOUBLE n,
                                              const NETDATA_DOUBLE min_value,
@@ -570,7 +570,7 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __m
 #endif
 }
 
-void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *sch,
+ALWAYS_INLINE void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *sch,
                               const usec_t point_in_time_ut,
                               const NETDATA_DOUBLE n,
                               const NETDATA_DOUBLE min_value,
