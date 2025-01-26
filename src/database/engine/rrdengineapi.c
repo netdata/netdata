@@ -803,7 +803,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
     }
 }
 
-static bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
+static inline bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
@@ -874,7 +874,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh) {
+ALWAYS_INLINE STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     STORAGE_POINT sp;
 

@@ -925,7 +925,7 @@ void pgdc_reset(PGDC *pgdc, PGD *pgd, uint32_t position)
     pgdc_seek(pgdc, position);
 }
 
-bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, STORAGE_POINT *sp)
+ALWAYS_INLINE bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, STORAGE_POINT *sp)
 {
     if (!pgdc->pgd || pgdc->pgd == PGD_EMPTY || pgdc->position >= pgdc->slots)
     {
@@ -937,30 +937,6 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
 
     switch (pgdc->pgd->type)
     {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT: {
-            storage_number *array = (storage_number *) pgdc->pgd->raw.data;
-            storage_number n = array[pgdc->position++];
-
-            sp->min = sp->max = sp->sum = unpack_storage_number(n);
-            sp->flags = (SN_FLAGS)(n & SN_USER_FLAGS);
-            sp->count = 1;
-            sp->anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
-
-            return true;
-        }
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
-            storage_number_tier1_t *array = (storage_number_tier1_t *) pgdc->pgd->raw.data;
-            storage_number_tier1_t n = array[pgdc->position++];
-
-            sp->flags = n.anomaly_count ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
-            sp->count = n.count;
-            sp->anomaly_count = n.anomaly_count;
-            sp->min = n.min_value;
-            sp->max = n.max_value;
-            sp->sum = n.sum_value;
-
-            return true;
-        }
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             pgdc->position++;
 
@@ -977,6 +953,30 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
             }
 
             return ok;
+        }
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
+            storage_number_tier1_t *array = (storage_number_tier1_t *) pgdc->pgd->raw.data;
+            storage_number_tier1_t n = array[pgdc->position++];
+
+            sp->flags = n.anomaly_count ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
+            sp->count = n.count;
+            sp->anomaly_count = n.anomaly_count;
+            sp->min = n.min_value;
+            sp->max = n.max_value;
+            sp->sum = n.sum_value;
+
+            return true;
+        }
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT: {
+            storage_number *array = (storage_number *) pgdc->pgd->raw.data;
+            storage_number n = array[pgdc->position++];
+
+            sp->min = sp->max = sp->sum = unpack_storage_number(n);
+            sp->flags = (SN_FLAGS)(n & SN_USER_FLAGS);
+            sp->count = 1;
+            sp->anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
+
+            return true;
         }
         default: {
             static bool logged = false;

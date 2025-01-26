@@ -390,7 +390,7 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_h
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *seqh) {
+ALWAYS_INLINE STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *seqh) {
     struct mem_query_handle* h = (struct mem_query_handle*)seqh->handle;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)h->smh;
     RRDDIM *rd = mh->rd;
