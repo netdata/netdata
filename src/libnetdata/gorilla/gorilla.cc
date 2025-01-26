@@ -131,66 +131,68 @@ uint32_t gorilla_writer_entries(const gorilla_writer_t *gw) {
     return entries;
 }
 
-bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number)
-{
-    gorilla_header_t *hdr = &gw->last_buffer->header;
-    uint32_t *data = gw->last_buffer->data;
+extern "C" {
+    ALWAYS_INLINE_ONLY bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number)
+    {
+        gorilla_header_t *hdr = &gw->last_buffer->header;
+        uint32_t *data = gw->last_buffer->data;
 
-    // this is the first number we are writing
-    if (hdr->entries == 0) {
-        if (hdr->nbits + bit_size<uint32_t>() >= gw->capacity)
-            return false;
-        bit_buffer_write(data, hdr->nbits, number, bit_size<uint32_t>());
+        // this is the first number we are writing
+        if (hdr->entries == 0) {
+            if (hdr->nbits + bit_size<uint32_t>() >= gw->capacity)
+                return false;
+            bit_buffer_write(data, hdr->nbits, number, bit_size<uint32_t>());
 
-        __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>(), __ATOMIC_RELEASE);
-        __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
-        gw->prev_number = number;
-        return true;
-    }
+            __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>(), __ATOMIC_RELEASE);
+            __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
+            gw->prev_number = number;
+            return true;
+        }
 
-    // write true/false based on whether we got the same number or not.
-    if (number == gw->prev_number) {
+        // write true/false based on whether we got the same number or not.
+        if (number == gw->prev_number) {
+            if (hdr->nbits + 1 >= gw->capacity)
+                return false;
+
+            bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(1), 1);
+            __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
+            __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
+            return true;
+        }
+
         if (hdr->nbits + 1 >= gw->capacity)
             return false;
-
-        bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(1), 1);
+        bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(0), 1);
         __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
+
+        uint32_t xor_value = gw->prev_number ^ number;
+        uint32_t xor_lzc = (bit_size<uint32_t>() == 32) ? __builtin_clz(xor_value) : __builtin_clzll(xor_value);
+        uint32_t is_xor_lzc_same = (xor_lzc == gw->prev_xor_lzc) ? 1 : 0;
+
+        if (hdr->nbits + 1 >= gw->capacity)
+            return false;
+        bit_buffer_write(data, hdr->nbits, is_xor_lzc_same, 1);
+        __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
+
+        if (!is_xor_lzc_same) {
+            size_t bits_needed = (bit_size<uint32_t>() == 32) ? 5 : 6;
+            if ((hdr->nbits + bits_needed) >= gw->capacity)
+                return false;
+            bit_buffer_write(data, hdr->nbits, xor_lzc, bits_needed);
+            __atomic_fetch_add(&hdr->nbits, bits_needed, __ATOMIC_RELEASE);
+        }
+
+        // write the bits of the XOR'd value without the LZC prefix
+        if (hdr->nbits + (bit_size<uint32_t>() - xor_lzc) >= gw->capacity)
+            return false;
+        bit_buffer_write(data, hdr->nbits, xor_value, bit_size<uint32_t>() - xor_lzc);
+        __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>() - xor_lzc, __ATOMIC_RELEASE);
         __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
+
+        gw->prev_number = number;
+        gw->prev_xor_lzc = xor_lzc;
         return true;
     }
-
-    if (hdr->nbits + 1 >= gw->capacity)
-        return false;
-    bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(0), 1);
-    __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
-
-    uint32_t xor_value = gw->prev_number ^ number;
-    uint32_t xor_lzc = (bit_size<uint32_t>() == 32) ? __builtin_clz(xor_value) : __builtin_clzll(xor_value);
-    uint32_t is_xor_lzc_same = (xor_lzc == gw->prev_xor_lzc) ? 1 : 0;
-
-    if (hdr->nbits + 1 >= gw->capacity)
-        return false;
-    bit_buffer_write(data, hdr->nbits, is_xor_lzc_same, 1);
-    __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
-    
-    if (!is_xor_lzc_same) {
-        size_t bits_needed = (bit_size<uint32_t>() == 32) ? 5 : 6;
-        if ((hdr->nbits + bits_needed) >= gw->capacity)
-            return false;
-        bit_buffer_write(data, hdr->nbits, xor_lzc, bits_needed);
-        __atomic_fetch_add(&hdr->nbits, bits_needed, __ATOMIC_RELEASE);
-    }
-
-    // write the bits of the XOR'd value without the LZC prefix
-    if (hdr->nbits + (bit_size<uint32_t>() - xor_lzc) >= gw->capacity)
-        return false;
-    bit_buffer_write(data, hdr->nbits, xor_value, bit_size<uint32_t>() - xor_lzc);
-    __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>() - xor_lzc, __ATOMIC_RELEASE);
-    __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
-
-    gw->prev_number = number;
-    gw->prev_xor_lzc = xor_lzc;
-    return true;
 }
 
 gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw) {
