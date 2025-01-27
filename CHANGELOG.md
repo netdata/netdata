@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- LTO Benchmark [\#19488](https://github.com/netdata/netdata/pull/19488) ([ktsaou](https://github.com/ktsaou))
+- Improve alert transition processing [\#19487](https://github.com/netdata/netdata/pull/19487) ([stelfrag](https://github.com/stelfrag))
+- add agent name and version in streaming function [\#19485](https://github.com/netdata/netdata/pull/19485) ([ktsaou](https://github.com/ktsaou))
+- Coverity fixes [\#19484](https://github.com/netdata/netdata/pull/19484) ([ktsaou](https://github.com/ktsaou))
 - add system-info columns to streaming function [\#19482](https://github.com/netdata/netdata/pull/19482) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations docs [\#19481](https://github.com/netdata/netdata/pull/19481) ([netdatabot](https://github.com/netdatabot))
 - chore\(go.d/ping\): set privileged by default for dyncfg jobs [\#19480](https://github.com/netdata/netdata/pull/19480) ([ilyam8](https://github.com/ilyam8))
@@ -475,9 +479,6 @@
 - Random numbers improvements [\#18939](https://github.com/netdata/netdata/pull/18939) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/prometheus\): correct unsupported protocol scheme "file" error [\#18938](https://github.com/netdata/netdata/pull/18938) ([ilyam8](https://github.com/ilyam8))
 - Improve ACLK sync CPU usage [\#18935](https://github.com/netdata/netdata/pull/18935) ([stelfrag](https://github.com/stelfrag))
-- Hyper collector fixes [\#18934](https://github.com/netdata/netdata/pull/18934) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#18932](https://github.com/netdata/netdata/pull/18932) ([netdatabot](https://github.com/netdatabot))
-- better randomness for heartbeat [\#18930](https://github.com/netdata/netdata/pull/18930) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
