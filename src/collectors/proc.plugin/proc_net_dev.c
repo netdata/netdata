@@ -909,7 +909,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             config_get(
                 CONFIG_SECTION_PLUGIN_PROC_NETDEV,
                 "disable by default interfaces matching",
-                "lo fireqos* *-ifb fwpr* fwbr* fwln*"),
+                "lo fireqos* *-ifb fwpr* fwbr* fwln* ifb4*"),
             NULL,
             SIMPLE_PATTERN_EXACT,
             true);
