@@ -331,6 +331,20 @@ jobs:
 ```
 </details>
 
+##### Unix socket (custom port)
+
+Connect to PostgreSQL using a Unix socket with a non-default port (5433).
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    dsn: 'host=/var/run/postgresql port=5433 dbname=postgres user=netdata'
+
+```
+</details>
+
 ##### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
