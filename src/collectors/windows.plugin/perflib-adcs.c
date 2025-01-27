@@ -386,6 +386,48 @@ static void netdata_adcs_challenge_response(struct adcs_certificate *ac,
     rrdset_done(ac->st_challenge_responses_total);
 }
 
+static void netdata_adcs_retrieval_processing(struct adcs_certificate *ac,
+                                              PERF_DATA_BLOCK *pDataBlock,
+                                              PERF_OBJECT_TYPE *pObjectType,
+                                              int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ac->ADCSRetrievalsProcessingTime)) {
+        return;
+    }
+
+    if  (!ac->st_adcs_challenge_response_processing_time_seconds) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_%s_retrievals_processing_time", ac->name);
+        ac->st_adcs_challenge_response_processing_time_seconds =  rrdset_create_localhost("adcs"
+                                                                                         , id
+                                                                                         , NULL
+                                                                                         , "retrievals"
+                                                                                         , "adcs.cert_template_retrieval_processing_time"
+                                                                                         , "Certificate last retrieval processing time"
+                                                                                         , "seconds"
+                                                                                         , PLUGIN_WINDOWS_NAME
+                                                                                         , "PerflibADCS"
+                                                                                         , PRIO_ADCS_CERT_RETRIEVAL_PROCESSING_TIME
+                                                                                         , update_every
+                                                                                         , RRDSET_TYPE_LINE
+        );
+
+        ac->rd_adcs_challenge_response_processing_time_seconds = rrddim_add(ac->st_adcs_challenge_response_processing_time_seconds,
+                                                      "processing_time",
+                                                      NULL,
+                                                      1,
+                                                      1000,
+                                                      RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ac->st_adcs_challenge_response_processing_time_seconds->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(ac->st_adcs_challenge_response_processing_time_seconds,
+                          ac->rd_adcs_challenge_response_processing_time_seconds,
+                          (collected_number)ac->ADCSRetrievalsProcessingTime.current.Data);
+    rrdset_done(ac->st_adcs_challenge_response_processing_time_seconds);
+}
+
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
     if (!pObjectType)
@@ -398,7 +440,10 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         netdata_adcs_failed_requets,
         netdata_adcs_issued_requets,
         netdata_adcs_pending_requets,
+
         netdata_adcs_challenge_response,
+
+        netdata_adcs_retrieval_processing,
 
         // This must be the end
         NULL
