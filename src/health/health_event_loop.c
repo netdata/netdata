@@ -12,8 +12,9 @@
 #define WORKER_HEALTH_JOB_CRITICAL_EVAL         5
 #define WORKER_HEALTH_JOB_ALARM_LOG_ENTRY       6
 #define WORKER_HEALTH_JOB_ALARM_LOG_PROCESS     7
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET   8
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM   9
+#define WORKER_HEALTH_JOB_ALARM_LOG_QUEUE       8
+#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET   9
+#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM   10
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
@@ -637,6 +638,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             wc->send_snapshot = 2;
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         } else {
+            worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);
             if (process_alert_pending_queue(host))
                 rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         }
@@ -721,6 +723,7 @@ void *health_main(void *ptr) {
     worker_register_job_name(WORKER_HEALTH_JOB_CRITICAL_EVAL, "critical eval");
     worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY, "alert log entry");
     worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS, "alert log process");
+    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE, "alert log queue");
     worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET, "rrdset init");
     worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM, "rrddim init");
 
