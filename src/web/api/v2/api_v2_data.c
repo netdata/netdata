@@ -169,7 +169,8 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
         group_by[0].group_by = RRDR_GROUP_BY_DIMENSION;
 
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
-        if (!(group_by[g].group_by & RRDR_GROUP_BY_DIMENSION) || (options & RRDR_OPTION_PERCENTAGE)) {
+        if ((group_by[g].group_by != RRDR_GROUP_BY_NONE && !(group_by[g].group_by & RRDR_GROUP_BY_DIMENSION)) ||
+            (options & RRDR_OPTION_PERCENTAGE)) {
             options |= RRDR_OPTION_ABSOLUTE;
             break;
         }
