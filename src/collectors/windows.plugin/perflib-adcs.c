@@ -596,6 +596,48 @@ static void netdata_adcs_signed_certificate_timetamp_list(struct adcs_certificat
     rrdset_done(ac->st_adcs_signed_certificate_timestamp_lists_total);
 }
 
+static void netdata_adcs_signed_certificate_timetamp_list_processing(struct adcs_certificate *ac,
+                                                                     PERF_DATA_BLOCK *pDataBlock,
+                                                                     PERF_OBJECT_TYPE *pObjectType,
+                                                                     int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ac->ADCSSignedCertTimestampListProcessingTime)) {
+        return;
+    }
+
+    if  (!ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_%s_signed_certificate_timestamp_list_processing_time", ac->name);
+        ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds =  rrdset_create_localhost("adcs"
+                                                                                                        , id
+                                                                                                        , NULL
+                                                                                                        , "timings"
+                                                                                                        , "adcs.cert_template_signed_certificate_timestamp_list_processing_time"
+                                                                                                        , "Certificate last Signed Certificate Timestamp List process time"
+                                                                                                        , "seconds"
+                                                                                                        , PLUGIN_WINDOWS_NAME
+                                                                                                        , "PerflibADCS"
+                                                                                                        , PRIO_ADCS_CERT_SIGNED_CERTIFICATE_TIMESTAMP_PROC_TIME_LIST
+                                                                                                        , update_every
+                                                                                                        , RRDSET_TYPE_LINE
+                                                                                                        );
+
+        ac->rd_adcs_signed_certificate_timestamp_list_processing_time_seconds = rrddim_add(ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds,
+                                                                                           "processing_time",
+                                                                                           NULL,
+                                                                                           1,
+                                                                                           1000,
+                                                                                           RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds,
+                          ac->rd_adcs_signed_certificate_timestamp_list_processing_time_seconds,
+                          (collected_number)ac->ADCSSignedCertTimestampListProcessingTime.current.Data);
+    rrdset_done(ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds);
+}
+
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
     if (!pObjectType)
@@ -617,6 +659,7 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         netdata_adcs_policy_mod_processing_time,
         netdata_adcs_challenge_response_processing_time,
         netdata_adcs_signed_certificate_timetamp_list,
+        netdata_adcs_signed_certificate_timetamp_list_processing,
 
         // This must be the end
         NULL
