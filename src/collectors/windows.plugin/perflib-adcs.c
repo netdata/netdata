@@ -650,7 +650,6 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         netdata_adcs_failed_requets,
         netdata_adcs_issued_requets,
         netdata_adcs_pending_requets,
-        netdata_adcs_challenge_response,
 
         netdata_adcs_challenge_response,
 
@@ -661,6 +660,7 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         netdata_adcs_challenge_response_processing_time,
         netdata_adcs_signed_certificate_timetamp_list,
         netdata_adcs_signed_certificate_timetamp_list_processing,
+        netdata_adcs_retrieval_processing,
 
         // This must be the end
         NULL
