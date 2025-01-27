@@ -470,6 +470,48 @@ static void netdata_adcs_crypto_singing_time(struct adcs_certificate *ac,
     rrdset_done(ac->st_adcs_request_cryptographic_signing_time_seconds);
 }
 
+static void netdata_adcs_policy_mod_processing_time(struct adcs_certificate *ac,
+                                                    PERF_DATA_BLOCK *pDataBlock,
+                                                    PERF_OBJECT_TYPE *pObjectType,
+                                                    int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ac->ADCSRequestPolicyModuleProcessingTime)) {
+        return;
+    }
+
+    if  (!ac->st_adcs_request_policy_module_processing_time_seconds) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "cert_%s_request_policy_module_processing_time", ac->name);
+        ac->st_adcs_request_policy_module_processing_time_seconds =  rrdset_create_localhost("adcs"
+                                                                                            , id
+                                                                                            , NULL
+                                                                                            , "timings"
+                                                                                            , "adcs.cert_template_request_policy_module_processing"
+                                                                                            , "Certificate last policy module processing request time"
+                                                                                            , "seconds"
+                                                                                            , PLUGIN_WINDOWS_NAME
+                                                                                            , "PerflibADCS"
+                                                                                            , PRIO_ADCS_CERT_REQ_POLICY_MODULE_PROCESS_TIME
+                                                                                            , update_every
+                                                                                            , RRDSET_TYPE_LINE
+                                                                                            );
+
+        ac->rd_adcs_request_policy_module_processing_time_seconds = rrddim_add(ac->st_adcs_request_policy_module_processing_time_seconds,
+                                                                               "processing_time",
+                                                                               NULL,
+                                                                               1,
+                                                                               1000,
+                                                                               RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ac->st_adcs_request_policy_module_processing_time_seconds->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(ac->st_adcs_request_policy_module_processing_time_seconds,
+                          ac->rd_adcs_request_policy_module_processing_time_seconds,
+                          (collected_number)ac->ADCSRequestPolicyModuleProcessingTime.current.Data);
+    rrdset_done(ac->st_adcs_request_policy_module_processing_time_seconds);
+}
+
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
     if (!pObjectType)
@@ -488,6 +530,7 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         netdata_adcs_retrieval_processing,
 
         netdata_adcs_crypto_singing_time,
+        netdata_adcs_policy_mod_processing_time,
 
         // This must be the end
         NULL
