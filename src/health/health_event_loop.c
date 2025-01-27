@@ -12,8 +12,10 @@
 #define WORKER_HEALTH_JOB_CRITICAL_EVAL         5
 #define WORKER_HEALTH_JOB_ALARM_LOG_ENTRY       6
 #define WORKER_HEALTH_JOB_ALARM_LOG_PROCESS     7
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET   8
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM   9
+#define WORKER_HEALTH_JOB_ALARM_LOG_QUEUE       8
+#define WORKER_HEALTH_JOB_WAIT_EXEC             9
+#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET   10
+#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM   11
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
@@ -637,10 +639,12 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             wc->send_snapshot = 2;
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         } else {
+            worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);
             if (process_alert_pending_queue(host))
                 rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         }
     }
+    worker_is_idle();
 }
 
 __thread bool is_health_thread = false;
@@ -693,7 +697,9 @@ static void health_event_loop(void) {
             break;
 
         // wait for all notifications to finish before allowing health to be cleaned up
+        worker_is_busy(WORKER_HEALTH_JOB_WAIT_EXEC);
         wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
+        worker_is_idle();
         
         health_sleep(next_run, loop);
     } // forever
@@ -721,6 +727,8 @@ void *health_main(void *ptr) {
     worker_register_job_name(WORKER_HEALTH_JOB_CRITICAL_EVAL, "critical eval");
     worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY, "alert log entry");
     worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS, "alert log process");
+    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE, "alert log queue");
+    worker_register_job_name(WORKER_HEALTH_JOB_WAIT_EXEC, "alert wait exec");
     worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET, "rrdset init");
     worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM, "rrddim init");
 
