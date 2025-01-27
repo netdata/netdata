@@ -89,6 +89,8 @@ const char *database_config[] = {
     " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
     " UNIQUE(host_id, health_log_id, alarm_id))",
 
+    "CREATE INDEX IF NOT EXISTS ind_alert_queue1 ON alert_queue(host_id, date_scheduled)",
+
     "CREATE TABLE IF NOT EXISTS alert_version (health_log_id INTEGER PRIMARY KEY, unique_id INT, status INT, "
     "version INT, date_submitted INT)",
 
