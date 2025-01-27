@@ -233,7 +233,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.static-matrix.outputs.matrix) }}
-      fail-fast: false
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Skip Check
