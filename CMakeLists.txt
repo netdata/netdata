@@ -83,6 +83,11 @@ if(USE_MOLD)
         endif()
 endif()
 
+check_c_compiler_flag("-fexceptions" HAVE_FEXCEPTIONS)
+if (NOT HAVE_FEXCEPTIONS)
+    message(FATAL_ERROR "Missing required compiler flag: -fexceptions.")
+endif()
+
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
@@ -2965,8 +2970,33 @@ endif()
 set(WEB_DEST "${WEB_DIR}")
 set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 
+# Collect all compiler flags
+get_directory_property(NETDATA_COMPILE_OPTIONS COMPILE_OPTIONS)
+get_directory_property(NETDATA_COMPILE_DEFINITIONS COMPILE_DEFINITIONS)
 
-set(CONFIGURE_COMMAND "dummy-configure-command")
+# Collect all linker flags
+get_directory_property(NETDATA_LINK_OPTIONS LINK_OPTIONS)
+get_directory_property(NETDATA_LINK_LIBRARIES LINK_LIBRARIES)
+
+list(APPEND CONFIGURE_OPTIONS
+        # Build type and languages
+        "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+        "-DCMAKE_C_STANDARD=${CMAKE_C_STANDARD}"
+        "-DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}"
+        "-DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}"
+
+        # Compiler flags (dynamically collected)
+        "-DCMAKE_C_FLAGS='${CMAKE_C_FLAGS} ${NETDATA_COMPILE_OPTIONS}'"
+        "-DCMAKE_CXX_FLAGS='${CMAKE_CXX_FLAGS} ${NETDATA_COMPILE_OPTIONS}'"
+        "-DCMAKE_COMPILE_DEFINITIONS='${NETDATA_COMPILE_DEFINITIONS}'"
+
+        # Linker flags (dynamically collected)
+        "-DCMAKE_EXE_LINKER_FLAGS='${CMAKE_EXE_LINKER_FLAGS} ${NETDATA_LINK_OPTIONS}'"
+        "-DCMAKE_SHARED_LINKER_FLAGS='${CMAKE_SHARED_LINKER_FLAGS}'"
+)
+
+string(JOIN " " CONFIGURE_COMMAND "cmake" ${CONFIGURE_OPTIONS})
+
 if (NOT NETDATA_USER)
         set(NETDATA_USER "netdata")
 endif()

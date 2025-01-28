@@ -114,6 +114,11 @@ typedef enum __attribute__((packed)) {
     BIB_EXPORT_SHELL,
     BIB_DEVEL_TRACE_ALLOCATIONS,
     BIB_DEVELOPER_MODE,
+    BIB_RUNTIME_PROFILE,
+    BIB_RUNTIME_PARENT,
+    BIB_RUNTIME_CHILD,
+    BIB_RUNTIME_MEM_TOTAL,
+    BIB_RUNTIME_MEM_AVAIL,
 
     // leave this last
     BIB_TERMINATOR,
@@ -131,7 +136,8 @@ typedef enum __attribute__((packed)) {
     BIC_LIBS,
     BIC_PLUGINS,
     BIC_EXPORTERS,
-    BIC_DEBUG_DEVEL
+    BIC_DEBUG_DEVEL,
+    BIC_RUNTIME,
 } BUILD_INFO_CATEGORY;
 
 typedef enum __attribute__((packed)) {
@@ -1004,6 +1010,46 @@ static struct {
                 .json = "dev-mode",
                 .value = NULL,
         },
+        [BIB_RUNTIME_PROFILE] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_STRING,
+            .analytics = "ConfigProfile",
+            .print = "Profile",
+            .json = "profile",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_PARENT] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_BOOLEAN,
+            .analytics = "StreamParent",
+            .print = "Stream Parent (accept data from Children)",
+            .json = "parent",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_CHILD] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_BOOLEAN,
+            .analytics = "StreamChild",
+            .print = "Stream Child (send data to a Parent)",
+            .json = "child",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_MEM_TOTAL] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_STRING,
+            .analytics = "TotalMemory",
+            .print = "Total System Memory",
+            .json = "mem-total",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_MEM_AVAIL] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_STRING,
+            .analytics = "AvailableMemory",
+            .print = "Available System Memory",
+            .json = "mem-available",
+            .value = NULL,
+        },
 
         // leave this last
         [BIB_TERMINATOR] = {
@@ -1410,9 +1456,26 @@ static void populate_packaging_info() {
             build_info_set_value(BIB_PACKAGING_INSTALL_TYPE, strdupz(BUILD_PACKAGING_INFO.install_type));
             build_info_set_value(BIB_PACKAGING_ARCHITECTURE, strdupz(BUILD_PACKAGING_INFO.prebuilt_arch));
             build_info_set_value(BIB_PACKAGING_DISTRO, strdupz(BUILD_PACKAGING_INFO.prebuilt_distro));
+
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            ND_PROFILE_2buffer(wb, nd_profile_detect_and_configure(false), " ");
+            build_info_set_value_strdupz(BIB_RUNTIME_PROFILE, buffer_tostring(wb));
+
+            build_info_set_status(BIB_RUNTIME_PARENT, stream_conf_is_parent(false));
+            build_info_set_status(BIB_RUNTIME_CHILD, stream_conf_is_child());
         }
         spinlock_unlock(&BUILD_PACKAGING_INFO.spinlock);
     }
+
+    OS_SYSTEM_MEMORY sm = os_system_memory(true);
+    char buf[1024];
+    snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_total_bytes);
+    // size_snprintf(buf, sizeof(buf), sm.ram_total_bytes, "B", false);
+    build_info_set_value_strdupz(BIB_RUNTIME_MEM_TOTAL, buf);
+
+    snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_available_bytes);
+    // size_snprintf(buf, sizeof(buf), sm.ram_available_bytes, "B", false);
+    build_info_set_value_strdupz(BIB_RUNTIME_MEM_AVAIL, buf);
 }
 
 // ----------------------------------------------------------------------------
@@ -1485,6 +1548,7 @@ void print_build_info(void) {
     print_build_info_category_to_console(BIC_PLUGINS, "Plugins");
     print_build_info_category_to_console(BIC_EXPORTERS, "Exporters");
     print_build_info_category_to_console(BIC_DEBUG_DEVEL, "Debug/Developer Features");
+    print_build_info_category_to_console(BIC_RUNTIME, "Runtime Information");
 }
 
 void build_info_to_json_object(BUFFER *b) {
@@ -1504,6 +1568,7 @@ void build_info_to_json_object(BUFFER *b) {
     print_build_info_category_to_json(b, BIC_PLUGINS, "plugins");
     print_build_info_category_to_json(b, BIC_EXPORTERS, "exporters");
     print_build_info_category_to_json(b, BIC_DEBUG_DEVEL, "debug-n-devel");
+    print_build_info_category_to_json(b, BIC_RUNTIME, "runtime");
 }
 
 void print_build_info_json(void) {
