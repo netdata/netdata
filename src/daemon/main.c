@@ -227,6 +227,11 @@ int unittest_prepare_rrd(const char **user) {
 }
 
 int netdata_main(int argc, char **argv) {
+#if !defined(HAVE_GC_SECTIONS) || !defined(HAVE_FFUNCTION_SECTIONS)
+    fprintf(stderr, "Netdata has been compiled without these required compiler flags: -ffunction-sections and/or -Wl,--gc-sections.\n");
+    exit(1);
+#endif
+
     string_init();
     analytics_init();
 

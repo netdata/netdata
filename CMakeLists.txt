@@ -58,6 +58,12 @@ include(NetdataCompilerFlags)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
+check_c_compiler_flag("-ffunction-sections" HAVE_FFUNCTION_SECTIONS)
+check_c_compiler_flag("-Wl,--gc-sections" HAVE_GC_SECTIONS)
+if (NOT HAVE_FFUNCTION_SECTIONS OR NOT HAVE_GC_SECTIONS)
+    message(FATAL_ERROR "Missing required compiler flags: -ffunction-sections or -Wl,--gc-sections.")
+endif()
+
 # Check for the mold linker and try to use it if available
 option(USE_MOLD "If the MOLD linker is available on the system, use it instead of the default linker." TRUE)
 
