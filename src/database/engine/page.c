@@ -792,19 +792,19 @@ ALWAYS_INLINE size_t pgd_append_point(PGD *pg,
                       SN_FLAGS flags,
                       uint32_t expected_slot)
 {
-    if (unlikely(pg->used >= pg->slots))
-        fatal("DBENGINE: attempted to write beyond page size (page type %u, slots %u, used %u)",
-              pg->type, pg->slots, pg->used /* FIXME:, pg->size */);
+    if (pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING)
+        fatal("Data collection on page already scheduled for flushing");
+
+    if (!(pg->states & PGD_STATE_CREATED_FROM_COLLECTOR))
+        fatal("DBENGINE: collection on page not created from a collector");
 
     if (unlikely(pg->used != expected_slot))
         fatal("DBENGINE: page is not aligned to expected slot (used %u, expected %u)",
               pg->used, expected_slot);
 
-    if (!(pg->states & PGD_STATE_CREATED_FROM_COLLECTOR))
-        fatal("DBENGINE: collection on page not created from a collector");
-
-    if (pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING)
-        fatal("Data collection on page already scheduled for flushing");
+    if (unlikely(pg->used >= pg->slots))
+        fatal("DBENGINE: attempted to write beyond page size (page type %u, slots %u, used %u)",
+              pg->type, pg->slots, pg->used /* FIXME:, pg->size */);
 
     switch (pg->type) {
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
