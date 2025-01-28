@@ -359,20 +359,25 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, un
     return delay;
 }
 
-static inline int aclk_parse_pair(const char *src, const char c, char **a, char **b)
+static inline int aclk_parse_userpass_pair(const char *src, const char c, char **a, char **b)
 {
     const char *ptr = strchr(src, c);
     if (ptr == NULL)
         return 1;
 
-//  allow empty string
-/*    if (!*(ptr+1))
-        return 1;*/
+    char *tmp_a = callocz(1, ptr - src + 1);
+    memcpy(tmp_a, src, ptr - src);
 
-    *a = callocz(1, ptr - src + 1);
-    memcpy (*a, src, ptr - src);
+    char *decoded_a = callocz(1, ptr - src + 1);
+    url_decode_r(decoded_a, tmp_a, ptr - src + 1);
+    freez(tmp_a);
+    *a = decoded_a;
 
-    *b = strdupz(ptr+1);
+    char *tmp_b = strdupz(ptr+1);
+    char *decoded_b = callocz(1, strlen(tmp_b) + 1);
+    url_decode_r(decoded_b, tmp_b, strlen(tmp_b) + 1);
+    freez(tmp_b);
+    *b = decoded_b;
 
     return 0;
 }
@@ -399,7 +404,7 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd, enum mqtt
 
     if ((tmp = strchr(ptr, '@'))) {
         *tmp = 0;
-        if(aclk_parse_pair(ptr, ':', uname, pwd)) {
+        if(aclk_parse_userpass_pair(ptr, ':', uname, pwd)) {
             error_report("Failed to get username and password for proxy. Will attempt connection without authentication");
         }
         ptr = tmp+1;
