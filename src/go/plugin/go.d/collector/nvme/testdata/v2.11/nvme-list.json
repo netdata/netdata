@@ -1,0 +1,97 @@
+{
+  "Devices": [
+    {
+      "HostNQN": "nqn.2014-08.org.nvmexpress:uuid:e9184000-7983-11ec-8000-d85ed316925c",
+      "HostID": "e9184000-7983-11ec-8000-d85ed316925c",
+      "Subsystems": [
+        {
+          "Subsystem": "nvme-subsys0",
+          "SubsystemNQN": "nqn.2014.08.org.nvmexpress:1bb11bb1XXX02YYY            Seagate FireCuda 530 ZP4000GM30023",
+          "Controllers": [
+            {
+              "Controller": "nvme0",
+              "Cntlid": "1",
+              "SerialNumber": "XXX02YYY",
+              "ModelNumber": "Seagate FireCuda 530 ZP4000GM30023",
+              "Firmware": "SU6SM005",
+              "Transport": "pcie",
+              "Address": "0000:01:00.0",
+              "Slot": "",
+              "Namespaces": [
+                {
+                  "NameSpace": "nvme0n1",
+                  "Generic": "ng0n1",
+                  "NSID": 1,
+                  "UsedBytes": 4000787030016,
+                  "MaximumLBA": 7814037168,
+                  "PhysicalSize": 4000787030016,
+                  "SectorSize": 512
+                }
+              ],
+              "Paths": []
+            }
+          ],
+          "Namespaces": []
+        },
+        {
+          "Subsystem": "nvme-subsys1",
+          "SubsystemNQN": "nqn.2014.08.org.nvmexpress:1bb11bb1XXX00YYY            Seagate FireCuda 530 ZP4000GM30023",
+          "Controllers": [
+            {
+              "Controller": "nvme1",
+              "Cntlid": "1",
+              "SerialNumber": "XXX00YYY",
+              "ModelNumber": "Seagate FireCuda 530 ZP4000GM30023",
+              "Firmware": "SU6SM001",
+              "Transport": "pcie",
+              "Address": "0000:81:00.0",
+              "Slot": "",
+              "Namespaces": [
+                {
+                  "NameSpace": "nvme1n1",
+                  "Generic": "ng1n1",
+                  "NSID": 1,
+                  "UsedBytes": 4000787030016,
+                  "MaximumLBA": 7814037168,
+                  "PhysicalSize": 4000787030016,
+                  "SectorSize": 512
+                }
+              ],
+              "Paths": []
+            }
+          ],
+          "Namespaces": []
+        },
+        {
+          "Subsystem": "nvme-subsys2",
+          "SubsystemNQN": "nqn.2014.08.org.nvmexpress:1bb11bb17VS00KNX            Seagate FireCuda 530 ZP4000GM30023",
+          "Controllers": [
+            {
+              "Controller": "nvme2",
+              "Cntlid": "1",
+              "SerialNumber": "7VS00KNX",
+              "ModelNumber": "Seagate FireCuda 530 ZP4000GM30023",
+              "Firmware": "SU6SM001",
+              "Transport": "pcie",
+              "Address": "0000:61:00.0",
+              "Slot": "",
+              "Namespaces": [
+                {
+                  "NameSpace": "nvme2n1",
+                  "Generic": "ng2n1",
+                  "NSID": 1,
+                  "UsedBytes": 4000787030016,
+                  "MaximumLBA": 7814037168,
+                  "PhysicalSize": 4000787030016,
+                  "SectorSize": 512
+                }
+              ],
+              "Paths": []
+            }
+          ],
+          "Namespaces": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "critical_warning": {
+    "value": 0,
+    "available_spare": 0,
+    "temp_threshold": 0,
+    "reliability_degraded": 0,
+    "ro": 0,
+    "vmbu_failed": 0,
+    "pmr_ro": 0
+  },
+  "temperature": 324,
+  "avail_spare": 100,
+  "spare_thresh": 5,
+  "percent_used": 30,
+  "endurance_grp_critical_warning_summary": 0,
+  "data_units_read": 178037231,
+  "data_units_written": 1928683480,
+  "host_read_commands": 5808178366,
+  "host_write_commands": 24273507789,
+  "controller_busy_time": 69549,
+  "power_cycles": 99,
+  "power_on_hours": 24424,
+  "unsafe_shutdowns": 49,
+  "media_errors": 0,
+  "num_err_log_entries": 212,
+  "warning_temp_time": 0,
+  "critical_comp_time": 0,
+  "thm_temp1_trans_count": 3,
+  "thm_temp2_trans_count": 0,
+  "thm_temp1_total_time": 1474,
+  "thm_temp2_total_time": 0
+}
