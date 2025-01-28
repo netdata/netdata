@@ -365,7 +365,7 @@ static ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE ty
 
         if(was_empty) {
             msg.opcode = STREAM_OPCODE_RECEIVER_POLLOUT;
-            msg.opcode = 0;
+            msg.reason = 0;
         }
     }
 

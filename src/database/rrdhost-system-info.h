@@ -96,4 +96,6 @@ int rrdhost_system_info_foreach(struct rrdhost_system_info *system_info, add_hos
 struct update_node_info;
 void rrdhost_system_info_to_node_info(struct rrdhost_system_info *system_info, struct update_node_info *node_info);
 
+void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_system_info *system_info);
+
 #endif //NETDATA_RRDHOST_SYSTEM_INFO_H

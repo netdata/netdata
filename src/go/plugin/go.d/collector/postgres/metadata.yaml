@@ -128,6 +128,12 @@ modules:
                 jobs:
                   - name: local
                     dsn: 'host=/var/run/postgresql dbname=postgres user=netdata'
+            - name: Unix socket (custom port)
+              description: Connect to PostgreSQL using a Unix socket with a non-default port (5433).
+              config: |
+                jobs:
+                  - name: local
+                    dsn: 'host=/var/run/postgresql port=5433 dbname=postgres user=netdata'
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.

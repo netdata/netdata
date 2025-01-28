@@ -20,6 +20,7 @@
 #define WORKER_JOB_ARAL                 14
 #define WORKER_JOB_NETWORK              15
 #define WORKER_JOB_PARENTS              16
+#define WORKER_JOB_MEMORY_EXTENDED      17
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 17
 #error "WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 14"
@@ -43,28 +44,16 @@ static void pulse_register_workers(void) {
     worker_register_job_name(WORKER_JOB_GORILLA, "gorilla");
     worker_register_job_name(WORKER_JOB_HEARTBEAT, "heartbeat");
     worker_register_job_name(WORKER_JOB_WORKERS, "workers");
-    worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
+    worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc trace");
     worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
     worker_register_job_name(WORKER_JOB_ARAL, "aral");
     worker_register_job_name(WORKER_JOB_NETWORK, "network");
     worker_register_job_name(WORKER_JOB_PARENTS, "parents");
-}
-
-static void pulse_cleanup(void *pptr)
-{
-    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!static_thread) return;
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-    pulse_workers_cleanup();
-    worker_unregister();
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+    worker_register_job_name(WORKER_JOB_MEMORY_EXTENDED, "memory extended");
 }
 
 void *pulse_thread_main(void *ptr) {
-    CLEANUP_FUNCTION_REGISTER(pulse_cleanup) cleanup_ptr = ptr;
+    struct netdata_static_thread *static_thread = ptr;
     pulse_register_workers();
 
     int update_every =
@@ -135,14 +124,6 @@ void *pulse_thread_main(void *ptr) {
         pulse_dictionary_do(pulse_extended_enabled);
 #endif
 
-#ifdef NETDATA_TRACE_ALLOCATIONS
-        worker_is_busy(WORKER_JOB_MALLOC_TRACE);
-        pulse_trace_allocations_do(pulse_extended_enabled);
-#endif
-
-        worker_is_busy(WORKER_JOB_WORKERS);
-        pulse_workers_do(pulse_extended_enabled);
-
         worker_is_busy(WORKER_JOB_ARAL);
         pulse_aral_do(pulse_extended_enabled);
 
@@ -155,27 +136,18 @@ void *pulse_thread_main(void *ptr) {
         pulse_daemon_do(pulse_extended_enabled);
     }
 
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+    worker_unregister();
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+
     return NULL;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 // pulse sqlite3 thread
 
-static void pulse_thread_sqlite3_cleanup(void *pptr)
-{
-    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if (!static_thread)
-        return;
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-    worker_unregister();
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-}
-
 void *pulse_thread_sqlite3_main(void *ptr) {
-    CLEANUP_FUNCTION_REGISTER(pulse_thread_sqlite3_cleanup) cleanup_ptr = ptr;
+    struct netdata_static_thread *static_thread = ptr;
     pulse_register_workers();
 
     int update_every =
@@ -190,6 +162,10 @@ void *pulse_thread_sqlite3_main(void *ptr) {
     heartbeat_init(&hb, USEC_PER_SEC);
     usec_t real_step = USEC_PER_SEC;
 
+    // keep the randomness at zero
+    // to make sure we are not close to any other thread
+    hb.randomness = 0;
+
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb);
@@ -202,6 +178,102 @@ void *pulse_thread_sqlite3_main(void *ptr) {
         worker_is_busy(WORKER_JOB_SQLITE3);
         pulse_sqlite3_do(pulse_extended_enabled);
     }
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+    worker_unregister();
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+
+    return NULL;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// pulse workers thread
+
+void *pulse_thread_workers_main(void *ptr) {
+    struct netdata_static_thread *static_thread = ptr;
+    pulse_register_workers();
+
+    int update_every =
+        (int)config_get_duration_seconds(CONFIG_SECTION_PULSE, "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every) {
+        update_every = localhost->rrd_update_every;
+        config_set_duration_seconds(CONFIG_SECTION_PULSE, "update every", update_every);
+    }
+
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb, USEC_PER_SEC);
+    usec_t real_step = USEC_PER_SEC;
+
+    // keep the randomness at zero
+    // to make sure we are not close to any other thread
+    hb.randomness = 0;
+
+    while (service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        heartbeat_next(&hb);
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
+
+        worker_is_busy(WORKER_JOB_WORKERS);
+        pulse_workers_do(pulse_extended_enabled);
+    }
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+    pulse_workers_cleanup();
+    worker_unregister();
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+
+    return NULL;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// pulse workers thread
+
+void *pulse_thread_memory_extended_main(void *ptr) {
+    struct netdata_static_thread *static_thread = ptr;
+    pulse_register_workers();
+
+    int update_every =
+        (int)config_get_duration_seconds(CONFIG_SECTION_PULSE, "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every) {
+        update_every = localhost->rrd_update_every;
+        config_set_duration_seconds(CONFIG_SECTION_PULSE, "update every", update_every);
+    }
+
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb, USEC_PER_SEC);
+    usec_t real_step = USEC_PER_SEC;
+
+    // keep the randomness at zero
+    // to make sure we are not close to any other thread
+    hb.randomness = 0;
+
+    while (service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        heartbeat_next(&hb);
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
+
+#ifdef NETDATA_TRACE_ALLOCATIONS
+        worker_is_busy(WORKER_JOB_MALLOC_TRACE);
+        pulse_trace_allocations_do(pulse_extended_enabled);
+#endif
+
+        worker_is_busy(WORKER_JOB_MEMORY_EXTENDED);
+        pulse_daemon_memory_system_do(pulse_extended_enabled);
+    }
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+    worker_unregister();
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
     return NULL;
 }
