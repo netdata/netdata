@@ -373,8 +373,6 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
         return;
     }
 
-    struct ctxs_checkpoint *cmd;
-
     bool ok_to_send = true;
 
     switch (query->type) {
@@ -387,20 +385,12 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             break;
         case CTX_CHECKPOINT:;
             worker_is_busy(UV_EVENT_CTX_CHECKPOINT);
-            cmd = query->data.payload;
-            rrdcontext_hub_checkpoint_command(cmd);
-            freez(cmd->claim_id);
-            freez(cmd->node_id);
-            freez(cmd);
+            rrdcontext_hub_checkpoint_command(query->data.payload);
             ok_to_send = false;
             break;
         case CTX_STOP_STREAMING:
             worker_is_busy(UV_EVENT_CTX_STOP_STREAMING);
-            cmd = query->data.payload;
-            rrdcontext_hub_stop_streaming_command(cmd);
-            freez(cmd->claim_id);
-            freez(cmd->node_id);
-            freez(cmd);
+            rrdcontext_hub_stop_streaming_command(query->data.payload);
             ok_to_send = false;
             break;
         case SEND_NODE_INSTANCES:
@@ -411,21 +401,16 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
         case ALERT_START_STREAMING:
             worker_is_busy(UV_EVENT_ALERT_START_STREAMING);
             aclk_start_alert_streaming(query->data.node_id, query->version);
-            freez(query->data.node_id);
             ok_to_send = false;
             break;
         case ALERT_CHECKPOINT:
             worker_is_busy(UV_EVENT_ALERT_CHECKPOINT);
             aclk_alert_version_check(query->data.node_id, query->claim_id, query->version);
-            freez(query->data.node_id);
-            freez(query->claim_id);
             ok_to_send = false;
             break;
         case CREATE_NODE_INSTANCE:
             worker_is_busy(UV_EVENT_CREATE_NODE_INSTANCE);
             create_node_instance_result_job(query->machine_guid, query->data.node_id);
-            freez(query->data.node_id);
-            freez(query->machine_guid);
             ok_to_send = false;
             break;
 
