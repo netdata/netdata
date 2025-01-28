@@ -86,6 +86,7 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_LINUX_DISKSPACE,
     BIB_PLUGIN_FREEBSD,
     BIB_PLUGIN_MACOS,
+    BIB_PLUGIN_WINDOWS,
     BIB_PLUGIN_STATSD,
     BIB_PLUGIN_TIMEX,
     BIB_PLUGIN_IDLEJITTER,
@@ -94,6 +95,8 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_CUPS,
     BIB_PLUGIN_EBPF,
     BIB_PLUGIN_FREEIPMI,
+    BIB_PLUGIN_SYSTEMD_JOURNAL,
+    BIB_PLUGIN_WINDOWS_EVENTS,
     BIB_PLUGIN_NFACCT,
     BIB_PLUGIN_PERF,
     BIB_PLUGIN_SLABINFO,
@@ -780,6 +783,14 @@ static struct {
                 .json = "macos",
                 .value = NULL,
         },
+        [BIB_PLUGIN_WINDOWS] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = NULL,
+            .print = "windows (monitor Windows systems)",
+            .json = "windows",
+            .value = NULL,
+        },
         [BIB_PLUGIN_STATSD] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
@@ -843,6 +854,22 @@ static struct {
                 .print = "freeipmi (monitor enterprise server H/W)",
                 .json = "freeipmi",
                 .value = NULL,
+        },
+        [BIB_PLUGIN_SYSTEMD_JOURNAL] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = "SYSTEMD-JOURNAL",
+            .print = "systemd-journal (monitor journal logs)",
+            .json = "systemd-journal",
+            .value = NULL,
+        },
+        [BIB_PLUGIN_WINDOWS_EVENTS] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = "WINDOWS-EVENTS",
+            .print = "windows-events (monitor Windows events)",
+            .json = "windows-events",
+            .value = NULL,
         },
         [BIB_PLUGIN_NFACCT] = {
                 .category = BIC_PLUGINS,
@@ -1069,6 +1096,8 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_PLUGIN_MACOS, true);
 #endif
 #ifdef OS_WINDOWS
+    build_info_set_status(BIB_PLUGIN_WINDOWS, true);
+    build_info_set_status(BIB_PLUGIN_WINDOWS_EVENTS, true);
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
 #if defined(__CYGWIN__) && defined(__MSYS__)
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows (MSYS)");
@@ -1209,6 +1238,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef ENABLE_PLUGIN_FREEIPMI
     build_info_set_status(BIB_PLUGIN_FREEIPMI, true);
+#endif
+#ifdef ENABLE_PLUGIN_SYSTEMD_JOURNAL
+    build_info_set_status(BIB_PLUGIN_SYSTEMD_JOURNAL, true);
 #endif
 #ifdef ENABLE_PLUGIN_NFACCT
     build_info_set_status(BIB_PLUGIN_NFACCT, true);
