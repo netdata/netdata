@@ -2151,11 +2151,6 @@ if(OS_WINDOWS)
         endif()
 endif()
 
-# ebpf
-if(ENABLE_PLUGIN_EBPF)
-        netdata_add_libbpf_to_target(libnetdata)
-endif()
-
 # judy
 target_link_libraries(libnetdata PUBLIC judy)
 
@@ -2652,6 +2647,7 @@ if(ENABLE_PLUGIN_EBPF)
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES})
     target_link_libraries(ebpf.plugin libnetdata)
 
+    netdata_add_libbpf_to_target(ebpf.plugin)
     netdata_add_ebpf_co_re_to_target(ebpf.plugin)
 
     install(TARGETS ebpf.plugin
