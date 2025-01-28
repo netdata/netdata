@@ -1648,3 +1648,22 @@ void analytics_build_info(BUFFER *b) {
     }
 }
 
+void print_build_info_cmake_cache(void) {
+        const char *path = NETDATA_RUNTIME_PREFIX "/"
+                           BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH "/"
+                           BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME;
+
+        gzFile f = gzopen(path, "rb");
+        if (!f) {
+            printf("Could not open build info cmake cache archive located at %s\n",
+                   path);
+            return;
+        }
+
+        char line[1024];
+        while (gzgets(f, line, sizeof(line))) {
+            printf("%s", line);
+        }
+
+        gzclose(f);
+}
