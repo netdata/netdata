@@ -95,6 +95,7 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_CUPS,
     BIB_PLUGIN_EBPF,
     BIB_PLUGIN_FREEIPMI,
+    BIB_PLUGIN_NETWORK_VIEWER,
     BIB_PLUGIN_SYSTEMD_JOURNAL,
     BIB_PLUGIN_WINDOWS_EVENTS,
     BIB_PLUGIN_NFACCT,
@@ -855,6 +856,14 @@ static struct {
                 .json = "freeipmi",
                 .value = NULL,
         },
+        [BIB_PLUGIN_NETWORK_VIEWER] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = "NETWORK-VIEWER",
+            .print = "network-viewer (monitor TCP/UDP IPv4/6 sockets)",
+            .json = "network-viewer",
+            .value = NULL,
+        },
         [BIB_PLUGIN_SYSTEMD_JOURNAL] = {
             .category = BIC_PLUGINS,
             .type = BIT_BOOLEAN,
@@ -1241,6 +1250,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef ENABLE_PLUGIN_SYSTEMD_JOURNAL
     build_info_set_status(BIB_PLUGIN_SYSTEMD_JOURNAL, true);
+#endif
+#ifdef ENABLE_PLUGIN_NETWORK_VIEWER
+    build_info_set_status(BIB_PLUGIN_NETWORK_VIEWER, true);
 #endif
 #ifdef ENABLE_PLUGIN_NFACCT
     build_info_set_status(BIB_PLUGIN_NFACCT, true);
