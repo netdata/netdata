@@ -29,13 +29,11 @@ func (n *nvmeDeviceList) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	for _, d := range n.Devices {
-		if d.DevicePath != "" {
-			return nil
-		}
-		n.Devices = n.Devices[:0]
-		break
+	if len(n.Devices) > 0 && n.Devices[0].DevicePath != "" {
+		return nil
 	}
+
+	n.Devices = n.Devices[:0]
 
 	var v211Format struct {
 		Devices []struct {
