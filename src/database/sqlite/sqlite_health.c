@@ -150,7 +150,7 @@ int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
 
 #define SQL_INSERT_ALERT_PENDING_QUEUE                                                                                 \
     "INSERT INTO alert_queue (host_id, health_log_id, unique_id, alarm_id, status, date_scheduled)"                    \
-    "  VALUES (@host_id, @health_log_id, @unique_id, @alarm_id, @new_status, UNIXEPOCH() + @delay)"                    \
+    "  VALUES (@host_id, @health_log_id, @unique_id, @alarm_id, @new_status, @delay)"                                  \
     " ON CONFLICT (host_id, health_log_id, alarm_id)"                                                                  \
     " DO UPDATE SET status = excluded.status, unique_id = excluded.unique_id, "                                        \
     " date_scheduled = MIN(date_scheduled, excluded.date_scheduled)"
@@ -161,7 +161,8 @@ static void insert_alert_queue(
     int64_t unique_id,
     uint32_t alarm_id,
     RRDCALC_STATUS old_status,
-    RRDCALC_STATUS new_status)
+    RRDCALC_STATUS new_status,
+    time_t trigger_time)
 {
     static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
@@ -185,7 +186,7 @@ static void insert_alert_queue(
     if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
         return;
 
-    int submit_delay = calculate_delay(old_status, new_status);
+    time_t submit_delay = trigger_time + calculate_delay(old_status, new_status);
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
@@ -193,7 +194,7 @@ static void insert_alert_queue(
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, alarm_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, new_status));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, submit_delay));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, submit_delay));
 
     param = 0;
     rc = sqlite3_step_monitored(res);
