@@ -128,11 +128,11 @@ int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
         case RRDCALC_STATUS_WARNING:
         case RRDCALC_STATUS_CRITICAL:
             switch (new_status) {
-                case RRDCALC_STATUS_REMOVED:
                 case RRDCALC_STATUS_UNINITIALIZED:
                 case RRDCALC_STATUS_UNDEFINED:
                     delay = ALERT_TRANSITION_DELAY_LONG;
                     break;
+                case RRDCALC_STATUS_REMOVED:
                 case RRDCALC_STATUS_CLEAR:
                     delay = ALERT_TRANSITION_DELAY_SHORT;
                     break;
