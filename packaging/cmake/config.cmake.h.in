@@ -16,8 +16,7 @@
 
 // required compilation options
 
-#cmakedefine HAVE_FFUNCTION_SECTIONS
-#cmakedefine HAVE_GC_SECTIONS
+#cmakedefine HAVE_FEXCEPTIONS
 
 // checked headers
 
