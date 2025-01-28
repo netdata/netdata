@@ -81,13 +81,6 @@ if(USE_MOLD)
         endif()
 endif()
 
-include(NetdataCompilerFlags)
-
-check_c_compiler_flag("-fexceptions" HAVE_FEXCEPTIONS)
-if (NOT HAVE_FEXCEPTIONS)
-    message(FATAL_ERROR "Missing required compiler flag: -fexceptions.")
-endif()
-
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
@@ -152,6 +145,13 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
         message(STATUS " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
 else()
         message(FATAL_ERROR "Unknown/unsupported platform: ${CMAKE_SYSTEM_NAME} (Supported platforms: FreeBSD, Linux, macOS, Windows)")
+endif()
+
+include(NetdataCompilerFlags)
+
+check_c_compiler_flag("-fexceptions" HAVE_FEXCEPTIONS)
+if (NOT HAVE_FEXCEPTIONS)
+    message(FATAL_ERROR "Missing required compiler flag: -fexceptions.")
 endif()
 
 # This is intended to make life easier for developers who are working on one
