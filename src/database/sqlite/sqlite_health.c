@@ -474,6 +474,7 @@ static void sql_inject_removed_status(
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, last_transition, sizeof(*last_transition), SQLITE_STATIC));
 
     param = 0;
+    time_t now = now_realtime_sec();
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         //update the old entry in health_log_detail
         sql_set_updated_by_in_health_log_detail(unique_id, max_unique_id, last_transition);
@@ -483,7 +484,7 @@ static void sql_inject_removed_status(
         int64_t health_log_id = sqlite3_column_int64(res, 0);
         RRDCALC_STATUS old_status = (RRDCALC_STATUS)sqlite3_column_double(res, 1);
         insert_alert_queue(
-            host, health_log_id, (int64_t)max_unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED);
+            host, health_log_id, (int64_t)max_unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED, now);
     }
 
 done:
