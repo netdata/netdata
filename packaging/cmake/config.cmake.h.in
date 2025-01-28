@@ -139,6 +139,8 @@
 #cmakedefine ENABLE_PLUGIN_CUPS
 #cmakedefine ENABLE_PLUGIN_CGROUP_NETWORK
 #cmakedefine ENABLE_PLUGIN_EBPF
+#cmakedefine ENABLE_PLUGIN_SYSTEMD_JOURNAL
+#cmakedefine ENABLE_PLUGIN_NETWORK_VIEWER
 
 // enabled sentry
 
