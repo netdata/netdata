@@ -596,6 +596,19 @@ int schedule_query_in_worker(uv_loop_t *loop, struct aclk_sync_config_s *config,
     return rc;
 }
 
+static void free_query_list(Pvoid_t JudyL)
+{
+    bool first = true;
+    Pvoid_t *Pvalue;
+    Word_t Index = 0;
+    aclk_query_t query;
+    while ((Pvalue = JudyLFirstThenNext(JudyL, &Index, &first))) {
+        if (!*Pvalue)
+            continue;
+        query = *Pvalue;
+        aclk_query_free(query);
+    }
+}
 
 static void aclk_synchronization(void *arg)
 {
@@ -635,8 +648,11 @@ static void aclk_synchronization(void *arg)
 
     struct worker_data *data;
     aclk_query_t query;
+
+    // This holds queries that need to be executed one by one
     struct judy_list_t *aclk_query_batch = NULL;
-    struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));;
+    // This holds queries that can be dispatched in parallel in ACLK QUERY worker threads
+    struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));
     size_t pending_queries = 0;
 
     Pvoid_t *Pvalue;
@@ -864,6 +880,20 @@ static void aclk_synchronization(void *arg)
     uv_run(loop, UV_RUN_NOWAIT);
 
     (void) uv_loop_close(loop);
+
+    // Free execute commands / queries
+    if (pending_queries) {
+        free_query_list(aclk_query_execute->JudyL);
+        (void)JudyLFreeArray(&aclk_query_execute->JudyL, PJE0);
+    }
+    freez(aclk_query_execute);
+
+    // Free batch commands
+    if (aclk_query_batch) {
+        free_query_list(aclk_query_batch->JudyL);
+        (void)JudyLFreeArray(&aclk_query_batch->JudyL, PJE0);
+        freez(aclk_query_batch);
+    }
 
     aral_by_size_release(config->ar);
 
