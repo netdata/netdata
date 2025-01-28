@@ -6,12 +6,20 @@
 
 **Merged pull requests:**
 
+- Invert order of checks in pgd\_append\_point\(\). [\#19515](https://github.com/netdata/netdata/pull/19515) ([vkalintiris](https://github.com/vkalintiris))
+- compile time and runtime check of required compiler flags [\#19513](https://github.com/netdata/netdata/pull/19513) ([ktsaou](https://github.com/ktsaou))
+- ACLK: allow encoded proxy username and password to work [\#19508](https://github.com/netdata/netdata/pull/19508) ([ktsaou](https://github.com/ktsaou))
+- Fix alert transition [\#19507](https://github.com/netdata/netdata/pull/19507) ([stelfrag](https://github.com/stelfrag))
+- update buildinfo  [\#19506](https://github.com/netdata/netdata/pull/19506) ([ktsaou](https://github.com/ktsaou))
+- fix\(go.d/nvme\): support v2.11 output format [\#19505](https://github.com/netdata/netdata/pull/19505) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/vmware/govmomi from 0.47.0 to 0.48.0 in /src/go [\#19504](https://github.com/netdata/netdata/pull/19504) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations docs [\#19502](https://github.com/netdata/netdata/pull/19502) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/postgres\): add config example with unix socket + custom port [\#19501](https://github.com/netdata/netdata/pull/19501) ([ilyam8](https://github.com/ilyam8))
 - Create impact-on-resources.md [\#19499](https://github.com/netdata/netdata/pull/19499) ([ktsaou](https://github.com/ktsaou))
 - Add worker for alert queue processing [\#19498](https://github.com/netdata/netdata/pull/19498) ([stelfrag](https://github.com/stelfrag))
 - fix absolute injection again [\#19497](https://github.com/netdata/netdata/pull/19497) ([ktsaou](https://github.com/ktsaou))
 - fix absolute injection [\#19496](https://github.com/netdata/netdata/pull/19496) ([ktsaou](https://github.com/ktsaou))
+- max data file size [\#19495](https://github.com/netdata/netdata/pull/19495) ([ktsaou](https://github.com/ktsaou))
 - proc.plugin: add `ifb4*` to excluded interface name patterns [\#19494](https://github.com/netdata/netdata/pull/19494) ([intelfx](https://github.com/intelfx))
 - build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.8.0 to 4.8.1 in /src/go [\#19493](https://github.com/netdata/netdata/pull/19493) ([dependabot[bot]](https://github.com/apps/dependabot))
 - proc.plugin: remove traces of /proc/spl/kstat/zfs/pool/state [\#19491](https://github.com/netdata/netdata/pull/19491) ([intelfx](https://github.com/intelfx))
@@ -29,6 +37,7 @@
 - build\(deps\): bump github.com/miekg/dns from 1.1.62 to 1.1.63 in /src/go [\#19475](https://github.com/netdata/netdata/pull/19475) ([dependabot[bot]](https://github.com/apps/dependabot))
 - optimized rrdhost\_status [\#19472](https://github.com/netdata/netdata/pull/19472) ([ktsaou](https://github.com/ktsaou))
 - Unregister node from the agent to run in a worker thread [\#19471](https://github.com/netdata/netdata/pull/19471) ([stelfrag](https://github.com/stelfrag))
+- Make handling of cross-platform emulation for static builds smarter. [\#19470](https://github.com/netdata/netdata/pull/19470) ([Ferroin](https://github.com/Ferroin))
 - Use QEMU from the runner environment instead of an external copy. [\#19468](https://github.com/netdata/netdata/pull/19468) ([Ferroin](https://github.com/Ferroin))
 - fix crash when cleaning up virtual nodes [\#19467](https://github.com/netdata/netdata/pull/19467) ([ktsaou](https://github.com/ktsaou))
 - streaming nodes accounting [\#19466](https://github.com/netdata/netdata/pull/19466) ([ktsaou](https://github.com/ktsaou))
@@ -224,7 +233,6 @@
 - Monitor sensors using libsensors via debugfs.plugin [\#19251](https://github.com/netdata/netdata/pull/19251) ([ktsaou](https://github.com/ktsaou))
 - Add option to updater to report status of auto-updates on the system. [\#19248](https://github.com/netdata/netdata/pull/19248) ([Ferroin](https://github.com/Ferroin))
 - DBENGINE: pgc tuning, replication tuning [\#19237](https://github.com/netdata/netdata/pull/19237) ([ktsaou](https://github.com/ktsaou))
-- Update kickstart script to use new repository host. [\#18962](https://github.com/netdata/netdata/pull/18962) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
@@ -456,7 +464,6 @@
 - go mod tidy [\#18967](https://github.com/netdata/netdata/pull/18967) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18966](https://github.com/netdata/netdata/pull/18966) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/rabbitmq\): add cluster support [\#18965](https://github.com/netdata/netdata/pull/18965) ([ilyam8](https://github.com/ilyam8))
-- Tidy up CI to improve overall run times. [\#18957](https://github.com/netdata/netdata/pull/18957) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
@@ -473,17 +480,6 @@
 ## [v2.0.0](https://github.com/netdata/netdata/tree/v2.0.0) (2024-11-07)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.47.5...v2.0.0)
-
-**Merged pull requests:**
-
-- build\(deps\): update go toolchain to v1.23.3 [\#18961](https://github.com/netdata/netdata/pull/18961) ([ilyam8](https://github.com/ilyam8))
-- Adjust max possible extent size [\#18960](https://github.com/netdata/netdata/pull/18960) ([stelfrag](https://github.com/stelfrag))
-- build\(deps\): bump github.com/vmware/govmomi from 0.45.1 to 0.46.0 in /src/go [\#18959](https://github.com/netdata/netdata/pull/18959) ([dependabot[bot]](https://github.com/apps/dependabot))
-- chore\(go.d.plugin\): remove duplicate logging in init/check [\#18955](https://github.com/netdata/netdata/pull/18955) ([ilyam8](https://github.com/ilyam8))
-- Update README.md [\#18954](https://github.com/netdata/netdata/pull/18954) ([Ancairon](https://github.com/Ancairon))
-- Fix br elements [\#18952](https://github.com/netdata/netdata/pull/18952) ([Ancairon](https://github.com/Ancairon))
-- Precompile Python code on Windows. [\#18951](https://github.com/netdata/netdata/pull/18951) ([Ferroin](https://github.com/Ferroin))
-- docs: simplify go.d.plugin readme [\#18949](https://github.com/netdata/netdata/pull/18949) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
