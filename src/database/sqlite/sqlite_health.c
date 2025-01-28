@@ -322,7 +322,7 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
         health_log_id = (size_t)sqlite3_column_int64(res, 0);
         sql_health_alarm_log_insert_detail(host, health_log_id, ae);
         insert_alert_queue(
-            host, health_log_id, (int64_t)ae->unique_id, (int64_t)ae->alarm_id, ae->old_status, ae->new_status);
+            host, health_log_id, (int64_t)ae->unique_id, (int64_t)ae->alarm_id, ae->old_status, ae->new_status, ae->when);
     } else
         error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", rrdhost_hostname(host), rc);
 
