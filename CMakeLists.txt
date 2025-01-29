@@ -3537,66 +3537,11 @@ if(ENABLE_DASHBOARD)
   include(NetdataDashboard)
   bundle_dashboard()
 
-  include(src/web/gui/v1/dashboard_v1.cmake)
-  include(src/web/gui/gui.cmake)
-
-  function(cat IN_FILE OUT_FILE)
-    file(READ ${IN_FILE} CONTENTS)
-    file(APPEND ${OUT_FILE} "${CONTENTS}")
-  endfunction()
-
-  file(WRITE ${CMAKE_BINARY_DIR}/src/web/gui/dashboard.js.in "")
-
-  foreach(JS_FILE ${DASHBOARD_JS_FILES})
-    cat(${JS_FILE} ${CMAKE_BINARY_DIR}/dashboard.js.in)
-  endforeach()
-
-  configure_file(${CMAKE_BINARY_DIR}/dashboard.js.in
-                 ${CMAKE_BINARY_DIR}/dashboard.js COPYONLY)
-
   install(FILES
-          ${CMAKE_BINARY_DIR}/dashboard.js
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST})
-
-  install(FILES
-          src/web/gui/dashboard_info_custom_example.js
-          src/web/gui/dashboard_info.js
-          src/web/gui/main.css
-          src/web/gui/main.js
-          src/web/gui/switch.html
           src/web/gui/ilove.html
           COMPONENT dashboard
           DESTINATION ${WEB_DEST})
 
-  install(FILES
-          src/web/gui/old/index.html
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/old)
-
-  install(FILES
-          src/web/gui/static/img/netdata-logomark.svg
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/static/img)
-
-  install(FILES
-          src/web/gui/css/morris-0.5.1.css
-          src/web/gui/css/c3-0.4.18.min.css
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/css)
-
-  install(FILES
-          src/web/gui/.well-known/dnt/cookies
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/.well-known/dnt)
-
-  if(NOT OS_WINDOWS)
-    # v0 dashboard
-    install(FILES
-            src/web/gui/v0/index.html
-            COMPONENT dashboard
-            DESTINATION ${WEB_DEST}/v0)
-  endif()
 endif()
 
 if(OS_WINDOWS)
