@@ -31,7 +31,7 @@ void buffer_char_replace(BUFFER *wb, char from, char to) {
     buffer_overflow_check(wb);
 }
 
-void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit) {
+ALWAYS_INLINE void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit) {
     if(unlikely(flags == SN_EMPTY_SLOT)) {
         buffer_fast_strcat(wb, "E", 1);
         return;

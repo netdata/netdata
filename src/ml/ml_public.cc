@@ -242,9 +242,9 @@ void ml_chart_delete(RRDSET *rs)
     rs->ml_chart = NULL;
 }
 
-bool ml_chart_update_begin(RRDSET *rs)
+ALWAYS_INLINE_ONLY bool ml_chart_update_begin(RRDSET *rs)
 {
-    ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
+    ml_chart_t *chart = (ml_chart_t *)rs->ml_chart;
     if (!chart)
         return false;
 
@@ -320,7 +320,7 @@ void ml_dimension_delete(RRDDIM *rd)
     rd->ml_dimension = NULL;
 }
 
-void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomalous) {
+ALWAYS_INLINE_ONLY void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomalous) {
     ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
     if (!dim)
         return;

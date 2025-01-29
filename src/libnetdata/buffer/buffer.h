@@ -117,7 +117,7 @@ void buffer_char_replace(BUFFER *wb, char from, char to);
 
 void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit);
 
-static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
+static ALWAYS_INLINE void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
     if(unlikely(buffer->len + needed_free_size >= buffer->size))
         buffer_increase(buffer, needed_free_size + 1);
 }
@@ -156,14 +156,14 @@ static inline void _buffer_json_depth_pop(BUFFER *wb) {
     wb->json.depth--;
 }
 
-static inline void buffer_putc(BUFFER *wb, char c) {
+static ALWAYS_INLINE void buffer_putc(BUFFER *wb, char c) {
     buffer_need_bytes(wb, 2);
     wb->buffer[wb->len++] = c;
     wb->buffer[wb->len] = '\0';
     buffer_overflow_check(wb);
 }
 
-static inline void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
+static ALWAYS_INLINE void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt || !len)) return;
 
     buffer_need_bytes(wb, len + 1);
@@ -182,7 +182,7 @@ static inline void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
     buffer_overflow_check(wb);
 }
 
-static inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
+static ALWAYS_INLINE void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt || !len)) return;
 
     buffer_need_bytes(wb, len + 1);
@@ -209,7 +209,7 @@ static inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     buffer_overflow_check(wb);
 }
 
-static inline void buffer_strcat(BUFFER *wb, const char *txt) {
+static ALWAYS_INLINE void buffer_strcat(BUFFER *wb, const char *txt) {
     if(unlikely(!txt || !*txt)) return;
 
     const char *t = txt;
@@ -669,7 +669,7 @@ typedef enum {
     NUMBER_ENCODING_BASE64,
 } NUMBER_ENCODING;
 
-static inline void buffer_print_int64_encoded(BUFFER *wb, NUMBER_ENCODING encoding, int64_t value) {
+static ALWAYS_INLINE void buffer_print_int64_encoded(BUFFER *wb, NUMBER_ENCODING encoding, int64_t value) {
     if(encoding == NUMBER_ENCODING_BASE64)
         return buffer_print_int64_base64(wb, value);
 
@@ -679,7 +679,7 @@ static inline void buffer_print_int64_encoded(BUFFER *wb, NUMBER_ENCODING encodi
     return buffer_print_int64(wb, value);
 }
 
-static inline void buffer_print_uint64_encoded(BUFFER *wb, NUMBER_ENCODING encoding, uint64_t value) {
+static ALWAYS_INLINE void buffer_print_uint64_encoded(BUFFER *wb, NUMBER_ENCODING encoding, uint64_t value) {
     if(encoding == NUMBER_ENCODING_BASE64)
         return buffer_print_uint64_base64(wb, value);
 
@@ -689,7 +689,7 @@ static inline void buffer_print_uint64_encoded(BUFFER *wb, NUMBER_ENCODING encod
     return buffer_print_uint64(wb, value);
 }
 
-static inline void buffer_print_netdata_double_encoded(BUFFER *wb, NUMBER_ENCODING encoding, NETDATA_DOUBLE value) {
+static ALWAYS_INLINE void buffer_print_netdata_double_encoded(BUFFER *wb, NUMBER_ENCODING encoding, NETDATA_DOUBLE value) {
     if(encoding == NUMBER_ENCODING_BASE64)
         return buffer_print_netdata_double_base64(wb, value);
 
