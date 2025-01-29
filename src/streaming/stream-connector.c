@@ -394,6 +394,8 @@ struct connector {
     ND_THREAD *thread;
     struct completion completion;
 
+    Word_t idx;
+
     size_t nodes;
 
     struct {
@@ -403,6 +405,12 @@ struct connector {
         SENDERS_JudyLSet senders;
     } queue;
 };
+
+static inline Word_t get_unique_idx(struct connector *cn, STRCNT_CMD cmd) {
+    Word_t t = STRCNT_CMD_MAX - 1;
+    Word_t reserved_bits = (sizeof(Word_t) * 8) - __builtin_clz(t);
+    return (__atomic_add_fetch(&cn->idx, 1, __ATOMIC_RELAXED) << reserved_bits) | cmd;
+}
 
 static struct {
     int id;
@@ -441,19 +449,28 @@ struct connector *stream_connector_get(struct sender_state *s) {
     return sc;
 }
 
-void stream_connector_requeue(struct sender_state *s) {
+void stream_connector_requeue(struct sender_state *s, STRCNT_CMD cmd) {
     struct connector *sc = stream_connector_get(s);
 
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM CONNECT '%s' [to parent]: adding host in connector queue...",
-           rrdhost_hostname(s->host));
+    switch(cmd) {
+        case STRCNT_CMD_CONNECT:
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                "STREAM CONNECT '%s' [to parent]: adding host in connector queue...",
+                rrdhost_hostname(s->host));
+
+            pulse_host_status(s->host, PULSE_HOST_STATUS_SND_PENDING, 0);
+            break;
+
+        case STRCNT_CMD_REMOVE:
+            break;
+
+        default:
+            fatal("STREAM CONNECT '%s': invalid cmd %d", rrdhost_hostname(s->host), cmd);
+    }
 
     spinlock_lock(&sc->queue.spinlock);
-    internal_fatal(SENDERS_GET(&sc->queue.senders, (Word_t)s) != NULL, "Sender is already in the connector queue");
-    SENDERS_SET(&sc->queue.senders, (Word_t)s, s);
+    SENDERS_SET(&sc->queue.senders, get_unique_idx(sc, cmd), s);
     spinlock_unlock(&sc->queue.spinlock);
-
-    pulse_host_status(s->host, PULSE_HOST_STATUS_SND_PENDING, 0);
 
     // signal the connector to catch the job
     completion_mark_complete_a_job(&sc->completion);
@@ -482,7 +499,7 @@ void stream_connector_add(struct sender_state *s) {
     s->parent_using_h2o = stream_send.parents.h2o;
 
     // do not call this with any locks held
-    stream_connector_requeue(s);
+    stream_connector_requeue(s, STRCNT_CMD_CONNECT);
 }
 
 static void stream_connector_remove(struct sender_state *s) {
@@ -507,6 +524,7 @@ static void *stream_connector_thread(void *ptr) {
     worker_register("STREAMCNT");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_CONNECTING, "connect");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_CONNECTED, "connected");
+    worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_REMOVED, "removed");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE, "bad handshake");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT, "timeout");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION, "cant upgrade");
@@ -539,31 +557,52 @@ static void *stream_connector_thread(void *ptr) {
 
             if(stream_connector_is_signaled_to_stop(s)) {
                 cancelled_nodes++;
-                SENDERS_DEL(&sc->queue.senders, (Word_t)s);
+                SENDERS_DEL(&sc->queue.senders, idx);
                 stream_connector_remove(s);
                 continue;
             }
 
-            spinlock_unlock(&sc->queue.spinlock);
-            worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
-            bool move_to_sender = stream_connect(s, stream_send.parents.default_port, stream_send.parents.timeout_s);
-            spinlock_lock(&sc->queue.spinlock);
+            STRCNT_CMD cmd = idx & (STRCNT_CMD_CONNECT| STRCNT_CMD_REMOVE);
+            switch(cmd) {
+                case STRCNT_CMD_CONNECT:
+                    spinlock_unlock(&sc->queue.spinlock);
+                    worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
+                    bool move_to_sender =
+                        stream_connect(s, stream_send.parents.default_port, stream_send.parents.timeout_s);
+                    spinlock_lock(&sc->queue.spinlock);
 
-            if(move_to_sender) {
-                connected_nodes++;
-                stream_sender_on_connect(s);
+                    if (move_to_sender) {
+                        connected_nodes++;
+                        stream_sender_on_connect(s);
 
-                worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTED);
-                SENDERS_DEL(&sc->queue.senders, (Word_t)s);
-                spinlock_unlock(&sc->queue.spinlock);
+                        worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTED);
+                        SENDERS_DEL(&sc->queue.senders, idx);
+                        spinlock_unlock(&sc->queue.spinlock);
 
-                // do not have the connector lock when calling this
-                stream_sender_add_to_queue(s);
+                        // do not have the connector lock when calling this
+                        stream_sender_add_to_queue(s);
 
-                spinlock_lock(&sc->queue.spinlock);
+                        spinlock_lock(&sc->queue.spinlock);
+                    }
+                    else
+                        failed_nodes++;
+
+                    break;
+
+                case STRCNT_CMD_REMOVE:
+                    worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_REMOVED);
+                    SENDERS_DEL(&sc->queue.senders, idx);
+                    spinlock_unlock(&sc->queue.spinlock);
+
+                    stream_sender_on_disconnect(s);
+                    stream_sender_remove(s, s->exit.reason);
+
+                    spinlock_lock(&sc->queue.spinlock);
+                    break;
+
+                default:
+                    fatal("STREAM CONNECT '%s': invalid cmd %d", rrdhost_hostname(s->host), cmd);
             }
-            else
-                failed_nodes++;
 
             worker_is_idle();
         }

@@ -68,7 +68,7 @@ void stream_sender_log_payload(struct sender_state *s, BUFFER *payload, STREAM_T
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
+void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     // stop all replication commands inflight
     replication_sender_delete_pending_requests(s);
 
@@ -144,7 +144,7 @@ static void stream_sender_on_ready_to_dispatch(struct sender_state *s) {
     stream_send_global_functions(s->host);
 }
 
-static void stream_sender_on_disconnect(struct sender_state *s) {
+void stream_sender_on_disconnect(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM SND '%s': running on-disconnect hooks...",
            rrdhost_hostname(s->host));
@@ -153,7 +153,6 @@ static void stream_sender_on_disconnect(struct sender_state *s) {
     stream_circular_buffer_flush_unsafe(s->scb, stream_send.buffer_max_size);
     stream_sender_unlock(s);
 
-    stream_sender_execute_commands_cleanup(s);
     stream_sender_charts_and_replication_reset(s);
     stream_sender_clear_parent_claim_id(s->host);
     stream_receiver_send_node_and_claim_id_to_child(s->host);
@@ -433,18 +432,17 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     nd_sock_close(&s->sock);
 
     stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, now_realtime_sec());
-    stream_sender_on_disconnect(s);
-
-    bool should_remove = !reconnect || stream_connector_is_signaled_to_stop(s);
-
+    stream_sender_execute_commands_cleanup(s);
     stream_thread_node_removed(s->host);
 
     pulse_host_status(s->host, PULSE_HOST_STATUS_SND_OFFLINE, reason);
 
-    if (should_remove)
-        stream_sender_remove(s, reason);
+    if (!reconnect || stream_connector_is_signaled_to_stop(s)) {
+        s->exit.reason = reason;
+        stream_connector_requeue(s, STRCNT_CMD_REMOVE);
+    }
     else
-        stream_connector_requeue(s);
+        stream_connector_requeue(s, STRCNT_CMD_CONNECT);
 }
 
 void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut) {
