@@ -89,7 +89,17 @@ Metrics:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ httpcheck_web_service_up ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | HTTP check endpoint ${label:url} liveness status |
+| [ httpcheck_web_service_bad_content ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of HTTP responses from ${label:url} with unexpected content in the last 5 minutes |
+| [ httpcheck_web_service_bad_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of HTTP responses from ${label:url} with unexpected status in the last 5 minutes |
+| [ httpcheck_web_service_bad_header ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of HTTP responses from ${label:url} with unexpected header in the last 5 minutes |
+| [ httpcheck_web_service_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of timed-out HTTP requests to ${label:url} in the last 5 minutes |
+| [ httpcheck_web_service_no_connection ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of failed HTTP requests to ${label:url} in the last 5 minutes |
 
 
 ## Setup
