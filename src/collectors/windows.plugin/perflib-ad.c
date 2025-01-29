@@ -637,12 +637,14 @@ static void netdata_ad_bind(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
 
 static void netdata_ad_atq(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     static COUNTER_DATA atqAverageRequestLatency = { .key = "ATQ Request Latency" };
-    static COUNTER_DATA atqOutstandingRequests = { .key = "ATQ Outstanding Queued Requests" };
+    //static COUNTER_DATA atqOutstandingRequests = { .key = "ATQ Outstanding Queued Requests" };
 
     static RRDSET *st_atq_average_request_latency = NULL;
     static RRDDIM *rd_atq_average_request_latency = NULL;
+    /* TODO: Check why values are growing forever in our setup
     static RRDSET *st_atq_outstanding_requests = NULL;
     static RRDDIM *rd_atq_outstanding_requests = NULL;
+    */
 
     if(perflibGetObjectCounter(pDataBlock, pObjectType, &atqAverageRequestLatency)) {
         if (unlikely(!st_atq_average_request_latency)) {
@@ -674,6 +676,7 @@ static void netdata_ad_atq(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
         rrdset_done(st_atq_average_request_latency);
     }
 
+    /*
     if(perflibGetObjectCounter(pDataBlock, pObjectType, &atqOutstandingRequests)) {
         if (unlikely(!st_atq_outstanding_requests)) {
             st_atq_outstanding_requests = rrdset_create_localhost("ad"
@@ -701,7 +704,7 @@ static void netdata_ad_atq(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
                               rd_atq_outstanding_requests,
                               (collected_number)atqOutstandingRequests.current.Data);
         rrdset_done(st_atq_outstanding_requests);
-    }
+    } */
 }
 
 static void netdata_ad_op_total(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
