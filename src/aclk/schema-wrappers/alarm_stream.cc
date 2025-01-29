@@ -176,8 +176,6 @@ struct send_alarm_snapshot *parse_send_alarm_snapshot(const char *data, size_t l
 
 void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr)
 {
-    freez(ptr->claim_id);
-    freez(ptr->node_id);
     freez(ptr->snapshot_uuid);
     freez(ptr);
 }
