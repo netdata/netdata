@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#19517](https://github.com/netdata/netdata/pull/19517) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/httpcheck\): add alerts to metadata [\#19516](https://github.com/netdata/netdata/pull/19516) ([ilyam8](https://github.com/ilyam8))
 - Invert order of checks in pgd\_append\_point\(\). [\#19515](https://github.com/netdata/netdata/pull/19515) ([vkalintiris](https://github.com/vkalintiris))
+- Link the ebpf plugin against libbpf directly instead of through libnetdata. [\#19514](https://github.com/netdata/netdata/pull/19514) ([Ferroin](https://github.com/Ferroin))
 - compile time and runtime check of required compiler flags [\#19513](https://github.com/netdata/netdata/pull/19513) ([ktsaou](https://github.com/ktsaou))
+- chore\(go.d/nvme\): fix :dog: warning [\#19510](https://github.com/netdata/netdata/pull/19510) ([ilyam8](https://github.com/ilyam8))
 - ACLK: allow encoded proxy username and password to work [\#19508](https://github.com/netdata/netdata/pull/19508) ([ktsaou](https://github.com/ktsaou))
 - Fix alert transition [\#19507](https://github.com/netdata/netdata/pull/19507) ([stelfrag](https://github.com/stelfrag))
 - update buildinfo  [\#19506](https://github.com/netdata/netdata/pull/19506) ([ktsaou](https://github.com/ktsaou))
@@ -462,8 +466,6 @@
 - fix\(go.d/snmp\): don't return error if no sysName [\#18970](https://github.com/netdata/netdata/pull/18970) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump golang.org/x/text from 0.19.0 to 0.20.0 in /src/go [\#18968](https://github.com/netdata/netdata/pull/18968) ([dependabot[bot]](https://github.com/apps/dependabot))
 - go mod tidy [\#18967](https://github.com/netdata/netdata/pull/18967) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18966](https://github.com/netdata/netdata/pull/18966) ([netdatabot](https://github.com/netdatabot))
-- feat\(go.d/rabbitmq\): add cluster support [\#18965](https://github.com/netdata/netdata/pull/18965) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
