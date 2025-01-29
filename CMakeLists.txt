@@ -3542,10 +3542,6 @@ if(ENABLE_DASHBOARD)
           COMPONENT dashboard
           DESTINATION ${WEB_DEST})
 
-  install(FILES
-          src/web/gui/.well-known/dnt/cookies
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/.well-known/dnt)
 endif()
 
 if(OS_WINDOWS)
