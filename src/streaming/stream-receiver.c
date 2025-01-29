@@ -291,9 +291,11 @@ static inline ssize_t receiver_read_compressed(struct receiver_state *r) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAKE reason, bool force) {
+static STREAM_HANDSHAKE receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAKE reason, bool force) {
     if(force || !rpt->exit.reason)
         rpt->exit.reason = reason;
+
+    return rpt->exit.reason;
 }
 
 static inline bool receiver_should_stop(struct receiver_state *rpt) {
@@ -516,6 +518,8 @@ void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *s
 static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, STREAM_HANDSHAKE reason) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
+    receiver_set_exit_reason(rpt, reason, false);
+
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
         ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
@@ -627,7 +631,6 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
 
                         while (buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
                             if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
-                                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED, false);
                                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                                 *removed = true;
                                 return -1;
@@ -641,7 +644,6 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
                         break;
 
                     else {
-                        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED, false);
                         stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
                         *removed = true;
                         return -1;
@@ -651,7 +653,6 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             else if (feed_rc == DECOMPRESS_NEED_MORE_DATA)
                 break;
             else {
-                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED, false);
                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
                 *removed = true;
                 return -1;
@@ -659,9 +660,7 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
         }
 
         if(receiver_should_stop(rpt)) {
-            STREAM_HANDSHAKE reason = rpt->exit.reason ? rpt->exit.reason : STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP;
-            receiver_set_exit_reason(rpt, reason, false);
-            stream_receiver_remove(sth, rpt, reason);
+            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
             *removed = true;
             return -1;
         }
@@ -673,7 +672,6 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
 
         while(buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
             if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
-                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED, false);
                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                 *removed = true;
                 return -1;
@@ -755,27 +753,27 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
                    stream_handshake_error_to_string(reason), rc, rpt->sock.fd, stats->bytes_sent, stats->sends);
 
-            receiver_set_exit_reason(rpt, reason, false);
-
             if(process_opcodes_and_enable_removal) {
                 // this is not executed from the opcode handling mechanism
                 // so we can safely remove the receiver.
                 stream_receiver_remove(sth, rpt, reason);
             }
             else {
-                 // protection against this case:
-                 //
-                 // 1. receiver gets a replication request
-                 // 2. parser processes the request
-                 // 3. parser decides to send back a message to the child (REPLAY_CHART)
-                 // 4. send_to_child appends the data to the sending circular buffer
-                 // 5. send_to_child sends opcode to enable sending
-                 // 6. opcode bypasses the signal and runs this function inline to dispatch immediately
-                 // 7. sending fails (child disconnected)
-                 // 8. receiver is removed
-                 //
-                 // Point 2 above crashes. The parser is no longer there (freed at point 7)
-                 // and there is no way for point 2 to know...
+                receiver_set_exit_reason(rpt, reason, false);
+
+                // protection against this case:
+                //
+                // 1. receiver gets a replication request
+                // 2. parser processes the request
+                // 3. parser decides to send back a message to the child (REPLAY_CHART)
+                // 4. send_to_child appends the data to the sending circular buffer
+                // 5. send_to_child sends opcode to enable sending
+                // 6. opcode bypasses the signal and runs this function inline to dispatch immediately
+                // 7. sending fails (child disconnected)
+                // 8. receiver is removed
+                //
+                // Point 2 above crashes. The parser is no longer there (freed at point 7)
+                // and there is no way for point 2 to know...
             }
         }
         else if(process_opcodes_and_enable_removal &&
@@ -840,7 +838,6 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
                    stream_handshake_error_to_string(reason), rpt->sock.fd);
 
-            receiver_set_exit_reason(rpt, reason, false);
             stream_receiver_remove(sth, rpt, reason);
         }
         else if(status == EVLOOP_STATUS_CONTINUE && process_opcodes && stream_thread_process_opcodes(sth, &rpt->thread.meta))
@@ -866,9 +863,7 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
     ND_LOG_STACK_PUSH(lgs);
 
     if (receiver_should_stop(rpt)) {
-        STREAM_HANDSHAKE reason = rpt->exit.reason ? rpt->exit.reason : STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP;
-        receiver_set_exit_reason(rpt, reason, false);
-        stream_receiver_remove(sth, rpt, reason);
+        stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
         return false;
     }
 
@@ -884,7 +879,6 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
                sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
                stream_handshake_error_to_string(reason));
 
-        receiver_set_exit_reason(rpt, reason, false);
         stream_receiver_remove(sth, rpt, reason);
         return false;
     }
@@ -953,7 +947,6 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, timeout_s,
                    stats.bytes_sent, stats.sends, duration, pending, stats.buffer_ratio);
 
-            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_TIMEOUT, false);
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_TIMEOUT);
             continue;
         }
@@ -1044,7 +1037,6 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
                    __atomic_load_n(&host->stream.rcv.status.replication.counter_out, __ATOMIC_RELAXED),
                    __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED));
 
-            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_REPLICATION_STALLED, false);
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_REPLICATION_STALLED);
         }
 

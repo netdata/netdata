@@ -111,6 +111,15 @@ void stream_sender_charts_and_replication_reset(struct sender_state *s) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static void stream_sender_on_connect_and_disconnect(struct sender_state *s) {
+    stream_sender_execute_commands_cleanup(s);
+    stream_sender_charts_and_replication_reset(s);
+
+    stream_sender_lock(s);
+    stream_circular_buffer_flush_unsafe(s->scb, stream_send.buffer_max_size);
+    stream_sender_unlock(s);
+}
+
 void stream_sender_on_connect(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM SND [%s]: running on-connect hooks...",
@@ -118,11 +127,7 @@ void stream_sender_on_connect(struct sender_state *s) {
 
     rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED);
 
-    stream_sender_charts_and_replication_reset(s);
-
-    stream_sender_lock(s);
-    stream_circular_buffer_flush_unsafe(s->scb, stream_send.buffer_max_size);
-    stream_sender_unlock(s);
+    stream_sender_on_connect_and_disconnect(s);
 
     s->thread.last_traffic_ut = now_monotonic_usec();
     s->rbuf.read_len = 0;
@@ -136,7 +141,7 @@ static void stream_sender_on_ready_to_dispatch(struct sender_state *s) {
     // set this flag before sending any data, or the data will not be sent
     rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
-    stream_sender_execute_commands_cleanup(s);
+    // send our global metadata to the parent
     stream_sender_send_custom_host_variables(s->host);
     stream_path_send_to_parent(s->host);
     stream_sender_send_claimed_id(s->host);
@@ -149,15 +154,11 @@ void stream_sender_on_disconnect(struct sender_state *s) {
            "STREAM SND '%s': running on-disconnect hooks...",
            rrdhost_hostname(s->host));
 
-    stream_sender_lock(s);
-    stream_circular_buffer_flush_unsafe(s->scb, stream_send.buffer_max_size);
-    stream_sender_unlock(s);
+    stream_sender_on_connect_and_disconnect(s);
 
-    stream_sender_charts_and_replication_reset(s);
-    stream_sender_clear_parent_claim_id(s->host);
-    stream_receiver_send_node_and_claim_id_to_child(s->host);
+    // update the child (the receiver side) for this parent
     stream_path_parent_disconnected(s->host);
-    sender_host_buffer_free(s->host);
+    stream_receiver_send_node_and_claim_id_to_child(s->host);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -343,10 +344,10 @@ void stream_sender_remove(struct sender_state *s, STREAM_HANDSHAKE reason) {
 
     stream_sender_lock(s);
 
-    if(reason == STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP && s->exit.reason) {
+    if(reason == STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP && s->exit.reason)
         reason = s->exit.reason;
-        s->exit.reason = 0;
-    }
+
+    s->exit.reason = 0;
 
     __atomic_store_n(&s->exit.shutdown, false, __ATOMIC_RELAXED);
     rrdhost_flag_clear(s->host,
@@ -356,7 +357,6 @@ void stream_sender_remove(struct sender_state *s, STREAM_HANDSHAKE reason) {
     s->last_state_since_t = now_realtime_sec();
     stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, s->last_state_since_t);
     s->connector.id = -1;
-    s->exit.reason = 0;
 
     stream_sender_unlock(s);
 
@@ -421,6 +421,10 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     // clear these asap, to make sender_commit() stop processing data for this host
     stream_sender_lock(s);
 
+    if(reason == STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP && s->exit.reason)
+        reason = s->exit.reason;
+
+    s->exit.reason = reason;
     s->thread.msg.session = 0;
     s->thread.msg.meta = NULL;
 
@@ -432,17 +436,15 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     nd_sock_close(&s->sock);
 
     stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, now_realtime_sec());
-    stream_sender_execute_commands_cleanup(s);
-    stream_thread_node_removed(s->host);
+    stream_sender_clear_parent_claim_id(s->host);
+    sender_host_buffer_free(s->host);
 
     pulse_host_status(s->host, PULSE_HOST_STATUS_SND_OFFLINE, reason);
 
-    if (!reconnect || stream_connector_is_signaled_to_stop(s)) {
-        s->exit.reason = reason;
-        stream_connector_requeue(s, STRCNT_CMD_REMOVE);
-    }
-    else
-        stream_connector_requeue(s, STRCNT_CMD_CONNECT);
+    stream_thread_node_removed(s->host);
+
+    stream_connector_requeue(
+        s, reconnect && !stream_connector_is_signaled_to_stop(s) ? STRCNT_CMD_CONNECT : STRCNT_CMD_REMOVE);
 }
 
 void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut) {

@@ -12,7 +12,7 @@ void stream_sender_clear_parent_claim_id(RRDHOST *host) {
 
 // the parent sends to the child its claim id, node id and cloud url
 void stream_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
-    if(host == localhost || UUIDiszero(host->node_id)) return;
+    if(rrdhost_is_local(host) || UUIDiszero(host->node_id)) return;
 
     rrdhost_receiver_lock(host);
     if(stream_has_capability(host->receiver, STREAM_CAP_NODE_ID)) {
