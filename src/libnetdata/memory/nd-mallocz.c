@@ -386,7 +386,7 @@ void freez_int(void *ptr, const char *file, const char *function, size_t line) {
 }
 #else
 
-char *strdupz(const char *s) {
+ALWAYS_INLINE char *strdupz(const char *s) {
     char *t = strdup(s);
     if (unlikely(!t)) {
         OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
@@ -395,7 +395,7 @@ char *strdupz(const char *s) {
     return t;
 }
 
-char *strndupz(const char *s, size_t len) {
+ALWAYS_INLINE char *strndupz(const char *s, size_t len) {
     char *t = strndup(s, len);
     if (unlikely(!t)) {
         OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
@@ -405,11 +405,11 @@ char *strndupz(const char *s, size_t len) {
 }
 
 // If ptr is NULL, no operation is performed.
-void freez(void *ptr) {
+ALWAYS_INLINE void freez(void *ptr) {
     if(likely(ptr)) free(ptr);
 }
 
-void *mallocz(size_t size) {
+ALWAYS_INLINE void *mallocz(size_t size) {
     void *p = malloc(size);
     if (unlikely(!p)) {
         OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
@@ -418,7 +418,7 @@ void *mallocz(size_t size) {
     return p;
 }
 
-void *callocz(size_t nmemb, size_t size) {
+ALWAYS_INLINE void *callocz(size_t nmemb, size_t size) {
     void *p = calloc(nmemb, size);
     if (unlikely(!p)) {
         OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
@@ -427,7 +427,7 @@ void *callocz(size_t nmemb, size_t size) {
     return p;
 }
 
-void *reallocz(void *ptr, size_t size) {
+ALWAYS_INLINE void *reallocz(void *ptr, size_t size) {
     void *p = realloc(ptr, size);
     if (unlikely(!p)) {
         OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
@@ -436,7 +436,7 @@ void *reallocz(void *ptr, size_t size) {
     return p;
 }
 
-void posix_memfree(void *ptr) {
+ALWAYS_INLINE void posix_memfree(void *ptr) {
     free(ptr);
 }
 #endif

@@ -61,13 +61,13 @@ void pdc_init(void) {
     pulse_aral_register(pdc_globals.pdc.ar, "pdc");
 }
 
-PDC *pdc_get(void) {
+ALWAYS_INLINE PDC *pdc_get(void) {
     PDC *pdc = aral_mallocz(pdc_globals.pdc.ar);
     memset(pdc, 0, sizeof(PDC));
     return pdc;
 }
 
-static void pdc_release(PDC *pdc) {
+static ALWAYS_INLINE void pdc_release(PDC *pdc) {
     aral_freez(pdc_globals.pdc.ar, pdc);
 }
 
@@ -90,13 +90,13 @@ void page_details_init(void) {
     pulse_aral_register(pdc_globals.pd.ar, "pd");
 }
 
-struct page_details *page_details_get(void) {
+ALWAYS_INLINE struct page_details *page_details_get(void) {
     struct page_details *pd = aral_mallocz(pdc_globals.pd.ar);
     memset(pd, 0, sizeof(struct page_details));
     return pd;
 }
 
-static void page_details_release(struct page_details *pd) {
+static ALWAYS_INLINE void page_details_release(struct page_details *pd) {
     aral_freez(pdc_globals.pd.ar, pd);
 }
 
@@ -119,13 +119,13 @@ void epdl_init(void) {
     pulse_aral_register(pdc_globals.epdl.ar, "epdl");
 }
 
-static EPDL *epdl_get(void) {
+static ALWAYS_INLINE EPDL *epdl_get(void) {
     EPDL *epdl = aral_mallocz(pdc_globals.epdl.ar);
     memset(epdl, 0, sizeof(EPDL));
     return epdl;
 }
 
-static void epdl_release(EPDL *epdl) {
+static ALWAYS_INLINE void epdl_release(EPDL *epdl) {
     aral_freez(pdc_globals.epdl.ar, epdl);
 }
 
@@ -149,13 +149,13 @@ void deol_init(void) {
     pulse_aral_register(pdc_globals.deol.ar, "deol");
 }
 
-static DEOL *deol_get(void) {
+static ALWAYS_INLINE DEOL *deol_get(void) {
     DEOL *deol = aral_mallocz(pdc_globals.deol.ar);
     memset(deol, 0, sizeof(DEOL));
     return deol;
 }
 
-static void deol_release(DEOL *deol) {
+static ALWAYS_INLINE void deol_release(DEOL *deol) {
     aral_freez(pdc_globals.deol.ar, deol);
 }
 
@@ -224,7 +224,7 @@ void extent_buffer_cleanup1(void) {
     }
 }
 
-struct extent_buffer *extent_buffer_get(size_t size) {
+ALWAYS_INLINE struct extent_buffer *extent_buffer_get(size_t size) {
     internal_fatal(size > extent_buffer_globals.max_size, "DBENGINE: extent size is too big");
 
     struct extent_buffer *eb = NULL;
@@ -259,7 +259,7 @@ struct extent_buffer *extent_buffer_get(size_t size) {
     return eb;
 }
 
-void extent_buffer_release(struct extent_buffer *eb) {
+ALWAYS_INLINE void extent_buffer_release(struct extent_buffer *eb) {
     if(unlikely(!eb)) return;
 
     spinlock_lock(&extent_buffer_globals.protected.spinlock);
@@ -275,7 +275,7 @@ size_t extent_buffer_cache_size(void) {
 // ----------------------------------------------------------------------------
 // epdl logic
 
-static void epdl_destroy(EPDL *epdl)
+static ALWAYS_INLINE void epdl_destroy(EPDL *epdl)
 {
     Pvoid_t *pd_by_start_time_s_JudyL;
     Word_t metric_id_index = 0;
@@ -289,7 +289,7 @@ static void epdl_destroy(EPDL *epdl)
     epdl_release(epdl);
 }
 
-static void epdl_mark_all_not_loaded_pages_as_failed(EPDL *epdl, PDC_PAGE_STATUS tags, size_t *statistics_counter)
+static ALWAYS_INLINE void epdl_mark_all_not_loaded_pages_as_failed(EPDL *epdl, PDC_PAGE_STATUS tags, size_t *statistics_counter)
 {
     size_t pages_matched = 0;
 
@@ -355,7 +355,7 @@ static bool epdl_check_if_pages_are_already_in_cache(struct rrdengine_instance *
 // ----------------------------------------------------------------------------
 // PDC logic
 
-static void pdc_destroy(PDC *pdc) {
+static ALWAYS_INLINE void pdc_destroy(PDC *pdc) {
     mrg_metric_release(main_mrg, pdc->metric);
     completion_destroy(&pdc->prep_completion);
     completion_destroy(&pdc->page_completion);
@@ -406,7 +406,7 @@ static void pdc_destroy(PDC *pdc) {
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_cancelled, cancelled, __ATOMIC_RELAXED);
 }
 
-void pdc_acquire(PDC *pdc) {
+ALWAYS_INLINE void pdc_acquire(PDC *pdc) {
     spinlock_lock(&pdc->refcount_spinlock);
 
     if(pdc->refcount < 1)
@@ -416,7 +416,7 @@ void pdc_acquire(PDC *pdc) {
     spinlock_unlock(&pdc->refcount_spinlock);
 }
 
-bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router __maybe_unused) {
+ALWAYS_INLINE bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router __maybe_unused) {
     if(unlikely(!pdc))
         return true;
 
@@ -445,22 +445,22 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router 
     return false;
 }
 
-void epdl_cmd_queued(void *epdl_ptr, struct rrdeng_cmd *cmd) {
+ALWAYS_INLINE void epdl_cmd_queued(void *epdl_ptr, struct rrdeng_cmd *cmd) {
     EPDL *epdl = epdl_ptr;
     epdl->cmd = cmd;
 }
 
-void epdl_cmd_dequeued(void *epdl_ptr) {
+ALWAYS_INLINE void epdl_cmd_dequeued(void *epdl_ptr) {
     EPDL *epdl = epdl_ptr;
     epdl->cmd = NULL;
 }
 
-static inline struct rrdeng_cmd *epdl_get_cmd(void *epdl_ptr) {
+static ALWAYS_INLINE struct rrdeng_cmd *epdl_get_cmd(void *epdl_ptr) {
     EPDL *epdl = epdl_ptr;
     return epdl->cmd;
 }
 
-static EPDL_EXTENT *epdl_find_extent_base(EPDL *epdl) {
+static ALWAYS_INLINE EPDL_EXTENT *epdl_find_extent_base(EPDL *epdl) {
     EPDL_EXTENT *e = NULL;
     rw_spinlock_read_lock(&epdl->datafile->extent_epdl.spinlock);
     Pvoid_t *PValue = JudyLGet(epdl->datafile->extent_epdl.epdl_per_extent, epdl->extent_offset, PJE0);
@@ -492,7 +492,7 @@ static EPDL_EXTENT *epdl_find_extent_base(EPDL *epdl) {
     return e;
 }
 
-static bool epdl_pending_add(EPDL *epdl) {
+static ALWAYS_INLINE bool epdl_pending_add(EPDL *epdl) {
     EPDL_EXTENT *e = epdl_find_extent_base(epdl);
     spinlock_lock(&e->spinlock);
 
@@ -519,7 +519,7 @@ static bool epdl_pending_add(EPDL *epdl) {
     return added_new;
 }
 
-static void epdl_pending_del(EPDL *epdl) {
+static ALWAYS_INLINE void epdl_pending_del(EPDL *epdl) {
     EPDL_EXTENT *e = epdl_find_extent_base(epdl);
     spinlock_lock(&e->spinlock);
     e->base = NULL;
@@ -660,7 +660,7 @@ void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags) {
         buffer_strcat(wb, "STEP_UNALIGNED");
 }
 
-inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error) {
+ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error) {
     time_t start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC);
 
     time_t end_time_s = 0;
@@ -695,7 +695,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
             "loaded", 0);
 }
 
-VALIDATED_PAGE_DESCRIPTOR validate_page(
+ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_page(
         nd_uuid_t *uuid,
         time_t start_time_s,
         time_t end_time_s,
@@ -862,7 +862,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
     return vd;
 }
 
-static inline struct page_details *epdl_get_pd_load_link_list_from_metric_start_time(EPDL *epdl, Word_t metric_id, time_t start_time_s) {
+static ALWAYS_INLINE struct page_details *epdl_get_pd_load_link_list_from_metric_start_time(EPDL *epdl, Word_t metric_id, time_t start_time_s) {
 
     if(unlikely(epdl->head_to_datafile_extent_queries_pending_for_extent))
         // stop appending more pages to this epdl

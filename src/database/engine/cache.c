@@ -334,7 +334,7 @@ static inline void pgc_size_histogram_del(PGC *cache, struct pgc_size_histogram 
 // ----------------------------------------------------------------------------
 // evictions control
 
-static inline uint64_t pgc_threshold(size_t threshold, uint64_t wanted, uint64_t current, uint64_t clean) {
+static ALWAYS_INLINE uint64_t pgc_threshold(size_t threshold, uint64_t wanted, uint64_t current, uint64_t clean) {
     if(current < clean)
         current = clean;
 
@@ -348,7 +348,7 @@ static inline uint64_t pgc_threshold(size_t threshold, uint64_t wanted, uint64_t
     return ret;
 }
 
-static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
+static size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
 
     if(size_to_evict)
         spinlock_lock(&cache->usage.spinlock);
@@ -481,7 +481,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 static inline bool flushing_critical(PGC *cache);
 static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wait, bool all_of_them);
 
-static void evict_pages_inline(PGC *cache, bool on_release) {
+static ALWAYS_INLINE void evict_pages_inline(PGC *cache, bool on_release) {
     const size_t per1000 = cache_usage_per1000(cache, NULL);
 
     if(!(cache->config.options & PGC_OPTIONS_EVICT_PAGES_NO_INLINE)) {
@@ -505,15 +505,15 @@ static void evict_pages_inline(PGC *cache, bool on_release) {
     }
 }
 
-static inline void evict_on_clean_page_added(PGC *cache) {
+static ALWAYS_INLINE void evict_on_clean_page_added(PGC *cache) {
     evict_pages_inline(cache, false);
 }
 
-static inline void evict_on_page_release_when_permitted(PGC *cache) {
+static ALWAYS_INLINE void evict_on_page_release_when_permitted(PGC *cache) {
     evict_pages_inline(cache, true);
 }
 
-static inline void flush_inline(PGC *cache, bool on_release) {
+static ALWAYS_INLINE void flush_inline(PGC *cache, bool on_release) {
     if(!(cache->config.options & PGC_OPTIONS_FLUSH_PAGES_NO_INLINE) && flushing_critical(cache)) {
         if (on_release)
             p2_add_fetch(&cache->stats.p2_waste_flush_on_release, 1);
@@ -524,11 +524,11 @@ static inline void flush_inline(PGC *cache, bool on_release) {
     }
 }
 
-static inline void flush_on_page_add(PGC *cache) {
+static ALWAYS_INLINE void flush_on_page_add(PGC *cache) {
     flush_inline(cache, false);
 }
 
-static inline void flush_on_page_hot_release(PGC *cache) {
+static ALWAYS_INLINE void flush_on_page_hot_release(PGC *cache) {
     flush_inline(cache, true);
 }
 
@@ -1354,7 +1354,7 @@ premature_exit:
     return stopped_before_finishing;
 }
 
-static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
+static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     internal_fatal(entry->start_time_s < 0 || entry->end_time_s < 0,
                    "DBENGINE CACHE: timestamps are negative");
 
@@ -2115,11 +2115,11 @@ void pgc_destroy(PGC *cache) {
     }
 }
 
-PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry, bool *added) {
-    return page_add(cache, &entry, added);
+ALWAYS_INLINE PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry, bool *added) {
+    return pgc_page_add(cache, &entry, added);
 }
 
-PGC_PAGE *pgc_page_dup(PGC *cache, PGC_PAGE *page) {
+ALWAYS_INLINE PGC_PAGE *pgc_page_dup(PGC *cache, PGC_PAGE *page) {
     if(!page_acquire(cache, page))
         fatal("DBENGINE CACHE: tried to dup a page that is not acquired!");
 
@@ -2130,7 +2130,7 @@ ALWAYS_INLINE void pgc_page_release(PGC *cache, PGC_PAGE *page) {
     page_release(cache, page, is_page_clean(page));
 }
 
-void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page, bool never_flush) {
+ALWAYS_INLINE void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page, bool never_flush) {
     p2_add_fetch(&cache->stats.p2_workers_hot2dirty, 1);
 
 //#ifdef NETDATA_INTERNAL_CHECKS

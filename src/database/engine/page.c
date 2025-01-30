@@ -340,7 +340,7 @@ ALWAYS_INLINE void dbengine_extent_free(void *extent, size_t size) {
 // ----------------------------------------------------------------------------
 // management api
 
-PGD *pgd_create(uint8_t type, uint32_t slots) {
+ALWAYS_INLINE PGD *pgd_create(uint8_t type, uint32_t slots) {
 
     PGD *pg = pgd_alloc(true); // this is malloc'd !
     pg->type = type;
@@ -391,7 +391,7 @@ PGD *pgd_create(uint8_t type, uint32_t slots) {
     return pg;
 }
 
-PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
+ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
 
     if (!size || size < page_type_size[type])
         return PGD_EMPTY;
@@ -612,7 +612,7 @@ ALWAYS_INLINE uint32_t pgd_capacity(PGD *pg) {
 }
 
 // return the overall memory footprint of the page, including all its structures and overheads
-uint32_t pgd_memory_footprint(PGD *pg)
+ALWAYS_INLINE uint32_t pgd_memory_footprint(PGD *pg)
 {
     if (!pg)
         return 0;

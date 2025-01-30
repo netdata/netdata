@@ -318,13 +318,13 @@ void rrdeng_query_handle_init(void) {
     pulse_aral_register(rrdeng_main.handles.ar, "query handles");
 }
 
-struct rrdeng_query_handle *rrdeng_query_handle_get(void) {
+ALWAYS_INLINE struct rrdeng_query_handle *rrdeng_query_handle_get(void) {
     struct rrdeng_query_handle *handle = aral_mallocz(rrdeng_main.handles.ar);
     memset(handle, 0, sizeof(struct rrdeng_query_handle));
     return handle;
 }
 
-void rrdeng_query_handle_release(struct rrdeng_query_handle *handle) {
+ALWAYS_INLINE void rrdeng_query_handle_release(struct rrdeng_query_handle *handle) {
     aral_freez(rrdeng_main.handles.ar, handle);
 }
 
@@ -456,15 +456,15 @@ static inline STORAGE_PRIORITY rrdeng_enq_cmd_map_opcode_to_priority(enum rrdeng
     return priority;
 }
 
-void rrdeng_enqueue_epdl_cmd(struct rrdeng_cmd *cmd) {
+ALWAYS_INLINE void rrdeng_enqueue_epdl_cmd(struct rrdeng_cmd *cmd) {
     epdl_cmd_queued(cmd->data, cmd);
 }
 
-void rrdeng_dequeue_epdl_cmd(struct rrdeng_cmd *cmd) {
+ALWAYS_INLINE void rrdeng_dequeue_epdl_cmd(struct rrdeng_cmd *cmd) {
     epdl_cmd_dequeued(cmd->data);
 }
 
-void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY priority) {
+ALWAYS_INLINE void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY priority) {
     spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 
     struct rrdeng_cmd *cmd = get_cmd_cb(data);
@@ -481,7 +481,7 @@ void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY 
     spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 }
 
-void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion,
+ALWAYS_INLINE void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion,
                enum storage_priority priority, enqueue_callback_t enqueue_cb, dequeue_callback_t dequeue_cb) {
 
     priority = rrdeng_enq_cmd_map_opcode_to_priority(opcode, priority);

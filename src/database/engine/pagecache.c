@@ -81,7 +81,7 @@ static void extent_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PG
     ;
 }
 
-inline TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
+ALWAYS_INLINE TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
     // page_first_time_s <= wanted_end_time_s && page_last_time_s >= wanted_start_time_s
 
     if(page_last_time_s < wanted_start_time_s)
@@ -214,7 +214,7 @@ static inline struct page_details *pdc_find_page_for_time(
     return NULL;
 }
 
-static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengine_instance *ctx,
+static ALWAYS_INLINE size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengine_instance *ctx,
         time_t wanted_start_time_s, time_t wanted_end_time_s,
         Pvoid_t *JudyL_page_array, size_t *cache_gaps,
         bool open_cache_mode, PDC_PAGE_STATUS tags) {
@@ -357,7 +357,7 @@ static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_
     pgc_page_release(main_cache, page);
 }
 
-static size_t list_has_time_gaps(
+static ALWAYS_INLINE size_t list_has_time_gaps(
         struct rrdengine_instance *ctx,
         METRIC *metric,
         Pvoid_t JudyL_page_array,
@@ -491,7 +491,7 @@ static size_t list_has_time_gaps(
 // ----------------------------------------------------------------------------
 
 typedef void (*page_found_callback_t)(PGC_PAGE *page, void *data);
-static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data) {
+static ALWAYS_INLINE size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data) {
     nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
@@ -629,7 +629,7 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
 // Pvalue of the judy will be the end time for that page
 // DBENGINE2:
 #define time_delta(finish, pass) do { if(pass) { usec_t t = pass; (pass) = (finish) - (pass); (finish) = t; } } while(0)
-static Pvoid_t get_page_list(
+static ALWAYS_INLINE Pvoid_t get_page_list(
         struct rrdengine_instance *ctx,
         METRIC *metric,
         usec_t start_time_ut,
@@ -756,7 +756,7 @@ we_are_done:
     return JudyL_page_array;
 }
 
-inline void rrdeng_prep_wait(PDC *pdc) {
+ALWAYS_INLINE void rrdeng_prep_wait(PDC *pdc) {
     if (unlikely(pdc && !pdc->prep_done)) {
         usec_t started_ut = now_monotonic_usec();
         completion_wait_for(&pdc->prep_completion);
@@ -765,7 +765,7 @@ inline void rrdeng_prep_wait(PDC *pdc) {
     }
 }
 
-void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
+ALWAYS_INLINE void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_QUERY);
 
@@ -820,7 +820,7 @@ void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
  * @param end_time_ut inclusive ending time in usec
  * @return 1 / 0 (pages found or not found)
  */
-void pg_cache_preload(struct rrdeng_query_handle *handle) {
+ALWAYS_INLINE void pg_cache_preload(struct rrdeng_query_handle *handle) {
     if (unlikely(!handle || !handle->metric))
         return;
 

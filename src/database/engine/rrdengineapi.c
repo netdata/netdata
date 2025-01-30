@@ -708,7 +708,7 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch
 #ifdef NETDATA_INTERNAL_CHECKS
 SPINLOCK global_query_handle_spinlock = SPINLOCK_INITIALIZER;
 static struct rrdeng_query_handle *global_query_handle_ll = NULL;
-static void register_query_handle(struct rrdeng_query_handle *handle) {
+static ALWAYS_INLINE void register_query_handle(struct rrdeng_query_handle *handle) {
     handle->query_pid = gettid_cached();
     handle->started_time_s = now_realtime_sec();
 
@@ -716,7 +716,7 @@ static void register_query_handle(struct rrdeng_query_handle *handle) {
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(global_query_handle_ll, handle, prev, next);
     spinlock_unlock(&global_query_handle_spinlock);
 }
-static void unregister_query_handle(struct rrdeng_query_handle *handle) {
+static ALWAYS_INLINE void unregister_query_handle(struct rrdeng_query_handle *handle) {
     spinlock_lock(&global_query_handle_spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(global_query_handle_ll, handle, prev, next);
     spinlock_unlock(&global_query_handle_spinlock);

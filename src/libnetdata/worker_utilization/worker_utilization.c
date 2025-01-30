@@ -76,7 +76,7 @@ static struct workers_globals {
 
 static __thread struct worker *worker = NULL; // the current thread worker
 
-static inline usec_t worker_now_monotonic_usec(void) {
+static ALWAYS_INLINE usec_t worker_now_monotonic_usec(void) {
 #ifdef NETDATA_WITHOUT_WORKERS_LATENCY
     return 0;
 #else
@@ -200,7 +200,7 @@ void worker_unregister(void) {
     worker = NULL;
 }
 
-static inline void worker_is_idle_with_time(usec_t now) {
+static void worker_is_idle_with_time(usec_t now) {
     usec_t delta = now - worker->last_action_timestamp;
     worker->busy_time += delta;
     worker->per_job_type[worker->job_id].worker_busy_time += delta;
@@ -213,16 +213,13 @@ static inline void worker_is_idle_with_time(usec_t now) {
         worker->last_action_timestamp = now;
 }
 
-void worker_is_idle(void) {
+ALWAYS_INLINE void worker_is_idle(void) {
     if(unlikely(!worker || worker->last_action != WORKER_BUSY)) return;
 
     worker_is_idle_with_time(worker_now_monotonic_usec());
 }
 
-void worker_is_busy(size_t job_id) {
-    if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
-        return;
-
+static void worker_is_busy_do(size_t job_id) {
     usec_t now = worker_now_monotonic_usec();
 
     if(worker->last_action == WORKER_BUSY)
@@ -238,10 +235,14 @@ void worker_is_busy(size_t job_id) {
     worker->last_action = WORKER_BUSY;
 }
 
-void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
+ALWAYS_INLINE void worker_is_busy(size_t job_id) {
     if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 
+    worker_is_busy_do(job_id);
+}
+
+static void worker_set_metric_do(size_t job_id, NETDATA_DOUBLE value) {
     switch(worker->per_job_type[job_id].type) {
         case WORKER_METRIC_INCREMENT:
             worker->per_job_type[job_id].custom_value += value;
@@ -255,17 +256,21 @@ void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
     }
 }
 
+ALWAYS_INLINE void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
+    if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+        return;
+
+    worker_set_metric_do(job_id, value);
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline size_t pointer_hash_function(const char *func) {
+static ALWAYS_INLINE size_t pointer_hash_function(const char *func) {
     uintptr_t addr = (uintptr_t)func;
     return (size_t)(((addr >> 4) | (addr >> 16)) + func[0]) % WORKER_SPINLOCK_CONTENTION_FUNCTIONS;
 }
 
-void worker_spinlock_contention(const char *func, size_t spins) {
-    if(unlikely(!worker))
-        return;
-
+static void worker_spinlock_contention_do(const char *func, size_t spins) {
     size_t hash = pointer_hash_function(func);
     for (size_t i = 0; i < WORKER_SPINLOCK_CONTENTION_FUNCTIONS; i++) {
         size_t slot = (hash + i) % WORKER_SPINLOCK_CONTENTION_FUNCTIONS;
@@ -281,6 +286,13 @@ void worker_spinlock_contention(const char *func, size_t spins) {
     }
 
     // Array is full - do nothing
+}
+
+ALWAYS_INLINE void worker_spinlock_contention(const char *func, size_t spins) {
+    if(unlikely(!worker))
+        return;
+
+    worker_spinlock_contention_do(func, spins);
 }
 
 // statistics interface
