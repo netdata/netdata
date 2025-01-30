@@ -782,15 +782,16 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
 // data collection
 
 // returns additional memory that may have been allocated to store this point
-ALWAYS_INLINE size_t pgd_append_point(PGD *pg,
-                      usec_t point_in_time_ut __maybe_unused,
-                      NETDATA_DOUBLE n,
-                      NETDATA_DOUBLE min_value,
-                      NETDATA_DOUBLE max_value,
-                      uint16_t count,
-                      uint16_t anomaly_count,
-                      SN_FLAGS flags,
-                      uint32_t expected_slot)
+ALWAYS_INLINE_HOT size_t pgd_append_point(
+    PGD *pg,
+    usec_t point_in_time_ut __maybe_unused,
+    NETDATA_DOUBLE n,
+    NETDATA_DOUBLE min_value,
+    NETDATA_DOUBLE max_value,
+    uint16_t count,
+    uint16_t anomaly_count,
+    SN_FLAGS flags,
+    uint32_t expected_slot)
 {
     if (pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING)
         fatal("Data collection on page already scheduled for flushing");
@@ -935,7 +936,7 @@ void pgdc_reset(PGDC *pgdc, PGD *pgd, uint32_t position)
     pgdc_seek(pgdc, position);
 }
 
-ALWAYS_INLINE bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, STORAGE_POINT *sp)
+ALWAYS_INLINE_HOT bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, STORAGE_POINT *sp)
 {
     if (!pgdc->pgd || pgdc->pgd == PGD_EMPTY || pgdc->position >= pgdc->slots)
     {

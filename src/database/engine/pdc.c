@@ -526,7 +526,7 @@ static ALWAYS_INLINE void epdl_pending_del(EPDL *epdl) {
     spinlock_unlock(&e->spinlock);
 }
 
-void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list)
+ALWAYS_INLINE_HOT void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list)
 {
     Pvoid_t *PValue;
     Pvoid_t *PValue1;
@@ -1238,7 +1238,7 @@ static inline void datafile_extent_read_free(void *buffer) {
     posix_memfree(buffer);
 }
 
-void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
+NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
 

@@ -1577,7 +1577,7 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id
     return ops;
 }
 
-static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops) {
+NOT_INLINE_HOT static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops) {
     QUERY_TARGET *qt = r->internal.qt;
     QUERY_METRIC *qm = ops->qm;
 

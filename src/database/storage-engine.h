@@ -290,7 +290,7 @@ static inline time_t storage_engine_oldest_time_s(STORAGE_ENGINE_BACKEND seb  __
 
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *smh);
 time_t rrddim_query_latest_time_s(STORAGE_METRIC_HANDLE *smh);
-static inline time_t storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_METRIC_HANDLE *smh) {
+static ALWAYS_INLINE time_t storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_METRIC_HANDLE *smh) {
     internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
@@ -308,7 +308,7 @@ void rrddim_query_init(
     STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
     time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 
-static inline void storage_engine_query_init(
+static ALWAYS_INLINE void storage_engine_query_init(
     STORAGE_ENGINE_BACKEND seb __maybe_unused,
     STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
     time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority) {

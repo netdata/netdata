@@ -1491,24 +1491,24 @@ static void *extent_read_tp_worker(struct rrdengine_instance *ctx __maybe_unused
     return data;
 }
 
-static void epdl_populate_pages_asynchronously(struct rrdengine_instance *ctx, EPDL *epdl, STORAGE_PRIORITY priority) {
+static NOT_INLINE_HOT void epdl_populate_pages_asynchronously(struct rrdengine_instance *ctx, EPDL *epdl, STORAGE_PRIORITY priority) {
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_EXTENT_READ, epdl, NULL, priority,
                    rrdeng_enqueue_epdl_cmd, rrdeng_dequeue_epdl_cmd);
 }
 
-void pdc_route_asynchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
+NOT_INLINE_HOT void pdc_route_asynchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
     pdc_to_epdl_router(ctx, pdc, epdl_populate_pages_asynchronously, epdl_populate_pages_asynchronously);
 }
 
-void epdl_populate_pages_synchronously(struct rrdengine_instance *ctx, EPDL *epdl, enum storage_priority priority __maybe_unused) {
+NOT_INLINE_HOT void epdl_populate_pages_synchronously(struct rrdengine_instance *ctx, EPDL *epdl, enum storage_priority priority __maybe_unused) {
     epdl_find_extent_and_populate_pages(ctx, epdl, false);
 }
 
-void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
+NOT_INLINE_HOT void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
     pdc_to_epdl_router(ctx, pdc, epdl_populate_pages_synchronously, epdl_populate_pages_synchronously);
 }
 
-void pdc_route_synchronously_first(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
+NOT_INLINE_HOT void pdc_route_synchronously_first(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
     pdc_to_epdl_router(ctx, pdc, epdl_populate_pages_synchronously, epdl_populate_pages_asynchronously);
 }
 

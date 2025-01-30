@@ -81,7 +81,7 @@ static void extent_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PG
     ;
 }
 
-ALWAYS_INLINE TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
+ALWAYS_INLINE_HOT TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
     // page_first_time_s <= wanted_end_time_s && page_last_time_s >= wanted_start_time_s
 
     if(page_last_time_s < wanted_start_time_s)
@@ -629,7 +629,7 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
 // Pvalue of the judy will be the end time for that page
 // DBENGINE2:
 #define time_delta(finish, pass) do { if(pass) { usec_t t = pass; (pass) = (finish) - (pass); (finish) = t; } } while(0)
-static ALWAYS_INLINE Pvoid_t get_page_list(
+static ALWAYS_INLINE_HOT Pvoid_t get_page_list(
         struct rrdengine_instance *ctx,
         METRIC *metric,
         usec_t start_time_ut,
@@ -765,7 +765,7 @@ ALWAYS_INLINE void rrdeng_prep_wait(PDC *pdc) {
     }
 }
 
-ALWAYS_INLINE void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
+ALWAYS_INLINE_HOT void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_QUERY);
 
@@ -820,7 +820,7 @@ ALWAYS_INLINE void rrdeng_prep_query(struct page_details_control *pdc, bool work
  * @param end_time_ut inclusive ending time in usec
  * @return 1 / 0 (pages found or not found)
  */
-ALWAYS_INLINE void pg_cache_preload(struct rrdeng_query_handle *handle) {
+ALWAYS_INLINE_HOT void pg_cache_preload(struct rrdeng_query_handle *handle) {
     if (unlikely(!handle || !handle->metric))
         return;
 

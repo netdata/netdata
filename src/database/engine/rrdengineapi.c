@@ -487,7 +487,7 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, use
     return d;
 }
 
-static ALWAYS_INLINE void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
+static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
                                              const usec_t point_in_time_ut,
                                              const NETDATA_DOUBLE n,
                                              const NETDATA_DOUBLE min_value,
@@ -570,14 +570,15 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __m
 #endif
 }
 
-ALWAYS_INLINE void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *sch,
-                              const usec_t point_in_time_ut,
-                              const NETDATA_DOUBLE n,
-                              const NETDATA_DOUBLE min_value,
-                              const NETDATA_DOUBLE max_value,
-                              const uint16_t count,
-                              const uint16_t anomaly_count,
-                              const SN_FLAGS flags)
+ALWAYS_INLINE_HOT void rrdeng_store_metric_next(
+    STORAGE_COLLECT_HANDLE *sch,
+    const usec_t point_in_time_ut,
+    const NETDATA_DOUBLE n,
+    const NETDATA_DOUBLE min_value,
+    const NETDATA_DOUBLE max_value,
+    const uint16_t count,
+    const uint16_t anomaly_count,
+    const SN_FLAGS flags)
 {
     timing_step(TIMING_STEP_RRDSET_STORE_METRIC);
 
@@ -734,11 +735,12 @@ static void unregister_query_handle(struct rrdeng_query_handle *handle __maybe_u
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
-                             struct storage_engine_query_handle *seqh,
-                             time_t start_time_s,
-                             time_t end_time_s,
-                             STORAGE_PRIORITY priority)
+ALWAYS_INLINE_HOT void rrdeng_load_metric_init(
+    STORAGE_METRIC_HANDLE *smh,
+    struct storage_engine_query_handle *seqh,
+    time_t start_time_s,
+    time_t end_time_s,
+    STORAGE_PRIORITY priority)
 {
     usec_t started_ut = now_monotonic_usec();
 
@@ -803,7 +805,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
     }
 }
 
-static ALWAYS_INLINE bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
+static ALWAYS_INLINE_HOT bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
@@ -874,7 +876,7 @@ static ALWAYS_INLINE bool rrdeng_load_page_next(struct storage_engine_query_hand
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-ALWAYS_INLINE STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh) {
+ALWAYS_INLINE_HOT STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     STORAGE_POINT sp;
 

@@ -459,7 +459,7 @@ ALWAYS_INLINE time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC
     return mrg_metric_get_first_time_s_smart(mrg, metric);
 }
 
-ALWAYS_INLINE void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, uint32_t *update_every_s) {
+ALWAYS_INLINE_HOT void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, uint32_t *update_every_s) {
     time_t clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
     time_t hot = __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED);
 
@@ -565,14 +565,14 @@ ALWAYS_INLINE time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRI
 }
 
 ALWAYS_INLINE bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, uint32_t update_every_s) {
-    if(update_every_s > 0)
+    if(likely(update_every_s > 0))
         return set_metric_field_with_condition(metric->latest_update_every_s, update_every_s, true);
 
     return false;
 }
 
-ALWAYS_INLINE bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, uint32_t update_every_s) {
-    if(update_every_s > 0)
+ALWAYS_INLINE_HOT bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, uint32_t update_every_s) {
+    if(likely(update_every_s > 0))
         return set_metric_field_with_condition(metric->latest_update_every_s, update_every_s, _current <= 0);
 
     return false;
