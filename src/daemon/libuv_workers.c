@@ -52,10 +52,8 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_METADATA_ML_LOAD, "metadata load ml models");
     worker_register_job_name(UV_EVENT_CTX_CLEANUP_SCHEDULE, "metadata ctx cleanup schedule");
     worker_register_job_name(UV_EVENT_CTX_CLEANUP, "metadata ctx cleanup");
-    worker_register_job_name(UV_EVENT_STORE_ALERT_TRANSITIONS, "metadata store alert transitions");
     worker_register_job_name(UV_EVENT_STORE_SQL_STATEMENTS, "metadata store sql statements");
     worker_register_job_name(UV_EVENT_CHART_LABEL_CLEANUP, "metadata chart label cleanup");
-    worker_register_job_name(UV_EVENT_HEALTH_LOG_CLEANUP, "alert transitions cleanup");
     worker_register_job_name(UV_EVENT_UUID_DELETION, "metadata dimension deletion");
     worker_register_job_name(UV_EVENT_DIMENSION_CLEANUP, "metadata dimension cleanup");
     worker_register_job_name(UV_EVENT_CHART_CLEANUP, "metadata chart cleanup");
@@ -66,6 +64,9 @@ static void register_libuv_worker_jobs_internal(void) {
     // aclk_sync
     worker_register_job_name(UV_EVENT_ACLK_NODE_INFO, "aclk host node info");
     worker_register_job_name(UV_EVENT_ACLK_ALERT_PUSH, "aclk alert push");
+    worker_register_job_name(UV_EVENT_ACLK_ALERT_HOST_PUSH, "aclk alert host push");
+    worker_register_job_name(UV_EVENT_ACLK_ALERT_HOST_SNAPSHOT, "aclk alert host snapshot");
+    worker_register_job_name(UV_EVENT_ACLK_ALERT_HOST_PROCESS, "aclk alert host process");
     worker_register_job_name(UV_EVENT_ACLK_QUERY_EXECUTE, "aclk query execute");
     // aclk
     worker_register_job_name(UV_EVENT_CTX_STOP_STREAMING, "ctx stop streaming");
@@ -83,6 +84,23 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_ALERT_CHECKPOINT, "alert checkpoint");
     worker_register_job_name(UV_EVENT_CREATE_NODE_INSTANCE, "create node instance");
     worker_register_job_name(UV_EVENT_UNREGISTER_NODE, "unregister node locally");
+
+    // health
+    worker_register_job_name(UV_EVENT_HOST_HEALTH_INIT, "host health initialization");
+    worker_register_job_name(UV_EVENT_HOST_HEALTH_RUN, "host health run");
+    worker_register_job_name(UV_EVENT_HEALTH_LOG_CLEANUP, "alert transitions cleanup");
+    worker_register_job_name(UV_EVENT_HOST_CALC_CLEANUP, "health host calc cleanup");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_RRD_LOCK, "health rrd lock");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_HOST_LOCK, "health host lock");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_DB_QUERY, "health db lookup");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_CALC_EVAL, "health calc eval");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_WARNING_EVAL, "health warning eval");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_CRITICAL_EVAL, "health critical eval");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_ALARM_LOG_ENTRY, "health alert log entry");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_ALARM_LOG_PROCESS, "health alert log process");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_ALARM_LOG_QUEUE, "health alert log queue");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_WAIT_EXEC, "health alert wait exec");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_DELAYED_INIT_RRDSET, "health rrdset init");
 
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");

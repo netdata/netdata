@@ -494,6 +494,105 @@ static int do_ml_migration_v1_v2(sqlite3 *database)
     return 0;
 }
 
+// Actions for health migration
+const char *database_health_migrate_v0_v1[] = {
+    "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
+    "on_key text, class text, component text, type text, os text, hosts text, lookup text, "
+    "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
+    "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
+    "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
+    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text, "
+    "summary text, time_group_condition INT, time_group_value DOUBLE, dims_group INT, data_source INT)",
+
+    "CREATE TABLE IF NOT EXISTS health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, "
+    "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "
+    "chart_context text, last_transition_id blob, chart_name text, UNIQUE (host_id, alarm_id))",
+
+    "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, "
+    "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
+    "flags int, exec_run_timestamp int, delay_up_to_timestamp int, "
+    "info_id INT, exec_code int, new_status real, old_status real, delay int, "
+    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary_id INT)",
+
+    "CREATE TABLE IF NOT EXISTS alert_info(id INTEGER PRIMARY KEY, description TEXT UNIQUE)",
+    "CREATE TABLE IF NOT EXISTS alert_summary(id INTEGER PRIMARY KEY, description TEXT UNIQUE)",
+
+    "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_9 ON health_log_detail (unique_id DESC, health_log_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_6 on health_log_detail (health_log_id, when_key)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
+
+    "INSERT INTO alert_info (description) SELECT DISTINCT info FROM meta.health_log_detail WHERE info IS NOT NULL",
+    "INSERT INTO alert_summary (description) SELECT DISTINCT summary FROM meta.health_log_detail WHERE summary IS NOT NULL",
+
+    "INSERT INTO alert_hash SELECT * FROM meta.alert_hash",
+    "INSERT INTO health_log SELECT * FROM meta.health_log",
+
+    "INSERT INTO health_log_detail "
+    "  (health_log_id, unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key,"
+    "   duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info_id,"
+    "   exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id,"
+    "   global_id, summary_id)"
+    " SELECT h.health_log_id, h.unique_id, h.alarm_id, h.alarm_event_id, h.updated_by_id, h.updates_id,"
+    "   h.when_key, h.duration, h.non_clear_duration, h.flags, h.exec_run_timestamp,"
+    "   h.delay_up_to_timestamp, "
+    "   (SELECT id FROM alert_info WHERE description = h.info) AS info_id,"
+    "   h.exec_code, h.new_status, h.old_status, h.delay, h.new_value, h.old_value,"
+    "   h.last_repeat, h.transition_id, h.global_id, "
+    "   (SELECT id FROM alert_summary WHERE description = h.summary) AS summary_id"
+    " FROM meta.health_log_detail h",
+
+    "DROP TABLE IF EXISTS meta.alert_hash",
+    "DROP TABLE IF EXISTS meta.health_log",
+    "DROP TABLE IF EXISTS meta.health_log_detail",
+
+    NULL
+};
+
+static int do_health_migration_v0_v1(sqlite3 *database)
+{
+    // Copy data from netdata-meta.db to netdata-health.db to complete the migration
+    // alert_hash, health_log, health_log_detail
+    return init_database_batch(database, &database_health_migrate_v0_v1[0], "health_migrate");
+}
+
+// Actions for aclk migration
+
+const char *database_aclk_migrate_v0_v1[] = {
+    "CREATE TABLE IF NOT EXISTS alert_queue "
+    " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
+    " UNIQUE(host_id, health_log_id, alarm_id))",
+
+    "CREATE INDEX IF NOT EXISTS ind_alert_queue1 ON alert_queue(host_id, date_scheduled)",
+
+    "CREATE TABLE IF NOT EXISTS alert_version (health_log_id INTEGER PRIMARY KEY, unique_id INT, status INT, "
+    "version INT, date_submitted INT)",
+
+    "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
+    "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
+
+    "INSERT INTO alert_queue SELECT * FROM meta.alert_queue",
+    "INSERT INTO alert_version SELECT * FROM meta.alert_version",
+    "INSERT INTO aclk_queue SELECT * FROM meta.aclk_queue",
+
+    "DROP TABLE IF EXISTS meta.alert_queue",
+    "DROP TABLE IF EXISTS meta.alert_version",
+    "DROP TABLE IF EXISTS meta.aclk_queue",
+
+    NULL
+};
+
+
+static int do_aclk_migration_v0_v1(sqlite3 *database)
+{
+    // Copy data from netdata-meta.db to netdata-aclk.db to complete the migration
+    // aclk_queue, alert_queue, alert_version
+    return init_database_batch(database, &database_aclk_migrate_v0_v1[0], "aclk_migrate");
+}
+
 static int do_migration_noop(sqlite3 *database)
 {
     UNUSED(database);
@@ -571,6 +670,18 @@ DATABASE_FUNC_MIGRATION_LIST ml_migration_action[] = {
     {.name = NULL, .func = NULL}
 };
 
+DATABASE_FUNC_MIGRATION_LIST health_migration_action[] = {
+    {.name = "v0 to v1",  .func = do_health_migration_v0_v1},
+    // the terminator of this array
+    {.name = NULL, .func = NULL}
+};
+
+DATABASE_FUNC_MIGRATION_LIST aclk_migration_action[] = {
+    {.name = "v0 to v1",  .func = do_aclk_migration_v0_v1},
+    // the terminator of this array
+    {.name = NULL, .func = NULL}
+};
+
 int perform_database_migration(sqlite3 *database, int target_version)
 {
     int user_version = get_database_user_version(database);
@@ -594,4 +705,15 @@ int perform_context_database_migration(sqlite3 *database, int target_version)
 int perform_ml_database_migration(sqlite3 *database, int target_version)
 {
     return migrate_database(database, target_version, "ml", ml_migration_action);
+}
+
+
+int perform_health_database_migration(sqlite3 *database, int target_version)
+{
+    return migrate_database(database, target_version, "health", health_migration_action);
+}
+
+int perform_aclk_database_migration(sqlite3 *database, int target_version)
+{
+    return migrate_database(database, target_version, "aclk", aclk_migration_action);
 }

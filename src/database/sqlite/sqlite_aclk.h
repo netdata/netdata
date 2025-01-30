@@ -18,6 +18,7 @@ static inline int uuid_parse_fix(char *in, nd_uuid_t uuid)
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
     ACLK_DATABASE_NODE_STATE,
+    ACLK_DATABASE_PUSH_HOST_ALERT,
     ACLK_DATABASE_PUSH_ALERT,
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
     ACLK_DATABASE_NODE_UNREGISTER,

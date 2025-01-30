@@ -28,12 +28,12 @@ sqlite3 *db_context_meta = NULL;
  * Initialize the SQLite database
  * Return 0 on success
  */
-int sql_init_context_database(int memory)
+int sql_init_context_database(bool in_memory)
 {
     char sqlite_database[FILENAME_MAX + 1];
     int rc;
 
-    if (likely(!memory))
+    if (likely(!in_memory))
         snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/context-meta.db", netdata_configured_cache_dir);
     else
         strcpy(sqlite_database, ":memory:");
@@ -49,22 +49,15 @@ int sql_init_context_database(int memory)
     errno_clear();
     netdata_log_info("SQLite database %s initialization", sqlite_database);
 
-    char buf[1024 + 1] = "";
-    const char *list[2] = { buf, NULL };
-
     int target_version = DB_CONTEXT_METADATA_VERSION;
-    if (likely(!memory))
+    if (likely(!in_memory))
         target_version = perform_context_database_migration(db_context_meta, DB_CONTEXT_METADATA_VERSION);
 
     if (configure_sqlite_database(db_context_meta, target_version, "context_config"))
         return 1;
 
-    if (likely(!memory))
-        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta", netdata_configured_cache_dir);
-    else
-        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE ':memory:' as meta");
-
-    if(init_database_batch(db_context_meta, list, "context")) return 1;
+    if (attach_database(db_context_meta, "netdata-meta.db", "meta", in_memory))
+        return 1;
 
     if (init_database_batch(db_context_meta, &database_context_config[0], "context_init"))
         return 1;

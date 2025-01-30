@@ -67,18 +67,11 @@ void api_v1_management_init(void);
 int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
 
-    if (unlikely(sql_init_meta_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
+    if (unlikely(sql_init_databases(system_info ? 0 : 1))) {
         if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
             set_late_analytics_variables(system_info);
             fatal("Failed to initialize SQLite");
         }
-
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "Skipping SQLITE metadata initialization since memory mode is not dbengine");
-    }
-
-    if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
-        error_report("Failed to initialize context metadata database");
     }
 
     if (unlikely(unittest)) {
@@ -154,8 +147,10 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
     ml_host_start(localhost);
     dyncfg_host_init(localhost);
 
-    if(!unittest)
+    if(!unittest) {
         health_plugin_init();
+        health_event_loop_init();
+    }
 
     global_functions_add();
 

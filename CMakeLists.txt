@@ -1271,6 +1271,8 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-db-rrd.h
         src/daemon/config/netdata-conf-cloud.c
         src/daemon/config/netdata-conf-cloud.h
+        src/daemon/config/netdata-conf-health.c
+        src/daemon/config/netdata-conf-health.h
         src/daemon/config/netdata-conf-profile.c
         src/daemon/config/netdata-conf-profile.h
         src/daemon/pulse/pulse-daemon-memory-system.c

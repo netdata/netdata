@@ -93,6 +93,11 @@ SQLITE_API int sqlite3_exec_monitored(
     char **errmsg                              /* Error msg written here */
     );
 
+struct judy_list_t {
+    Pvoid_t JudyL;
+    Word_t count;
+};
+
 // Initialization and shutdown
 int init_database_batch(sqlite3 *database, const char *batch[], const char *description);
 int configure_sqlite_database(sqlite3 *database, int target_version, const char *description);
@@ -119,4 +124,7 @@ void sql_close_database(sqlite3 *database, const char *database_name);
 void sqlite_close_databases(void);
 uint64_t get_total_database_space(void);
 int sqlite_release_memory(int bytes);
+int attach_database(sqlite3 *database, const char *db_file, const char *alias, bool in_memory);
+int sql_init_databases(bool memory_mode);
+void create_user_database_functions(sqlite3 *database);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

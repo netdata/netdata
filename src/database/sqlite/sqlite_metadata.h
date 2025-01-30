@@ -63,6 +63,7 @@ void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context);
 void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer);
 void metadata_execute_store_statement(sqlite3_stmt *stmt);
 size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid));
+int sql_init_databases(bool memory_mode);
 
 // UNIT TEST
 int metadata_unittest(void);

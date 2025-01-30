@@ -255,6 +255,10 @@ static void health_raised_summary_add_alert(struct health_raised_summary *hrm, c
 }
 
 void alerts_raised_summary_free(struct health_raised_summary *hrm) {
+
+    if (!hrm)
+        return;
+
     for(size_t i = 0; i < hrm->active_alerts.used ;i++)
         dictionary_acquired_item_release(hrm->rrdcalc_dict, hrm->active_alerts.array[i]);
 
@@ -461,7 +465,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
         else
             netdata_log_error("Failed to execute alarm notification");
 
-        health_alarm_log_save(host, ae, false);
+        health_alarm_log_save(host, ae);
     }
     else
         netdata_log_error("Failed to format command arguments");
@@ -473,7 +477,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
 
     return; //health_alarm_wait_for_execution
 done:
-    health_alarm_log_save(host, ae, false);
+    health_alarm_log_save(host, ae);
 }
 
 bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, nd_uuid_t *transitions_id) {
@@ -545,7 +549,7 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
              (ae->when + 86400 < now_realtime_sec())))
         {
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
-            health_alarm_log_free_one_nochecks_nounlink(ae);
+            health_queue_ae_deletion(host, ae);
         }
 
         ae = next;

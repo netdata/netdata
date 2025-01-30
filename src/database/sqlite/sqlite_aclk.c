@@ -12,6 +12,83 @@ void sanity_check(void) {
 #include "aclk/aclk_query_queue.h"
 #include "aclk/aclk_query.h"
 #include "aclk/aclk_capas.h"
+#include "sqlite_db_migration.h"
+
+#define DB_ACLK_VERSION 1
+
+const char *database_aclk_config[] = {
+
+    "CREATE TABLE IF NOT EXISTS alert_queue "
+    " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
+    " UNIQUE(host_id, health_log_id, alarm_id))",
+
+    "CREATE INDEX IF NOT EXISTS ind_alert_queue1 ON alert_queue(host_id, date_scheduled)",
+
+    "CREATE TABLE IF NOT EXISTS alert_version (health_log_id INTEGER PRIMARY KEY, unique_id INT, status INT, "
+    "version INT, date_submitted INT)",
+
+    "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
+    "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
+
+    NULL
+};
+
+const char *database_aclk_cleanup[] = {
+    "VACUUM",
+    NULL
+};
+
+sqlite3 *db_aclk = NULL;
+
+/*
+ * Initialize the SQLite database
+ * Return 0 on success
+ */
+int sql_init_aclk_database(bool in_memory)
+{
+    char sqlite_database[FILENAME_MAX + 1];
+    int rc;
+
+    if (likely(!in_memory))
+        snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-aclk.db", netdata_configured_cache_dir);
+    else
+        strcpy(sqlite_database, ":memory:");
+
+    rc = sqlite3_open(sqlite_database, &db_aclk);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
+        sqlite3_close(db_aclk);
+        db_aclk = NULL;
+        return 1;
+    }
+
+    errno = 0;
+    netdata_log_info("SQLite database %s initialization", sqlite_database);
+    create_user_database_functions(db_aclk);
+
+    int target_version = DB_ACLK_VERSION;
+
+    if (attach_database(db_aclk, "netdata-meta.db", "meta", in_memory))
+        return 1;
+
+    if (attach_database(db_aclk, "netdata-health.db", "health", in_memory))
+        return 1;
+
+    if (likely(!in_memory))
+        target_version = perform_aclk_database_migration(db_aclk, DB_ACLK_VERSION);
+
+    if (configure_sqlite_database(db_aclk, target_version, "aclk_config"))
+        return 1;
+
+    if (init_database_batch(db_aclk, &database_aclk_config[0], "aclk_init"))
+        return 1;
+
+    if (init_database_batch(db_aclk, &database_aclk_cleanup[0], "aclk_cleanup"))
+        return 1;
+
+    return 0;
+}
+
 
 static void create_node_instance_result_job(const char *machine_guid, const char *node_id)
 {
@@ -305,11 +382,6 @@ static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_un
     return 0;
 }
 
-struct judy_list_t {
-    Pvoid_t JudyL;
-    Word_t count;
-};
-
 static void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
@@ -550,6 +622,44 @@ static void node_update_timer_cb(uv_timer_t *handle)
         uv_timer_stop(&aclk_host_config->timer);
 }
 
+static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
+{
+    if (handle->type == UV_TIMER) {
+        uv_timer_stop((uv_timer_t *)handle);
+    }
+
+    uv_close(handle, NULL);  // Automatically close and free the handle
+}
+
+static void after_start_alert_push_for_host(uv_work_t *req, int status __maybe_unused)
+{
+    struct worker_data *data = req->data;
+    RRDHOST *host = data->payload;
+
+    HEALTH *health = &host->health;
+    health->alert_processing_running = false;
+    freez(data);
+}
+
+// Worker thread to scan hosts for pending metadata to store
+static void start_alert_push_for_host(uv_work_t *req)
+{
+    register_libuv_worker_jobs();
+
+    struct worker_data *data =  req->data;
+    RRDHOST *host = data->payload;
+
+    sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res_version = NULL;
+
+    // worker will be set in the following function
+    aclk_push_alert_events_for_host(host, &res, &res_version);
+
+
+    SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res_version);
+}
+
 static void after_start_alert_push(uv_work_t *req, int status __maybe_unused)
 {
     struct worker_data *data = req->data;
@@ -628,6 +738,7 @@ static void aclk_synchronization_event_loop(void *arg)
     worker_register_job_name(ACLK_DATABASE_NOOP,                "noop");
     worker_register_job_name(ACLK_DATABASE_NODE_STATE,          "node state");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,          "alert push");
+    worker_register_job_name(ACLK_DATABASE_PUSH_HOST_ALERT,     "alert host push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,   "alert conf push");
     worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,           "aclk query execute sync");
     worker_register_job_name(ACLK_QUERY_BATCH_EXECUTE,          "aclk batch execute");
@@ -802,6 +913,25 @@ static void aclk_synchronization_event_loop(void *arg)
                         config->alert_push_running = false;
                     }
                     break;
+                case ACLK_DATABASE_PUSH_HOST_ALERT:
+                    host = cmd.param[0];
+                    HEALTH *health = &host->health;
+                    if (health->alert_processing_running)
+                        break;
+
+                    health->alert_processing_running = true;
+
+                    data = mallocz(sizeof(*data));
+                    data->request.data = data;
+                    data->config = config;
+                    data->payload = host;
+
+                    if (uv_queue_work(loop, &data->request, start_alert_push_for_host, after_start_alert_push_for_host)) {
+                        freez(data);
+                        health->alert_processing_running = false;
+                    }
+                    break;
+
                 case ACLK_MQTT_WSS_CLIENT_SET:
                     config->client = (mqtt_wss_client)cmd.param[0];
                     break;
@@ -1094,6 +1224,14 @@ void aclk_add_job(aclk_query_t query)
         return;
 
     queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
+}
+
+void aclk_push_host_alert(RRDHOST *host)
+{
+    if (unlikely(!aclk_sync_config.initialized))
+        return;
+
+    queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_HOST_ALERT, host, NULL);
 }
 
 void aclk_mqtt_client_set(mqtt_wss_client client)
