@@ -558,7 +558,12 @@ static void *stream_connector_thread(void *ptr) {
             if(stream_connector_is_signaled_to_stop(s)) {
                 cancelled_nodes++;
                 SENDERS_DEL(&sc->queue.senders, idx);
+                spinlock_unlock(&sc->queue.spinlock);
+
+                // do not have the connector lock when calling these
                 stream_connector_remove(s);
+
+                spinlock_lock(&sc->queue.spinlock);
                 continue;
             }
 
@@ -567,19 +572,22 @@ static void *stream_connector_thread(void *ptr) {
                 case STRCNT_CMD_CONNECT:
                     spinlock_unlock(&sc->queue.spinlock);
                     worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
+
+                    // do not have the connector lock when calling these
                     bool move_to_sender =
                         stream_connect(s, stream_send.parents.default_port, stream_send.parents.timeout_s);
+
                     spinlock_lock(&sc->queue.spinlock);
 
                     if (move_to_sender) {
                         connected_nodes++;
-                        stream_sender_on_connect(s);
 
                         worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTED);
                         SENDERS_DEL(&sc->queue.senders, idx);
                         spinlock_unlock(&sc->queue.spinlock);
 
-                        // do not have the connector lock when calling this
+                        // do not have the connector lock when calling these
+                        stream_sender_on_connect(s);
                         stream_sender_add_to_queue(s);
 
                         spinlock_lock(&sc->queue.spinlock);
@@ -594,6 +602,7 @@ static void *stream_connector_thread(void *ptr) {
                     SENDERS_DEL(&sc->queue.senders, idx);
                     spinlock_unlock(&sc->queue.spinlock);
 
+                    // do not have the connector lock when calling these
                     stream_sender_on_disconnect(s);
                     stream_sender_remove(s, s->exit.reason);
 
