@@ -1045,31 +1045,31 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
     pgc_page_release(open_cache, (PGC_PAGE *)page);
 }
 
-size_t dynamic_open_cache_size(void) {
-    size_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
-    size_t target_size = main_wanted_cache_size / 100 * 5;
+int64_t dynamic_open_cache_size(void) {
+    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
+    int64_t target_size = main_wanted_cache_size / 100 * 5;
 
     if(target_size < 2 * 1024 * 1024)
         target_size = 2 * 1024 * 1024;
 
-    size_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
+    int64_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
 
-    size_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
+    int64_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
                                       main_wanted_cache_size - main_current_cache_size : 0;
 
     return target_size + main_free_cache_size;
 }
 
-size_t dynamic_extent_cache_size(void) {
-    size_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
-    size_t target_size = main_wanted_cache_size / 100 * 30;
+int64_t dynamic_extent_cache_size(void) {
+    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
+    int64_t target_size = main_wanted_cache_size / 100 * 30;
 
     if(target_size < 5 * 1024 * 1024)
         target_size = 5 * 1024 * 1024;
 
-    size_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
+    int64_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
 
-    size_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
+    int64_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
                                       main_wanted_cache_size - main_current_cache_size : 0;
 
     return target_size + main_free_cache_size;
