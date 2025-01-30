@@ -2,13 +2,13 @@
 
 #include "../libnetdata.h"
 
-static inline void buffer_overflow_init(BUFFER *b)
+static ALWAYS_INLINE void buffer_overflow_init(BUFFER *b)
 {
     b->buffer[b->size] = '\0';
     strcpy(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF);
 }
 
-void buffer_reset(BUFFER *wb) {
+ALWAYS_INLINE void buffer_reset(BUFFER *wb) {
     buffer_flush(wb);
 
     wb->content_type = CT_TEXT_PLAIN;
@@ -31,7 +31,7 @@ void buffer_char_replace(BUFFER *wb, char from, char to) {
     buffer_overflow_check(wb);
 }
 
-void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit) {
+ALWAYS_INLINE void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit) {
     if(unlikely(flags == SN_EMPTY_SLOT)) {
         buffer_fast_strcat(wb, "E", 1);
         return;
@@ -90,7 +90,7 @@ void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
     // the buffer is \0 terminated by vsnprintfz
 }
 
-inline void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args) {
+void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args) {
     if(unlikely(!fmt || !*fmt)) return;
 
     size_t full_size_bytes = 0, need = 2, space_remaining = 0;

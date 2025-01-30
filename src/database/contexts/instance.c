@@ -512,7 +512,7 @@ inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
     rrdinstance_trigger_updates(ri, __FUNCTION__ );
 }
 
-inline void rrdinstance_collected_rrdset(RRDSET *st) {
+ALWAYS_INLINE void rrdinstance_collected_rrdset(RRDSET *st) {
     if(st->rrdcontexts.collected)
         return;
 
