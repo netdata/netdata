@@ -276,7 +276,7 @@ static void netdata_adcs_issued_requets(struct adcs_certificate *ac,
                                                                     , id
                                                                     , NULL
                                                                     , "requests"
-                                                                    , "adcs.cert_template_issued_requests"
+                                                                    , "adcs.cert_issued_requests"
                                                                     , "Certificate issued requests processed"
                                                                     , "requests/s"
                                                                     , PLUGIN_WINDOWS_NAME
@@ -318,7 +318,7 @@ static void netdata_adcs_pending_requets(struct adcs_certificate *ac,
                                                                      , id
                                                                      , NULL
                                                                      , "requests"
-                                                                     , "adcs.cert_template_pending_requests"
+                                                                     , "adcs.cert_pending_requests"
                                                                      , "Certificate pending requests processed"
                                                                      , "requests/s"
                                                                      , PLUGIN_WINDOWS_NAME
@@ -360,7 +360,7 @@ static void netdata_adcs_challenge_response(struct adcs_certificate *ac,
                                                                         , id
                                                                         , NULL
                                                                         , "responses"
-                                                                        , "adcs.cert_template_challenge_responses"
+                                                                        , "adcs.cert_challenge_responses"
                                                                         , "Certificate challenge responses"
                                                                         , "responses/s"
                                                                         , PLUGIN_WINDOWS_NAME
@@ -402,7 +402,7 @@ static void netdata_adcs_retrieval_processing(struct adcs_certificate *ac,
                                                                                          , id
                                                                                          , NULL
                                                                                          , "retrievals"
-                                                                                         , "adcs.cert_template_retrieval_processing_time"
+                                                                                         , "adcs.cert_retrieval_processing_time"
                                                                                          , "Certificate last retrieval processing time"
                                                                                          , "seconds"
                                                                                          , PLUGIN_WINDOWS_NAME
@@ -444,7 +444,7 @@ static void netdata_adcs_crypto_singing_time(struct adcs_certificate *ac,
                                                                                          , id
                                                                                          , NULL
                                                                                          , "timings"
-                                                                                         , "adcs.cert_template_request_cryptographic_signing_time"
+                                                                                         , "adcs.cert_request_cryptographic_signing_time"
                                                                                          , "Certificate last signing operation request time"
                                                                                          , "seconds"
                                                                                          , PLUGIN_WINDOWS_NAME
@@ -486,7 +486,7 @@ static void netdata_adcs_policy_mod_processing_time(struct adcs_certificate *ac,
                                                                                             , id
                                                                                             , NULL
                                                                                             , "timings"
-                                                                                            , "adcs.cert_template_request_policy_module_processing"
+                                                                                            , "adcs.cert_request_policy_module_processing"
                                                                                             , "Certificate last policy module processing request time"
                                                                                             , "seconds"
                                                                                             , PLUGIN_WINDOWS_NAME
@@ -528,7 +528,7 @@ static void netdata_adcs_challenge_response_processing_time(struct adcs_certific
                                                                                          , id
                                                                                          , NULL
                                                                                          , "timings"
-                                                                                         , "adcs.cert_template_challenge_response_processing_time"
+                                                                                         , "adcs.cert_challenge_response_processing_time"
                                                                                          , "Certificate last challenge response time"
                                                                                          , "seconds"
                                                                                          , PLUGIN_WINDOWS_NAME
@@ -570,7 +570,7 @@ static void netdata_adcs_signed_certificate_timetamp_list(struct adcs_certificat
                                                                                        , id
                                                                                        , NULL
                                                                                        , "timings"
-                                                                                       , "adcs.cert_template_signed_certificate_timestamp_lists"
+                                                                                       , "adcs.cert_signed_certificate_timestamp_lists"
                                                                                        , "Certificate Signed Certificate Timestamp Lists processed"
                                                                                        , "lists/s"
                                                                                        , PLUGIN_WINDOWS_NAME
@@ -612,7 +612,7 @@ static void netdata_adcs_signed_certificate_timetamp_list_processing(struct adcs
                                                                                                         , id
                                                                                                         , NULL
                                                                                                         , "timings"
-                                                                                                        , "adcs.cert_template_signed_certificate_timestamp_list_processing_time"
+                                                                                                        , "adcs.cert_signed_certificate_timestamp_list_processing_time"
                                                                                                         , "Certificate last Signed Certificate Timestamp List process time"
                                                                                                         , "seconds"
                                                                                                         , PLUGIN_WINDOWS_NAME
