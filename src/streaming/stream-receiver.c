@@ -597,9 +597,11 @@ static bool stream_receiver_dequeue_senders(struct stream_thread *sth, struct re
 
     if(rpt->host->sender &&                                         // the host has a sender
         rpt->host->stream.snd.status.tid == gettid_cached() &&      // the sender is mine
-        (rpt->host->sender->thread.wanted & ND_POLL_WRITE))         // the sender needs to send data
-        if(!stream_sender_send_data(sth, rpt->host->sender, now_ut, false))
-            return false;
+        (rpt->host->sender->thread.wanted & ND_POLL_WRITE)) {       // the sender needs to send data
+        // we return true even if this fais,
+        // so that we will not disconnect the receiver because the sender failed
+        stream_sender_send_data(sth, rpt->host->sender, now_ut, false);
+    }
 
     return true;
 }
