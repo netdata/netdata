@@ -284,7 +284,7 @@ jobs:
         id: build
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 180
+          timeout_minutes: 360
           max_attempts: 3
           command: |
             export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
