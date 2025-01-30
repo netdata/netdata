@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- chore\(packaging\): remove old dashboard [\#19523](https://github.com/netdata/netdata/pull/19523) ([ilyam8](https://github.com/ilyam8))
+- ci: increase static build timeout 180-\>300m [\#19519](https://github.com/netdata/netdata/pull/19519) ([ilyam8](https://github.com/ilyam8))
+- Improve ACLK query processing [\#19518](https://github.com/netdata/netdata/pull/19518) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#19517](https://github.com/netdata/netdata/pull/19517) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/httpcheck\): add alerts to metadata [\#19516](https://github.com/netdata/netdata/pull/19516) ([ilyam8](https://github.com/ilyam8))
 - Invert order of checks in pgd\_append\_point\(\). [\#19515](https://github.com/netdata/netdata/pull/19515) ([vkalintiris](https://github.com/vkalintiris))
@@ -463,9 +466,6 @@
 - Regenerate integrations.js [\#18973](https://github.com/netdata/netdata/pull/18973) ([netdatabot](https://github.com/netdatabot))
 - add rabbitmq alerts [\#18972](https://github.com/netdata/netdata/pull/18972) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18971](https://github.com/netdata/netdata/pull/18971) ([netdatabot](https://github.com/netdatabot))
-- fix\(go.d/snmp\): don't return error if no sysName [\#18970](https://github.com/netdata/netdata/pull/18970) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump golang.org/x/text from 0.19.0 to 0.20.0 in /src/go [\#18968](https://github.com/netdata/netdata/pull/18968) ([dependabot[bot]](https://github.com/apps/dependabot))
-- go mod tidy [\#18967](https://github.com/netdata/netdata/pull/18967) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
