@@ -803,7 +803,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
     }
 }
 
-static inline bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
+static ALWAYS_INLINE bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 

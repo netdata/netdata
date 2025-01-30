@@ -15,7 +15,7 @@ PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const cha
 
 ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type);
 
-static inline RRDHOST *pluginsd_require_scope_host(PARSER *parser, const char *cmd) {
+static ALWAYS_INLINE RRDHOST *pluginsd_require_scope_host(PARSER *parser, const char *cmd) {
     RRDHOST *host = parser->user.host;
 
     if(unlikely(!host))
@@ -24,7 +24,7 @@ static inline RRDHOST *pluginsd_require_scope_host(PARSER *parser, const char *c
     return host;
 }
 
-static inline RRDSET *pluginsd_require_scope_chart(PARSER *parser, const char *cmd, const char *parent_cmd) {
+static ALWAYS_INLINE RRDSET *pluginsd_require_scope_chart(PARSER *parser, const char *cmd, const char *parent_cmd) {
     RRDSET *st = parser->user.st;
 
     if(unlikely(!st))
@@ -57,7 +57,7 @@ static inline bool rrdset_data_collection_unlock_with_trace(PARSER *parser, cons
 #define rrdset_data_collection_lock(parser) rrdset_data_collection_lock_with_trace(parser, __FUNCTION__)
 #define rrdset_data_collection_unlock(parser) rrdset_data_collection_unlock_with_trace(parser, __FUNCTION__)
 
-static inline void rrdset_previous_scope_chart_unlock(PARSER *parser, const char *keyword, bool stale) {
+static ALWAYS_INLINE void rrdset_previous_scope_chart_unlock(PARSER *parser, const char *keyword, bool stale) {
     if(unlikely(rrdset_data_collection_unlock(parser))) {
         if(stale)
             netdata_log_error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock found during %s; it has been unlocked",
@@ -88,7 +88,7 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
     parser->user.cleanup_slots = false;
 }
 
-static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
+static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
     RRDSET *old_st = parser->user.st;
     pid_t old_collector_tid = (old_st) ? old_st->pluginsd.collector_tid : 0;
     pid_t my_collector_tid = gettid_cached();
@@ -159,7 +159,7 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
     }
 }
 
-static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, const char *dimension, ssize_t slot, const char *cmd) {
+static ALWAYS_INLINE RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, const char *dimension, ssize_t slot, const char *cmd) {
     if (unlikely(!dimension || !*dimension)) {
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s, without a dimension.",
                           rrdhost_hostname(host), rrdset_id(st), cmd);
@@ -265,7 +265,7 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
     return st;
 }
 
-static inline ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
+static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
     ssize_t slot = -1;
     char *id = get_word(words, num_words, 1);
     if(id && id[0] == PLUGINSD_KEYWORD_SLOT[0] && id[1] == PLUGINSD_KEYWORD_SLOT[1] &&
@@ -311,7 +311,7 @@ static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st,
     parser->user.cleanup_slots = obsolete;
 }
 
-static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(PARSER *parser, RRDHOST *host, const char *id, ssize_t slot, const char *keyword) {
+static ALWAYS_INLINE RRDSET *pluginsd_rrdset_cache_get_from_slot(PARSER *parser, RRDHOST *host, const char *id, ssize_t slot, const char *keyword) {
     if(unlikely(slot < 1 || (size_t)slot > host->stream.rcv.pluginsd_chart_slots.size))
         return pluginsd_find_chart(host, id, keyword);
 

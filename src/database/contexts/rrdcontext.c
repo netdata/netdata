@@ -88,7 +88,7 @@ void rrdcontext_updated_rrdset_flags(RRDSET *st) {
     rrdinstance_updated_rrdset_flags(st);
 }
 
-void rrdcontext_collected_rrdset(RRDSET *st) {
+ALWAYS_INLINE void rrdcontext_collected_rrdset(RRDSET *st) {
     rrdinstance_collected_rrdset(st);
 }
 
