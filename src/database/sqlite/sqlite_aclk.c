@@ -882,10 +882,8 @@ static void aclk_synchronization(void *arg)
     (void) uv_loop_close(loop);
 
     // Free execute commands / queries
-    if (pending_queries) {
-        free_query_list(aclk_query_execute->JudyL);
-        (void)JudyLFreeArray(&aclk_query_execute->JudyL, PJE0);
-    }
+    free_query_list(aclk_query_execute->JudyL);
+    (void)JudyLFreeArray(&aclk_query_execute->JudyL, PJE0);
     freez(aclk_query_execute);
 
     // Free batch commands
