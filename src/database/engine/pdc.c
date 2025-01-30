@@ -1210,7 +1210,7 @@ static bool epdl_populate_pages_from_extent_data(
     return true;
 }
 
-static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file file, unsigned pos, unsigned size_bytes)
+static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file file, uint64_t pos, unsigned size_bytes)
 {
     void *buffer = NULL;
     uv_fs_t request;
@@ -1221,7 +1221,7 @@ static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file
         fatal("DBENGINE: posix_memalign(): %s", strerror(ret));
 
     uv_buf_t iov = uv_buf_init(buffer, real_io_size);
-    ret = uv_fs_read(NULL, &request, file, &iov, 1, pos, NULL);
+    ret = uv_fs_read(NULL, &request, file, &iov, 1, (int64_t)pos, NULL);
     if (unlikely(-1 == ret)) {
         ctx_io_error(ctx);
         posix_memfree(buffer);
