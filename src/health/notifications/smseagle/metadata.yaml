@@ -11,22 +11,22 @@
     - smseagle
   overview:
     notification_description: |
-      Forward notifications to SMSEagle device to send SMS, MMS, wake-up call or text to speech call.
+      Forward notifications to SMSEagle device to send SMS, MMS, wake-up, or text-to-speech calls.
     notification_limitations: ''
   setup:
     prerequisites:
       list:
         - title: ''
           description: |
-            Before you can start using API, first you need to enable API access on your SMSEagle device.
-
-            1. Go to Web-GUI > menu Users
-            2. Create a new User with access level "User"
-            3. Click Access to API beside newly created user
-            4. Select APIv2 and generate API Access token using a button Generate new token
-            5. Add access permissions in section APIv2 Permission
+            Before using the API, you'll need to enable API access on your SMSEagle device by following these steps:
             
-            Optionally you may choose to give access to data of all users with a checkbox Access to resources of all users (by default you can access only to data created by this particular API key)
+            1. Navigate to the Web-GUI and select the "Users" menu.
+            2. Create a new user account with "User" access level.
+            3. Locate the "Access to API" option next to your newly created user.
+            4. Select APIv2 and click the "Generate new token" button to create your API access token.
+            5. Set up the appropriate permissions in the APIv2 Permission section.
+            
+            Optional: Enable the "Access to resources of all users" checkbox if you want this API key to access data across all users. By default, the API key can only access data created under its credentials.
     configuration:
       file:
         name: 'health_alarm_notify.conf'
