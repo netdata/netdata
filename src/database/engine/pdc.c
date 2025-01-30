@@ -974,7 +974,8 @@ static bool epdl_populate_pages_from_extent_data(
 {
     unsigned i, count;
     void *uncompressed_buf = NULL;
-    uint32_t payload_length, payload_offset, trailer_offset, uncompressed_payload_length = 0;
+    uint64_t payload_length, payload_offset, trailer_offset;
+    uint32_t uncompressed_payload_length = 0;
     bool have_read_error = false;
     /* persistent structures */
     struct rrdeng_df_extent_header *header;
