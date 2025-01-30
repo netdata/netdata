@@ -40,7 +40,7 @@ typedef int32_t REFCOUNT;
     ((refcount) >= REFCOUNT_DELETED && (refcount) <= -REFCOUNT_MAX))
 
 // returns the non-usable refcount found when it fails, the final refcount when it succeeds
-static inline REFCOUNT WARNUNUSED refcount_acquire_advanced_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
+static ALWAYS_INLINE REFCOUNT WARNUNUSED refcount_acquire_advanced_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
     REFCOUNT expected = refcount_references(refcount);
     REFCOUNT desired;
 
@@ -60,12 +60,12 @@ static inline REFCOUNT WARNUNUSED refcount_acquire_advanced_with_trace(REFCOUNT 
     return desired;
 }
 
-static inline bool WARNUNUSED refcount_acquire_with_trace(REFCOUNT *refcount, const char *func) {
+static ALWAYS_INLINE bool WARNUNUSED refcount_acquire_with_trace(REFCOUNT *refcount, const char *func) {
     return REFCOUNT_ACQUIRED(refcount_acquire_advanced_with_trace(refcount, func));
 }
 
 // returns the number of references remaining
-static inline REFCOUNT refcount_release_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
+static ALWAYS_INLINE REFCOUNT refcount_release_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
     REFCOUNT expected, desired;
 
     do {
@@ -84,7 +84,7 @@ static inline REFCOUNT refcount_release_with_trace(REFCOUNT *refcount, const cha
 }
 
 // returns true when the item can be deleted, false when the item is currently referenced
-static inline bool WARNUNUSED refcount_acquire_for_deletion_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
+static ALWAYS_INLINE bool WARNUNUSED refcount_acquire_for_deletion_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
     REFCOUNT expected = 0;
     REFCOUNT desired = REFCOUNT_DELETED;
 
@@ -97,7 +97,7 @@ static inline bool WARNUNUSED refcount_acquire_for_deletion_with_trace(REFCOUNT 
     return false;
 }
 
-static inline bool WARNUNUSED refcount_release_and_acquire_for_deletion_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
+static ALWAYS_INLINE bool WARNUNUSED refcount_release_and_acquire_for_deletion_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
     REFCOUNT expected, desired;
 
     do {
@@ -123,7 +123,7 @@ static inline bool WARNUNUSED refcount_release_and_acquire_for_deletion_with_tra
 // this sleeps for 1 nanosecond (posix systems), or Sleep(0) on Windows
 void tinysleep(void);
 
-static inline bool refcount_acquire_for_deletion_and_wait_with_trace(REFCOUNT *refcount, const char *func) {
+static ALWAYS_INLINE bool refcount_acquire_for_deletion_and_wait_with_trace(REFCOUNT *refcount, const char *func) {
     REFCOUNT expected = refcount_references(refcount);
     REFCOUNT desired;
 
