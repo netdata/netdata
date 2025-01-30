@@ -910,7 +910,7 @@ prepare_for_next_iteration:
     return sp;
 }
 
-int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *seqh) {
+ALWAYS_INLINE int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *seqh) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     return (handle->now_s > seqh->end_time_s);
 }
@@ -918,7 +918,7 @@ int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *seqh) {
 /*
  * Releases the database reference from the handle for loading metrics.
  */
-void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh)
+ALWAYS_INLINE void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh)
 {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
 
@@ -937,7 +937,7 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh)
     seqh->handle = NULL;
 }
 
-time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *seqh) {
+ALWAYS_INLINE time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *seqh) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
 
     if(handle->pdc) {
@@ -949,7 +949,7 @@ time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *s
     return seqh->end_time_s;
 }
 
-time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *smh) {
+ALWAYS_INLINE time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *smh) {
     METRIC *metric = (METRIC *)smh;
     time_t latest_time_s = 0;
 
@@ -959,7 +959,7 @@ time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *smh) {
     return latest_time_s;
 }
 
-time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh) {
+ALWAYS_INLINE time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh) {
     METRIC *metric = (METRIC *)smh;
 
     time_t oldest_time_s = 0;

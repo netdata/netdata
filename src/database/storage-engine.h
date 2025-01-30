@@ -278,7 +278,7 @@ static inline void storage_engine_store_change_collection_frequency(STORAGE_COLL
 
 time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh);
 time_t rrddim_query_oldest_time_s(STORAGE_METRIC_HANDLE *smh);
-static inline time_t storage_engine_oldest_time_s(STORAGE_ENGINE_BACKEND seb  __maybe_unused, STORAGE_METRIC_HANDLE *smh) {
+static ALWAYS_INLINE time_t storage_engine_oldest_time_s(STORAGE_ENGINE_BACKEND seb  __maybe_unused, STORAGE_METRIC_HANDLE *smh) {
     internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
@@ -348,7 +348,7 @@ static ALWAYS_INLINE int storage_engine_query_is_finished(struct storage_engine_
 
 void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh);
 void rrddim_query_finalize(struct storage_engine_query_handle *seqh);
-static inline void storage_engine_query_finalize(struct storage_engine_query_handle *seqh) {
+static ALWAYS_INLINE void storage_engine_query_finalize(struct storage_engine_query_handle *seqh) {
     internal_fatal(!is_valid_backend(seqh->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE

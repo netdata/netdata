@@ -11,7 +11,7 @@ static inline time_t tier_next_point_time_s(RRDDIM *rd, struct rrddim_tier *t, t
     return now_s + loop - ((now_s + loop) % loop);
 }
 
-void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
+ALWAYS_INLINE_HOT void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
     if (unlikely(!t->next_point_end_time_s))
         t->next_point_end_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
 
