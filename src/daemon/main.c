@@ -227,11 +227,6 @@ int unittest_prepare_rrd(const char **user) {
 }
 
 int netdata_main(int argc, char **argv) {
-#if !defined(HAVE_FEXCEPTIONS)
-    fprintf(stderr, "Netdata has been compiled without these required compiler flags: -fexceptions.\n");
-    exit(1);
-#endif
-
     string_init();
     analytics_init();
 

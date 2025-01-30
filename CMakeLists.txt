@@ -83,11 +83,6 @@ if(USE_MOLD)
         endif()
 endif()
 
-check_c_compiler_flag("-fexceptions" HAVE_FEXCEPTIONS)
-if (NOT HAVE_FEXCEPTIONS)
-    message(FATAL_ERROR "Missing required compiler flag: -fexceptions.")
-endif()
-
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
