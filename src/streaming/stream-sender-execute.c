@@ -74,17 +74,12 @@ static void execute_commands_function(struct sender_state *s, const char *comman
         tmp->transaction = string_strdupz(transaction);
         BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_functions);
 
-        int code = rrd_function_run(s->host, wb, timeout,
-                                    http_access_from_hex_mapping_old_roles(access), function, false, transaction,
-                                    stream_execute_function_callback, tmp,
-                                    stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
-                                    stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : NULL,
-                                    NULL, NULL, payload, source, true);
-
-        if(code != HTTP_RESP_OK) {
-            if (!buffer_strlen(wb))
-                rrd_call_function_error(wb, "Failed to route this request to the plugin that offered it.", code);
-        }
+        rrd_function_run(s->host, wb, timeout,
+                         http_access_from_hex_mapping_old_roles(access), function, false, transaction,
+                         stream_execute_function_callback, tmp,
+                         stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
+                         stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : NULL,
+                         NULL, NULL, payload, source, true);
     }
 }
 
