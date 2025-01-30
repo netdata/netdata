@@ -456,8 +456,8 @@ inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     st->rrdcontexts.rrdcontext = NULL;
 }
 
-inline void rrdinstance_rrdset_has_updated_retention(RRDSET *st) {
-    rrdinstance_rrdset_not_collected(st);
+ALWAYS_INLINE void rrdinstance_rrdset_has_updated_retention(RRDSET *st) {
+    // rrdinstance_rrdset_not_collected(st);
 
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;

@@ -40,51 +40,51 @@ void rrd_reasons_to_buffer_json_array_items(RRD_FLAGS flags, BUFFER *wb) {
 // ----------------------------------------------------------------------------
 // public API
 
-void rrdcontext_updated_rrddim(RRDDIM *rd) {
+ALWAYS_INLINE void rrdcontext_updated_rrddim(RRDDIM *rd) {
     rrdmetric_from_rrddim(rd);
 }
 
-void rrdcontext_removed_rrddim(RRDDIM *rd) {
+ALWAYS_INLINE void rrdcontext_removed_rrddim(RRDDIM *rd) {
     rrdmetric_rrddim_is_freed(rd);
 }
 
-void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd) {
+ALWAYS_INLINE void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd) {
     rrdmetric_updated_rrddim_flags(rd);
 }
 
-void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd) {
+ALWAYS_INLINE void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd) {
     rrdmetric_updated_rrddim_flags(rd);
 }
 
-void rrdcontext_updated_rrddim_divisor(RRDDIM *rd) {
+ALWAYS_INLINE void rrdcontext_updated_rrddim_divisor(RRDDIM *rd) {
     rrdmetric_updated_rrddim_flags(rd);
 }
 
-void rrdcontext_updated_rrddim_flags(RRDDIM *rd) {
+ALWAYS_INLINE void rrdcontext_updated_rrddim_flags(RRDDIM *rd) {
     rrdmetric_updated_rrddim_flags(rd);
 }
 
-void rrdcontext_collected_rrddim(RRDDIM *rd) {
+ALWAYS_INLINE void rrdcontext_collected_rrddim(RRDDIM *rd) {
     rrdmetric_collected_rrddim(rd);
 }
 
-void rrdcontext_updated_rrdset(RRDSET *st) {
+ALWAYS_INLINE void rrdcontext_updated_rrdset(RRDSET *st) {
     rrdinstance_from_rrdset(st);
 }
 
-void rrdcontext_removed_rrdset(RRDSET *st) {
+ALWAYS_INLINE void rrdcontext_removed_rrdset(RRDSET *st) {
     rrdinstance_rrdset_is_freed(st);
 }
 
-void rrdcontext_updated_retention_rrdset(RRDSET *st) {
+ALWAYS_INLINE void rrdcontext_updated_retention_rrdset(RRDSET *st) {
     rrdinstance_rrdset_has_updated_retention(st);
 }
 
-void rrdcontext_updated_rrdset_name(RRDSET *st) {
+ALWAYS_INLINE void rrdcontext_updated_rrdset_name(RRDSET *st) {
     rrdinstance_updated_rrdset_name(st);
 }
 
-void rrdcontext_updated_rrdset_flags(RRDSET *st) {
+ALWAYS_INLINE void rrdcontext_updated_rrdset_flags(RRDSET *st) {
     rrdinstance_updated_rrdset_flags(st);
 }
 
@@ -92,11 +92,11 @@ ALWAYS_INLINE void rrdcontext_collected_rrdset(RRDSET *st) {
     rrdinstance_collected_rrdset(st);
 }
 
-void rrdcontext_host_child_disconnected(RRDHOST *host) {
+ALWAYS_INLINE void rrdcontext_host_child_disconnected(RRDHOST *host) {
     rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, false);
 }
 
-void rrdcontext_host_child_connected(RRDHOST *host) {
+ALWAYS_INLINE void rrdcontext_host_child_connected(RRDHOST *host) {
     // clear the rrdcontexts status cache inside RRDSET and RRDDIM
     RRDSET *st;
     rrdset_foreach_read(st, host) {
@@ -106,7 +106,7 @@ void rrdcontext_host_child_connected(RRDHOST *host) {
 }
 
 usec_t rrdcontext_next_db_rotation_ut = 0;
-void rrdcontext_db_rotation(void) {
+ALWAYS_INLINE void rrdcontext_db_rotation(void) {
     // called when the db rotates its database
     rrdcontext_next_db_rotation_ut = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
 }
