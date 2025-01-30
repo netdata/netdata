@@ -81,6 +81,11 @@ enum event_loop_job {
     UV_EVENT_CREATE_NODE_INSTANCE,
     UV_EVENT_UNREGISTER_NODE,
 
+    // Health
+    UV_EVENT_HOST_HEALTH_INIT,
+    UV_EVENT_HOST_HEALTH_RUN,
+
+
     // netdatacli
     UV_EVENT_SCHEDULE_CMD,
 };

@@ -510,6 +510,7 @@ RRDHOST *rrdhost_create(
     } else
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
 
+    register_host_to_health(host);
     return host;
 }
 
