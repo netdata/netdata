@@ -420,8 +420,14 @@ static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const c
     return ri;
 }
 
-static inline void rrdinstance_rrdset_not_collected(RRDSET *st) {
+ALWAYS_INLINE void rrdinstance_rrdset_not_collected(RRDSET *st) {
     st->rrdcontexts.collected = false;
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        rrdmetric_not_collected_rrddim(rd);
+    }
+    rrddim_foreach_done(rd);
 }
 
 inline void rrdinstance_rrdset_is_freed(RRDSET *st) {

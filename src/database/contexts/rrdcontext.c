@@ -92,11 +92,17 @@ ALWAYS_INLINE void rrdcontext_collected_rrdset(RRDSET *st) {
     rrdinstance_collected_rrdset(st);
 }
 
-void rrdcontext_host_child_connected(RRDHOST *host) {
-    (void)host;
+void rrdcontext_host_child_disconnected(RRDHOST *host) {
+    rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, false);
+}
 
-    // no need to do anything here
-    ;
+void rrdcontext_host_child_connected(RRDHOST *host) {
+    // clear the rrdcontexts status cache inside RRDSET and RRDDIM
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        rrdinstance_rrdset_not_collected(st);
+    }
+    rrdset_foreach_done(st);
 }
 
 usec_t rrdcontext_next_db_rotation_ut = 0;
@@ -160,10 +166,6 @@ int rrdcontext_find_chart_uuid(RRDSET *st, nd_uuid_t *store_uuid) {
     rrdinstance_release(ria);
     rrdcontext_release(rca);
     return 0;
-}
-
-void rrdcontext_host_child_disconnected(RRDHOST *host) {
-    rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, false);
 }
 
 int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char *context, int (*callback)(RRDSET *st, void *data), void *data) {
