@@ -175,8 +175,8 @@ static void initialize_mssql_objects(struct mssql_instance *p, const char *insta
     } else if (!strcmp(instance, "SQLEXPRESS")) {
         strncpyz(prefix, "MSSQL$SQLEXPRESS:", sizeof(prefix) - 1);
     } else {
-        char *express = (!is_sqlexpress) ? "" : "SQLEXPRESS";
-        snprintfz(prefix, sizeof(prefix) - 1, "MSSQL$%s:%s:", express, instance);
+        char *express = (!is_sqlexpress) ? "" : "SQLEXPRESS:";
+        snprintfz(prefix, sizeof(prefix) - 1, "MSSQL$%s%s:", express, instance);
     }
 
     size_t length = strlen(prefix);
