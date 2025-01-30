@@ -13,6 +13,8 @@ int perform_database_migration(sqlite3 *database, int target_version);
 int perform_context_database_migration(sqlite3 *database, int target_version);
 int table_exists_in_database(sqlite3 *database, const char *table);
 int perform_ml_database_migration(sqlite3 *database, int target_version);
+int perform_health_database_migration(sqlite3 *database, int target_version);
+int perform_aclk_database_migration(sqlite3 *database, int target_version);
 
 #ifdef __cplusplus
 }
