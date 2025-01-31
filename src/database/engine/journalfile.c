@@ -361,7 +361,7 @@ ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrden
     return NULL;
 }
 
-void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile) {
+ALWAYS_INLINE void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile) {
     spinlock_lock(&journalfile->v2.spinlock);
 
     internal_fatal(!journalfile->mmap.data, "trying to release a journalfile without data");

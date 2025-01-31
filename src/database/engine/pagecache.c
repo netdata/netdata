@@ -93,7 +93,7 @@ ALWAYS_INLINE_HOT TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_tim
     return PAGE_IS_IN_RANGE;
 }
 
-static inline struct page_details *pdc_find_page_for_time(
+static ALWAYS_INLINE_HOT struct page_details *pdc_find_page_for_time(
         Pcvoid_t PArray,
         time_t wanted_time_s,
         size_t *gaps,
@@ -214,7 +214,7 @@ static inline struct page_details *pdc_find_page_for_time(
     return NULL;
 }
 
-static ALWAYS_INLINE size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengine_instance *ctx,
+static ALWAYS_INLINE_HOT size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengine_instance *ctx,
         time_t wanted_start_time_s, time_t wanted_end_time_s,
         Pvoid_t *JudyL_page_array, size_t *cache_gaps,
         bool open_cache_mode, PDC_PAGE_STATUS tags) {
@@ -357,7 +357,7 @@ static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_
     pgc_page_release(main_cache, page);
 }
 
-static ALWAYS_INLINE size_t list_has_time_gaps(
+static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
         struct rrdengine_instance *ctx,
         METRIC *metric,
         Pvoid_t JudyL_page_array,
@@ -491,7 +491,7 @@ static ALWAYS_INLINE size_t list_has_time_gaps(
 // ----------------------------------------------------------------------------
 
 typedef void (*page_found_callback_t)(PGC_PAGE *page, void *data);
-static ALWAYS_INLINE size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data) {
+static ALWAYS_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data) {
     nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
