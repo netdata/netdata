@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGIN_FREEBSD_H
 #define NETDATA_PLUGIN_FREEBSD_H 1
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #include <sys/sysctl.h>
 

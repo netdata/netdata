@@ -160,6 +160,7 @@ int help(int exitcode) {
             "  -W buildinfojson         Print the version, the configure options,\n"
             "                           a list of optional features, and whether they\n"
             "                           are enabled or not, in JSON format.\n\n"
+            "  -W cmakecache            Print the cmake cache used for building this agent\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
 #ifdef OS_WINDOWS
@@ -707,6 +708,10 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "buildinfojson") == 0) {
                             print_build_info_json();
+                            return 0;
+                        }
+                        else if(strcmp(optarg, "cmakecache") == 0) {
+                            print_build_info_cmake_cache();
                             return 0;
                         }
                         else if(strcmp(optarg, "keepopenfds") == 0) {

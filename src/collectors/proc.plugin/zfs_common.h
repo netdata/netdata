@@ -3,7 +3,7 @@
 #ifndef NETDATA_ZFS_COMMON_H
 #define NETDATA_ZFS_COMMON_H 1
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #define ZFS_FAMILY_SIZE "size"
 #define ZFS_FAMILY_EFFICIENCY "efficiency"

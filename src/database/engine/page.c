@@ -51,6 +51,108 @@ struct pgd {
     };
 };
 
+static PRINTFLIKE(2, 3) void pgd_fatal(const PGD *pg, const char *fmt, ...) {
+    BUFFER *wb = buffer_create(0, NULL);
+
+    va_list args;
+    va_start(args, fmt);
+    buffer_vsprintf(wb, fmt, args);
+    va_end(args);
+
+    buffer_strcat(wb, " - pgd: { ");
+
+    {
+        buffer_strcat(wb, "type: ");
+        bool added = false;
+
+        if (pg->type == RRDENG_PAGE_TYPE_ARRAY_32BIT) {
+            buffer_sprintf(wb, "%s", "ARRAY_32BIT");
+            added = true;
+        }
+
+        if (pg->type == RRDENG_PAGE_TYPE_ARRAY_TIER1) {
+            buffer_sprintf(wb, added ? "|%s" : "%s", "ARRAY_TIER1");
+            added = true;
+        }
+
+        if (pg->type == RRDENG_PAGE_TYPE_GORILLA_32BIT) {
+            buffer_sprintf(wb, added ? "|%s" : "%s", "GORILLA_32BIT");
+            added = true;
+        }
+
+        if (!added) {
+            int type = pg->type;
+            buffer_sprintf(wb, "%d", type);
+        }
+    }
+
+    {
+        int used = pg->used;
+        int slots = pg->slots;
+        int partition = pg->partition;
+        buffer_sprintf(wb, ", used: %d, slots: %d, partition: %d", used, slots, partition);
+    }
+
+    {
+        buffer_strcat(wb, ", state: ");
+        bool added = false;
+
+        if (pg->states == PGD_STATE_CREATED_FROM_COLLECTOR) {
+            buffer_sprintf(wb, "%s", "CREATED_FROM_COLLECTOR");
+            added = true;
+        }
+
+        if (pg->states == PGD_STATE_CREATED_FROM_DISK) {
+            buffer_sprintf(wb, added ? "|%s" : "%s", "CREATED_FROM_DISK");
+            added = true;
+        }
+
+        if (pg->states == PGD_STATE_SCHEDULED_FOR_FLUSHING) {
+            buffer_sprintf(wb, added ? "|%s" : "%s", "SCHEDULED_FOR_FLUSHING");
+            added = true;
+        }
+
+        if (pg->states == PGD_STATE_FLUSHED_TO_DISK) {
+            buffer_sprintf(wb, added ? "|%s" : "%s", "FLUSHED_TO_DISK");
+            added = true;
+        }
+
+        if (!added) {
+            int state = pg->states;
+            buffer_sprintf(wb, "%d", state);
+        }
+    }
+
+    {
+        buffer_strcat(wb, ", options: ");
+        bool added = false;
+
+        if (pg->options & PAGE_OPTION_ALL_VALUES_EMPTY) {
+            buffer_sprintf(wb, "%s", "ALL_VALUES_EMPTY");
+            added = true;
+        }
+
+        if (pg->options & PAGE_OPTION_ARAL_MARKED) {
+            buffer_sprintf(wb, added ? "|%s" : "%s", "ARAL_MARKED");
+            added = true;
+        }
+
+        if (pg->options & PAGE_OPTION_ARAL_UNMARKED) {
+            buffer_sprintf(wb, added ? "|%s" : "%s", "ARAL_UNMARKED");
+            added = true;
+        }
+
+        if (!added) {
+            int options = pg->options;
+            buffer_sprintf(wb, "%d", options);
+        }
+    }
+
+    buffer_strcat(wb, " }");
+
+    fatal("%s", buffer_tostring(wb));
+}
+
 // ----------------------------------------------------------------------------
 // memory management
 
@@ -794,17 +896,17 @@ ALWAYS_INLINE_HOT size_t pgd_append_point(
     uint32_t expected_slot)
 {
     if (pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING)
-        fatal("Data collection on page already scheduled for flushing");
+        pgd_fatal(pg, "Data collection on page already scheduled for flushing");
 
     if (!(pg->states & PGD_STATE_CREATED_FROM_COLLECTOR))
-        fatal("DBENGINE: collection on page not created from a collector");
+        pgd_fatal(pg, "DBENGINE: collection on page not created from a collector");
 
     if (unlikely(pg->used != expected_slot))
-        fatal("DBENGINE: page is not aligned to expected slot (used %u, expected %u)",
+        pgd_fatal(pg, "DBENGINE: page is not aligned to expected slot (used %u, expected %u)",
               pg->used, expected_slot);
 
     if (unlikely(pg->used >= pg->slots))
-        fatal("DBENGINE: attempted to write beyond page size (page type %u, slots %u, used %u)",
+        pgd_fatal(pg, "DBENGINE: attempted to write beyond page size (page type %u, slots %u, used %u)",
               pg->type, pg->slots, pg->used /* FIXME:, pg->size */);
 
     switch (pg->type) {
@@ -881,10 +983,10 @@ static void pgdc_seek(PGDC *pgdc, uint32_t position)
                 if (!(pg->states & PGD_STATE_CREATED_FROM_COLLECTOR) &&
                     !(pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING) &&
                     !(pg->states & PGD_STATE_FLUSHED_TO_DISK))
-                    fatal("pgdc_seek() currently is not supported for pages created from disk.");
+                    pgd_fatal(pg, "pgdc_seek() currently is not supported for pages created from disk.");
 
                 if (!pg->gorilla.writer)
-                    fatal("Seeking from a page without an active gorilla writer is not supported (yet).");
+                    pgd_fatal(pg, "Seeking from a page without an active gorilla writer is not supported (yet).");
 
                 pgdc->slots = gorilla_writer_entries(pg->gorilla.writer);
                 pgdc->gr = gorilla_writer_get_reader(pg->gorilla.writer);

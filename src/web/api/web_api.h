@@ -8,7 +8,7 @@
 
 struct web_client;
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "maps/maps.h"
 #include "functions/functions.h"
 

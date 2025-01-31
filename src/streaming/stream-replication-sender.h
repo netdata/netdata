@@ -3,7 +3,7 @@
 #ifndef REPLICATION_H
 #define REPLICATION_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "stream-circular-buffer.h"
 
 #ifdef __cplusplus

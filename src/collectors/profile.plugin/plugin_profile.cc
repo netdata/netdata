@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #ifdef __cplusplus
 }
