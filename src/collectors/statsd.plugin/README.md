@@ -972,8 +972,6 @@ At this point, you have used StatsD to gather metrics for k6, creating a whole n
 Netdata dashboard in the process. Moreover, you can further customize the icon of the particular section, 
 as well as the description for each chart.
 
-To edit the section, please follow the Netdata [documentation](/src/web/gui/README.md#customizing-the-local-dashboard).
-
 While the following configuration will be placed in a new file, as the documentation suggests, it is 
 instructing to use `dashboard_info.js` as a template. Open the file and see how the rest of sections and collectors have been defined.
 
