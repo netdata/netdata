@@ -997,24 +997,6 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
 
     size_t mem_before_judyl = 0, mem_after_judyl = 0;
 
-<<<<<<< Updated upstream
-    mem_before_judyl += JudyLMemUsed(*pages_judy_pptr);
-    if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_s, PJE0)))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' exists, but cannot be deleted.",
-              page->start_time_s, page->metric_id, page->section);
-    mem_after_judyl += JudyLMemUsed(*pages_judy_pptr);
-
-    mem_before_judyl += JudyLMemUsed(*metrics_judy_pptr);
-    if(!*pages_judy_pptr && !JudyLDel(metrics_judy_pptr, page->metric_id, PJE0))
-        fatal("DBENGINE CACHE: metric '%lu' in section '%lu' exists and is empty, but cannot be deleted.",
-              page->metric_id, page->section);
-    mem_after_judyl += JudyLMemUsed(*metrics_judy_pptr);
-
-    mem_before_judyl += JudyLMemUsed(cache->index[partition].sections_judy);
-    if(!*metrics_judy_pptr && !JudyLDel(&cache->index[partition].sections_judy, page->section, PJE0))
-        fatal("DBENGINE CACHE: section '%lu' exists and is empty, but cannot be deleted.", page->section);
-    mem_after_judyl += JudyLMemUsed(cache->index[partition].sections_judy);
-=======
     Pvoid_t *metrics_judy_pptr = JudyLGet(cache->index[partition].sections_judy, page->section, PJE0);
     if(likely(metrics_judy_pptr)) {
         Pvoid_t *pages_judy_pptr = JudyLGet(*metrics_judy_pptr, page->metric_id, PJE0);
@@ -1023,10 +1005,12 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
             if(likely(page_ptr)) {
                 PGC_PAGE *found_page = *page_ptr;
                 if(likely(found_page == page)) {
+                    mem_before_judyl += JudyLMemUsed(*pages_judy_pptr);
                     if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_s, PJE0)))
                         nd_log(NDLS_DAEMON, NDLP_ERR,
                                "DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' exists, but cannot be deleted.",
                               page->start_time_s, page->metric_id, page->section);
+                    mem_after_judyl += JudyLMemUsed(*pages_judy_pptr);
                 }
                 else {
                     nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -1039,25 +1023,28 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
                        "DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, but it does not.",
                        page->start_time_s, page->metric_id, page->section);
 
+            mem_before_judyl += JudyLMemUsed(*metrics_judy_pptr);
             if(!*pages_judy_pptr && !JudyLDel(metrics_judy_pptr, page->metric_id, PJE0))
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "DBENGINE CACHE: metric '%lu' in section '%lu' exists and is empty, but cannot be deleted.",
                        page->metric_id, page->section);
+            mem_after_judyl += JudyLMemUsed(*metrics_judy_pptr);
         }
         else
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "DBENGINE CACHE: metric '%lu' in section '%lu' should exist, but it does not.",
                    page->metric_id, page->section);
 
+        mem_before_judyl += JudyLMemUsed(cache->index[partition].sections_judy);
         if(!*metrics_judy_pptr && !JudyLDel(&cache->index[partition].sections_judy, page->section, PJE0))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "DBENGINE CACHE: section '%lu' exists and is empty, but cannot be deleted.",
                    page->section);
+        mem_after_judyl += JudyLMemUsed(cache->index[partition].sections_judy);
     }
     else
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "DBENGINE CACHE: section '%lu' should exist, but it does not.", page->section);
->>>>>>> Stashed changes
 
     pgc_stats_index_judy_change(cache, mem_before_judyl, mem_after_judyl);
 
