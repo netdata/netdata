@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "libnetdata/required_dummies.h"
 
 #define PLUGIN_SLABINFO_NAME "slabinfo.plugin"

@@ -2,7 +2,7 @@
 #ifndef ACLK_H
 #define ACLK_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #include "aclk_util.h"
 //#include "aclk_rrdhost_state.h"

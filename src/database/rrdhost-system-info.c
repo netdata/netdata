@@ -2,7 +2,6 @@
 
 #define RRDHOST_SYSTEM_INFO_INTERNALS
 #include "rrdhost-system-info.h"
-#include "daemon/common.h"
 #include "aclk/schema-wrappers/node_info.h"
 #include "daemon/win_system-info.h"
 

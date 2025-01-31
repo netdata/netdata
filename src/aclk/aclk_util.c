@@ -4,7 +4,7 @@
 
 #include "aclk_proxy.h"
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 usec_t aclk_session_newarch = 0;
 

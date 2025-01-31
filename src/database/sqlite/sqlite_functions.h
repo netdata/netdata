@@ -3,7 +3,7 @@
 #ifndef NETDATA_SQLITE_FUNCTIONS_H
 #define NETDATA_SQLITE_FUNCTIONS_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "database/sqlite/vendored/sqlite3.h"
 
 void analytics_set_data_str(char **name, const char *value);

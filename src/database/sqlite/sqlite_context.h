@@ -3,7 +3,7 @@
 #ifndef NETDATA_SQLITE_CONTEXT_H
 #define NETDATA_SQLITE_CONTEXT_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "database/sqlite/vendored/sqlite3.h"
 
 int sql_context_cache_stats(int op);
