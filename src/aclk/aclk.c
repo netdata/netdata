@@ -1008,6 +1008,9 @@ void aclk_send_node_instances()
     struct node_instance_list *list = list_head;
     if (unlikely(!list)) {
         error_report("Failure to get_node_list from DB!");
+        sleep_usec(USEC_PER_SEC);
+        aclk_query_t query = aclk_query_new(SEND_NODE_INSTANCES);
+        aclk_add_job(query);
         return;
     }
     while (!uuid_is_null(list->host_id)) {
