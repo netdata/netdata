@@ -13,7 +13,7 @@ int aclklog_enabled = 0;
 
 // --------------------------------------------------------------------------------------------------------------------
 
-void errno_clear(void) {
+ALWAYS_INLINE void errno_clear(void) {
     errno = 0;
 
 #if defined(OS_WINDOWS)

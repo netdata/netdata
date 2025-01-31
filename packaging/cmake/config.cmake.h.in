@@ -14,6 +14,10 @@
 #cmakedefine OS_MACOS
 #cmakedefine OS_WINDOWS
 
+// required compilation options
+
+#cmakedefine HAVE_FEXCEPTIONS
+
 // checked headers
 
 #cmakedefine HAVE_NETINET_IN_H
@@ -139,6 +143,8 @@
 #cmakedefine ENABLE_PLUGIN_CUPS
 #cmakedefine ENABLE_PLUGIN_CGROUP_NETWORK
 #cmakedefine ENABLE_PLUGIN_EBPF
+#cmakedefine ENABLE_PLUGIN_SYSTEMD_JOURNAL
+#cmakedefine ENABLE_PLUGIN_NETWORK_VIEWER
 
 // enabled sentry
 

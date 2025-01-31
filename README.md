@@ -137,7 +137,7 @@ The study didn’t normalize the results based on the number of metrics collecte
 </a>
 </p>
 
-On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% less bandwidth**, **98% less disk I/O**, and is **75% more disk space efficient** on high resolution metrics storage, while providing more than a year of overall retention on the same disk footprint Prometheus offers 7 days of retention. [Read the full analysis in our blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
+On the same workload, Netdata uses **1/3rd less CPU**, consumes **1/8th of the RAM**, performes **31 times less disk I/O**, stores **40 times more data**, while being **22 times faster** in query responses! [Read the full 2025 review in our blog](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/).
 
 ---
 

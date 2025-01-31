@@ -32,7 +32,8 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			Community: "public",
+			CreateVnode: true,
+			Community:   "public",
 			Options: Options{
 				Port:           161,
 				Retries:        1,

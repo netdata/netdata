@@ -213,7 +213,6 @@ void *proc_main(void *ptr)
     }
 
     config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
-    config_get_boolean("plugin:proc", "/proc/spl/kstat/zfs/pool/state", CONFIG_BOOLEAN_NO);
 
     // check the enabled status for each module
     int i;

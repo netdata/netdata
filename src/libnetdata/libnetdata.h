@@ -125,9 +125,6 @@ extern const char *netdata_configured_host_prefix;
 
 #include "log/systemd-journal-helpers.h"
 
-#if defined(HAVE_LIBBPF) && !defined(__cplusplus)
-#include "ebpf/ebpf.h"
-#endif
 #include "eval/eval.h"
 #include "statistical/statistical.h"
 #include "adaptive_resortable_list/adaptive_resortable_list.h"

@@ -298,14 +298,10 @@ static void sql_unregister_node(char *machine_guid)
     param = 0;
 
     rc = sqlite3_step_monitored(res);
-    if (unlikely(rc != SQLITE_DONE)) {
+    if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to execute command to remove host node id");
-    } else {
-       // node: machine guid will be freed after processing
+    else
        invalidate_host_last_connected(&host_uuid);
-       metadata_delete_host_chart_labels(machine_guid);
-       machine_guid = NULL;
-    }
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -377,8 +373,6 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
         return;
     }
 
-    struct ctxs_checkpoint *cmd;
-
     bool ok_to_send = true;
 
     switch (query->type) {
@@ -391,20 +385,12 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             break;
         case CTX_CHECKPOINT:;
             worker_is_busy(UV_EVENT_CTX_CHECKPOINT);
-            cmd = query->data.payload;
-            rrdcontext_hub_checkpoint_command(cmd);
-            freez(cmd->claim_id);
-            freez(cmd->node_id);
-            freez(cmd);
+            rrdcontext_hub_checkpoint_command(query->data.payload);
             ok_to_send = false;
             break;
         case CTX_STOP_STREAMING:
             worker_is_busy(UV_EVENT_CTX_STOP_STREAMING);
-            cmd = query->data.payload;
-            rrdcontext_hub_stop_streaming_command(cmd);
-            freez(cmd->claim_id);
-            freez(cmd->node_id);
-            freez(cmd);
+            rrdcontext_hub_stop_streaming_command(query->data.payload);
             ok_to_send = false;
             break;
         case SEND_NODE_INSTANCES:
@@ -415,21 +401,16 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
         case ALERT_START_STREAMING:
             worker_is_busy(UV_EVENT_ALERT_START_STREAMING);
             aclk_start_alert_streaming(query->data.node_id, query->version);
-            freez(query->data.node_id);
             ok_to_send = false;
             break;
         case ALERT_CHECKPOINT:
             worker_is_busy(UV_EVENT_ALERT_CHECKPOINT);
             aclk_alert_version_check(query->data.node_id, query->claim_id, query->version);
-            freez(query->data.node_id);
-            freez(query->claim_id);
             ok_to_send = false;
             break;
         case CREATE_NODE_INSTANCE:
             worker_is_busy(UV_EVENT_CREATE_NODE_INSTANCE);
             create_node_instance_result_job(query->machine_guid, query->data.node_id);
-            freez(query->data.node_id);
-            freez(query->machine_guid);
             ok_to_send = false;
             break;
 
@@ -615,6 +596,19 @@ int schedule_query_in_worker(uv_loop_t *loop, struct aclk_sync_config_s *config,
     return rc;
 }
 
+static void free_query_list(Pvoid_t JudyL)
+{
+    bool first = true;
+    Pvoid_t *Pvalue;
+    Word_t Index = 0;
+    aclk_query_t query;
+    while ((Pvalue = JudyLFirstThenNext(JudyL, &Index, &first))) {
+        if (!*Pvalue)
+            continue;
+        query = *Pvalue;
+        aclk_query_free(query);
+    }
+}
 
 static void aclk_synchronization(void *arg)
 {
@@ -654,8 +648,11 @@ static void aclk_synchronization(void *arg)
 
     struct worker_data *data;
     aclk_query_t query;
+
+    // This holds queries that need to be executed one by one
     struct judy_list_t *aclk_query_batch = NULL;
-    struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));;
+    // This holds queries that can be dispatched in parallel in ACLK QUERY worker threads
+    struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));
     size_t pending_queries = 0;
 
     Pvoid_t *Pvalue;
@@ -883,6 +880,18 @@ static void aclk_synchronization(void *arg)
     uv_run(loop, UV_RUN_NOWAIT);
 
     (void) uv_loop_close(loop);
+
+    // Free execute commands / queries
+    free_query_list(aclk_query_execute->JudyL);
+    (void)JudyLFreeArray(&aclk_query_execute->JudyL, PJE0);
+    freez(aclk_query_execute);
+
+    // Free batch commands
+    if (aclk_query_batch) {
+        free_query_list(aclk_query_batch->JudyL);
+        (void)JudyLFreeArray(&aclk_query_batch->JudyL, PJE0);
+        freez(aclk_query_batch);
+    }
 
     aral_by_size_release(config->ar);
 

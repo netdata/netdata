@@ -42,8 +42,10 @@ static bool parse_malloc_info(size_t *arenas, size_t *allocated_arena, size_t *u
     char *t = malloc(1024);
 
     // Generate malloc_info XML
-    if(malloc_info(0, meminfo) != 0)
+    if(malloc_info(0, meminfo) != 0) {
+        free(t);
         goto cleanup;
+    }
 
     fflush(meminfo);
     fclose(meminfo);
@@ -107,11 +109,65 @@ cleanup:
 }
 #endif // HAVE_C_MALLOC_INFO
 
-void pulse_daemon_memory_system_do(bool extended __maybe_unused) {
+void pulse_daemon_memory_system_do(bool extended) {
+    if(!extended) return;
+
+    size_t glibc_mmaps = 0;
+    bool have_mallinfo = false;
+
+#ifdef HAVE_C_MALLINFO2
+    struct mallinfo2 mi = mallinfo2();
+    glibc_mmaps = mi.hblks;
+    if(mi.hblkhd || mi.fordblks) {
+        static RRDSET *st_mallinfo = NULL;
+        static RRDDIM *rd_used_mmap = NULL;
+        static RRDDIM *rd_used_arena = NULL;
+        static RRDDIM *rd_unused_fragments = NULL;
+        static RRDDIM *rd_unused_releasable = NULL;
+
+        if (unlikely(!st_mallinfo)) {
+            st_mallinfo = rrdset_create_localhost(
+                "netdata",
+                "glibc_mallinfo2",
+                NULL,
+                "Memory Usage",
+                NULL,
+                "Glibc Mallinfo2 Memory Distribution",
+                "bytes",
+                "netdata",
+                "pulse",
+                130130,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_STACKED);
+
+            rd_unused_releasable = rrddim_add(st_mallinfo, "unused releasable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_unused_fragments = rrddim_add(st_mallinfo, "unused fragments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_used_arena = rrddim_add(st_mallinfo, "used arena", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_used_mmap = rrddim_add(st_mallinfo, "used mmap", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        // size_t total = mi.uordblks;
+        size_t used_mmap = mi.hblkhd;
+        size_t used_arena = (mi.arena > mi.fordblks) ? mi.arena - mi.fordblks : 0;
+
+        size_t unused_total = mi.fordblks;
+        size_t unused_releasable = mi.keepcost;
+        // size_t unused_fast = mi.fsmblks;
+        size_t unused_fragments = (unused_total > unused_releasable) ? unused_total - unused_releasable : 0;
+
+        rrddim_set_by_pointer(st_mallinfo, rd_unused_releasable, (collected_number)unused_releasable);
+        rrddim_set_by_pointer(st_mallinfo, rd_unused_fragments, (collected_number)unused_fragments);
+        rrddim_set_by_pointer(st_mallinfo, rd_used_arena, (collected_number)used_arena);
+        rrddim_set_by_pointer(st_mallinfo, rd_used_mmap, (collected_number)used_mmap);
+
+        rrdset_done(st_mallinfo);
+        have_mallinfo = true;
+    }
+#endif // HAVE_C_MALLINFO2
 
 #ifdef HAVE_C_MALLOC_INFO
     size_t glibc_arenas, glibc_allocated_arenas, glibc_unused_fast, glibc_unused_rest, glibc_allocated_mmap;
-    if(extended && parse_malloc_info(&glibc_arenas, &glibc_allocated_arenas, &glibc_unused_fast, &glibc_unused_rest, &glibc_allocated_mmap)) {
+    if(!have_mallinfo && parse_malloc_info(&glibc_arenas, &glibc_allocated_arenas, &glibc_unused_fast, &glibc_unused_rest, &glibc_allocated_mmap)) {
         if (glibc_arenas) {
             static RRDSET *st_arenas = NULL;
             static RRDDIM *rd_arenas = NULL;
@@ -177,57 +233,6 @@ void pulse_daemon_memory_system_do(bool extended __maybe_unused) {
         }
     }
 #endif
-
-    size_t glibc_mmaps = 0;
-
-#ifdef HAVE_C_MALLINFO2
-    struct mallinfo2 mi = mallinfo2();
-    glibc_mmaps = mi.hblks;
-    if(extended && (mi.hblkhd || mi.fordblks)) {
-        static RRDSET *st_mallinfo = NULL;
-        static RRDDIM *rd_used_mmap = NULL;
-        static RRDDIM *rd_used_arena = NULL;
-        static RRDDIM *rd_unused_fragments = NULL;
-        static RRDDIM *rd_unused_releasable = NULL;
-
-        if (unlikely(!st_mallinfo)) {
-            st_mallinfo = rrdset_create_localhost(
-                "netdata",
-                "glibc_mallinfo2",
-                NULL,
-                "Memory Usage",
-                NULL,
-                "Glibc Mallinfo2 Memory Distribution",
-                "bytes",
-                "netdata",
-                "pulse",
-                130130,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_STACKED);
-
-            rd_unused_releasable = rrddim_add(st_mallinfo, "unused releasable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_unused_fragments = rrddim_add(st_mallinfo, "unused fragments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_used_arena = rrddim_add(st_mallinfo, "used arena", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_used_mmap = rrddim_add(st_mallinfo, "used mmap", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
-
-        // size_t total = mi.uordblks;
-        size_t used_mmap = mi.hblkhd;
-        size_t used_arena = (mi.arena > mi.fordblks) ? mi.arena - mi.fordblks : 0;
-
-        size_t unused_total = mi.fordblks;
-        size_t unused_releasable = mi.keepcost;
-        // size_t unused_fast = mi.fsmblks;
-        size_t unused_fragments = (unused_total > unused_releasable) ? unused_total - unused_releasable : 0;
-
-        rrddim_set_by_pointer(st_mallinfo, rd_unused_releasable, (collected_number)unused_releasable);
-        rrddim_set_by_pointer(st_mallinfo, rd_unused_fragments, (collected_number)unused_fragments);
-        rrddim_set_by_pointer(st_mallinfo, rd_used_arena, (collected_number)used_arena);
-        rrddim_set_by_pointer(st_mallinfo, rd_used_mmap, (collected_number)used_mmap);
-
-        rrdset_done(st_mallinfo);
-    }
-#endif // HAVE_C_MALLINFO2
 
     size_t netdata_mmaps = __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED);
     size_t total_mmaps = netdata_mmaps + glibc_mmaps;

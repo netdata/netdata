@@ -13,13 +13,14 @@
 // connector thread
 #define WORKER_SENDER_CONNECTOR_JOB_CONNECTING                          0
 #define WORKER_SENDER_CONNECTOR_JOB_CONNECTED                           1
-#define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE            2
-#define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT                  3
-#define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION  4
-#define WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES                        5
-#define WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES                     6
-#define WORKER_SENDER_CONNECTOR_JOB_FAILED_NODES                        7
-#define WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES                     8
+#define WORKER_SENDER_CONNECTOR_JOB_REMOVED                             2
+#define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE            3
+#define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT                  4
+#define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION  5
+#define WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES                        6
+#define WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES                     7
+#define WORKER_SENDER_CONNECTOR_JOB_FAILED_NODES                        8
+#define WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES                     9
 
 #define CONNECTED_TO_SIZE 100
 
@@ -143,13 +144,23 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
 void stream_sender_add_to_queue(struct sender_state *s);
 
 // stream connector
+typedef enum __attribute__((packed)) {
+    STRCNT_CMD_NONE = 0,
+    STRCNT_CMD_CONNECT,
+    STRCNT_CMD_REMOVE,
+
+    // terminator
+    STRCNT_CMD_MAX,
+} STRCNT_CMD;
+
 bool stream_connector_init(struct sender_state *s);
 void stream_connector_cancel_threads(void);
 void stream_connector_add(struct sender_state *s);
-void stream_connector_requeue(struct sender_state *s);
+void stream_connector_requeue(struct sender_state *s, STRCNT_CMD cmd);
 bool stream_connector_is_signaled_to_stop(struct sender_state *s);
 
 void stream_sender_on_connect(struct sender_state *s);
+void stream_sender_on_disconnect(struct sender_state *s);
 
 void stream_sender_remove(struct sender_state *s, STREAM_HANDSHAKE reason);
 

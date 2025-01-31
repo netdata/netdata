@@ -52,7 +52,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
     return dfe->value;
 }
 
-void *dictionary_foreach_next(DICTFE *dfe) {
+ALWAYS_INLINE void *dictionary_foreach_next(DICTFE *dfe) {
     if(unlikely(!dfe || !dfe->dict)) return NULL;
 
     if(unlikely(is_dictionary_destroyed(dfe->dict))) {

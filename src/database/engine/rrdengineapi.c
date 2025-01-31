@@ -487,7 +487,7 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, use
     return d;
 }
 
-static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
+static ALWAYS_INLINE void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
                                              const usec_t point_in_time_ut,
                                              const NETDATA_DOUBLE n,
                                              const NETDATA_DOUBLE min_value,
@@ -570,7 +570,7 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __m
 #endif
 }
 
-void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *sch,
+ALWAYS_INLINE void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *sch,
                               const usec_t point_in_time_ut,
                               const NETDATA_DOUBLE n,
                               const NETDATA_DOUBLE min_value,
@@ -803,7 +803,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
     }
 }
 
-static bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
+static ALWAYS_INLINE bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
@@ -874,7 +874,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh) {
+ALWAYS_INLINE STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     STORAGE_POINT sp;
 

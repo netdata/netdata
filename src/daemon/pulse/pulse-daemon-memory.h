@@ -24,6 +24,7 @@ extern struct netdata_buffers_statistics {
 
 #if defined(PULSE_INTERNALS)
 void pulse_daemon_memory_do(bool extended);
+void pulse_daemon_memory_system_do(bool extended);
 #endif
 
 void rrd_slot_memory_added(size_t added);

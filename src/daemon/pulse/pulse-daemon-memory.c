@@ -19,9 +19,8 @@ void rrd_slot_memory_removed(size_t added) {
 
 struct netdata_buffers_statistics netdata_buffers_statistics = { 0 };
 
-void pulse_daemon_memory_system_do(bool extended);
+void pulse_daemon_memory_do(bool extended __maybe_unused) {
 
-void pulse_daemon_memory_do(bool extended) {
     {
         static RRDSET *st_memory = NULL;
         static RRDDIM *rd_db_dbengine = NULL;
@@ -307,6 +306,4 @@ void pulse_daemon_memory_do(bool extended) {
     }
 
     // ----------------------------------------------------------------------------------------------------------------
-
-    pulse_daemon_memory_system_do(extended);
 }

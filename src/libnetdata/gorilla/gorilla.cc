@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "libnetdata/common.h"
 #include "gorilla.h"
 
 #include <cassert>
@@ -112,17 +113,17 @@ void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, siz
     if (gw->last_buffer)
         gw->last_buffer->header.next = gbuf;
 
-    __atomic_store_n(&gw->last_buffer, gbuf, __ATOMIC_RELAXED);
+    __atomic_store_n(&gw->last_buffer, gbuf, __ATOMIC_RELEASE);
 }
 
 uint32_t gorilla_writer_entries(const gorilla_writer_t *gw) {
     uint32_t entries = 0;
 
-    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_SEQ_CST);
+    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_ACQUIRE);
     do {
-        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_SEQ_CST);
+        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_ACQUIRE);
 
-        entries += __atomic_load_n(&curr_gbuf->header.entries, __ATOMIC_SEQ_CST);
+        entries += __atomic_load_n(&curr_gbuf->header.entries, __ATOMIC_ACQUIRE);
 
         curr_gbuf = next_gbuf;
     } while (curr_gbuf);
@@ -130,66 +131,68 @@ uint32_t gorilla_writer_entries(const gorilla_writer_t *gw) {
     return entries;
 }
 
-bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number)
-{
-    gorilla_header_t *hdr = &gw->last_buffer->header;
-    uint32_t *data = gw->last_buffer->data;
+extern "C" {
+    ALWAYS_INLINE_ONLY bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number)
+    {
+        gorilla_header_t *hdr = &gw->last_buffer->header;
+        uint32_t *data = gw->last_buffer->data;
 
-    // this is the first number we are writing
-    if (hdr->entries == 0) {
-        if (hdr->nbits + bit_size<uint32_t>() >= gw->capacity)
-            return false;
-        bit_buffer_write(data, hdr->nbits, number, bit_size<uint32_t>());
+        // this is the first number we are writing
+        if (hdr->entries == 0) {
+            if (hdr->nbits + bit_size<uint32_t>() >= gw->capacity)
+                return false;
+            bit_buffer_write(data, hdr->nbits, number, bit_size<uint32_t>());
 
-        __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>(), __ATOMIC_RELAXED);
-        __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELAXED);
-        gw->prev_number = number;
-        return true;
-    }
+            __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>(), __ATOMIC_RELEASE);
+            __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
+            gw->prev_number = number;
+            return true;
+        }
 
-    // write true/false based on whether we got the same number or not.
-    if (number == gw->prev_number) {
+        // write true/false based on whether we got the same number or not.
+        if (number == gw->prev_number) {
+            if (hdr->nbits + 1 >= gw->capacity)
+                return false;
+
+            bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(1), 1);
+            __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
+            __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
+            return true;
+        }
+
         if (hdr->nbits + 1 >= gw->capacity)
             return false;
+        bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(0), 1);
+        __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
 
-        bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(1), 1);
-        __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELAXED);
-        __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELAXED);
+        uint32_t xor_value = gw->prev_number ^ number;
+        uint32_t xor_lzc = (bit_size<uint32_t>() == 32) ? __builtin_clz(xor_value) : __builtin_clzll(xor_value);
+        uint32_t is_xor_lzc_same = (xor_lzc == gw->prev_xor_lzc) ? 1 : 0;
+
+        if (hdr->nbits + 1 >= gw->capacity)
+            return false;
+        bit_buffer_write(data, hdr->nbits, is_xor_lzc_same, 1);
+        __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
+
+        if (!is_xor_lzc_same) {
+            size_t bits_needed = (bit_size<uint32_t>() == 32) ? 5 : 6;
+            if ((hdr->nbits + bits_needed) >= gw->capacity)
+                return false;
+            bit_buffer_write(data, hdr->nbits, xor_lzc, bits_needed);
+            __atomic_fetch_add(&hdr->nbits, bits_needed, __ATOMIC_RELEASE);
+        }
+
+        // write the bits of the XOR'd value without the LZC prefix
+        if (hdr->nbits + (bit_size<uint32_t>() - xor_lzc) >= gw->capacity)
+            return false;
+        bit_buffer_write(data, hdr->nbits, xor_value, bit_size<uint32_t>() - xor_lzc);
+        __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>() - xor_lzc, __ATOMIC_RELEASE);
+        __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
+
+        gw->prev_number = number;
+        gw->prev_xor_lzc = xor_lzc;
         return true;
     }
-
-    if (hdr->nbits + 1 >= gw->capacity)
-        return false;
-    bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(0), 1);
-    __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELAXED);
-
-    uint32_t xor_value = gw->prev_number ^ number;
-    uint32_t xor_lzc = (bit_size<uint32_t>() == 32) ? __builtin_clz(xor_value) : __builtin_clzll(xor_value);
-    uint32_t is_xor_lzc_same = (xor_lzc == gw->prev_xor_lzc) ? 1 : 0;
-
-    if (hdr->nbits + 1 >= gw->capacity)
-        return false;
-    bit_buffer_write(data, hdr->nbits, is_xor_lzc_same, 1);
-    __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELAXED);
-    
-    if (!is_xor_lzc_same) {
-        size_t bits_needed = (bit_size<uint32_t>() == 32) ? 5 : 6;
-        if ((hdr->nbits + bits_needed) >= gw->capacity)
-            return false;
-        bit_buffer_write(data, hdr->nbits, xor_lzc, bits_needed);
-        __atomic_fetch_add(&hdr->nbits, bits_needed, __ATOMIC_RELAXED);
-    }
-
-    // write the bits of the XOR'd value without the LZC prefix
-    if (hdr->nbits + (bit_size<uint32_t>() - xor_lzc) >= gw->capacity)
-        return false;
-    bit_buffer_write(data, hdr->nbits, xor_value, bit_size<uint32_t>() - xor_lzc);
-    __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>() - xor_lzc, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELAXED);
-
-    gw->prev_number = number;
-    gw->prev_xor_lzc = xor_lzc;
-    return true;
 }
 
 gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw) {
@@ -198,7 +201,7 @@ gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw) {
 
     gorilla_buffer_t *curr_head = gw->head_buffer;
     gorilla_buffer_t *next_head = gw->head_buffer->header.next;
-    __atomic_store_n(&gw->head_buffer, next_head, __ATOMIC_RELAXED);
+    __atomic_store_n(&gw->head_buffer, next_head, __ATOMIC_RELEASE);
     return curr_head;
 }
 
@@ -206,9 +209,9 @@ uint32_t gorilla_writer_actual_nbytes(const gorilla_writer_t *gw)
 {
     uint32_t nbytes = 0;
 
-    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_SEQ_CST);
+    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_ACQUIRE);
     do {
-        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_SEQ_CST);
+        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_ACQUIRE);
 
         nbytes += RRDENG_GORILLA_32BIT_BUFFER_SIZE;
 
@@ -222,14 +225,14 @@ uint32_t gorilla_writer_optimal_nbytes(const gorilla_writer_t *gw)
 {
     uint32_t nbytes = 0;
 
-    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_SEQ_CST);
+    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_ACQUIRE);
     do {
-        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_SEQ_CST);
+        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_ACQUIRE);
 
         if(next_gbuf)
             nbytes += RRDENG_GORILLA_32BIT_BUFFER_SIZE;
         else
-            nbytes += gorilla_buffer_nbytes(__atomic_load_n(&curr_gbuf->header.nbits, __ATOMIC_SEQ_CST));
+            nbytes += gorilla_buffer_nbytes(__atomic_load_n(&curr_gbuf->header.nbits, __ATOMIC_ACQUIRE));
 
         curr_gbuf = next_gbuf;
     } while (curr_gbuf);
@@ -312,10 +315,10 @@ size_t gorilla_buffer_unpatched_nbytes(const gorilla_buffer_t *gbuf) {
 
 gorilla_reader_t gorilla_writer_get_reader(const gorilla_writer_t *gw)
 {
-    const gorilla_buffer_t *buffer = __atomic_load_n(&gw->head_buffer, __ATOMIC_SEQ_CST);
+    const gorilla_buffer_t *buffer = __atomic_load_n(&gw->head_buffer, __ATOMIC_ACQUIRE);
 
-    uint32_t entries = __atomic_load_n(&buffer->header.entries, __ATOMIC_SEQ_CST);
-    uint32_t capacity = __atomic_load_n(&buffer->header.nbits, __ATOMIC_SEQ_CST);
+    uint32_t entries = __atomic_load_n(&buffer->header.entries, __ATOMIC_ACQUIRE);
+    uint32_t capacity = __atomic_load_n(&buffer->header.nbits, __ATOMIC_ACQUIRE);
 
     return gorilla_reader_t {
         .buffer = buffer,
@@ -331,8 +334,8 @@ gorilla_reader_t gorilla_writer_get_reader(const gorilla_writer_t *gw)
 
 gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *gbuf)
 {
-    uint32_t entries = __atomic_load_n(&gbuf->header.entries, __ATOMIC_SEQ_CST);
-    uint32_t capacity = __atomic_load_n(&gbuf->header.nbits, __ATOMIC_SEQ_CST);
+    uint32_t entries = __atomic_load_n(&gbuf->header.entries, __ATOMIC_ACQUIRE);
+    uint32_t capacity = __atomic_load_n(&gbuf->header.nbits, __ATOMIC_ACQUIRE);
 
     return gorilla_reader_t {
         .buffer = gbuf,
@@ -346,79 +349,83 @@ gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *gbuf)
     };
 }
 
-bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number)
-{
-    const uint32_t *data = gr->buffer->data;
+extern "C" {
+    ALWAYS_INLINE_ONLY bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number)
+    {
+        const uint32_t *data = gr->buffer->data;
 
-    if (gr->index + 1 > gr->entries) {
-        // We don't have any more entries to return. However, the writer
-        // might have updated the buffer's entries. We need to check once
-        // more in case more elements were added.
-        gr->entries = __atomic_load_n(&gr->buffer->header.entries, __ATOMIC_SEQ_CST);
-        gr->capacity = __atomic_load_n(&gr->buffer->header.nbits, __ATOMIC_SEQ_CST);
+        while (gr->index + 1 > gr->entries) {
+            // We don't have any more entries to return. However, the writer
+            // might have updated the buffer's entries. We need to check once
+            // more in case more elements were added.
+            gr->entries = __atomic_load_n(&gr->buffer->header.entries, __ATOMIC_ACQUIRE);
+            gr->capacity = __atomic_load_n(&gr->buffer->header.nbits, __ATOMIC_ACQUIRE);
 
-        // if the reader's current buffer has not been updated, we need to
-        // check if it has a pointer to a next buffer.
-        if (gr->index + 1 > gr->entries) {
-            gorilla_buffer_t *next_buffer = __atomic_load_n(&gr->buffer->header.next, __ATOMIC_SEQ_CST);
+            // if the reader's current buffer has not been updated, we need to
+            // check if it has a pointer to a next buffer.
+            if (gr->index + 1 > gr->entries) {
+                gorilla_buffer_t *next_buffer = __atomic_load_n(&gr->buffer->header.next, __ATOMIC_ACQUIRE);
 
-            if (!next_buffer) {
-                // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n (No more buffers to read from)", gr->length, gr->buffer);
-                return false;
+                if (!next_buffer) {
+                    // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n (No more buffers to read from)", gr->length, gr->buffer);
+                    return false;
+                }
+
+                // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n", gr->length, gr->buffer);
+                *gr = gorilla_reader_init(next_buffer);
+                data = gr->buffer->data;
             }
-
-            // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n", gr->length, gr->buffer);
-            *gr = gorilla_reader_init(next_buffer);
-            return gorilla_reader_read(gr, number);
+            else
+                break;
         }
-    }
 
-    // read the first number
-    if (gr->index == 0) {
-        bit_buffer_read(data, gr->position, number, bit_size<uint32_t>());
+        // read the first number
+        if (gr->index == 0) {
+            bit_buffer_read(data, gr->position, number, bit_size<uint32_t>());
+
+            gr->index++;
+            gr->position += bit_size<uint32_t>();
+            gr->prev_number = *number;
+            return true;
+        }
+
+        // process same-number bit
+        uint32_t is_same_number;
+        bit_buffer_read(data, gr->position, &is_same_number, 1);
+        gr->position++;
+
+        if (is_same_number) {
+            *number = gr->prev_number;
+            gr->index++;
+            return true;
+        }
+
+        // proceess same-xor-lzc bit
+        uint32_t xor_lzc = gr->prev_xor_lzc;
+
+        uint32_t same_xor_lzc;
+        bit_buffer_read(data, gr->position, &same_xor_lzc, 1);
+        gr->position++;
+
+        if (!same_xor_lzc) {
+            bit_buffer_read(data, gr->position, &xor_lzc, (bit_size<uint32_t>() == 32) ? 5 : 6);
+            gr->position += (bit_size<uint32_t>() == 32) ? 5 : 6;
+        }
+
+        // process the non-lzc suffix
+        uint32_t xor_value = 0;
+        bit_buffer_read(data, gr->position, &xor_value, bit_size<uint32_t>() - xor_lzc);
+        gr->position += bit_size<uint32_t>() - xor_lzc;
+
+        *number = (gr->prev_number ^ xor_value);
 
         gr->index++;
-        gr->position += bit_size<uint32_t>();
         gr->prev_number = *number;
+        gr->prev_xor_lzc = xor_lzc;
+        gr->prev_xor = xor_value;
+
         return true;
     }
-
-    // process same-number bit
-    uint32_t is_same_number;
-    bit_buffer_read(data, gr->position, &is_same_number, 1);
-    gr->position++;
-
-    if (is_same_number) {
-        *number = gr->prev_number;
-        gr->index++;
-        return true;
-    }
-
-    // proceess same-xor-lzc bit
-    uint32_t xor_lzc = gr->prev_xor_lzc;
-
-    uint32_t same_xor_lzc;
-    bit_buffer_read(data, gr->position, &same_xor_lzc, 1);
-    gr->position++;
-
-    if (!same_xor_lzc) {
-        bit_buffer_read(data, gr->position, &xor_lzc, (bit_size<uint32_t>() == 32) ? 5 : 6);
-        gr->position += (bit_size<uint32_t>() == 32) ? 5 : 6;
-    }
-
-    // process the non-lzc suffix
-    uint32_t xor_value = 0;
-    bit_buffer_read(data, gr->position, &xor_value, bit_size<uint32_t>() - xor_lzc);
-    gr->position += bit_size<uint32_t>() - xor_lzc;
-
-    *number = (gr->prev_number ^ xor_value);
-
-    gr->index++;
-    gr->prev_number = *number;
-    gr->prev_xor_lzc = xor_lzc;
-    gr->prev_xor = xor_value;
-
-    return true;
 }
 
 extern "C" {
@@ -428,9 +435,9 @@ void aral_unmark_allocation(struct aral *ar, void *ptr);
 
 void gorilla_writer_aral_unmark(const gorilla_writer_t *gw, struct aral *ar)
 {
-    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_SEQ_CST);
+    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_ACQUIRE);
     do {
-        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_SEQ_CST);
+        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_ACQUIRE);
 
         // Call the C function here
         aral_unmark_allocation(ar, const_cast<void*>(static_cast<const void*>(curr_gbuf)));
