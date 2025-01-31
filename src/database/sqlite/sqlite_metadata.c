@@ -541,6 +541,9 @@ struct node_instance_list *get_node_list(void)
     while (sqlite3_step_monitored(res) == SQLITE_ROW)
         row++;
 
+    if (row == 0)
+        return NULL;
+
     if (sqlite3_reset(res) != SQLITE_OK) {
         error_report("Failed to reset the prepared statement while fetching node instance information");
         goto failed;
