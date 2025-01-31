@@ -91,8 +91,10 @@ endfunction()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" TRUE)
+        option(USE_LTO "Attempt to use of LTO when building. Defaults to being enabled if supported for release builds." FALSE)
 else()
         option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" FALSE)
+        option(USE_LTO "Attempt to use of LTO when building. Defaults to being enabled if supported for release builds." TRUE)
 endif()
 
 option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)
@@ -100,6 +102,26 @@ mark_as_advanced(ENABLE_ADDRESS_SANITIZER)
 
 if(ENABLE_ADDRESS_SANITIZER)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+endif()
+
+if(USE_LTO)
+  if(OS_WINDOWS)
+    message(WARNING "LTO not supported on Windows, not checking for it")
+  else()
+    include(CheckIPOSupported)
+
+    message(CHECK_START "Checking for LTO support")
+    check_ipo_supported(RESULT HAVE_LTO)
+
+    if(HAVE_LTO)
+      message(CHECK_PASS "supported")
+      set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    else()
+      message(CHECK_FAIL "not supported")
+    endif()
+  endif()
+else()
+  message(STATUS "Not checking for LTO support as it has been explicitly disabled")
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
