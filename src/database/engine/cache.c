@@ -987,7 +987,7 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
 
     if(unlikely(!page_flag_check(page, PGC_PAGE_IS_BEING_DELETED)))
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' is removed but is it is not marked for deletion.",
+               "DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' is removed but it is not marked for deletion.",
                page->start_time_s, page->metric_id, page->section);
 
     if(unlikely(partition != pgc_indexing_partition(cache, page->metric_id)))
