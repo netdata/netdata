@@ -3,7 +3,7 @@
 #ifndef NETDATA_FUNCTION_PROGRESS_H
 #define NETDATA_FUNCTION_PROGRESS_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 int function_progress(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 

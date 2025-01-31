@@ -19,16 +19,9 @@
 #include <ctype.h>
 #include <dirent.h>
 
-// From libnetdata.h
-#include "libnetdata/threads/threads.h"
-#include "libnetdata/locks/locks.h"
-#include "libnetdata/avl/avl.h"
-#include "libnetdata/clocks/clocks.h"
-#include "libnetdata/config/appconfig.h"
 #include "libbpf_api/ebpf.h"
-#include "libnetdata/procfile/procfile.h"
+
 #include "collectors/cgroups.plugin/sys_fs_cgroup.h"
-#include "daemon/main.h"
 
 #include "ebpf_apps.h"
 #include "ebpf_functions.h"

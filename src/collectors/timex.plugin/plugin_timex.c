@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "daemon/common.h"
-#include "libnetdata/os/os.h"
+#include "database/rrd.h"
 
 #define PLUGIN_TIMEX_NAME "timex.plugin"
 

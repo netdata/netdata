@@ -3,7 +3,7 @@
 #ifndef NETDATA_SYS_FS_CGROUP_H
 #define NETDATA_SYS_FS_CGROUP_H 1
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #define PLUGIN_CGROUPS_NAME "cgroups.plugin"
 #define PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME "systemd"

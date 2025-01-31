@@ -3,7 +3,7 @@
 #ifndef NETDATA_FUNCTION_STREAMING_H
 #define NETDATA_FUNCTION_STREAMING_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
 

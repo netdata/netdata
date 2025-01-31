@@ -3,7 +3,7 @@
 #ifndef NETDATA_HEALTH_H
 #define NETDATA_HEALTH_H 1
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "rrdcalc.h"
 
 typedef enum __attribute__((packed)) {

@@ -3,7 +3,7 @@
 #ifndef NETDATA_WINDOWS_PLUGIN_H
 #define NETDATA_WINDOWS_PLUGIN_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #define PLUGIN_WINDOWS_NAME "windows.plugin"
 

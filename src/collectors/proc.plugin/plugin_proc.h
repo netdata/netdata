@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGIN_PROC_H
 #define NETDATA_PLUGIN_PROC_H 1
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #define PLUGIN_PROC_CONFIG_NAME "proc"
 #define PLUGIN_PROC_NAME PLUGIN_PROC_CONFIG_NAME ".plugin"

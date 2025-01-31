@@ -2,6 +2,8 @@
 
 #include "ml_private.h"
 
+#include "database/sqlite/sqlite_db_migration.h"
+
 #include <random>
 
 #define ML_METADATA_VERSION 2

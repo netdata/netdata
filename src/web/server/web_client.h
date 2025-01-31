@@ -242,7 +242,7 @@ void web_client_free(struct web_client *w);
 
 #include "web/api/web_api_v1.h"
 #include "web/api/web_api_v2.h"
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);

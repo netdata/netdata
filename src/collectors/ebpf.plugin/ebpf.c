@@ -4018,7 +4018,8 @@ int main(int argc, char **argv)
     ebpf_start_pthread_variables();
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(verify_netdata_host_prefix(true) == -1) ebpf_exit(6);
+    if(verify_netdata_host_prefix(true) == -1)
+        ebpf_exit();
 
     ebpf_allocate_common_vectors();
 
