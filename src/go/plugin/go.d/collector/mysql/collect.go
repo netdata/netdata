@@ -57,6 +57,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		if err := c.collectGlobalVariables(); err != nil {
 			return nil, fmt.Errorf("error on collecting global variables: %v", err)
 		}
+		c.recheckGlobalVarsTime = now
 	}
 	mx["max_connections"] = c.varMaxConns
 	mx["table_open_cache"] = c.varTableOpenCache
