@@ -171,7 +171,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
     }
 
     if (unlikely(!base_path))
-        base_path = config_get(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, "base path of pressure metrics", "/proc/pressure");
+        base_path = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_PRESSURE, "base path of pressure metrics", "/proc/pressure");
 
     for (i = 0; i < PRESSURE_NUM_RESOURCES; i++) {
         procfile *ff = resource_info[i].pf;
@@ -195,11 +195,11 @@ int do_proc_pressure(int update_every, usec_t dt) {
             do_full = resources[i].full.available ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
 
             snprintfz(config_key, CONFIG_MAX_NAME, "enable %s some pressure", resource_info[i].name);
-            do_some = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, do_some);
+            do_some = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, do_some);
             resources[i].some.enabled = do_some;
 
             snprintfz(config_key, CONFIG_MAX_NAME, "enable %s full pressure", resource_info[i].name);
-            do_full = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, do_full);
+            do_full = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, do_full);
             resources[i].full.enabled = do_full;
 
             if (!do_full && !do_some) {

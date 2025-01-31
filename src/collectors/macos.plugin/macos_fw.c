@@ -27,10 +27,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
     static int do_io = -1, do_space = -1, do_inodes = -1, do_bandwidth = -1;
 
     if (unlikely(do_io == -1)) {
-        do_io                   = config_get_boolean("plugin:macos:iokit", "disk i/o", 1);
-        do_space                = config_get_boolean("plugin:macos:sysctl", "space usage for all disks", 1);
-        do_inodes               = config_get_boolean("plugin:macos:sysctl", "inodes usage for all disks", 1);
-        do_bandwidth            = config_get_boolean("plugin:macos:sysctl", "bandwidth", 1);
+        do_io                   = inicfg_get_boolean(&netdata_config, "plugin:macos:iokit", "disk i/o", 1);
+        do_space                = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "space usage for all disks", 1);
+        do_inodes               = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "inodes usage for all disks", 1);
+        do_bandwidth            = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "bandwidth", 1);
     }
 
     RRDSET *st;

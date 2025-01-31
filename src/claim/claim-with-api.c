@@ -385,7 +385,7 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
 bool claim_agent_from_environment(void) {
     const char *url = getenv("NETDATA_CLAIM_URL");
     if(!url || !*url) {
-        url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
+        url = inicfg_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
         if(!url || !*url) return false;
     }
 
@@ -418,15 +418,15 @@ bool claim_agent_from_claim_conf(void) {
 
     errno_clear();
     char *filename = filename_from_path_entry_strdupz(netdata_configured_user_config_dir, "claim.conf");
-    bool loaded = appconfig_load(&claim_config, filename, 1, NULL);
+    bool loaded = inicfg_load(&claim_config, filename, 1, NULL);
     freez(filename);
 
     if(loaded) {
-        const char *url = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
-        const char *token = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "token", "");
-        const char *rooms = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "rooms", "");
-        const char *proxy = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "proxy", "env");
-        bool insecure = appconfig_get_boolean(&claim_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
+        const char *url = inicfg_get(&claim_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
+        const char *token = inicfg_get(&claim_config, CONFIG_SECTION_GLOBAL, "token", "");
+        const char *rooms = inicfg_get(&claim_config, CONFIG_SECTION_GLOBAL, "rooms", "");
+        const char *proxy = inicfg_get(&claim_config, CONFIG_SECTION_GLOBAL, "proxy", "env");
+        bool insecure = inicfg_get_boolean(&claim_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
 
         if(token && *token && url && *url)
             ret = claim_agent(url, token, rooms, proxy, insecure);

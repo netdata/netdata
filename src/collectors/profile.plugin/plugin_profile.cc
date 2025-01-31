@@ -192,17 +192,17 @@ static void profile_main_cleanup(void *pptr) {
 extern "C" void *profile_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(profile_main_cleanup) cleanup_ptr = ptr;
 
-    int UpdateEvery = (int) config_get_duration_seconds(CONFIG_SECTION_PROFILE, "update every", 1);
+    int UpdateEvery = (int) inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_PROFILE, "update every", 1);
     if (UpdateEvery < localhost->rrd_update_every) {
         UpdateEvery = localhost->rrd_update_every;
-        config_set_duration_seconds(CONFIG_SECTION_PROFILE, "update every", UpdateEvery);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_PROFILE, "update every", UpdateEvery);
     }
 
     // pick low-default values, in case this plugin is ever enabled accidentaly.
-    size_t NumThreads = config_get_number(CONFIG_SECTION_PROFILE, "number of threads", 2);
-    size_t NumCharts = config_get_number(CONFIG_SECTION_PROFILE, "number of charts", 2);
-    size_t NumDimsPerChart = config_get_number(CONFIG_SECTION_PROFILE, "number of dimensions per chart", 2);
-    size_t SecondsToBackfill = config_get_number(CONFIG_SECTION_PROFILE, "seconds to backfill", 10 * 60);
+    size_t NumThreads = inicfg_get_number(&netdata_config, CONFIG_SECTION_PROFILE, "number of threads", 2);
+    size_t NumCharts = inicfg_get_number(&netdata_config, CONFIG_SECTION_PROFILE, "number of charts", 2);
+    size_t NumDimsPerChart = inicfg_get_number(&netdata_config, CONFIG_SECTION_PROFILE, "number of dimensions per chart", 2);
+    size_t SecondsToBackfill = inicfg_get_number(&netdata_config, CONFIG_SECTION_PROFILE, "seconds to backfill", 10 * 60);
 
     std::vector<Profiler> Profilers;
 

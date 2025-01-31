@@ -136,7 +136,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/vmstat");
-        ff = procfile_open(config_get("plugin:proc:/proc/vmstat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, "plugin:proc:/proc/vmstat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 
@@ -146,15 +146,15 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     size_t lines = procfile_lines(ff), l;
 
     if(unlikely(!arl_base)) {
-        do_swapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "swap i/o", CONFIG_BOOLEAN_AUTO);
-        do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", CONFIG_BOOLEAN_YES);
-        do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", CONFIG_BOOLEAN_YES);
-        do_oom_kill = config_get_boolean("plugin:proc:/proc/vmstat", "out of memory kills", CONFIG_BOOLEAN_AUTO);
-        do_numa = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_BOOLEAN_AUTO);
-        do_thp = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "transparent huge pages", CONFIG_BOOLEAN_AUTO);
-        do_zswapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "zswap i/o", CONFIG_BOOLEAN_AUTO);
-        do_balloon = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "memory ballooning", CONFIG_BOOLEAN_AUTO);
-        do_ksm = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "kernel same memory", CONFIG_BOOLEAN_AUTO);
+        do_swapio = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/vmstat", "swap i/o", CONFIG_BOOLEAN_AUTO);
+        do_io = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/vmstat", "disk i/o", CONFIG_BOOLEAN_YES);
+        do_pgfaults = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/vmstat", "memory page faults", CONFIG_BOOLEAN_YES);
+        do_oom_kill = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/vmstat", "out of memory kills", CONFIG_BOOLEAN_AUTO);
+        do_numa = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_BOOLEAN_AUTO);
+        do_thp = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/vmstat", "transparent huge pages", CONFIG_BOOLEAN_AUTO);
+        do_zswapio = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/vmstat", "zswap i/o", CONFIG_BOOLEAN_AUTO);
+        do_balloon = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/vmstat", "memory ballooning", CONFIG_BOOLEAN_AUTO);
+        do_ksm = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/vmstat", "kernel same memory", CONFIG_BOOLEAN_AUTO);
 
         arl_base = arl_create("vmstat", NULL, 60);
         arl_expect(arl_base, "pgfault", &pgfault);

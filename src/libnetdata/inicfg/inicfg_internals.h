@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_APPCONFIG_INTERNALS_H
-#define NETDATA_APPCONFIG_INTERNALS_H
+#ifndef LIBNETDATA_INICFG_INTERNALS_H
+#define LIBNETDATA_INICFG_INTERNALS_H
 
-#include "appconfig.h"
+#include "inicfg.h"
 
 typedef enum __attribute__((packed)) {
     CONFIG_VALUE_TYPE_UNKNOWN = 0,
@@ -46,7 +46,7 @@ struct config_option {
     STRING *value;
 
     STRING *value_original;     // the original value of this option (the first value it got, independently on how it got it)
-    STRING *value_default;      // the internal default value of this option (the first value it got, from appconfig_get_XXX())
+    STRING *value_default;      // the internal default value of this option (the first value it got, from inicfg_get_XXX())
 
     // when we move options around, this is where we keep the original
     // section and name (of the first migration)
@@ -79,41 +79,41 @@ struct config_section {
 #define SECTION_UNLOCK(sect) spinlock_unlock(&((sect)->spinlock));
 
 // config sections
-void appconfig_section_free(struct config_section *sect);
-void appconfig_section_remove_and_delete(struct config *root, struct config_section *sect, bool have_root_lock, bool have_sect_lock);
-#define appconfig_section_add(root, cfg) (struct config_section *)avl_insert_lock(&(root)->index, (avl_t *)(cfg))
-#define appconfig_section_del(root, cfg) (struct config_section *)avl_remove_lock(&(root)->index, (avl_t *)(cfg))
-struct config_section *appconfig_section_find(struct config *root, const char *name);
-struct config_section *appconfig_section_create(struct config *root, const char *section);
+void inicfg_section_free(struct config_section *sect);
+void inicfg_section_remove_and_delete(struct config *root, struct config_section *sect, bool have_root_lock, bool have_sect_lock);
+#define inicfg_section_add(root, cfg) (struct config_section *)avl_insert_lock(&(root)->index, (avl_t *)(cfg))
+#define inicfg_section_del(root, cfg) (struct config_section *)avl_remove_lock(&(root)->index, (avl_t *)(cfg))
+struct config_section *inicfg_section_find(struct config *root, const char *name);
+struct config_section *inicfg_section_create(struct config *root, const char *section);
 
 // config options
-void appconfig_option_cleanup(struct config_option *opt);
-void appconfig_option_free(struct config_option *opt);
-void appconfig_option_remove_and_delete(struct config_section *sect, struct config_option *opt, bool have_sect_lock);
-void appconfig_option_remove_and_delete_all(struct config_section *sect, bool have_sect_lock);
-int appconfig_option_compare(void *a, void *b);
-#define appconfig_option_add(co, cv) (struct config_option *)avl_insert_lock(&((co)->values_index), (avl_t *)(cv))
-#define appconfig_option_del(co, cv) (struct config_option *)avl_remove_lock(&((co)->values_index), (avl_t *)(cv))
-struct config_option *appconfig_option_find(struct config_section *sect, const char *name);
-struct config_option *appconfig_option_create(struct config_section *sect, const char *name, const char *value);
+void inicfg_option_cleanup(struct config_option *opt);
+void inicfg_option_free(struct config_option *opt);
+void inicfg_option_remove_and_delete(struct config_section *sect, struct config_option *opt, bool have_sect_lock);
+void inicfg_option_remove_and_delete_all(struct config_section *sect, bool have_sect_lock);
+int inicfg_option_compare(void *a, void *b);
+#define inicfg_option_add(co, cv) (struct config_option *)avl_insert_lock(&((co)->values_index), (avl_t *)(cv))
+#define inicfg_option_del(co, cv) (struct config_option *)avl_remove_lock(&((co)->values_index), (avl_t *)(cv))
+struct config_option *inicfg_option_find(struct config_section *sect, const char *name);
+struct config_option *inicfg_option_create(struct config_section *sect, const char *name, const char *value);
 
 // lookup
-int appconfig_get_boolean_by_section(struct config_section *sect, const char *name, int value);
+int inicfg_get_boolean_by_section(struct config_section *sect, const char *name, int value);
 
 typedef STRING *(*reformat_t)(STRING *value);
-struct config_option *appconfig_get_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb);
-struct config_option *appconfig_get_raw_value(struct config *root, const char *section, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb);
+struct config_option *inicfg_get_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb);
+struct config_option *inicfg_get_raw_value(struct config *root, const char *section, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb);
 
-void appconfig_set_raw_value_of_option(struct config_option *opt, const char *value, CONFIG_VALUE_TYPES type);
-struct config_option *appconfig_set_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *value, CONFIG_VALUE_TYPES type);
-struct config_option *appconfig_set_raw_value(struct config *root, const char *section, const char *option, const char *value, CONFIG_VALUE_TYPES type);
+void inicfg_set_raw_value_of_option(struct config_option *opt, const char *value, CONFIG_VALUE_TYPES type);
+struct config_option *inicfg_set_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *value, CONFIG_VALUE_TYPES type);
+struct config_option *inicfg_set_raw_value(struct config *root, const char *section, const char *option, const char *value, CONFIG_VALUE_TYPES type);
 
 // cleanup
-void appconfig_section_destroy_non_loaded(struct config *root, const char *section);
-void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name);
+void inicfg_section_destroy_non_loaded(struct config *root, const char *section);
+void inicfg_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name);
 
 // exporters
 _CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, struct config_section *instance);
 int is_valid_connector(char *type, int check_reserved);
 
-#endif //NETDATA_APPCONFIG_INTERNALS_H
+#endif /* LIBNETDATA_INICFG_INTERNALS_H */

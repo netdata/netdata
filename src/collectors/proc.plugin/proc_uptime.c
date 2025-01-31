@@ -10,7 +10,7 @@ int do_proc_uptime(int update_every, usec_t dt) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/uptime");
 
-        uptime_filename = config_get("plugin:proc:/proc/uptime", "filename to monitor", filename);
+        uptime_filename = inicfg_get(&netdata_config, "plugin:proc:/proc/uptime", "filename to monitor", filename);
     }
 
     static RRDSET *st = NULL;

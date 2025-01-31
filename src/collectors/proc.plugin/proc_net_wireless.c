@@ -214,11 +214,11 @@ int do_proc_net_wireless(int update_every, usec_t dt)
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/wireless");
 
-        proc_net_wireless_filename = config_get(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,"filename to monitor", filename);
-        do_status = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "status for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_quality = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "quality for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_discarded_packets = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "discarded packets for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_beacon = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "missed beacon for all interface", CONFIG_BOOLEAN_AUTO);
+        proc_net_wireless_filename = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,"filename to monitor", filename);
+        do_status = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "status for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_quality = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "quality for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_discarded_packets = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "discarded packets for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_beacon = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS, "missed beacon for all interface", CONFIG_BOOLEAN_AUTO);
 	}
 
     if (unlikely(!ff)) {

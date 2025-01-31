@@ -2489,42 +2489,42 @@ void *statsd_main(void *ptr) {
     // ----------------------------------------------------------------------------------------------------------------
     // statsd configuration
 
-    statsd.enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, "statsd", statsd.enabled);
+    statsd.enabled = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, "statsd", statsd.enabled);
 
     statsd.update_every = nd_profile.update_every;
-    statsd.update_every = (int)config_get_duration_seconds(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
+    statsd.update_every = (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
     if(statsd.update_every < nd_profile.update_every) {
         collector_error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d",
                         (int)statsd.update_every, (int)nd_profile.update_every);
         statsd.update_every = nd_profile.update_every;
-        config_set_duration_seconds(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
     }
 
 #ifdef HAVE_RECVMMSG
-    statsd.recvmmsg_size = (size_t)config_get_number(CONFIG_SECTION_STATSD, "udp messages to process at once", (long long)statsd.recvmmsg_size);
+    statsd.recvmmsg_size = (size_t)inicfg_get_number(&netdata_config, CONFIG_SECTION_STATSD, "udp messages to process at once", (long long)statsd.recvmmsg_size);
 #endif
 
     statsd.charts_for = simple_pattern_create(
-            config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), NULL,
+            inicfg_get(&netdata_config, CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), NULL,
             SIMPLE_PATTERN_EXACT, true);
 
     statsd.max_private_charts_hard =
-        (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts_hard);
+        (size_t)inicfg_get_number(&netdata_config, CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts_hard);
 
     statsd.set_obsolete_after =
-        (size_t)config_get_duration_seconds(CONFIG_SECTION_STATSD, "set charts as obsolete after", (long long)statsd.set_obsolete_after);
+        (size_t)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_STATSD, "set charts as obsolete after", (long long)statsd.set_obsolete_after);
 
     statsd.decimal_detail =
-        (collected_number)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
+        (collected_number)inicfg_get_number(&netdata_config, CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
 
     statsd.tcp_idle_timeout =
-        (size_t) config_get_duration_seconds(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after", (long long int)statsd.tcp_idle_timeout);
+        (size_t) inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_STATSD, "disconnect idle tcp clients after", (long long int)statsd.tcp_idle_timeout);
 
     statsd.private_charts_hidden =
-        (unsigned int)config_get_boolean(CONFIG_SECTION_STATSD, "private charts hidden", statsd.private_charts_hidden);
+        (unsigned int)inicfg_get_boolean(&netdata_config, CONFIG_SECTION_STATSD, "private charts hidden", statsd.private_charts_hidden);
 
     statsd.histogram_percentile =
-        (double)config_get_double(
+        (double)inicfg_get_double(&netdata_config, 
         CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
 
     if(isless(statsd.histogram_percentile, 0) || isgreater(statsd.histogram_percentile, 100)) {
@@ -2538,9 +2538,9 @@ void *statsd_main(void *ptr) {
     }
 
     statsd.dictionary_max_unique =
-        config_get_number(CONFIG_SECTION_STATSD, "dictionaries max unique dimensions", statsd.dictionary_max_unique);
+        inicfg_get_number(&netdata_config, CONFIG_SECTION_STATSD, "dictionaries max unique dimensions", statsd.dictionary_max_unique);
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "add dimension for number of events received", 0)) {
+    if(inicfg_get_boolean(&netdata_config, CONFIG_SECTION_STATSD, "add dimension for number of events received", 0)) {
         statsd.gauges.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
         statsd.counters.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
         statsd.meters.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
@@ -2550,35 +2550,35 @@ void *statsd_main(void *ptr) {
         statsd.dictionaries.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
     }
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on gauges (deleteGauges)", 0))
+    if(inicfg_get_boolean(&netdata_config, CONFIG_SECTION_STATSD, "gaps on gauges (deleteGauges)", 0))
         statsd.gauges.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on counters (deleteCounters)", 0))
+    if(inicfg_get_boolean(&netdata_config, CONFIG_SECTION_STATSD, "gaps on counters (deleteCounters)", 0))
         statsd.counters.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on meters (deleteMeters)", 0))
+    if(inicfg_get_boolean(&netdata_config, CONFIG_SECTION_STATSD, "gaps on meters (deleteMeters)", 0))
         statsd.meters.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on sets (deleteSets)", 0))
+    if(inicfg_get_boolean(&netdata_config, CONFIG_SECTION_STATSD, "gaps on sets (deleteSets)", 0))
         statsd.sets.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on histograms (deleteHistograms)", 0))
+    if(inicfg_get_boolean(&netdata_config, CONFIG_SECTION_STATSD, "gaps on histograms (deleteHistograms)", 0))
         statsd.histograms.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on timers (deleteTimers)", 0))
+    if(inicfg_get_boolean(&netdata_config, CONFIG_SECTION_STATSD, "gaps on timers (deleteTimers)", 0))
         statsd.timers.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on dictionaries (deleteDictionaries)", 0))
+    if(inicfg_get_boolean(&netdata_config, CONFIG_SECTION_STATSD, "gaps on dictionaries (deleteDictionaries)", 0))
         statsd.dictionaries.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_STATSD, "statsd server max TCP sockets", (long long int)(rlimit_nofile.rlim_cur / 4));
+    size_t max_sockets = (size_t)inicfg_get_number(&netdata_config, CONFIG_SECTION_STATSD, "statsd server max TCP sockets", (long long int)(rlimit_nofile.rlim_cur / 4));
 
 #ifdef STATSD_MULTITHREADED
-    statsd.threads = (int)config_get_number(CONFIG_SECTION_STATSD, "threads", processors);
+    statsd.threads = (int)inicfg_get_number(&netdata_config, CONFIG_SECTION_STATSD, "threads", processors);
     if(statsd.threads < 1) {
         collector_error("STATSD: Invalid number of threads %d, using %d", statsd.threads, processors);
         statsd.threads = processors;
-        config_set_number(CONFIG_SECTION_STATSD, "collector threads", statsd.threads);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_STATSD, "collector threads", statsd.threads);
     }
 #else
     statsd.threads = 1;

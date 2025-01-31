@@ -39,7 +39,7 @@ static void netdata_conf_dbengine_pre_logs(void) {
     // ------------------------------------------------------------------------
     // get default Database Engine page type
 
-    const char *page_type = config_get(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
+    const char *page_type = inicfg_get(&netdata_config, CONFIG_SECTION_DB, "dbengine page type", "gorilla");
     if (strcmp(page_type, "gorilla") == 0)
         tier_page_type[0] = RRDENG_PAGE_TYPE_GORILLA_32BIT;
     else if (strcmp(page_type, "raw") == 0)
@@ -52,19 +52,19 @@ static void netdata_conf_dbengine_pre_logs(void) {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    default_rrdeng_page_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
-    default_rrdeng_extent_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
-    db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
+    default_rrdeng_page_cache_mb = (int) inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
+    default_rrdeng_extent_cache_mb = (int) inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
+    db_engine_journal_check = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
 
     if(default_rrdeng_extent_cache_mb < 0) {
         default_rrdeng_extent_cache_mb = 0;
-        config_set_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
+        inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
     }
 
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
         default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-        config_set_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
+        inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
     }
 
     // ------------------------------------------------------------------------
@@ -72,18 +72,18 @@ static void netdata_conf_dbengine_pre_logs(void) {
     //
     //    //    if (!config_exists(CONFIG_SECTION_DB, "dbengine disk space MB") && !config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB"))
     //
-    //    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
+    //    default_rrdeng_disk_quota_mb = (int) inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
     //    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
     //        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
     //        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-    //        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
+    //        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
     //    }
     //
-    //    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
+    //    default_multidb_disk_quota_mb = (int) inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
     //    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
     //        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
     //        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
-    //        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
+    //        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
     //    }
 
 #else
@@ -112,7 +112,7 @@ void *dbengine_tier_init(void *ptr) {
 
 RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
 {
-    const char *bf = config_get(
+    const char *bf = inicfg_get(&netdata_config, 
         CONFIG_SECTION_DB,
         "dbengine tier backfill",
         backfill == RRD_BACKFILL_NEW  ? "new" :
@@ -127,7 +127,7 @@ RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
         backfill = RRD_BACKFILL_NONE;
     else {
         nd_log(NDLS_DAEMON, NDLP_WARNING, "DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
-        config_set(CONFIG_SECTION_DB, "dbengine tier backfill", "new");
+        inicfg_set(&netdata_config, CONFIG_SECTION_DB, "dbengine tier backfill", "new");
         backfill = RRD_BACKFILL_NEW;
     }
     return backfill;
@@ -153,8 +153,8 @@ void netdata_conf_dbengine_init(const char *hostname) {
     }
 
     if(dbengine_out_of_memory_protection) {
-        dbengine_use_all_ram_for_caches = config_get_boolean(CONFIG_SECTION_DB, "dbengine use all ram for caches", dbengine_use_all_ram_for_caches);
-        dbengine_out_of_memory_protection = config_get_size_bytes(CONFIG_SECTION_DB, "dbengine out of memory protection", dbengine_out_of_memory_protection);
+        dbengine_use_all_ram_for_caches = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine use all ram for caches", dbengine_use_all_ram_for_caches);
+        dbengine_out_of_memory_protection = inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_DB, "dbengine out of memory protection", dbengine_out_of_memory_protection);
 
         char buf_total[64], buf_avail[64], buf_oom[64];
         size_snprintf(buf_total, sizeof(buf_total), sm.ram_total_bytes, "B", false);
@@ -177,9 +177,9 @@ void netdata_conf_dbengine_init(const char *hostname) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    dbengine_use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", dbengine_use_direct_io);
+    dbengine_use_direct_io = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine use direct io", dbengine_use_direct_io);
 
-    unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", DEFAULT_PAGES_PER_EXTENT);
+    unsigned read_num = (unsigned)inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", DEFAULT_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= DEFAULT_PAGES_PER_EXTENT)
         rrdeng_pages_per_extent = read_num;
     else {
@@ -187,15 +187,15 @@ void netdata_conf_dbengine_init(const char *hostname) {
                "Invalid dbengine pages per extent %u given. Using %u.",
                read_num, rrdeng_pages_per_extent);
 
-        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
     }
 
-    nd_profile.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
+    nd_profile.storage_tiers = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     if(nd_profile.storage_tiers < 1) {
         nd_log(NDLS_DAEMON, NDLP_WARNING, "At least 1 storage tier is required. Assuming 1.");
 
         nd_profile.storage_tiers = 1;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     }
     if(nd_profile.storage_tiers > RRD_STORAGE_TIERS) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
@@ -203,19 +203,19 @@ void netdata_conf_dbengine_init(const char *hostname) {
                RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
 
         nd_profile.storage_tiers = RRD_STORAGE_TIERS;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     }
 
     new_dbengine_defaults =
         (!legacy_multihost_db_space &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 retention size") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 retention size") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 retention size") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 retention size"));
+         !inicfg_exists(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
+         !inicfg_exists(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
+         !inicfg_exists(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 3 update every iterations") &&
+         !inicfg_exists(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 4 update every iterations") &&
+         !inicfg_exists(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 1 retention size") &&
+         !inicfg_exists(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 2 retention size") &&
+         !inicfg_exists(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 3 retention size") &&
+         !inicfg_exists(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 4 retention size"));
 
     default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
     char dbengineconfig[200 + 1];
@@ -226,10 +226,10 @@ void netdata_conf_dbengine_init(const char *hostname) {
     for (size_t tier = 1; tier < nd_profile.storage_tiers; tier++) {
         grouping_iterations = storage_tiers_grouping_iterations[tier];
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
-        grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
+        grouping_iterations = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
         if(grouping_iterations < 2) {
             grouping_iterations = 2;
-            config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
+            inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
                    hostname, tier);
@@ -237,11 +237,11 @@ void netdata_conf_dbengine_init(const char *hostname) {
         storage_tiers_grouping_iterations[tier] = grouping_iterations;
     }
 
-    default_multidb_disk_quota_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine tier 0 retention size", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
+    default_multidb_disk_quota_mb = (int) inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 0 retention size", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
     if(default_multidb_disk_quota_mb && default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
         netdata_log_error("Invalid disk space %d for tier 0 given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
         default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-        config_set_size_mb(CONFIG_SECTION_DB, "dbengine tier 0 retention size", default_multidb_disk_quota_mb);
+        inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 0 retention size", default_multidb_disk_quota_mb);
     }
 
 #ifdef OS_WINDOWS
@@ -272,10 +272,10 @@ void netdata_conf_dbengine_init(const char *hostname) {
 
         int disk_space_mb = tier ? RRDENG_DEFAULT_TIER_DISK_SPACE_MB : default_multidb_disk_quota_mb;
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention size", tier);
-        disk_space_mb = config_get_size_mb(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
+        disk_space_mb = inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention time", tier);
-        storage_tiers_retention_days[tier] = config_get_duration_days(
+        storage_tiers_retention_days[tier] = inicfg_get_duration_days(&netdata_config, 
             CONFIG_SECTION_DB, dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
 
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
@@ -324,14 +324,14 @@ void netdata_conf_dbengine_init(const char *hostname) {
 
     dbengine_enabled = true;
 #else
-    nd_profile.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
+    nd_profile.storage_tiers = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "storage tiers", 1);
     if(nd_profile.storage_tiers != 1) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "DBENGINE is not available on '%s', so only 1 database tier can be supported.",
                hostname);
 
         nd_profile.storage_tiers = 1;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     }
     dbengine_enabled = false;
 #endif
@@ -345,36 +345,36 @@ void netdata_conf_section_db(void) {
     // ------------------------------------------------------------------------
 
     rrdhost_free_orphan_time_s =
-        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_free_orphan_time_s);
+        inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_free_orphan_time_s);
 
     // ------------------------------------------------------------------------
     // get default database update frequency
 
-    nd_profile.update_every = (int) config_get_duration_seconds(CONFIG_SECTION_DB, "update every", nd_profile.update_every);
+    nd_profile.update_every = (int) inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "update every", nd_profile.update_every);
     if(nd_profile.update_every < UPDATE_EVERY_MIN) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "Data collection frequency in netdata.conf ([" CONFIG_SECTION_DB "].update every), changed from %d to %d",
                (int)nd_profile.update_every, UPDATE_EVERY_MIN);
         nd_profile.update_every = UPDATE_EVERY_MIN;
-        config_set_duration_seconds(CONFIG_SECTION_DB, "update every", nd_profile.update_every);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "update every", nd_profile.update_every);
     }
     if(nd_profile.update_every > UPDATE_EVERY_MAX) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "Data collection frequency in netdata.conf ([" CONFIG_SECTION_DB "].update every), changed from %d to %d",
                (int)nd_profile.update_every, UPDATE_EVERY_MIN);
         nd_profile.update_every = UPDATE_EVERY_MAX;
-        config_set_duration_seconds(CONFIG_SECTION_DB, "update every", nd_profile.update_every);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "update every", nd_profile.update_every);
     }
 
     // ------------------------------------------------------------------------
     // get the database selection
 
     {
-        const char *mode = config_get(CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
+        const char *mode = inicfg_get(&netdata_config, CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
         default_rrd_memory_mode = rrd_memory_mode_id(mode);
         if(strcmp(mode, rrd_memory_mode_name(default_rrd_memory_mode)) != 0) {
             netdata_log_error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
-            config_set(CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
+            inicfg_set(&netdata_config, CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
         }
     }
 
@@ -382,13 +382,13 @@ void netdata_conf_section_db(void) {
     // get default database size
 
     if(default_rrd_memory_mode != RRD_DB_MODE_DBENGINE && default_rrd_memory_mode != RRD_DB_MODE_NONE) {
-        default_rrd_history_entries = (int)config_get_duration_seconds(
+        default_rrd_history_entries = (int)inicfg_get_duration_seconds(&netdata_config, 
             CONFIG_SECTION_DB, "retention",
             align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
 
         long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
         if (h != default_rrd_history_entries) {
-            config_set_duration_seconds(CONFIG_SECTION_DB, "retention", h);
+            inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "retention", h);
             default_rrd_history_entries = (int)h;
         }
     }
@@ -397,16 +397,16 @@ void netdata_conf_section_db(void) {
     // get KSM settings
 
 #ifdef MADV_MERGEABLE
-    enable_ksm = config_get_boolean_ondemand(CONFIG_SECTION_DB, "memory deduplication (ksm)", enable_ksm);
+    enable_ksm = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_DB, "memory deduplication (ksm)", enable_ksm);
 #endif
 
     // --------------------------------------------------------------------
 
     rrdhost_free_ephemeral_time_s =
-        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup ephemeral hosts after", rrdhost_free_ephemeral_time_s);
+        inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup ephemeral hosts after", rrdhost_free_ephemeral_time_s);
 
     rrdset_free_obsolete_time_s =
-        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
+        inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
 
     // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
     // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
@@ -414,13 +414,13 @@ void netdata_conf_section_db(void) {
     if (rrdset_free_obsolete_time_s < 10) {
         rrdset_free_obsolete_time_s = 10;
         netdata_log_info("The \"cleanup obsolete charts after\" option was set to 10 seconds.");
-        config_set_duration_seconds(CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
     }
 
-    gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
+    gap_when_lost_iterations_above = (int)inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
     if (gap_when_lost_iterations_above < 1) {
         gap_when_lost_iterations_above = 1;
-        config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
     }
     gap_when_lost_iterations_above += 2;
 

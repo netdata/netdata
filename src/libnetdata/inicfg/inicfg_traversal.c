@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "appconfig_internals.h"
+#include "inicfg_internals.h"
 
-size_t appconfig_foreach_value_in_section(struct config *root, const char *section, appconfig_foreach_value_cb_t cb, void *data) {
+size_t inicfg_foreach_value_in_section(struct config *root, const char *section, inicfg_foreach_value_cb_t cb, void *data) {
     size_t used = 0;
-    struct config_section *co = appconfig_section_find(root, section);
+    struct config_section *co = inicfg_section_find(root, section);
     if(co) {
         SECTION_LOCK(co);
         struct config_option *cv;

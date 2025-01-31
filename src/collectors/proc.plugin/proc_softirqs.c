@@ -59,12 +59,12 @@ int do_proc_softirqs(int update_every, usec_t dt) {
     struct interrupt *irrs = NULL;
 
     if(unlikely(do_per_core == CONFIG_BOOLEAN_INVALID))
-        do_per_core = config_get_boolean_ondemand("plugin:proc:/proc/softirqs", "interrupts per core", CONFIG_BOOLEAN_NO);
+        do_per_core = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/softirqs", "interrupts per core", CONFIG_BOOLEAN_NO);
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/softirqs");
-        ff = procfile_open(config_get("plugin:proc:/proc/softirqs", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, "plugin:proc:/proc/softirqs", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 

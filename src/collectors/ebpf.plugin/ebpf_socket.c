@@ -2753,7 +2753,7 @@ static bool config_service_value_cb(void *data __maybe_unused, const char *name,
 
 void ebpf_parse_service_name_section(struct config *cfg)
 {
-    appconfig_foreach_value_in_section(cfg, EBPF_SERVICE_NAME_SECTION, config_service_value_cb, NULL);
+    inicfg_foreach_value_in_section(cfg, EBPF_SERVICE_NAME_SECTION, config_service_value_cb, NULL);
 
     // Always associated the default port to Netdata
     ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
@@ -2783,12 +2783,12 @@ void ebpf_parse_service_name_section(struct config *cfg)
  */
 void parse_table_size_options(struct config *cfg)
 {
-    socket_maps[NETDATA_SOCKET_OPEN_SOCKET].user_input = (uint32_t) appconfig_get_number(cfg,
+    socket_maps[NETDATA_SOCKET_OPEN_SOCKET].user_input = (uint32_t) inicfg_get_number(cfg,
                                                                                         EBPF_GLOBAL_SECTION,
                                                                                         EBPF_CONFIG_SOCKET_MONITORING_SIZE,
                                                                                         NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
 
-    socket_maps[NETDATA_SOCKET_TABLE_UDP].user_input = (uint32_t) appconfig_get_number(cfg,
+    socket_maps[NETDATA_SOCKET_TABLE_UDP].user_input = (uint32_t) inicfg_get_number(cfg,
                                                                                       EBPF_GLOBAL_SECTION,
                                                                                       EBPF_CONFIG_UDP_SIZE, NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED);
 }
@@ -2857,7 +2857,7 @@ void *ebpf_socket_thread(void *ptr)
     rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
     // It was not enabled from main config file (ebpf.d.conf)
     if (!network_viewer_opt.enabled)
-        network_viewer_opt.enabled = appconfig_get_boolean(&socket_config, EBPF_NETWORK_VIEWER_SECTION, "enabled",
+        network_viewer_opt.enabled = inicfg_get_boolean(&socket_config, EBPF_NETWORK_VIEWER_SECTION, "enabled",
                                                            CONFIG_BOOLEAN_YES);
     rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
 

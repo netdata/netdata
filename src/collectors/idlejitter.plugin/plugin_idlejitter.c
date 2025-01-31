@@ -21,9 +21,9 @@ void *cpuidlejitter_main(void *ptr) {
     worker_register("IDLEJITTER");
     worker_register_job_name(0, "measurements");
 
-    usec_t sleep_ut = config_get_duration_ms("plugin:idlejitter", "loop time", CPU_IDLEJITTER_SLEEP_TIME_MS) * USEC_PER_MS;
+    usec_t sleep_ut = inicfg_get_duration_ms(&netdata_config, "plugin:idlejitter", "loop time", CPU_IDLEJITTER_SLEEP_TIME_MS) * USEC_PER_MS;
     if(sleep_ut <= 0) {
-        config_set_duration_ms("plugin:idlejitter", "loop time", CPU_IDLEJITTER_SLEEP_TIME_MS);
+        inicfg_set_duration_ms(&netdata_config, "plugin:idlejitter", "loop time", CPU_IDLEJITTER_SLEEP_TIME_MS);
         sleep_ut = CPU_IDLEJITTER_SLEEP_TIME_MS * USEC_PER_MS;
     }
 

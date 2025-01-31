@@ -195,7 +195,7 @@ static void oom_score_adj(void) {
     }
 
     // check netdata.conf configuration
-    s = config_get(CONFIG_SECTION_GLOBAL, "OOM score", s);
+    s = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "OOM score", s);
     if(s && *s && (isdigit((uint8_t)*s) || *s == '-' || *s == '+'))
         wanted_score = atoll(s);
     else if(s && !strcmp(s, "keep")) {
@@ -248,7 +248,7 @@ static void oom_score_adj(void) {
 
 static void process_nice_level(void) {
 #ifdef HAVE_NICE
-    int nice_level = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process nice level", 0);
+    int nice_level = (int)inicfg_get_number(&netdata_config, CONFIG_SECTION_GLOBAL, "process nice level", 0);
     if(nice(nice_level) == -1)
         netdata_log_error("Cannot set netdata CPU nice level to %d.", nice_level);
     else
@@ -355,7 +355,7 @@ static void sched_setscheduler_set(void) {
         int found = 0;
 
         // read the configuration
-        name = config_get(CONFIG_SECTION_GLOBAL, "process scheduling policy", name);
+        name = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "process scheduling policy", name);
         int i;
         for(i = 0 ; scheduler_defaults[i].name ; i++) {
             if(!strcmp(name, scheduler_defaults[i].name)) {
@@ -368,7 +368,7 @@ static void sched_setscheduler_set(void) {
                     goto report;
 
                 if(flags & SCHED_FLAG_PRIORITY_CONFIGURABLE)
-                    priority = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process scheduling priority", priority);
+                    priority = (int)inicfg_get_number(&netdata_config, CONFIG_SECTION_GLOBAL, "process scheduling priority", priority);
 
 #ifdef HAVE_SCHED_GET_PRIORITY_MIN
                 errno_clear();

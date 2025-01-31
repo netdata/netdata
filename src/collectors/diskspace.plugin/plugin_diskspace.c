@@ -309,25 +309,25 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     if(unlikely(!dict_mountpoints)) {
         SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
 
-        if(config_move("plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
+        if(inicfg_move(&netdata_config, "plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
             // old configuration, enable backwards compatibility
             mode = SIMPLE_PATTERN_PREFIX;
         }
 
         excluded_mountpoints = simple_pattern_create(
-            config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS),
+            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS),
             NULL,
             mode,
             true);
 
         excluded_filesystems = simple_pattern_create(
-            config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS),
+            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS),
             NULL,
             SIMPLE_PATTERN_EXACT,
             true);
 
         excluded_filesystems_inodes = simple_pattern_create(
-            config_get(CONFIG_SECTION_DISKSPACE, "exclude inode metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS_INODES),
+            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude inode metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS_INODES),
             NULL,
             SIMPLE_PATTERN_EXACT,
             true);
@@ -340,8 +340,8 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     if(unlikely(!item)) {
         bool slow = false;
 
-        int def_space = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks", CONFIG_BOOLEAN_AUTO);
-        int def_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
+        int def_space = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_DISKSPACE, "space usage for all disks", CONFIG_BOOLEAN_AUTO);
+        int def_inodes = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
 
         if(unlikely(simple_pattern_matches(excluded_mountpoints, mi->mount_point))) {
             def_space = CONFIG_BOOLEAN_NO;
@@ -395,10 +395,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         do_space = def_space;
         do_inodes = def_inodes;
 
-        if (config_exists(var_name, "space usage"))
-            do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
-        if (config_exists(var_name, "inodes usage"))
-            do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
+        if (inicfg_exists(&netdata_config, var_name, "space usage"))
+            do_space = inicfg_get_boolean_ondemand(&netdata_config, var_name, "space usage", def_space);
+        if (inicfg_exists(&netdata_config, var_name, "inodes usage"))
+            do_inodes = inicfg_get_boolean_ondemand(&netdata_config, var_name, "inodes usage", def_inodes);
 
         struct mount_point_metadata mp = {
             .do_space = do_space,
@@ -852,15 +852,15 @@ void *diskspace_main(void *ptr) {
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             diskspace_function_mount_points);
 
-    cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
+    cleanup_mount_points = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
-    int update_every = (int)config_get_duration_seconds(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
+    int update_every = (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
     if(update_every < localhost->rrd_update_every) {
         update_every = localhost->rrd_update_every;
-        config_set_duration_seconds(CONFIG_SECTION_DISKSPACE, "update every", update_every);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DISKSPACE, "update every", update_every);
     }
 
-    check_for_new_mountpoints_every = (int)config_get_duration_seconds(CONFIG_SECTION_DISKSPACE, "check for new mount points every", check_for_new_mountpoints_every);
+    check_for_new_mountpoints_every = (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DISKSPACE, "check for new mount points every", check_for_new_mountpoints_every);
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 

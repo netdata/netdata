@@ -16,9 +16,9 @@ struct tg_ses {
 static size_t tg_ses_max_window_size = 15;
 
 static inline void tg_ses_init(void) {
-    long long ret = config_get_number(CONFIG_SECTION_WEB, "ses max tg_des_window", (long long)tg_ses_max_window_size);
+    long long ret = inicfg_get_number(&netdata_config, CONFIG_SECTION_WEB, "ses max tg_des_window", (long long)tg_ses_max_window_size);
     if(ret <= 1) {
-        config_set_number(CONFIG_SECTION_WEB, "ses max tg_des_window", (long long)tg_ses_max_window_size);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_WEB, "ses max tg_des_window", (long long)tg_ses_max_window_size);
     }
     else {
         tg_ses_max_window_size = (size_t) ret;
