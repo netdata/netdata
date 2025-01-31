@@ -2,10 +2,21 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.2...HEAD)
 
 **Merged pull requests:**
 
+- allow dbengine to read at offsets above 4GiB - again [\#19539](https://github.com/netdata/netdata/pull/19539) ([ktsaou](https://github.com/ktsaou))
+- allow dbengine to read at offsets above 4GiB [\#19538](https://github.com/netdata/netdata/pull/19538) ([ktsaou](https://github.com/ktsaou))
+- Fix contexts stay not-live when children reconnect [\#19536](https://github.com/netdata/netdata/pull/19536) ([ktsaou](https://github.com/ktsaou))
+- Fix coverity issue [\#19535](https://github.com/netdata/netdata/pull/19535) ([stelfrag](https://github.com/stelfrag))
+- fix heap use after free [\#19532](https://github.com/netdata/netdata/pull/19532) ([ktsaou](https://github.com/ktsaou))
+- docs\(web/gui\): remove info about old dashboard from readme [\#19531](https://github.com/netdata/netdata/pull/19531) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19530](https://github.com/netdata/netdata/pull/19530) ([netdatabot](https://github.com/netdatabot))
+- chore\(go.d/snmp\): enable create\_vnode by default [\#19529](https://github.com/netdata/netdata/pull/19529) ([ilyam8](https://github.com/ilyam8))
+- ci: bump static build timeout to 6hr [\#19528](https://github.com/netdata/netdata/pull/19528) ([ilyam8](https://github.com/ilyam8))
+- Fix MSSQL Instance [\#19527](https://github.com/netdata/netdata/pull/19527) ([thiagoftsm](https://github.com/thiagoftsm))
+- inline functions related to metrics ingestion [\#19524](https://github.com/netdata/netdata/pull/19524) ([ktsaou](https://github.com/ktsaou))
 - chore\(packaging\): remove old dashboard [\#19523](https://github.com/netdata/netdata/pull/19523) ([ilyam8](https://github.com/ilyam8))
 - ci: increase static build timeout 180-\>300m [\#19519](https://github.com/netdata/netdata/pull/19519) ([ilyam8](https://github.com/ilyam8))
 - Improve ACLK query processing [\#19518](https://github.com/netdata/netdata/pull/19518) ([stelfrag](https://github.com/stelfrag))
@@ -14,6 +25,7 @@
 - Invert order of checks in pgd\_append\_point\(\). [\#19515](https://github.com/netdata/netdata/pull/19515) ([vkalintiris](https://github.com/vkalintiris))
 - Link the ebpf plugin against libbpf directly instead of through libnetdata. [\#19514](https://github.com/netdata/netdata/pull/19514) ([Ferroin](https://github.com/Ferroin))
 - compile time and runtime check of required compiler flags [\#19513](https://github.com/netdata/netdata/pull/19513) ([ktsaou](https://github.com/ktsaou))
+- netdata.spec/plugin-go: remove dependency for lm\_sensors [\#19511](https://github.com/netdata/netdata/pull/19511) ([k0ste](https://github.com/k0ste))
 - chore\(go.d/nvme\): fix :dog: warning [\#19510](https://github.com/netdata/netdata/pull/19510) ([ilyam8](https://github.com/ilyam8))
 - ACLK: allow encoded proxy username and password to work [\#19508](https://github.com/netdata/netdata/pull/19508) ([ktsaou](https://github.com/ktsaou))
 - Fix alert transition [\#19507](https://github.com/netdata/netdata/pull/19507) ([stelfrag](https://github.com/stelfrag))
@@ -50,9 +62,14 @@
 - streaming nodes accounting [\#19466](https://github.com/netdata/netdata/pull/19466) ([ktsaou](https://github.com/ktsaou))
 - Don’t fail fast on static builds and Docker builds. [\#19465](https://github.com/netdata/netdata/pull/19465) ([Ferroin](https://github.com/Ferroin))
 - Child should be online before initializing health [\#19463](https://github.com/netdata/netdata/pull/19463) ([stelfrag](https://github.com/stelfrag))
+- Active Directory Metrics \(Windows.plugin\) [\#19461](https://github.com/netdata/netdata/pull/19461) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use aral in ACLK [\#19459](https://github.com/netdata/netdata/pull/19459) ([stelfrag](https://github.com/stelfrag))
 - Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
 - Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
+
+## [v2.2.2](https://github.com/netdata/netdata/tree/v2.2.2) (2025-01-30)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.1...v2.2.2)
 
 ## [v2.2.1](https://github.com/netdata/netdata/tree/v2.2.1) (2025-01-27)
 
@@ -453,19 +470,6 @@
 - docs: single line win deploy [\#18994](https://github.com/netdata/netdata/pull/18994) ([ilyam8](https://github.com/ilyam8))
 - Add SQL Express Metrics [\#18992](https://github.com/netdata/netdata/pull/18992) ([thiagoftsm](https://github.com/thiagoftsm))
 - Do not intentionally abort on non-0 exit code. [\#18991](https://github.com/netdata/netdata/pull/18991) ([vkalintiris](https://github.com/vkalintiris))
-- update plugin\_data\_collection\_status alert summary/info [\#18990](https://github.com/netdata/netdata/pull/18990) ([ilyam8](https://github.com/ilyam8))
-- health: enable go.d data collection job status alert [\#18989](https://github.com/netdata/netdata/pull/18989) ([ilyam8](https://github.com/ilyam8))
-- update GH bug report [\#18988](https://github.com/netdata/netdata/pull/18988) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d.plugin\): fix duplicate boolToInt [\#18987](https://github.com/netdata/netdata/pull/18987) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump golang.org/x/net from 0.30.0 to 0.31.0 in /src/go [\#18986](https://github.com/netdata/netdata/pull/18986) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Improve Installer \(Part II\) [\#18983](https://github.com/netdata/netdata/pull/18983) ([thiagoftsm](https://github.com/thiagoftsm))
-- improvement\(go.d.plugin\): add data collection status chart [\#18981](https://github.com/netdata/netdata/pull/18981) ([ilyam8](https://github.com/ilyam8))
-- ci: fix win jobs [\#18979](https://github.com/netdata/netdata/pull/18979) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18977](https://github.com/netdata/netdata/pull/18977) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/rabbitmq\): add queue status and net partitions [\#18976](https://github.com/netdata/netdata/pull/18976) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18973](https://github.com/netdata/netdata/pull/18973) ([netdatabot](https://github.com/netdatabot))
-- add rabbitmq alerts [\#18972](https://github.com/netdata/netdata/pull/18972) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18971](https://github.com/netdata/netdata/pull/18971) ([netdatabot](https://github.com/netdatabot))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
