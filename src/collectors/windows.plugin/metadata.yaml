@@ -1958,3 +1958,87 @@ modules:
               chart_type: line
               dimensions:
                 - name: class_load
+            - name: netframework.clrremoting_channels
+              description: Registered channels
+              unit: channels/s
+              chart_type: line
+              dimensions:
+                - name: registered
+            - name: netframework.clrremoting_context_bound_classes_loaded
+              description: Loaded context-bound classes
+              unit: classes
+              chart_type: line
+              dimensions:
+                - name: loaded
+            - name: netframework.clrremoting_context_bound_objects
+              description: Allocated context-bound objects
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: objects
+            - name: netframework.clrremoting_context_proxies
+              description: Remoting proxy objects
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: contexts
+            - name: netframework.clrremoting_remote_calls
+              description: Remote Procedure Calls (RPC) invoked
+              unit: calls/s
+              chart_type: line
+              dimensions:
+                - name: rpc
+            - name: netframework.clrsecurity_link_time_checks
+              description: Link-time code access security checks
+              unit: checks/s
+              chart_type: line
+              dimensions:
+                - name: linktime
+            - name: netframework.clrsecurity_checks_time
+              description: Time spent performing runtime code access security checks
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: netframework.clrsecurity_stack_walk_depth
+              description: Depth of the stack
+              unit: depth
+              chart_type: line
+              dimensions:
+                - name: stack
+            - name: netframework.clrsecurity_runtime_checks
+              description: Runtime code access security checks performed
+              unit: checks/s
+              chart_type: line
+              dimensions:
+                - name: runtime
+            - name: netframework.clrlocksandthreads_queue_length
+              description: Threads waited to acquire a managed lock
+              unit: threads/s
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: netframework.clrlocksandthreads_current_logical_threads
+              description: Logical threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: logical
+            - name: netframework.clrlocksandthreads_current_physical_threads
+              description: Physical threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: physical
+            - name: netframework.clrlocksandthreads_recognized_threads
+              description: Threads recognized by the runtime
+              unit: threads/s
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: netframework.clrlocksandthreads_contentions
+              description: Fails to acquire a managed lock
+              unit: contentions/s
+              chart_type: line
+              dimensions:
+                - name: contentions
