@@ -278,7 +278,7 @@ func TestCollector_Collect(t *testing.T) {
 		check       func(t *testing.T, my *Collector)
 	}
 	tests := map[string][]testCaseStep{
-		"MariaDB-Standalone[v5.5.46]: success on all queries": {
+		"MariaDB-Standalone[v5.5.64]: success on all queries": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer5564Version)
