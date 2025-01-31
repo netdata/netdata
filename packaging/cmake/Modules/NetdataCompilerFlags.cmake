@@ -69,6 +69,26 @@ function(add_double_extra_compiler_flag match flag1 flag2)
         endif()
 endfunction()
 
+# Add a required extra compiler flag to C and C++ flags.
+#
+# Similar logic as add_simple_extra_compiler_flag, but ignores existing
+# instances and throws an error if the flag is not supported.
+function(add_required_compiler_flag flag)
+  set(CMAKE_REQUIRED_FLAGS "-Werror")
+
+  make_cpp_safe_name("${flag}" flag_name)
+
+  check_c_compiler_flag("${flag}" HAVE_C_${flag_name})
+  check_cxx_compiler_flag("${flag}" HAVE_CXX_${flag_name})
+
+  if(HAVE_C_${flag_name} AND HAVE_CXX_${flag_name})
+    add_compile_options("${flag}")
+    add_link_options("${flag}")
+  else()
+    message(FATAL_ERROR "${flag} support is required to build Netdata")
+  endif()
+endfunction()
+
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" TRUE)
 else()
@@ -83,6 +103,8 @@ if(ENABLE_ADDRESS_SANITIZER)
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
+
+add_required_compiler_flag("-fexceptions")
 
 if(NOT ${DISABLE_HARDENING})
         add_double_extra_compiler_flag("stack-protector" "-fstack-protector-strong" "-fstack-protector")
