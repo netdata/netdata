@@ -635,6 +635,8 @@ int is_valid_path_symbol(char c) {
 int verify_path(const char *path) {
     struct stat sb;
 
+    fatal_assert(path);
+
     char c;
     const char *s = path;
     while((c = *s++)) {
