@@ -546,7 +546,7 @@ static void ebpf_obsolete_fd_global(ebpf_module_t *em)
  */
 static void ebpf_fd_exit(void *pptr)
 {
-    pids_fd[EBPF_PIDS_FD_IDX] = -1;
+    pids_fd[NETDATA_EBPF_PIDS_FD_IDX] = -1;
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
 
@@ -698,7 +698,7 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
 
         fd_apps_accumulator(fv, maps_per_core);
 
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, fv->tgid, fv->name, EBPF_PIDS_FD_IDX);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, fv->tgid, fv->name, NETDATA_EBPF_PIDS_FD_IDX);
         netdata_publish_fd_stat_t *publish_fd = pid_stat->fd;
         if (!publish_fd)
             pid_stat->fd = publish_fd = ebpf_fd_allocate_publish();
@@ -715,7 +715,7 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
             if (kill(key, 0)) { // No PID found
                 ebpf_reset_specific_pid_data(pid_stat);
             } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(pid_stat, fd, key, EBPF_PIDS_FD_IDX);
+                ebpf_release_pid_data(pid_stat, fd, key, NETDATA_EBPF_PIDS_FD_IDX);
                 ebpf_fd_release_publish(publish_fd);
                 pid_stat->fd = NULL;
             }
@@ -742,7 +742,7 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
 
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_FD_IDX);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_FD_IDX);
         netdata_publish_fd_stat_t *w = pid_stat->fd;
         if (!w)
             continue;
@@ -792,7 +792,7 @@ void *ebpf_read_fd_thread(void *ptr)
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
-    pids_fd[EBPF_PIDS_FD_IDX] = fd_maps[NETDATA_FD_PID_STATS].map_fd;
+    pids_fd[NETDATA_EBPF_PIDS_FD_IDX] = fd_maps[NETDATA_FD_PID_STATS].map_fd;
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
@@ -838,7 +838,7 @@ static void ebpf_update_fd_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_fd_stat_t *out = &pids->fd;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_FD_IDX);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_FD_IDX);
             netdata_publish_fd_stat_t *in = local_pid->fd;
             if (!in)
                 continue;

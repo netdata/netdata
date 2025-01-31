@@ -1110,7 +1110,7 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_tar
 
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_VFS_IDX);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_VFS_IDX);
         netdata_publish_vfs_t *w = local_pid->vfs;
         if (!w)
             continue;
@@ -1257,7 +1257,7 @@ static void ebpf_vfs_read_apps(int maps_per_core, uint32_t max_period)
 
         vfs_apps_accumulator(vv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, vv->tgid, vv->name, EBPF_PIDS_VFS_IDX);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, vv->tgid, vv->name, NETDATA_EBPF_PIDS_VFS_IDX);
         netdata_publish_vfs_t *publish = local_pid->vfs;
         if (!publish)
             local_pid->vfs = publish = ebpf_vfs_allocate_publish();
@@ -1269,7 +1269,7 @@ static void ebpf_vfs_read_apps(int maps_per_core, uint32_t max_period)
             if (kill(key, 0)) { // No PID found
                 ebpf_reset_specific_pid_data(local_pid);
             } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(local_pid, fd, key, EBPF_PIDS_VFS_IDX);
+                ebpf_release_pid_data(local_pid, fd, key, NETDATA_EBPF_PIDS_VFS_IDX);
                 ebpf_vfs_release_publish(publish);
                 local_pid->vfs = NULL;
             }
@@ -1300,7 +1300,7 @@ static void read_update_vfs_cgroup()
             netdata_publish_vfs_t *out = &pids->vfs;
             memset(out, 0, sizeof(netdata_publish_vfs_t));
 
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_VFS_IDX);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_VFS_IDX);
             netdata_publish_vfs_t *in = local_pid->vfs;
             if (!in)
                 continue;
@@ -2073,7 +2073,7 @@ void *ebpf_read_vfs_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     uint32_t max_period = EBPF_CLEANUP_FACTOR;
-    pids_fd[EBPF_PIDS_VFS_IDX] = vfs_maps[NETDATA_VFS_PID].map_fd;
+    pids_fd[NETDATA_EBPF_PIDS_VFS_IDX] = vfs_maps[NETDATA_VFS_PID].map_fd;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
@@ -2624,7 +2624,7 @@ static int ebpf_vfs_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_vfs_thread(void *ptr)
 {
-    pids_fd[EBPF_PIDS_VFS_IDX] = -1;
+    pids_fd[NETDATA_EBPF_PIDS_VFS_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_vfs_exit) cleanup_ptr = em;
