@@ -1002,12 +1002,15 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
     aclk_add_job(query);
 }
 
-void aclk_send_node_instances()
+void aclk_send_node_instances(mqtt_wss_client client)
 {
     struct node_instance_list *list_head = get_node_list();
     struct node_instance_list *list = list_head;
     if (unlikely(!list)) {
         error_report("Failure to get_node_list from DB!");
+        sleep_usec(USEC_PER_SEC);
+        aclk_query_t query = aclk_query_new(SEND_NODE_INSTANCES);
+        aclk_add_job(query);
         return;
     }
     while (!uuid_is_null(list->host_id)) {
@@ -1045,7 +1048,8 @@ void aclk_send_node_instances()
             freez((void*)node_state_update.node_id);
             query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
             query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-            aclk_add_job(query);
+            send_bin_msg(client, query);
+            aclk_query_free(query);
         } else {
             aclk_query_t create_query;
             create_query = aclk_query_new(REGISTER_NODE);
@@ -1067,7 +1071,8 @@ void aclk_send_node_instances()
                    (char*)node_instance_creation.machine_guid, list->hops);
 
             freez((void *)node_instance_creation.machine_guid);
-            aclk_add_job(create_query);
+            send_bin_msg(client, create_query);
+            aclk_query_free(create_query);
         }
         freez(list->hostname);
 

@@ -2490,7 +2490,6 @@ send_ntfy() {
     msg="${host} ${status_message}: ${alarm} - ${info}"
     httpcode=$(docurl -X POST \
                       "${ntfy_auth_header[@]}" \
-                      -H "Icon: https://raw.githubusercontent.com/netdata/netdata/master/src/web/gui/dashboard/images/favicon-196x196.png" \
                       -H "Title: ${host}: ${name//_/ }" \
                       -H "Tags: ${emoji}" \
                       -H "Priority: ${priority}" \

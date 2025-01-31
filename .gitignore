@@ -60,14 +60,6 @@ README
 TODO.md
 TODO.txt
 
-src/web/gui/chart-info/
-src/web/gui/control.html
-src/web/gui/dashboard.js
-src/web/gui/datasource.css
-src/web/gui/gadget.xml
-src/web/gui/index_new.html
-src/web/gui/version.txt
-
 # related to karma/javascript/node
 /node_modules/
 /coverage/
