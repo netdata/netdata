@@ -2998,6 +2998,9 @@ if (NOT NETDATA_USER)
         set(NETDATA_USER "netdata")
 endif()
 
+set(BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME "build-info-cmake-cache.gz")
+set(BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH "usr/share/netdata")
+
 configure_file(packaging/cmake/config.cmake.h.in config.h)
 
 #
@@ -3545,6 +3548,27 @@ if(ENABLE_DASHBOARD)
 
 endif()
 
+#
+# Ship CMakeCache.txt as an archive
+#
+
+install(CODE "
+        execute_process(COMMAND gzip -c \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
+                        OUTPUT_FILE \"${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+                        WORKING_DIRECTORY \"${CMAKE_BINARY_DIR}\"
+                        RESULT_VARIABLE result)
+        if(NOT result EQUAL 0)
+                message(WARNING \"Failed to compress CMakeCache.txt\")
+        endif()
+
+        file(INSTALL \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+             DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
+")
+
+#
+# vendor msys stuff on Windows
+#
+
 if(OS_WINDOWS)
         install(FILES /usr/bin/msys-protobuf-32.dll
                       /usr/bin/msys-uv-1.dll
@@ -3556,5 +3580,9 @@ if(OS_WINDOWS)
         # Make curl work with ssl
         install(DIRECTORY /usr/ssl DESTINATION usr)
 endif()
+
+#
+# Include packaging logic
+#
 
 include(Packaging)

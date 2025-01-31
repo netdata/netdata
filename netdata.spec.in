@@ -522,6 +522,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_presetdir}/50-%{name}.preset
 %{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf
 
+%{_datarootdir}/%{name}/build-info-cmake-cache.gz
+
 %dir %{_libexecdir}/%{name}
 %dir %{_libexecdir}/%{name}/plugins.d
 %defattr(0750,root,netdata,0750)
