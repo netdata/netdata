@@ -18,7 +18,7 @@ typedef struct rrdset_stream_buffer {
 
 RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t wall_clock_time);
 
-void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s);
+void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, const char *claim_id_str, const char *node_id_str, const char *url);
 void stream_receiver_send_node_and_claim_id_to_child(RRDHOST *host);
 void stream_sender_clear_parent_claim_id(RRDHOST *host);
 

@@ -130,7 +130,12 @@ void stream_sender_on_connect(struct sender_state *s) {
     stream_sender_on_connect_and_disconnect(s);
 
     s->thread.last_traffic_ut = now_monotonic_usec();
-    s->rbuf.read_len = 0;
+
+    freez(s->thread.rbuf.b);
+    s->thread.rbuf.size = PLUGINSD_LINE_MAX + 1;
+    s->thread.rbuf.b = mallocz(s->thread.rbuf.size);
+    s->thread.rbuf.b[0] = '\0';
+    s->thread.rbuf.read_len = 0;
 }
 
 static void stream_sender_on_ready_to_dispatch(struct sender_state *s) {
@@ -159,6 +164,11 @@ void stream_sender_on_disconnect(struct sender_state *s) {
     // update the child (the receiver side) for this parent
     stream_path_parent_disconnected(s->host);
     stream_receiver_send_node_and_claim_id_to_child(s->host);
+
+    freez(s->thread.rbuf.b);
+    s->thread.rbuf.size = 0;
+    s->thread.rbuf.b = NULL;
+    s->thread.rbuf.read_len = 0;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -508,11 +518,18 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         bytes_compressed += stats.bytes_added;
         bytes_uncompressed += stats.bytes_uncompressed;
 
-        s->thread.wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
-        if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted))
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
+        nd_poll_event_t wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
+        if(unlikely(s->thread.wanted != wanted)) {
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM SND[%zu] '%s' [to %s]: nd_poll() wanted events mismatch.",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip);
+
+            s->thread.wanted = wanted;
+            if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted))
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
+                       sth->id, rrdhost_hostname(s->host), s->remote_ip);
+        }
     }
 
     if (bytes_compressed && bytes_uncompressed) {
@@ -724,9 +741,9 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
 bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes) {
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
     while(status == EVLOOP_STATUS_CONTINUE) {
-        ssize_t rc = nd_sock_revc_nowait(&s->sock, s->rbuf.b + s->rbuf.read_len, sizeof(s->rbuf.b) - s->rbuf.read_len - 1);
+        ssize_t rc = nd_sock_revc_nowait(&s->sock, s->thread.rbuf.b + s->thread.rbuf.read_len, s->thread.rbuf.size - s->thread.rbuf.read_len - 1);
         if (likely(rc > 0)) {
-            s->rbuf.read_len += rc;
+            s->thread.rbuf.read_len += rc;
 
             s->thread.last_traffic_ut = now_ut;
             sth->snd.bytes_received += rc;

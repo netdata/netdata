@@ -93,9 +93,9 @@ struct deferred_function {
 
 static void execute_deferred_function(struct sender_state *s, void *data) {
     struct deferred_function *dfd = data;
-    execute_commands_function(s, s->defer.end_keyword,
+    execute_commands_function(s, s->thread.defer.end_keyword,
                               dfd->transaction, dfd->timeout_s,
-                              dfd->function, s->defer.payload,
+                              dfd->function, s->thread.defer.payload,
                               dfd->access, dfd->source);
 }
 
@@ -103,12 +103,12 @@ static void execute_deferred_json(struct sender_state *s, void *data) {
     const char *keyword = data;
 
     if(strcmp(keyword, PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH) == 0)
-        stream_path_set_from_json(s->host, buffer_tostring(s->defer.payload), true);
+        stream_path_set_from_json(s->host, buffer_tostring(s->thread.defer.payload), true);
     else
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND '%s' [to %s]: unknown JSON keyword '%s' with payload: %s",
                rrdhost_hostname(s->host), s->remote_ip,
-               keyword, buffer_tostring(s->defer.payload));
+               keyword, buffer_tostring(s->thread.defer.payload));
 }
 
 static void cleanup_deferred_json(struct sender_state *s __maybe_unused, void *data) {
@@ -127,15 +127,15 @@ static void cleanup_deferred_function(struct sender_state *s __maybe_unused, voi
 }
 
 static void cleanup_deferred_data(struct sender_state *s) {
-    if(s->defer.cleanup)
-        s->defer.cleanup(s, s->defer.action_data);
+    if(s->thread.defer.cleanup)
+        s->thread.defer.cleanup(s, s->thread.defer.action_data);
 
-    buffer_free(s->defer.payload);
-    s->defer.payload = NULL;
-    s->defer.end_keyword = NULL;
-    s->defer.action = NULL;
-    s->defer.cleanup = NULL;
-    s->defer.action_data = NULL;
+    buffer_free(s->thread.defer.payload);
+    s->thread.defer.payload = NULL;
+    s->thread.defer.end_keyword = NULL;
+    s->thread.defer.action = NULL;
+    s->thread.defer.cleanup = NULL;
+    s->thread.defer.action_data = NULL;
 }
 
 void stream_sender_execute_commands_cleanup(struct sender_state *s) {
@@ -145,7 +145,7 @@ void stream_sender_execute_commands_cleanup(struct sender_state *s) {
 // This is just a placeholder until the gap filling state machine is inserted
 void stream_sender_execute_commands(struct sender_state *s) {
     ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &s->rbuf.line),
+        ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &s->thread.rbuf.line),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -155,37 +155,37 @@ void stream_sender_execute_commands(struct sender_state *s) {
         s->log.received = buffer_create(0, NULL);
 #endif
 
-    char *start = s->rbuf.b, *end = &s->rbuf.b[s->rbuf.read_len], *newline;
+    char *start = s->thread.rbuf.b, *end = &s->thread.rbuf.b[s->thread.rbuf.read_len], *newline;
     *end = '\0';
     for( ; start < end ; start = newline + 1) {
         newline = strchr(start, '\n');
 
         if(!newline) {
-            if(s->defer.end_keyword) {
-                buffer_strcat(s->defer.payload, start);
+            if(s->thread.defer.end_keyword) {
+                buffer_strcat(s->thread.defer.payload, start);
                 start = end;
             }
             break;
         }
 
         *newline = '\0';
-        s->rbuf.line.count++;
+        s->thread.rbuf.line.count++;
 
-        if(s->defer.end_keyword) {
-            if(strcmp(start, s->defer.end_keyword) == 0) {
+        if(s->thread.defer.end_keyword) {
+            if(strcmp(start, s->thread.defer.end_keyword) == 0) {
 #ifdef NETDATA_LOG_STREAM_SENDER
-                buffer_strcat(s->log.received, buffer_tostring(s->defer.payload));
+                buffer_strcat(s->log.received, buffer_tostring(s->thread.defer.payload));
                 buffer_strcat(s->log.received, "\n");
-                buffer_strcat(s->log.received, s->defer.end_keyword);
+                buffer_strcat(s->log.received, s->thread.defer.end_keyword);
                 buffer_strcat(s->log.received, "\n");
                 stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_METADATA, true);
 #endif
-                s->defer.action(s, s->defer.action_data);
+                s->thread.defer.action(s, s->thread.defer.action_data);
                 cleanup_deferred_data(s);
             }
             else {
-                buffer_strcat(s->defer.payload, start);
-                buffer_putc(s->defer.payload, '\n');
+                buffer_strcat(s->thread.defer.payload, start);
+                buffer_putc(s->thread.defer.payload, '\n');
             }
 
             continue;
@@ -197,34 +197,34 @@ void stream_sender_execute_commands(struct sender_state *s) {
         buffer_strcat(s->log.received, "\n");
 #endif
 
-        s->rbuf.line.num_words = quoted_strings_splitter_whitespace(start, s->rbuf.line.words, PLUGINSD_MAX_WORDS);
-        const char *command = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 0);
+        s->thread.rbuf.line.num_words = quoted_strings_splitter_whitespace(start, s->thread.rbuf.line.words, PLUGINSD_MAX_WORDS);
+        const char *command = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 0);
 
         if(command && strcmp(command, PLUGINSD_CALL_FUNCTION) == 0) {
 #ifdef NETDATA_LOG_STREAM_SENDER
             stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_FUNCTIONS, true);
 #endif
-            char *transaction  = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
-            char *timeout_s    = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 2);
-            char *function     = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 3);
-            char *access       = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 4);
-            char *source       = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 5);
+            char *transaction  = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 1);
+            char *timeout_s    = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 2);
+            char *function     = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 3);
+            char *access       = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 4);
+            char *source       = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 5);
 
             execute_commands_function(s, command, transaction, timeout_s, function, NULL, access, source);
         }
         else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN) == 0) {
-            char *transaction  = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
-            char *timeout_s    = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 2);
-            char *function     = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 3);
-            char *access       = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 4);
-            char *source       = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 5);
-            char *content_type = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 6);
+            char *transaction  = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 1);
+            char *timeout_s    = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 2);
+            char *function     = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 3);
+            char *access       = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 4);
+            char *source       = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 5);
+            char *content_type = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 6);
 
-            s->defer.end_keyword = PLUGINSD_CALL_FUNCTION_PAYLOAD_END;
-            s->defer.payload = buffer_create(0, NULL);
-            s->defer.payload->content_type = content_type_string2id(content_type);
-            s->defer.action = execute_deferred_function;
-            s->defer.cleanup = cleanup_deferred_function;
+            s->thread.defer.end_keyword = PLUGINSD_CALL_FUNCTION_PAYLOAD_END;
+            s->thread.defer.payload = buffer_create(0, NULL);
+            s->thread.defer.payload->content_type = content_type_string2id(content_type);
+            s->thread.defer.action = execute_deferred_function;
+            s->thread.defer.cleanup = cleanup_deferred_function;
 
             struct deferred_function *dfd = callocz(1, sizeof(*dfd));
             dfd->transaction = strdupz(transaction ? transaction : "");
@@ -233,7 +233,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
             dfd->access = strdupz(access ? access : "");
             dfd->source = strdupz(source ? source : "");
 
-            s->defer.action_data = dfd;
+            s->thread.defer.action_data = dfd;
         }
         else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_CANCEL) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_FUNCTION);
@@ -242,7 +242,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
 #endif
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
-            char *transaction = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
+            char *transaction = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 1);
             if(transaction && *transaction)
                 rrd_function_cancel(transaction);
         }
@@ -253,7 +253,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
 #endif
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
-            char *transaction = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
+            char *transaction = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 1);
             if(transaction && *transaction)
                 rrd_function_progress(transaction);
         }
@@ -268,10 +268,10 @@ void stream_sender_execute_commands(struct sender_state *s) {
             // do not log replication commands received - way too many!
             // nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
-            const char *chart_id = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
-            const char *start_streaming = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 2);
-            const char *after = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 3);
-            const char *before = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 4);
+            const char *chart_id = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 1);
+            const char *start_streaming = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 2);
+            const char *after = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 3);
+            const char *before = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 4);
 
             if (!chart_id || !start_streaming || !after || !before) {
                 netdata_log_error("STREAM REPLAY ERROR '%s' [send to %s] %s command is incomplete"
@@ -299,33 +299,37 @@ void stream_sender_execute_commands(struct sender_state *s) {
 #ifdef NETDATA_LOG_STREAM_SENDER
             stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_METADATA, true);
 #endif
-            stream_sender_get_node_and_claim_id_from_parent(s);
+            char *claim_id_str = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 1);
+            char *node_id_str = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 2);
+            char *url = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 3);
+
+            stream_sender_get_node_and_claim_id_from_parent(s, claim_id_str, node_id_str, url);
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_JSON) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_META);
 
-            char *keyword = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
+            char *keyword = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 1);
 
-            s->defer.end_keyword = PLUGINSD_KEYWORD_JSON_END;
-            s->defer.payload = buffer_create(0, NULL);
-            s->defer.action = execute_deferred_json;
-            s->defer.cleanup = cleanup_deferred_json;
-            s->defer.action_data = strdupz(keyword);
+            s->thread.defer.end_keyword = PLUGINSD_KEYWORD_JSON_END;
+            s->thread.defer.payload = buffer_create(0, NULL);
+            s->thread.defer.action = execute_deferred_json;
+            s->thread.defer.cleanup = cleanup_deferred_json;
+            s->thread.defer.action_data = strdupz(keyword);
         }
         else {
             netdata_log_error("STREAM SND '%s' [to %s] received unknown command over connection: %s",
-                              rrdhost_hostname(s->host), s->remote_ip, s->rbuf.line.words[0]?s->rbuf.line.words[0]:"(unset)");
+                              rrdhost_hostname(s->host), s->remote_ip, s->thread.rbuf.line.words[0]?s->thread.rbuf.line.words[0]:"(unset)");
         }
 
-        line_splitter_reset(&s->rbuf.line);
+        line_splitter_reset(&s->thread.rbuf.line);
     }
 
     if (start < end) {
-        memmove(s->rbuf.b, start, end-start);
-        s->rbuf.read_len = end - start;
+        memmove(s->thread.rbuf.b, start, end-start);
+        s->thread.rbuf.read_len = end - start;
     }
     else {
-        s->rbuf.b[0] = '\0';
-        s->rbuf.read_len = 0;
+        s->thread.rbuf.b[0] = '\0';
+        s->thread.rbuf.read_len = 0;
     }
 }

@@ -32,13 +32,16 @@ typedef void (*stream_defer_cleanup_t)(struct sender_state *s, void *data);
 
 struct sender_state {
     SPINLOCK spinlock;
-
-    RRDHOST *host;
     STREAM_CAPABILITIES capabilities;
     STREAM_CAPABILITIES disabled_capabilities;
     int16_t hops;
-
+    bool parent_using_h2o;
+    WAITQ waitq;
     ND_SOCK sock;
+    RRDHOST *host;
+
+    time_t last_state_since_t;                  // the timestamp of the last state (online/offline) change
+    STREAM_CIRCULAR_BUFFER *scb;                // sender buffer
 
     struct {
         struct stream_opcode msg;   // the template for sending a message to the dispatcher - protected by sender_lock()
@@ -48,6 +51,23 @@ struct sender_state {
         // DO NOT READ OR WRITE ANYWHERE
         uint32_t msg_slot;      // ensures a opcode queue that can never get full
 
+        struct compressor_state compressor;
+
+        struct {
+            size_t size;
+            char *b;
+            ssize_t read_len;
+            struct line_splitter line;
+        } rbuf;
+
+        struct {
+            const char *end_keyword;
+            BUFFER *payload;
+            stream_defer_action_t action;
+            stream_defer_cleanup_t cleanup;
+            void *action_data;
+        } defer;
+
         nd_poll_event_t wanted;
         usec_t last_traffic_ut;
         struct pollfd_meta meta;
@@ -56,29 +76,6 @@ struct sender_state {
     struct {
         int8_t id;                              // the connector id - protected by sender_lock()
     } connector;
-
-    char remote_ip[CONNECTED_TO_SIZE + 1];      // We don't know which proxy we connect to, passed back from socket.c
-    time_t last_state_since_t;                  // the timestamp of the last state (online/offline) change
-
-    WAITQ waitq;
-    STREAM_CIRCULAR_BUFFER *scb;
-
-    struct {
-        char b[PLUGINSD_LINE_MAX + 1];
-        ssize_t read_len;
-        struct line_splitter line;
-    } rbuf;
-
-    struct compressor_state compressor;
-
-#ifdef NETDATA_LOG_STREAM_SENDER
-    struct {
-        SPINLOCK spinlock;
-        struct timespec first_call;
-        BUFFER *received;
-        FILE *fp;
-    } log;
-#endif
 
     struct {
         bool shutdown;                          // when set, the sender should stop sending this host
@@ -99,18 +96,18 @@ struct sender_state {
             size_t charts_replicating;          // the number of unique charts having pending replication requests (on every request one is added and is removed when we finish it - it does not track completion of the replication for this chart)
             bool reached_max;                   // true when the sender buffer should not get more replication responses
         } atomic;
-
     } replication;
 
+#ifdef NETDATA_LOG_STREAM_SENDER
     struct {
-        const char *end_keyword;
-        BUFFER *payload;
-        stream_defer_action_t action;
-        stream_defer_cleanup_t cleanup;
-        void *action_data;
-    } defer;
-
-    bool parent_using_h2o;
+        SPINLOCK spinlock;
+        struct timespec first_call;
+        BUFFER *received;
+        FILE *fp;
+    } log;
+#endif
+    
+    char remote_ip[CONNECTED_TO_SIZE + 1];      // We don't know which proxy we connect to, passed back from socket.c
 };
 
 #define stream_sender_lock(sender) spinlock_lock(&(sender)->spinlock)

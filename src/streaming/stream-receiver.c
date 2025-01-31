@@ -953,12 +953,18 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             continue;
         }
 
-        rpt->thread.wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
-        if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV[%zu] '%s' [from %s]: failed to update nd_poll().",
+        nd_poll_event_t wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
+        if(unlikely(rpt->thread.wanted != wanted)) {
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM RCV[%zu] '%s' [from %s]: nd_poll() wanted events mismatch.",
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);
 
+            rpt->thread.wanted = wanted;
+            if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "STREAM RCV[%zu] '%s' [from %s]: failed to update nd_poll().",
+                       sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);
+        }
     }
 }
 
