@@ -387,7 +387,7 @@ static void ebpf_obsolete_swap_global(ebpf_module_t *em)
  */
 static void ebpf_swap_exit(void *ptr)
 {
-    pids_fd[EBPF_PIDS_SWAP_IDX] = -1;
+    pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     pthread_mutex_lock(&lock);
@@ -479,12 +479,12 @@ static void ebpf_update_swap_cgroup()
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_publish_swap_t *out = &pids->swap;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_SWAP_IDX);
-            netdata_publish_swap_t *in = local_pid->swap;
-            if (!in)
-                continue;
-            memcpy(out, in, sizeof(netdata_publish_swap_t));
+            netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+            netdata_ebpf_swap_t *in = &local_pid->swap;
+
+            netdata_ebpf_swap_t *out = &pids->swap;
+
+            memcpy(out, in, sizeof(*in));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -498,17 +498,15 @@ static void ebpf_update_swap_cgroup()
  * @param swap
  * @param root
  */
-static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_target *root)
+static void ebpf_swap_sum_pids(netdata_ebpf_swap_t *swap, struct ebpf_pid_on_target *root)
 {
     uint64_t local_read = 0;
     uint64_t local_write = 0;
 
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_SWAP_IDX);
-        netdata_publish_swap_t *w = local_pid->swap;
-        if (!w)
-            continue;
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+        netdata_ebpf_swap_t *w = &local_pid->swap;
 
         local_write += w->write;
         local_read += w->read;
@@ -549,6 +547,7 @@ static void ebpf_read_swap_apps_table(int maps_per_core)
         length *= ebpf_nprocs;
 
     uint32_t key = 0, next_key = 0;
+    sem_wait(shm_mutex_ebpf_integration);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
             goto end_swap_loop;
@@ -556,21 +555,15 @@ static void ebpf_read_swap_apps_table(int maps_per_core)
 
         swap_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, EBPF_PIDS_SWAP_IDX);
-        netdata_publish_swap_t *publish = local_pid->swap;
-        if (!publish)
-            local_pid->swap = publish = ebpf_swap_allocate_publish_swap();
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[key];
+        netdata_ebpf_swap_t *publish = &local_pid->swap;
 
         if (!publish->ct || publish->ct != cv->ct) {
-            memcpy(publish, cv, sizeof(netdata_publish_swap_t));
-            local_pid->not_updated = 0;
+            local_pid->thread_collecting |= NETDATA_EBPF_PIDS_SWAP_IDX;
+            memcpy(publish, &cv[0], sizeof(*publish));
         } else {
-            if (kill(key, 0)) { // No PID found
-                ebpf_reset_specific_pid_data(local_pid);
-            } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(local_pid, fd, key, EBPF_PIDS_SWAP_IDX);
-                ebpf_swap_release_publish(publish);
-                local_pid->swap = NULL;
+            if (local_pid->process.release_call || kill((pid_t)key, 0)) { // No PID found
+                netdata_integration_release_pid(local_pid, fd, key, NETDATA_EBPF_PIDS_SWAP_IDX);
             }
         }
 
@@ -579,6 +572,7 @@ end_swap_loop:
         memset(cv, 0, length);
         key = next_key;
     }
+    sem_post(shm_mutex_ebpf_integration);
 }
 
 /**
@@ -604,7 +598,7 @@ void *ebpf_read_swap_thread(void *ptr)
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
-    pids_fd[EBPF_PIDS_SWAP_IDX] = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
+    pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
 
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
@@ -704,13 +698,13 @@ void ebpf_swap_send_apps_data(struct ebpf_target *root)
  * @param swap
  * @param root
  */
-static void ebpf_swap_sum_cgroup_pids(netdata_publish_swap_t *swap, struct pid_on_target2 *pids)
+static void ebpf_swap_sum_cgroup_pids(netdata_ebpf_swap_t *swap, struct pid_on_target2 *pids)
 {
     uint64_t local_read = 0;
     uint64_t local_write = 0;
 
     while (pids) {
-        netdata_publish_swap_t *w = &pids->swap;
+        netdata_ebpf_swap_t *w = &pids->swap;
         local_write += w->write;
         local_read += w->read;
 
@@ -807,7 +801,7 @@ static void ebpf_obsolete_specific_swap_charts(char *type, int update_every)
  * @param type   chart type
  * @param values structure with values that will be sent to netdata
  */
-static void ebpf_send_specific_swap_data(char *type, netdata_publish_swap_t *values)
+static void ebpf_send_specific_swap_data(char *type, netdata_ebpf_swap_t *values)
 {
     ebpf_write_begin_chart(type, NETDATA_MEM_SWAP_READ_CHART, "");
     write_chart_dimension(swap_publish_aggregated[NETDATA_KEY_SWAP_READPAGE_CALL].name, (long long) values->read);

@@ -3,6 +3,7 @@
 #ifndef NETDATA_EBPF_APPS_H
 #define NETDATA_EBPF_APPS_H 1
 
+#include "collectors/collectors-ipc/ebpf-ipc.h"
 #include "libnetdata/locks/locks.h"
 #include "libnetdata/avl/avl.h"
 #include "libnetdata/clocks/clocks.h"
@@ -16,10 +17,6 @@
 #define NETDATA_APPS_PROCESS_GROUP "process"
 #define NETDATA_APPS_NET_GROUP "net"
 #define NETDATA_APPS_IPC_SHM_GROUP "ipc shm"
-
-#ifndef TASK_COMM_LEN
-#define TASK_COMM_LEN 16
-#endif
 
 #include "ebpf_process.h"
 #include "ebpf_dcstat.h"
@@ -44,21 +41,7 @@
 
 #define EBPF_CLEANUP_FACTOR 2
 
-enum ebpf_pids_index {
-    EBPF_PIDS_PROCESS_IDX,
-    EBPF_PIDS_SOCKET_IDX,
-    EBPF_PIDS_CACHESTAT_IDX,
-    EBPF_PIDS_DCSTAT_IDX,
-    EBPF_PIDS_SWAP_IDX,
-    EBPF_PIDS_VFS_IDX,
-    EBPF_PIDS_FD_IDX,
-    EBPF_PIDS_SHM_IDX,
-
-    EBPF_PIDS_PROC_FILE,
-    EBPF_PIDS_END_IDX
-};
-
-extern int pids_fd[EBPF_PIDS_END_IDX];
+extern int pids_fd[NETDATA_EBPF_PIDS_END_IDX];
 
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
@@ -90,40 +73,6 @@ enum ebpf_main_index {
 };
 
 // ----------------------------------------------------------------------------
-// Structures used to read information from kernel ring
-typedef struct ebpf_process_stat {
-    uint64_t ct;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t tgid;
-    uint32_t pid;
-
-    //Counter
-    uint32_t exit_call;
-    uint32_t release_call;
-    uint32_t create_process;
-    uint32_t create_thread;
-
-    //Counter
-    uint32_t task_err;
-} ebpf_process_stat_t;
-
-typedef struct __attribute__((packed)) ebpf_publish_process {
-    uint64_t ct;
-
-    //Counter
-    uint32_t exit_call;
-    uint32_t release_call;
-    uint32_t create_process;
-    uint32_t create_thread;
-
-    //Counter
-    uint32_t task_err;
-} ebpf_publish_process_t;
-
-// ----------------------------------------------------------------------------
 // pid_stat
 //
 struct ebpf_target {
@@ -141,10 +90,10 @@ struct ebpf_target {
     // Changes made to simplify integration between apps and eBPF.
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dcstat;
-    netdata_publish_swap_t swap;
+    netdata_ebpf_swap_t swap;
     netdata_publish_vfs_t vfs;
     netdata_fd_stat_t fd;
-    netdata_publish_shm_t shm;
+    netdata_ebpf_shm_t shm;
     ebpf_process_stat_t process;
     ebpf_socket_publish_apps_t socket;
 
@@ -190,13 +139,13 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     struct ebpf_pid_data *prev;
     struct ebpf_pid_data *next;
 
-    netdata_publish_fd_stat_t *fd;
-    netdata_publish_swap_t *swap;
-    netdata_publish_shm_t *shm; // this has a leak issue
+    netdata_fd_stat_t *fd;
+    netdata_ebpf_swap_t *swap;
+    netdata_ebpf_shm_t *shm; // this has a leak issue
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
     netdata_publish_cachestat_t *cachestat;
-    ebpf_publish_process_t *process;
+    ebpf_process_stat_t *process;
     ebpf_socket_publish_apps_t *socket;
 
 } ebpf_pid_data_t;
@@ -207,102 +156,6 @@ extern size_t ebpf_all_pids_count;
 extern size_t ebpf_hash_table_pids_count;
 void ebpf_del_pid_entry(pid_t pid);
 
-static inline void *ebpf_cachestat_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_cachestat_t));
-}
-
-static inline void ebpf_cachestat_release_publish(netdata_publish_cachestat_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_dcallocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_dcstat_t));
-}
-
-static inline void ebpf_dc_release_publish(netdata_publish_dcstat_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_fd_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_fd_stat_t));
-}
-
-static inline void ebpf_fd_release_publish(netdata_publish_fd_stat_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_shm_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_shm_t));
-}
-
-static inline void ebpf_shm_release_publish(netdata_publish_shm_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_socket_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(ebpf_socket_publish_apps_t));
-}
-
-static inline void ebpf_socket_release_publish(ebpf_socket_publish_apps_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_swap_allocate_publish_swap()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_swap_t));
-}
-
-static inline void ebpf_swap_release_publish(netdata_publish_swap_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_vfs_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_vfs_t));
-}
-
-static inline void ebpf_vfs_release_publish(netdata_publish_vfs_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_process_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(ebpf_publish_process_t));
-}
-
-static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
 ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid);
 
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx) {
@@ -310,7 +163,7 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
     ebpf_pid_data_t *ptr = ebpf_find_or_create_pid_data(pid);
     ptr->thread_collecting |= 1<<idx;
     // The caller is getting data to work.
-    if (!name && idx != EBPF_PIDS_PROC_FILE)
+    if (!name && idx != NETDATA_EBPF_PIDS_PROC_FILE)
         return ptr;
 
     if (ptr->pid == pid) {
@@ -328,7 +181,7 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
 
     ptr->next = ebpf_pids_link_list;
     ebpf_pids_link_list = ptr;
-    if (idx == EBPF_PIDS_PROC_FILE) {
+    if (idx == NETDATA_EBPF_PIDS_PROC_FILE) {
         ebpf_all_pids_count++;
     }
 
@@ -350,7 +203,7 @@ static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
 {
     int idx;
     uint32_t pid = ptr->pid;
-    for (idx = EBPF_PIDS_PROCESS_IDX; idx < EBPF_PIDS_PROC_FILE; idx++) {
+    for (idx = NETDATA_EBPF_PIDS_PROCESS_IDX; idx < NETDATA_EBPF_PIDS_PROC_FILE; idx++) {
         if (!(ptr->thread_collecting & (1<<idx)))  {
             continue;
         }
@@ -363,28 +216,28 @@ static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
         ebpf_hash_table_pids_count--;
         void *clean;
         switch (idx) {
-            case EBPF_PIDS_PROCESS_IDX:
+            case NETDATA_EBPF_PIDS_PROCESS_IDX:
                 clean = ptr->process;
                 break;
-            case EBPF_PIDS_SOCKET_IDX:
+            case NETDATA_EBPF_PIDS_SOCKET_IDX:
                 clean = ptr->socket;
                 break;
-            case EBPF_PIDS_CACHESTAT_IDX:
+            case NETDATA_EBPF_PIDS_CACHESTAT_IDX:
                 clean = ptr->cachestat;
                 break;
-            case EBPF_PIDS_DCSTAT_IDX:
+            case NETDATA_EBPF_PIDS_DCSTAT_IDX:
                 clean = ptr->dc;
                 break;
-            case EBPF_PIDS_SWAP_IDX:
+            case NETDATA_EBPF_PIDS_SWAP_IDX:
                 clean = ptr->swap;
                 break;
-            case EBPF_PIDS_VFS_IDX:
+            case NETDATA_EBPF_PIDS_VFS_IDX:
                 clean = ptr->vfs;
                 break;
-            case EBPF_PIDS_FD_IDX:
+            case NETDATA_EBPF_PIDS_FD_IDX:
                 clean = ptr->fd;
                 break;
-            case EBPF_PIDS_SHM_IDX:
+            case NETDATA_EBPF_PIDS_SHM_IDX:
                 clean = ptr->shm;
                 break;
             default:
@@ -423,8 +276,8 @@ typedef struct ebpf_pid_stat {
     netdata_publish_dcstat_t dc;
     netdata_fd_stat_t fd;
     ebpf_process_stat_t process;
-    netdata_publish_shm_t shm;
-    netdata_publish_swap_t swap;
+    netdata_ebpf_shm_t shm;
+    netdata_ebpf_swap_t swap;
     ebpf_socket_publish_apps_t socket;
     netdata_publish_vfs_t vfs;
 
@@ -498,9 +351,6 @@ int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
 
 int get_pid_comm(pid_t pid, size_t n, char *dest);
 
-void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core);
-void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
-
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,
 // this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/src/libnetdata/aral).
 #ifndef NETDATA_EBPF_ALLOC_MAX_PID
@@ -519,8 +369,6 @@ void ebpf_vfs_release(netdata_publish_vfs_t *stat);
 
 extern ARAL *ebpf_aral_shm_pid;
 void ebpf_shm_aral_init();
-netdata_publish_shm_t *ebpf_shm_stat_get(void);
-void ebpf_shm_release(netdata_publish_shm_t *stat);
 void ebpf_parse_proc_files();
 
 // ARAL Section end
