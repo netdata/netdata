@@ -168,7 +168,8 @@ struct mssql_db_instance {
 
 static DICTIONARY *mssql_instances = NULL;
 
-static void initialize_mssql_objects(struct mssql_instance *p, const char *instance) {
+static void initialize_mssql_objects(struct mssql_instance *p, const char *instance)
+{
     char prefix[NETDATA_MAX_INSTANCE_NAME];
     if (!strcmp(instance, "MSSQLSERVER")) {
         strncpyz(prefix, "SQLServer:", sizeof(prefix) - 1);
@@ -208,7 +209,8 @@ static void initialize_mssql_objects(struct mssql_instance *p, const char *insta
     p->instanceID = strdup(instance);
 }
 
-static inline void initialize_mssql_keys(struct mssql_instance *p) {
+static inline void initialize_mssql_keys(struct mssql_instance *p)
+{
     // General Statistics (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-general-statistics-object)
     p->MSSQLUserConnections.key = "User Connections";
     p->MSSQLBlockedProcesses.key = "Processes blocked";
@@ -240,14 +242,16 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
     p->MSSQLTotalServerMemory.key = "Total Server Memory (KB)";
 }
 
-void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object
     struct mssql_lock_instance *ptr = value;
     ptr->deadLocks.key = "Number of Deadlocks/sec";
     ptr->lockWait.key = "Lock Waits/sec";
 }
 
-void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     struct mssql_db_instance *ptr = value;
 
     // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-databases-object
@@ -260,7 +264,8 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     ptr->MSSQLDatabaseWriteTransactions.key = "Write Transactions/sec";
 }
 
-void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     struct mssql_instance *p = value;
     const char *instance = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
@@ -280,7 +285,8 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
     initialize_mssql_keys(p);
 }
 
-static int mssql_fill_dictionary() {
+static int mssql_fill_dictionary()
+{
     HKEY hKey;
     LSTATUS ret = RegOpenKeyExA(
         HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Microsoft SQL Server\\Instance Names\\SQL", 0, KEY_READ, &hKey);
@@ -325,7 +331,8 @@ endMSSQLFillDict:
     return (ret == ERROR_SUCCESS) ? 0 : -1;
 }
 
-static int initialize(void) {
+static int initialize(void)
+{
     mssql_instances = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct mssql_instance));
 
@@ -338,7 +345,8 @@ static int initialize(void) {
     return 0;
 }
 
-static void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every) {
+static void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_GENERAL_STATS]);
@@ -402,7 +410,8 @@ static void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_ins
     }
 }
 
-static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every) {
+static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_SQL_STATS]);
@@ -560,7 +569,8 @@ static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
     }
 }
 
-static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every) {
+static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     PERF_OBJECT_TYPE *pObjectType =
@@ -694,7 +704,8 @@ static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql
     }
 }
 
-static void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every) {
+static void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     PERF_OBJECT_TYPE *pObjectType =
@@ -735,7 +746,8 @@ static void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
     }
 }
 
-static void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every) {
+static void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_SQL_ERRORS]);
@@ -771,7 +783,8 @@ static void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
     }
 }
 
-int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     struct mssql_lock_instance *mli = value;
@@ -842,7 +855,8 @@ int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
     return 1;
 }
 
-static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every) {
+static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_LOCKS]);
     if (!pObjectType)
         return;
@@ -879,7 +893,8 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p
     rrdset_done(p->st_deadLocks);
 }
 
-static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
+static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_backup_restore_operations) {
@@ -922,7 +937,8 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, c
     rrdset_done(mli->st_db_backup_restore_operations);
 }
 
-static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
+static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_log_flushes) {
@@ -960,7 +976,8 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, cons
     rrdset_done(mli->st_db_log_flushes);
 }
 
-static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
+static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_log_flushed) {
@@ -998,7 +1015,8 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, cons
     rrdset_done(mli->st_db_log_flushed);
 }
 
-static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
+static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_transactions) {
@@ -1037,7 +1055,8 @@ static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *
     rrdset_done(mli->st_db_transactions);
 }
 
-static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
+static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_write_transactions) {
@@ -1077,7 +1096,8 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const 
     rrdset_done(mli->st_db_write_transactions);
 }
 
-static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
+static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_active_transactions) {
@@ -1117,7 +1137,8 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
     rrdset_done(mli->st_db_active_transactions);
 }
 
-static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
+static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_data_file_size) {
@@ -1154,7 +1175,8 @@ static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, con
     rrdset_done(mli->st_db_data_file_size);
 }
 
-int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     struct mssql_db_instance *mli = value;
     const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
@@ -1182,7 +1204,8 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     return 1;
 }
 
-static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every) {
+static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_DATABASE]);
     if (!pObjectType)
         return;
@@ -1236,7 +1259,8 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
     dictionary_sorted_walkthrough_read(p->databases, dict_mssql_databases_charts_cb, &update_every);
 }
 
-static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every) {
+static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_MEMORY]);
@@ -1367,7 +1391,8 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
     }
 }
 
-int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     struct mssql_instance *p = value;
     int *update_every = data;
 
@@ -1400,7 +1425,8 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     return 1;
 }
 
-int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused) {
+int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
+{
     static bool initialized = false;
 
     if (unlikely(!initialized)) {
