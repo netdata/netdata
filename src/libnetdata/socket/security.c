@@ -47,28 +47,25 @@ static void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl, unsi
         char err_str[1024 + 1];
         ERR_error_string_n(err, err_str, 1024);
 
-        // Detect TLS Alert
-        const char *alert_type = NULL;
-        const char *alert_desc = NULL;
-#ifdef SSL_CB_ALERT
-        if (err == SSL_ERROR_SSL) {  // Alerts are part of protocol errors
-            alert_type = SSL_alert_type_string_long(err);
-            alert_desc = SSL_alert_desc_string_long(err);
+        // Extract TLS Alert Information
+        const char *alert_type = "None";
+        const char *alert_desc = "None";
+
+        if (ERR_GET_LIB(err) == ERR_LIB_SSL) {  // Ensure it's an SSL error
+            alert_type = SSL_alert_type_string_long(reason_code);
+            alert_desc = SSL_alert_desc_string_long(reason_code);
         }
-#endif
 
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                      "SSL ERROR: %s() on socket local [[%s]:%d] <-> remote [[%s]:%d], "
                      "State: %s, Cipher: %s, ALPN: %.*s, OpenSSL error: [%lu] %s "
-                     "(Reason Code: %d, Reason: %s)%s%s%s",
+                     "(Reason Code: %d, Reason: %s), Alert Type: %s, Alert Description: %s",
                      call,
                      peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port,
                      ssl_state, cipher,
                      (int)alpn_len, alpn_proto ? alpn_proto : "None",
                      err, err_str, reason_code, reason ? reason : "Unknown",
-                     alert_type ? ", Alert Type: " : "",
-                     alert_type ? alert_type : "",
-                     alert_desc ? alert_desc : "");
+                     alert_type, alert_desc);
 
     } while ((err = ERR_get_error()));
 }
