@@ -31,11 +31,7 @@ typedef struct __attribute__((packed)) netdata_publish_swap {
     uint32_t write;
 } netdata_publish_swap_t;
 
-enum swap_tables {
-    NETDATA_PID_SWAP_TABLE,
-    NETDATA_SWAP_CONTROLLER,
-    NETDATA_SWAP_GLOBAL_TABLE
-};
+enum swap_tables { NETDATA_PID_SWAP_TABLE, NETDATA_SWAP_CONTROLLER, NETDATA_SWAP_GLOBAL_TABLE };
 
 enum swap_counters {
     NETDATA_KEY_SWAP_READPAGE_CALL,
