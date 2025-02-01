@@ -5,7 +5,8 @@
 
 // Module name & File description
 #define NETDATA_EBPF_MODULE_NAME_FD "filedescriptor"
-#define NETDATA_EBPF_FD_MODULE_DESC "Monitor when files are open and closed. This thread is integrated with apps and cgroup."
+#define NETDATA_EBPF_FD_MODULE_DESC                                                                                    \
+    "Monitor when files are open and closed. This thread is integrated with apps and cgroup."
 
 // Menu group
 #define NETDATA_FILE_GROUP "file_access"
@@ -43,8 +44,8 @@
 typedef struct __attribute__((packed)) netdata_publish_fd_stat {
     uint64_t ct;
 
-    uint32_t open_call;                    // Open syscalls (open and openat)
-    uint32_t close_call;                   // Close syscall (close)
+    uint32_t open_call;  // Open syscalls (open and openat)
+    uint32_t close_call; // Close syscall (close)
 
     // Errors
     uint32_t open_err;
@@ -94,4 +95,3 @@ extern struct config fd_config;
 extern netdata_ebpf_targets_t fd_targets[];
 
 #endif /* NETDATA_EBPF_FD_H */
-

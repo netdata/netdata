@@ -3,22 +3,27 @@
 #include "ebpf.h"
 #include "ebpf_mount.h"
 
-static ebpf_local_maps_t mount_maps[] = {{.name = "tbl_mount", .internal_input = NETDATA_MOUNT_END,
-                                          .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+static ebpf_local_maps_t mount_maps[] = {
+    {.name = "tbl_mount",
+     .internal_input = NETDATA_MOUNT_END,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                          .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
-                                         },
-                                         {.name = NULL, .internal_input = 0, .user_input = 0,
-                                          .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                          .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
-                                         }};
+    }};
 
-static char *mount_dimension_name[NETDATA_EBPF_MOUNT_SYSCALL] = { "mount", "umount" };
+static char *mount_dimension_name[NETDATA_EBPF_MOUNT_SYSCALL] = {"mount", "umount"};
 static netdata_syscall_stat_t mount_aggregated_data[NETDATA_EBPF_MOUNT_SYSCALL];
 static netdata_publish_syscall_t mount_publish_aggregated[NETDATA_EBPF_MOUNT_SYSCALL];
 
@@ -26,9 +31,10 @@ struct config mount_config = APPCONFIG_INITIALIZER;
 
 static netdata_idx_t mount_hash_values[NETDATA_MOUNT_END];
 
-netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
-                                           {.name = "umount", .mode = EBPF_LOAD_TRAMPOLINE},
-                                           {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+netdata_ebpf_targets_t mount_targets[] = {
+    {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = "umount", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #ifdef LIBBPF_MAJOR_VERSION
 /*****************************************************************
@@ -91,23 +97,19 @@ static inline void ebpf_mount_disable_trampoline(struct mount_bpf *obj)
 static inline void netdata_set_trampoline_target(struct mount_bpf *obj)
 {
     char syscall[NETDATA_EBPF_MAX_SYSCALL_LENGTH + 1];
-    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
-                            mount_targets[NETDATA_MOUNT_SYSCALL].name, running_on_kernel);
+    ebpf_select_host_prefix(
+        syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH, mount_targets[NETDATA_MOUNT_SYSCALL].name, running_on_kernel);
 
-    bpf_program__set_attach_target(obj->progs.netdata_mount_fentry, 0,
-                                   syscall);
+    bpf_program__set_attach_target(obj->progs.netdata_mount_fentry, 0, syscall);
 
-    bpf_program__set_attach_target(obj->progs.netdata_mount_fexit, 0,
-                                   syscall);
+    bpf_program__set_attach_target(obj->progs.netdata_mount_fexit, 0, syscall);
 
-    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
-                            mount_targets[NETDATA_UMOUNT_SYSCALL].name, running_on_kernel);
+    ebpf_select_host_prefix(
+        syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH, mount_targets[NETDATA_UMOUNT_SYSCALL].name, running_on_kernel);
 
-    bpf_program__set_attach_target(obj->progs.netdata_umount_fentry, 0,
-                                   syscall);
+    bpf_program__set_attach_target(obj->progs.netdata_umount_fentry, 0, syscall);
 
-    bpf_program__set_attach_target(obj->progs.netdata_umount_fexit, 0,
-                                   syscall);
+    bpf_program__set_attach_target(obj->progs.netdata_umount_fexit, 0, syscall);
 }
 
 /**
@@ -123,32 +125,28 @@ static int ebpf_mount_attach_probe(struct mount_bpf *obj)
 {
     char syscall[NETDATA_EBPF_MAX_SYSCALL_LENGTH + 1];
 
-    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
-                            mount_targets[NETDATA_MOUNT_SYSCALL].name, running_on_kernel);
+    ebpf_select_host_prefix(
+        syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH, mount_targets[NETDATA_MOUNT_SYSCALL].name, running_on_kernel);
 
-    obj->links.netdata_mount_probe = bpf_program__attach_kprobe(obj->progs.netdata_mount_probe,
-                                                                false, syscall);
+    obj->links.netdata_mount_probe = bpf_program__attach_kprobe(obj->progs.netdata_mount_probe, false, syscall);
     int ret = (int)libbpf_get_error(obj->links.netdata_mount_probe);
     if (ret)
         return -1;
 
-    obj->links.netdata_mount_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_mount_retprobe,
-                                                                   true, syscall);
+    obj->links.netdata_mount_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_mount_retprobe, true, syscall);
     ret = (int)libbpf_get_error(obj->links.netdata_mount_retprobe);
     if (ret)
         return -1;
 
-    ebpf_select_host_prefix(syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH,
-                            mount_targets[NETDATA_UMOUNT_SYSCALL].name, running_on_kernel);
+    ebpf_select_host_prefix(
+        syscall, NETDATA_EBPF_MAX_SYSCALL_LENGTH, mount_targets[NETDATA_UMOUNT_SYSCALL].name, running_on_kernel);
 
-    obj->links.netdata_umount_probe = bpf_program__attach_kprobe(obj->progs.netdata_umount_probe,
-                                                                 false, syscall);
+    obj->links.netdata_umount_probe = bpf_program__attach_kprobe(obj->progs.netdata_umount_probe, false, syscall);
     ret = (int)libbpf_get_error(obj->links.netdata_umount_probe);
     if (ret)
         return -1;
 
-    obj->links.netdata_umount_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_umount_retprobe,
-                                                                    true, syscall);
+    obj->links.netdata_umount_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_umount_retprobe, true, syscall);
     ret = (int)libbpf_get_error(obj->links.netdata_umount_retprobe);
     if (ret)
         return -1;
@@ -184,13 +182,12 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
     netdata_ebpf_program_loaded_t test = mt[NETDATA_MOUNT_SYSCALL].mode;
 
     // We are testing only one, because all will have the same behavior
-    if (test == EBPF_LOAD_TRAMPOLINE ) {
+    if (test == EBPF_LOAD_TRAMPOLINE) {
         ebpf_mount_disable_probe(obj);
         ebpf_mount_disable_tracepoint(obj);
 
         netdata_set_trampoline_target(obj);
-    } else if (test == EBPF_LOAD_PROBE ||
-    test == EBPF_LOAD_RETPROBE ) {
+    } else if (test == EBPF_LOAD_PROBE || test == EBPF_LOAD_RETPROBE) {
         ebpf_mount_disable_tracepoint(obj);
         ebpf_mount_disable_trampoline(obj);
     } else {
@@ -202,7 +199,7 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
 
     int ret = mount_bpf__load(obj);
     if (!ret) {
-        if (test != EBPF_LOAD_PROBE && test != EBPF_LOAD_RETPROBE )
+        if (test != EBPF_LOAD_PROBE && test != EBPF_LOAD_RETPROBE)
             ret = mount_bpf__attach(obj);
         else
             ret = ebpf_mount_attach_probe(obj);
@@ -229,27 +226,29 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
  */
 static void ebpf_obsolete_mount_global(ebpf_module_t *em)
 {
-    ebpf_write_chart_obsolete(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
-                              NETDATA_EBPF_MOUNT_CALLS,
-                              "",
-                              "Calls to mount and umount syscalls",
-                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                              NETDATA_EBPF_MOUNT_FAMILY,
-                              NETDATA_EBPF_CHART_TYPE_LINE,
-                              "mount_points.call",
-                              NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
-                              em->update_every);
+    ebpf_write_chart_obsolete(
+        NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
+        NETDATA_EBPF_MOUNT_CALLS,
+        "",
+        "Calls to mount and umount syscalls",
+        EBPF_COMMON_UNITS_CALLS_PER_SEC,
+        NETDATA_EBPF_MOUNT_FAMILY,
+        NETDATA_EBPF_CHART_TYPE_LINE,
+        "mount_points.call",
+        NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
+        em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
-                              NETDATA_EBPF_MOUNT_ERRORS,
-                              "",
-                              "Errors to mount and umount file systems",
-                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                              NETDATA_EBPF_MOUNT_FAMILY,
-                              NETDATA_EBPF_CHART_TYPE_LINE,
-                              "mount_points.error",
-                              NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
-                              em->update_every);
+    ebpf_write_chart_obsolete(
+        NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
+        NETDATA_EBPF_MOUNT_ERRORS,
+        "",
+        "Errors to mount and umount file systems",
+        EBPF_COMMON_UNITS_CALLS_PER_SEC,
+        NETDATA_EBPF_MOUNT_FAMILY,
+        NETDATA_EBPF_CHART_TYPE_LINE,
+        "mount_points.error",
+        NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
+        em->update_every);
 }
 
 /**
@@ -262,7 +261,8 @@ static void ebpf_obsolete_mount_global(ebpf_module_t *em)
 static void ebpf_mount_exit(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!em) return;
+    if (!em)
+        return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -347,11 +347,17 @@ static void ebpf_mount_send_data()
         mount_publish_aggregated[i].nerr = mount_hash_values[j];
     }
 
-    write_count_chart(NETDATA_EBPF_MOUNT_CALLS, NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
-                      mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL);
+    write_count_chart(
+        NETDATA_EBPF_MOUNT_CALLS,
+        NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
+        mount_publish_aggregated,
+        NETDATA_EBPF_MOUNT_SYSCALL);
 
-    write_err_chart(NETDATA_EBPF_MOUNT_ERRORS, NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
-                    mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL);
+    write_err_chart(
+        NETDATA_EBPF_MOUNT_ERRORS,
+        NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
+        mount_publish_aggregated,
+        NETDATA_EBPF_MOUNT_SYSCALL);
 }
 
 /**
@@ -407,25 +413,35 @@ static void mount_collector(ebpf_module_t *em)
  */
 static void ebpf_create_mount_charts(int update_every)
 {
-    ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_CALLS,
-                      "Calls to mount and umount syscalls",
-                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_EBPF_MOUNT_FAMILY,
-                      "mount_points.call",
-                      NETDATA_EBPF_CHART_TYPE_LINE,
-                      NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
-                      ebpf_create_global_dimension,
-                      mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL,
-                      update_every, NETDATA_EBPF_MODULE_NAME_MOUNT);
+    ebpf_create_chart(
+        NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
+        NETDATA_EBPF_MOUNT_CALLS,
+        "Calls to mount and umount syscalls",
+        EBPF_COMMON_UNITS_CALLS_PER_SEC,
+        NETDATA_EBPF_MOUNT_FAMILY,
+        "mount_points.call",
+        NETDATA_EBPF_CHART_TYPE_LINE,
+        NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
+        ebpf_create_global_dimension,
+        mount_publish_aggregated,
+        NETDATA_EBPF_MOUNT_SYSCALL,
+        update_every,
+        NETDATA_EBPF_MODULE_NAME_MOUNT);
 
-    ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_ERRORS,
-                      "Errors to mount and umount file systems",
-                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_EBPF_MOUNT_FAMILY,
-                      "mount_points.error",
-                      NETDATA_EBPF_CHART_TYPE_LINE,
-                      NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
-                      ebpf_create_global_dimension,
-                      mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL,
-                      update_every, NETDATA_EBPF_MODULE_NAME_MOUNT);
+    ebpf_create_chart(
+        NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
+        NETDATA_EBPF_MOUNT_ERRORS,
+        "Errors to mount and umount file systems",
+        EBPF_COMMON_UNITS_CALLS_PER_SEC,
+        NETDATA_EBPF_MOUNT_FAMILY,
+        "mount_points.error",
+        NETDATA_EBPF_CHART_TYPE_LINE,
+        NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
+        ebpf_create_global_dimension,
+        mount_publish_aggregated,
+        NETDATA_EBPF_MOUNT_SYSCALL,
+        update_every,
+        NETDATA_EBPF_MODULE_NAME_MOUNT);
 
     fflush(stdout);
 }
@@ -495,10 +511,15 @@ void *ebpf_mount_thread(void *ptr)
         goto endmount;
     }
 
-    int algorithms[NETDATA_EBPF_MOUNT_SYSCALL] = { NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX };
+    int algorithms[NETDATA_EBPF_MOUNT_SYSCALL] = {NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX};
 
-    ebpf_global_labels(mount_aggregated_data, mount_publish_aggregated, mount_dimension_name, mount_dimension_name,
-                       algorithms, NETDATA_EBPF_MOUNT_SYSCALL);
+    ebpf_global_labels(
+        mount_aggregated_data,
+        mount_publish_aggregated,
+        mount_dimension_name,
+        mount_dimension_name,
+        algorithms,
+        NETDATA_EBPF_MOUNT_SYSCALL);
 
     pthread_mutex_lock(&lock);
     ebpf_create_mount_charts(em->update_every);

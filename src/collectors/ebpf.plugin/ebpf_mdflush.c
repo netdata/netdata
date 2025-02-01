@@ -7,29 +7,25 @@ struct config mdflush_config = APPCONFIG_INITIALIZER;
 
 #define MDFLUSH_MAP_COUNT 0
 static ebpf_local_maps_t mdflush_maps[] = {
-    {
-        .name = "tbl_mdflush",
-        .internal_input = 1024,
-        .user_input = 0,
-        .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    {.name = "tbl_mdflush",
+     .internal_input = 1024,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-        .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
     },
     /* end */
-    {
-        .name = NULL,
-        .internal_input = 0,
-        .user_input = 0,
-        .type = NETDATA_EBPF_MAP_CONTROLLER,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
-    }
-};
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
-netdata_ebpf_targets_t mdflush_targets[] = { {.name = "md_flush_request", .mode = EBPF_LOAD_TRAMPOLINE},
-                                           {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
-
+netdata_ebpf_targets_t mdflush_targets[] = {
+    {.name = "md_flush_request", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 // store for "published" data from the reader thread, which the collector
 // thread will write to netdata agent.
@@ -72,8 +68,8 @@ static inline void ebpf_disable_trampoline(struct mdflush_bpf *obj)
  */
 static void ebpf_set_trampoline_target(struct mdflush_bpf *obj)
 {
-    bpf_program__set_attach_target(obj->progs.netdata_md_flush_request_fentry, 0,
-                                   mdflush_targets[NETDATA_MD_FLUSH_REQUEST].name);
+    bpf_program__set_attach_target(
+        obj->progs.netdata_md_flush_request_fentry, 0, mdflush_targets[NETDATA_MD_FLUSH_REQUEST].name);
 }
 
 /**
@@ -85,9 +81,8 @@ static void ebpf_set_trampoline_target(struct mdflush_bpf *obj)
  */
 static inline int ebpf_load_probes(struct mdflush_bpf *obj)
 {
-    obj->links.netdata_md_flush_request_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_md_flush_request_kprobe,
-                                                                            false,
-                                                                            mdflush_targets[NETDATA_MD_FLUSH_REQUEST].name);
+    obj->links.netdata_md_flush_request_kprobe = bpf_program__attach_kprobe(
+        obj->progs.netdata_md_flush_request_kprobe, false, mdflush_targets[NETDATA_MD_FLUSH_REQUEST].name);
     return libbpf_get_error(obj->links.netdata_md_flush_request_kprobe);
 }
 
@@ -134,16 +129,17 @@ static inline int ebpf_mdflush_load_and_attach(struct mdflush_bpf *obj, ebpf_mod
  */
 static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
 {
-    ebpf_write_chart_obsolete("mdstat",
-                              "mdstat_flush",
-                              "",
-                              "MD flushes",
-                              "flushes",
-                              "flush (eBPF)",
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              "mdstat.mdstat_flush",
-                              NETDATA_CHART_PRIO_MDSTAT_FLUSH,
-                              em->update_every);
+    ebpf_write_chart_obsolete(
+        "mdstat",
+        "mdstat_flush",
+        "",
+        "MD flushes",
+        "flushes",
+        "flush (eBPF)",
+        NETDATA_EBPF_CHART_TYPE_STACKED,
+        "mdstat.mdstat_flush",
+        NETDATA_CHART_PRIO_MDSTAT_FLUSH,
+        em->update_every);
 }
 
 /**
@@ -156,7 +152,8 @@ static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
 static void mdflush_exit(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!em) return;
+    if (!em)
+        return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -196,11 +193,9 @@ static int mdflush_val_cmp(void *a, void *b)
 
     if (ptr1->unit > ptr2->unit) {
         return 1;
-    }
-    else if (ptr1->unit < ptr2->unit) {
+    } else if (ptr1->unit < ptr2->unit) {
         return -1;
-    }
-    else {
+    } else {
         return 0;
     }
 }
@@ -244,10 +239,7 @@ static void mdflush_read_count_map(int maps_per_core)
         // there is no congestion.
         bool v_is_new = false;
         search_v.unit = key;
-        v = (netdata_mdflush_t *)avl_search_lock(
-            &mdflush_pub,
-            (avl_t *)&search_v
-        );
+        v = (netdata_mdflush_t *)avl_search_lock(&mdflush_pub, (avl_t *)&search_v);
         if (unlikely(v == NULL)) {
             // flush count can only be added reliably at a later time.
             // when they're added, only then will we AVL insert.
@@ -291,9 +283,11 @@ static void mdflush_create_charts(int update_every)
         "mdstat.mdstat_flush",
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_MDSTAT_FLUSH,
-        NULL, NULL, 0, update_every,
-        NETDATA_EBPF_MODULE_NAME_MDFLUSH
-    );
+        NULL,
+        NULL,
+        0,
+        update_every,
+        NETDATA_EBPF_MODULE_NAME_MDFLUSH);
 
     fflush(stdout);
 }
@@ -307,10 +301,7 @@ static int mdflush_write_dims(void *entry, void *data)
 
     // records get dynamically added in, so add the dim if we haven't yet.
     if (!v->dim_exists) {
-        ebpf_write_global_dimension(
-            v->disk_name, v->disk_name,
-            ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]
-        );
+        ebpf_write_global_dimension(v->disk_name, v->disk_name, ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
         v->dim_exists = true;
     }
 
@@ -411,7 +402,6 @@ static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
 
     return ret;
 }
-
 
 /**
  * mdflush thread.

@@ -5,7 +5,8 @@
 
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SYNC "sync"
-#define NETDATA_EBPF_SYNC_MODULE_DESC "Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2)."
+#define NETDATA_EBPF_SYNC_MODULE_DESC                                                                                  \
+    "Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2)."
 
 // charts
 #define NETDATA_EBPF_SYNC_CHART "sync"
@@ -14,12 +15,12 @@
 #define NETDATA_EBPF_FILE_SEGMENT_CHART "file_segment"
 #define NETDATA_EBPF_SYNC_SUBMENU "synchronization (eBPF)"
 
-#define NETDATA_SYSCALLS_SYNC   "sync"
+#define NETDATA_SYSCALLS_SYNC "sync"
 #define NETDATA_SYSCALLS_SYNCFS "syncfs"
-#define NETDATA_SYSCALLS_MSYNC  "msync"
-#define NETDATA_SYSCALLS_FSYNC  "fsync"
-#define NETDATA_SYSCALLS_FDATASYNC  "fdatasync"
-#define NETDATA_SYSCALLS_SYNC_FILE_RANGE  "sync_file_range"
+#define NETDATA_SYSCALLS_MSYNC "msync"
+#define NETDATA_SYSCALLS_FSYNC "fsync"
+#define NETDATA_SYSCALLS_FDATASYNC "fdatasync"
+#define NETDATA_SYSCALLS_SYNC_FILE_RANGE "sync_file_range"
 
 #define NETDATA_EBPF_SYNC_SLEEP_MS 800000ULL
 
@@ -45,9 +46,7 @@ enum netdata_sync_charts {
     NETDATA_SYNC_END
 };
 
-enum netdata_sync_table {
-    NETDATA_SYNC_GLOBAL_TABLE
-};
+enum netdata_sync_table { NETDATA_SYNC_GLOBAL_TABLE };
 
 void *ebpf_sync_thread(void *ptr);
 extern struct config sync_config;
