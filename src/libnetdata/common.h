@@ -340,12 +340,14 @@ typedef uint32_t uid_t;
 #define ALWAYS_INLINE_ONLY __attribute__((always_inline))
 #define ALWAYS_INLINE inline __attribute__((always_inline))             // Forces inlining
 #define ALWAYS_INLINE_HOT inline __attribute__((hot, always_inline))    // Encourages optimization and forces inlining
+#define ALWAYS_INLINE_HOT_FLATTEN inline __attribute__((hot, always_inline, flatten))    // Encourages optimization and forces inlining and flattening
 #define NOT_INLINE_HOT __attribute__((hot))                             // Encourages optimization but doesn’t force inlining.
 #else
 #define UNUSED_FUNCTION(x) UNUSED_##x
 #define ALWAYS_INLINE_ONLY
 #define ALWAYS_INLINE inline
-#define ALWAYS_INLINE_HOT
+#define ALWAYS_INLINE_HOT inline
+#define ALWAYS_INLINE_HOT_FLATTEN inline
 #define NOT_INLINE_HOT
 #endif
 

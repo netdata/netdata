@@ -884,7 +884,8 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
 // data collection
 
 // returns additional memory that may have been allocated to store this point
-ALWAYS_INLINE_HOT size_t pgd_append_point(
+ALWAYS_INLINE_HOT_FLATTEN
+size_t pgd_append_point(
     PGD *pg,
     usec_t point_in_time_ut __maybe_unused,
     NETDATA_DOUBLE n,
@@ -1038,7 +1039,8 @@ void pgdc_reset(PGDC *pgdc, PGD *pgd, uint32_t position)
     pgdc_seek(pgdc, position);
 }
 
-ALWAYS_INLINE_HOT bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, STORAGE_POINT *sp)
+ALWAYS_INLINE_HOT_FLATTEN
+bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, STORAGE_POINT *sp)
 {
     if (!pgdc->pgd || pgdc->pgd == PGD_EMPTY || pgdc->position >= pgdc->slots)
     {
