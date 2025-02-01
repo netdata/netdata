@@ -955,7 +955,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
 
         nd_poll_event_t wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
         if(unlikely(rpt->thread.wanted != wanted)) {
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM RCV[%zu] '%s' [from %s]: nd_poll() wanted events mismatch.",
                    sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);
 
