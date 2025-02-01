@@ -41,6 +41,72 @@ static void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl, unsi
 #endif
 
     do {
+        char *err_code;
+        switch (err) {
+            case SSL_ERROR_SSL:
+                err_code = "SSL_ERROR_SSL";
+                ssl->state = NETDATA_SSL_STATE_FAILED;
+                break;
+
+            case SSL_ERROR_WANT_READ:
+                err_code = "SSL_ERROR_WANT_READ";
+                break;
+
+            case SSL_ERROR_WANT_WRITE:
+                err_code = "SSL_ERROR_WANT_WRITE";
+                break;
+
+            case SSL_ERROR_WANT_X509_LOOKUP:
+                err_code = "SSL_ERROR_WANT_X509_LOOKUP";
+                break;
+
+            case SSL_ERROR_SYSCALL:
+                err_code = "SSL_ERROR_SYSCALL";
+                ssl->state = NETDATA_SSL_STATE_FAILED;
+                break;
+
+            case SSL_ERROR_ZERO_RETURN:
+                err_code = "SSL_ERROR_ZERO_RETURN";
+                ssl->state = NETDATA_SSL_STATE_FAILED;
+                break;
+
+            case SSL_ERROR_WANT_CONNECT:
+                err_code = "SSL_ERROR_WANT_CONNECT";
+                break;
+
+            case SSL_ERROR_WANT_ACCEPT:
+                err_code = "SSL_ERROR_WANT_ACCEPT";
+                break;
+
+#ifdef SSL_ERROR_WANT_ASYNC
+            case SSL_ERROR_WANT_ASYNC:
+                err_code = "SSL_ERROR_WANT_ASYNC";
+                break;
+#endif
+
+#ifdef SSL_ERROR_WANT_ASYNC_JOB
+            case SSL_ERROR_WANT_ASYNC_JOB:
+                err_code = "SSL_ERROR_WANT_ASYNC_JOB";
+                break;
+#endif
+
+#ifdef SSL_ERROR_WANT_CLIENT_HELLO_CB
+            case SSL_ERROR_WANT_CLIENT_HELLO_CB:
+                err_code = "SSL_ERROR_WANT_CLIENT_HELLO_CB";
+                break;
+#endif
+
+#ifdef SSL_ERROR_WANT_RETRY_VERIFY
+            case SSL_ERROR_WANT_RETRY_VERIFY:
+                err_code = "SSL_ERROR_WANT_RETRY_VERIFY";
+                break;
+#endif
+
+            default:
+                err_code = "SSL_ERROR_UNKNOWN";
+                break;
+        }
+
         const char *reason = ERR_reason_error_string(err);
         int reason_code = ERR_GET_REASON(err);
 
@@ -57,15 +123,20 @@ static void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl, unsi
         }
 
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "SSL ERROR: %s() on socket local [[%s]:%d] <-> remote [[%s]:%d], "
-                     "State: %s, Cipher: %s, ALPN: %.*s, OpenSSL error: [%lu] %s "
-                     "(Reason Code: %d, Reason: %s), Alert Type: %s, Alert Description: %s",
+                     "SSL ERROR: %s() on socket "
+                     "local [[%s]:%d] <-> remote [[%s]:%d], "
+                     "State [%s], Cipher: [%s], ALPN: [%.*s], "
+                     "Error [%lu, %s, %s], "
+                     "Reason [%d, %s], "
+                     "Alert [%s, %s], "
+                     "Errno [%d]",
                      call,
                      peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port,
-                     ssl_state, cipher,
-                     (int)alpn_len, alpn_proto ? alpn_proto : "None",
-                     err, err_str, reason_code, reason ? reason : "Unknown",
-                     alert_type, alert_desc);
+                     ssl_state, cipher, (int)alpn_len, alpn_proto ? alpn_proto : "None",
+                     err, err_code, err_str,
+                     reason_code, reason ? reason : "Unknown",
+                     alert_type, alert_desc,
+                     errno);
 
     } while ((err = ERR_get_error()));
 }
