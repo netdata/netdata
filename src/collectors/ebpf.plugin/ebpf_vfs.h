@@ -5,7 +5,8 @@
 
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_VFS "vfs"
-#define NETDATA_EBPF_VFS_MODULE_DESC "Monitor VFS (Virtual File System) functions. This thread is integrated with apps and cgroup."
+#define NETDATA_EBPF_VFS_MODULE_DESC                                                                                   \
+    "Monitor VFS (Virtual File System) functions. This thread is integrated with apps and cgroup."
 
 #define NETDATA_DIRECTORY_VFS_CONFIG_FILE "vfs.conf"
 
@@ -150,11 +151,7 @@ enum vfs_counters {
     NETDATA_VFS_COUNTER
 };
 
-enum netdata_vfs_tables {
-    NETDATA_VFS_PID,
-    NETDATA_VFS_ALL,
-    NETDATA_VFS_CTRL
-};
+enum netdata_vfs_tables { NETDATA_VFS_PID, NETDATA_VFS_ALL, NETDATA_VFS_CTRL };
 
 enum netdata_vfs_calls_name {
     NETDATA_EBPF_VFS_WRITE,
