@@ -93,7 +93,8 @@ struct web_service {
     COUNTER_DATA IISRequestsOther;
 };
 
-static inline void initialize_web_service_keys(struct web_service *p) {
+static inline void initialize_web_service_keys(struct web_service *p)
+{
     p->IISCurrentAnonymousUser.key = "Current Anonymous Users";
     p->IISCurrentNonAnonymousUsers.key = "Current NonAnonymous Users";
     p->IISCurrentConnections.key = "Current Connections";
@@ -128,21 +129,24 @@ static inline void initialize_web_service_keys(struct web_service *p) {
     p->IISRequestsOther.key = "Other Request Methods/sec";
 }
 
-void dict_web_service_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void dict_web_service_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     struct web_service *p = value;
     initialize_web_service_keys(p);
 }
 
 static DICTIONARY *web_services = NULL;
 
-static void initialize(void) {
+static void initialize(void)
+{
     web_services = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct web_service));
 
     dictionary_register_insert_callback(web_services, dict_web_service_insert_cb, NULL);
 }
 
-static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
+static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
+{
     char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Web Service");
     if (!pObjectType)
@@ -215,7 +219,8 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                p->rd_files_received = rrddim_add(p->st_file_transfer, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_files_received =
+                    rrddim_add(p->st_file_transfer, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 p->rd_files_sent = rrddim_add(p->st_file_transfer, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rrdlabels_add(p->st_file_transfer->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
@@ -246,7 +251,8 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                p->rd_curr_connections = rrddim_add(p->st_curr_connections, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_curr_connections =
+                    rrddim_add(p->st_curr_connections, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rrdlabels_add(p->st_curr_connections->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
@@ -555,24 +561,41 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                     update_every,
                     RRDSET_TYPE_STACKED);
 
-                p->rd_request_options_rate = rrddim_add(p->st_request_by_type_rate, "options", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_get_rate = rrddim_add(p->st_request_by_type_rate, "get", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_post_rate = rrddim_add(p->st_request_by_type_rate, "post", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_head_rate = rrddim_add(p->st_request_by_type_rate, "head", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_put_rate = rrddim_add(p->st_request_by_type_rate, "put", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_delete_rate = rrddim_add(p->st_request_by_type_rate, "delete", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_trace_rate = rrddim_add(p->st_request_by_type_rate, "trace", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_move_rate = rrddim_add(p->st_request_by_type_rate, "move", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_copy_rate = rrddim_add(p->st_request_by_type_rate, "copy", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_mkcol_rate = rrddim_add(p->st_request_by_type_rate, "mkcol", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_propfind_rate = rrddim_add(p->st_request_by_type_rate, "propfind", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_proppatch_rate = rrddim_add(p->st_request_by_type_rate, "proppatch", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_search_rate = rrddim_add(p->st_request_by_type_rate, "search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_lock_rate = rrddim_add(p->st_request_by_type_rate, "lock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_unlock_rate = rrddim_add(p->st_request_by_type_rate, "unlock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_request_other_rate = rrddim_add(p->st_request_by_type_rate, "other", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_options_rate =
+                    rrddim_add(p->st_request_by_type_rate, "options", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_get_rate =
+                    rrddim_add(p->st_request_by_type_rate, "get", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_post_rate =
+                    rrddim_add(p->st_request_by_type_rate, "post", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_head_rate =
+                    rrddim_add(p->st_request_by_type_rate, "head", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_put_rate =
+                    rrddim_add(p->st_request_by_type_rate, "put", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_delete_rate =
+                    rrddim_add(p->st_request_by_type_rate, "delete", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_trace_rate =
+                    rrddim_add(p->st_request_by_type_rate, "trace", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_move_rate =
+                    rrddim_add(p->st_request_by_type_rate, "move", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_copy_rate =
+                    rrddim_add(p->st_request_by_type_rate, "copy", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_mkcol_rate =
+                    rrddim_add(p->st_request_by_type_rate, "mkcol", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_propfind_rate =
+                    rrddim_add(p->st_request_by_type_rate, "propfind", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_proppatch_rate =
+                    rrddim_add(p->st_request_by_type_rate, "proppatch", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_search_rate =
+                    rrddim_add(p->st_request_by_type_rate, "search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_lock_rate =
+                    rrddim_add(p->st_request_by_type_rate, "lock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_unlock_rate =
+                    rrddim_add(p->st_request_by_type_rate, "unlock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_request_other_rate =
+                    rrddim_add(p->st_request_by_type_rate, "other", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                rrdlabels_add(p->st_request_by_type_rate->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(
+                    p->st_request_by_type_rate->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
             rrddim_set_by_pointer(
@@ -580,21 +603,13 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                 p->rd_request_options_rate,
                 (collected_number)p->IISRequestsOptions.current.Data);
             rrddim_set_by_pointer(
-                p->st_request_by_type_rate,
-                p->rd_request_get_rate,
-                (collected_number)p->IISRequestsGet.current.Data);
+                p->st_request_by_type_rate, p->rd_request_get_rate, (collected_number)p->IISRequestsGet.current.Data);
             rrddim_set_by_pointer(
-                p->st_request_by_type_rate,
-                p->rd_request_post_rate,
-                (collected_number)p->IISRequestsPost.current.Data);
+                p->st_request_by_type_rate, p->rd_request_post_rate, (collected_number)p->IISRequestsPost.current.Data);
             rrddim_set_by_pointer(
-                p->st_request_by_type_rate,
-                p->rd_request_head_rate,
-                (collected_number)p->IISRequestsHead.current.Data);
+                p->st_request_by_type_rate, p->rd_request_head_rate, (collected_number)p->IISRequestsHead.current.Data);
             rrddim_set_by_pointer(
-                p->st_request_by_type_rate,
-                p->rd_request_put_rate,
-                (collected_number)p->IISRequestsPut.current.Data);
+                p->st_request_by_type_rate, p->rd_request_put_rate, (collected_number)p->IISRequestsPut.current.Data);
             rrddim_set_by_pointer(
                 p->st_request_by_type_rate,
                 p->rd_request_delete_rate,
@@ -604,13 +619,9 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                 p->rd_request_trace_rate,
                 (collected_number)p->IISRequestsTrace.current.Data);
             rrddim_set_by_pointer(
-                p->st_request_by_type_rate,
-                p->rd_request_move_rate,
-                (collected_number)p->IISRequestsMove.current.Data);
+                p->st_request_by_type_rate, p->rd_request_move_rate, (collected_number)p->IISRequestsMove.current.Data);
             rrddim_set_by_pointer(
-                p->st_request_by_type_rate,
-                p->rd_request_copy_rate,
-                (collected_number)p->IISRequestsCopy.current.Data);
+                p->st_request_by_type_rate, p->rd_request_copy_rate, (collected_number)p->IISRequestsCopy.current.Data);
             rrddim_set_by_pointer(
                 p->st_request_by_type_rate,
                 p->rd_request_mkcol_rate,
@@ -628,9 +639,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                 p->rd_request_search_rate,
                 (collected_number)p->IISRequestsSearch.current.Data);
             rrddim_set_by_pointer(
-                p->st_request_by_type_rate,
-                p->rd_request_lock_rate,
-                (collected_number)p->IISRequestsLock.current.Data);
+                p->st_request_by_type_rate, p->rd_request_lock_rate, (collected_number)p->IISRequestsLock.current.Data);
             rrddim_set_by_pointer(
                 p->st_request_by_type_rate,
                 p->rd_request_unlock_rate,
@@ -647,7 +656,8 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     return true;
 }
 
-int do_PerflibWebService(int update_every, usec_t dt __maybe_unused) {
+int do_PerflibWebService(int update_every, usec_t dt __maybe_unused)
+{
     static bool initialized = false;
 
     if (unlikely(!initialized)) {
