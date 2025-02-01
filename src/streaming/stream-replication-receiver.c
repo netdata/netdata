@@ -259,3 +259,23 @@ bool replicate_chart_request(send_command callback, struct parser *parser, RRDHO
     return send_replay_chart_cmd(&r, "OK", false);
 }
 
+ALWAYS_INLINE bool stream_parse_enable_streaming(const char *start_streaming_txt) {
+    bool start_streaming;
+
+    if(unlikely(!start_streaming_txt || !*start_streaming_txt)) {
+        start_streaming = false;
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "REPLAY: malformed start_streaming boolean value empty");
+    }
+    else if(likely(strcmp(start_streaming_txt, "false") == 0))
+        start_streaming = false;
+    else if(likely(strcmp(start_streaming_txt, "true") == 0))
+        start_streaming = true;
+    else {
+        start_streaming = false;
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "REPLAY: malformed start_streaming boolean value '%s'", start_streaming_txt);
+    }
+
+    return start_streaming;
+}
