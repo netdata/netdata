@@ -24,88 +24,53 @@ static SOCKET_PEERS netdata_ssl_peers(NETDATA_SSL *ssl) {
 static void netdata_ssl_log_error_queue(const char *call, NETDATA_SSL *ssl, unsigned long err) {
     nd_log_limit_static_thread_var(erl, 1, 0);
 
-    if(err == SSL_ERROR_NONE)
+    if (err == SSL_ERROR_NONE)
         err = ERR_get_error();
 
-    if(err == SSL_ERROR_NONE)
+    if (err == SSL_ERROR_NONE)
         return;
 
+    SOCKET_PEERS peers = netdata_ssl_peers(ssl);
+    const char *ssl_state = ssl->conn ? SSL_state_string_long(ssl->conn) : "No SSL connection";
+    const char *cipher = ssl->conn ? SSL_get_cipher(ssl->conn) : "Unknown";
+    const char *alpn_proto = NULL;
+    unsigned int alpn_len = 0;
+
+#ifdef OPENSSL_NPN_NEGOTIATED
+    SSL_get0_alpn_selected(ssl->conn, (const unsigned char **)&alpn_proto, &alpn_len);
+#endif
+
     do {
-        char *code;
+        const char *reason = ERR_reason_error_string(err);
+        int reason_code = ERR_GET_REASON(err);
 
-        switch (err) {
-            case SSL_ERROR_SSL:
-                code = "SSL_ERROR_SSL";
-                ssl->state = NETDATA_SSL_STATE_FAILED;
-                break;
+        char err_str[1024 + 1];
+        ERR_error_string_n(err, err_str, 1024);
 
-            case SSL_ERROR_WANT_READ:
-                code = "SSL_ERROR_WANT_READ";
-                break;
-
-            case SSL_ERROR_WANT_WRITE:
-                code = "SSL_ERROR_WANT_WRITE";
-                break;
-
-            case SSL_ERROR_WANT_X509_LOOKUP:
-                code = "SSL_ERROR_WANT_X509_LOOKUP";
-                break;
-
-            case SSL_ERROR_SYSCALL:
-                code = "SSL_ERROR_SYSCALL";
-                ssl->state = NETDATA_SSL_STATE_FAILED;
-                break;
-
-            case SSL_ERROR_ZERO_RETURN:
-                code = "SSL_ERROR_ZERO_RETURN";
-                break;
-
-            case SSL_ERROR_WANT_CONNECT:
-                code = "SSL_ERROR_WANT_CONNECT";
-                break;
-
-            case SSL_ERROR_WANT_ACCEPT:
-                code = "SSL_ERROR_WANT_ACCEPT";
-                break;
-
-#ifdef SSL_ERROR_WANT_ASYNC
-            case SSL_ERROR_WANT_ASYNC:
-                code = "SSL_ERROR_WANT_ASYNC";
-                break;
-#endif
-
-#ifdef SSL_ERROR_WANT_ASYNC_JOB
-            case SSL_ERROR_WANT_ASYNC_JOB:
-                code = "SSL_ERROR_WANT_ASYNC_JOB";
-                break;
-#endif
-
-#ifdef SSL_ERROR_WANT_CLIENT_HELLO_CB
-            case SSL_ERROR_WANT_CLIENT_HELLO_CB:
-                code = "SSL_ERROR_WANT_CLIENT_HELLO_CB";
-                break;
-#endif
-
-#ifdef SSL_ERROR_WANT_RETRY_VERIFY
-            case SSL_ERROR_WANT_RETRY_VERIFY:
-                code = "SSL_ERROR_WANT_RETRY_VERIFY";
-                break;
-#endif
-
-            default:
-                code = "SSL_ERROR_UNKNOWN";
-                break;
+        // Detect TLS Alert
+        const char *alert_type = NULL;
+        const char *alert_desc = NULL;
+#ifdef SSL_CB_ALERT
+        if (err == SSL_ERROR_SSL) {  // Alerts are part of protocol errors
+            alert_type = SSL_alert_type_string_long(err);
+            alert_desc = SSL_alert_desc_string_long(err);
         }
+#endif
 
-        char str[1024 + 1];
-        ERR_error_string_n(err, str, 1024);
-        str[1024] = '\0';
-        SOCKET_PEERS peers = netdata_ssl_peers(ssl);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "SSL: %s() on socket local [[%s]:%d] <-> remote [[%s]:%d], returned error %lu (%s): %s",
-                     call, peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port, err, code, str);
+                     "SSL ERROR: %s() on socket local [[%s]:%d] <-> remote [[%s]:%d], "
+                     "State: %s, Cipher: %s, ALPN: %.*s, OpenSSL error: [%lu] %s "
+                     "(Reason Code: %d, Reason: %s)%s%s%s",
+                     call,
+                     peers.local.ip, peers.local.port, peers.peer.ip, peers.peer.port,
+                     ssl_state, cipher,
+                     (int)alpn_len, alpn_proto ? alpn_proto : "None",
+                     err, err_str, reason_code, reason ? reason : "Unknown",
+                     alert_type ? ", Alert Type: " : "",
+                     alert_type ? alert_type : "",
+                     alert_desc ? alert_desc : "");
 
-    } while((err = ERR_get_error()));
+    } while ((err = ERR_get_error()));
 }
 
 bool netdata_ssl_open_ext(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd, const unsigned char *alpn_protos, unsigned int alpn_protos_len) {

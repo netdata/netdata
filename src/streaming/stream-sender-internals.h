@@ -106,7 +106,7 @@ struct sender_state {
         FILE *fp;
     } log;
 #endif
-    
+
     char remote_ip[CONNECTED_TO_SIZE + 1];      // We don't know which proxy we connect to, passed back from socket.c
 };
 
