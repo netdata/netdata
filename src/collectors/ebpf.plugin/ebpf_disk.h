@@ -16,8 +16,8 @@
 #define NETDATA_DISK_CONFIG_FILE "disk.conf"
 
 // Decode function extracted from: https://elixir.bootlin.com/linux/v5.10.8/source/include/linux/kdev_t.h#L7
-#define MINORBITS       20
-#define MKDEV(ma,mi)    (((ma) << MINORBITS) | (mi))
+#define MINORBITS 20
+#define MKDEV(ma, mi) (((ma) << MINORBITS) | (mi))
 
 enum netdata_latency_disks_flags {
     NETDATA_DISK_NONE = 0,
@@ -75,4 +75,3 @@ extern struct config disk_config;
 void *ebpf_disk_thread(void *ptr);
 
 #endif /* NETDATA_EBPF_DISK_H */
-

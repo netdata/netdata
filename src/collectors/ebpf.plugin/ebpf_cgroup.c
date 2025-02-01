@@ -26,9 +26,10 @@ static inline void *ebpf_cgroup_map_shm_locally(int fd, size_t length)
 {
     void *value;
 
-    value =  nd_mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    value = nd_mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (!value) {
-        netdata_log_error("Cannot map shared memory used between eBPF and cgroup, integration between processes won't happen");
+        netdata_log_error(
+            "Cannot map shared memory used between eBPF and cgroup, integration between processes won't happen");
         close(shm_fd_ebpf_cgroup);
         shm_fd_ebpf_cgroup = -1;
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
@@ -78,14 +79,14 @@ void ebpf_map_cgroup_shared_memory()
     }
 
     // Map only header
-    void *mapped = (netdata_ebpf_cgroup_shm_header_t *) ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup,
-                                                                                   sizeof(netdata_ebpf_cgroup_shm_header_t));
+    void *mapped = (netdata_ebpf_cgroup_shm_header_t *)ebpf_cgroup_map_shm_locally(
+        shm_fd_ebpf_cgroup, sizeof(netdata_ebpf_cgroup_shm_header_t));
     if (unlikely(mapped == SEM_FAILED)) {
         return;
     }
     netdata_ebpf_cgroup_shm_header_t *header = mapped;
 
-    size_t length =  header->body_length;
+    size_t length = header->body_length;
 
     nd_munmap(header, sizeof(netdata_ebpf_cgroup_shm_header_t));
 
@@ -191,7 +192,7 @@ static inline void ebpf_cgroup_set_target_data(ebpf_cgroup_target_t *out, netdat
  *
  * @return It returns a pointer for the structure associated with the input.
  */
-static ebpf_cgroup_target_t * ebpf_cgroup_find_or_create(netdata_ebpf_cgroup_shm_body_t *ptr)
+static ebpf_cgroup_target_t *ebpf_cgroup_find_or_create(netdata_ebpf_cgroup_shm_body_t *ptr)
 {
     ebpf_cgroup_target_t *ect, *prev;
     for (ect = ebpf_cgroup_pids, prev = ebpf_cgroup_pids; ect; prev = ect, ect = ect->next) {
@@ -232,7 +233,7 @@ static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
         return;
 
     size_t lines = procfile_lines(ff), l;
-    for (l = 0; l < lines ;l++) {
+    for (l = 0; l < lines; l++) {
         int pid = (int)str2l(procfile_lineword(ff, l, 0));
         if (pid) {
             struct pid_on_target2 *pt, *prev;
@@ -261,12 +262,12 @@ static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
  * Set variable remove. If this variable is not reset, the structure will be removed from link list.
  */
 void ebpf_reset_updated_var()
- {
-     ebpf_cgroup_target_t *ect;
-     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-         ect->updated = 0;
-     }
- }
+{
+    ebpf_cgroup_target_t *ect;
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        ect->updated = 0;
+    }
+}
 
 /**
  * Parse cgroup shared memory
@@ -294,7 +295,7 @@ void ebpf_parse_cgroup_shm_data()
     for (i = 0; i < end; i++) {
         netdata_ebpf_cgroup_shm_body_t *ptr = &shm_ebpf_cgroup.body[i];
         if (ptr->enabled) {
-            ebpf_cgroup_target_t *ect =  ebpf_cgroup_find_or_create(ptr);
+            ebpf_cgroup_target_t *ect = ebpf_cgroup_find_or_create(ptr);
             ebpf_update_pid_link_list(ect, ptr->path);
         }
     }
@@ -303,8 +304,11 @@ void ebpf_parse_cgroup_shm_data()
     sem_post(shm_sem_ebpf_cgroup);
     pthread_mutex_unlock(&mutex_cgroup_shm);
 #ifdef NETDATA_DEV_MODE
-    netdata_log_info("Updating cgroup %d (Previous: %d, Current: %d)",
-         send_cgroup_chart, previous, shm_ebpf_cgroup.header->cgroup_root_count);
+    netdata_log_info(
+        "Updating cgroup %d (Previous: %d, Current: %d)",
+        send_cgroup_chart,
+        previous,
+        shm_ebpf_cgroup.header->cgroup_root_count);
 #endif
 
     sem_post(shm_sem_ebpf_cgroup);
@@ -329,17 +333,18 @@ void ebpf_parse_cgroup_shm_data()
  */
 void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart)
 {
-    ebpf_write_chart_cmd(chart->id,
-                         chart->suffix,
-                         "",
-                         chart->title,
-                         chart->units,
-                         chart->family,
-                         chart->charttype,
-                         chart->context,
-                         chart->order,
-                         chart->update_every,
-                         chart->module);
+    ebpf_write_chart_cmd(
+        chart->id,
+        chart->suffix,
+        "",
+        chart->title,
+        chart->units,
+        chart->family,
+        chart->charttype,
+        chart->context,
+        chart->order,
+        chart->update_every,
+        chart->module);
     char service_name[512];
     snprintfz(service_name, 511, "%s", (!strstr(chart->id, "systemd_")) ? chart->id : (chart->id + 8));
     ebpf_create_chart_labels("service_name", service_name, RRDLABEL_SRC_AUTO);
@@ -382,7 +387,7 @@ void *ebpf_cgroup_integration(void *ptr __maybe_unused)
 
         // We are using a small heartbeat time to wake up thread,
         // but we should not update so frequently the shared memory data
-        if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
+        if (++counter >= NETDATA_EBPF_CGROUP_UPDATE) {
             counter = 0;
             if (!shm_ebpf_cgroup.header)
                 ebpf_map_cgroup_shared_memory();

@@ -5,7 +5,8 @@
 
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_CACHESTAT "cachestat"
-#define NETDATA_EBPF_CACHESTAT_MODULE_DESC "Monitor Linux page cache internal functions. This thread is integrated with apps and cgroup."
+#define NETDATA_EBPF_CACHESTAT_MODULE_DESC                                                                             \
+    "Monitor Linux page cache internal functions. This thread is integrated with apps and cgroup."
 
 // charts
 #define NETDATA_CACHESTAT_HIT_RATIO_CHART "cachestat_ratio"
@@ -63,11 +64,7 @@ enum cachestat_indexes {
     NETDATA_CACHESTAT_IDX_MISS
 };
 
-enum cachestat_tables {
-    NETDATA_CACHESTAT_GLOBAL_STATS,
-    NETDATA_CACHESTAT_PID_STATS,
-    NETDATA_CACHESTAT_CTRL
-};
+enum cachestat_tables { NETDATA_CACHESTAT_GLOBAL_STATS, NETDATA_CACHESTAT_PID_STATS, NETDATA_CACHESTAT_CTRL };
 
 typedef struct __attribute__((packed)) netdata_cachestat {
     uint32_t add_to_page_cache_lru;

@@ -7,7 +7,8 @@
 
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_DCSTAT "dcstat"
-#define NETDATA_EBPF_DC_MODULE_DESC "Monitor file access using directory cache. This thread is integrated with apps and cgroup."
+#define NETDATA_EBPF_DC_MODULE_DESC                                                                                    \
+    "Monitor file access using directory cache. This thread is integrated with apps and cgroup."
 
 // charts
 #define NETDATA_DC_HIT_CHART "dc_hit_ratio"
@@ -50,11 +51,7 @@ enum directory_cache_indexes {
     NETDATA_DCSTAT_IDX_END
 };
 
-enum directory_cache_tables {
-    NETDATA_DCSTAT_GLOBAL_STATS,
-    NETDATA_DCSTAT_PID_STATS,
-    NETDATA_DCSTAT_CTRL
-};
+enum directory_cache_tables { NETDATA_DCSTAT_GLOBAL_STATS, NETDATA_DCSTAT_PID_STATS, NETDATA_DCSTAT_CTRL };
 
 // variables
 enum directory_cache_counters {
@@ -66,10 +63,7 @@ enum directory_cache_counters {
     NETDATA_DIRECTORY_CACHE_END
 };
 
-enum directory_cache_targets {
-    NETDATA_DC_TARGET_LOOKUP_FAST,
-    NETDATA_DC_TARGET_D_LOOKUP
-};
+enum directory_cache_targets { NETDATA_DC_TARGET_LOOKUP_FAST, NETDATA_DC_TARGET_D_LOOKUP };
 
 typedef struct __attribute__((packed)) netdata_publish_dcstat_pid {
     uint64_t cache_access;
