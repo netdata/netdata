@@ -25,9 +25,7 @@ enum mount_counters {
     NETDATA_MOUNT_END
 };
 
-enum mount_tables {
-    NETDATA_KEY_MOUNT_TABLE
-};
+enum mount_tables { NETDATA_KEY_MOUNT_TABLE };
 
 enum netdata_mount_syscalls {
     NETDATA_MOUNT_SYSCALL,
