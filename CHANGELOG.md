@@ -2,14 +2,24 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.3...HEAD)
 
 **Merged pull requests:**
 
+- fix\(go.d/mysql\): fix typo in test name [\#19550](https://github.com/netdata/netdata/pull/19550) ([arkamar](https://github.com/arkamar))
+- fix\(go.d/mysql\): don't collect global variables on every iteration [\#19549](https://github.com/netdata/netdata/pull/19549) ([arkamar](https://github.com/arkamar))
+- Regenerate integrations docs [\#19548](https://github.com/netdata/netdata/pull/19548) ([netdatabot](https://github.com/netdatabot))
+- Fix cloud connect after claim [\#19547](https://github.com/netdata/netdata/pull/19547) ([stelfrag](https://github.com/stelfrag))
+- virtual hosts now get hops = 1 [\#19546](https://github.com/netdata/netdata/pull/19546) ([ktsaou](https://github.com/ktsaou))
+- chore: remove old dashboard leftovers [\#19545](https://github.com/netdata/netdata/pull/19545) ([ilyam8](https://github.com/ilyam8))
+- chore\(windows.plugin\): format perflib ad and netframework [\#19544](https://github.com/netdata/netdata/pull/19544) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19541](https://github.com/netdata/netdata/pull/19541) ([netdatabot](https://github.com/netdatabot))
+- Use database/rrd.h instead of daemon/common.h [\#19540](https://github.com/netdata/netdata/pull/19540) ([vkalintiris](https://github.com/vkalintiris))
 - allow dbengine to read at offsets above 4GiB - again [\#19539](https://github.com/netdata/netdata/pull/19539) ([ktsaou](https://github.com/ktsaou))
 - allow dbengine to read at offsets above 4GiB [\#19538](https://github.com/netdata/netdata/pull/19538) ([ktsaou](https://github.com/ktsaou))
 - Fix contexts stay not-live when children reconnect [\#19536](https://github.com/netdata/netdata/pull/19536) ([ktsaou](https://github.com/ktsaou))
 - Fix coverity issue [\#19535](https://github.com/netdata/netdata/pull/19535) ([stelfrag](https://github.com/stelfrag))
+- Actually handle the `-fexceptions` requirement correctly in our build system. [\#19534](https://github.com/netdata/netdata/pull/19534) ([Ferroin](https://github.com/Ferroin))
 - fix heap use after free [\#19532](https://github.com/netdata/netdata/pull/19532) ([ktsaou](https://github.com/ktsaou))
 - docs\(web/gui\): remove info about old dashboard from readme [\#19531](https://github.com/netdata/netdata/pull/19531) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19530](https://github.com/netdata/netdata/pull/19530) ([netdatabot](https://github.com/netdatabot))
@@ -18,6 +28,8 @@
 - Fix MSSQL Instance [\#19527](https://github.com/netdata/netdata/pull/19527) ([thiagoftsm](https://github.com/thiagoftsm))
 - inline functions related to metrics ingestion [\#19524](https://github.com/netdata/netdata/pull/19524) ([ktsaou](https://github.com/ktsaou))
 - chore\(packaging\): remove old dashboard [\#19523](https://github.com/netdata/netdata/pull/19523) ([ilyam8](https://github.com/ilyam8))
+- Format PGDs on fatal\(\) [\#19521](https://github.com/netdata/netdata/pull/19521) ([vkalintiris](https://github.com/vkalintiris))
+- SMSEagle integration [\#19520](https://github.com/netdata/netdata/pull/19520) ([marcin-smseagle](https://github.com/marcin-smseagle))
 - ci: increase static build timeout 180-\>300m [\#19519](https://github.com/netdata/netdata/pull/19519) ([ilyam8](https://github.com/ilyam8))
 - Improve ACLK query processing [\#19518](https://github.com/netdata/netdata/pull/19518) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#19517](https://github.com/netdata/netdata/pull/19517) ([netdatabot](https://github.com/netdatabot))
@@ -27,6 +39,7 @@
 - compile time and runtime check of required compiler flags [\#19513](https://github.com/netdata/netdata/pull/19513) ([ktsaou](https://github.com/ktsaou))
 - netdata.spec/plugin-go: remove dependency for lm\_sensors [\#19511](https://github.com/netdata/netdata/pull/19511) ([k0ste](https://github.com/k0ste))
 - chore\(go.d/nvme\): fix :dog: warning [\#19510](https://github.com/netdata/netdata/pull/19510) ([ilyam8](https://github.com/ilyam8))
+- Bundle cmake cache. [\#19509](https://github.com/netdata/netdata/pull/19509) ([vkalintiris](https://github.com/vkalintiris))
 - ACLK: allow encoded proxy username and password to work [\#19508](https://github.com/netdata/netdata/pull/19508) ([ktsaou](https://github.com/ktsaou))
 - Fix alert transition [\#19507](https://github.com/netdata/netdata/pull/19507) ([stelfrag](https://github.com/stelfrag))
 - update buildinfo  [\#19506](https://github.com/netdata/netdata/pull/19506) ([ktsaou](https://github.com/ktsaou))
@@ -41,6 +54,7 @@
 - max data file size [\#19495](https://github.com/netdata/netdata/pull/19495) ([ktsaou](https://github.com/ktsaou))
 - proc.plugin: add `ifb4*` to excluded interface name patterns [\#19494](https://github.com/netdata/netdata/pull/19494) ([intelfx](https://github.com/intelfx))
 - build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.8.0 to 4.8.1 in /src/go [\#19493](https://github.com/netdata/netdata/pull/19493) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Active Directory Certification Service \(windows.plugin\) [\#19492](https://github.com/netdata/netdata/pull/19492) ([thiagoftsm](https://github.com/thiagoftsm))
 - proc.plugin: remove traces of /proc/spl/kstat/zfs/pool/state [\#19491](https://github.com/netdata/netdata/pull/19491) ([intelfx](https://github.com/intelfx))
 - Further improve alert processing [\#19489](https://github.com/netdata/netdata/pull/19489) ([stelfrag](https://github.com/stelfrag))
 - LTO Benchmark [\#19488](https://github.com/netdata/netdata/pull/19488) ([ktsaou](https://github.com/ktsaou))
@@ -66,6 +80,12 @@
 - Use aral in ACLK [\#19459](https://github.com/netdata/netdata/pull/19459) ([stelfrag](https://github.com/stelfrag))
 - Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
 - Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
+- Modify eBPF.plugin integration \(Part I\) [\#19219](https://github.com/netdata/netdata/pull/19219) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add CLR Remoting metadata [\#19203](https://github.com/netdata/netdata/pull/19203) ([thiagoftsm](https://github.com/thiagoftsm))
+
+## [v2.2.3](https://github.com/netdata/netdata/tree/v2.2.3) (2025-01-31)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.2...v2.2.3)
 
 ## [v2.2.2](https://github.com/netdata/netdata/tree/v2.2.2) (2025-01-30)
 
@@ -458,18 +478,6 @@
 - add missing spinlock unlocks on containers [\#19011](https://github.com/netdata/netdata/pull/19011) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#19010](https://github.com/netdata/netdata/pull/19010) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/windows\): add deprecation notice [\#19009](https://github.com/netdata/netdata/pull/19009) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/dyncfg\): remove additionalProperties [\#19006](https://github.com/netdata/netdata/pull/19006) ([ilyam8](https://github.com/ilyam8))
-- Set expires header when serving files [\#19005](https://github.com/netdata/netdata/pull/19005) ([stelfrag](https://github.com/stelfrag))
-- fix\(go.d/x509check\): correct check revocation code [\#19004](https://github.com/netdata/netdata/pull/19004) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/dyncfg\): remove additionalProperties check [\#19003](https://github.com/netdata/netdata/pull/19003) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#19002](https://github.com/netdata/netdata/pull/19002) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/x509check\): support checking full chain expiry time [\#19001](https://github.com/netdata/netdata/pull/19001) ([ilyam8](https://github.com/ilyam8))
-- fix: exclude volumes w/o drive letter from disk\_space\_usage\_alert [\#19000](https://github.com/netdata/netdata/pull/19000) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18997](https://github.com/netdata/netdata/pull/18997) ([netdatabot](https://github.com/netdatabot))
-- docs: win deploy remove `./` [\#18996](https://github.com/netdata/netdata/pull/18996) ([ilyam8](https://github.com/ilyam8))
-- docs: single line win deploy [\#18994](https://github.com/netdata/netdata/pull/18994) ([ilyam8](https://github.com/ilyam8))
-- Add SQL Express Metrics [\#18992](https://github.com/netdata/netdata/pull/18992) ([thiagoftsm](https://github.com/thiagoftsm))
-- Do not intentionally abort on non-0 exit code. [\#18991](https://github.com/netdata/netdata/pull/18991) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
