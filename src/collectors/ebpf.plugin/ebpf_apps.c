@@ -17,7 +17,8 @@ void ebpf_aral_init(void)
 {
     size_t max_elements = NETDATA_EBPF_ALLOC_MAX_PID;
     if (max_elements < NETDATA_EBPF_ALLOC_MIN_ELEMENTS) {
-        netdata_log_error("Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
+        netdata_log_error(
+            "Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
         max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
     }
 
@@ -122,7 +123,8 @@ void clean_apps_groups_target(struct ebpf_target *agrt)
  *
  * @return It returns the target on success and NULL otherwise
  */
-struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char *id, struct ebpf_target *target, const char *name)
+struct ebpf_target *
+get_apps_groups_target(struct ebpf_target **agrt, const char *id, struct ebpf_target *target, const char *name)
 {
     int tdebug = 0, thidden = target ? target->hidden : 0, ends_with = 0;
     const char *nid = id;
@@ -164,8 +166,10 @@ struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char
 
     if (target && target->target)
         fatal(
-            "Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'", id,
-            target->id, target->target->id);
+            "Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'",
+            id,
+            target->id,
+            target->target->id);
 
     w = callocz(1, sizeof(struct ebpf_target));
     strncpyz(w->id, nid, EBPF_MAX_NAME);
@@ -312,19 +316,18 @@ SPINLOCK ebpf_pid_spinlock = SPINLOCK_INITIALIZER;
 void ebpf_pid_del(pid_t pid)
 {
     spinlock_lock(&ebpf_pid_spinlock);
-    (void) JudyLDel(&ebpf_pid_judyL, (Word_t) pid, PJE0);
+    (void)JudyLDel(&ebpf_pid_judyL, (Word_t)pid, PJE0);
     spinlock_unlock(&ebpf_pid_spinlock);
 }
 
 static ebpf_pid_data_t *ebpf_find_pid_data_unsafe(pid_t pid)
 {
     ebpf_pid_data_t *pid_data = NULL;
-    Pvoid_t *Pvalue = JudyLGet(ebpf_pid_judyL, (Word_t) pid, PJE0);
+    Pvoid_t *Pvalue = JudyLGet(ebpf_pid_judyL, (Word_t)pid, PJE0);
     if (Pvalue)
         pid_data = *Pvalue;
     return pid_data;
 }
-
 
 ebpf_pid_data_t *ebpf_find_pid_data(pid_t pid)
 {
@@ -339,7 +342,7 @@ ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid)
     spinlock_lock(&ebpf_pid_spinlock);
     ebpf_pid_data_t *pid_data = ebpf_find_pid_data_unsafe(pid);
     if (!pid_data) {
-        Pvoid_t *Pvalue = JudyLIns(&ebpf_pid_judyL, (Word_t) pid, PJE0);
+        Pvoid_t *Pvalue = JudyLIns(&ebpf_pid_judyL, (Word_t)pid, PJE0);
         internal_fatal(!Pvalue || Pvalue == PJERR, "EBPF: pid judy array");
         if (likely(!*Pvalue))
             *Pvalue = pid_data = callocz(1, sizeof(*pid_data));
@@ -352,16 +355,15 @@ ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid)
 }
 
 //ebpf_pid_data_t *ebpf_pids = NULL;            // to avoid allocations, we pre-allocate the entire pid space.
-ebpf_pid_data_t *ebpf_pids_link_list = NULL;  // global list of all processes running
+ebpf_pid_data_t *ebpf_pids_link_list = NULL; // global list of all processes running
 
-size_t ebpf_all_pids_count = 0; // the number of processes running read from /proc
+size_t ebpf_all_pids_count = 0;        // the number of processes running read from /proc
 size_t ebpf_hash_table_pids_count = 0; // the number of tasks in our hash tables
 
-struct ebpf_target
-    *apps_groups_default_target = NULL, // the default target
-    *apps_groups_root_target = NULL,    // apps_groups.conf defined
-    *users_root_target = NULL,          // users
-    *groups_root_target = NULL;         // user groups
+struct ebpf_target *apps_groups_default_target = NULL, // the default target
+    *apps_groups_root_target = NULL,                   // apps_groups.conf defined
+        *users_root_target = NULL,                     // users
+            *groups_root_target = NULL;                // user groups
 
 size_t apps_groups_targets_count = 0; // # of apps_groups.conf targets
 
@@ -435,8 +437,10 @@ static inline void assign_target_to_pid(ebpf_pid_data_t *p)
         if (unlikely(
                 ((!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm)) ||
                  (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen)) ||
-                 (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen])) ||
-                 (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && p->cmdline && strstr(p->cmdline, w->compare))))) {
+                 (!w->starts_with && w->ends_with && pclen >= w->comparelen &&
+                  !strcmp(w->compare, &p->comm[pclen - w->comparelen])) ||
+                 (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && p->cmdline &&
+                  strstr(p->cmdline, w->compare))))) {
             if (w->target)
                 p->target = w->target;
             else
@@ -561,7 +565,10 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
     if (unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
         debug_log_int(
             "READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s'",
-            netdata_configured_host_prefix, p->pid, p->comm, (p->target) ? p->target->name : "UNSET");
+            netdata_configured_host_prefix,
+            p->pid,
+            p->comm,
+            (p->target) ? p->target->name : "UNSET");
 
 without_cmdline_target:
     p->has_proc_file = 1;
@@ -591,7 +598,7 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
     read_proc_pid_stat(p);
 
     // check its parent pid
-    if (unlikely( p->ppid > (uint32_t)pid_max)) {
+    if (unlikely(p->ppid > (uint32_t)pid_max)) {
         netdata_log_error("Pid %d (command '%s') states invalid parent pid %u. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
@@ -618,7 +625,7 @@ static inline void link_all_processes_to_their_parents(void)
             continue;
         }
 
-//        pp = &ebpf_pids[p->ppid];
+        //        pp = &ebpf_pids[p->ppid];
         pp = ebpf_find_pid_data(p->ppid);
         if (likely(pp && pp->pid)) {
             p->parent = pp;
@@ -626,8 +633,12 @@ static inline void link_all_processes_to_their_parents(void)
 
             if (unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
                 debug_log_int(
-                    "child %d (%s) on target '%s' has parent %d (%s).", p->pid, p->comm,
-                    (p->target) ? p->target->name : "UNSET", pp->pid, pp->comm);
+                    "child %d (%s) on target '%s' has parent %d (%s).",
+                    p->pid,
+                    p->comm,
+                    (p->target) ? p->target->name : "UNSET",
+                    pp->pid,
+                    pp->comm);
         } else {
             p->parent = NULL;
             debug_log("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
@@ -660,8 +671,12 @@ static void apply_apps_groups_targets_inheritance(void)
 
                 if (debug_enabled || (p->target && p->target->debug_enabled))
                     debug_log_int(
-                        "TARGET INHERITANCE: %s is inherited by %u (%s) from its parent %d (%s).", p->target->name,
-                        p->pid, p->comm, p->parent->pid, p->parent->comm);
+                        "TARGET INHERITANCE: %s is inherited by %u (%s) from its parent %d (%s).",
+                        p->target->name,
+                        p->pid,
+                        p->comm,
+                        p->parent->pid,
+                        p->parent->comm);
             }
         }
     }
@@ -699,8 +714,12 @@ static void apply_apps_groups_targets_inheritance(void)
 
                     if (debug_enabled || (p->target && p->target->debug_enabled))
                         debug_log_int(
-                            "TARGET INHERITANCE: %s is inherited by %d (%s) from its child %d (%s).", p->target->name,
-                            p->parent->pid, p->parent->comm, p->pid, p->comm);
+                            "TARGET INHERITANCE: %s is inherited by %d (%s) from its child %d (%s).",
+                            p->target->name,
+                            p->parent->pid,
+                            p->parent->comm,
+                            p->pid,
+                            p->comm);
                 }
 
                 found++;
@@ -713,7 +732,7 @@ static void apply_apps_groups_targets_inheritance(void)
     // init goes always to default target
     ebpf_pid_data_t *pid_entry = ebpf_find_or_create_pid_data(INIT_PID);
     pid_entry->target = apps_groups_default_target;
-//    ebpf_pids[INIT_PID].target = apps_groups_default_target;
+    //    ebpf_pids[INIT_PID].target = apps_groups_default_target;
 
     // pid 0 goes always to default target
     pid_entry = ebpf_find_or_create_pid_data(0);
@@ -752,7 +771,11 @@ static void apply_apps_groups_targets_inheritance(void)
                 if (debug_enabled || (p->target && p->target->debug_enabled))
                     debug_log_int(
                         "TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s) at phase 2.",
-                        p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
+                        p->target->name,
+                        p->pid,
+                        p->comm,
+                        p->parent->pid,
+                        p->parent->comm);
             }
         }
     }
@@ -786,7 +809,6 @@ static inline void post_aggregate_targets(struct ebpf_target *root)
  */
 void ebpf_del_pid_entry(pid_t pid)
 {
-
     //ebpf_pid_data_t *p = &ebpf_pids[pid];
     ebpf_pid_data_t *p = ebpf_find_pid_data(pid);
 
@@ -810,7 +832,8 @@ void ebpf_del_pid_entry(pid_t pid)
             Word_t local_socket = 0;
             Pvoid_t *socket_value;
             bool first_socket = true;
-            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_socket, &first_socket))) {
+            while (
+                (socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_socket, &first_socket))) {
                 netdata_socket_plus_t *socket_clean = *socket_value;
                 aral_freez(aral_socket_table, socket_clean);
             }
@@ -968,12 +991,11 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
         return;
 
     pids_fd[NETDATA_EBPF_PIDS_PROCESS_IDX] = tbl_pid_stats_fd;
-    size_t length =  sizeof(ebpf_process_stat_t);
+    size_t length = sizeof(ebpf_process_stat_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
     if (tbl_pid_stats_fd != -1) {
-
         uint32_t key = 0, next_key = 0;
         while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
             if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
@@ -1005,7 +1027,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
                 }
             }
 
-end_process_loop:
+        end_process_loop:
             memset(process_stat_vector, 0, length);
             key = next_key;
         }
@@ -1018,7 +1040,6 @@ end_process_loop:
 
         ebpf_process_sum_values_for_pids(&w->process, w->root_pid);
     }
-
 }
 
 /**
