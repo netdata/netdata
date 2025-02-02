@@ -2128,3 +2128,95 @@ modules:
                 - name: read
                 - name: write
                 - name: search
+            - name: ad.name_cache_lookups
+              description: Name cache lookups
+              unit: lookups/s
+              chart_type: line
+              dimensions:
+                - name: lookups
+            - name: ad.dra_replication_properties_updated
+              description: DRA replication properties updated
+              unit: properties/s
+              chart_type: line
+              dimensions:
+                - name: inbound
+            - name: ad.dra_replication_properties_filtered
+              description: DRA replication properties filtered
+              unit: properties/s
+              chart_type: line
+              dimensions:
+                - name: inbound
+            - name: ad.dra_replication_intersite_compressed_traffic
+              description: DRA replication compressed traffic withing site
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: ad.dra_replication_intrasite_compressed_traffic
+              description: DRA replication compressed traffic between sites
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: ad.dra_replication_pending_syncs
+              description: DRA replication pending syncs
+              unit: syncs
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: ad.dra_replication_pending_syncs
+              description: DRA replication pending syncs
+              unit: syncs
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: ad.dra_replication_sync_requests
+              description: DRA replication sync requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: request
+            - name: ad.dra_replication_sync_objects_remaining
+              description: DRA replication full sync objects remaining
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: object
+            - name: ad.dra_replication_sync_objects_remaining
+              description: DRA replication full sync objects remaining
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: object
+            - name: ad.name_cache_hits
+              description: Name cache hits
+              unit: hits/s
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: ad.ds_threads
+              description: Directory Service threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: thread
+            - name: ad.ldap_last_bind_time
+              description: LDAP last successful bind time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: last_bind
+            - name: ad.ldap_searches
+              description: LDAP client search operations
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: searches
+            - name: ad.atq_average_request_latency
+              description: Average request processing time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
