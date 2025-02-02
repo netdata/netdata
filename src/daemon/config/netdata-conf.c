@@ -36,5 +36,6 @@ bool netdata_conf_load(char *filename, char overwrite_used, const char **user) {
 
     netdata_conf_backwards_compatibility();
     netdata_conf_section_global_run_as_user(user);
+    libuv_initialize();
     return ret;
 }

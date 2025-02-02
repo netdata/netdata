@@ -1852,14 +1852,14 @@ void *replication_thread_main(void *ptr) {
     return NULL;
 }
 
-int replication_prefetch_default(void) {
-    int prefetch = (int)ROUNDUP(libuv_worker_threads, stream_send.replication.threads);
-    prefetch = INRANGE(prefetch, 1, MIN(libuv_worker_threads, MAX_REPLICATION_PREFETCH));
-    return prefetch;
-}
-
 int replication_threads_default(void) {
     int threads = netdata_conf_is_parent() ? (int)ROUNDUP(netdata_conf_cpus(), 3) : 1;
     threads = INRANGE(threads, 1, MAX_REPLICATION_THREADS);
     return threads;
+}
+
+int replication_prefetch_default(void) {
+    int prefetch = (int)ROUNDUP(libuv_worker_threads, stream_send.replication.threads);
+    prefetch = INRANGE(prefetch, 1, MIN(libuv_worker_threads, MAX_REPLICATION_PREFETCH));
+    return prefetch;
 }

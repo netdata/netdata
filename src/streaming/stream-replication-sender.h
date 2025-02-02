@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 #define MAX_REPLICATION_THREADS 256
-#define MAX_REPLICATION_PREFETCH 1024
+#define MAX_REPLICATION_PREFETCH 256
 
 struct parser;
 
