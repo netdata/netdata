@@ -717,12 +717,30 @@ set(LIBJUDY_SOURCES
         ${LIBJUDY_NEXT_FILES}
 )
 
+set(INICFG_FILES
+        src/libnetdata/inicfg/inicfg.c
+        src/libnetdata/inicfg/inicfg.h
+        src/libnetdata/inicfg/inicfg_internals.h
+        src/libnetdata/inicfg/inicfg_exporters.c
+        src/libnetdata/inicfg/inicfg_conf_file.c
+        src/libnetdata/inicfg/inicfg_cleanup.c
+        src/libnetdata/inicfg/inicfg_sections.c
+        src/libnetdata/inicfg/inicfg_options.c
+        src/libnetdata/inicfg/inicfg_migrate.c
+        src/libnetdata/inicfg/inicfg_traversal.c
+        src/libnetdata/inicfg/inicfg_api.c
+        src/libnetdata/inicfg/dyncfg.c
+        src/libnetdata/inicfg/dyncfg.h
+)
+
+set(CONFIG_FILES
+        src/libnetdata/config/config.h
+)
+
 set(LIBNETDATA_FILES
         ${CONFIG_H}
         src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.c
         src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
-        src/libnetdata/config/appconfig.c
-        src/libnetdata/config/appconfig.h
         src/libnetdata/aral/aral.c
         src/libnetdata/aral/aral.h
         src/libnetdata/avl/avl.c
@@ -810,8 +828,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/http/http_defs.h
         src/libnetdata/http/content_type.c
         src/libnetdata/http/content_type.h
-        src/libnetdata/config/dyncfg.c
-        src/libnetdata/config/dyncfg.h
         src/libnetdata/json/json-c-parser-inline.h
         src/libnetdata/template-enum.h
         src/libnetdata/dictionary/dictionary-internals.h
@@ -896,24 +912,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/parsers/size.h
         src/libnetdata/libjudy/judy-malloc.c
         src/libnetdata/libjudy/judy-malloc.h
-        src/libnetdata/config/appconfig_internals.h
-        src/libnetdata/config/appconfig_exporters.c
-        src/libnetdata/config/appconfig_conf_file.c
-        src/libnetdata/config/appconfig_cleanup.c
-        src/libnetdata/config/appconfig_sections.c
-        src/libnetdata/config/appconfig_options.c
-        src/libnetdata/config/appconfig_migrate.c
-        src/libnetdata/config/appconfig_traversal.c
-        src/libnetdata/config/appconfig_api_sizes.c
-        src/libnetdata/config/appconfig_api_sizes.h
-        src/libnetdata/config/appconfig_api_durations.c
-        src/libnetdata/config/appconfig_api_durations.h
-        src/libnetdata/config/appconfig_api_numbers.c
-        src/libnetdata/config/appconfig_api_numbers.h
-        src/libnetdata/config/appconfig_api_text.c
-        src/libnetdata/config/appconfig_api_text.h
-        src/libnetdata/config/appconfig_api_boolean.c
-        src/libnetdata/config/appconfig_api_boolean.h
         src/libnetdata/facets/logs_query_status.h
         src/libnetdata/os/timestamps.c
         src/libnetdata/os/timestamps.h
@@ -997,6 +995,9 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/hostname.c
         src/libnetdata/os/hostname.h
 )
+
+list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
+list(APPEND LIBNETDATA_FILES ${CONFIG_FILES})
 
 set(LIBH2O_FILES
         src/web/server/h2o/libh2o/deps/cloexec/cloexec.c

@@ -185,7 +185,7 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
     static int cleanup_every = 999;
 
     if(unlikely(cleanup_every > 0)) {
-        cleanup_every = (int) config_get_number("plugin:tc", "cleanup unused classes every", 120);
+        cleanup_every = (int) inicfg_get_number(&netdata_config, "plugin:tc", "cleanup unused classes every", 120);
         if(cleanup_every < 0) cleanup_every = -cleanup_every;
     }
 
@@ -209,9 +209,9 @@ static inline void tc_device_commit(struct tc_device *d) {
     static int enable_tokens = -1, enable_ctokens = -1, enabled_all_classes_qdiscs = -1;
 
     if(unlikely(enabled_all_classes_qdiscs == -1)) {
-        enable_tokens              = config_get_boolean_ondemand("plugin:tc", "enable tokens charts for all interfaces", CONFIG_BOOLEAN_NO);
-        enable_ctokens             = config_get_boolean_ondemand("plugin:tc", "enable ctokens charts for all interfaces", CONFIG_BOOLEAN_NO);
-        enabled_all_classes_qdiscs = config_get_boolean_ondemand("plugin:tc", "enable show all classes and qdiscs for all interfaces", CONFIG_BOOLEAN_NO);
+        enable_tokens              = inicfg_get_boolean_ondemand(&netdata_config, "plugin:tc", "enable tokens charts for all interfaces", CONFIG_BOOLEAN_NO);
+        enable_ctokens             = inicfg_get_boolean_ondemand(&netdata_config, "plugin:tc", "enable ctokens charts for all interfaces", CONFIG_BOOLEAN_NO);
+        enabled_all_classes_qdiscs = inicfg_get_boolean_ondemand(&netdata_config, "plugin:tc", "enable show all classes and qdiscs for all interfaces", CONFIG_BOOLEAN_NO);
     }
 
     if(unlikely(d->enabled == (char)-1)) {
@@ -227,33 +227,33 @@ static inline void tc_device_commit(struct tc_device *d) {
         char var_name[CONFIG_MAX_NAME + 1];
 
         snprintfz(var_name, CONFIG_MAX_NAME, "qos for %s", string2str(d->id));
-        if (config_exists("plugin:tc", var_name))
-            d->enabled = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled);
+        if (inicfg_exists(&netdata_config, "plugin:tc", var_name))
+            d->enabled = (char)inicfg_get_boolean_ondemand(&netdata_config, "plugin:tc", var_name, d->enabled);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "traffic chart for %s", string2str(d->id));
-        if (config_exists("plugin:tc", var_name))
-            d->enabled_bytes = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_bytes);
+        if (inicfg_exists(&netdata_config, "plugin:tc", var_name))
+            d->enabled_bytes = (char)inicfg_get_boolean_ondemand(&netdata_config, "plugin:tc", var_name, d->enabled_bytes);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "packets chart for %s", string2str(d->id));
-        if (config_exists("plugin:tc", var_name))
-            d->enabled_packets = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_packets);
+        if (inicfg_exists(&netdata_config, "plugin:tc", var_name))
+            d->enabled_packets = (char)inicfg_get_boolean_ondemand(&netdata_config, "plugin:tc", var_name, d->enabled_packets);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "dropped packets chart for %s", string2str(d->id));
-        if (config_exists("plugin:tc", var_name))
-            d->enabled_dropped = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_dropped);
+        if (inicfg_exists(&netdata_config, "plugin:tc", var_name))
+            d->enabled_dropped = (char)inicfg_get_boolean_ondemand(&netdata_config, "plugin:tc", var_name, d->enabled_dropped);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "tokens chart for %s", string2str(d->id));
-        if (config_exists("plugin:tc", var_name))
-            d->enabled_tokens = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_tokens);
+        if (inicfg_exists(&netdata_config, "plugin:tc", var_name))
+            d->enabled_tokens = (char)inicfg_get_boolean_ondemand(&netdata_config, "plugin:tc", var_name, d->enabled_tokens);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "ctokens chart for %s", string2str(d->id));
-        if (config_exists("plugin:tc", var_name))
-            d->enabled_ctokens = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_ctokens);
+        if (inicfg_exists(&netdata_config, "plugin:tc", var_name))
+            d->enabled_ctokens = (char)inicfg_get_boolean_ondemand(&netdata_config, "plugin:tc", var_name, d->enabled_ctokens);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "show all classes for %s", string2str(d->id));
-        if (config_exists("plugin:tc", var_name))
+        if (inicfg_exists(&netdata_config, "plugin:tc", var_name))
             d->enabled_all_classes_qdiscs =
-                (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_all_classes_qdiscs);
+                (char)inicfg_get_boolean_ondemand(&netdata_config, "plugin:tc", var_name, d->enabled_all_classes_qdiscs);
     }
 
     // we only need to add leaf classes
@@ -910,7 +910,7 @@ void *tc_main(void *ptr) {
     uint32_t first_hash;
 
     snprintfz(command, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_primary_plugins_dir);
-    const char *tc_script = config_get("plugin:tc", "script to run to get tc values", command);
+    const char *tc_script = inicfg_get(&netdata_config, "plugin:tc", "script to run to get tc values", command);
 
     while(service_running(SERVICE_COLLECTORS)) {
         struct tc_device *device = NULL;

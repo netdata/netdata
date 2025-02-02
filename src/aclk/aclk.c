@@ -851,7 +851,7 @@ void *aclk_main(void *ptr)
     size_t default_ssl_log_filename_size = strlen(netdata_configured_log_dir) + strlen(DEFAULT_SSKEYLOGFILE_NAME) + 2;
     char *default_ssl_log_filename = mallocz(default_ssl_log_filename_size);
     snprintfz(default_ssl_log_filename, default_ssl_log_filename_size, "%s/%s", netdata_configured_log_dir, DEFAULT_SSKEYLOGFILE_NAME);
-    ssl_log_filename = config_get(CONFIG_SECTION_CLOUD, "aclk ssl keylog file", default_ssl_log_filename);
+    ssl_log_filename = inicfg_get(&netdata_config, CONFIG_SECTION_CLOUD, "aclk ssl keylog file", default_ssl_log_filename);
     freez(default_ssl_log_filename);
     if (ssl_log_filename) {
         error_report("SSLKEYLOGFILE active (path:\"%s\")!", ssl_log_filename);

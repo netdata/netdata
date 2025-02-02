@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "appconfig_internals.h"
+#include "inicfg_internals.h"
 
 /*
  * @Input:

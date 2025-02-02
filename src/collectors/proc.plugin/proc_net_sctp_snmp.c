@@ -52,12 +52,12 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
     static unsigned long long SctpInDataChunkDiscards     = 0ULL;
 
     if(unlikely(!arl_base)) {
-        do_associations = config_get_boolean_ondemand("plugin:proc:/proc/net/sctp/snmp", "established associations", CONFIG_BOOLEAN_AUTO);
-        do_transitions = config_get_boolean_ondemand("plugin:proc:/proc/net/sctp/snmp", "association transitions", CONFIG_BOOLEAN_AUTO);
-        do_fragmentation = config_get_boolean_ondemand("plugin:proc:/proc/net/sctp/snmp", "fragmentation", CONFIG_BOOLEAN_AUTO);
-        do_packets = config_get_boolean_ondemand("plugin:proc:/proc/net/sctp/snmp", "packets", CONFIG_BOOLEAN_AUTO);
-        do_packet_errors = config_get_boolean_ondemand("plugin:proc:/proc/net/sctp/snmp", "packet errors", CONFIG_BOOLEAN_AUTO);
-        do_chunk_types = config_get_boolean_ondemand("plugin:proc:/proc/net/sctp/snmp", "chunk types", CONFIG_BOOLEAN_AUTO);
+        do_associations = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sctp/snmp", "established associations", CONFIG_BOOLEAN_AUTO);
+        do_transitions = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sctp/snmp", "association transitions", CONFIG_BOOLEAN_AUTO);
+        do_fragmentation = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sctp/snmp", "fragmentation", CONFIG_BOOLEAN_AUTO);
+        do_packets = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sctp/snmp", "packets", CONFIG_BOOLEAN_AUTO);
+        do_packet_errors = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sctp/snmp", "packet errors", CONFIG_BOOLEAN_AUTO);
+        do_chunk_types = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sctp/snmp", "chunk types", CONFIG_BOOLEAN_AUTO);
 
         arl_base = arl_create("sctp", NULL, 60);
         arl_expect(arl_base, "SctpCurrEstab", &SctpCurrEstab);
@@ -97,7 +97,7 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/sctp/snmp");
-        ff = procfile_open(config_get("plugin:proc:/proc/net/sctp/snmp", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, "plugin:proc:/proc/net/sctp/snmp", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff))
             return 1;
     }

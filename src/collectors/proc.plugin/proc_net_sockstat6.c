@@ -36,11 +36,11 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
     static ARL_BASE *bases[6] = { NULL };
 
     if(unlikely(!arl_tcp)) {
-        do_tcp_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat6", "ipv6 TCP sockets", CONFIG_BOOLEAN_AUTO);
-        do_udp_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat6", "ipv6 UDP sockets", CONFIG_BOOLEAN_AUTO);
-        do_udplite_sockets = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat6", "ipv6 UDPLITE sockets", CONFIG_BOOLEAN_AUTO);
-        do_raw_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat6", "ipv6 RAW sockets", CONFIG_BOOLEAN_AUTO);
-        do_frag_sockets    = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat6", "ipv6 FRAG sockets", CONFIG_BOOLEAN_AUTO);
+        do_tcp_sockets     = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat6", "ipv6 TCP sockets", CONFIG_BOOLEAN_AUTO);
+        do_udp_sockets     = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat6", "ipv6 UDP sockets", CONFIG_BOOLEAN_AUTO);
+        do_udplite_sockets = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat6", "ipv6 UDPLITE sockets", CONFIG_BOOLEAN_AUTO);
+        do_raw_sockets     = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat6", "ipv6 RAW sockets", CONFIG_BOOLEAN_AUTO);
+        do_frag_sockets    = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat6", "ipv6 FRAG sockets", CONFIG_BOOLEAN_AUTO);
 
         arl_tcp = arl_create("sockstat6/TCP6", arl_callback_str2kernel_uint_t, 60);
         arl_expect(arl_tcp, "inuse",  &sockstat6_root.tcp6_inuse);
@@ -74,7 +74,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/sockstat6");
-        ff = procfile_open(config_get("plugin:proc:/proc/net/sockstat6", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, "plugin:proc:/proc/net/sockstat6", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 

@@ -89,7 +89,7 @@ void *win_plugin_main(void *ptr)
     for (i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
 
-        pm->enabled = config_get_boolean("plugin:windows", pm->name, pm->enabled);
+        pm->enabled = inicfg_get_boolean(&netdata_config, "plugin:windows", pm->name, pm->enabled);
         pm->rd = NULL;
 
         worker_register_job_name(i, win_modules[i].dim);

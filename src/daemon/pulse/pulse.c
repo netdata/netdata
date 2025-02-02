@@ -57,10 +57,10 @@ void *pulse_thread_main(void *ptr) {
     pulse_register_workers();
 
     int update_every =
-        (int)config_get_duration_seconds(CONFIG_SECTION_PULSE, "update every", localhost->rrd_update_every);
+        (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_PULSE, "update every", localhost->rrd_update_every);
     if (update_every < localhost->rrd_update_every) {
         update_every = localhost->rrd_update_every;
-        config_set_duration_seconds(CONFIG_SECTION_PULSE, "update every", update_every);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_PULSE, "update every", update_every);
     }
 
     pulse_aral_init();
@@ -151,10 +151,10 @@ void *pulse_thread_sqlite3_main(void *ptr) {
     pulse_register_workers();
 
     int update_every =
-        (int)config_get_duration_seconds(CONFIG_SECTION_PULSE, "update every", localhost->rrd_update_every);
+        (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_PULSE, "update every", localhost->rrd_update_every);
     if (update_every < localhost->rrd_update_every) {
         update_every = localhost->rrd_update_every;
-        config_set_duration_seconds(CONFIG_SECTION_PULSE, "update every", update_every);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_PULSE, "update every", update_every);
     }
 
     usec_t step = update_every * USEC_PER_SEC;
@@ -194,10 +194,10 @@ void *pulse_thread_workers_main(void *ptr) {
     pulse_register_workers();
 
     int update_every =
-        (int)config_get_duration_seconds(CONFIG_SECTION_PULSE, "update every", localhost->rrd_update_every);
+        (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_PULSE, "update every", localhost->rrd_update_every);
     if (update_every < localhost->rrd_update_every) {
         update_every = localhost->rrd_update_every;
-        config_set_duration_seconds(CONFIG_SECTION_PULSE, "update every", update_every);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_PULSE, "update every", update_every);
     }
 
     usec_t step = update_every * USEC_PER_SEC;
@@ -238,10 +238,10 @@ void *pulse_thread_memory_extended_main(void *ptr) {
     pulse_register_workers();
 
     int update_every =
-        (int)config_get_duration_seconds(CONFIG_SECTION_PULSE, "update every", localhost->rrd_update_every);
+        (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_PULSE, "update every", localhost->rrd_update_every);
     if (update_every < localhost->rrd_update_every) {
         update_every = localhost->rrd_update_every;
-        config_set_duration_seconds(CONFIG_SECTION_PULSE, "update every", update_every);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_PULSE, "update every", update_every);
     }
 
     usec_t step = update_every * USEC_PER_SEC;

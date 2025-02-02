@@ -67,56 +67,56 @@ int registry_init(void) {
 
     // registry enabled?
     if(web_server_mode != WEB_SERVER_MODE_NONE) {
-        registry.enabled = config_get_boolean(CONFIG_SECTION_REGISTRY, "enabled", 0);
+        registry.enabled = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "enabled", 0);
     }
     else {
         netdata_log_info("Registry is disabled - use the central netdata");
-        config_set_boolean(CONFIG_SECTION_REGISTRY, "enabled", 0);
+        inicfg_set_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "enabled", 0);
         registry.enabled = 0;
     }
 
     // path names
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
-    registry.pathname = config_get(CONFIG_SECTION_DIRECTORIES, "registry", filename);
+    registry.pathname = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "registry", filename);
     if(mkdir(registry.pathname, 0770) == -1 && errno != EEXIST)
         fatal("Cannot create directory '%s'.", registry.pathname);
 
     // filenames
     snprintfz(filename, FILENAME_MAX, "%s/netdata.public.unique.id", registry.pathname);
-    registry.machine_guid_filename = config_get(CONFIG_SECTION_REGISTRY, "netdata unique id file", filename);
+    registry.machine_guid_filename = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "netdata unique id file", filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/registry.db", registry.pathname);
-    registry.db_filename = config_get(CONFIG_SECTION_REGISTRY, "registry db file", filename);
+    registry.db_filename = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry db file", filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/registry-log.db", registry.pathname);
-    registry.log_filename = config_get(CONFIG_SECTION_REGISTRY, "registry log file", filename);
+    registry.log_filename = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry log file", filename);
 
     // configuration options
-    registry.save_registry_every_entries = (unsigned long long)config_get_number(CONFIG_SECTION_REGISTRY, "registry save db every new entries", 1000000);
-    registry.persons_expiration = config_get_duration_days(CONFIG_SECTION_REGISTRY, "registry expire idle persons", 365) * 86400;
-    registry.registry_domain = config_get(CONFIG_SECTION_REGISTRY, "registry domain", "");
-    registry.registry_to_announce = config_get(CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io");
-    registry.hostname = config_get(CONFIG_SECTION_REGISTRY, "registry hostname", netdata_configured_hostname);
-    registry.verify_cookies_redirects = config_get_boolean(CONFIG_SECTION_REGISTRY, "verify browser cookies support", 1);
-    registry.enable_cookies_samesite_secure = config_get_boolean(CONFIG_SECTION_REGISTRY, "enable cookies SameSite and Secure", 1);
+    registry.save_registry_every_entries = (unsigned long long)inicfg_get_number(&netdata_config, CONFIG_SECTION_REGISTRY, "registry save db every new entries", 1000000);
+    registry.persons_expiration = inicfg_get_duration_days(&netdata_config, CONFIG_SECTION_REGISTRY, "registry expire idle persons", 365) * 86400;
+    registry.registry_domain = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry domain", "");
+    registry.registry_to_announce = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io");
+    registry.hostname = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry hostname", netdata_configured_hostname);
+    registry.verify_cookies_redirects = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "verify browser cookies support", 1);
+    registry.enable_cookies_samesite_secure = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "enable cookies SameSite and Secure", 1);
 
     registry_update_cloud_base_url();
     nd_setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);
     nd_setenv("NETDATA_REGISTRY_URL", registry.registry_to_announce, 1);
 
-    registry.max_url_length = (size_t)config_get_number(CONFIG_SECTION_REGISTRY, "max URL length", 1024);
+    registry.max_url_length = (size_t)inicfg_get_number(&netdata_config, CONFIG_SECTION_REGISTRY, "max URL length", 1024);
     if(registry.max_url_length < 10) {
         registry.max_url_length = 10;
-        config_set_number(CONFIG_SECTION_REGISTRY, "max URL length", (long long)registry.max_url_length);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_REGISTRY, "max URL length", (long long)registry.max_url_length);
     }
 
-    registry.max_name_length = (size_t)config_get_number(CONFIG_SECTION_REGISTRY, "max URL name length", 50);
+    registry.max_name_length = (size_t)inicfg_get_number(&netdata_config, CONFIG_SECTION_REGISTRY, "max URL name length", 50);
     if(registry.max_name_length < 10) {
         registry.max_name_length = 10;
-        config_set_number(CONFIG_SECTION_REGISTRY, "max URL name length", (long long)registry.max_name_length);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_REGISTRY, "max URL name length", (long long)registry.max_name_length);
     }
 
-    bool use_mmap = config_get_boolean(CONFIG_SECTION_REGISTRY, "use mmap", false);
+    bool use_mmap = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "use mmap", false);
 
     // initialize entries counters
     registry.persons_count = 0;

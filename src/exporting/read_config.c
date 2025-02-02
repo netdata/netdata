@@ -33,17 +33,17 @@ static const char *expconfig_get(struct config *root, const char *section, const
     _CONNECTOR_INSTANCE *local_ci;
 
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
-        return appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value);
+        return inicfg_get(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
     local_ci = find_instance(section);
 
     if (!local_ci)
         return NULL; // TODO: Check if it is meaningful to return default_value
 
-    return appconfig_get(
+    return inicfg_get(
         root, local_ci->instance_name, name,
-        appconfig_get(
-            root, local_ci->connector_name, name, appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+        inicfg_get(
+            root, local_ci->connector_name, name, inicfg_get(root, CONFIG_SECTION_EXPORTING, name, default_value)));
 }
 
 int expconfig_get_boolean(struct config *root, const char *section, const char *name, int default_value)
@@ -51,18 +51,18 @@ int expconfig_get_boolean(struct config *root, const char *section, const char *
     _CONNECTOR_INSTANCE *local_ci;
 
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
-        return appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value);
+        return inicfg_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
     local_ci = find_instance(section);
 
     if (!local_ci)
         return 0; // TODO: Check if it is meaningful to return default_value
 
-    return appconfig_get_boolean(
+    return inicfg_get_boolean(
         root, local_ci->instance_name, name,
-        appconfig_get_boolean(
+        inicfg_get_boolean(
             root, local_ci->connector_name, name,
-            appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+            inicfg_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value)));
 }
 
 long long expconfig_get_number(struct config *root, const char *section, const char *name, long long default_value)
@@ -70,18 +70,18 @@ long long expconfig_get_number(struct config *root, const char *section, const c
     _CONNECTOR_INSTANCE *local_ci;
 
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
-        return appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value);
+        return inicfg_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
     local_ci = find_instance(section);
 
     if (!local_ci)
         return 0; // TODO: Check if it is meaningful to return default_value
 
-    return appconfig_get_number(
+    return inicfg_get_number(
         root, local_ci->instance_name, name,
-        appconfig_get_number(
+        inicfg_get_number(
             root, local_ci->connector_name, name,
-            appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+            inicfg_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value)));
 }
 
 /*
@@ -205,13 +205,13 @@ struct engine *read_exporting_config()
 
     char *filename = filename_from_path_entry_strdupz(netdata_configured_user_config_dir, EXPORTING_CONF);
 
-    exporting_config_exists = appconfig_load(&exporting_config, filename, 0, NULL);
+    exporting_config_exists = inicfg_load(&exporting_config, filename, 0, NULL);
     if (!exporting_config_exists) {
         netdata_log_info("CONFIG: cannot load user exporting config '%s'. Will try the stock version.", filename);
         freez(filename);
 
         filename = filename_from_path_entry_strdupz(netdata_configured_stock_config_dir, EXPORTING_CONF);
-        exporting_config_exists = appconfig_load(&exporting_config, filename, 0, NULL);
+        exporting_config_exists = inicfg_load(&exporting_config, filename, 0, NULL);
         if (!exporting_config_exists)
             netdata_log_info("CONFIG: cannot load stock exporting config '%s'. Running with internal defaults.", filename);
     }
@@ -219,17 +219,17 @@ struct engine *read_exporting_config()
     freez(filename);
 
 #define prometheus_config_get(name, value)                                                                             \
-    appconfig_get(                                                                                                     \
+    inicfg_get(                                                                                                     \
         &exporting_config, CONFIG_SECTION_PROMETHEUS, name,                                                            \
-        appconfig_get(&exporting_config, CONFIG_SECTION_EXPORTING, name, value))
+        inicfg_get(&exporting_config, CONFIG_SECTION_EXPORTING, name, value))
 #define prometheus_config_get_number(name, value)                                                                      \
-    appconfig_get_number(                                                                                              \
+    inicfg_get_number(                                                                                              \
         &exporting_config, CONFIG_SECTION_PROMETHEUS, name,                                                            \
-        appconfig_get_number(&exporting_config, CONFIG_SECTION_EXPORTING, name, value))
+        inicfg_get_number(&exporting_config, CONFIG_SECTION_EXPORTING, name, value))
 #define prometheus_config_get_boolean(name, value)                                                                     \
-    appconfig_get_boolean(                                                                                             \
+    inicfg_get_boolean(                                                                                             \
         &exporting_config, CONFIG_SECTION_PROMETHEUS, name,                                                            \
-        appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, name, value))
+        inicfg_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, name, value))
 
     if (!prometheus_exporter_instance) {
         prometheus_exporter_instance = callocz(1, sizeof(struct instance));
@@ -493,9 +493,9 @@ struct engine *read_exporting_config()
 #endif
 
         if (unlikely(!exporting_config_exists) && !engine->config.hostname) {
-            engine->config.hostname = strdupz(config_get(instance_name, "hostname", netdata_configured_hostname));
+            engine->config.hostname = strdupz(inicfg_get(&netdata_config, instance_name, "hostname", netdata_configured_hostname));
             engine->config.update_every =
-                config_get_number(instance_name, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
+                inicfg_get_number(&netdata_config, instance_name, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
         }
 
     next_connector_instance:

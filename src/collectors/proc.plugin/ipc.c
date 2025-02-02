@@ -293,19 +293,19 @@ int do_ipc(int update_every, usec_t dt) {
     static const char *shm_filename = NULL;
 
     if(unlikely(do_sem == -1)) {
-        do_msg = config_get_boolean("plugin:proc:ipc", "message queues", CONFIG_BOOLEAN_YES);
-        do_sem = config_get_boolean("plugin:proc:ipc", "semaphore totals", CONFIG_BOOLEAN_YES);
-        do_shm = config_get_boolean("plugin:proc:ipc", "shared memory totals", CONFIG_BOOLEAN_YES);
+        do_msg = inicfg_get_boolean(&netdata_config, "plugin:proc:ipc", "message queues", CONFIG_BOOLEAN_YES);
+        do_sem = inicfg_get_boolean(&netdata_config, "plugin:proc:ipc", "semaphore totals", CONFIG_BOOLEAN_YES);
+        do_shm = inicfg_get_boolean(&netdata_config, "plugin:proc:ipc", "shared memory totals", CONFIG_BOOLEAN_YES);
 
         char filename[FILENAME_MAX + 1];
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/sysvipc/msg");
-        msg_filename = config_get("plugin:proc:ipc", "msg filename to monitor", filename);
+        msg_filename = inicfg_get(&netdata_config, "plugin:proc:ipc", "msg filename to monitor", filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/sysvipc/shm");
-        shm_filename = config_get("plugin:proc:ipc", "shm filename to monitor", filename);
+        shm_filename = inicfg_get(&netdata_config, "plugin:proc:ipc", "shm filename to monitor", filename);
 
-        dimensions_limit = config_get_number("plugin:proc:ipc", "max dimensions in memory allowed", 50);
+        dimensions_limit = inicfg_get_number(&netdata_config, "plugin:proc:ipc", "max dimensions in memory allowed", 50);
 
         // make sure it works
         if(ipc_sem_get_limits(&limits) == -1) {

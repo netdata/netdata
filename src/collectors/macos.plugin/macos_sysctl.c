@@ -38,36 +38,36 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
 
     if (unlikely(do_loadavg == -1)) {
-        do_loadavg              = config_get_boolean("plugin:macos:sysctl", "enable load average", 1);
-        do_swap                 = config_get_boolean("plugin:macos:sysctl", "system swap", 1);
-        do_bandwidth            = config_get_boolean("plugin:macos:sysctl", "bandwidth", 1);
-        do_tcp_packets          = config_get_boolean("plugin:macos:sysctl", "ipv4 TCP packets", 1);
-        do_tcp_errors           = config_get_boolean("plugin:macos:sysctl", "ipv4 TCP errors", 1);
-        do_tcp_handshake        = config_get_boolean("plugin:macos:sysctl", "ipv4 TCP handshake issues", 1);
-        do_ecn                  = config_get_boolean_ondemand("plugin:macos:sysctl", "ECN packets", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_syscookies    = config_get_boolean_ondemand("plugin:macos:sysctl", "TCP SYN cookies", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_ofo           = config_get_boolean_ondemand("plugin:macos:sysctl", "TCP out-of-order queue", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_connaborts    = config_get_boolean_ondemand("plugin:macos:sysctl", "TCP connection aborts", CONFIG_BOOLEAN_AUTO);
-        do_udp_packets          = config_get_boolean("plugin:macos:sysctl", "ipv4 UDP packets", 1);
-        do_udp_errors           = config_get_boolean("plugin:macos:sysctl", "ipv4 UDP errors", 1);
-        do_icmp_packets         = config_get_boolean("plugin:macos:sysctl", "ipv4 ICMP packets", 1);
-        do_icmpmsg              = config_get_boolean("plugin:macos:sysctl", "ipv4 ICMP messages", 1);
-        do_ip_packets           = config_get_boolean("plugin:macos:sysctl", "ipv4 packets", 1);
-        do_ip_fragsout          = config_get_boolean("plugin:macos:sysctl", "ipv4 fragments sent", 1);
-        do_ip_fragsin           = config_get_boolean("plugin:macos:sysctl", "ipv4 fragments assembly", 1);
-        do_ip_errors            = config_get_boolean("plugin:macos:sysctl", "ipv4 errors", 1);
-        do_ip6_packets          = config_get_boolean_ondemand("plugin:macos:sysctl", "ipv6 packets", CONFIG_BOOLEAN_AUTO);
-        do_ip6_fragsout         = config_get_boolean_ondemand("plugin:macos:sysctl", "ipv6 fragments sent", CONFIG_BOOLEAN_AUTO);
-        do_ip6_fragsin          = config_get_boolean_ondemand("plugin:macos:sysctl", "ipv6 fragments assembly", CONFIG_BOOLEAN_AUTO);
-        do_ip6_errors           = config_get_boolean_ondemand("plugin:macos:sysctl", "ipv6 errors", CONFIG_BOOLEAN_AUTO);
-        do_icmp6                = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp", CONFIG_BOOLEAN_AUTO);
-        do_icmp6_redir          = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp redirects", CONFIG_BOOLEAN_AUTO);
-        do_icmp6_errors         = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp errors", CONFIG_BOOLEAN_AUTO);
-        do_icmp6_echos          = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp echos", CONFIG_BOOLEAN_AUTO);
-        do_icmp6_router         = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp router", CONFIG_BOOLEAN_AUTO);
-        do_icmp6_neighbor       = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp neighbor", CONFIG_BOOLEAN_AUTO);
-        do_icmp6_types          = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp types", CONFIG_BOOLEAN_AUTO);
-        do_uptime               = config_get_boolean("plugin:macos:sysctl", "system uptime", 1);
+        do_loadavg              = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "enable load average", 1);
+        do_swap                 = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "system swap", 1);
+        do_bandwidth            = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "bandwidth", 1);
+        do_tcp_packets          = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 TCP packets", 1);
+        do_tcp_errors           = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 TCP errors", 1);
+        do_tcp_handshake        = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 TCP handshake issues", 1);
+        do_ecn                  = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "ECN packets", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_syscookies    = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "TCP SYN cookies", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_ofo           = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "TCP out-of-order queue", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_connaborts    = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "TCP connection aborts", CONFIG_BOOLEAN_AUTO);
+        do_udp_packets          = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 UDP packets", 1);
+        do_udp_errors           = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 UDP errors", 1);
+        do_icmp_packets         = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 ICMP packets", 1);
+        do_icmpmsg              = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 ICMP messages", 1);
+        do_ip_packets           = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 packets", 1);
+        do_ip_fragsout          = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 fragments sent", 1);
+        do_ip_fragsin           = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 fragments assembly", 1);
+        do_ip_errors            = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "ipv4 errors", 1);
+        do_ip6_packets          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "ipv6 packets", CONFIG_BOOLEAN_AUTO);
+        do_ip6_fragsout         = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "ipv6 fragments sent", CONFIG_BOOLEAN_AUTO);
+        do_ip6_fragsin          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "ipv6 fragments assembly", CONFIG_BOOLEAN_AUTO);
+        do_ip6_errors           = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "ipv6 errors", CONFIG_BOOLEAN_AUTO);
+        do_icmp6                = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "icmp", CONFIG_BOOLEAN_AUTO);
+        do_icmp6_redir          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "icmp redirects", CONFIG_BOOLEAN_AUTO);
+        do_icmp6_errors         = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "icmp errors", CONFIG_BOOLEAN_AUTO);
+        do_icmp6_echos          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "icmp echos", CONFIG_BOOLEAN_AUTO);
+        do_icmp6_router         = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "icmp router", CONFIG_BOOLEAN_AUTO);
+        do_icmp6_neighbor       = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "icmp neighbor", CONFIG_BOOLEAN_AUTO);
+        do_icmp6_types          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:macos:sysctl", "icmp types", CONFIG_BOOLEAN_AUTO);
+        do_uptime               = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "system uptime", 1);
     }
 
     RRDSET *st = NULL;

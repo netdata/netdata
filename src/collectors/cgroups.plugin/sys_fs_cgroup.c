@@ -229,19 +229,19 @@ void read_cgroup_plugin_configuration() {
     throttled_time_hash = simple_hash("throttled_time");
     throttled_usec_hash = simple_hash("throttled_usec");
 
-    cgroup_update_every = (int)config_get_duration_seconds("plugin:cgroups", "update every", localhost->rrd_update_every);
+    cgroup_update_every = (int)inicfg_get_duration_seconds(&netdata_config, "plugin:cgroups", "update every", localhost->rrd_update_every);
     if(cgroup_update_every < localhost->rrd_update_every) {
         cgroup_update_every = localhost->rrd_update_every;
-        config_set_duration_seconds("plugin:cgroups", "update every", localhost->rrd_update_every);
+        inicfg_set_duration_seconds(&netdata_config, "plugin:cgroups", "update every", localhost->rrd_update_every);
     }
 
-    cgroup_check_for_new_every = (int)config_get_duration_seconds("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
+    cgroup_check_for_new_every = (int)inicfg_get_duration_seconds(&netdata_config, "plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
     if(cgroup_check_for_new_every < cgroup_update_every) {
         cgroup_check_for_new_every = cgroup_update_every;
-        config_set_duration_seconds("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
+        inicfg_set_duration_seconds(&netdata_config, "plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
     }
 
-    cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", CONFIG_BOOLEAN_AUTO);
+    cgroup_use_unified_cgroups = inicfg_get_boolean_ondemand(&netdata_config, "plugin:cgroups", "use unified cgroups", CONFIG_BOOLEAN_AUTO);
     if (cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO)
         cgroup_use_unified_cgroups = (cgroups_try_detect_version() == CGROUPS_V2);
     collector_info("use unified cgroups %s", cgroup_use_unified_cgroups ? "true" : "false");
@@ -323,11 +323,11 @@ void read_cgroup_plugin_configuration() {
         cgroup_unified_base = strdupz(filename);
     }
 
-    cgroup_root_max = (int)config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
-    cgroup_max_depth = (int)config_get_number("plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
+    cgroup_root_max = (int)inicfg_get_number(&netdata_config, "plugin:cgroups", "max cgroups to allow", cgroup_root_max);
+    cgroup_max_depth = (int)inicfg_get_number(&netdata_config, "plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
 
     enabled_cgroup_paths = simple_pattern_create(
-            config_get("plugin:cgroups", "enable by default cgroups matching",
+            inicfg_get(&netdata_config, "plugin:cgroups", "enable by default cgroups matching",
             // ----------------------------------------------------------------
 
                        " !*/init.scope "                      // ignore init.scope
@@ -378,12 +378,12 @@ void read_cgroup_plugin_configuration() {
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     enabled_cgroup_names = simple_pattern_create(
-            config_get("plugin:cgroups", "enable by default cgroups names matching",
+            inicfg_get(&netdata_config, "plugin:cgroups", "enable by default cgroups names matching",
                        " * "
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     search_cgroup_paths = simple_pattern_create(
-            config_get("plugin:cgroups", "search for cgroups in subpaths matching",
+            inicfg_get(&netdata_config, "plugin:cgroups", "search for cgroups in subpaths matching",
                        " !*/init.scope "                      // ignore init.scope
                        " !*-qemu "                            //  #345
                        " !*.libvirt-qemu "                    //  #3010
@@ -399,13 +399,13 @@ void read_cgroup_plugin_configuration() {
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
-    cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", filename);
+    cgroups_rename_script = inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-network", netdata_configured_primary_plugins_dir);
-    cgroups_network_interface_script = config_get("plugin:cgroups", "script to get cgroup network interfaces", filename);
+    cgroups_network_interface_script = inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup network interfaces", filename);
 
     enabled_cgroup_renames = simple_pattern_create(
-            config_get("plugin:cgroups", "run script to rename cgroups matching",
+            inicfg_get(&netdata_config, "plugin:cgroups", "run script to rename cgroups matching",
                        " !/ "
                        " !*.mount "
                        " !*.socket "
@@ -432,7 +432,7 @@ void read_cgroup_plugin_configuration() {
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
     systemd_services_cgroups = simple_pattern_create(
-        config_get(
+        inicfg_get(&netdata_config, 
             "plugin:cgroups",
             "cgroups to match as systemd services",
             " !/system.slice/*/*.service "

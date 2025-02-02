@@ -1135,8 +1135,8 @@ static void ebpf_update_filesystem()
     for (i = 0; localfs[i].filesystem; i++) {
         snprintfz(dist, NETDATA_FS_MAX_DIST_NAME, "%sdist", localfs[i].filesystem);
 
-        localfs[i].enabled =
-            appconfig_get_boolean(&fs_config, NETDATA_FILESYSTEM_CONFIG_NAME, dist, CONFIG_BOOLEAN_YES);
+        localfs[i].enabled = inicfg_get_boolean(&fs_config, NETDATA_FILESYSTEM_CONFIG_NAME, dist,
+                                                   CONFIG_BOOLEAN_YES);
     }
 }
 
