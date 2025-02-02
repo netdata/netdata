@@ -105,6 +105,7 @@ struct replication_query {
     struct replication_dimension data[];
 };
 
+ALWAYS_INLINE
 static struct replication_query *replication_query_prepare(
         RRDSET *st,
         time_t db_first_entry,
@@ -548,6 +549,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
     return finished_with_gap;
 }
 
+ALWAYS_INLINE
 static struct replication_query *replication_response_prepare(
         RRDSET *st,
         bool requested_enable_streaming,
@@ -556,59 +558,44 @@ static struct replication_query *replication_response_prepare(
         STREAM_CAPABILITIES capabilities,
         bool synchronous
         ) {
-    time_t wall_clock_time = now_realtime_sec();
 
-    if(requested_after > requested_before) {
-        // flip them
-        time_t t = requested_before;
-        requested_before = requested_after;
-        requested_after = t;
-    }
-
-    if(requested_after > wall_clock_time) {
-        requested_after = 0;
-        requested_before = 0;
-        requested_enable_streaming = true;
-    }
-
-    if(requested_before > wall_clock_time) {
-        requested_before = wall_clock_time;
-        requested_enable_streaming = true;
-    }
-
+    bool query_enable_streaming = requested_enable_streaming;
     time_t query_after = requested_after;
     time_t query_before = requested_before;
-    bool query_enable_streaming = requested_enable_streaming;
+
+    time_t wall_clock_time = now_realtime_sec();
+
+    if(query_after > query_before)
+        SWAP(query_before, query_after);
+
+    if(!query_after || !query_before || query_after > wall_clock_time) {
+        query_after = 0;
+        query_before = 0;
+        query_enable_streaming = true;
+    }
+    else if(query_before >= (wall_clock_time - (st->update_every * 100))) {
+        query_before = wall_clock_time;
+        query_enable_streaming = true;
+    }
 
     time_t db_first_entry = 0, db_last_entry = 0;
     rrdset_get_retention_of_tier_for_collected_chart(
-            st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
+        st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
 
-    if(requested_after == 0 && requested_before == 0 && requested_enable_streaming == true) {
-        // no data requested - just enable streaming
-        ;
-    }
-    else {
+    if(query_after && query_before) {
         if (query_after < db_first_entry)
             query_after = db_first_entry;
 
         if (query_before > db_last_entry)
             query_before = db_last_entry;
 
-        // if the parent asked us to start streaming, then fill the rest with the data that we have
-        if (requested_enable_streaming)
+        if (query_after > query_before)
+            SWAP(query_after, query_before);
+
+        if (query_enable_streaming || query_before >= db_last_entry) {
             query_before = db_last_entry;
-
-        if (query_after > query_before) {
-            time_t tmp = query_before;
-            query_before = query_after;
-            query_after = tmp;
+            query_enable_streaming = true;
         }
-
-        query_enable_streaming = (requested_enable_streaming ||
-                                  query_before == db_last_entry ||
-                                  !requested_after ||
-                                  !requested_before) ? true : false;
     }
 
     return replication_query_prepare(
@@ -619,7 +606,7 @@ static struct replication_query *replication_response_prepare(
             wall_clock_time, capabilities, synchronous);
 }
 
-static void replication_response_cancel_and_finalize(struct replication_query *q) {
+static inline void replication_response_cancel_and_finalize(struct replication_query *q) {
     if(!q) return;
     replication_query_finalize(NULL, q, false);
 }
@@ -657,7 +644,7 @@ bool replication_response_execute_finalize_and_send(struct replication_query *q,
     if(q->query.execute)
         finished_with_gap = replication_query_execute(wb, q, max_msg_size);
 
-    time_t after = q->request.after;
+    time_t after = q->query.after;
     time_t before = q->query.before;
     bool enable_streaming = q->query.enable_streaming;
 
