@@ -4,120 +4,157 @@
 
 struct config fs_config = APPCONFIG_INITIALIZER;
 
-ebpf_local_maps_t ext4_maps[] = {{.name = "tbl_ext4", .internal_input = NETDATA_KEY_CALLS_SYNC,
-                                  .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                  .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+ebpf_local_maps_t ext4_maps[] = {
+    {.name = "tbl_ext4",
+     .internal_input = NETDATA_KEY_CALLS_SYNC,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                  .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
-                                  },
-                                  {.name = "tmp_ext4", .internal_input = 4192, .user_input = 4192,
-                                   .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                   .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = "tmp_ext4",
+     .internal_input = 4192,
+     .user_input = 4192,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                   .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                   },
-                                   {.name = NULL, .internal_input = 0, .user_input = 0,
-                                    .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                    .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                    .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                    }};
+    }};
 
-ebpf_local_maps_t xfs_maps[] = {{.name = "tbl_xfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
-                                 .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+ebpf_local_maps_t xfs_maps[] = {
+    {.name = "tbl_xfs",
+     .internal_input = NETDATA_KEY_CALLS_SYNC,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
-                                 },
-                                {.name = "tmp_xfs", .internal_input = 4192, .user_input = 4192,
-                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = "tmp_xfs",
+     .internal_input = 4192,
+     .user_input = 4192,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                 },
-                                 {.name = NULL, .internal_input = 0, .user_input = 0,
-                                  .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                  .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                  .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                 }};
+    }};
 
-ebpf_local_maps_t nfs_maps[] = {{.name = "tbl_nfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
-                                 .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+ebpf_local_maps_t nfs_maps[] = {
+    {.name = "tbl_nfs",
+     .internal_input = NETDATA_KEY_CALLS_SYNC,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
-                                 },
-                                {.name = "tmp_nfs", .internal_input = 4192, .user_input = 4192,
-                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = "tmp_nfs",
+     .internal_input = 4192,
+     .user_input = 4192,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                },
-                                {.name = NULL, .internal_input = 0, .user_input = 0,
-                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                 }};
+    }};
 
-ebpf_local_maps_t zfs_maps[] = {{.name = "tbl_zfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
-                                 .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+ebpf_local_maps_t zfs_maps[] = {
+    {.name = "tbl_zfs",
+     .internal_input = NETDATA_KEY_CALLS_SYNC,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
-                                },
-                                {.name = "tmp_zfs", .internal_input = 4192, .user_input = 4192,
-                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = "tmp_zfs",
+     .internal_input = 4192,
+     .user_input = 4192,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                },
-                                {.name = NULL, .internal_input = 0, .user_input = 0,
-                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                }};
+    }};
 
-ebpf_local_maps_t btrfs_maps[] = {{.name = "tbl_btrfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
-                                   .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                   .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+ebpf_local_maps_t btrfs_maps[] = {
+    {.name = "tbl_btrfs",
+     .internal_input = NETDATA_KEY_CALLS_SYNC,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                   .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
-                                },
-                                {.name = "tbl_ext_addr", .internal_input = 1, .user_input = 1,
-                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = "tbl_ext_addr",
+     .internal_input = 1,
+     .user_input = 1,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                },
-                                {.name = "tmp_btrfs", .internal_input = 4192, .user_input = 4192,
-                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = "tmp_btrfs",
+     .internal_input = 4192,
+     .user_input = 4192,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                },
-                                {.name = NULL, .internal_input = 0, .user_input = 0,
-                                 .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                 .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                 .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
     }};
 
@@ -138,7 +175,7 @@ static netdata_idx_t *filesystem_hash_values = NULL;
  *  @param obj FS object loaded.
  */
 static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
- {
+{
     // kprobe
     bpf_program__set_autoload(obj->progs.netdata_fs_file_read_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_fs_file_write_probe, false);
@@ -151,17 +188,17 @@ static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_fs_file_open_retprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_retprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_fs_getattr_retprobe, false);
- }
+}
 
- /**
+/**
   * Disable trampoline
   *
   * Disable trampolines to use kprobes.
   *
   *  @param obj FS object loaded.
   */
- static void ebpf_fs_disable_trampoline(struct filesystem_bpf *obj)
- {
+static void ebpf_fs_disable_trampoline(struct filesystem_bpf *obj)
+{
     // entry
     bpf_program__set_autoload(obj->progs.netdata_fs_file_read_entry, false);
     bpf_program__set_autoload(obj->progs.netdata_fs_file_write_entry, false);
@@ -175,9 +212,9 @@ static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_fs_file_open_exit, false);
     bpf_program__set_autoload(obj->progs.netdata_fs_getattr_exit, false);
     bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_exit, false);
- }
+}
 
- /**
+/**
   * Set targets
   *
   * Set targets for each objects.
@@ -185,37 +222,27 @@ static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
   *  @param obj        FS object loaded.
   *  @param functions  array with function names.
   */
- static void ebpf_fs_set_target(struct filesystem_bpf *obj, const char **functions)
+static void ebpf_fs_set_target(struct filesystem_bpf *obj, const char **functions)
 {
-     // entry
-     bpf_program__set_attach_target(obj->progs.netdata_fs_file_read_entry, 0,
-                                    functions[NETDATA_KEY_BTF_READ]);
-     bpf_program__set_attach_target(obj->progs.netdata_fs_file_write_entry, 0,
-                                    functions[NETDATA_KEY_BTF_WRITE]);
-     bpf_program__set_attach_target(obj->progs.netdata_fs_file_open_entry, 0,
-                                    functions[NETDATA_KEY_BTF_OPEN]);
-     bpf_program__set_attach_target(obj->progs.netdata_fs_getattr_entry, 0,
-                                    functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+    // entry
+    bpf_program__set_attach_target(obj->progs.netdata_fs_file_read_entry, 0, functions[NETDATA_KEY_BTF_READ]);
+    bpf_program__set_attach_target(obj->progs.netdata_fs_file_write_entry, 0, functions[NETDATA_KEY_BTF_WRITE]);
+    bpf_program__set_attach_target(obj->progs.netdata_fs_file_open_entry, 0, functions[NETDATA_KEY_BTF_OPEN]);
+    bpf_program__set_attach_target(obj->progs.netdata_fs_getattr_entry, 0, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
 
-     // exit
-     bpf_program__set_attach_target(obj->progs.netdata_fs_file_read_exit, 0,
-                                    functions[NETDATA_KEY_BTF_READ]);
-     bpf_program__set_attach_target(obj->progs.netdata_fs_file_write_exit, 0,
-                                    functions[NETDATA_KEY_BTF_WRITE]);
-     bpf_program__set_attach_target(obj->progs.netdata_fs_file_open_exit, 0,
-                                    functions[NETDATA_KEY_BTF_OPEN]);
-     bpf_program__set_attach_target(obj->progs.netdata_fs_getattr_exit, 0,
-                                    functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+    // exit
+    bpf_program__set_attach_target(obj->progs.netdata_fs_file_read_exit, 0, functions[NETDATA_KEY_BTF_READ]);
+    bpf_program__set_attach_target(obj->progs.netdata_fs_file_write_exit, 0, functions[NETDATA_KEY_BTF_WRITE]);
+    bpf_program__set_attach_target(obj->progs.netdata_fs_file_open_exit, 0, functions[NETDATA_KEY_BTF_OPEN]);
+    bpf_program__set_attach_target(obj->progs.netdata_fs_getattr_exit, 0, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
 
-     if (functions[NETDATA_KEY_BTF_OPEN2]) {
-         bpf_program__set_attach_target(obj->progs.netdata_fs_2nd_file_open_entry, 0,
-                                        functions[NETDATA_KEY_BTF_OPEN2]);
-         bpf_program__set_attach_target(obj->progs.netdata_fs_2nd_file_open_exit, 0,
-                                        functions[NETDATA_KEY_BTF_OPEN2]);
-     } else {
-         bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_entry, false);
-         bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_exit, false);
-     }
+    if (functions[NETDATA_KEY_BTF_OPEN2]) {
+        bpf_program__set_attach_target(obj->progs.netdata_fs_2nd_file_open_entry, 0, functions[NETDATA_KEY_BTF_OPEN2]);
+        bpf_program__set_attach_target(obj->progs.netdata_fs_2nd_file_open_exit, 0, functions[NETDATA_KEY_BTF_OPEN2]);
+    } else {
+        bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_entry, false);
+        bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_exit, false);
+    }
 }
 
 /**
@@ -228,61 +255,61 @@ static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
  */
 static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functions)
 {
-     // kprobe
-     obj->links.netdata_fs_file_read_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_probe,
-                                                                        false, functions[NETDATA_KEY_BTF_READ]);
-     if (libbpf_get_error(obj->links.netdata_fs_file_read_probe))
-         return -1;
+    // kprobe
+    obj->links.netdata_fs_file_read_probe =
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_probe, false, functions[NETDATA_KEY_BTF_READ]);
+    if (libbpf_get_error(obj->links.netdata_fs_file_read_probe))
+        return -1;
 
-     obj->links.netdata_fs_file_write_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_probe,
-                                                                         false, functions[NETDATA_KEY_BTF_WRITE]);
-     if (libbpf_get_error(obj->links.netdata_fs_file_write_probe))
-         return -1;
+    obj->links.netdata_fs_file_write_probe =
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_probe, false, functions[NETDATA_KEY_BTF_WRITE]);
+    if (libbpf_get_error(obj->links.netdata_fs_file_write_probe))
+        return -1;
 
-     obj->links.netdata_fs_file_open_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_probe,
-                                                                        false, functions[NETDATA_KEY_BTF_OPEN]);
-     if (libbpf_get_error(obj->links.netdata_fs_file_open_probe))
-         return -1;
+    obj->links.netdata_fs_file_open_probe =
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_probe, false, functions[NETDATA_KEY_BTF_OPEN]);
+    if (libbpf_get_error(obj->links.netdata_fs_file_open_probe))
+        return -1;
 
-     obj->links.netdata_fs_getattr_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_probe,
-                                                                      false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
-     if (libbpf_get_error(obj->links.netdata_fs_getattr_probe))
-         return -1;
+    obj->links.netdata_fs_getattr_probe =
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_probe, false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+    if (libbpf_get_error(obj->links.netdata_fs_getattr_probe))
+        return -1;
 
-     // kretprobe
-     obj->links.netdata_fs_file_read_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_retprobe,
-                                                                           false, functions[NETDATA_KEY_BTF_READ]);
-     if (libbpf_get_error(obj->links.netdata_fs_file_read_retprobe))
-         return -1;
+    // kretprobe
+    obj->links.netdata_fs_file_read_retprobe =
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_retprobe, false, functions[NETDATA_KEY_BTF_READ]);
+    if (libbpf_get_error(obj->links.netdata_fs_file_read_retprobe))
+        return -1;
 
-     obj->links.netdata_fs_file_write_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_retprobe,
-                                                                            false, functions[NETDATA_KEY_BTF_WRITE]);
-     if (libbpf_get_error(obj->links.netdata_fs_file_write_retprobe))
-         return -1;
+    obj->links.netdata_fs_file_write_retprobe =
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_retprobe, false, functions[NETDATA_KEY_BTF_WRITE]);
+    if (libbpf_get_error(obj->links.netdata_fs_file_write_retprobe))
+        return -1;
 
-     obj->links.netdata_fs_file_open_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_retprobe,
-                                                                           false, functions[NETDATA_KEY_BTF_OPEN]);
-     if (libbpf_get_error(obj->links.netdata_fs_file_open_retprobe))
-         return -1;
+    obj->links.netdata_fs_file_open_retprobe =
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_retprobe, false, functions[NETDATA_KEY_BTF_OPEN]);
+    if (libbpf_get_error(obj->links.netdata_fs_file_open_retprobe))
+        return -1;
 
-     obj->links.netdata_fs_getattr_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_retprobe,
-                                                                         false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
-     if (libbpf_get_error(obj->links.netdata_fs_getattr_retprobe))
-         return -1;
+    obj->links.netdata_fs_getattr_retprobe =
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_retprobe, false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+    if (libbpf_get_error(obj->links.netdata_fs_getattr_retprobe))
+        return -1;
 
-     if (functions[NETDATA_KEY_BTF_OPEN2]) {
-         obj->links.netdata_fs_2nd_file_open_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_2nd_file_open_probe,
-                                                                                false, functions[NETDATA_KEY_BTF_OPEN2]);
-         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_probe))
-             return -1;
+    if (functions[NETDATA_KEY_BTF_OPEN2]) {
+        obj->links.netdata_fs_2nd_file_open_probe = bpf_program__attach_kprobe(
+            obj->progs.netdata_fs_2nd_file_open_probe, false, functions[NETDATA_KEY_BTF_OPEN2]);
+        if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_probe))
+            return -1;
 
-         obj->links.netdata_fs_2nd_file_open_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_2nd_file_open_retprobe,
-                                                                                   false, functions[NETDATA_KEY_BTF_OPEN2]);
-         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_retprobe))
-             return -1;
-     }
+        obj->links.netdata_fs_2nd_file_open_retprobe = bpf_program__attach_kprobe(
+            obj->progs.netdata_fs_2nd_file_open_retprobe, false, functions[NETDATA_KEY_BTF_OPEN2]);
+        if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_retprobe))
+            return -1;
+    }
 
-     return 0;
+    return 0;
 }
 
 /**
@@ -295,8 +322,8 @@ static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functi
  *  @param functions  array with function names.
  *  @param bf         sttruct with btf file loaded.
  */
-static inline int ebpf_fs_load_and_attach(ebpf_local_maps_t *map, struct filesystem_bpf *obj,
-                                       const char **functions, struct btf *bf)
+static inline int
+ebpf_fs_load_and_attach(ebpf_local_maps_t *map, struct filesystem_bpf *obj, const char **functions, struct btf *bf)
 {
     if (bf) {
         ebpf_fs_disable_kprobe(obj);
@@ -336,7 +363,8 @@ static inline int ebpf_fs_load_and_attach(ebpf_local_maps_t *map, struct filesys
  *
  * @param efp
  */
-static void ebpf_obsolete_cleanup_struct(ebpf_filesystem_partitions_t *efp) {
+static void ebpf_obsolete_cleanup_struct(ebpf_filesystem_partitions_t *efp)
+{
     freez(efp->hread.name);
     efp->hread.name = NULL;
     freez(efp->hread.title);
@@ -386,26 +414,53 @@ static void ebpf_obsolete_fs_charts(int update_every)
         if ((flags & test) == test) {
             flags &= ~test;
 
-            ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
-                                      "",
-                                      efp->hread.title,
-                                      EBPF_COMMON_UNITS_CALLS_PER_SEC, efp->family_name,
-                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hread.order, update_every);
+            ebpf_write_chart_obsolete(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hread.name,
+                "",
+                efp->hread.title,
+                EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                efp->family_name,
+                NULL,
+                NETDATA_EBPF_CHART_TYPE_STACKED,
+                efp->hread.order,
+                update_every);
 
-            ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
-                                      "",
-                                      efp->hwrite.title,
-                                      EBPF_COMMON_UNITS_CALLS_PER_SEC, efp->family_name,
-                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hwrite.order, update_every);
+            ebpf_write_chart_obsolete(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hwrite.name,
+                "",
+                efp->hwrite.title,
+                EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                efp->family_name,
+                NULL,
+                NETDATA_EBPF_CHART_TYPE_STACKED,
+                efp->hwrite.order,
+                update_every);
 
-            ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name, "", efp->hopen.title,
-                                      EBPF_COMMON_UNITS_CALLS_PER_SEC, efp->family_name,
-                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hopen.order, update_every);
+            ebpf_write_chart_obsolete(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hopen.name,
+                "",
+                efp->hopen.title,
+                EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                efp->family_name,
+                NULL,
+                NETDATA_EBPF_CHART_TYPE_STACKED,
+                efp->hopen.order,
+                update_every);
 
-            ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name,"",  efp->hadditional.title,
-                                      EBPF_COMMON_UNITS_CALLS_PER_SEC, efp->family_name,
-                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hadditional.order,
-                                      update_every);
+            ebpf_write_chart_obsolete(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hadditional.name,
+                "",
+                efp->hadditional.title,
+                EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                efp->family_name,
+                NULL,
+                NETDATA_EBPF_CHART_TYPE_STACKED,
+                efp->hadditional.order,
+                update_every);
 
             ebpf_obsolete_cleanup_struct(efp);
         }
@@ -425,7 +480,7 @@ static void ebpf_create_fs_charts(int update_every)
     static int order = NETDATA_CHART_PRIO_EBPF_FILESYSTEM_CHARTS;
     char chart_name[64], title[256], family[64], ctx[64];
     int i;
-    uint32_t test = NETDATA_FILESYSTEM_FLAG_CHART_CREATED|NETDATA_FILESYSTEM_REMOVE_CHARTS;
+    uint32_t test = NETDATA_FILESYSTEM_FLAG_CHART_CREATED | NETDATA_FILESYSTEM_REMOVE_CHARTS;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         uint32_t flags = efp->flags;
@@ -440,13 +495,20 @@ static void ebpf_create_fs_charts(int update_every)
             efp->hread.order = order;
             efp->family_name = strdupz(family);
 
-            ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
-                              efp->hread.title,
-                              EBPF_COMMON_UNITS_CALLS_PER_SEC, efp->family_name,
-                              "filesystem.read_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order,
-                              ebpf_create_global_dimension,
-                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
-                              update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
+            ebpf_create_chart(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hread.name,
+                efp->hread.title,
+                EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                efp->family_name,
+                "filesystem.read_latency",
+                NETDATA_EBPF_CHART_TYPE_STACKED,
+                order,
+                ebpf_create_global_dimension,
+                filesystem_publish_aggregated,
+                NETDATA_EBPF_HIST_MAX_BINS,
+                update_every,
+                NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
 
             snprintfz(title, sizeof(title) - 1, "%s latency for each write request.", efp->filesystem);
@@ -456,13 +518,20 @@ static void ebpf_create_fs_charts(int update_every)
             efp->hwrite.title = strdupz(title);
             efp->hwrite.ctx = strdupz(ctx);
             efp->hwrite.order = order;
-            ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
-                              efp->hwrite.title,
-                              EBPF_COMMON_UNITS_CALLS_PER_SEC, efp->family_name,
-                              "filesystem.write_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order,
-                              ebpf_create_global_dimension,
-                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
-                              update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
+            ebpf_create_chart(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hwrite.name,
+                efp->hwrite.title,
+                EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                efp->family_name,
+                "filesystem.write_latency",
+                NETDATA_EBPF_CHART_TYPE_STACKED,
+                order,
+                ebpf_create_global_dimension,
+                filesystem_publish_aggregated,
+                NETDATA_EBPF_HIST_MAX_BINS,
+                update_every,
+                NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
 
             snprintfz(title, sizeof(title) - 1, "%s latency for each open request.", efp->filesystem);
@@ -472,13 +541,20 @@ static void ebpf_create_fs_charts(int update_every)
             efp->hopen.title = strdupz(title);
             efp->hopen.ctx = strdupz(ctx);
             efp->hopen.order = order;
-            ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name,
-                              efp->hopen.title,
-                              EBPF_COMMON_UNITS_CALLS_PER_SEC, efp->family_name,
-                              "filesystem.open_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order,
-                              ebpf_create_global_dimension,
-                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
-                              update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
+            ebpf_create_chart(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hopen.name,
+                efp->hopen.title,
+                EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                efp->family_name,
+                "filesystem.open_latency",
+                NETDATA_EBPF_CHART_TYPE_STACKED,
+                order,
+                ebpf_create_global_dimension,
+                filesystem_publish_aggregated,
+                NETDATA_EBPF_HIST_MAX_BINS,
+                update_every,
+                NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
 
             char *type = (efp->flags & NETDATA_FILESYSTEM_ATTR_CHARTS) ? "attribute" : "sync";
@@ -489,11 +565,20 @@ static void ebpf_create_fs_charts(int update_every)
             efp->hadditional.title = strdupz(title);
             efp->hadditional.ctx = strdupz(ctx);
             efp->hadditional.order = order;
-            ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name, efp->hadditional.title,
-                              EBPF_COMMON_UNITS_CALLS_PER_SEC, efp->family_name,
-                              ctx, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
-                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
-                              update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
+            ebpf_create_chart(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hadditional.name,
+                efp->hadditional.title,
+                EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                efp->family_name,
+                ctx,
+                NETDATA_EBPF_CHART_TYPE_STACKED,
+                order,
+                ebpf_create_global_dimension,
+                filesystem_publish_aggregated,
+                NETDATA_EBPF_HIST_MAX_BINS,
+                update_every,
+                NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
             efp->flags |= NETDATA_FILESYSTEM_FLAG_CHART_CREATED;
         }
@@ -542,8 +627,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                     em->kernels = kernels;
                     pthread_mutex_unlock(&lock);
                     return -1;
-                } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj,
-                    efp->functions, NULL)) {
+                } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj, efp->functions, NULL)) {
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
                     pthread_mutex_unlock(&lock);
@@ -569,8 +653,8 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     if (!dimensions) {
         dimensions = ebpf_fill_histogram_dimension(NETDATA_EBPF_HIST_MAX_BINS);
 
-        memset(filesystem_aggregated_data, 0 , NETDATA_EBPF_HIST_MAX_BINS * sizeof(netdata_syscall_stat_t));
-        memset(filesystem_publish_aggregated, 0 , NETDATA_EBPF_HIST_MAX_BINS * sizeof(netdata_publish_syscall_t));
+        memset(filesystem_aggregated_data, 0, NETDATA_EBPF_HIST_MAX_BINS * sizeof(netdata_syscall_stat_t));
+        memset(filesystem_publish_aggregated, 0, NETDATA_EBPF_HIST_MAX_BINS * sizeof(netdata_publish_syscall_t));
 
         filesystem_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
     }
@@ -588,14 +672,15 @@ static int ebpf_read_local_partitions()
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", netdata_configured_host_prefix);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-    if(unlikely(!ff)) {
+    if (unlikely(!ff)) {
         snprintfz(filename, FILENAME_MAX, "%s/proc/1/mountinfo", netdata_configured_host_prefix);
         ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 0;
+        if (unlikely(!ff))
+            return 0;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if (unlikely(!ff))
         return 0;
 
     int count = 0;
@@ -604,7 +689,7 @@ static int ebpf_read_local_partitions()
         localfs[i].flags |= NETDATA_FILESYSTEM_REMOVE_CHARTS;
     }
 
-    for(l = 0; l < lines ; l++) {
+    for (l = 0; l < lines; l++) {
         // In "normal" situation the expected value is at column 7
         // When `shared` options is added to mount information, the filesystem is at column 8
         // Finally when we have systemd starting netdata, it will be at column 9
@@ -614,8 +699,8 @@ static int ebpf_read_local_partitions()
 
         for (i = 0; localfs[i].filesystem; i++) {
             ebpf_filesystem_partitions_t *w = &localfs[i];
-            if (w->enabled && (!strcmp(fs, w->filesystem) ||
-                              (w->optional_filesystem && !strcmp(fs, w->optional_filesystem)))) {
+            if (w->enabled &&
+                (!strcmp(fs, w->filesystem) || (w->optional_filesystem && !strcmp(fs, w->optional_filesystem)))) {
                 if (!(localfs[i].flags & NETDATA_FILESYSTEM_FLAG_CHART_CREATED))
                     localfs[i].flags |= NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
 
@@ -734,52 +819,56 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
         if (!efp->objects)
             continue;
 
-        ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
-                                  efp->hread.name,
-                                  "",
-                                  efp->hread.title,
-                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                                  efp->family_name,
-                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "filesystem.read_latency",
-                                  efp->hread.order,
-                                  em->update_every);
+        ebpf_write_chart_obsolete(
+            NETDATA_FILESYSTEM_FAMILY,
+            efp->hread.name,
+            "",
+            efp->hread.title,
+            EBPF_COMMON_UNITS_CALLS_PER_SEC,
+            efp->family_name,
+            NETDATA_EBPF_CHART_TYPE_STACKED,
+            "filesystem.read_latency",
+            efp->hread.order,
+            em->update_every);
         ebpf_cleanup_fs_histograms(&efp->hread);
 
-        ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
-                                  efp->hwrite.name,
-                                  "",
-                                  efp->hwrite.title,
-                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                                  efp->family_name,
-                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "filesystem.write_latency",
-                                  efp->hwrite.order,
-                                  em->update_every);
+        ebpf_write_chart_obsolete(
+            NETDATA_FILESYSTEM_FAMILY,
+            efp->hwrite.name,
+            "",
+            efp->hwrite.title,
+            EBPF_COMMON_UNITS_CALLS_PER_SEC,
+            efp->family_name,
+            NETDATA_EBPF_CHART_TYPE_STACKED,
+            "filesystem.write_latency",
+            efp->hwrite.order,
+            em->update_every);
         ebpf_cleanup_fs_histograms(&efp->hwrite);
 
-        ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
-                                  efp->hopen.name,
-                                  "",
-                                  efp->hopen.title,
-                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                                  efp->family_name,
-                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "filesystem.open_latency",
-                                  efp->hopen.order,
-                                  em->update_every);
+        ebpf_write_chart_obsolete(
+            NETDATA_FILESYSTEM_FAMILY,
+            efp->hopen.name,
+            "",
+            efp->hopen.title,
+            EBPF_COMMON_UNITS_CALLS_PER_SEC,
+            efp->family_name,
+            NETDATA_EBPF_CHART_TYPE_STACKED,
+            "filesystem.open_latency",
+            efp->hopen.order,
+            em->update_every);
         ebpf_cleanup_fs_histograms(&efp->hopen);
 
-        ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
-                                  efp->hadditional.name,
-                                  "",
-                                  efp->hadditional.title,
-                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                                  efp->family_name,
-                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  efp->hadditional.ctx,
-                                  efp->hadditional.order,
-                                  em->update_every);
+        ebpf_write_chart_obsolete(
+            NETDATA_FILESYSTEM_FAMILY,
+            efp->hadditional.name,
+            "",
+            efp->hadditional.title,
+            EBPF_COMMON_UNITS_CALLS_PER_SEC,
+            efp->family_name,
+            NETDATA_EBPF_CHART_TYPE_STACKED,
+            efp->hadditional.ctx,
+            efp->hadditional.order,
+            em->update_every);
         ebpf_cleanup_fs_histograms(&efp->hadditional);
 
         efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
@@ -796,7 +885,8 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
 static void ebpf_filesystem_exit(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!em) return;
+    if (!em)
+        return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -859,7 +949,7 @@ static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t
     } else if (id < NETDATA_KEY_CALLS_OPEN) {
         *idx = id - NETDATA_KEY_CALLS_WRITE;
         return &efp->hopen;
-    } else if (id < NETDATA_KEY_CALLS_SYNC ){
+    } else if (id < NETDATA_KEY_CALLS_SYNC) {
         *idx = id - NETDATA_KEY_CALLS_OPEN;
         return &efp->hadditional;
     }
@@ -935,7 +1025,7 @@ static void read_filesystem_tables(int maps_per_core)
  */
 void ebpf_filesystem_read_hash(ebpf_module_t *em)
 {
-    (void) ebpf_update_partitions(em);
+    (void)ebpf_update_partitions(em);
 
     ebpf_obsolete_fs_charts(em->update_every);
 
@@ -957,17 +1047,33 @@ static void ebpf_histogram_send_data()
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if ((efp->flags & test) == NETDATA_FILESYSTEM_FLAG_HAS_PARTITION) {
-            write_histogram_chart(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
-                                  efp->hread.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+            write_histogram_chart(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hread.name,
+                efp->hread.histogram,
+                dimensions,
+                NETDATA_EBPF_HIST_MAX_BINS);
 
-            write_histogram_chart(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
-                                  efp->hwrite.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+            write_histogram_chart(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hwrite.name,
+                efp->hwrite.histogram,
+                dimensions,
+                NETDATA_EBPF_HIST_MAX_BINS);
 
-            write_histogram_chart(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name,
-                                  efp->hopen.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+            write_histogram_chart(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hopen.name,
+                efp->hopen.histogram,
+                dimensions,
+                NETDATA_EBPF_HIST_MAX_BINS);
 
-            write_histogram_chart(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name,
-                                  efp->hadditional.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+            write_histogram_chart(
+                NETDATA_FILESYSTEM_FAMILY,
+                efp->hadditional.name,
+                efp->hadditional.histogram,
+                dimensions,
+                NETDATA_EBPF_HIST_MAX_BINS);
         }
     }
 }
@@ -1029,8 +1135,8 @@ static void ebpf_update_filesystem()
     for (i = 0; localfs[i].filesystem; i++) {
         snprintfz(dist, NETDATA_FS_MAX_DIST_NAME, "%sdist", localfs[i].filesystem);
 
-        localfs[i].enabled = appconfig_get_boolean(&fs_config, NETDATA_FILESYSTEM_CONFIG_NAME, dist,
-                                                   CONFIG_BOOLEAN_YES);
+        localfs[i].enabled =
+            appconfig_get_boolean(&fs_config, NETDATA_FILESYSTEM_CONFIG_NAME, dist, CONFIG_BOOLEAN_YES);
     }
 }
 
@@ -1082,8 +1188,13 @@ void *ebpf_filesystem_thread(void *ptr)
 
     int algorithms[NETDATA_EBPF_HIST_MAX_BINS];
     ebpf_fill_algorithms(algorithms, NETDATA_EBPF_HIST_MAX_BINS, NETDATA_EBPF_INCREMENTAL_IDX);
-    ebpf_global_labels(filesystem_aggregated_data, filesystem_publish_aggregated, dimensions, dimensions,
-                       algorithms, NETDATA_EBPF_HIST_MAX_BINS);
+    ebpf_global_labels(
+        filesystem_aggregated_data,
+        filesystem_publish_aggregated,
+        dimensions,
+        dimensions,
+        algorithms,
+        NETDATA_EBPF_HIST_MAX_BINS);
 
     pthread_mutex_lock(&lock);
     ebpf_create_fs_charts(em->update_every);

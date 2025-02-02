@@ -38,10 +38,7 @@ enum netdata_filesystem_flags {
     NETDATA_FILESYSTEM_ATTR_CHARTS = 32
 };
 
-enum netdata_filesystem_table {
-    NETDATA_MAIN_FS_TABLE,
-    NETDATA_ADDR_FS_TABLE
-};
+enum netdata_filesystem_table { NETDATA_MAIN_FS_TABLE, NETDATA_ADDR_FS_TABLE };
 
 enum netdata_filesystem_localfs_idx {
     NETDATA_FS_LOCALFS_EXT4,

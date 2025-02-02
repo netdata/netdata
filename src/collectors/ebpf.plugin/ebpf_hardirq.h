@@ -37,16 +37,12 @@ enum hardirq_ebpf_static {
     HARDIRQ_EBPF_STATIC_END
 };
 
-enum hardirq_maps {
-    HARDIRQ_MAP_LATENCY,
-    HARDIRQ_MAP_LATENCY_STATIC
-};
+enum hardirq_maps { HARDIRQ_MAP_LATENCY, HARDIRQ_MAP_LATENCY_STATIC };
 
 typedef struct hardirq_ebpf_static_val {
     uint64_t latency;
     uint64_t ts;
 } hardirq_ebpf_static_val_t;
-
 
 /*****************************************************************
  * below this is eBPF plugin-specific code.

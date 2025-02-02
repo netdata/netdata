@@ -146,7 +146,7 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
 
     uint32_t has_proc_file;
     uint32_t not_updated;
-    int children_count;              // number of processes directly referencing this
+    int children_count; // number of processes directly referencing this
     int merged;
     int sortlist; // higher numbers = top on the process tree
 
@@ -270,10 +270,11 @@ static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
 
 ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid);
 
-static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx) {
-//    ebpf_pid_data_t *ptr = &ebpf_pids[pid];
+static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx)
+{
+    //    ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     ebpf_pid_data_t *ptr = ebpf_find_or_create_pid_data(pid);
-    ptr->thread_collecting |= 1<<idx;
+    ptr->thread_collecting |= 1 << idx;
     // The caller is getting data to work.
     if (!name && idx != NETDATA_EBPF_PIDS_PROC_FILE)
         return ptr;
@@ -305,7 +306,7 @@ static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t 
     if (fd) {
         bpf_map_delete_elem(fd, &key);
     }
-    eps->thread_collecting &= ~(1<<idx);
+    eps->thread_collecting &= ~(1 << idx);
     if (!eps->thread_collecting && !eps->has_proc_file) {
         ebpf_del_pid_entry((pid_t)key);
     }
@@ -316,7 +317,7 @@ static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
     int idx;
     uint32_t pid = ptr->pid;
     for (idx = NETDATA_EBPF_PIDS_PROCESS_IDX; idx < NETDATA_EBPF_PIDS_PROC_FILE; idx++) {
-        if (!(ptr->thread_collecting & (1<<idx)))  {
+        if (!(ptr->thread_collecting & (1 << idx))) {
             continue;
         }
         // Check if we still have the map loaded
@@ -360,7 +361,6 @@ static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
 
     ebpf_del_pid_entry(pid);
 }
-
 
 typedef struct ebpf_pid_stat {
     uint32_t pid;
@@ -448,10 +448,11 @@ static inline void debug_log_int(const char *fmt, ...)
 // ----------------------------------------------------------------------------
 // Exported variabled and functions
 //
-int ebpf_read_apps_groups_conf(struct ebpf_target **apps_groups_default_target,
-                               struct ebpf_target **apps_groups_root_target,
-                               const char *path,
-                               const char *file);
+int ebpf_read_apps_groups_conf(
+    struct ebpf_target **apps_groups_default_target,
+    struct ebpf_target **apps_groups_root_target,
+    const char *path,
+    const char *file);
 
 void clean_apps_groups_target(struct ebpf_target *apps_groups_root_target);
 
@@ -469,7 +470,7 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,
 // this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/src/libnetdata/aral).
 #ifndef NETDATA_EBPF_ALLOC_MAX_PID
-# define NETDATA_EBPF_ALLOC_MAX_PID 1024
+#define NETDATA_EBPF_ALLOC_MAX_PID 1024
 #endif
 #define NETDATA_EBPF_ALLOC_MIN_ELEMENTS 256
 
