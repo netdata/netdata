@@ -110,7 +110,8 @@ static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline ssize_t write_stream(struct receiver_state *r, char* buffer, size_t size) {
+ALWAYS_INLINE
+static ssize_t write_stream(struct receiver_state *r, char* buffer, size_t size) {
     if(unlikely(!size)) {
         internal_error(true, "%s() asked to read zero bytes", __FUNCTION__);
         errno_clear();
@@ -132,7 +133,8 @@ static inline ssize_t write_stream(struct receiver_state *r, char* buffer, size_
     return bytes_written;
 }
 
-static inline ssize_t read_stream(struct receiver_state *r, char* buffer, size_t size) {
+ALWAYS_INLINE
+static ssize_t read_stream(struct receiver_state *r, char* buffer, size_t size) {
     if(unlikely(!size)) {
         internal_error(true, "%s() asked to read zero bytes", __FUNCTION__);
         errno_clear();
@@ -156,7 +158,8 @@ static inline ssize_t read_stream(struct receiver_state *r, char* buffer, size_t
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline ssize_t receiver_read_uncompressed(struct receiver_state *r) {
+ALWAYS_INLINE
+static ssize_t receiver_read_uncompressed(struct receiver_state *r) {
     internal_fatal(r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
@@ -192,7 +195,8 @@ static inline void receiver_move_compressed(struct receiver_state *r) {
     }
 }
 
-static inline decompressor_status_t receiver_feed_decompressor(struct receiver_state *r) {
+ALWAYS_INLINE_HOT_FLATTEN
+static decompressor_status_t receiver_feed_decompressor(struct receiver_state *r) {
     char *buf = r->thread.compressed.buf;
     size_t start = r->thread.compressed.start;
     size_t signature_size = r->thread.compressed.decompressor.signature_size;
@@ -248,7 +252,8 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
     return DECOMPRESS_OK;
 }
 
-static inline decompressor_status_t receiver_get_decompressed(struct receiver_state *r) {
+ALWAYS_INLINE_HOT_FLATTEN
+static decompressor_status_t receiver_get_decompressed(struct receiver_state *r) {
     if (unlikely(!stream_decompressed_bytes_in_buffer(&r->thread.compressed.decompressor)))
         return DECOMPRESS_NEED_MORE_DATA;
 
@@ -272,7 +277,8 @@ static inline decompressor_status_t receiver_get_decompressed(struct receiver_st
     return DECOMPRESS_OK;
 }
 
-static inline ssize_t receiver_read_compressed(struct receiver_state *r) {
+ALWAYS_INLINE_HOT_FLATTEN
+static ssize_t receiver_read_compressed(struct receiver_state *r) {
 
     internal_fatal(r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
@@ -298,7 +304,8 @@ static STREAM_HANDSHAKE receiver_set_exit_reason(struct receiver_state *rpt, STR
     return rpt->exit.reason;
 }
 
-static inline bool receiver_should_stop(struct receiver_state *rpt) {
+ALWAYS_INLINE
+static bool receiver_should_stop(struct receiver_state *rpt) {
     if(unlikely(__atomic_load_n(&rpt->exit.shutdown, __ATOMIC_ACQUIRE))) {
         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP, false);
         return true;
@@ -309,6 +316,7 @@ static inline bool receiver_should_stop(struct receiver_state *rpt) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+ALWAYS_INLINE
 void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state *rpt, struct stream_opcode *msg) {
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),

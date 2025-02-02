@@ -191,6 +191,7 @@ bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd) {
     return netdata_ssl_open_ext(ssl, ctx, fd, NULL, 0);
 }
 
+ALWAYS_INLINE
 void netdata_ssl_close(NETDATA_SSL *ssl) {
     errno = 0;
     ssl->ssl_errno = 0;
@@ -210,7 +211,8 @@ void netdata_ssl_close(NETDATA_SSL *ssl) {
     *ssl = NETDATA_SSL_UNSET_CONNECTION;
 }
 
-static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
+ALWAYS_INLINE
+static bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
     nd_log_limit_static_thread_var(erl, 1, 0);
 
     if(unlikely(!ssl->conn)) {
@@ -264,10 +266,12 @@ static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
  *     (These are often the same value, but can be different on some systems.)
  */
 
+ALWAYS_INLINE
 ssize_t netdata_ssl_pending(NETDATA_SSL *ssl) {
     return SSL_pending(ssl->conn);
 }
 
+ALWAYS_INLINE
 bool netdata_ssl_has_pending(NETDATA_SSL *ssl) {
     // this call was added on OpenSSL 1.1.0
     // however, it is more accurate than SSL_pending()
@@ -277,6 +281,7 @@ bool netdata_ssl_has_pending(NETDATA_SSL *ssl) {
     return SSL_pending(ssl->conn) > 0;
 }
 
+ALWAYS_INLINE
 ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
     errno = 0;
     ssl->ssl_errno = 0;
@@ -319,6 +324,7 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
  *     (These are often the same value, but can be different on some systems.)
  */
 
+ALWAYS_INLINE
 ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
     errno = 0;
     ssl->ssl_errno = 0;
@@ -386,7 +392,8 @@ static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
 
 #define WANT_READ_WRITE_TIMEOUT_MS 10
 
-static inline bool want_read_write_should_retry(NETDATA_SSL *ssl, int err) {
+ALWAYS_INLINE
+static bool want_read_write_should_retry(NETDATA_SSL *ssl, int err) {
     int ssl_errno = SSL_get_error(ssl->conn, err);
     if(ssl_errno == SSL_ERROR_WANT_READ || ssl_errno == SSL_ERROR_WANT_WRITE) {
         struct pollfd pfds[1] = { [0] = {

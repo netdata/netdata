@@ -214,6 +214,7 @@ static bool stream_sender_log_dst_port(BUFFER *wb, void *ptr) {
 // --------------------------------------------------------------------------------------------------------------------
 // opcodes
 
+ALWAYS_INLINE
 void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, struct stream_opcode *msg) {
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
