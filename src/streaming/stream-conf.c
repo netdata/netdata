@@ -296,8 +296,8 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
         stream_receive.replication.period));
 
     config->replication.step =
-        inicfg_get_number(&stream_config, machine_guid, "replication step",
-        inicfg_get_number(&stream_config, api_key, "replication step",
+        inicfg_get_duration_seconds(&stream_config, machine_guid, "replication step",
+        inicfg_get_duration_seconds(&stream_config, api_key, "replication step",
         stream_receive.replication.step));
 
     config->compression.enabled =
