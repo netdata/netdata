@@ -370,14 +370,16 @@ typedef uint32_t uid_t;
     a = _tmp;           \
 } while(0)
 
-#define ROUNDUP(total, divider) ({ \
+// returns the number of times the divider fits into the total
+// if the divider is 0, it is treated as 1 (it returns total)
+#define HOWMANY(total, divider) ({ \
     typeof(total) _t = (total);    \
     typeof(total) _d = (divider);  \
     _d = _d ? _d : 1;              \
     (_t + (_d - 1)) / _d;          \
 })
 
-#define INRANGE(value, min, max) ({ \
+#define FIT_IN_RANGE(value, min, max) ({ \
     typeof(value) _v = (value);     \
     typeof(min) _min = (min);       \
     typeof(max) _max = (max);       \

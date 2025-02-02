@@ -46,7 +46,7 @@ struct _stream_receive stream_receive = {
     .replication = {
         .enabled = true,
         .period = 86400,
-        .step = 1200,
+        .step = 3600,
     }
 };
 

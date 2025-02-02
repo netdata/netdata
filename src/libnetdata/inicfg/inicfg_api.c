@@ -228,7 +228,7 @@ long long inicfg_get_number_range(struct config *root, const char *section, cons
 
     const char *s = string2str(opt->value);
     long long rc = strtoll(s, NULL, 0);
-    long long rc2 = INRANGE(rc, min, max);
+    long long rc2 = FIT_IN_RANGE(rc, min, max);
 
     if(rc != rc2) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "CONFIG: out of range [%s].%s = %lld. Acceptable values: %lld to %lld inclusive. Setting it to %lld",

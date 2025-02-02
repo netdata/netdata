@@ -444,13 +444,14 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 q->query.before = last_end_time_in_buffer;
                 q->query.enable_streaming = false;
 
-                internal_error(true,
-                               "STREAM SND REPLAY: current buffer size %zu is more than the "
-                               "max message size %zu for chart '%s' of host '%s'. "
-                               "Interrupting replication request (%ld to %ld, %s) at %ld to %ld, %s.",
-                               buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
-                               q->request.after, q->request.before, q->request.enable_streaming?"true":"false",
-                               q->query.after, q->query.before, q->query.enable_streaming?"true":"false");
+                internal_error(
+                    true,
+                    "STREAM SND REPLAY: current remaining sender buffer of %zu bytes cannot fit the "
+                    "message size %zu bytes for chart '%s' of host '%s'. "
+                    "Sending partial replication response %ld to %ld, %s (original: %ld to %ld, %s).",
+                    buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
+                    q->query.after, q->query.before, q->query.enable_streaming?"true":"false",
+                    q->request.after, q->request.before, q->request.enable_streaming?"true":"false");
 
                 q->query.interrupted = true;
 
@@ -1861,18 +1862,18 @@ void *replication_thread_main(void *ptr) {
 }
 
 int replication_threads_default(void) {
-    int threads = netdata_conf_is_parent() ? (int)ROUNDUP(netdata_conf_cpus(), 3) : 1;
-    threads = INRANGE(threads, 1, MAX_REPLICATION_THREADS);
+    int threads = netdata_conf_is_parent() ? (int)HOWMANY(netdata_conf_cpus(), 4) : 1;
+    threads = FIT_IN_RANGE(threads, 1, MAX_REPLICATION_THREADS);
     return threads;
 }
 
 int replication_prefetch_default(void) {
-    // Our goal is to feed the pipeline with 2x the libuv worker threads,
+    // Our goal is to feed the pipeline with enough requests,
     // since this will allow dbengine to merge the requests that load the same extents,
-    // providing the best performance and miniming disk I/O.
-    int target = libuv_worker_threads * 2;
+    // providing the best performance and minimizing disk I/O.
+    int target = MAX(libuv_worker_threads / 2, (int)stream_send.replication.threads * 5);
 
-    int prefetch = (int)ROUNDUP(target, stream_send.replication.threads);
-    prefetch = INRANGE(prefetch, 1, MAX_REPLICATION_PREFETCH);
+    int prefetch = (int)HOWMANY(target, stream_send.replication.threads);
+    prefetch = FIT_IN_RANGE(prefetch, 1, MAX_REPLICATION_PREFETCH);
     return prefetch;
 }
