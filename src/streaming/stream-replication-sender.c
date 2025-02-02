@@ -1057,6 +1057,7 @@ static void replication_sort_entry_del(struct replication_request *rq, bool buff
     replication_recursive_unlock();
 }
 
+ALWAYS_INLINE_HOT
 static struct replication_request replication_request_get_first_available() {
     Pvoid_t *inner_judy_pptr;
 
@@ -1210,6 +1211,7 @@ static bool sender_is_still_connected_for_this_request(struct replication_reques
     return rq->sender_circular_buffer_last_flush_ut == stream_circular_buffer_last_flush_ut(rq->sender->scb);
 }
 
+ALWAYS_INLINE_HOT
 static bool replication_execute_request(struct replication_request *rq, bool workers) {
     bool ret = false;
 
@@ -1553,10 +1555,10 @@ static int replication_pipeline_execute_next(void) {
 
     if(unlikely(!rtp.rqs)) {
 #if REQUESTS_AHEAD_PER_THREAD == 0
-        rtp.max_requests_ahead = (int)netdata_conf_cpus() / 2;
+        rtp.max_requests_ahead = (int)(libuv_worker_threads / (replication_globals.main_thread.threads + 1));
 
-        if (rtp.max_requests_ahead > libuv_worker_threads * 2)
-            rtp.max_requests_ahead = libuv_worker_threads * 2;
+        if (rtp.max_requests_ahead > libuv_worker_threads)
+            rtp.max_requests_ahead = libuv_worker_threads;
 
         if (rtp.max_requests_ahead < 5)
             rtp.max_requests_ahead = 5;
