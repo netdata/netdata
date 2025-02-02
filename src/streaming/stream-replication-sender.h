@@ -10,6 +10,9 @@
 extern "C" {
 #endif
 
+#define MAX_REPLICATION_THREADS 256
+#define MAX_REPLICATION_PREFETCH 1024
+
 struct parser;
 
 struct replication_query_statistics {
@@ -30,6 +33,9 @@ void replication_sender_recalculate_buffer_used_ratio_unsafe(struct sender_state
 
 size_t replication_sender_allocated_memory(void);
 size_t replication_sender_allocated_buffers(void);
+
+int replication_prefetch_default(void);
+int replication_threads_default(void);
 
 #ifdef __cplusplus
 }

@@ -30,9 +30,6 @@
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
 
-#define MAX_REPLICATION_THREADS 256
-#define REQUESTS_AHEAD_PER_THREAD 0 // 0 = dynamic, 1 = enable synchronous queries, > 1 static
-
 static struct replication_query_statistics replication_queries = {
         .spinlock = SPINLOCK_INITIALIZER,
         .queries_started = 0,
@@ -1541,18 +1538,7 @@ static int replication_pipeline_execute_next(void) {
     struct replication_request *rq;
 
     if(unlikely(!rtp.rqs)) {
-#if REQUESTS_AHEAD_PER_THREAD == 0
-        rtp.max_requests_ahead = (int)(libuv_worker_threads / (replication_globals.main_thread.threads + 1));
-
-        if (rtp.max_requests_ahead > libuv_worker_threads)
-            rtp.max_requests_ahead = libuv_worker_threads;
-
-        if (rtp.max_requests_ahead < 5)
-            rtp.max_requests_ahead = 5;
-#else
-        rtp.max_requests_ahead = REQUESTS_AHEAD_PER_THREAD;
-#endif
-
+        rtp.max_requests_ahead = stream_send.replication.prefetch;
         rtp.rqs = callocz(rtp.max_requests_ahead, sizeof(struct replication_request));
         __atomic_add_fetch(&replication_buffers_allocated, rtp.max_requests_ahead * sizeof(struct replication_request), __ATOMIC_RELAXED);
     }
@@ -1721,22 +1707,7 @@ void *replication_thread_main(void *ptr) {
 
     replication_initialize_workers(true);
 
-    size_t threads = netdata_conf_is_parent() ? (netdata_conf_cpus() / 3) : 1;
-    if (threads < 1) threads = 1;
-    else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
-
-    threads = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "replication threads", threads);
-    if(threads < 1) {
-        netdata_log_error("replication threads given %zu is invalid, resetting to 1", threads);
-        threads = 1;
-        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "replication threads", threads);
-    }
-    else if(threads > MAX_REPLICATION_THREADS) {
-        netdata_log_error("replication threads given %zu is invalid, resetting to %d", threads, (int)MAX_REPLICATION_THREADS);
-        threads = MAX_REPLICATION_THREADS;
-        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "replication threads", threads);
-    }
-
+    size_t threads = stream_send.replication.threads;
     if(--threads) {
         replication_globals.main_thread.threads = threads;
         replication_globals.main_thread.threads_ptrs = mallocz(threads * sizeof(ND_THREAD *));
@@ -1879,4 +1850,16 @@ void *replication_thread_main(void *ptr) {
     }
 
     return NULL;
+}
+
+int replication_prefetch_default(void) {
+    int prefetch = (int)ROUNDUP(libuv_worker_threads, stream_send.replication.threads);
+    prefetch = INRANGE(prefetch, 1, MIN(libuv_worker_threads, MAX_REPLICATION_PREFETCH));
+    return prefetch;
+}
+
+int replication_threads_default(void) {
+    int threads = netdata_conf_is_parent() ? (int)ROUNDUP(netdata_conf_cpus(), 3) : 1;
+    threads = INRANGE(threads, 1, MAX_REPLICATION_THREADS);
+    return threads;
 }

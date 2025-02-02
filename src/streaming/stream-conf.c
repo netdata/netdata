@@ -3,6 +3,7 @@
 #include "database/rrd.h"
 #include "stream-receiver-internals.h"
 #include "stream-sender-internals.h"
+#include "stream-replication-sender.h"
 
 static struct config stream_config = APPCONFIG_INITIALIZER;
 
@@ -13,6 +14,11 @@ struct _stream_send stream_send = {
     .initial_clock_resync_iterations = 60,
 
     .buffer_max_size = CBUFFER_INITIAL_MAX_SIZE,
+
+    .replication = {
+        .prefetch = 0,
+        .threads = 0,
+    },
 
     .parents = {
         .destination = NULL,
@@ -139,6 +145,14 @@ void stream_conf_load() {
     stream_receive.replication.step =
         inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "replication step",
                                     stream_receive.replication.step);
+
+    stream_send.replication.threads = inicfg_get_number_range(
+        &netdata_config, CONFIG_SECTION_DB, "replication threads",
+        replication_threads_default(), 1, MAX_REPLICATION_THREADS);
+
+    stream_send.replication.prefetch = inicfg_get_number_range(
+        &netdata_config, CONFIG_SECTION_DB, "replication prefetch",
+        replication_prefetch_default(), 1, MAX_REPLICATION_PREFETCH);
 
     stream_send.buffer_max_size = (size_t)inicfg_get_size_bytes(
         &stream_config, CONFIG_SECTION_STREAM, "buffer size",

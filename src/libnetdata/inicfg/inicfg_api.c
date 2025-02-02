@@ -219,6 +219,28 @@ long long inicfg_get_number(struct config *root, const char *section, const char
     return strtoll(s, NULL, 0);
 }
 
+long long inicfg_get_number_range(struct config *root, const char *section, const char *name, long long value, long long min, long long max) {
+    char buffer[100];
+    sprintf(buffer, "%lld", value);
+
+    struct config_option *opt = inicfg_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_INTEGER, NULL);
+    if(!opt) return value;
+
+    const char *s = string2str(opt->value);
+    long long rc = strtoll(s, NULL, 0);
+    long long rc2 = INRANGE(rc, min, max);
+
+    if(rc != rc2) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "CONFIG: out of range [%s].%s = %lld. Acceptable values: %lld to %lld inclusive. Setting it to %lld",
+               section, name, rc, min, max, rc2);
+
+        rc = rc2;
+        inicfg_set_number(root, section, name, rc);
+    }
+
+    return rc;
+}
+
 NETDATA_DOUBLE inicfg_get_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value) {
     char buffer[100];
     sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
