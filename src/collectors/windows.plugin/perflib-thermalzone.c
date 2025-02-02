@@ -10,25 +10,29 @@ struct thermal_zone {
     COUNTER_DATA thermalZoneTemperature;
 };
 
-static inline void initialize_thermal_zone_keys(struct thermal_zone *p) {
+static inline void initialize_thermal_zone_keys(struct thermal_zone *p)
+{
     p->thermalZoneTemperature.key = "Temperature";
 }
 
-void dict_thermal_zone_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void dict_thermal_zone_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     struct thermal_zone *p = value;
     initialize_thermal_zone_keys(p);
 }
 
 static DICTIONARY *thermal_zones = NULL;
 
-static void initialize(void) {
+static void initialize(void)
+{
     thermal_zones = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct thermal_zone));
 
     dictionary_register_insert_callback(thermal_zones, dict_thermal_zone_insert_cb, NULL);
 }
 
-static bool do_thermal_zones(PERF_DATA_BLOCK *pDataBlock, int update_every) {
+static bool do_thermal_zones(PERF_DATA_BLOCK *pDataBlock, int update_every)
+{
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Thermal Zone Information");
     if (!pObjectType)
         return false;
@@ -81,7 +85,8 @@ static bool do_thermal_zones(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     return true;
 }
 
-int do_PerflibThermalZone(int update_every, usec_t dt __maybe_unused) {
+int do_PerflibThermalZone(int update_every, usec_t dt __maybe_unused)
+{
     static bool initialized = false;
 
     if (unlikely(!initialized)) {
