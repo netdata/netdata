@@ -27,7 +27,7 @@ static int find_all_nodes() {
     int numa_node_count = 0;
     char name[FILENAME_MAX + 1];
     snprintfz(name, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/node");
-    const char *dirname = config_get("plugin:proc:/sys/devices/system/node", "directory to monitor", name);
+    const char *dirname = inicfg_get(&netdata_config, "plugin:proc:/sys/devices/system/node", "directory to monitor", name);
 
     DIR *dir = opendir(dirname);
     if(!dir) {
@@ -276,8 +276,8 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
     static int do_numastat = -1;
 
     if(unlikely(do_numastat == -1)) {
-        do_numastat = config_get_boolean_ondemand(
-            "plugin:proc:/sys/devices/system/node", "enable per-node numa metrics", CONFIG_BOOLEAN_AUTO);
+        do_numastat = inicfg_get_boolean_ondemand(
+            &netdata_config, "plugin:proc:/sys/devices/system/node", "enable per-node numa metrics", CONFIG_BOOLEAN_AUTO);
     }
 
     if(unlikely(numa_root == NULL)) {

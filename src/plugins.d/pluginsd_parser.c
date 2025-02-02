@@ -609,7 +609,7 @@ static inline PARSER_RC pluginsd_label(char **words, size_t num_words, PARSER *p
         parser->user.new_host_labels = rrdlabels_create();
 
     if (strcmp(name,HOST_LABEL_IS_EPHEMERAL) == 0) {
-        int is_ephemeral = appconfig_test_boolean_value((char *) value);
+        int is_ephemeral = inicfg_test_boolean_value((char *) value);
         RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_LABEL);
         if (host) {
             if (is_ephemeral)

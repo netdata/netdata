@@ -361,7 +361,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
     if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
 
-    netdata_ssl_validate_certificate = !config_get_boolean(CONFIG_SECTION_WEB, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
+    netdata_ssl_validate_certificate = !inicfg_get_boolean(&netdata_config, CONFIG_SECTION_WEB, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
         netdata_log_info("SSL: web server will skip SSL certificates verification.");
@@ -370,7 +370,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
 
     static_threaded_workers_count = netdata_conf_web_query_threads();
 
-    size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets",
+    size_t max_sockets = (size_t)inicfg_get_number(&netdata_config, CONFIG_SECTION_WEB, "web server max sockets",
                                                    (long long int)(rlimit_nofile.rlim_cur / 4));
 
     static_workers_private_data = callocz((size_t)static_threaded_workers_count,

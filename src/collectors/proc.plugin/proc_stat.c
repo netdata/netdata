@@ -491,12 +491,12 @@ int do_proc_stat(int update_every, usec_t dt) {
     size_t cores_found = (size_t)os_get_system_cpus();
 
     if(unlikely(do_cpu == -1)) {
-        do_cpu                    = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", CONFIG_BOOLEAN_YES);
-        do_cpu_cores              = config_get_boolean("plugin:proc:/proc/stat", "per cpu core utilization", CONFIG_BOOLEAN_NO);
-        do_interrupts             = config_get_boolean("plugin:proc:/proc/stat", "cpu interrupts", CONFIG_BOOLEAN_YES);
-        do_context                = config_get_boolean("plugin:proc:/proc/stat", "context switches", CONFIG_BOOLEAN_YES);
-        do_forks                  = config_get_boolean("plugin:proc:/proc/stat", "processes started", CONFIG_BOOLEAN_YES);
-        do_processes              = config_get_boolean("plugin:proc:/proc/stat", "processes running", CONFIG_BOOLEAN_YES);
+        do_cpu                    = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/stat", "cpu utilization", CONFIG_BOOLEAN_YES);
+        do_cpu_cores              = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/stat", "per cpu core utilization", CONFIG_BOOLEAN_NO);
+        do_interrupts             = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/stat", "cpu interrupts", CONFIG_BOOLEAN_YES);
+        do_context                = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/stat", "context switches", CONFIG_BOOLEAN_YES);
+        do_forks                  = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/stat", "processes started", CONFIG_BOOLEAN_YES);
+        do_processes              = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/stat", "processes running", CONFIG_BOOLEAN_YES);
 
         // give sane defaults based on the number of processors
         if(unlikely(os_get_system_cpus() > 128)) {
@@ -524,12 +524,12 @@ int do_proc_stat(int update_every, usec_t dt) {
             keep_cpuidle_fds_open = CONFIG_BOOLEAN_YES;
         }
 
-        keep_per_core_fds_open    = config_get_boolean("plugin:proc:/proc/stat", "keep per core files open", keep_per_core_fds_open);
-        keep_cpuidle_fds_open     = config_get_boolean("plugin:proc:/proc/stat", "keep cpuidle files open", keep_cpuidle_fds_open);
-        do_core_throttle_count    = config_get_boolean_ondemand("plugin:proc:/proc/stat", "core_throttle_count", do_core_throttle_count);
-        do_package_throttle_count = config_get_boolean_ondemand("plugin:proc:/proc/stat", "package_throttle_count", do_package_throttle_count);
-        do_cpu_freq               = config_get_boolean_ondemand("plugin:proc:/proc/stat", "cpu frequency", do_cpu_freq);
-        do_cpuidle                = config_get_boolean_ondemand("plugin:proc:/proc/stat", "cpu idle states", do_cpuidle);
+        keep_per_core_fds_open    = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/stat", "keep per core files open", keep_per_core_fds_open);
+        keep_cpuidle_fds_open     = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/stat", "keep cpuidle files open", keep_cpuidle_fds_open);
+        do_core_throttle_count    = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/stat", "core_throttle_count", do_core_throttle_count);
+        do_package_throttle_count = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/stat", "package_throttle_count", do_package_throttle_count);
+        do_cpu_freq               = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/stat", "cpu frequency", do_cpu_freq);
+        do_cpuidle                = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/stat", "cpu idle states", do_cpuidle);
 
         hash_intr = simple_hash("intr");
         hash_ctxt = simple_hash("ctxt");
@@ -539,19 +539,19 @@ int do_proc_stat(int update_every, usec_t dt) {
 
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/thermal_throttle/core_throttle_count");
-        core_throttle_count_filename = config_get("plugin:proc:/proc/stat", "core_throttle_count filename to monitor", filename);
+        core_throttle_count_filename = inicfg_get(&netdata_config, "plugin:proc:/proc/stat", "core_throttle_count filename to monitor", filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/thermal_throttle/package_throttle_count");
-        package_throttle_count_filename = config_get("plugin:proc:/proc/stat", "package_throttle_count filename to monitor", filename);
+        package_throttle_count_filename = inicfg_get(&netdata_config, "plugin:proc:/proc/stat", "package_throttle_count filename to monitor", filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpufreq/scaling_cur_freq");
-        scaling_cur_freq_filename = config_get("plugin:proc:/proc/stat", "scaling_cur_freq filename to monitor", filename);
+        scaling_cur_freq_filename = inicfg_get(&netdata_config, "plugin:proc:/proc/stat", "scaling_cur_freq filename to monitor", filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpufreq/stats/time_in_state");
-        time_in_state_filename = config_get("plugin:proc:/proc/stat", "time_in_state filename to monitor", filename);
+        time_in_state_filename = inicfg_get(&netdata_config, "plugin:proc:/proc/stat", "time_in_state filename to monitor", filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/schedstat");
-        schedstat_filename = config_get("plugin:proc:/proc/stat", "schedstat filename to monitor", filename);
+        schedstat_filename = inicfg_get(&netdata_config, "plugin:proc:/proc/stat", "schedstat filename to monitor", filename);
 
         if(do_cpuidle != CONFIG_BOOLEAN_NO) {
             struct stat stbuf;
@@ -561,16 +561,16 @@ int do_proc_stat(int update_every, usec_t dt) {
         }
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/cpu%zu/cpuidle/state%zu/name");
-        cpuidle_name_filename = config_get("plugin:proc:/proc/stat", "cpuidle name filename to monitor", filename);
+        cpuidle_name_filename = inicfg_get(&netdata_config, "plugin:proc:/proc/stat", "cpuidle name filename to monitor", filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/cpu%zu/cpuidle/state%zu/time");
-        cpuidle_time_filename = config_get("plugin:proc:/proc/stat", "cpuidle time filename to monitor", filename);
+        cpuidle_time_filename = inicfg_get(&netdata_config, "plugin:proc:/proc/stat", "cpuidle time filename to monitor", filename);
     }
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/stat");
-        ff = procfile_open(config_get("plugin:proc:/proc/stat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, "plugin:proc:/proc/stat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 

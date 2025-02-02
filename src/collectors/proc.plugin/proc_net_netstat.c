@@ -221,28 +221,28 @@ static void do_proc_net_snmp6(int update_every) {
     // prepare for /proc/net/snmp6 parsing
 
     if(unlikely(!arl_ipv6)) {
-        do_ip6_packets          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 packets", CONFIG_BOOLEAN_AUTO);
-        do_ip6_fragsout         = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments sent", CONFIG_BOOLEAN_AUTO);
-        do_ip6_fragsin          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments assembly", CONFIG_BOOLEAN_AUTO);
-        do_ip6_errors           = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 errors", CONFIG_BOOLEAN_AUTO);
-        do_ip6_udp_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDP packets", CONFIG_BOOLEAN_AUTO);
-        do_ip6_udp_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDP errors", CONFIG_BOOLEAN_AUTO);
-        do_ip6_udplite_packets  = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDPlite packets", CONFIG_BOOLEAN_AUTO);
-        do_ip6_udplite_errors   = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDPlite errors", CONFIG_BOOLEAN_AUTO);
-        do_ip6_bandwidth        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "bandwidth", CONFIG_BOOLEAN_AUTO);
-        do_ip6_mcast            = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "multicast bandwidth", CONFIG_BOOLEAN_AUTO);
-        do_ip6_bcast            = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "broadcast bandwidth", CONFIG_BOOLEAN_AUTO);
-        do_ip6_mcast_p          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "multicast packets", CONFIG_BOOLEAN_AUTO);
-        do_ip6_icmp             = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp", CONFIG_BOOLEAN_AUTO);
-        do_ip6_icmp_redir       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp redirects", CONFIG_BOOLEAN_AUTO);
-        do_ip6_icmp_errors      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp errors", CONFIG_BOOLEAN_AUTO);
-        do_ip6_icmp_echos       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp echos", CONFIG_BOOLEAN_AUTO);
-        do_ip6_icmp_groupmemb   = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp group membership", CONFIG_BOOLEAN_AUTO);
-        do_ip6_icmp_router      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp router", CONFIG_BOOLEAN_AUTO);
-        do_ip6_icmp_neighbor    = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp neighbor", CONFIG_BOOLEAN_AUTO);
-        do_ip6_icmp_mldv2       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp mldv2", CONFIG_BOOLEAN_AUTO);
-        do_ip6_icmp_types       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp types", CONFIG_BOOLEAN_AUTO);
-        do_ip6_ect              = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ect", CONFIG_BOOLEAN_AUTO);
+        do_ip6_packets          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "ipv6 packets", CONFIG_BOOLEAN_AUTO);
+        do_ip6_fragsout         = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "ipv6 fragments sent", CONFIG_BOOLEAN_AUTO);
+        do_ip6_fragsin          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "ipv6 fragments assembly", CONFIG_BOOLEAN_AUTO);
+        do_ip6_errors           = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "ipv6 errors", CONFIG_BOOLEAN_AUTO);
+        do_ip6_udp_packets      = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "ipv6 UDP packets", CONFIG_BOOLEAN_AUTO);
+        do_ip6_udp_errors       = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "ipv6 UDP errors", CONFIG_BOOLEAN_AUTO);
+        do_ip6_udplite_packets  = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "ipv6 UDPlite packets", CONFIG_BOOLEAN_AUTO);
+        do_ip6_udplite_errors   = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "ipv6 UDPlite errors", CONFIG_BOOLEAN_AUTO);
+        do_ip6_bandwidth        = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_ip6_mcast            = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "multicast bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_ip6_bcast            = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "broadcast bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_ip6_mcast_p          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "multicast packets", CONFIG_BOOLEAN_AUTO);
+        do_ip6_icmp             = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "icmp", CONFIG_BOOLEAN_AUTO);
+        do_ip6_icmp_redir       = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "icmp redirects", CONFIG_BOOLEAN_AUTO);
+        do_ip6_icmp_errors      = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "icmp errors", CONFIG_BOOLEAN_AUTO);
+        do_ip6_icmp_echos       = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "icmp echos", CONFIG_BOOLEAN_AUTO);
+        do_ip6_icmp_groupmemb   = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "icmp group membership", CONFIG_BOOLEAN_AUTO);
+        do_ip6_icmp_router      = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "icmp router", CONFIG_BOOLEAN_AUTO);
+        do_ip6_icmp_neighbor    = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "icmp neighbor", CONFIG_BOOLEAN_AUTO);
+        do_ip6_icmp_mldv2       = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "icmp mldv2", CONFIG_BOOLEAN_AUTO);
+        do_ip6_icmp_types       = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "icmp types", CONFIG_BOOLEAN_AUTO);
+        do_ip6_ect              = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp6", "ect", CONFIG_BOOLEAN_AUTO);
 
         arl_ipv6 = arl_create("snmp6", NULL, 60);
         arl_expect(arl_ipv6, "Ip6InReceives", &Ip6InReceives);
@@ -345,7 +345,7 @@ static void do_proc_net_snmp6(int update_every) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/snmp6");
         ff_snmp6 = procfile_open(
-            config_get("plugin:proc:/proc/net/snmp6", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+            inicfg_get(&netdata_config, "plugin:proc:/proc/net/snmp6", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if (unlikely(!ff_snmp6)) {
             do_snmp6 = false;
             return;
@@ -1306,22 +1306,22 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         hash_ipext = simple_hash("IpExt");
         hash_tcpext = simple_hash("TcpExt");
 
-        do_bandwidth = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "bandwidth", CONFIG_BOOLEAN_AUTO);
-        do_inerrors  = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "input errors", CONFIG_BOOLEAN_AUTO);
-        do_mcast     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "multicast bandwidth", CONFIG_BOOLEAN_AUTO);
-        do_bcast     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "broadcast bandwidth", CONFIG_BOOLEAN_AUTO);
-        do_mcast_p   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "multicast packets", CONFIG_BOOLEAN_AUTO);
-        do_bcast_p   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "broadcast packets", CONFIG_BOOLEAN_AUTO);
-        do_ecn       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "ECN packets", CONFIG_BOOLEAN_AUTO);
+        do_bandwidth = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_inerrors  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "input errors", CONFIG_BOOLEAN_AUTO);
+        do_mcast     = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "multicast bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_bcast     = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "broadcast bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_mcast_p   = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "multicast packets", CONFIG_BOOLEAN_AUTO);
+        do_bcast_p   = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "broadcast packets", CONFIG_BOOLEAN_AUTO);
+        do_ecn       = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "ECN packets", CONFIG_BOOLEAN_AUTO);
 
-        do_tcpext_reorder    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP reorders", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_syscookies = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP SYN cookies", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_ofo        = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP out-of-order queue", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_connaborts = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP connection aborts", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_memory     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP memory pressures", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_reorder    = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP reorders", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_syscookies = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP SYN cookies", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_ofo        = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP out-of-order queue", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_connaborts = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP connection aborts", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_memory     = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP memory pressures", CONFIG_BOOLEAN_AUTO);
 
-        do_tcpext_syn_queue    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP SYN queue", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_accept_queue = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP accept queue", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_syn_queue    = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP SYN queue", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_accept_queue = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP accept queue", CONFIG_BOOLEAN_AUTO);
 
         arl_ipext  = arl_create("netstat/ipext", NULL, 60);
         arl_tcpext = arl_create("netstat/tcpext", NULL, 60);
@@ -1419,20 +1419,20 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     // prepare for /proc/net/snmp parsing
 
     if(unlikely(!arl_ip)) {
-        do_ip_packets       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 packets", CONFIG_BOOLEAN_AUTO);
-        do_ip_fragsout      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 fragments sent", CONFIG_BOOLEAN_AUTO);
-        do_ip_fragsin       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 fragments assembly", CONFIG_BOOLEAN_AUTO);
-        do_ip_errors        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 errors", CONFIG_BOOLEAN_AUTO);
-        do_tcp_sockets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP connections", CONFIG_BOOLEAN_AUTO);
-        do_tcp_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP packets", CONFIG_BOOLEAN_AUTO);
-        do_tcp_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP errors", CONFIG_BOOLEAN_AUTO);
-        do_tcp_opens        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP opens", CONFIG_BOOLEAN_AUTO);
-        do_tcp_handshake    = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP handshake issues", CONFIG_BOOLEAN_AUTO);
-        do_udp_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 UDP packets", CONFIG_BOOLEAN_AUTO);
-        do_udp_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 UDP errors", CONFIG_BOOLEAN_AUTO);
-        do_icmp_packets     = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 ICMP packets", CONFIG_BOOLEAN_AUTO);
-        do_icmpmsg          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 ICMP messages", CONFIG_BOOLEAN_AUTO);
-        do_udplite_packets  = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 UDPLite packets", CONFIG_BOOLEAN_AUTO);
+        do_ip_packets       = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 packets", CONFIG_BOOLEAN_AUTO);
+        do_ip_fragsout      = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 fragments sent", CONFIG_BOOLEAN_AUTO);
+        do_ip_fragsin       = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 fragments assembly", CONFIG_BOOLEAN_AUTO);
+        do_ip_errors        = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 errors", CONFIG_BOOLEAN_AUTO);
+        do_tcp_sockets      = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 TCP connections", CONFIG_BOOLEAN_AUTO);
+        do_tcp_packets      = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 TCP packets", CONFIG_BOOLEAN_AUTO);
+        do_tcp_errors       = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 TCP errors", CONFIG_BOOLEAN_AUTO);
+        do_tcp_opens        = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 TCP opens", CONFIG_BOOLEAN_AUTO);
+        do_tcp_handshake    = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 TCP handshake issues", CONFIG_BOOLEAN_AUTO);
+        do_udp_packets      = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 UDP packets", CONFIG_BOOLEAN_AUTO);
+        do_udp_errors       = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 UDP errors", CONFIG_BOOLEAN_AUTO);
+        do_icmp_packets     = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 ICMP packets", CONFIG_BOOLEAN_AUTO);
+        do_icmpmsg          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 ICMP messages", CONFIG_BOOLEAN_AUTO);
+        do_udplite_packets  = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 UDPLite packets", CONFIG_BOOLEAN_AUTO);
 
         hash_ip = simple_hash("Ip");
         hash_tcp = simple_hash("Tcp");
@@ -1538,7 +1538,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if(unlikely(!ff_netstat)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/netstat");
-        ff_netstat = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff_netstat = procfile_open(inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff_netstat)) return 1;
     }
 
@@ -1584,7 +1584,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if(unlikely(!ff_snmp)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/snmp");
-        ff_snmp = procfile_open(config_get("plugin:proc:/proc/net/snmp", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff_snmp = procfile_open(inicfg_get(&netdata_config, "plugin:proc:/proc/net/snmp", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff_snmp)) return 1;
     }
 

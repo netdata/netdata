@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "appconfig_internals.h"
+#include "inicfg_internals.h"
 
-void appconfig_section_destroy_non_loaded(struct config *root, const char *section)
+void inicfg_section_destroy_non_loaded(struct config *root, const char *section)
 {
     struct config_section *sect;
     struct config_option *opt;
 
     netdata_log_debug(D_CONFIG, "Destroying section '%s'.", section);
 
-    sect = appconfig_section_find(root, section);
+    sect = inicfg_section_find(root, section);
     if(!sect) {
         netdata_log_error("Could not destroy section '%s'. Not found.", section);
         return;
@@ -27,12 +27,12 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
     }
 
     // no option is loaded, free them all
-    appconfig_section_remove_and_delete(root, sect, false, true);
+    inicfg_section_remove_and_delete(root, sect, false, true);
 }
 
-void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name) {
+void inicfg_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name) {
     struct config_section *sect;
-    sect = appconfig_section_find(root, section);
+    sect = inicfg_section_find(root, section);
     if (!sect) {
         netdata_log_error("Could not destroy section option '%s -> %s'. The section not found.", section, name);
         return;
@@ -40,13 +40,13 @@ void appconfig_section_option_destroy_non_loaded(struct config *root, const char
 
     SECTION_LOCK(sect);
 
-    struct config_option *opt = appconfig_option_find(sect, name);
+    struct config_option *opt = inicfg_option_find(sect, name);
     if (opt && opt->flags & CONFIG_VALUE_LOADED) {
         SECTION_UNLOCK(sect);
         return;
     }
 
-    if (unlikely(!(opt && appconfig_option_del(sect, opt)))) {
+    if (unlikely(!(opt && inicfg_option_del(sect, opt)))) {
         SECTION_UNLOCK(sect);
         netdata_log_error("Could not destroy section option '%s -> %s'. The option not found.", section, name);
         return;
@@ -54,7 +54,7 @@ void appconfig_section_option_destroy_non_loaded(struct config *root, const char
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sect->values, opt, prev, next);
 
-    appconfig_option_free(opt);
+    inicfg_option_free(opt);
     SECTION_UNLOCK(sect);
 }
 

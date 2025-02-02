@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "appconfig_internals.h"
+#include "inicfg_internals.h"
 
 ENUM_STR_MAP_DEFINE(CONFIG_VALUE_TYPES) = {
     { .id = CONFIG_VALUE_TYPE_UNKNOWN, .name ="unknown", },
@@ -30,7 +30,7 @@ ENUM_STR_DEFINE_FUNCTIONS(CONFIG_VALUE_TYPES, CONFIG_VALUE_TYPE_UNKNOWN, "unknow
 // ----------------------------------------------------------------------------
 // config load/save
 
-int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name) {
+int inicfg_load(struct config *root, char *filename, int overwrite_used, const char *section_name) {
     int line = 0;
     struct config_section *sect = NULL;
     int is_exporter_config = 0;
@@ -89,7 +89,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
                         }
                         strncpyz(working_instance, s, CONFIG_MAX_NAME);
                         working_connector_section = NULL;
-                        if (unlikely(appconfig_section_find(root, working_instance))) {
+                        if (unlikely(inicfg_section_find(root, working_instance))) {
                             netdata_log_error("Instance (%s) already exists", working_instance);
                             sect = NULL;
                             continue;
@@ -103,15 +103,15 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
                 }
             }
 
-            sect = appconfig_section_find(root, s);
+            sect = inicfg_section_find(root, s);
             if(!sect)
-                sect = appconfig_section_create(root, s);
+                sect = inicfg_section_create(root, s);
 
             if(sect && section_string && overwrite_used && section_string == sect->name) {
                 SECTION_LOCK(sect);
 
                 while(sect->values)
-                    appconfig_option_remove_and_delete(sect, sect->values, true);
+                    inicfg_option_remove_and_delete(sect, sect->values, true);
 
                 SECTION_UNLOCK(sect);
             }
@@ -147,15 +147,15 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 
         if(!value) value = "";
 
-        struct config_option *opt = appconfig_option_find(sect, name);
+        struct config_option *opt = inicfg_option_find(sect, name);
 
         if (!opt) {
-            opt = appconfig_option_create(sect, name, value);
+            opt = inicfg_option_create(sect, name, value);
             if (likely(is_exporter_config) && unlikely(!global_exporting_section)) {
                 if (unlikely(!working_connector_section)) {
-                    working_connector_section = appconfig_section_find(root, working_connector);
+                    working_connector_section = inicfg_section_find(root, working_connector);
                     if (!working_connector_section)
-                        working_connector_section = appconfig_section_create(root, working_connector);
+                        working_connector_section = inicfg_section_create(root, working_connector);
                     if (likely(working_connector_section)) {
                         add_connector_instance(working_connector_section, sect);
                     }
@@ -176,7 +176,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
     return 1;
 }
 
-void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool netdata_conf)
+void inicfg_generate(struct config *root, BUFFER *wb, int only_changed, bool netdata_conf)
 {
     int i, pri;
     struct config_section *sect;
@@ -189,8 +189,8 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
                 found_host_labels = 1;
 
         if(netdata_conf && !found_host_labels) {
-            appconfig_section_create(root, CONFIG_SECTION_HOST_LABEL);
-            appconfig_get_raw_value(root, CONFIG_SECTION_HOST_LABEL, "name", "value", CONFIG_VALUE_TYPE_TEXT, NULL);
+            inicfg_section_create(root, CONFIG_SECTION_HOST_LABEL);
+            inicfg_get_raw_value(root, CONFIG_SECTION_HOST_LABEL, "name", "value", CONFIG_VALUE_TYPE_TEXT, NULL);
         }
     }
 

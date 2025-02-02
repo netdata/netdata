@@ -118,17 +118,17 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
     static ARL_BASE *bases[7] = { NULL };
 
     if(unlikely(!arl_sockets)) {
-        do_sockets         = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 sockets", CONFIG_BOOLEAN_AUTO);
-        do_tcp_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 TCP sockets", CONFIG_BOOLEAN_AUTO);
-        do_tcp_mem         = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 TCP memory", CONFIG_BOOLEAN_AUTO);
-        do_udp_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 UDP sockets", CONFIG_BOOLEAN_AUTO);
-        do_udp_mem         = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 UDP memory", CONFIG_BOOLEAN_AUTO);
-        do_udplite_sockets = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 UDPLITE sockets", CONFIG_BOOLEAN_AUTO);
-        do_raw_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 RAW sockets", CONFIG_BOOLEAN_AUTO);
-        do_frag_sockets    = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 FRAG sockets", CONFIG_BOOLEAN_AUTO);
-        do_frag_mem        = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 FRAG memory", CONFIG_BOOLEAN_AUTO);
+        do_sockets         = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat", "ipv4 sockets", CONFIG_BOOLEAN_AUTO);
+        do_tcp_sockets     = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat", "ipv4 TCP sockets", CONFIG_BOOLEAN_AUTO);
+        do_tcp_mem         = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat", "ipv4 TCP memory", CONFIG_BOOLEAN_AUTO);
+        do_udp_sockets     = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat", "ipv4 UDP sockets", CONFIG_BOOLEAN_AUTO);
+        do_udp_mem         = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat", "ipv4 UDP memory", CONFIG_BOOLEAN_AUTO);
+        do_udplite_sockets = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat", "ipv4 UDPLITE sockets", CONFIG_BOOLEAN_AUTO);
+        do_raw_sockets     = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat", "ipv4 RAW sockets", CONFIG_BOOLEAN_AUTO);
+        do_frag_sockets    = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat", "ipv4 FRAG sockets", CONFIG_BOOLEAN_AUTO);
+        do_frag_mem        = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/sockstat", "ipv4 FRAG memory", CONFIG_BOOLEAN_AUTO);
 
-        update_constants_every = config_get_duration_seconds("plugin:proc:/proc/net/sockstat", "update constants every", update_constants_every);
+        update_constants_every = inicfg_get_duration_seconds(&netdata_config, "plugin:proc:/proc/net/sockstat", "update constants every", update_constants_every);
         update_constants_count = update_constants_every;
 
         arl_sockets = arl_create("sockstat/sockets", arl_callback_str2kernel_uint_t, 60);
@@ -181,7 +181,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/sockstat");
-        ff = procfile_open(config_get("plugin:proc:/proc/net/sockstat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, "plugin:proc:/proc/net/sockstat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 

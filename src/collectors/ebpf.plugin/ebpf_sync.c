@@ -724,10 +724,9 @@ static void ebpf_create_sync_charts(int update_every)
  */
 static void ebpf_sync_parse_syscalls()
 {
-    int i;
-    for (i = 0; local_syscalls[i].syscall; i++) {
-        local_syscalls[i].enabled = appconfig_get_boolean(
-            &sync_config, NETDATA_SYNC_CONFIG_NAME, local_syscalls[i].syscall, CONFIG_BOOLEAN_YES);
+    for (int i = 0; local_syscalls[i].syscall; i++) {
+        local_syscalls[i].enabled = inicfg_get_boolean(&sync_config, NETDATA_SYNC_CONFIG_NAME,
+                                                          local_syscalls[i].syscall, CONFIG_BOOLEAN_YES);
     }
 }
 

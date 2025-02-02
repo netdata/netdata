@@ -90,7 +90,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
     if(unlikely(!ff)) {
         snprintfz(ff_path, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "filename to monitor", ff_path), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "filename to monitor", ff_path), " \t:", PROCFILE_FLAG_DEFAULT);
 
         if(unlikely(!ff)) {
             strncpyz(ff_path, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME, FILENAME_MAX);
@@ -117,10 +117,10 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         }
 
         // Configuration
-        do_global = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "enable system summary", CONFIG_BOOLEAN_YES);
-        do_detail = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "enable detail per-type", CONFIG_BOOLEAN_AUTO);
+        do_global = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "enable system summary", CONFIG_BOOLEAN_YES);
+        do_detail = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "enable detail per-type", CONFIG_BOOLEAN_AUTO);
         filter_types = simple_pattern_create(
-                config_get(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "hide charts id matching", ""), NULL,
+                inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "hide charts id matching", ""), NULL,
                 SIMPLE_PATTERN_SUFFIX, true);
 
         pagelines_cnt = 0;
