@@ -1779,12 +1779,20 @@ void *replication_thread_main(void *ptr) {
                     run_verification_countdown = ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION;
             }
 
-            time_t latest_first_time_t = replication_get_latest_first_time();
-            if(latest_first_time_t && replication_globals.unsafe.pending) {
+            time_t current_s = replication_get_latest_first_time();
+            if(current_s && replication_globals.unsafe.pending) {
                 // completion percentage statistics
-                time_t now = now_realtime_sec();
-                time_t total = now - replication_globals.unsafe.first_time_t;
-                time_t done = latest_first_time_t - replication_globals.unsafe.first_time_t;
+                time_t now_s = now_realtime_sec();
+                if(current_s > now_s)
+                    current_s = now_s;
+
+                time_t started_s = replication_globals.unsafe.first_time_t;
+                if(current_s < started_s)
+                    replication_globals.unsafe.first_time_t = started_s = current_s;
+
+                time_t total = now_s - started_s;
+                time_t done = current_s - started_s;
+
                 worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION,
                                   (NETDATA_DOUBLE) done * 100.0 / (NETDATA_DOUBLE) total);
             }
@@ -1859,7 +1867,12 @@ int replication_threads_default(void) {
 }
 
 int replication_prefetch_default(void) {
-    int prefetch = (int)ROUNDUP(libuv_worker_threads, stream_send.replication.threads);
-    prefetch = INRANGE(prefetch, 1, MIN(libuv_worker_threads, MAX_REPLICATION_PREFETCH));
+    // Our goal is to feed the pipeline with 2x the libuv worker threads,
+    // since this will allow dbengine to merge the requests that load the same extents,
+    // providing the best performance and miniming disk I/O.
+    int target = libuv_worker_threads * 2;
+
+    int prefetch = (int)ROUNDUP(target, stream_send.replication.threads);
+    prefetch = INRANGE(prefetch, 1, MAX_REPLICATION_PREFETCH);
     return prefetch;
 }
