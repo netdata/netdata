@@ -31,15 +31,14 @@ static integration_cmd_status_t integration_cmd_charts_execute(char *args, char 
 
 static integration_command_info_t command_info_array[] = {
     {"ping", integration_cmd_ping_execute},
-    {"charts", integration_cmd_charts_execute}
-};
+    {"charts", integration_cmd_charts_execute}};
 
 static uv_rwlock_t exclusive_rwlock;
 
 static int command_server_initialized = 0;
 
 static uv_thread_t thread;
-static uv_loop_t* loop;
+static uv_loop_t *loop;
 static uv_async_t async;
 static struct completion completion;
 static uv_pipe_t server_pipe;
@@ -70,13 +69,13 @@ static integration_cmd_status_t integration_cmd_charts_execute(char *args, char 
     return INTEGRATION_CMD_STATUS_SUCCESS;
 }
 
-static void netdata_integration_pipe_close_cb(uv_handle_t* handle)
+static void netdata_integration_pipe_close_cb(uv_handle_t *handle)
 {
     /* Also frees command context */
     freez(handle);
 }
 
-static void netdata_integration_pipe_write_cb(uv_write_t* req, int status)
+static void netdata_integration_pipe_write_cb(uv_write_t *req, int status)
 {
     (void)status;
     uv_pipe_t *client = req->data;
@@ -104,9 +103,8 @@ static void netdata_integration_alloc_cb(uv_handle_t *handle, size_t suggested_s
     buf->len = suggested_size;
 }
 
-static inline void netdata_integration_add_string_to_command_reply(BUFFER *reply_string,
-                                                                   unsigned *reply_string_size,
-                                                                   char *str)
+static inline void
+netdata_integration_add_string_to_command_reply(BUFFER *reply_string, unsigned *reply_string_size, char *str)
 {
     unsigned len;
 
@@ -115,9 +113,10 @@ static inline void netdata_integration_add_string_to_command_reply(BUFFER *reply
     *reply_string_size += len;
 }
 
-static void netdata_integration_send_command_reply(struct integration_ebpf_context *cmd_ctx,
-                                                   integration_cmd_status_t status,
-                                                   char *message)
+static void netdata_integration_send_command_reply(
+    struct integration_ebpf_context *cmd_ctx,
+    integration_cmd_status_t status,
+    char *message)
 {
     (void)status;
     int ret;
@@ -160,21 +159,27 @@ static void netdata_integration_parse_commands(struct integration_ebpf_context *
     ebpf_cmds_t i;
 
     /* Skip white-space characters */
-    for (pos = cmd_ctx->command_string ; isspace((uint8_t)*pos) && ('\0' != *pos) ; ++pos) ;
-    for (i = 0 ; i < NETDATA_EBPF_CMDS_TOTAL ; ++i) {
+    for (pos = cmd_ctx->command_string; isspace((uint8_t)*pos) && ('\0' != *pos); ++pos)
+        ;
+    for (i = 0; i < NETDATA_EBPF_CMDS_TOTAL; ++i) {
         if (!strncmp(pos, command_info_array[i].cmd_str, strlen(command_info_array[i].cmd_str))) {
-            for (lstrip=pos + strlen(command_info_array[i].cmd_str); isspace((uint8_t)*lstrip) && ('\0' != *lstrip); ++lstrip) ;
-            for (rstrip=lstrip+strlen(lstrip)-1; rstrip>lstrip && isspace((uint8_t)*rstrip); *(rstrip--) = 0 ) ;
+            for (lstrip = pos + strlen(command_info_array[i].cmd_str); isspace((uint8_t)*lstrip) && ('\0' != *lstrip);
+                 ++lstrip)
+                ;
+            for (rstrip = lstrip + strlen(lstrip) - 1; rstrip > lstrip && isspace((uint8_t)*rstrip); *(rstrip--) = 0)
+                ;
 
             cmd_ctx->work.data = cmd_ctx;
             cmd_ctx->idx = i;
             cmd_ctx->args = lstrip;
             cmd_ctx->message = NULL;
 
-            fatal_assert(0 == uv_queue_work(loop,
-                                            &cmd_ctx->work,
-                                            netdata_integration_schedule_command,
-                                            netdata_integration_after_schedule_command));
+            fatal_assert(
+                0 == uv_queue_work(
+                         loop,
+                         &cmd_ctx->work,
+                         netdata_integration_schedule_command,
+                         netdata_integration_after_schedule_command));
             break;
         }
     }
@@ -202,7 +207,7 @@ static void netdata_integration_pipe_read_cb(uv_stream_t *client, ssize_t nread,
     } else if (nread) {
         size_t to_copy;
 
-        to_copy = MIN((size_t) nread, NETDATA_EBPF_INTEGRATION_CMD_LENGTH - 1 - cmd_ctx->command_string_size);
+        to_copy = MIN((size_t)nread, NETDATA_EBPF_INTEGRATION_CMD_LENGTH - 1 - cmd_ctx->command_string_size);
         memcpy(cmd_ctx->command_string + cmd_ctx->command_string_size, buf->base, to_copy);
         cmd_ctx->command_string_size += to_copy;
         cmd_ctx->command_string[cmd_ctx->command_string_size] = '\0';
@@ -243,7 +248,7 @@ static void netdata_integration_connection_cb(uv_stream_t *server, int status)
     cmd_ctx->command_string_size = 0;
     cmd_ctx->command_string[0] = '\0';
 
-    ret = uv_read_start((uv_stream_t*)client, netdata_integration_alloc_cb, netdata_integration_pipe_read_cb);
+    ret = uv_read_start((uv_stream_t *)client, netdata_integration_alloc_cb, netdata_integration_pipe_read_cb);
     if (ret) {
         netdata_log_error("uv_read_start(): %s", uv_strerror(ret));
         uv_close((uv_handle_t *)client, netdata_integration_pipe_close_cb);
@@ -320,7 +325,7 @@ static void netdata_integration_parser_thread(void *arg)
 
 error_after_uv_listen:
 error_after_pipe_bind:
-    uv_close((uv_handle_t*)&server_pipe, NULL);
+    uv_close((uv_handle_t *)&server_pipe, NULL);
 error_after_pipe_init:
     uv_close((uv_handle_t *)&async, NULL);
 error_after_async_init:
@@ -338,7 +343,7 @@ void netdata_integration_cleanup_shm()
     /* cleanup operations of the event loop */
     netdata_log_info("Shutting down pipe %s event loop.", pipes);
     uv_close((uv_handle_t *)&async, NULL);
-    uv_close((uv_handle_t*)&server_pipe, NULL);
+    uv_close((uv_handle_t *)&server_pipe, NULL);
     uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
 
     netdata_log_info("Shutting down pipe %s loop complete.", pipes);
@@ -350,7 +355,7 @@ void netdata_integration_cleanup_shm()
     }
 
     if (integration_shm) {
-        size_t length  = os_get_system_pid_max() * sizeof(netdata_ebpf_pid_stats_t);
+        size_t length = os_get_system_pid_max() * sizeof(netdata_ebpf_pid_stats_t);
         munmap(integration_shm, length);
     }
 
@@ -376,13 +381,15 @@ static int netdata_integration_initialize_shm()
     integration_shm = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd_ebpf_integration, 0);
     if (unlikely(MAP_FAILED == integration_shm)) {
         integration_shm = NULL;
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot map shared memory used between cgroup and eBPF, integration won't happen");
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "Cannot map shared memory used between cgroup and eBPF, integration won't happen");
         goto end_shm;
     }
 
-    shm_mutex_ebpf_integration = sem_open(NETDATA_EBPF_SHM_INTEGRATION_NAME, O_CREAT,
-                                          S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH,
-                                          1);
+    shm_mutex_ebpf_integration = sem_open(
+        NETDATA_EBPF_SHM_INTEGRATION_NAME, O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, 1);
     if (shm_mutex_ebpf_integration != SEM_FAILED) {
         return 0;
     }
@@ -395,7 +402,7 @@ end_shm:
     return -1;
 }
 
-void netdata_integration_init(enum netdata_integration_selector idx)
+void netdata_integration_init()
 {
     if (command_server_initialized)
         return;
@@ -407,7 +414,7 @@ void netdata_integration_init(enum netdata_integration_selector idx)
 
     completion_init(&completion);
 
-    int error = uv_thread_create(&thread, netdata_integration_parser_thread, NULL);;
+    int error = uv_thread_create(&thread, netdata_integration_parser_thread, NULL);
     if (error) {
         netdata_log_error("uv_thread_create(): %s", uv_strerror(error));
         goto after_error;
@@ -443,7 +450,5 @@ const char *netdata_integration_pipename()
     return "/tmp/netdata-ebpf-integration";
 #endif
 }
-
-
 
 #endif // defined(OS_LINUX)
