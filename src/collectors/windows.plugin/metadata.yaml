@@ -2220,3 +2220,180 @@ modules:
               chart_type: line
               dimensions:
                 - name: time
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibADCS
+      monitored_instance:
+        name: Active Directory Certificate Service
+        link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-cs/"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - active directory
+        - adcs
+        - ad
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Active Directory Certificate Services statistics.
+        method_description: |
+          It queries 'Certification Authority' object per certificate from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibADCS
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Certificate Service Certificate
+          description: "These metrics refer to the Certificate instances defined on host."
+          labels:
+            - name: cert
+              description: The certificate name.
+          metrics:
+            - name: adcs.cert_requests
+              description: Certificate requests processed
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: adcs.cert_request_processing_time
+              description: Certificate last request processing time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: processing_times
+            - name: adcs.cert_retrievals
+              description: Total of certificate retrievals
+              unit: retrievals/s
+              chart_type: line
+              dimensions:
+                - name: retrievals
+            - name: adcs.cert_failed_requests
+              description: Certificate failed requests processed
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: failed
+            - name: adcs.cert_issued_requests
+              description: Certificate issued requests processed
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: issued
+            - name: adcs.cert_pending_requests
+              description: Certificate pending requests processed
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: adcs.cert_challenge_responses
+              description: Certificate challenge responses
+              unit: responses/s
+              chart_type: line
+              dimensions:
+                - name: challenge
+            - name: adcs.cert_retrieval_processing_time
+              description: Certificate last retrieval processing time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: processing_time
+            - name: adcs.cert_request_cryptographic_signing_time
+              description: Certificate last signing operation request time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: singing_time
+            - name: adcs.cert_request_policy_module_processing
+              description: Certificate last policy module processing request time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: processing_time
+            - name: adcs.cert_request_policy_module_processing
+              description: Certificate last policy module processing request time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: processing_time
+            - name: adcs.cert_challenge_response_processing_time
+              description: Certificate last challenge response time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: processing_time
+            - name: adcs.cert_signed_certificate_timestamp_lists
+              description: Certificate Signed Certificate Timestamp Lists processed
+              unit: lists/s
+              chart_type: line
+              dimensions:
+                - name: processing_time
+            - name: adcs.cert_signed_certificate_timestamp_lists
+              description: Certificate Signed Certificate Timestamp Lists processed
+              unit: lists/s
+              chart_type: line
+              dimensions:
+                - name: lists
+            - name: adcs.cert_signed_certificate_timestamp_list_processing_time
+              description: Certificate last Signed Certificate Timestamp List process time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: processing_time
+            - name: adcs.cert_retrieval_processing_time
+              description: Certificate last retrieval processing time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: processing_time
