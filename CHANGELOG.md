@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Format ebpf [\#19553](https://github.com/netdata/netdata/pull/19553) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(go.d/mysql\): fix typo in test name [\#19550](https://github.com/netdata/netdata/pull/19550) ([arkamar](https://github.com/arkamar))
 - fix\(go.d/mysql\): don't collect global variables on every iteration [\#19549](https://github.com/netdata/netdata/pull/19549) ([arkamar](https://github.com/arkamar))
 - Regenerate integrations docs [\#19548](https://github.com/netdata/netdata/pull/19548) ([netdatabot](https://github.com/netdatabot))
@@ -477,7 +478,6 @@
 - backport of fixes from balance-parents [\#19012](https://github.com/netdata/netdata/pull/19012) ([ktsaou](https://github.com/ktsaou))
 - add missing spinlock unlocks on containers [\#19011](https://github.com/netdata/netdata/pull/19011) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#19010](https://github.com/netdata/netdata/pull/19010) ([netdatabot](https://github.com/netdatabot))
-- docs\(go.d/windows\): add deprecation notice [\#19009](https://github.com/netdata/netdata/pull/19009) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
