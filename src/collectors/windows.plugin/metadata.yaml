@@ -2042,3 +2042,89 @@ modules:
               chart_type: line
               dimensions:
                 - name: contentions
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibAD
+      monitored_instance:
+        name: Active Directory
+        link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - active directory
+        - ad
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Active Directory IO and queries.
+        method_description: |
+          It queries DirectoryServices object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibAD
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Active Directory
+          description: "These metrics refer to Active Directory."
+          labels: []
+          metrics:
+            - name: ad.directory_operations
+              description: AD directory operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: search
