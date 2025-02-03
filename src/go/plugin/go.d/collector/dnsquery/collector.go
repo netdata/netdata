@@ -83,6 +83,10 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
+	if err := c.initServers(); err != nil {
+		return fmt.Errorf("failed to initialize servers: %v", err)
+	}
+
 	rt, err := c.initRecordTypes()
 	if err != nil {
 		return fmt.Errorf("init record type: %v", err)
