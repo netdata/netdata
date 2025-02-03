@@ -98,6 +98,6 @@ ALWAYS_INLINE bool stream_control_replication_should_be_running(void) {
 
 ALWAYS_INLINE bool stream_control_health_should_be_running(void) {
     return backfill_runners() == 0 &&
-           replication_runners() == 0 &&
+           // replication_runners() == 0 &&
            (user_data_query_runners() + user_weights_query_runners()) <= 1;
 }
