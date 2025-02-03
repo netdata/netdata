@@ -121,7 +121,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
 
         rrddim_set_by_pointer(st_memory, rd_db_dbengine, (collected_number)pulse_dbengine_total_memory);
         rrddim_set_by_pointer(st_memory, rd_db_rrd, (collected_number)pulse_rrd_memory_size);
-        rrddim_set_by_pointer(st_memory, rd_db_sqlite3, (collected_number)sqlite3_memory_used_highwater);
+        rrddim_set_by_pointer(st_memory, rd_db_sqlite3, (collected_number)sqlite3_memory_used_current);
 
 #ifdef DICT_WITH_STATS
         rrddim_set_by_pointer(st_memory, rd_collectors,
