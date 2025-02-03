@@ -2212,9 +2212,6 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, size_t *query
 
 static void store_host_and_system_info(RRDHOST *host, size_t *query_counter)
 {
-    if (!rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_INFO))
-        return;
-
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_INFO);
 
     if (unlikely(store_host_systeminfo(host))) {
@@ -2360,9 +2357,6 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list)
 
 static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter)
 {
-    if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS)))
-        return;
-
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
 
     int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_id.uuid);
@@ -2392,9 +2386,6 @@ static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer, size_t *q
 
 static void store_host_claim_id(RRDHOST *host, size_t *query_counter)
 {
-    if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID)))
-        return;
-
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_CLAIMID);
     int rc;
     ND_UUID uuid = claim_id_get_uuid();
@@ -2413,6 +2404,22 @@ static void store_host_claim_id(RRDHOST *host, size_t *query_counter)
     char var_name[64];                                    \
     duration_snprintf(var_name, sizeof(var_name),         \
                       (int64_t)((end) - (start)), unit, true)
+
+
+void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter)
+{
+    // Store labels (if needed)
+    if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS)))
+        meta_store_host_labels(host, work_buffer, query_counter);
+
+    // Store claim id (if needed)
+    if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID)))
+        store_host_claim_id(host, query_counter);
+
+    // Store host and system info (if needed);
+    if (rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_INFO))
+        store_host_and_system_info(host, query_counter);
+}
 
 // Worker thread to scan hosts for pending metadata to store
 static void start_metadata_hosts(uv_work_t *req)
@@ -2444,14 +2451,10 @@ static void start_metadata_hosts(uv_work_t *req)
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
 
         worker_is_busy(UV_EVENT_STORE_HOST);
-        // Store labels (if needed)
-        meta_store_host_labels(host, work_buffer, &query_counter);
 
-        // Store claim id (if needed)
-        store_host_claim_id(host, &query_counter);
+        // store labels, claim_id, host and system info (if needed)
+        store_host_info_and_metadata(host, work_buffer, &query_counter);
 
-        // Store host and system info (if needed);
-        store_host_and_system_info(host, &query_counter);
         worker_is_idle();
 
         metadata_scan_host(host, work_buffer, &query_counter, shutting_down);
