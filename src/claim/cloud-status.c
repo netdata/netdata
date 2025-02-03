@@ -17,6 +17,9 @@ const char *cloud_status_to_string(CLOUD_STATUS status) {
         case CLOUD_STATUS_ONLINE:
             return "online";
 
+        case CLOUD_STATUS_CONNECTING:
+            return "connecting";
+
         case CLOUD_STATUS_INDIRECT:
             return "indirect";
     }
@@ -26,8 +29,12 @@ CLOUD_STATUS cloud_status(void) {
     if(unlikely(aclk_disable_runtime))
         return CLOUD_STATUS_BANNED;
 
-    if(likely(aclk_online()))
-        return CLOUD_STATUS_ONLINE;
+    if(likely(aclk_online())) {
+        if (rrdhost_flag_check(localhost, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS))
+            return CLOUD_STATUS_ONLINE;
+        else
+            return CLOUD_STATUS_CONNECTING;
+    }
 
     if(localhost->sender &&
         rrdhost_flag_check(localhost, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS) &&
