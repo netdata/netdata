@@ -54,7 +54,12 @@ fi
 
 if ! ./run-all-jobs.sh "$@"; then
   printf >&2 "Build failed."
-  exit 1
+
+  if [ -n "${DEBUG_BUILD_INFRA}" ]; then
+    exec /bin/bash
+  else
+    exit 1
+  fi
 fi
 
 mkdir -p /netdata/artifacts
