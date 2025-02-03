@@ -304,9 +304,9 @@ static int mssql_fill_dictionary() {
 
     DWORD i;
     char avalue[REGISTRY_MAX_VALUE] = {'\0'};
-    DWORD length = REGISTRY_MAX_VALUE;
     for (i = 0; i < values; i++) {
         avalue[0] = '\0';
+        DWORD length = REGISTRY_MAX_VALUE;
 
         ret = RegEnumValue(hKey, i, avalue, &length, NULL, NULL, NULL, NULL);
         if (ret != ERROR_SUCCESS)
