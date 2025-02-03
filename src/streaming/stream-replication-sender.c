@@ -789,7 +789,7 @@ static struct replication_thread {
         size_t error_duplicate;         // the number of replication requests found duplicate (same chart)
         size_t error_flushed;           // the number of replication requests deleted due to disconnections
         size_t latest_first_time;       // the 'after' timestamp of the last request we executed
-        size_t memory;                  // the total memory allocated by replication
+        int64_t memory;                 // the total memory allocated by replication
     } atomic;                           // access should be with atomic operations
 
     struct {
@@ -838,7 +838,7 @@ static struct replication_thread {
         },
 };
 
-size_t replication_sender_allocated_memory(void) {
+int64_t replication_sender_allocated_memory(void) {
     return __atomic_load_n(&replication_globals.atomic.memory, __ATOMIC_RELAXED);
 }
 
@@ -947,17 +947,15 @@ static void replication_sort_entry_add(struct replication_request *rq) {
 
     Pvoid_t *inner_judy_ptr;
 
+    JudyAllocThreadPulseReset();
+
     // find the outer judy entry, using after as key
-    size_t mem_before_outer_judyl = JudyLMemUsed(replication_globals.unsafe.queue.JudyL_array);
     inner_judy_ptr = JudyLIns(&replication_globals.unsafe.queue.JudyL_array, (Word_t) rq->after, PJE0);
-    size_t mem_after_outer_judyl = JudyLMemUsed(replication_globals.unsafe.queue.JudyL_array);
     if(unlikely(!inner_judy_ptr || inner_judy_ptr == PJERR))
         fatal("REPLICATION: corrupted outer judyL");
 
     // add it to the inner judy, using unique_id as key
-    size_t mem_before_inner_judyl = JudyLMemUsed(*inner_judy_ptr);
     Pvoid_t *item = JudyLIns(inner_judy_ptr, rq->unique_id, PJE0);
-    size_t mem_after_inner_judyl = JudyLMemUsed(*inner_judy_ptr);
     if(unlikely(!item || item == PJERR))
         fatal("REPLICATION: corrupted inner judyL");
 
@@ -971,7 +969,7 @@ static void replication_sort_entry_add(struct replication_request *rq) {
 
     replication_recursive_unlock();
 
-    __atomic_add_fetch(&replication_globals.atomic.memory, (mem_after_inner_judyl - mem_before_inner_judyl) + (mem_after_outer_judyl - mem_before_outer_judyl), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&replication_globals.atomic.memory, JudyAllocThreadPulseGetAndReset(), __ATOMIC_RELAXED);
 }
 
 static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sort_entry *rse, Pvoid_t **inner_judy_ppptr, bool preprocessing) {
@@ -987,27 +985,21 @@ static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sor
     rse->rq->indexed_in_judy = false;
     rse->rq->not_indexed_preprocessing = preprocessing;
 
-    size_t memory_saved = 0;
+    JudyAllocThreadPulseReset();
 
     // delete it from the inner judy
-    size_t mem_before_inner_judyl = JudyLMemUsed(**inner_judy_ppptr);
     JudyLDel(*inner_judy_ppptr, rse->rq->unique_id, PJE0);
-    size_t mem_after_inner_judyl = JudyLMemUsed(**inner_judy_ppptr);
-    memory_saved = mem_before_inner_judyl - mem_after_inner_judyl;
 
     // if no items left, delete it from the outer judy
     if(**inner_judy_ppptr == NULL) {
-        size_t mem_before_outer_judyl = JudyLMemUsed(replication_globals.unsafe.queue.JudyL_array);
         JudyLDel(&replication_globals.unsafe.queue.JudyL_array, rse->rq->after, PJE0);
-        size_t mem_after_outer_judyl = JudyLMemUsed(replication_globals.unsafe.queue.JudyL_array);
-        memory_saved += mem_before_outer_judyl - mem_after_outer_judyl;
         inner_judy_deleted = true;
     }
 
     // free memory
     replication_sort_entry_destroy(rse);
 
-    __atomic_sub_fetch(&replication_globals.atomic.memory, memory_saved, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&replication_globals.atomic.memory, JudyAllocThreadPulseGetAndReset(), __ATOMIC_RELAXED);
 
     return inner_judy_deleted;
 }
@@ -1699,8 +1691,17 @@ static void replication_main_cleanup(void *pptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+struct aral_statistics aral_replication_stats = { 0 };
 void replication_initialize(void) {
-    replication_globals.aral_rse = aral_by_size_acquire(sizeof(struct replication_sort_entry));
+    replication_globals.aral_rse = aral_create(
+        "replication",
+        sizeof(struct replication_sort_entry),
+        0,
+        128 * 1024, // limit it so that when replication finishes, we will not have a lot of memory lost
+        &aral_replication_stats,
+        NULL, NULL, false, false, false);
+
+    pulse_aral_register_statistics(&aral_replication_stats, "replication");
 }
 
 void *replication_thread_main(void *ptr) {
