@@ -183,9 +183,6 @@ static void insert_alert_queue(
     if (!host->aclk_config)
         return;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
-        return;
-
     time_t submit_delay = trigger_time + calculate_delay(old_status, new_status);
 
     int param = 0;

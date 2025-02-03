@@ -2205,6 +2205,7 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, size_t *query
 
     SQLITE_FINALIZE(ml_load_stmt);
     SQLITE_FINALIZE(store_dimension);
+    SQLITE_FINALIZE(store_chart);
 
     return;
 }
