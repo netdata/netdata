@@ -117,7 +117,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | domains | Domain or subdomains to query. The collector will choose a random domain from the list on every iteration. |  | yes |
-| servers | Servers to query. |  | yes |
+| servers | Servers to query. If empty, the collector will automatically use DNS servers from `/etc/resolv.conf`. |  | no |
 | port | DNS server port. | 53 | no |
 | network | Network protocol name. Available options: udp, tcp, tcp-tls. | udp | no |
 | record_types | Query record type. Available options: A, AAAA, CNAME, MX, NS, PTR, TXT, SOA, SPF, TXT, SRV. | A | no |
@@ -127,9 +127,9 @@ The following options can be defined globally: update_every, autodetection_retry
 
 #### Examples
 
-##### Basic
+##### Specific DNS servers
 
-An example configuration.
+An example configuration using Google's public DNS servers.
 
 <details open><summary>Config</summary>
 
@@ -146,6 +146,26 @@ jobs:
     servers:
       - 8.8.8.8
       - 8.8.4.4
+
+```
+</details>
+
+##### System DNS
+
+An example configuration using DNS servers from `/etc/resolv.conf`.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: job1
+    record_types:
+      - A
+      - AAAA
+    domains:
+      - google.com
+      - github.com
+      - reddit.com
 
 ```
 </details>
