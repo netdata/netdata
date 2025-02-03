@@ -994,7 +994,7 @@ static int store_claim_id(nd_uuid_t *host_id, nd_uuid_t *claim_id)
         SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
 
     param = 0;
-    rc = execute_insert(res);
+    rc = sqlite3_step_monitored(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store host claim id rc = %d", rc);
 
@@ -1141,7 +1141,7 @@ static int store_chart_metadata(RRDSET *st, sqlite3_stmt **res)
             return 1;
     }
 
-    int rc =  SQLITE_DONE;
+    int rc = 1;
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, &st->chart_uuid, sizeof(st->chart_uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, &st->rrdhost->host_id.uuid, sizeof(st->rrdhost->host_id.uuid), SQLITE_STATIC));
@@ -1184,7 +1184,7 @@ static bool store_dimension_metadata(RRDDIM *rd, sqlite3_stmt **res)
             return 1;
     }
 
-    int rc = SQLITE_DONE;
+    int rc = 1;
     int param = 0;
 
     nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(rd->uuid);
