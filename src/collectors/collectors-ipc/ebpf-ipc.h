@@ -61,8 +61,8 @@ typedef struct netdata_socket {
         uint32_t call_tcp_received;
         uint64_t tcp_bytes_sent;
         uint64_t tcp_bytes_received;
-        uint32_t close;        //It is never used with UDP
-        uint32_t retransmit;   //It is never used with UDP
+        uint32_t close;      //It is never used with UDP
+        uint32_t retransmit; //It is never used with UDP
         uint32_t ipv4_connect;
         uint32_t ipv6_connect;
         uint32_t state; // We do not have charts for it, because we are using network viewer plugin
@@ -153,8 +153,8 @@ typedef struct netdata_fd_stat {
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint32_t open_call;                    // Open syscalls (open and openat)
-    uint32_t close_call;                   // Close syscall (close)
+    uint32_t open_call;  // Open syscalls (open and openat)
+    uint32_t close_call; // Close syscall (close)
 
     // Errors
     uint32_t open_err;
@@ -199,8 +199,9 @@ enum netdata_integration_selector {
     NETDATA_INTEGRATION_END
 };
 
-static inline const char *netdata_integration_pipename(enum netdata_integration_selector idx) {
-    const char *pipes[] = { "NETDATA_APPS_PIPENAME", "NETDATA_CGROUP_PIPENAME", "NETDATA_NV_PIPENAME"} ;
+static inline const char *netdata_integration_pipename(enum netdata_integration_selector idx)
+{
+    const char *pipes[] = {"NETDATA_APPS_PIPENAME", "NETDATA_CGROUP_PIPENAME", "NETDATA_NV_PIPENAME"};
     const char *pipename = getenv(pipes[idx]);
     if (pipename)
         return pipename;
