@@ -30,7 +30,9 @@ for i, v in enumerate(data['include']):
                     'builder_rev': data['include'][i]['packages']['builder_rev'],
                     'platform': data['platform_map'][arch],
                     'bundle_sentry': data['include'][i]['bundle_sentry'][arch],
-                    'arch': arch
+                    'arch': arch,
+                    'runner': data['arch_data'][arch]['runner'],
+                    'qemu': data['arch_data'][arch]['qemu'],
                 })
 
 entries.sort(key=lambda k: (data['arch_order'].index(k['arch']), k['distro'], k['version']))

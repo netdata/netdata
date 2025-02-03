@@ -36,9 +36,17 @@ fi
 cd "${NETDATA_MAKESELF_PATH}/tmp/openssl" || exit 1
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
-    sed -i "s/disable('static', 'pic', 'threads');/disable('static', 'pic');/" Configure
-    run ./config -static threads no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl
-    run make -j "$(nproc)"
+  COMMON_CONFIG="-static threads no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl"
+
+  sed -i "s/disable('static', 'pic', 'threads');/disable('static', 'pic');/" Configure
+
+  # shellcheck disable=SC2086
+  case "${BUILDARCH}" in
+    armv6l|armv7l) run ./config ${COMMON_CONFIG} linux-armv4 ;;
+    *) run ./config ${COMMON_CONFIG} ;;
+  esac
+
+  run make -j "$(nproc)"
 fi
 
 run make -j "$(nproc)" install_sw
