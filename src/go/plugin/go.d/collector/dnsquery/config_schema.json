@@ -65,7 +65,7 @@
       },
       "servers": {
         "title": "Servers",
-        "description": "List of DNS servers to query.",
+        "description": "List of DNS servers to query. If empty, the collector will automatically use DNS servers from `/etc/resolv.conf`.",
         "type": [
           "array",
           "null"
@@ -78,8 +78,7 @@
         "default": [
           "8.8.8.8"
         ],
-        "uniqueItems": true,
-        "minItems": 1
+        "uniqueItems": true
       },
       "domains": {
         "title": "Domains",
@@ -107,7 +106,6 @@
     },
     "required": [
       "domains",
-      "servers",
       "network"
     ],
     "patternProperties": {

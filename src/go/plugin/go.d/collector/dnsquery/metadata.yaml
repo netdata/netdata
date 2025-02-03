@@ -62,9 +62,9 @@ modules:
               default_value: ""
               required: true
             - name: servers
-              description: Servers to query.
+              description: Servers to query. If empty, the collector will automatically use DNS servers from `/etc/resolv.conf`.
               default_value: ""
-              required: true
+              required: false
             - name: port
               description: DNS server port.
               default_value: 53
@@ -86,8 +86,8 @@ modules:
             title: Config
             enabled: true
           list:
-            - name: Basic
-              description: An example configuration.
+            - name: Specific DNS servers
+              description: An example configuration using Google's public DNS servers.
               config: |
                 jobs:
                   - name: job1
@@ -101,6 +101,18 @@ modules:
                     servers:
                       - 8.8.8.8
                       - 8.8.4.4
+            - name: System DNS
+              description: An example configuration using DNS servers from `/etc/resolv.conf`.
+              config: |
+                jobs:
+                  - name: job1
+                    record_types:
+                      - A
+                      - AAAA
+                    domains:
+                      - google.com
+                      - github.com
+                      - reddit.com
     troubleshooting:
       problems:
         list: []
