@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- docs\(start-stop-restart\): fix restart typo [\#19555](https://github.com/netdata/netdata/pull/19555) ([L-U-C-K-Y](https://github.com/L-U-C-K-Y))
+- Format Windows.plugin [\#19554](https://github.com/netdata/netdata/pull/19554) ([thiagoftsm](https://github.com/thiagoftsm))
 - Format ebpf [\#19553](https://github.com/netdata/netdata/pull/19553) ([thiagoftsm](https://github.com/thiagoftsm))
+- Rename appconfig to inicfg and drop config\_\* function-like macros. [\#19552](https://github.com/netdata/netdata/pull/19552) ([vkalintiris](https://github.com/vkalintiris))
 - fix\(go.d/mysql\): fix typo in test name [\#19550](https://github.com/netdata/netdata/pull/19550) ([arkamar](https://github.com/arkamar))
 - fix\(go.d/mysql\): don't collect global variables on every iteration [\#19549](https://github.com/netdata/netdata/pull/19549) ([arkamar](https://github.com/arkamar))
 - Regenerate integrations docs [\#19548](https://github.com/netdata/netdata/pull/19548) ([netdatabot](https://github.com/netdatabot))
@@ -475,9 +478,6 @@
 - fix\(go.d/ping\): fix "interface" option [\#19016](https://github.com/netdata/netdata/pull/19016) ([ilyam8](https://github.com/ilyam8))
 - Remove MSI test [\#19015](https://github.com/netdata/netdata/pull/19015) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix has\_receiver condition in rrdhost\_status\(\) [\#19014](https://github.com/netdata/netdata/pull/19014) ([ktsaou](https://github.com/ktsaou))
-- backport of fixes from balance-parents [\#19012](https://github.com/netdata/netdata/pull/19012) ([ktsaou](https://github.com/ktsaou))
-- add missing spinlock unlocks on containers [\#19011](https://github.com/netdata/netdata/pull/19011) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#19010](https://github.com/netdata/netdata/pull/19010) ([netdatabot](https://github.com/netdatabot))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
