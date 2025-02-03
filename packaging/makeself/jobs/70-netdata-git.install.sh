@@ -14,7 +14,7 @@ else
   export CFLAGS="${TUNING_FLAGS} ${COMMON_CFLAGS} -O1 -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1"
 fi
 
-export LDFLAGS="-Wl,--gc-sections -static -L/libuwnind-static/lib -L/openssl-static/lib64 -L/libmnl-static/lib -L/libnetfilter-acct-static/lib -L/curl-local/lib"
+export LDFLAGS="-Wl,--gc-sections -static -L/libuwnind-static/lib -L/openssl-static/lib64 -L/libelf-static/lib -L/libmnl-static/lib -L/libnetfilter-acct-static/lib -L/curl-local/lib"
 
 # We export this to 'yes', installer sets this to .environment.
 # The updater consumes this one, so that it can tell whether it should update a static install or a non-static one
@@ -23,7 +23,7 @@ export IS_NETDATA_STATIC_BINARY="yes"
 # Set eBPF LIBC to "static" to bundle the `-static` variant of the kernel-collector
 export EBPF_LIBC="static"
 export PKG_CONFIG="pkg-config --static"
-export PKG_CONFIG_PATH="/libunwind-static/lib/pkgconfig:/openssl-static/lib64/pkgconfig:/libmnl-static/lib/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig:/curl-local/lib/pkgconfig"
+export PKG_CONFIG_PATH="/libunwind-static/lib/pkgconfig:/openssl-static/lib64/pkgconfig:/libelf-static/lib64/pkgconfig:/libmnl-static/lib/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig:/curl-local/lib/pkgconfig"
 
 [ "${BUILDARCH}" != "ppc64le" ] && export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBUNWIND=ON"
 
