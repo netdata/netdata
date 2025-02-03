@@ -1863,7 +1863,7 @@ void *replication_thread_main(void *ptr) {
 }
 
 int replication_threads_default(void) {
-    int threads = netdata_conf_is_parent() ? (int)HOWMANY(netdata_conf_cpus(), 4) : 1;
+    int threads = netdata_conf_is_parent() ? (int)MIN(netdata_conf_cpus(), 6) : 1;
     threads = FIT_IN_RANGE(threads, 1, MAX_REPLICATION_THREADS);
     return threads;
 }
@@ -1872,7 +1872,7 @@ int replication_prefetch_default(void) {
     // Our goal is to feed the pipeline with enough requests,
     // since this will allow dbengine to merge the requests that load the same extents,
     // providing the best performance and minimizing disk I/O.
-    int target = MAX(libuv_worker_threads / 2, (int)stream_send.replication.threads * 5);
+    int target = MAX(libuv_worker_threads / 2, (int)stream_send.replication.threads * 10);
 
     int prefetch = (int)HOWMANY(target, stream_send.replication.threads);
     prefetch = FIT_IN_RANGE(prefetch, 1, MAX_REPLICATION_PREFETCH);
