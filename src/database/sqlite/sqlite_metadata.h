@@ -15,16 +15,6 @@ typedef enum event_log_type {
 } event_log_type_t;
 void get_agent_event_time_median_init(void);
 
-// return a node list
-struct node_instance_list {
-    nd_uuid_t  node_id;
-    nd_uuid_t  host_id;
-    char *hostname;
-    int live;
-    int queryable;
-    int hops;
-};
-
 typedef enum db_check_action_type {
     DB_CHECK_NONE          = (1 << 0),
     DB_CHECK_RECLAIM_SPACE = (1 << 1),
@@ -49,7 +39,6 @@ int sql_metadata_cache_stats(int op);
 
 int get_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
 void sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
-struct node_instance_list *get_node_list(void);
 void sql_load_node_id(RRDHOST *host);
 
 // Help build archived hosts in memory when agent starts
