@@ -230,6 +230,13 @@ static ALWAYS_INLINE void aral_page_available_unlock(ARAL *ar, ARAL_PAGE *page) 
         spinlock_unlock(&page->available.spinlock);
 }
 
+static ALWAYS_INLINE bool aral_page_incoming_trylock(ARAL *ar, ARAL_PAGE *page, size_t partition) {
+    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
+        return spinlock_trylock(&page->incoming[partition].spinlock);
+
+    return true;
+}
+
 static ALWAYS_INLINE void aral_page_incoming_lock(ARAL *ar, ARAL_PAGE *page, size_t partition) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
         spinlock_lock(&page->incoming[partition].spinlock);
@@ -774,25 +781,31 @@ static ALWAYS_INLINE void *aral_get_free_slot___no_lock_required(ARAL *ar, ARAL_
     // Fall back to existing mechanism for reused memory
     aral_page_available_lock(ar, page);
 
-    if(!page->available.list) {
+    while(!page->available.list) {
         uint32_t bitmap = __atomic_load_n(&page->incoming_partition_bitmap, __ATOMIC_RELAXED);
-        if(!bitmap)
+        if (!bitmap)
             fatal("ARAL: bitmap of incoming free elements cannot be empty at this point");
 
-        size_t partition = __builtin_ffs((int)bitmap) - 1;
-        //        for(partition = 0; partition < ARAL_PAGE_INCOMING_PARTITIONS ; partition++) {
-        //            if (bitmap & (1U << partition))
-        //                break;
-        //        }
+        while(bitmap) {
+            size_t partition = __builtin_ffs((int)bitmap) - 1;
+            //        for(partition = 0; partition < ARAL_PAGE_INCOMING_PARTITIONS ; partition++) {
+            //            if (bitmap & (1U << partition))
+            //                break;
+            //        }
 
-        if(partition >= ARAL_PAGE_INCOMING_PARTITIONS)
-            fatal("ARAL: partition %zu must be smaller than %d", partition, ARAL_PAGE_INCOMING_PARTITIONS);
+            if (partition >= ARAL_PAGE_INCOMING_PARTITIONS)
+                fatal("ARAL: partition %zu must be smaller than %d", partition, ARAL_PAGE_INCOMING_PARTITIONS);
 
-        aral_page_incoming_lock(ar, page, partition);
-        page->available.list = page->incoming[partition].list;
-        page->incoming[partition].list = NULL;
-        __atomic_fetch_and(&page->incoming_partition_bitmap, ~(1U << partition), __ATOMIC_RELAXED);
-        aral_page_incoming_unlock(ar, page, partition);
+            if (aral_page_incoming_trylock(ar, page, partition)) {
+                page->available.list = page->incoming[partition].list;
+                page->incoming[partition].list = NULL;
+                __atomic_fetch_and(&page->incoming_partition_bitmap, ~(1U << partition), __ATOMIC_RELAXED);
+                aral_page_incoming_unlock(ar, page, partition);
+                break;
+            }
+            else
+                bitmap &= ~(1U << partition);
+        }
     }
 
     ARAL_FREE *found_fr = page->available.list;
@@ -813,12 +826,20 @@ static inline void aral_add_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *pa
     ARAL_FREE *fr = (ARAL_FREE *)ptr;
     fr->size = ar->config.element_size;
 
-    size_t partition = gettid_cached() % ARAL_PAGE_INCOMING_PARTITIONS;
-    aral_page_incoming_lock(ar, page, partition);
-    fr->next = page->incoming[partition].list;
-    page->incoming[partition].list = fr;
-    __atomic_fetch_or(&page->incoming_partition_bitmap, 1U << partition, __ATOMIC_RELAXED);
-    aral_page_incoming_unlock(ar, page, partition);
+    size_t start = gettid_cached() % ARAL_PAGE_INCOMING_PARTITIONS;
+    while (true) {
+        for (size_t partition = start; partition < ARAL_PAGE_INCOMING_PARTITIONS; partition++) {
+            if (aral_page_incoming_trylock(ar, page, partition)) {
+                fr->next = page->incoming[partition].list;
+                page->incoming[partition].list = fr;
+                __atomic_fetch_or(&page->incoming_partition_bitmap, 1U << partition, __ATOMIC_RELAXED);
+                aral_page_incoming_unlock(ar, page, partition);
+                return;
+            }
+        }
+
+        start = 0;
+    }
 }
 
 ALWAYS_INLINE void *aral_callocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
