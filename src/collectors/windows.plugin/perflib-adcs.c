@@ -629,7 +629,7 @@ static void netdata_adcs_signed_certificate_timetamp_list_processing(
 
         ac->rd_adcs_signed_certificate_timestamp_list_processing_time_seconds = rrddim_add(
             ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds,
-            "processing_time",
+            "list",
             NULL,
             1,
             1000,
