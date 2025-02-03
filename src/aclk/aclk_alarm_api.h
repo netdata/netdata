@@ -3,7 +3,7 @@
 #ifndef ACLK_ALARM_API_H
 #define ACLK_ALARM_API_H
 
-#include "../daemon/common.h"
+#include "database/rrd.h"
 #include "schema-wrappers/schema_wrappers.h"
 
 void aclk_send_alarm_log_entry(struct alarm_log_entry *log_entry);

@@ -336,6 +336,7 @@ happened, on your systems and applications.
 	-DUSE_CXX_11=On \
 	%endif
 	%endif
+	-DDISABLE_LTO=On \
 	%if %{_have_cups}
 	-DENABLE_PLUGIN_CUPS=On \
 	%else
@@ -521,6 +522,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_unitdir}/%{name}-updater.service
 %{_presetdir}/50-%{name}.preset
 %{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf
+
+%{_datarootdir}/%{name}/build-info-cmake-cache.gz
 
 %dir %{_libexecdir}/%{name}
 %dir %{_libexecdir}/%{name}/plugins.d

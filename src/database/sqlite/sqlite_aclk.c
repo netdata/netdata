@@ -13,7 +13,7 @@ void sanity_check(void) {
 #include "../aclk_query.h"
 #include "../aclk_capas.h"
 
-static void create_node_instance_result_job(const char *machine_guid, const char *node_id)
+static void create_node_instance_result_job(mqtt_wss_client client __maybe_unused, const char *machine_guid, const char *node_id)
 {
     nd_uuid_t host_uuid, node_uuid;
 
@@ -32,33 +32,33 @@ static void create_node_instance_result_job(const char *machine_guid, const char
         netdata_log_error("Cannot find machine_guid provided by CreateNodeInstanceResult");
         return;
     }
-
     sql_update_node_id(&host_uuid, &node_uuid);
-
-    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-    node_instance_connection_t node_state_update = {
-        .hops = 1,
-        .live = 0,
-        .queryable = 1,
-        .session_id = aclk_session_newarch,
-        .node_id = node_id,
-        .capabilities = NULL};
-
-    node_state_update.live = rrdhost_is_local(host) ? 1 : 0;
-    node_state_update.hops = rrdhost_ingestion_hops(host);
-    node_state_update.capabilities = aclk_get_node_instance_capas(host);
     schedule_node_state_update(host, 5000);
-
-    CLAIM_ID claim_id = claim_id_get();
-    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
-    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-
-    freez((void *)node_state_update.capabilities);
-
-    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
-    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-
-    aclk_add_job(query);
+//
+//    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
+//    node_instance_connection_t node_state_update = {
+//        .hops = 1,
+//        .live = 0,
+//        .queryable = 1,
+//        .session_id = aclk_session_newarch,
+//        .node_id = node_id,
+//        .capabilities = NULL};
+//
+//    node_state_update.live = rrdhost_is_local(host) ? 1 : 0;
+//    node_state_update.hops = rrdhost_ingestion_hops(host);
+//    node_state_update.capabilities = aclk_get_node_instance_capas(host);
+//    schedule_node_state_update(host, 5000);
+//
+//    CLAIM_ID claim_id = claim_id_get();
+//    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
+//    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
+//
+//    freez((void *)node_state_update.capabilities);
+//
+//    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
+//    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
+//
+//    aclk_add_job(query);
 }
 
 struct aclk_sync_config_s {
@@ -395,7 +395,7 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             break;
         case SEND_NODE_INSTANCES:
             worker_is_busy(UV_EVENT_SEND_NODE_INSTANCES);
-            aclk_send_node_instances();
+            aclk_send_node_instances(config->client);
             ok_to_send = false;
             break;
         case ALERT_START_STREAMING:
@@ -410,7 +410,7 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             break;
         case CREATE_NODE_INSTANCE:
             worker_is_busy(UV_EVENT_CREATE_NODE_INSTANCE);
-            create_node_instance_result_job(query->machine_guid, query->data.node_id);
+            create_node_instance_result_job(config->client, query->machine_guid, query->data.node_id);
             ok_to_send = false;
             break;
 
@@ -882,10 +882,8 @@ static void aclk_synchronization(void *arg)
     (void) uv_loop_close(loop);
 
     // Free execute commands / queries
-    if (pending_queries) {
-        free_query_list(aclk_query_execute->JudyL);
-        (void)JudyLFreeArray(&aclk_query_execute->JudyL, PJE0);
-    }
+    free_query_list(aclk_query_execute->JudyL);
+    (void)JudyLFreeArray(&aclk_query_execute->JudyL, PJE0);
     freez(aclk_query_execute);
 
     // Free batch commands

@@ -73,7 +73,7 @@ static void build_node_info(RRDHOST *host)
     node_info.data.version = host_version ? host_version : NETDATA_VERSION;
     node_info.data.release_channel = get_release_channel();
     node_info.data.timezone = rrdhost_abbrev_timezone(host);
-    node_info.data.custom_info = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
+    node_info.data.custom_info = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
     node_info.data.machine_guid = host->machine_guid;
     node_info.node_capabilities = (struct capability *)aclk_get_agent_capas();
     node_info.data.host_labels_ptr = host->rrdlabels;

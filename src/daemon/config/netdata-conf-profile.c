@@ -52,7 +52,7 @@ ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     ND_PROFILE_2buffer(wb, def_profile, " ");
 
-    CLEAN_CHAR_P *s = strdupz(config_get(CONFIG_SECTION_GLOBAL, "profile", buffer_tostring(wb)));
+    CLEAN_CHAR_P *s = strdupz(inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "profile", buffer_tostring(wb)));
 
     char *words[100];
     size_t n = quoted_strings_splitter(s, words, _countof(words), isspace_map_whitespace);
@@ -80,7 +80,7 @@ ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
     if(pt != started) {
         buffer_flush(wb);
         ND_PROFILE_2buffer(wb, pt, " ");
-        config_set(CONFIG_SECTION_GLOBAL, "profile", buffer_tostring(wb));
+        inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "profile", buffer_tostring(wb));
 
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "The netdata.conf setting [global].profile has been overwritten to '%s'",

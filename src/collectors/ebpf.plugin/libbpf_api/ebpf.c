@@ -1010,7 +1010,7 @@ void ebpf_mount_config_name(char *filename, size_t length, char *path, const cha
 
 int ebpf_load_config(struct config *config, char *filename)
 {
-    return appconfig_load(config, filename, 0, NULL);
+    return inicfg_load(config, filename, 0, NULL);
 }
 
 
@@ -1299,39 +1299,39 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
 {
     char default_value[EBPF_MAX_MODE_LENGTH + 1];
     ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
-    const char *load_mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
+    const char *load_mode = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
     modules->mode = ebpf_select_mode(load_mode);
 
-    modules->update_every = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
+    modules->update_every = (int)inicfg_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
                                                      EBPF_CFG_UPDATE_EVERY, modules->update_every);
 
-    modules->apps_charts = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
+    modules->apps_charts = inicfg_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
                                                  (int) (modules->apps_charts & NETDATA_EBPF_APPS_FLAG_YES));
 
-    modules->cgroup_charts = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CGROUP,
+    modules->cgroup_charts = inicfg_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CGROUP,
                                                    modules->cgroup_charts);
 
-    modules->pid_map_size = (uint32_t)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
+    modules->pid_map_size = (uint32_t)inicfg_get_number(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
                                                            modules->pid_map_size);
 
-    modules->lifetime = (uint32_t) appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
+    modules->lifetime = (uint32_t) inicfg_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
                                                         EBPF_CFG_LIFETIME, EBPF_DEFAULT_LIFETIME);
 
     char *value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
-    const char *type_format = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
+    const char *type_format = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(type_format);
     load = ebpf_select_load_mode(btf_file, load, kver, is_rh);
     modules->load = origin | load;
 
-    const char *core_attach = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
+    const char *core_attach = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
     netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(core_attach, modules->mode);
     ebpf_update_target_with_conf(modules, fill_lm);
 
     value = ebpf_convert_collect_pid_to_string(modules->apps_level);
-    const char *collect_pid = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
+    const char *collect_pid = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
     modules->apps_level =  ebpf_convert_string_to_apps_level(collect_pid);
 
-    modules->maps_per_core = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_MAPS_PER_CORE,
+    modules->maps_per_core = inicfg_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_MAPS_PER_CORE,
                                                    modules->maps_per_core);
     if (kver < NETDATA_EBPF_KERNEL_4_06)
         modules->maps_per_core = CONFIG_BOOLEAN_NO;

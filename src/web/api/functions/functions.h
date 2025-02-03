@@ -3,7 +3,7 @@
 #ifndef NETDATA_FUNCTIONS_H
 #define NETDATA_FUNCTIONS_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #include "function-metrics-cardinality.h"
 #include "function-streaming.h"

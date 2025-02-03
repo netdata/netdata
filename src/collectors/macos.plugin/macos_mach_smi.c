@@ -10,10 +10,10 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
     static int do_cpu = -1, do_ram = - 1, do_swapio = -1, do_pgfaults = -1;
 
     if (unlikely(do_cpu == -1)) {
-        do_cpu                  = config_get_boolean("plugin:macos:mach_smi", "cpu utilization", 1);
-        do_ram                  = config_get_boolean("plugin:macos:mach_smi", "system ram", 1);
-        do_swapio               = config_get_boolean("plugin:macos:mach_smi", "swap i/o", 1);
-        do_pgfaults             = config_get_boolean("plugin:macos:mach_smi", "memory page faults", 1);
+        do_cpu                  = inicfg_get_boolean(&netdata_config, "plugin:macos:mach_smi", "cpu utilization", 1);
+        do_ram                  = inicfg_get_boolean(&netdata_config, "plugin:macos:mach_smi", "system ram", 1);
+        do_swapio               = inicfg_get_boolean(&netdata_config, "plugin:macos:mach_smi", "swap i/o", 1);
+        do_pgfaults             = inicfg_get_boolean(&netdata_config, "plugin:macos:mach_smi", "memory page faults", 1);
     }
 
     RRDSET *st;

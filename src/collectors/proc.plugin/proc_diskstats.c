@@ -332,7 +332,7 @@ static inline int is_major_enabled(int major) {
     if(major_configs[major] == -1) {
         char buffer[CONFIG_MAX_NAME + 1];
         snprintfz(buffer, CONFIG_MAX_NAME, "performance metrics for disks with major %d", major);
-        major_configs[major] = (char)config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, buffer, 1);
+        major_configs[major] = (char)inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, buffer, 1);
     }
 
     return (int)major_configs[major];
@@ -582,8 +582,8 @@ static void get_disk_config(struct disk *d) {
     char var_name[4096 + 1];
     snprintfz(var_name, 4096, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS ":%s", d->disk);
 
-    if (config_exists(var_name, "enable"))
-        def_enable = config_get_boolean_ondemand(var_name, "enable", def_enable);
+    if (inicfg_exists(&netdata_config, var_name, "enable"))
+        def_enable = inicfg_get_boolean_ondemand(&netdata_config, var_name, "enable", def_enable);
 
     if(unlikely(def_enable == CONFIG_BOOLEAN_NO)) {
         // the user does not want any metrics for this disk
@@ -636,8 +636,8 @@ static void get_disk_config(struct disk *d) {
 
         // def_performance
         // check the user configuration (this will also show our 'on demand' decision)
-        if (config_exists(var_name, "enable performance metrics"))
-            def_performance = config_get_boolean_ondemand(var_name, "enable performance metrics", def_performance);
+        if (inicfg_exists(&netdata_config, var_name, "enable performance metrics"))
+            def_performance = inicfg_get_boolean_ondemand(&netdata_config, var_name, "enable performance metrics", def_performance);
 
         int ddo_io = CONFIG_BOOLEAN_NO,
                 ddo_ops = CONFIG_BOOLEAN_NO,
@@ -673,28 +673,28 @@ static void get_disk_config(struct disk *d) {
         d->do_ext = ddo_ext;
         d->do_backlog = ddo_backlog;
 
-        if (config_exists(var_name, "bandwidth"))
-            d->do_io = config_get_boolean_ondemand(var_name, "bandwidth", ddo_io);
-        if (config_exists(var_name, "operations"))
-            d->do_ops = config_get_boolean_ondemand(var_name, "operations", ddo_ops);
-        if (config_exists(var_name, "merged operations"))
-            d->do_mops = config_get_boolean_ondemand(var_name, "merged operations", ddo_mops);
-        if (config_exists(var_name, "i/o time"))
-            d->do_iotime = config_get_boolean_ondemand(var_name, "i/o time", ddo_iotime);
-        if (config_exists(var_name, "queued operations"))
-            d->do_qops = config_get_boolean_ondemand(var_name, "queued operations", ddo_qops);
-        if (config_exists(var_name, "utilization percentage"))
-            d->do_util = config_get_boolean_ondemand(var_name, "utilization percentage", ddo_util);
-        if (config_exists(var_name, "extended operations"))
-            d->do_ext = config_get_boolean_ondemand(var_name, "extended operations", ddo_ext);
-        if (config_exists(var_name, "backlog"))
-            d->do_backlog = config_get_boolean_ondemand(var_name, "backlog", ddo_backlog);
+        if (inicfg_exists(&netdata_config, var_name, "bandwidth"))
+            d->do_io = inicfg_get_boolean_ondemand(&netdata_config, var_name, "bandwidth", ddo_io);
+        if (inicfg_exists(&netdata_config, var_name, "operations"))
+            d->do_ops = inicfg_get_boolean_ondemand(&netdata_config, var_name, "operations", ddo_ops);
+        if (inicfg_exists(&netdata_config, var_name, "merged operations"))
+            d->do_mops = inicfg_get_boolean_ondemand(&netdata_config, var_name, "merged operations", ddo_mops);
+        if (inicfg_exists(&netdata_config, var_name, "i/o time"))
+            d->do_iotime = inicfg_get_boolean_ondemand(&netdata_config, var_name, "i/o time", ddo_iotime);
+        if (inicfg_exists(&netdata_config, var_name, "queued operations"))
+            d->do_qops = inicfg_get_boolean_ondemand(&netdata_config, var_name, "queued operations", ddo_qops);
+        if (inicfg_exists(&netdata_config, var_name, "utilization percentage"))
+            d->do_util = inicfg_get_boolean_ondemand(&netdata_config, var_name, "utilization percentage", ddo_util);
+        if (inicfg_exists(&netdata_config, var_name, "extended operations"))
+            d->do_ext = inicfg_get_boolean_ondemand(&netdata_config, var_name, "extended operations", ddo_ext);
+        if (inicfg_exists(&netdata_config, var_name, "backlog"))
+            d->do_backlog = inicfg_get_boolean_ondemand(&netdata_config, var_name, "backlog", ddo_backlog);
 
         d->do_bcache = ddo_bcache;
 
         if (d->device_is_bcache) {
-            if (config_exists(var_name, "bcache"))
-                d->do_bcache = config_get_boolean_ondemand(var_name, "bcache", ddo_bcache);
+            if (inicfg_exists(&netdata_config, var_name, "bcache"))
+                d->do_bcache = inicfg_get_boolean_ondemand(&netdata_config, var_name, "bcache", ddo_bcache);
         } else {
             d->do_bcache = 0;
         }
@@ -1339,64 +1339,64 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     if(unlikely(!globals_initialized)) {
         globals_initialized = 1;
 
-        global_enable_new_disks_detected_at_runtime = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "enable new disks detected at runtime", global_enable_new_disks_detected_at_runtime);
-        global_enable_performance_for_physical_disks = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "performance metrics for physical disks", global_enable_performance_for_physical_disks);
-        global_enable_performance_for_virtual_disks = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "performance metrics for virtual disks", global_enable_performance_for_virtual_disks);
-        global_enable_performance_for_partitions = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "performance metrics for partitions", global_enable_performance_for_partitions);
+        global_enable_new_disks_detected_at_runtime = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "enable new disks detected at runtime", global_enable_new_disks_detected_at_runtime);
+        global_enable_performance_for_physical_disks = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "performance metrics for physical disks", global_enable_performance_for_physical_disks);
+        global_enable_performance_for_virtual_disks = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "performance metrics for virtual disks", global_enable_performance_for_virtual_disks);
+        global_enable_performance_for_partitions = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "performance metrics for partitions", global_enable_performance_for_partitions);
 
-        global_do_io      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bandwidth for all disks", global_do_io);
-        global_do_ops     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "operations for all disks", global_do_ops);
-        global_do_mops    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "merged operations for all disks", global_do_mops);
-        global_do_iotime  = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "i/o time for all disks", global_do_iotime);
-        global_do_qops    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "queued operations for all disks", global_do_qops);
-        global_do_util    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "utilization percentage for all disks", global_do_util);
-        global_do_ext     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "extended operations for all disks", global_do_ext);
-        global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "backlog for all disks", global_do_backlog);
-        global_do_bcache  = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache for all disks", global_do_bcache);
-        global_bcache_priority_stats_update_every = (int)config_get_duration_seconds(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
+        global_do_io      = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bandwidth for all disks", global_do_io);
+        global_do_ops     = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "operations for all disks", global_do_ops);
+        global_do_mops    = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "merged operations for all disks", global_do_mops);
+        global_do_iotime  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "i/o time for all disks", global_do_iotime);
+        global_do_qops    = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "queued operations for all disks", global_do_qops);
+        global_do_util    = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "utilization percentage for all disks", global_do_util);
+        global_do_ext     = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "extended operations for all disks", global_do_ext);
+        global_do_backlog = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "backlog for all disks", global_do_backlog);
+        global_do_bcache  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache for all disks", global_do_bcache);
+        global_bcache_priority_stats_update_every = (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
 
-        global_cleanup_removed_disks = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
+        global_cleanup_removed_disks = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
 
         char buffer[FILENAME_MAX + 1];
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s");
-        path_to_sys_block_device = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get block device", buffer);
+        path_to_sys_block_device = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get block device", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/bcache");
-        path_to_sys_block_device_bcache = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get block device bcache", buffer);
+        path_to_sys_block_device_bcache = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get block device bcache", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/block/%s");
-        path_to_sys_devices_virtual_block_device = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get virtual block device", buffer);
+        path_to_sys_devices_virtual_block_device = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get virtual block device", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
-        path_to_sys_dev_block_major_minor_string = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get block device infos", buffer);
+        path_to_sys_dev_block_major_minor_string = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get block device infos", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/mapper", netdata_configured_host_prefix);
-        path_to_device_mapper = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to device mapper", buffer);
+        path_to_device_mapper = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to device mapper", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/disk", netdata_configured_host_prefix);
-        path_to_dev_disk = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/disk", buffer);
+        path_to_dev_disk = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/disk", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/sys/block", netdata_configured_host_prefix);
-        path_to_sys_block = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /sys/block", buffer);
+        path_to_sys_block = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /sys/block", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/disk/by-label", netdata_configured_host_prefix);
-        path_to_device_label = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/disk/by-label", buffer);
+        path_to_device_label = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/disk/by-label", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/disk/by-id", netdata_configured_host_prefix);
-        path_to_device_id = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/disk/by-id", buffer);
+        path_to_device_id = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/disk/by-id", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/vx/dsk", netdata_configured_host_prefix);
-        path_to_veritas_volume_groups = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/vx/dsk", buffer);
+        path_to_veritas_volume_groups = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/vx/dsk", buffer);
 
-        name_disks_by_id = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "name disks by id", name_disks_by_id);
+        name_disks_by_id = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "name disks by id", name_disks_by_id);
 
         preferred_ids = simple_pattern_create(
-                config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "preferred disk ids", DEFAULT_PREFERRED_IDS), NULL,
+                inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "preferred disk ids", DEFAULT_PREFERRED_IDS), NULL,
                 SIMPLE_PATTERN_EXACT, true);
 
         excluded_disks = simple_pattern_create(
-                config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS), NULL,
+                inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS), NULL,
                 SIMPLE_PATTERN_EXACT, true);
 
         rrd_function_add_inline(localhost, NULL, "block-devices", 10,
@@ -1411,7 +1411,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/diskstats");
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
     if(unlikely(!ff)) return 0;
 

@@ -400,7 +400,7 @@ void health_set_silencers_filename(void) {
     snprintfz(filename, FILENAME_MAX, "%s/health.silencers.json", netdata_configured_varlib_dir);
 
     health_globals.config.silencers_filename =
-        string_strdupz(config_get(CONFIG_SECTION_HEALTH, "silencers file", filename));
+        string_strdupz(inicfg_get(&netdata_config, CONFIG_SECTION_HEALTH, "silencers file", filename));
 }
 
 void health_silencers_init(void) {

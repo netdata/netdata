@@ -69,7 +69,7 @@ void set_environment_for_plugins_and_scripts(void) {
         buffer_free(user_plugins_dirs);
     }
 
-    const char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
+    const char *default_port = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;
     if (!default_port) {
         default_port = strdupz("19999");
@@ -84,12 +84,12 @@ void set_environment_for_plugins_and_scripts(void) {
     char path[4096], *p = getenv("PATH");
     if (!p) p = "/bin:/usr/bin";
     snprintfz(path, sizeof(path), "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
-    setenv("PATH", config_get(CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
+    setenv("PATH", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
 
     // python options
     p = getenv("PYTHONPATH");
     if (!p) p = "";
-    setenv("PYTHONPATH", config_get(CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p), 1);
+    setenv("PYTHONPATH", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p), 1);
 
     // disable buffering for python plugins
     setenv("PYTHONUNBUFFERED", "1", 1);

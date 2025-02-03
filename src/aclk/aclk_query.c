@@ -19,7 +19,7 @@ static struct pending_req_list *pending_req_list_head = NULL;
 static SPINLOCK pending_req_list_lock = SPINLOCK_INITIALIZER;
 
 void aclk_config_get_query_scope(void) {
-    const char *s = config_get(CONFIG_SECTION_CLOUD, "scope", "full");
+    const char *s = inicfg_get(&netdata_config, CONFIG_SECTION_CLOUD, "scope", "full");
     if(strcmp(s, "license manager") == 0)
         default_aclk_http_acl = HTTP_ACL_ACLK_LICENSE_MANAGER;
 }

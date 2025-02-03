@@ -21,9 +21,9 @@ struct tg_des {
 static size_t tg_des_max_window_size = 15;
 
 static inline void tg_des_init(void) {
-    long long ret = config_get_number(CONFIG_SECTION_WEB, "des max tg_des_window", (long long)tg_des_max_window_size);
+    long long ret = inicfg_get_number(&netdata_config, CONFIG_SECTION_WEB, "des max tg_des_window", (long long)tg_des_max_window_size);
     if(ret <= 1) {
-        config_set_number(CONFIG_SECTION_WEB, "des max tg_des_window", (long long)tg_des_max_window_size);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_WEB, "des max tg_des_window", (long long)tg_des_max_window_size);
     }
     else {
         tg_des_max_window_size = (size_t) ret;

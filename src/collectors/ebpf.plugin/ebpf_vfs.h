@@ -5,7 +5,8 @@
 
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_VFS "vfs"
-#define NETDATA_EBPF_VFS_MODULE_DESC "Monitor VFS (Virtual File System) functions. This thread is integrated with apps and cgroup."
+#define NETDATA_EBPF_VFS_MODULE_DESC                                                                                   \
+    "Monitor VFS (Virtual File System) functions. This thread is integrated with apps and cgroup."
 
 #define NETDATA_DIRECTORY_VFS_CONFIG_FILE "vfs.conf"
 
@@ -106,40 +107,6 @@ typedef struct __attribute__((packed)) netdata_publish_vfs {
 
 } netdata_publish_vfs_t;
 
-typedef struct netdata_ebpf_vfs {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    //Counter
-    uint32_t write_call;
-    uint32_t writev_call;
-    uint32_t read_call;
-    uint32_t readv_call;
-    uint32_t unlink_call;
-    uint32_t fsync_call;
-    uint32_t open_call;
-    uint32_t create_call;
-
-    //Accumulator
-    uint64_t write_bytes;
-    uint64_t writev_bytes;
-    uint64_t readv_bytes;
-    uint64_t read_bytes;
-
-    //Counter
-    uint32_t write_err;
-    uint32_t writev_err;
-    uint32_t read_err;
-    uint32_t readv_err;
-    uint32_t unlink_err;
-    uint32_t fsync_err;
-    uint32_t open_err;
-    uint32_t create_err;
-} netdata_ebpf_vfs_t;
-
 enum netdata_publish_vfs_list {
     NETDATA_KEY_PUBLISH_VFS_UNLINK,
     NETDATA_KEY_PUBLISH_VFS_READ,
@@ -184,11 +151,7 @@ enum vfs_counters {
     NETDATA_VFS_COUNTER
 };
 
-enum netdata_vfs_tables {
-    NETDATA_VFS_PID,
-    NETDATA_VFS_ALL,
-    NETDATA_VFS_CTRL
-};
+enum netdata_vfs_tables { NETDATA_VFS_PID, NETDATA_VFS_ALL, NETDATA_VFS_CTRL };
 
 enum netdata_vfs_calls_name {
     NETDATA_EBPF_VFS_WRITE,

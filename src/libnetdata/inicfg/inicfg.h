@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#ifndef LIBNETDATA_INICFG_H
+#define LIBNETDATA_INICFG_H
+
 /*
  * This section manages ini config files, like netdata.conf and stream.conf
  *
@@ -75,9 +78,6 @@
  *    a method to allocate only the dynamic option names.
  */
 
-#ifndef NETDATA_CONFIG_H
-#define NETDATA_CONFIG_H 1
-
 #include "../libnetdata.h"
 
 #define CONFIG_FILENAME "netdata.conf"
@@ -126,29 +126,29 @@ struct config {
         .index = {                                      \
             .avl_tree = {                               \
                 .root = NULL,                           \
-                .compar = appconfig_section_compare,    \
+                .compar = inicfg_section_compare,    \
             },                                          \
             .rwlock = AVL_LOCK_INITIALIZER,             \
         },                                              \
     }
 
-int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name);
+int inicfg_load(struct config *root, char *filename, int overwrite_used, const char *section_name);
 
-typedef bool (*appconfig_foreach_value_cb_t)(void *data, const char *name, const char *value);
-size_t appconfig_foreach_value_in_section(struct config *root, const char *section, appconfig_foreach_value_cb_t cb, void *data);
+typedef bool (*inicfg_foreach_value_cb_t)(void *data, const char *name, const char *value);
+size_t inicfg_foreach_value_in_section(struct config *root, const char *section, inicfg_foreach_value_cb_t cb, void *data);
 
 // sets a raw value, only if it is not loaded from the config
-void appconfig_set_default_raw_value(struct config *root, const char *section, const char *name, const char *value);
+void inicfg_set_default_raw_value(struct config *root, const char *section, const char *name, const char *value);
 
-int appconfig_exists(struct config *root, const char *section, const char *name);
-int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);
-int appconfig_move_everywhere(struct config *root, const char *name_old, const char *name_new);
+int inicfg_exists(struct config *root, const char *section, const char *name);
+int inicfg_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);
+int inicfg_move_everywhere(struct config *root, const char *name_old, const char *name_new);
 
-void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool netdata_conf);
+void inicfg_generate(struct config *root, BUFFER *wb, int only_changed, bool netdata_conf);
 
-int appconfig_section_compare(void *a, void *b);
+int inicfg_section_compare(void *a, void *b);
 
-bool appconfig_test_boolean_value(const char *s);
+bool inicfg_test_boolean_value(const char *s);
 
 struct connector_instance {
     char instance_name[CONFIG_MAX_NAME + 1];
@@ -168,27 +168,45 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, st
 // ----------------------------------------------------------------------------
 // shortcuts for the default netdata configuration
 
-#define config_load(filename, overwrite_used, section) appconfig_load(&netdata_config, filename, overwrite_used, section)
-
-#define config_set_default_raw_value(section, name, value) appconfig_set_default_raw_value(&netdata_config, section, name, value)
-
-#define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
-#define config_move(section_old, name_old, section_new, name_new) appconfig_move(&netdata_config, section_old, name_old, section_new, name_new)
-
-#define netdata_conf_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed, true)
-
-#define config_section_destroy(section) appconfig_section_destroy_non_loaded(&netdata_config, section)
-#define config_section_option_destroy(section, name) appconfig_section_option_destroy_non_loaded(&netdata_config, section, name)
+extern struct config netdata_config;
 
 bool stream_conf_needs_dbengine(struct config *root);
 bool stream_conf_has_api_enabled(struct config *root);
 
-void appconfig_foreach_section(struct config *root, void (*cb)(struct config *root, const char *name, void *data), void *data);
+const char *inicfg_get(struct config *root, const char *section, const char *name, const char *default_value);
+const char *inicfg_set(struct config *root, const char *section, const char *name, const char *value);
 
-#include "appconfig_api_text.h"
-#include "appconfig_api_numbers.h"
-#include "appconfig_api_boolean.h"
-#include "appconfig_api_sizes.h"
-#include "appconfig_api_durations.h"
+long long inicfg_get_number(struct config *root, const char *section, const char *name, long long value);
+long long inicfg_set_number(struct config *root, const char *section, const char *name, long long value);
+NETDATA_DOUBLE inicfg_get_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
+NETDATA_DOUBLE inicfg_set_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
 
-#endif // NETDATA_CONFIG_H
+// disabled
+#define CONFIG_BOOLEAN_NO   0
+// enabled
+#define CONFIG_BOOLEAN_YES  1
+// enabled if it has useful info when enabled
+#define CONFIG_BOOLEAN_AUTO 2
+// an invalid value to check for validity (used as default initialization when needed)
+#define CONFIG_BOOLEAN_INVALID 100
+
+int inicfg_get_boolean(struct config *root, const char *section, const char *name, int value);
+int inicfg_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
+int inicfg_set_boolean(struct config *root, const char *section, const char *name, int value);
+
+uint64_t inicfg_get_size_bytes(struct config *root, const char *section, const char *name, uint64_t default_value);
+uint64_t inicfg_set_size_bytes(struct config *root, const char *section, const char *name, uint64_t value);
+
+uint64_t inicfg_get_size_mb(struct config *root, const char *section, const char *name, uint64_t default_value);
+uint64_t inicfg_set_size_mb(struct config *root, const char *section, const char *name, uint64_t value);
+
+msec_t inicfg_get_duration_ms(struct config *root, const char *section, const char *name, msec_t default_value);
+msec_t inicfg_set_duration_ms(struct config *root, const char *section, const char *name, msec_t value);
+
+time_t inicfg_get_duration_seconds(struct config *root, const char *section, const char *name, time_t default_value);
+time_t inicfg_set_duration_seconds(struct config *root, const char *section, const char *name, time_t value);
+
+unsigned inicfg_get_duration_days(struct config *root, const char *section, const char *name, unsigned default_value);
+unsigned inicfg_set_duration_days(struct config *root, const char *section, const char *name, unsigned value);
+
+#endif // LIBNETDATA_INICFG_H

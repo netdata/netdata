@@ -297,6 +297,14 @@ prepare_cmake_options() {
     NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DUSE_CXX_11=On"
   fi
 
+  if [ -n "${NETDATA_ENABLE_LTO}" ]; then
+    if [ "${NETDATA_ENABLE_LTO}" -eq 1 ]; then
+      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DDISABLE_LTO=Off"
+    else
+      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DDISABLE_LTO=On"
+    fi
+  fi
+
   if [ "${ENABLE_GO:-1}" -eq 1 ]; then
     enable_feature PLUGIN_GO 1
   else

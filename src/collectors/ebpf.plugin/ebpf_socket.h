@@ -11,7 +11,8 @@
 
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SOCKET "socket"
-#define NETDATA_EBPF_SOCKET_MODULE_DESC "Monitors TCP and UDP bandwidth. This thread is integrated with apps and cgroup."
+#define NETDATA_EBPF_SOCKET_MODULE_DESC                                                                                \
+    "Monitors TCP and UDP bandwidth. This thread is integrated with apps and cgroup."
 
 // Vector indexes
 #define NETDATA_UDP_START 3
@@ -159,16 +160,16 @@ typedef enum ebpf_socket_idx {
 
 typedef struct __attribute__((packed)) ebpf_socket_publish_apps {
     // Data read
-    uint64_t bytes_sent;            // Bytes sent
-    uint64_t bytes_received;        // Bytes received
-    uint64_t call_tcp_sent;         // Number of times tcp_sendmsg was called
-    uint64_t call_tcp_received;     // Number of times tcp_cleanup_rbuf was called
-    uint64_t retransmit;            // Number of times tcp_retransmit was called
-    uint64_t call_udp_sent;         // Number of times udp_sendmsg was called
-    uint64_t call_udp_received;     // Number of times udp_recvmsg was called
-    uint64_t call_close;            // Number of times tcp_close was called
-    uint64_t call_tcp_v4_connection;// Number of times tcp_v4_connect was called
-    uint64_t call_tcp_v6_connection;// Number of times tcp_v6_connect was called
+    uint64_t bytes_sent;             // Bytes sent
+    uint64_t bytes_received;         // Bytes received
+    uint64_t call_tcp_sent;          // Number of times tcp_sendmsg was called
+    uint64_t call_tcp_received;      // Number of times tcp_cleanup_rbuf was called
+    uint64_t retransmit;             // Number of times tcp_retransmit was called
+    uint64_t call_udp_sent;          // Number of times udp_sendmsg was called
+    uint64_t call_udp_received;      // Number of times udp_recvmsg was called
+    uint64_t call_close;             // Number of times tcp_close was called
+    uint64_t call_tcp_v4_connection; // Number of times tcp_v4_connect was called
+    uint64_t call_tcp_v6_connection; // Number of times tcp_v6_connect was called
 } ebpf_socket_publish_apps_t;
 
 typedef struct ebpf_network_viewer_dimension_names {
@@ -178,7 +179,7 @@ typedef struct ebpf_network_viewer_dimension_names {
     uint16_t port;
 
     struct ebpf_network_viewer_dimension_names *next;
-} ebpf_network_viewer_dim_name_t ;
+} ebpf_network_viewer_dim_name_t;
 
 typedef struct ebpf_network_viewer_port_list {
     char *value;
@@ -212,27 +213,27 @@ typedef struct netdata_passive_connection_idx {
  * Union used to store ip addresses
  */
 union netdata_ip_t {
-    uint8_t  addr8[16];
+    uint8_t addr8[16];
     uint16_t addr16[8];
     uint32_t addr32[4];
     uint64_t addr64[2];
 };
 
 typedef struct ebpf_network_viewer_ip_list {
-    char *value;            // IP value
-    uint32_t hash;          // IP hash
+    char *value;   // IP value
+    uint32_t hash; // IP hash
 
-    uint8_t ver;            // IP version
+    uint8_t ver; // IP version
 
-    union netdata_ip_t first;        // The IP address informed
-    union netdata_ip_t last;        // The IP address informed
+    union netdata_ip_t first; // The IP address informed
+    union netdata_ip_t last;  // The IP address informed
 
     struct ebpf_network_viewer_ip_list *next;
 } ebpf_network_viewer_ip_list_t;
 
 typedef struct ebpf_network_viewer_hostname_list {
-    char *value;            // IP value
-    uint32_t hash;          // IP hash
+    char *value;   // IP value
+    uint32_t hash; // IP hash
 
     SIMPLE_PATTERN *value_pattern;
 
@@ -243,7 +244,7 @@ typedef struct ebpf_network_viewer_options {
     RW_SPINLOCK rw_spinlock;
 
     uint32_t enabled;
-    uint32_t family;                                        // AF_INET, AF_INET6 or AF_UNSPEC (both)
+    uint32_t family; // AF_INET, AF_INET6 or AF_UNSPEC (both)
 
     uint32_t hostname_resolution_enabled;
     uint32_t service_resolution_enabled;
@@ -265,42 +266,7 @@ typedef struct ebpf_network_viewer_options {
 
 extern ebpf_network_viewer_options_t network_viewer_opt;
 
-/**
- * Structure to store socket information
- */
-typedef struct netdata_socket {
-    char name[TASK_COMM_LEN];
-
-    // Timestamp
-    uint64_t first_timestamp;
-    uint64_t current_timestamp;
-    // Socket additional info
-    uint16_t protocol;
-    uint16_t family;
-    uint32_t external_origin;
-    struct {
-        uint32_t call_tcp_sent;
-        uint32_t call_tcp_received;
-        uint64_t tcp_bytes_sent;
-        uint64_t tcp_bytes_received;
-        uint32_t close;        //It is never used with UDP
-        uint32_t retransmit;   //It is never used with UDP
-        uint32_t ipv4_connect;
-        uint32_t ipv6_connect;
-        uint32_t state; // We do not have charts for it, because we are using network viewer plugin
-    } tcp;
-
-    struct {
-        uint32_t call_udp_sent;
-        uint32_t call_udp_received;
-        uint64_t udp_bytes_sent;
-        uint64_t udp_bytes_received;
-    } udp;
-} netdata_socket_t;
-
-typedef enum netdata_socket_flags {
-    NETDATA_SOCKET_FLAGS_ALREADY_OPEN = (1<<0)
-} netdata_socket_flags_t;
+typedef enum netdata_socket_flags { NETDATA_SOCKET_FLAGS_ALREADY_OPEN = (1 << 0) } netdata_socket_flags_t;
 
 typedef enum netdata_socket_src_ip_origin {
     NETDATA_EBPF_SRC_IP_ORIGIN_LOCAL,
@@ -308,15 +274,15 @@ typedef enum netdata_socket_src_ip_origin {
 } netdata_socket_src_ip_origin_t;
 
 typedef struct netata_socket_plus {
-    netdata_socket_t data;           // Data read from database
+    netdata_socket_t data; // Data read from database
     uint32_t pid;
     time_t last_update;
     netdata_socket_flags_t flags;
 
-    struct  {
+    struct {
         char src_ip[INET6_ADDRSTRLEN + 1];
- //       uint16_t src_port;
-        char dst_ip[INET6_ADDRSTRLEN+ 1];
+        //       uint16_t src_port;
+        char dst_ip[INET6_ADDRSTRLEN + 1];
         char dst_port[NI_MAXSERV + 1];
     } socket_string;
 } netdata_socket_plus_t;

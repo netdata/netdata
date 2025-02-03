@@ -47,7 +47,7 @@ void *macos_main(void *ptr)
     for (int i = 0; macos_modules[i].name; i++) {
         struct macos_module *pm = &macos_modules[i];
 
-        pm->enabled = config_get_boolean("plugin:macos", pm->name, pm->enabled);
+        pm->enabled = inicfg_get_boolean(&netdata_config, "plugin:macos", pm->name, pm->enabled);
         pm->rd = NULL;
 
         worker_register_job_name(i, macos_modules[i].dim);

@@ -4,7 +4,7 @@
 #include "database/sqlite/vendored/sqlite3recover.h"
 #include "health/health-alert-entry.h"
 
-//#include "sqlite_db_migration.h"
+#include "sqlite_db_migration.h"
 
 #define DB_METADATA_VERSION 18
 
@@ -420,11 +420,10 @@ done:
 
 #define SQL_UPDATE_NODE_ID  "UPDATE node_instance SET node_id = @node_id WHERE host_id = @host_id"
 
-int sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
+void sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
 {
     sqlite3_stmt *res = NULL;
     RRDHOST *host = NULL;
-    int rc = 2;
 
     char host_guid[GUID_LEN + 1];
     uuid_unparse_lower(*host_id, host_guid);
@@ -435,25 +434,23 @@ int sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
     rrd_wrunlock();
 
     if (!REQUIRE_DB(db_meta))
-        return 1;
+        return;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_NODE_ID, &res))
-        return 1;
+        return;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, node_id, sizeof(*node_id), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
 
     param = 0;
-    rc = execute_insert(res);
+    int rc = sqlite3_step_monitored(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store node instance information, rc = %d", rc);
-    rc = sqlite3_changes(db_meta);
 
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-    return rc - 1;
 }
 
 #define SQL_SELECT_NODE_ID  "SELECT node_id FROM node_instance WHERE host_id = @host_id AND node_id IS NOT NULL"
@@ -533,6 +530,9 @@ struct node_instance_list *get_node_list(void)
     char host_guid[UUID_STR_LEN];
     while (sqlite3_step_monitored(res) == SQLITE_ROW)
         row++;
+
+    if (row == 0)
+        return NULL;
 
     if (sqlite3_reset(res) != SQLITE_OK) {
         error_report("Failed to reset the prepared statement while fetching node instance information");

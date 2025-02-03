@@ -101,8 +101,8 @@ RRDHOST_INGEST_STATUS rrdhost_ingestion_status(RRDHOST *host) {
 }
 
 int16_t rrdhost_ingestion_hops(RRDHOST *host) {
-    if(rrdhost_is_local(host)) return 0;
-    if(!host->system_info) return 1;
+    if(host == localhost) return 0;
+    if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !host->system_info) return 1;
     return rrdhost_system_info_hops(host->system_info);
 }
 

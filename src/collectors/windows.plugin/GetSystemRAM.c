@@ -7,8 +7,9 @@
 #define _COMMON_PLUGIN_MODULE_NAME "GetSystemRam"
 #include "../common-contexts/common-contexts.h"
 
-int do_GetSystemRAM(int update_every, usec_t dt __maybe_unused) {
-    MEMORYSTATUSEX memStat = { 0 };
+int do_GetSystemRAM(int update_every, usec_t dt __maybe_unused)
+{
+    MEMORYSTATUSEX memStat = {0};
     memStat.dwLength = sizeof(memStat);
 
     if (!GlobalMemoryStatusEx(&memStat)) {

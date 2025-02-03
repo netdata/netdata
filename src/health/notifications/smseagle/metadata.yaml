@@ -1,0 +1,107 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-smseagle'
+  meta:
+    name: 'SMSEagle'
+    link: 'https://www.smseagle.eu/'
+    categories:
+      - notify.agent
+    icon_filename: 'smseagle.svg'
+  keywords:
+    - smseagle
+  overview:
+    notification_description: |
+      Forward notifications to SMSEagle device to send SMS, MMS, wake-up, or text-to-speech calls.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            Before using the API, you'll need to enable API access on your SMSEagle device by following these steps:
+            
+            1. Navigate to the Web-GUI and select the "Users" menu.
+            2. Create a new user account with "User" access level.
+            3. Locate the "Access to API" option next to your newly created user.
+            4. Select APIv2 and click the "Generate new token" button to create your API access token.
+            5. Set up the appropriate permissions in the APIv2 Permission section.
+            
+            Optional: Enable the "Access to resources of all users" checkbox if you want this API key to access data across all users. By default, the API key can only access data created under its credentials.
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'DEFAULT_RECIPIENT_SMSEAGLE'
+            default_value: ''
+            description: "If a role's recipients are not configured, a notification will be sent to this SMS recipient (empty = do not send a notification for unconfigured roles). Multiple recipients can be given like this: \"PHONE1,PHONE2...\""
+            required: true
+            detailed_description: |
+              All roles will default to this variable if left unconfigured.
+
+              You can then have different recipients per role, by editing `DEFAULT_RECIPIENT_SMSEAGLE` with the number you want, in the following entries at the bottom of the same file:
+              ```
+              role_recipients_smseagle[sysadmin]="+11222333444"
+              role_recipients_smseagle[domainadmin]="+11222333445"
+              role_recipients_smseagle[dba]="+11222333446"
+              role_recipients_smseagle[webmaster]="+11222333447"
+              role_recipients_smseagle[proxyadmin]="+11222333448"
+              role_recipients_smseagle[sitemgr]="+11222333449"
+              ```
+          - name: 'SMSEAGLE_API_URL'
+            default_value: ''
+            description: ""
+            required: true
+            detailed_description: |
+              The url of the SMSEagle device accessible from NetData, e.g https://192.168.0.101
+          - name: 'SMSEAGLE_API_ACCESSTOKEN'
+            default_value: ''
+            description: ""
+            required: true
+            detailed_description: |
+              An access token for the user created at SMSEagle device
+          - name: 'SMSEAGLE_MSG_TYPE'
+            default_value: 'sms'
+            description: ""
+            required: true
+            detailed_description: |
+              Choose a type of message/call. Available types: sms, mms, ring (wake-up call), tts (text-to-speech call), tts_advanced (multilanguage text-to-speech call). Be aware that some types require additional parameters to be set.
+          - name: 'SMSEAGLE_CALL_DURATION'
+            default_value: '10'
+            description: ""
+            required: true
+            detailed_description: |
+              Call duration, parameter required for Ring, TTS and TTS Advanced.
+          - name: 'SMSEAGLE_VOICE_ID'
+            default_value: '10'
+            description: ""
+            required: true
+            detailed_description: |
+              ID of the voice model, required for TTS Advanced.
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # SMSEagle options
+
+              SEND_SMSEAGLE="YES"
+              SMSEAGLE_API_URL="XXXXXXXX"
+              SMSEAGLE_API_ACCESSTOKEN="XXXXXXX"
+              SMSEAGLE_MSG_TYPE="sms"
+              SMSEAGLE_CALL_DURATION="10"
+              SMSEAGLE_VOICE_ID="1"
+              DEFAULT_RECIPIENT_SMSEAGLE="+11222333444"
+  troubleshooting:
+    problems:
+      list: []

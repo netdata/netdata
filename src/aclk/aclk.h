@@ -2,7 +2,7 @@
 #ifndef ACLK_H
 #define ACLK_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #include "aclk_util.h"
 //#include "aclk_rrdhost_state.h"
@@ -96,7 +96,7 @@ extern struct aclk_shared_state {
 void aclk_host_state_update(RRDHOST *host, int cmd, int queryable);
 bool aclk_host_state_update_auto(RRDHOST *host);
 
-void aclk_send_node_instances(void);
+void aclk_send_node_instances(mqtt_wss_client client);
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
 

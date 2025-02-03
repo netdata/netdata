@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "daemon/common.h"
-#include "libnetdata/os/os.h"
+#include "database/rrd.h"
 
 #define PLUGIN_TIMEX_NAME "timex.plugin"
 
@@ -49,14 +48,14 @@ void *timex_main(void *ptr)
     worker_register("TIMEX");
     worker_register_job_name(0, "clock check");
 
-    int update_every = (int)config_get_duration_seconds(CONFIG_SECTION_TIMEX, "update every", 10);
+    int update_every = (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_TIMEX, "update every", 10);
     if (update_every < localhost->rrd_update_every) {
         update_every = localhost->rrd_update_every;
-        config_set_duration_seconds(CONFIG_SECTION_TIMEX, "update every", update_every);
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_TIMEX, "update every", update_every);
     }
 
-    int do_sync = config_get_boolean(CONFIG_SECTION_TIMEX, "clock synchronization state", CONFIG_BOOLEAN_YES);
-    int do_offset = config_get_boolean(CONFIG_SECTION_TIMEX, "time offset", CONFIG_BOOLEAN_YES);
+    int do_sync = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_TIMEX, "clock synchronization state", CONFIG_BOOLEAN_YES);
+    int do_offset = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_TIMEX, "time offset", CONFIG_BOOLEAN_YES);
 
     if (unlikely(do_sync == CONFIG_BOOLEAN_NO && do_offset == CONFIG_BOOLEAN_NO)) {
         netdata_log_info("No charts to show");
