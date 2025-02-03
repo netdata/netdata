@@ -188,47 +188,6 @@ typedef struct netdata_ebpf_pid_stats {
 // ----------------------------------------------------------------------------
 // Helpers used during integration
 
-#include <stdlib.h>
-
-enum netdata_integration_selector {
-    NETDATA_INTEGRATION_APPS_EBPF,
-    NETDATA_INTEGRATION_CGROUPS_EBPF,
-    NETDATA_INTEGRATION_NETWORK_VIEWER_EBPF,
-
-    // This must be the last option always
-    NETDATA_INTEGRATION_END
-};
-
-static inline const char *netdata_integration_pipename(enum netdata_integration_selector idx)
-{
-    const char *pipes[] = {"NETDATA_APPS_PIPENAME", "NETDATA_CGROUP_PIPENAME", "NETDATA_NV_PIPENAME"};
-    const char *pipename = getenv(pipes[idx]);
-    if (pipename)
-        return pipename;
-
-#ifdef _WIN32
-    switch (idx) {
-        case NETDATA_INTEGRATION_NETWORK_VIEWER_EBPF:
-            return "\\\\?\\pipe\\netdata-nv-cli";
-        case NETDATA_INTEGRATION_CGROUPS_EBPF:
-            return "\\\\?\\pipe\\netdata-cg-cli";
-        case NETDATA_INTEGRATION_APPS_EBPF:
-        default:
-            return "\\\\?\\pipe\\netdata-apps-cli";
-    }
-#else
-    switch (idx) {
-        case NETDATA_INTEGRATION_NETWORK_VIEWER_EBPF:
-            return "/tmp/netdata-nv-ipc";
-        case NETDATA_INTEGRATION_CGROUPS_EBPF:
-            return "/tmp/netdata-cg-ipc";
-        default:
-        case NETDATA_INTEGRATION_APPS_EBPF:
-            return "/tmp/netdata-apps-ipc";
-    }
-#endif
-}
-
 #endif
 
 #endif //NETDATA_SHARED_DATA_H
