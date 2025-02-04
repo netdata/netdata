@@ -40,8 +40,8 @@ typedef int32_t REFCOUNT;
     ((refcount) >= REFCOUNT_DELETED && (refcount) <= -REFCOUNT_MAX))
 
 // returns the non-usable refcount found when it fails, the final refcount when it succeeds
-ALWAYS_INLINE
-static REFCOUNT WARNUNUSED refcount_acquire_advanced_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
+ALWAYS_INLINE WARNUNUSED
+static REFCOUNT refcount_acquire_advanced_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
     REFCOUNT expected = refcount_references(refcount);
     REFCOUNT desired;
 
