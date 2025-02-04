@@ -4,7 +4,6 @@
 /* Careful to always call this before creating a new journal file */
 void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, WAL *wal)
 {
-    int ret;
     struct generic_io_descriptor *io_descr;
     struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
@@ -26,14 +25,27 @@ void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengin
     io_descr->data = journalfile;
 
     io_descr->iov = uv_buf_init((void *)io_descr->buf, wal->buf_size);
-    ret = uv_fs_write(NULL, &io_descr->req, journalfile->file, &io_descr->iov, 1, (int64_t)io_descr->pos, NULL);
-    fatal_assert(-1 != ret);
 
-    if (io_descr->req.result < 0) {
+    int retries = 10;
+    int ret = -1;
+    while (ret == -1 && --retries) {
+        ret = uv_fs_write(NULL, &io_descr->req, journalfile->file, &io_descr->iov, 1, (int64_t)io_descr->pos, NULL);
+        if (ret == -1)
+            sleep_usec(300 * USEC_PER_MS);
+    }
+
+    bool jf_write_error = (ret == -1 || io_descr->req.result < 0);
+
+    if (unlikely(jf_write_error)) {
         ctx_io_error(ctx);
-        netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)io_descr->req.result));
-    } else {
-        netdata_log_debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
+        if (ret == -1)
+            netdata_log_error(
+                "DBENGINE: %s: uv_fs_write: failed to store metadata in journalfile %u, offset %ld",
+                __func__,
+                datafile->fileno,
+                (int64_t)io_descr->pos);
+        else
+            netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)io_descr->req.result));
     }
 
     uv_fs_req_cleanup(&io_descr->req);

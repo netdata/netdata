@@ -880,19 +880,32 @@ static void *extent_write_tp_worker(
 
     struct rrdengine_datafile *datafile = xt_io_descr->datafile;
 
-    int ret = uv_fs_write(NULL, &xt_io_descr->uv_fs_request, datafile->file, &xt_io_descr->iov, 1, (int64_t)xt_io_descr->pos, NULL);
-
-    // CHECK PROPERLY
-    fatal_assert(-1 != ret);
-
-    if (xt_io_descr->uv_fs_request.result < 0) {
-        ctx_io_error(ctx);
-        netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)xt_io_descr->uv_fs_request.result));
-    } else {
-        netdata_log_debug(D_RRDENGINE, "%s: Data block was written to disk.", __func__);
+    int retries = 10;
+    int ret = -1;
+    while (ret == -1 && --retries) {
+        ret = uv_fs_write(NULL, &xt_io_descr->uv_fs_request, datafile->file, &xt_io_descr->iov, 1, (int64_t)xt_io_descr->pos, NULL);
+        if (ret == -1)
+            sleep_usec(300 * USEC_PER_MS);
     }
 
-    journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
+    bool df_write_error = (ret == -1 || xt_io_descr->uv_fs_request.result < 0);
+
+    if (unlikely(df_write_error)) {
+        ctx_io_error(ctx);
+        if (ret == -1)
+            netdata_log_error(
+                "DBENGINE: %s: uv_fs_write: failed to store metrics in datafile %u, offset %ld",
+                __func__,
+                datafile->fileno,
+                (int64_t)xt_io_descr->pos);
+        else
+            netdata_log_error(
+                "DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)xt_io_descr->uv_fs_request.result));
+    }
+
+    if (likely(!df_write_error)) {
+        journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
+    }
 
     spinlock_lock(&datafile->writers.spinlock);
     datafile->writers.running--;
