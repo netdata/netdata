@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "ebpf_apps.h"
+#include "ebpf.h"
+#include "ebpf_socket_ipc.h"
 
 LISTEN_SOCKETS sockets;
 
