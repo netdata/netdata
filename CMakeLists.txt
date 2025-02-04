@@ -2288,7 +2288,7 @@ endif()
 # proto definitions
 #
 netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
-                            "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                            "${CMAKE_BINARY_DIR}/src/aclk/aclk-schemas"
                             ACLK_PROTO_BUILT_SRCS
                             ACLK_PROTO_BUILT_HDRS
                             ${ACLK_PROTO_DEFS})
@@ -2777,7 +2777,7 @@ if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         endif()
 
         netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
-                                    "${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
+                                    "${CMAKE_BINARY_DIR}/src/exporting/prometheus/remote_write"
                                     PROMETHEUS_REMOTE_WRITE_BUILT_SRCS
                                     PROMETHEUS_REMOTE_WRITE_BUILT_HDRS
                                     "src/exporting/prometheus/remote_write/remote_write.proto")
@@ -2836,7 +2836,7 @@ target_compile_options(netdata PRIVATE
 )
 
 target_include_directories(netdata PRIVATE
-        "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+        "${CMAKE_BINARY_DIR}/src/aclk/aclk-schemas"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
 )
