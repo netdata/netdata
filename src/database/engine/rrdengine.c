@@ -620,7 +620,10 @@ static void journalfile_extent_build(struct rrdengine_instance *ctx, struct exte
     crc32set(jf_trailer->checksum, crc);
 }
 
-static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr)
+static void extent_flushed_to_open_tp_worker(
+    struct rrdengine_instance *ctx,
+    struct extent_io_descriptor *xt_io_descr,
+    bool have_error)
 {
     worker_is_busy(UV_EVENT_DBENGINE_FLUSHED_TO_OPEN);
 
@@ -635,7 +638,7 @@ static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx, str
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
 
-        if (likely(still_running))
+        if (likely(still_running && !have_error))
             pgc_open_add_hot_page(
                     (Word_t)ctx, descr->metric_id,
                     (time_t) (descr->start_time_ut / USEC_PER_SEC),
@@ -912,7 +915,7 @@ static void *extent_write_tp_worker(
     datafile->writers.flushed_to_open_running++;
     spinlock_unlock(&datafile->writers.spinlock);
 
-    extent_flushed_to_open_tp_worker(ctx, xt_io_descr);
+    extent_flushed_to_open_tp_worker(ctx, xt_io_descr, df_write_error);
 
      if(ctx_is_available_for_queries(ctx))
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
