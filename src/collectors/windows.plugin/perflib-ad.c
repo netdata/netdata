@@ -359,7 +359,7 @@ intraChart:
             "PerflibAD",
             PRIO_AD_REPLICATION_INTRASITE_COMPRESSED,
             update_every,
-            RRDSET_TYPE_LINE);
+            RRDSET_TYPE_AREA);
 
         rd_replication_data_intrasite_bytes_total_inbound = rrddim_add(
             st_dra_replication_intrasite_compressed_traffic, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -472,7 +472,7 @@ RemainingSyncChart:
             RRDSET_TYPE_LINE);
 
         rd_dra_replication_sync_objects_remaining =
-            rrddim_add(st_dra_replication_sync_objects_remaining, "request", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_dra_replication_sync_objects_remaining, "object", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -507,7 +507,7 @@ netdata_ad_service_threads_in_use(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
                 RRDSET_TYPE_LINE);
 
             rd_directory_services_threads =
-                rrddim_add(st_directory_services_threads, "in_use", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(st_directory_services_threads, "thread", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         rrddim_set_by_pointer(

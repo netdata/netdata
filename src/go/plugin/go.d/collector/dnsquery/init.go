@@ -16,10 +16,6 @@ func (c *Collector) verifyConfig() error {
 		return errors.New("no domains specified")
 	}
 
-	if len(c.Servers) == 0 {
-		return errors.New("no servers specified")
-	}
-
 	if !(c.Network == "" || c.Network == "udp" || c.Network == "tcp" || c.Network == "tcp-tls") {
 		return fmt.Errorf("wrong network transport : %s", c.Network)
 	}
@@ -32,6 +28,24 @@ func (c *Collector) verifyConfig() error {
 	if len(c.RecordTypes) == 0 {
 		return errors.New("no record types specified")
 	}
+
+	return nil
+}
+
+func (c *Collector) initServers() error {
+	if len(c.Servers) != 0 {
+		return nil
+	}
+	servers, err := getResolvConfNameservers()
+	if err != nil {
+		return err
+	}
+	if len(servers) == 0 {
+		return errors.New("no resolv conf nameservers")
+	}
+
+	c.Debugf("resolv conf nameservers: %v", servers)
+	c.Servers = servers
 
 	return nil
 }

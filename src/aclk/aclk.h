@@ -93,10 +93,10 @@ extern struct aclk_shared_state {
     int mqtt_shutdown_msg_rcvd;
 } aclk_shared_state;
 
-void aclk_host_state_update(RRDHOST *host, int cmd, int queryable);
+void aclk_host_state_update(RRDHOST *host, int live, int queryable);
 bool aclk_host_state_update_auto(RRDHOST *host);
 
-void aclk_send_node_instances(mqtt_wss_client client);
+void aclk_send_node_instances();
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
 

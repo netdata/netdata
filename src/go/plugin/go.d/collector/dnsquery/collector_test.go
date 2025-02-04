@@ -77,17 +77,6 @@ func TestCollector_Init(t *testing.T) {
 				Timeout:     confopt.Duration(time.Second),
 			},
 		},
-		"fail when servers not set": {
-			wantFail: true,
-			config: Config{
-				Domains:     []string{"example.com"},
-				Servers:     nil,
-				Network:     "udp",
-				RecordTypes: []string{"A"},
-				Port:        53,
-				Timeout:     confopt.Duration(time.Second),
-			},
-		},
 		"fail when network is invalid": {
 			wantFail: true,
 			config: Config{

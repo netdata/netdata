@@ -90,6 +90,7 @@ static bool agent_can_be_claimed(void) {
 
         case CLOUD_STATUS_BANNED:
         case CLOUD_STATUS_ONLINE:
+        case CLOUD_STATUS_CONNECTING:
             return false;
     }
 
