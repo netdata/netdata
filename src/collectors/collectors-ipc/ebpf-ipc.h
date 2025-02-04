@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_SHARED_DATA_H
-#define NETDATA_SHARED_DATA_H 1
+#ifndef NETDATA_EBPF_IPC_H
+#define NETDATA_EBPF_IPC_H 1
 
 #ifndef TASK_COMM_LEN
 #define TASK_COMM_LEN 16
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 
 // ----------------------------------------------------------------------------
@@ -191,7 +197,11 @@ typedef struct netdata_ebpf_pid_stats {
 #define NETDATA_EBPF_INTEGRATION_NAME "netdata_shm_integration_ebpf"
 #define NETDATA_EBPF_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpf"
 
-int netdata_integration_initialize_shm()
+int netdata_integration_initialize_shm();
 void netdata_integration_cleanup_shm();
 
-#endif //NETDATA_SHARED_DATA_H
+#ifdef __cplusplus
+}
+#endif
+
+#endif //NETDATA_EBPF_IPC_H
