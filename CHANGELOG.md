@@ -1,11 +1,28 @@
 # Changelog
 
-## [v2.2.3](https://github.com/netdata/netdata/tree/v2.2.3) (2025-01-31)
+## [v2.2.4](https://github.com/netdata/netdata/tree/v2.2.4) (2025-02-04)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.2...v2.2.3)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.3...v2.2.4)
 
 **Merged pull requests:**
 
+- fix\(go.d\): clean up charts for stopped and removed jobs [\#19573](https://github.com/netdata/netdata/pull/19573) ([ilyam8](https://github.com/ilyam8))
+- Fix memory leak [\#19569](https://github.com/netdata/netdata/pull/19569) ([stelfrag](https://github.com/stelfrag))
+- build\(deps\): bump github.com/prometheus-community/pro-bing from 0.6.0 to 0.6.1 in /src/go [\#19567](https://github.com/netdata/netdata/pull/19567) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Code cleanup on ACLK messages [\#19566](https://github.com/netdata/netdata/pull/19566) ([stelfrag](https://github.com/stelfrag))
+- Add a new agent status when connecting to the cloud [\#19564](https://github.com/netdata/netdata/pull/19564) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations docs [\#19563](https://github.com/netdata/netdata/pull/19563) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/dnsquery\): support system DNS servers from /etc/resolv.conf [\#19562](https://github.com/netdata/netdata/pull/19562) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19561](https://github.com/netdata/netdata/pull/19561) ([netdatabot](https://github.com/netdatabot))
+- MSSQL Multiple Instances \(windows.plugin\) [\#19559](https://github.com/netdata/netdata/pull/19559) ([thiagoftsm](https://github.com/thiagoftsm))
+- build\(deps\): bump github.com/lmittmann/tint from 1.0.6 to 1.0.7 in /src/go [\#19558](https://github.com/netdata/netdata/pull/19558) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Metadata \(AD and ADCS\), and small fixes [\#19557](https://github.com/netdata/netdata/pull/19557) ([thiagoftsm](https://github.com/thiagoftsm))
+- docs\(start-stop-restart\): fix restart typo [\#19555](https://github.com/netdata/netdata/pull/19555) ([L-U-C-K-Y](https://github.com/L-U-C-K-Y))
+- Format Windows.plugin [\#19554](https://github.com/netdata/netdata/pull/19554) ([thiagoftsm](https://github.com/thiagoftsm))
+- Format ebpf [\#19553](https://github.com/netdata/netdata/pull/19553) ([thiagoftsm](https://github.com/thiagoftsm))
+- Rename appconfig to inicfg and drop config\_\* function-like macros. [\#19552](https://github.com/netdata/netdata/pull/19552) ([vkalintiris](https://github.com/vkalintiris))
+- fix\(go.d/mysql\): fix typo in test name [\#19550](https://github.com/netdata/netdata/pull/19550) ([arkamar](https://github.com/arkamar))
+- fix\(go.d/mysql\): don't collect global variables on every iteration [\#19549](https://github.com/netdata/netdata/pull/19549) ([arkamar](https://github.com/arkamar))
 - Regenerate integrations docs [\#19548](https://github.com/netdata/netdata/pull/19548) ([netdatabot](https://github.com/netdatabot))
 - Fix cloud connect after claim [\#19547](https://github.com/netdata/netdata/pull/19547) ([stelfrag](https://github.com/stelfrag))
 - virtual hosts now get hops = 1 [\#19546](https://github.com/netdata/netdata/pull/19546) ([ktsaou](https://github.com/ktsaou))
@@ -54,6 +71,7 @@
 - build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.8.0 to 4.8.1 in /src/go [\#19493](https://github.com/netdata/netdata/pull/19493) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Active Directory Certification Service \(windows.plugin\) [\#19492](https://github.com/netdata/netdata/pull/19492) ([thiagoftsm](https://github.com/thiagoftsm))
 - proc.plugin: remove traces of /proc/spl/kstat/zfs/pool/state [\#19491](https://github.com/netdata/netdata/pull/19491) ([intelfx](https://github.com/intelfx))
+- cgroups.plugin: fixes to cgroup path validation [\#19490](https://github.com/netdata/netdata/pull/19490) ([intelfx](https://github.com/intelfx))
 - Further improve alert processing [\#19489](https://github.com/netdata/netdata/pull/19489) ([stelfrag](https://github.com/stelfrag))
 - LTO Benchmark [\#19488](https://github.com/netdata/netdata/pull/19488) ([ktsaou](https://github.com/ktsaou))
 - Improve alert transition processing [\#19487](https://github.com/netdata/netdata/pull/19487) ([stelfrag](https://github.com/stelfrag))
@@ -77,10 +95,14 @@
 - Active Directory Metrics \(Windows.plugin\) [\#19461](https://github.com/netdata/netdata/pull/19461) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use aral in ACLK [\#19459](https://github.com/netdata/netdata/pull/19459) ([stelfrag](https://github.com/stelfrag))
 - Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
+- Start using new GitHub hosted ARM runners for CI when appropriate. [\#19427](https://github.com/netdata/netdata/pull/19427) ([Ferroin](https://github.com/Ferroin))
 - Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
 - Modify eBPF.plugin integration \(Part I\) [\#19219](https://github.com/netdata/netdata/pull/19219) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add CLR Remoting metadata [\#19203](https://github.com/netdata/netdata/pull/19203) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add NetFramework Metrics \(part II\) [\#19008](https://github.com/netdata/netdata/pull/19008) ([thiagoftsm](https://github.com/thiagoftsm))
+
+## [v2.2.3](https://github.com/netdata/netdata/tree/v2.2.3) (2025-01-31)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.2...v2.2.3)
 
 ## [v2.2.2](https://github.com/netdata/netdata/tree/v2.2.2) (2025-01-30)
 
@@ -452,27 +474,6 @@
 - Fix MSSQL algorithm \(Windows.plugin\) [\#19035](https://github.com/netdata/netdata/pull/19035) ([thiagoftsm](https://github.com/thiagoftsm))
 - --dev option to installer [\#19034](https://github.com/netdata/netdata/pull/19034) ([ktsaou](https://github.com/ktsaou))
 - add `shutdown` keyword to ensure graceful service termination on FreeBSD [\#19033](https://github.com/netdata/netdata/pull/19033) ([ilyam8](https://github.com/ilyam8))
-- fix: ensure correct startup order for Netdata service on FreeBSD [\#19032](https://github.com/netdata/netdata/pull/19032) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/gorcon/rcon from 1.3.5 to 1.4.0 in /src/go [\#19031](https://github.com/netdata/netdata/pull/19031) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/vmware/govmomi from 0.46.0 to 0.46.1 in /src/go [\#19030](https://github.com/netdata/netdata/pull/19030) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Regenerate integrations.js [\#19029](https://github.com/netdata/netdata/pull/19029) ([netdatabot](https://github.com/netdatabot))
-- improvement\(windows/iis\): add requests by type chart [\#19028](https://github.com/netdata/netdata/pull/19028) ([ilyam8](https://github.com/ilyam8))
-- fix\(windows/iis\): dont sanitize site name for labels [\#19027](https://github.com/netdata/netdata/pull/19027) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d.plugin\): set nooplogger for automaxprocs [\#19026](https://github.com/netdata/netdata/pull/19026) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#19025](https://github.com/netdata/netdata/pull/19025) ([netdatabot](https://github.com/netdatabot))
-- docs\(go.d/windows\): remove references to old MSI [\#19024](https://github.com/netdata/netdata/pull/19024) ([ilyam8](https://github.com/ilyam8))
-- improvement\(go.d.plugin\): automatically set GOMAXPROCS [\#19023](https://github.com/netdata/netdata/pull/19023) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#19022](https://github.com/netdata/netdata/pull/19022) ([netdatabot](https://github.com/netdatabot))
-- docs: just iis [\#19021](https://github.com/netdata/netdata/pull/19021) ([ilyam8](https://github.com/ilyam8))
-- chore\(windows.plugin\): format win collectors code [\#19019](https://github.com/netdata/netdata/pull/19019) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#19018](https://github.com/netdata/netdata/pull/19018) ([netdatabot](https://github.com/netdatabot))
-- fix\(go.d/ping\): fix "interface" option [\#19016](https://github.com/netdata/netdata/pull/19016) ([ilyam8](https://github.com/ilyam8))
-- Remove MSI test [\#19015](https://github.com/netdata/netdata/pull/19015) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix has\_receiver condition in rrdhost\_status\(\) [\#19014](https://github.com/netdata/netdata/pull/19014) ([ktsaou](https://github.com/ktsaou))
-- backport of fixes from balance-parents [\#19012](https://github.com/netdata/netdata/pull/19012) ([ktsaou](https://github.com/ktsaou))
-- add missing spinlock unlocks on containers [\#19011](https://github.com/netdata/netdata/pull/19011) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#19010](https://github.com/netdata/netdata/pull/19010) ([netdatabot](https://github.com/netdatabot))
-- docs\(go.d/windows\): add deprecation notice [\#19009](https://github.com/netdata/netdata/pull/19009) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
