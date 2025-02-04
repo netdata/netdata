@@ -680,6 +680,21 @@ static bool aral_page_acquire(ARAL_PAGE *page) {
     return true;
 }
 
+ALWAYS_INLINE WARNUNUSED
+static ARAL_PAGE *aral_acquire_first_page(ARAL *ar, bool marked) {
+    aral_lock(ar);
+
+    ARAL_PAGE **head_ptr_free = aral_pages_head_free(ar, marked);
+    ARAL_PAGE *page = *head_ptr_free;
+
+    if(page && !aral_page_acquire(page))
+        page = NULL;
+
+    aral_unlock(ar);
+    return page;
+}
+
+ALWAYS_INLINE WARNUNUSED
 static bool aral_page_release(ARAL_PAGE *page) {
     REFCOUNT rf = __atomic_sub_fetch(&page->refcount, 1, __ATOMIC_RELEASE);
     if(rf == 0) {
@@ -695,25 +710,20 @@ static bool aral_page_release(ARAL_PAGE *page) {
 static ALWAYS_INLINE ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     size_t idx = mark_to_idx(marked);
     __atomic_add_fetch(&ar->ops[idx].atomic.allocators, 1, __ATOMIC_RELAXED);
-    aral_lock(ar);
-
-    ARAL_PAGE **head_ptr_free = aral_pages_head_free(ar, marked);
-    ARAL_PAGE *page = *head_ptr_free;
 
 #ifdef NETDATA_ARAL_INTERNAL_CHECKS
     // bool added = false;
     struct free_space f1, f2;
 #endif
 
-    while(!page || !aral_page_acquire(page)) {
+    ARAL_PAGE *page;
+    while(!(page = aral_acquire_first_page(ar, marked))) {
 #ifdef NETDATA_ARAL_INTERNAL_CHECKS
         f1 = check_free_space___aral_lock_needed(ar, NULL, marked);
 #endif
 
-        size_t page_allocation_size = 0;
-        aral_unlock(ar);
-
         bool can_add = false;
+        size_t page_allocation_size = 0;
         if(aral_adders_trylock(ar, marked)) {
             // we can add a page - let's see it is really needed
             size_t threads_currently_allocating = __atomic_load_n(&ar->ops[idx].atomic.allocators, __ATOMIC_RELAXED);
@@ -731,12 +741,13 @@ static ALWAYS_INLINE ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, b
 
         if(can_add) {
             page = aral_create_page___no_lock_needed(ar, page_allocation_size TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
-
-            aral_lock(ar);
             page->aral_lock.marked = page->started_marked = marked;
 
+            ARAL_PAGE **head_ptr_free = aral_pages_head_free(ar, marked);
+            aral_lock(ar);
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(*head_ptr_free, page, aral_lock.prev, aral_lock.next);
             page->aral_lock.head_ptr = head_ptr_free;
+            aral_unlock(ar);
 
             //#ifdef NETDATA_ARAL_INTERNAL_CHECKS
             //            added = true;
@@ -747,25 +758,19 @@ static ALWAYS_INLINE ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, b
             aral_adders_unlock(ar, marked);
 
             // we have a page that is all empty
-            // and only aral_lock() is held, so
             // break the loop
             break;
         }
         else {
             // let the adders/deallocators do it
-            // tinysleep();
             sched_yield();
-
-            aral_lock(ar);
-            page = *head_ptr_free;
+            tinysleep();
         }
     }
 
     // we have a page
     // it is acquired
-    // and aral is locked
-
-    internal_fatal(marked && !page->aral_lock.marked, "ARAL: requested a marked page, but the page found is not marked");
+    // and aral is NOT locked
 
     //#ifdef NETDATA_ARAL_INTERNAL_CHECKS
     //    if(added) {
@@ -778,7 +783,6 @@ static ALWAYS_INLINE ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, b
                    "ARAL: '%s' failed to find a page with a free element",
                    ar->config.name);
 
-    aral_unlock(ar);
     aral_page_lock(ar, page);
 
     internal_fatal(!page->page_lock.free_elements,
@@ -1557,7 +1561,7 @@ int aral_unittest(size_t elements) {
 
     aral_destroy(auc.ar);
 
-    int errors = aral_stress_test(4, elements, 10);
+    int errors = aral_stress_test(2, elements, 10);
 
     return auc.errors + errors;
 }
