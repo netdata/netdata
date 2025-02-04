@@ -34,6 +34,8 @@ typedef struct aral_free {
 } ARAL_FREE;
 
 typedef struct aral_page {
+    REFCOUNT refcount;
+
     const char *filename;
     uint8_t *data;
 
@@ -43,18 +45,8 @@ typedef struct aral_page {
     uint32_t max_elements;              // the number of elements that can fit on this page
     uint64_t elements_segmented;        // fast path for acquiring new elements in this page
 
-    REFCOUNT refcount;
-
-    struct {
-        SPINLOCK spinlock;
-        uint32_t used_elements;         // the number of used elements on this page
-        uint32_t free_elements;         // the number of free elements on this page
-        uint32_t marked_elements;
-    } page_lock;
-
     struct {
         bool marked;
-
         struct aral_page **head_ptr;
         struct aral_page *prev;         // the prev page on the list
         struct aral_page *next;         // the next page on the list
@@ -62,7 +54,16 @@ typedef struct aral_page {
 
     struct {
         SPINLOCK spinlock;
+        uint32_t used_elements;         // the number of used elements on this page
+        uint32_t free_elements;         // the number of free elements on this page
+        uint32_t marked_elements;
+        char pad[32];
+    } page_lock;
+
+    struct {
+        SPINLOCK spinlock;
         ARAL_FREE *list;
+        char pad[40];
     } available;
 
     struct {
@@ -666,24 +667,29 @@ static void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOC
 }
 
 ALWAYS_INLINE WARNUNUSED
-static REFCOUNT aral_page_acquire(ARAL_PAGE *page) {
-    REFCOUNT expected = refcount_references(&page->refcount);
-    REFCOUNT desired;
+static bool aral_page_acquire(ARAL_PAGE *page) {
+    REFCOUNT rf = __atomic_add_fetch(&page->refcount, 1, __ATOMIC_ACQUIRE);
+    if(rf <= 0)
+        return false;
 
-    do {
-        if(!REFCOUNT_VALID(expected))
-            fatal("ARAL_PAGE REFCOUNT %d is invalid (detected at %s())", expected, __FUNCTION__);
+    if(rf > (REFCOUNT)page->max_elements) {
+        __atomic_sub_fetch(&page->refcount, 1, __ATOMIC_RELAXED);
+        return false;
+    }
 
-        if(expected >= (REFCOUNT)page->max_elements)
-            return REFCOUNT_ERROR;
+    return true;
+}
 
-        if(expected < 0)
-            return expected;
+static bool aral_page_release(ARAL_PAGE *page) {
+    REFCOUNT rf = __atomic_sub_fetch(&page->refcount, 1, __ATOMIC_RELEASE);
+    if(rf == 0) {
+        REFCOUNT expected = rf;
+        REFCOUNT desired = REFCOUNT_DELETED;
+        if (__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+            return true;
+    }
 
-        desired = expected + 1;
-    } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
-
-    return desired;
+    return false;
 }
 
 static ALWAYS_INLINE ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
@@ -699,8 +705,7 @@ static ALWAYS_INLINE ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, b
     struct free_space f1, f2;
 #endif
 
-    REFCOUNT rf;
-    while(!page || !REFCOUNT_ACQUIRED((rf = aral_page_acquire(page)))) {
+    while(!page || !aral_page_acquire(page)) {
 #ifdef NETDATA_ARAL_INTERNAL_CHECKS
         f1 = check_free_space___aral_lock_needed(ar, NULL, marked);
 #endif
@@ -726,7 +731,6 @@ static ALWAYS_INLINE ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, b
 
         if(can_add) {
             page = aral_create_page___no_lock_needed(ar, page_allocation_size TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
-            rf = page->refcount;
 
             aral_lock(ar);
             page->aral_lock.marked = page->started_marked = marked;
@@ -929,37 +933,34 @@ void aral_unmark_allocation(ARAL *ar, void *ptr) {
     bool marked;
     ARAL_PAGE *page = aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, &marked);
 
-    internal_fatal(!page->aral_lock.marked, "This allocation does not belong to a marked page");
     internal_fatal(!marked, "This allocation does is not marked");
 
     if(marked)
         aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ar, page, ptr, false);
 
-    if(marked) {
-        aral_page_lock(ar, page);
+    aral_page_lock(ar, page);
+    internal_fatal(marked && !page->page_lock.marked_elements, "Marked counter going negative.");
+    bool unmark = marked && --page->page_lock.marked_elements == 0 && page->page_lock.used_elements;
+
+    if(unmark) {
         aral_lock(ar);
-        if(page->aral_lock.marked) {
-            internal_fatal(!page->page_lock.marked_elements, "marked elements refcount found zero");
+        internal_fatal(!is_page_in_list(*page->aral_lock.head_ptr, page), "Page is not in this list");
+
+        ARAL_PAGE **head_ptr_to = (page->page_lock.free_elements) ? aral_pages_head_free(ar, false) : aral_pages_head_full(ar, false);
+        if(page->aral_lock.head_ptr != head_ptr_to) {
             internal_fatal(!is_page_in_list(*page->aral_lock.head_ptr, page), "Page is not in this list");
-
-            if (--page->page_lock.marked_elements == 0 && page->page_lock.used_elements) {
-                internal_fatal(!page->aral_lock.marked, "The page should be marked at this point");
-
-                ARAL_PAGE **head_ptr_to = (page->page_lock.free_elements) ? aral_pages_head_free(ar, false) : aral_pages_head_full(ar, false);
-                internal_fatal(!is_page_in_list(*page->aral_lock.head_ptr, page), "Page is not in this list");
-
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(*page->aral_lock.head_ptr, page, aral_lock.prev, aral_lock.next);
-                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(*head_ptr_to, page, aral_lock.prev, aral_lock.next);
-                page->aral_lock.head_ptr = head_ptr_to;
-                page->aral_lock.marked = false;
-            }
-
-            internal_fatal(page->page_lock.marked_elements > page->page_lock.used_elements,
-                           "page has more marked elements than the used ones");
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(*page->aral_lock.head_ptr, page, aral_lock.prev, aral_lock.next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(*head_ptr_to, page, aral_lock.prev, aral_lock.next);
+            page->aral_lock.head_ptr = head_ptr_to;
+            page->aral_lock.marked = false;
         }
+
+        internal_fatal(page->page_lock.marked_elements > page->page_lock.used_elements,
+                       "page has more marked elements than the used ones");
         aral_unlock(ar);
-        aral_page_unlock(ar, page);
     }
+
+    aral_page_unlock(ar, page);
 }
 
 void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
@@ -1003,6 +1004,7 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
     page->page_lock.used_elements--;
     page->page_lock.free_elements++;
 
+    internal_fatal(marked && !page->page_lock.marked_elements, "Marked counter going negative.");
     bool unmark = marked && --page->page_lock.marked_elements == 0 && page->page_lock.used_elements;
 
     internal_fatal(page->max_elements != page->page_lock.used_elements + page->page_lock.free_elements,
@@ -1019,9 +1021,7 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
                    "page has more marked elements than the used ones");
 
     // release it
-    REFCOUNT rf = refcount_release_and_acquire_for_deletion_advanced(&page->refcount);
-
-    if(unlikely(rf == REFCOUNT_DELETED)) {
+    if(unlikely(aral_page_release(page))) {
         __atomic_sub_fetch(&ar->ops[idx].atomic.deallocators, 1, __ATOMIC_RELAXED);
 
         internal_fatal(page->page_lock.used_elements, "page has used elements but has been acquired for deletion");
@@ -1038,7 +1038,6 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
     }
     else if(unlikely(unmark)) {
         aral_lock(ar);
-        internal_fatal(!page->aral_lock.marked, "ARAL: found a marked element on a non-marked page");
 
         ARAL_PAGE **head_ptr_to = aral_pages_head_free(ar, false);
         if(page->aral_lock.head_ptr != head_ptr_to) {
@@ -1558,7 +1557,7 @@ int aral_unittest(size_t elements) {
 
     aral_destroy(auc.ar);
 
-    int errors = aral_stress_test(2, elements, 5);
+    int errors = aral_stress_test(4, elements, 10);
 
     return auc.errors + errors;
 }
