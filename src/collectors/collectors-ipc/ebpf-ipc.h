@@ -3,11 +3,11 @@
 #ifndef NETDATA_SHARED_DATA_H
 #define NETDATA_SHARED_DATA_H 1
 
-#if defined(OS_LINUX)
-
 #ifndef TASK_COMM_LEN
 #define TASK_COMM_LEN 16
 #endif
+
+#include <stdint.h>
 
 // ----------------------------------------------------------------------------
 // Enumeration used to identify threads with eBPF PIDs
@@ -188,6 +188,10 @@ typedef struct netdata_ebpf_pid_stats {
 // ----------------------------------------------------------------------------
 // Helpers used during integration
 
-#endif
+#define NETDATA_EBPF_INTEGRATION_NAME "netdata_shm_integration_ebpf"
+#define NETDATA_EBPF_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpf"
+
+int netdata_integration_initialize_shm()
+void netdata_integration_cleanup_shm();
 
 #endif //NETDATA_SHARED_DATA_H

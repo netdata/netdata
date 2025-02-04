@@ -1422,6 +1422,7 @@ set(INTERNAL_COLLECTORS_FILES
 )
 
 set(INTERCOMMUNICATION_COLLECTORS_FILES
+        src/collectors/collectors-ipc/ebpf-ipc.c
         src/collectors/collectors-ipc/ebpf-ipc.h
         )
 
