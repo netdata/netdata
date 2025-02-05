@@ -8,6 +8,7 @@ static struct {
     size_t instances_count;
     size_t active_vs_archived_percentage;
 } extreme_cardinality = {
+    .enabled = true,
     .db_rotations = 0,
     .instances_count = 1000,
     .active_vs_archived_percentage = 50,
