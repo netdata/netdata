@@ -227,6 +227,10 @@ void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function) {
 // ----------------------------------------------------------------------------
 // RRDMETRIC HOOKS ON RRDDIM
 
+ALWAYS_INLINE void rrdmetric_not_collected_rrddim(RRDDIM *rd) {
+    rd->rrdcontexts.collected = false;
+}
+
 void rrdmetric_from_rrddim(RRDDIM *rd) {
     if(unlikely(!rd->rrdset))
         fatal("RRDMETRIC: rrddim '%s' does not have a rrdset.", rrddim_id(rd));
@@ -253,11 +257,11 @@ void rrdmetric_from_rrddim(RRDDIM *rd) {
         rrdmetric_release(rd->rrdcontexts.rrdmetric);
 
     rd->rrdcontexts.rrdmetric = rma;
-    rd->rrdcontexts.collected = false;
+    rrdmetric_not_collected_rrddim(rd);
 }
 
 #define rrddim_get_rrdmetric(rd) rrddim_get_rrdmetric_with_trace(rd, __FUNCTION__)
-static inline RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char *function) {
+static ALWAYS_INLINE RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char *function) {
     if(unlikely(!rd->rrdcontexts.rrdmetric)) {
         netdata_log_error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rrddim_id(rd), function);
         return NULL;
@@ -286,11 +290,11 @@ inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
     rrdmetric_trigger_updates(rm, __FUNCTION__ );
     rrdmetric_release(rd->rrdcontexts.rrdmetric);
     rd->rrdcontexts.rrdmetric = NULL;
-    rd->rrdcontexts.collected = false;
+    rrdmetric_not_collected_rrddim(rd);
 }
 
 inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
-    rd->rrdcontexts.collected = false;
+    rrdmetric_not_collected_rrddim(rd);
 
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
     if(unlikely(!rm)) return;
@@ -303,7 +307,7 @@ inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
     rrdmetric_trigger_updates(rm, __FUNCTION__ );
 }
 
-inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
+ALWAYS_INLINE void rrdmetric_collected_rrddim(RRDDIM *rd) {
     if(rd->rrdcontexts.collected)
         return;
 

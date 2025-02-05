@@ -54,8 +54,6 @@ if(NOT CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-include(NetdataCompilerFlags)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 # Check for the mold linker and try to use it if available
@@ -147,6 +145,13 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
         message(STATUS " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
 else()
         message(FATAL_ERROR "Unknown/unsupported platform: ${CMAKE_SYSTEM_NAME} (Supported platforms: FreeBSD, Linux, macOS, Windows)")
+endif()
+
+include(NetdataCompilerFlags)
+
+check_c_compiler_flag("-fexceptions" HAVE_FEXCEPTIONS)
+if (NOT HAVE_FEXCEPTIONS)
+    message(FATAL_ERROR "Missing required compiler flag: -fexceptions.")
 endif()
 
 # This is intended to make life easier for developers who are working on one
@@ -712,12 +717,30 @@ set(LIBJUDY_SOURCES
         ${LIBJUDY_NEXT_FILES}
 )
 
+set(INICFG_FILES
+        src/libnetdata/inicfg/inicfg.c
+        src/libnetdata/inicfg/inicfg.h
+        src/libnetdata/inicfg/inicfg_internals.h
+        src/libnetdata/inicfg/inicfg_exporters.c
+        src/libnetdata/inicfg/inicfg_conf_file.c
+        src/libnetdata/inicfg/inicfg_cleanup.c
+        src/libnetdata/inicfg/inicfg_sections.c
+        src/libnetdata/inicfg/inicfg_options.c
+        src/libnetdata/inicfg/inicfg_migrate.c
+        src/libnetdata/inicfg/inicfg_traversal.c
+        src/libnetdata/inicfg/inicfg_api.c
+        src/libnetdata/inicfg/dyncfg.c
+        src/libnetdata/inicfg/dyncfg.h
+)
+
+set(CONFIG_FILES
+        src/libnetdata/config/config.h
+)
+
 set(LIBNETDATA_FILES
         ${CONFIG_H}
         src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.c
         src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
-        src/libnetdata/config/appconfig.c
-        src/libnetdata/config/appconfig.h
         src/libnetdata/aral/aral.c
         src/libnetdata/aral/aral.h
         src/libnetdata/avl/avl.c
@@ -805,8 +828,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/http/http_defs.h
         src/libnetdata/http/content_type.c
         src/libnetdata/http/content_type.h
-        src/libnetdata/config/dyncfg.c
-        src/libnetdata/config/dyncfg.h
         src/libnetdata/json/json-c-parser-inline.h
         src/libnetdata/template-enum.h
         src/libnetdata/dictionary/dictionary-internals.h
@@ -891,24 +912,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/parsers/size.h
         src/libnetdata/libjudy/judy-malloc.c
         src/libnetdata/libjudy/judy-malloc.h
-        src/libnetdata/config/appconfig_internals.h
-        src/libnetdata/config/appconfig_exporters.c
-        src/libnetdata/config/appconfig_conf_file.c
-        src/libnetdata/config/appconfig_cleanup.c
-        src/libnetdata/config/appconfig_sections.c
-        src/libnetdata/config/appconfig_options.c
-        src/libnetdata/config/appconfig_migrate.c
-        src/libnetdata/config/appconfig_traversal.c
-        src/libnetdata/config/appconfig_api_sizes.c
-        src/libnetdata/config/appconfig_api_sizes.h
-        src/libnetdata/config/appconfig_api_durations.c
-        src/libnetdata/config/appconfig_api_durations.h
-        src/libnetdata/config/appconfig_api_numbers.c
-        src/libnetdata/config/appconfig_api_numbers.h
-        src/libnetdata/config/appconfig_api_text.c
-        src/libnetdata/config/appconfig_api_text.h
-        src/libnetdata/config/appconfig_api_boolean.c
-        src/libnetdata/config/appconfig_api_boolean.h
         src/libnetdata/facets/logs_query_status.h
         src/libnetdata/os/timestamps.c
         src/libnetdata/os/timestamps.h
@@ -992,6 +995,9 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/hostname.c
         src/libnetdata/os/hostname.h
 )
+
+list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
+list(APPEND LIBNETDATA_FILES ${CONFIG_FILES})
 
 set(LIBH2O_FILES
         src/web/server/h2o/libh2o/deps/cloexec/cloexec.c
@@ -1770,8 +1776,10 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemUptime.c
         src/collectors/windows.plugin/GetSystemRAM.c
         src/collectors/windows.plugin/GetSystemCPU.c
+        src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-rrd.c
         src/collectors/windows.plugin/perflib-rrd.h
+        src/collectors/windows.plugin/perflib-ad.c
         src/collectors/windows.plugin/perflib-mssql.c
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
@@ -2149,11 +2157,6 @@ if(OS_WINDOWS)
                                 DESTINATION "${BINDIR}")
                 endif()
         endif()
-endif()
-
-# ebpf
-if(ENABLE_PLUGIN_EBPF)
-        netdata_add_libbpf_to_target(libnetdata)
 endif()
 
 # judy
@@ -2652,6 +2655,7 @@ if(ENABLE_PLUGIN_EBPF)
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES})
     target_link_libraries(ebpf.plugin libnetdata)
 
+    netdata_add_libbpf_to_target(ebpf.plugin)
     netdata_add_ebpf_co_re_to_target(ebpf.plugin)
 
     install(TARGETS ebpf.plugin
@@ -2965,11 +2969,39 @@ endif()
 set(WEB_DEST "${WEB_DIR}")
 set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 
+# Collect all compiler flags
+get_directory_property(NETDATA_COMPILE_OPTIONS COMPILE_OPTIONS)
+get_directory_property(NETDATA_COMPILE_DEFINITIONS COMPILE_DEFINITIONS)
 
-set(CONFIGURE_COMMAND "dummy-configure-command")
+# Collect all linker flags
+get_directory_property(NETDATA_LINK_OPTIONS LINK_OPTIONS)
+get_directory_property(NETDATA_LINK_LIBRARIES LINK_LIBRARIES)
+
+list(APPEND CONFIGURE_OPTIONS
+        # Build type and languages
+        "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+        "-DCMAKE_C_STANDARD=${CMAKE_C_STANDARD}"
+        "-DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}"
+        "-DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}"
+
+        # Compiler flags (dynamically collected)
+        "-DCMAKE_C_FLAGS='${CMAKE_C_FLAGS} ${NETDATA_COMPILE_OPTIONS}'"
+        "-DCMAKE_CXX_FLAGS='${CMAKE_CXX_FLAGS} ${NETDATA_COMPILE_OPTIONS}'"
+        "-DCMAKE_COMPILE_DEFINITIONS='${NETDATA_COMPILE_DEFINITIONS}'"
+
+        # Linker flags (dynamically collected)
+        "-DCMAKE_EXE_LINKER_FLAGS='${CMAKE_EXE_LINKER_FLAGS} ${NETDATA_LINK_OPTIONS}'"
+        "-DCMAKE_SHARED_LINKER_FLAGS='${CMAKE_SHARED_LINKER_FLAGS}'"
+)
+
+string(JOIN " " CONFIGURE_COMMAND "cmake" ${CONFIGURE_OPTIONS})
+
 if (NOT NETDATA_USER)
         set(NETDATA_USER "netdata")
 endif()
+
+set(BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME "build-info-cmake-cache.gz")
+set(BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH "usr/share/netdata")
 
 configure_file(packaging/cmake/config.cmake.h.in config.h)
 
@@ -3511,67 +3543,33 @@ if(ENABLE_DASHBOARD)
   include(NetdataDashboard)
   bundle_dashboard()
 
-  include(src/web/gui/v1/dashboard_v1.cmake)
-  include(src/web/gui/gui.cmake)
-
-  function(cat IN_FILE OUT_FILE)
-    file(READ ${IN_FILE} CONTENTS)
-    file(APPEND ${OUT_FILE} "${CONTENTS}")
-  endfunction()
-
-  file(WRITE ${CMAKE_BINARY_DIR}/src/web/gui/dashboard.js.in "")
-
-  foreach(JS_FILE ${DASHBOARD_JS_FILES})
-    cat(${JS_FILE} ${CMAKE_BINARY_DIR}/dashboard.js.in)
-  endforeach()
-
-  configure_file(${CMAKE_BINARY_DIR}/dashboard.js.in
-                 ${CMAKE_BINARY_DIR}/dashboard.js COPYONLY)
-
   install(FILES
-          ${CMAKE_BINARY_DIR}/dashboard.js
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST})
-
-  install(FILES
-          src/web/gui/dashboard_info_custom_example.js
-          src/web/gui/dashboard_info.js
-          src/web/gui/main.css
-          src/web/gui/main.js
-          src/web/gui/switch.html
           src/web/gui/ilove.html
           COMPONENT dashboard
           DESTINATION ${WEB_DEST})
 
-  install(FILES
-          src/web/gui/old/index.html
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/old)
-
-  install(FILES
-          src/web/gui/static/img/netdata-logomark.svg
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/static/img)
-
-  install(FILES
-          src/web/gui/css/morris-0.5.1.css
-          src/web/gui/css/c3-0.4.18.min.css
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/css)
-
-  install(FILES
-          src/web/gui/.well-known/dnt/cookies
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/.well-known/dnt)
-
-  if(NOT OS_WINDOWS)
-    # v0 dashboard
-    install(FILES
-            src/web/gui/v0/index.html
-            COMPONENT dashboard
-            DESTINATION ${WEB_DEST}/v0)
-  endif()
 endif()
+
+#
+# Ship CMakeCache.txt as an archive
+#
+
+install(CODE "
+        execute_process(COMMAND gzip -c \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
+                        OUTPUT_FILE \"${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+                        WORKING_DIRECTORY \"${CMAKE_BINARY_DIR}\"
+                        RESULT_VARIABLE result)
+        if(NOT result EQUAL 0)
+                message(WARNING \"Failed to compress CMakeCache.txt\")
+        endif()
+
+        file(INSTALL \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+             DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
+")
+
+#
+# vendor msys stuff on Windows
+#
 
 if(OS_WINDOWS)
         install(FILES /usr/bin/msys-protobuf-32.dll
@@ -3584,5 +3582,9 @@ if(OS_WINDOWS)
         # Make curl work with ssl
         install(DIRECTORY /usr/ssl DESTINATION usr)
 endif()
+
+#
+# Include packaging logic
+#
 
 include(Packaging)

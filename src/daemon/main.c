@@ -160,6 +160,7 @@ int help(int exitcode) {
             "  -W buildinfojson         Print the version, the configure options,\n"
             "                           a list of optional features, and whether they\n"
             "                           are enabled or not, in JSON format.\n\n"
+            "  -W cmakecache            Print the cmake cache used for building this agent\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
 #ifdef OS_WINDOWS
@@ -296,22 +297,22 @@ int netdata_main(int argc, char **argv) {
                 case 'h':
                     return help(0);
                 case 'i':
-                    config_set(CONFIG_SECTION_WEB, "bind to", optarg);
+                    inicfg_set(&netdata_config, CONFIG_SECTION_WEB, "bind to", optarg);
                     break;
                 case 'P':
                     pidfile = strdupz(optarg);
                     break;
                 case 'p':
-                    config_set(CONFIG_SECTION_GLOBAL, "default port", optarg);
+                    inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "default port", optarg);
                     break;
                 case 's':
-                    config_set(CONFIG_SECTION_GLOBAL, "host access prefix", optarg);
+                    inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "host access prefix", optarg);
                     break;
                 case 't':
-                    config_set(CONFIG_SECTION_GLOBAL, "update every", optarg);
+                    inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "update every", optarg);
                     break;
                 case 'u':
-                    config_set(CONFIG_SECTION_GLOBAL, "run as user", optarg);
+                    inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "run as user", optarg);
                     break;
                 case 'v':
                 case 'V':
@@ -354,7 +355,7 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
 
                             // set defaults for dbegnine unittest
-                            config_set(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
+                            inicfg_set(&netdata_config, CONFIG_SECTION_DB, "dbengine page type", "gorilla");
 #ifdef ENABLE_DBENGINE
                             default_rrdeng_disk_quota_mb = default_multidb_disk_quota_mb = 256;
 #endif
@@ -570,11 +571,11 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strncmp(optarg, stacksize_string, strlen(stacksize_string)) == 0) {
                             optarg += strlen(stacksize_string);
-                            config_set(CONFIG_SECTION_GLOBAL, "pthread stack size", optarg);
+                            inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", optarg);
                         }
                         else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
                             optarg += strlen(debug_flags_string);
-                            config_set(CONFIG_SECTION_LOGS, "debug flags",  optarg);
+                            inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "debug flags",  optarg);
                             debug_flags = strtoull(optarg, NULL, 0);
                         }
                         else if(strcmp(optarg, "set") == 0) {
@@ -603,7 +604,7 @@ int netdata_main(int argc, char **argv) {
                             // so the caller can use -c netdata.conf before or
                             // after this parameter to prevent or allow overwriting
                             // variables at netdata.conf
-                            config_set_default_raw_value(section, key, value);
+                            inicfg_set_default_raw_value(&netdata_config, section, key, value);
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
@@ -636,7 +637,7 @@ int netdata_main(int argc, char **argv) {
                             // so the caller can use -c netdata.conf before or
                             // after this parameter to prevent or allow overwriting
                             // variables at netdata.conf
-                            appconfig_set_default_raw_value(tmp_config, section, key, value);
+                            inicfg_set_default_raw_value(tmp_config, section, key, value);
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
@@ -662,7 +663,7 @@ int netdata_main(int argc, char **argv) {
                             const char *section = argv[optind];
                             const char *key = argv[optind + 1];
                             const char *def = argv[optind + 2];
-                            const char *value = config_get(section, key, def);
+                            const char *value = inicfg_get(&netdata_config, section, key, def);
                             printf("%s\n", value);
                             return 0;
                         }
@@ -692,7 +693,7 @@ int netdata_main(int argc, char **argv) {
                             const char *section = argv[optind + 1];
                             const char *key = argv[optind + 2];
                             const char *def = argv[optind + 3];
-                            const char *value = appconfig_get(tmp_config, section, key, def);
+                            const char *value = inicfg_get(tmp_config, section, key, def);
                             printf("%s\n", value);
                             return 0;
                         }
@@ -702,6 +703,10 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "buildinfojson") == 0) {
                             print_build_info_json();
+                            return 0;
+                        }
+                        else if(strcmp(optarg, "cmakecache") == 0) {
+                            print_build_info_cmake_cache();
                             return 0;
                         }
                         else if(strcmp(optarg, "keepopenfds") == 0) {
@@ -787,7 +792,7 @@ int netdata_main(int argc, char **argv) {
 #endif
 
     pulse_extended_enabled =
-        config_get_boolean(CONFIG_SECTION_PULSE, "extended", pulse_extended_enabled);
+        inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PULSE, "extended", pulse_extended_enabled);
 
     if(pulse_extended_enabled)
         // this has to run before starting any other threads that use workers
@@ -838,7 +843,7 @@ int netdata_main(int argc, char **argv) {
                 st->enabled = st->enable_routine();
 
             if(st->config_name)
-                st->enabled = config_get_boolean(st->config_section, st->config_name, st->enabled);
+                st->enabled = inicfg_get_boolean(&netdata_config, st->config_section, st->config_name, st->enabled);
 
             if(st->enabled && st->init_routine)
                 st->init_routine();
@@ -912,10 +917,10 @@ int netdata_main(int argc, char **argv) {
 
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
     struct passwd *pw = getpwuid(getuid());
-    if (config_exists(CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
-        netdata_configured_home_dir = config_get(CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
+    if (inicfg_exists(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
+        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
     } else {
-        netdata_configured_home_dir = config_get(CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
+        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
     }
 
     nd_setenv("HOME", netdata_configured_home_dir, 1);
@@ -926,7 +931,7 @@ int netdata_main(int argc, char **argv) {
 
     delta_startup_time("initialize threads after fork");
 
-    netdata_threads_init_after_fork((size_t)config_get_size_bytes(CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
+    netdata_threads_init_after_fork((size_t)inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
 
     // initialize internal registry
     delta_startup_time("initialize registry");

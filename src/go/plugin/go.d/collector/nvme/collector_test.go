@@ -22,21 +22,27 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataNVMeListJSON, _           = os.ReadFile("testdata/nvme-list.json")
-	dataNVMeListEmptyJSON, _      = os.ReadFile("testdata/nvme-list-empty.json")
-	dataNVMeSmartLogJSON, _       = os.ReadFile("testdata/nvme-smart-log.json")
-	dataNVMeSmartLogStringJSON, _ = os.ReadFile("testdata/nvme-smart-log-string.json")
-	dataNVMeSmartLogFloatJSON, _  = os.ReadFile("testdata/nvme-smart-log-float.json")
+	dataNVMeListEmptyJson, _ = os.ReadFile("testdata/nvme-list-empty.json")
+
+	dataVer23NVMeListJson, _           = os.ReadFile("testdata/v2.3/nvme-list.json")
+	dataVer23NVMeSmartLogJson, _       = os.ReadFile("testdata/v2.3/nvme-smart-log.json")
+	dataVer23NVMeSmartLogStringJson, _ = os.ReadFile("testdata/v2.3/nvme-smart-log-string.json")
+	dataVer23NVMeSmartLogFloatJson, _  = os.ReadFile("testdata/v2.3/nvme-smart-log-float.json")
+
+	dataVer211NVMeListJson, _     = os.ReadFile("testdata/v2.11/nvme-list.json")
+	dataVer211NVMeSmartLogJson, _ = os.ReadFile("testdata/v2.11/nvme-smart-log.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
 		"dataConfigJSON":             dataConfigJSON,
 		"dataConfigYAML":             dataConfigYAML,
-		"dataNVMeListJSON":           dataNVMeListJSON,
-		"dataNVMeListEmptyJSON":      dataNVMeListEmptyJSON,
-		"dataNVMeSmartLogStringJSON": dataNVMeSmartLogStringJSON,
-		"dataNVMeSmartLogFloatJSON":  dataNVMeSmartLogFloatJSON,
+		"dataNVMeListEmptyJSON":      dataNVMeListEmptyJson,
+		"dataNVMeListJSON":           dataVer23NVMeListJson,
+		"dataNVMeSmartLogStringJSON": dataVer23NVMeSmartLogStringJson,
+		"dataNVMeSmartLogFloatJSON":  dataVer23NVMeSmartLogFloatJson,
+		"dataVer211NVMeListJson":     dataVer211NVMeListJson,
+		"dataVer211NVMeSmartLogJson": dataVer211NVMeSmartLogJson,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -85,7 +91,7 @@ func TestCollector_Check(t *testing.T) {
 	}{
 		"success if all calls successful": {
 			wantFail: false,
-			prepare:  prepareCaseOK,
+			prepare:  prepareCaseVer23OK,
 		},
 		"fails if 'nvme list' returns an empty list": {
 			wantFail: true,
@@ -123,9 +129,97 @@ func TestCollector_Collect(t *testing.T) {
 	}
 
 	tests := map[string][]testCaseStep{
-		"success if all calls successful": {
+		"v2.11: success if all calls successful": {
 			{
-				prepare: prepareCaseOK,
+				prepare: prepareCaseVer211OK,
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+
+					expected := map[string]int64{
+						"device_nvme0n1_available_spare":                              100,
+						"device_nvme0n1_controller_busy_time":                         4172940,
+						"device_nvme0n1_critical_comp_time":                           0,
+						"device_nvme0n1_critical_warning_available_spare":             0,
+						"device_nvme0n1_critical_warning_nvm_subsystem_reliability":   0,
+						"device_nvme0n1_critical_warning_persistent_memory_read_only": 0,
+						"device_nvme0n1_critical_warning_read_only":                   0,
+						"device_nvme0n1_critical_warning_temp_threshold":              0,
+						"device_nvme0n1_critical_warning_volatile_mem_backup_failed":  0,
+						"device_nvme0n1_data_units_read":                              91155062272000,
+						"device_nvme0n1_data_units_written":                           987485941760000,
+						"device_nvme0n1_host_read_commands":                           5808178366,
+						"device_nvme0n1_host_write_commands":                          24273507789,
+						"device_nvme0n1_media_errors":                                 0,
+						"device_nvme0n1_num_err_log_entries":                          212,
+						"device_nvme0n1_percentage_used":                              30,
+						"device_nvme0n1_power_cycles":                                 99,
+						"device_nvme0n1_power_on_time":                                87926400,
+						"device_nvme0n1_temperature":                                  50,
+						"device_nvme0n1_thm_temp1_total_time":                         1474,
+						"device_nvme0n1_thm_temp1_trans_count":                        3,
+						"device_nvme0n1_thm_temp2_total_time":                         0,
+						"device_nvme0n1_thm_temp2_trans_count":                        0,
+						"device_nvme0n1_unsafe_shutdowns":                             49,
+						"device_nvme0n1_warning_temp_time":                            0,
+						"device_nvme1n1_available_spare":                              100,
+						"device_nvme1n1_controller_busy_time":                         4172940,
+						"device_nvme1n1_critical_comp_time":                           0,
+						"device_nvme1n1_critical_warning_available_spare":             0,
+						"device_nvme1n1_critical_warning_nvm_subsystem_reliability":   0,
+						"device_nvme1n1_critical_warning_persistent_memory_read_only": 0,
+						"device_nvme1n1_critical_warning_read_only":                   0,
+						"device_nvme1n1_critical_warning_temp_threshold":              0,
+						"device_nvme1n1_critical_warning_volatile_mem_backup_failed":  0,
+						"device_nvme1n1_data_units_read":                              91155062272000,
+						"device_nvme1n1_data_units_written":                           987485941760000,
+						"device_nvme1n1_host_read_commands":                           5808178366,
+						"device_nvme1n1_host_write_commands":                          24273507789,
+						"device_nvme1n1_media_errors":                                 0,
+						"device_nvme1n1_num_err_log_entries":                          212,
+						"device_nvme1n1_percentage_used":                              30,
+						"device_nvme1n1_power_cycles":                                 99,
+						"device_nvme1n1_power_on_time":                                87926400,
+						"device_nvme1n1_temperature":                                  50,
+						"device_nvme1n1_thm_temp1_total_time":                         1474,
+						"device_nvme1n1_thm_temp1_trans_count":                        3,
+						"device_nvme1n1_thm_temp2_total_time":                         0,
+						"device_nvme1n1_thm_temp2_trans_count":                        0,
+						"device_nvme1n1_unsafe_shutdowns":                             49,
+						"device_nvme1n1_warning_temp_time":                            0,
+						"device_nvme2n1_available_spare":                              100,
+						"device_nvme2n1_controller_busy_time":                         4172940,
+						"device_nvme2n1_critical_comp_time":                           0,
+						"device_nvme2n1_critical_warning_available_spare":             0,
+						"device_nvme2n1_critical_warning_nvm_subsystem_reliability":   0,
+						"device_nvme2n1_critical_warning_persistent_memory_read_only": 0,
+						"device_nvme2n1_critical_warning_read_only":                   0,
+						"device_nvme2n1_critical_warning_temp_threshold":              0,
+						"device_nvme2n1_critical_warning_volatile_mem_backup_failed":  0,
+						"device_nvme2n1_data_units_read":                              91155062272000,
+						"device_nvme2n1_data_units_written":                           987485941760000,
+						"device_nvme2n1_host_read_commands":                           5808178366,
+						"device_nvme2n1_host_write_commands":                          24273507789,
+						"device_nvme2n1_media_errors":                                 0,
+						"device_nvme2n1_num_err_log_entries":                          212,
+						"device_nvme2n1_percentage_used":                              30,
+						"device_nvme2n1_power_cycles":                                 99,
+						"device_nvme2n1_power_on_time":                                87926400,
+						"device_nvme2n1_temperature":                                  50,
+						"device_nvme2n1_thm_temp1_total_time":                         1474,
+						"device_nvme2n1_thm_temp1_trans_count":                        3,
+						"device_nvme2n1_thm_temp2_total_time":                         0,
+						"device_nvme2n1_thm_temp2_trans_count":                        0,
+						"device_nvme2n1_unsafe_shutdowns":                             49,
+						"device_nvme2n1_warning_temp_time":                            0,
+					}
+
+					assert.Equal(t, expected, mx)
+				},
+			},
+		},
+		"v2.3: success if all calls successful": {
+			{
+				prepare: prepareCaseVer23OK,
 				check: func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
 
@@ -186,9 +280,9 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
-		"success if all calls successful with string values": {
+		"v2.3: success if all calls successful with string values": {
 			{
-				prepare: prepareCaseStringValuesOK,
+				prepare: prepareCaseVer23StringValuesOK,
 				check: func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
 
@@ -249,9 +343,9 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
-		"success if all calls successful with float values": {
+		"v2.3: success if all calls successful with float values": {
 			{
-				prepare: prepareCaseFloatValuesOK,
+				prepare: prepareCaseVer23FloatValuesOK,
 				check: func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
 
@@ -358,20 +452,38 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
-func prepareCaseOK(collr *Collector) {
-	collr.exec = &mockNVMeCLIExec{}
+func prepareCaseVer211OK(collr *Collector) {
+	collr.exec = &mockNVMeCLIExec{
+		dataList:     dataVer211NVMeListJson,
+		dataSmartLog: dataVer211NVMeSmartLogJson,
+	}
 }
 
-func prepareCaseStringValuesOK(collr *Collector) {
-	collr.exec = &mockNVMeCLIExec{smartLogString: true}
+func prepareCaseVer23OK(collr *Collector) {
+	collr.exec = &mockNVMeCLIExec{
+		dataList:     dataVer23NVMeListJson,
+		dataSmartLog: dataVer23NVMeSmartLogJson,
+	}
 }
 
-func prepareCaseFloatValuesOK(collr *Collector) {
-	collr.exec = &mockNVMeCLIExec{smartLogFloat: true}
+func prepareCaseVer23StringValuesOK(collr *Collector) {
+	collr.exec = &mockNVMeCLIExec{
+		dataList:     dataVer23NVMeListJson,
+		dataSmartLog: dataVer23NVMeSmartLogStringJson,
+	}
+}
+
+func prepareCaseVer23FloatValuesOK(collr *Collector) {
+	collr.exec = &mockNVMeCLIExec{
+		dataList:     dataVer23NVMeListJson,
+		dataSmartLog: dataVer23NVMeSmartLogFloatJson,
+	}
 }
 
 func prepareCaseEmptyList(collr *Collector) {
-	collr.exec = &mockNVMeCLIExec{emptyList: true}
+	collr.exec = &mockNVMeCLIExec{
+		dataList: dataNVMeListEmptyJson,
+	}
 }
 
 func prepareCaseErrOnList(collr *Collector) {
@@ -383,11 +495,11 @@ func prepareCaseErrOnSmartLog(collr *Collector) {
 }
 
 type mockNVMeCLIExec struct {
-	errOnList      bool
-	errOnSmartLog  bool
-	emptyList      bool
-	smartLogString bool
-	smartLogFloat  bool
+	errOnList     bool
+	errOnSmartLog bool
+
+	dataList     []byte
+	dataSmartLog []byte
 }
 
 func (m *mockNVMeCLIExec) list() (*nvmeDeviceList, error) {
@@ -395,13 +507,8 @@ func (m *mockNVMeCLIExec) list() (*nvmeDeviceList, error) {
 		return nil, errors.New("mock.list() error")
 	}
 
-	data := dataNVMeListJSON
-	if m.emptyList {
-		data = dataNVMeListEmptyJSON
-	}
-
 	var v nvmeDeviceList
-	if err := json.Unmarshal(data, &v); err != nil {
+	if err := json.Unmarshal(m.dataList, &v); err != nil {
 		return nil, err
 	}
 
@@ -412,20 +519,9 @@ func (m *mockNVMeCLIExec) smartLog(_ string) (*nvmeDeviceSmartLog, error) {
 	if m.errOnSmartLog {
 		return nil, errors.New("mock.smartLog() error")
 	}
-	if m.emptyList {
-		return nil, errors.New("mock.smartLog() no devices error")
-	}
-
-	data := dataNVMeSmartLogJSON
-	if m.smartLogString {
-		data = dataNVMeSmartLogStringJSON
-	}
-	if m.smartLogFloat {
-		data = dataNVMeSmartLogFloatJSON
-	}
 
 	var v nvmeDeviceSmartLog
-	if err := json.Unmarshal(data, &v); err != nil {
+	if err := json.Unmarshal(m.dataSmartLog, &v); err != nil {
 		return nil, err
 	}
 

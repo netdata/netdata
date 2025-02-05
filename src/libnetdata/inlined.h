@@ -351,7 +351,7 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
     return sign * result;
 }
 
-static inline unsigned long long str2ull_encoded(const char *s) {
+static ALWAYS_INLINE unsigned long long str2ull_encoded(const char *s) {
     if(*s == IEEE754_UINT64_B64_PREFIX[0])
         return str2uint64_base64(s + sizeof(IEEE754_UINT64_B64_PREFIX) - 1, NULL);
 
@@ -361,14 +361,14 @@ static inline unsigned long long str2ull_encoded(const char *s) {
     return str2uint64_t(s, NULL);
 }
 
-static inline long long str2ll_encoded(const char *s) {
+static ALWAYS_INLINE long long str2ll_encoded(const char *s) {
     if(*s == '-')
         return -(long long) str2ull_encoded(&s[1]);
     else
         return (long long) str2ull_encoded(s);
 }
 
-static inline NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
+static ALWAYS_INLINE NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
     if (*src == IEEE754_DOUBLE_B64_PREFIX[0]) {
         // double parsing from base64
         uint64_t n = str2uint64_base64(src + sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1, endptr);

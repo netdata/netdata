@@ -7,36 +7,32 @@ struct config softirq_config = APPCONFIG_INITIALIZER;
 
 #define SOFTIRQ_MAP_LATENCY 0
 static ebpf_local_maps_t softirq_maps[] = {
-    {
-        .name = "tbl_softirq",
-        .internal_input = NETDATA_SOFTIRQ_MAX_IRQS,
-        .user_input = 0,
-        .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    {.name = "tbl_softirq",
+     .internal_input = NETDATA_SOFTIRQ_MAX_IRQS,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
     },
     /* end */
-    {
-        .name = NULL,
-        .internal_input = 0,
-        .user_input = 0,
-        .type = NETDATA_EBPF_MAP_CONTROLLER,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
-    }
-};
+    }};
 
 #define SOFTIRQ_TP_CLASS_IRQ "irq"
 static ebpf_tracepoint_t softirq_tracepoints[] = {
     {.enabled = false, .class = SOFTIRQ_TP_CLASS_IRQ, .event = "softirq_entry"},
     {.enabled = false, .class = SOFTIRQ_TP_CLASS_IRQ, .event = "softirq_exit"},
     /* end */
-    {.enabled = false, .class = NULL, .event = NULL}
-};
+    {.enabled = false, .class = NULL, .event = NULL}};
 
 // these must be in the order defined by the kernel:
 // https://elixir.bootlin.com/linux/v5.12.19/source/include/trace/events/irq.h#L13
@@ -65,16 +61,17 @@ static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
  */
 static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
 {
-    ebpf_write_chart_obsolete(NETDATA_EBPF_SYSTEM_GROUP,
-                              "softirq_latency",
-                              "",
-                              "Software IRQ latency",
-                              EBPF_COMMON_UNITS_MILLISECONDS,
-                              "softirqs",
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              "system.softirq_latency",
-                              NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS+1,
-                              em->update_every);
+    ebpf_write_chart_obsolete(
+        NETDATA_EBPF_SYSTEM_GROUP,
+        "softirq_latency",
+        "",
+        "Software IRQ latency",
+        EBPF_COMMON_UNITS_MILLISECONDS,
+        "softirqs",
+        NETDATA_EBPF_CHART_TYPE_STACKED,
+        "system.softirq_latency",
+        NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS + 1,
+        em->update_every);
 }
 
 /**
@@ -87,7 +84,8 @@ static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
 static void softirq_cleanup(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!em) return;
+    if (!em)
+        return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -147,7 +145,7 @@ static void softirq_read_latency_map(int maps_per_core)
         int cpu_i;
         int end = (maps_per_core) ? ebpf_nprocs : 1;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
-            total_latency += softirq_ebpf_vals[cpu_i].latency/1000;
+            total_latency += softirq_ebpf_vals[cpu_i].latency / 1000;
         }
 
         softirq_vals[i].latency = total_latency;
@@ -165,10 +163,12 @@ static void softirq_create_charts(int update_every)
         "softirqs",
         "system.softirq_latency",
         NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS+1,
-        NULL, NULL, 0, update_every,
-        NETDATA_EBPF_MODULE_NAME_SOFTIRQ
-    );
+        NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS + 1,
+        NULL,
+        NULL,
+        0,
+        update_every,
+        NETDATA_EBPF_MODULE_NAME_SOFTIRQ);
 
     fflush(stdout);
 }
@@ -178,9 +178,7 @@ static void softirq_create_dims()
     uint32_t i;
     for (i = 0; i < NETDATA_SOFTIRQ_MAX_IRQS; i++) {
         ebpf_write_global_dimension(
-            softirq_vals[i].name, softirq_vals[i].name,
-            ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]
-        );
+            softirq_vals[i].name, softirq_vals[i].name, ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
     }
 }
 

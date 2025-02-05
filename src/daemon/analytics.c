@@ -463,19 +463,19 @@ void analytics_misc(void)
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
     analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
 
-    analytics_data.exporting_enabled = appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO);
+    analytics_data.exporting_enabled = inicfg_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO);
     analytics_set_data(&analytics_data.netdata_config_exporting_enabled,  analytics_data.exporting_enabled ? "true" : "false");
 
     analytics_set_data(&analytics_data.netdata_config_is_private_registry, "false");
     analytics_set_data(&analytics_data.netdata_config_use_private_registry, "false");
 
     if (strcmp(
-        config_get(CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io"),
+        inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io"),
         "https://registry.my-netdata.io") != 0)
         analytics_set_data(&analytics_data.netdata_config_use_private_registry, "true");
 
     //do we need both registry to announce and enabled to indicate that this is a private registry ?
-    if (config_get_boolean(CONFIG_SECTION_REGISTRY, "enabled", CONFIG_BOOLEAN_NO) &&
+    if (inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "enabled", CONFIG_BOOLEAN_NO) &&
         web_server_mode != WEB_SERVER_MODE_NONE)
         analytics_set_data(&analytics_data.netdata_config_is_private_registry, "true");
 }
@@ -654,7 +654,7 @@ void get_system_timezone(void)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
     const char *tz = getenv("TZ");
     if (!tz || !*tz)
-        setenv("TZ", config_get(CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
+        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
 
     char buffer[FILENAME_MAX + 1] = "";
     const char *timezone = NULL;
@@ -734,7 +734,7 @@ void get_system_timezone(void)
     if (!timezone || !*timezone)
         timezone = "unknown";
 
-    netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
+    netdata_configured_timezone = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone", timezone);
 
     //get the utc offset, and the timezone as returned by strftime
     //will be sent to the cloud

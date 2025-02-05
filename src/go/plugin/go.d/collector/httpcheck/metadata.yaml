@@ -257,7 +257,31 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: httpcheck_web_service_up
+        metric: httpcheck.status
+        info: "HTTP check endpoint ${label:url} liveness status"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
+      - name: httpcheck_web_service_bad_content
+        metric: httpcheck.status
+        info: "Percentage of HTTP responses from ${label:url} with unexpected content in the last 5 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
+      - name: httpcheck_web_service_bad_status
+        metric: httpcheck.status
+        info: "Percentage of HTTP responses from ${label:url} with unexpected status in the last 5 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
+      - name: httpcheck_web_service_bad_header
+        metric: httpcheck.status
+        info: "Percentage of HTTP responses from ${label:url} with unexpected header in the last 5 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
+      - name: httpcheck_web_service_timeouts
+        metric: httpcheck.status
+        info: "Percentage of timed-out HTTP requests to ${label:url} in the last 5 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
+      - name: httpcheck_web_service_no_connection
+        metric: httpcheck.status
+        info: "Percentage of failed HTTP requests to ${label:url} in the last 5 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
     metrics:
       folding:
         title: Metrics

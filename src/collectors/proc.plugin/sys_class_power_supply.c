@@ -202,17 +202,17 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
     static const char *dirname = NULL;
 
     if(unlikely(do_capacity == -1)) {
-        do_capacity    = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery capacity", CONFIG_BOOLEAN_YES);
-        do_power       = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery power", CONFIG_BOOLEAN_YES);
-        do_property[0] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery charge", CONFIG_BOOLEAN_NO);
-        do_property[1] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery energy", CONFIG_BOOLEAN_NO);
-        do_property[2] = config_get_boolean("plugin:proc:/sys/class/power_supply", "power supply voltage", CONFIG_BOOLEAN_NO);
+        do_capacity    = inicfg_get_boolean(&netdata_config, "plugin:proc:/sys/class/power_supply", "battery capacity", CONFIG_BOOLEAN_YES);
+        do_power       = inicfg_get_boolean(&netdata_config, "plugin:proc:/sys/class/power_supply", "battery power", CONFIG_BOOLEAN_YES);
+        do_property[0] = inicfg_get_boolean(&netdata_config, "plugin:proc:/sys/class/power_supply", "battery charge", CONFIG_BOOLEAN_NO);
+        do_property[1] = inicfg_get_boolean(&netdata_config, "plugin:proc:/sys/class/power_supply", "battery energy", CONFIG_BOOLEAN_NO);
+        do_property[2] = inicfg_get_boolean(&netdata_config, "plugin:proc:/sys/class/power_supply", "power supply voltage", CONFIG_BOOLEAN_NO);
 
-        keep_fds_open_config = config_get_boolean_ondemand("plugin:proc:/sys/class/power_supply", "keep files open", CONFIG_BOOLEAN_AUTO);
+        keep_fds_open_config = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/sys/class/power_supply", "keep files open", CONFIG_BOOLEAN_AUTO);
 
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/power_supply");
-        dirname = config_get("plugin:proc:/sys/class/power_supply", "directory to monitor", filename);
+        dirname = inicfg_get(&netdata_config, "plugin:proc:/sys/class/power_supply", "directory to monitor", filename);
     }
 
     DIR *dir = opendir(dirname);

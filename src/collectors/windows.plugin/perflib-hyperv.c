@@ -7,7 +7,7 @@
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibHyperV"
 #include "../common-contexts/common-contexts.h"
 
-#define HYPERV  "hyperv"
+#define HYPERV "hyperv"
 
 static void get_and_sanitize_instance_value(
     PERF_DATA_BLOCK *pDataBlock,
@@ -72,15 +72,16 @@ struct hypervisor_memory {
     COUNTER_DATA GuestAvailableMemory;
 };
 
-void initialize_hyperv_memory_keys(struct hypervisor_memory *p) {
+void initialize_hyperv_memory_keys(struct hypervisor_memory *p)
+{
     p->CurrentPressure.key = "Current Pressure";
     p->PhysicalMemory.key = "Physical Memory";
     p->GuestVisiblePhysicalMemory.key = "Guest Visible Physical Memory";
     p->GuestAvailableMemory.key = "Guest Available Memory";
 }
 
-
-void dict_hyperv_memory_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void dict_hyperv_memory_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     struct hypervisor_memory *p = value;
     initialize_hyperv_memory_keys(p);
 }
@@ -97,7 +98,6 @@ struct hypervisor_partition {
 
     COUNTER_DATA PhysicalPagesAllocated;
     COUNTER_DATA RemotePhysicalPages;
-
 };
 
 void initialize_hyperv_partition_keys(struct hypervisor_partition *p)
@@ -106,7 +106,8 @@ void initialize_hyperv_partition_keys(struct hypervisor_partition *p)
     p->RemotePhysicalPages.key = "Remote Physical Pages";
 }
 
-void dict_hyperv_partition_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void dict_hyperv_partition_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     struct hypervisor_partition *p = value;
     initialize_hyperv_partition_keys(p);
 }
@@ -120,16 +121,17 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
         return false;
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
-    for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
         if (!pi)
             break;
 
-        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+        get_and_sanitize_instance_value(
+            pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
         struct hypervisor_memory *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
-        if(!p->collected_metadata) {
+        if (!p->collected_metadata) {
             p->collected_metadata = true;
         }
 
@@ -140,13 +142,13 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
         if (!p->charts_created) {
             p->charts_created = true;
-            if(!p->st_vm_memory_physical) {
+            if (!p->st_vm_memory_physical) {
                 p->st_vm_memory_physical = rrdset_create_localhost(
                     "vm_memory_physical",
                     windows_shared_buffer,
                     NULL,
                     HYPERV,
-                    HYPERV".vm_memory_physical",
+                    HYPERV ".vm_memory_physical",
                     "VM assigned memory",
                     "bytes",
                     _COMMON_PLUGIN_NAME,
@@ -160,7 +162,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                     windows_shared_buffer,
                     NULL,
                     HYPERV,
-                    HYPERV".vm_memory_physical_guest_visible",
+                    HYPERV ".vm_memory_physical_guest_visible",
                     "VM guest visible memory",
                     "bytes",
                     _COMMON_PLUGIN_NAME,
@@ -174,7 +176,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                     windows_shared_buffer,
                     NULL,
                     HYPERV,
-                    HYPERV".vm_memory_pressure_current",
+                    HYPERV ".vm_memory_pressure_current",
                     "VM Memory Pressure",
                     "percentage",
                     _COMMON_PLUGIN_NAME,
@@ -184,13 +186,20 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                     RRDSET_TYPE_LINE);
 
                 p->rd_CurrentPressure = rrddim_add(p->st_pressure, "pressure", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                p->rd_PhysicalMemory = rrddim_add(p->st_vm_memory_physical, "assigned", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
-                p->rd_GuestVisiblePhysicalMemory = rrddim_add(p->st_vm_memory_physical_guest_visible, "visible", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
-                p->rd_GuestAvailableMemory = rrddim_add(p->st_vm_memory_physical_guest_visible, "available", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_PhysicalMemory =
+                    rrddim_add(p->st_vm_memory_physical, "assigned", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_GuestVisiblePhysicalMemory = rrddim_add(
+                    p->st_vm_memory_physical_guest_visible, "visible", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_GuestAvailableMemory = rrddim_add(
+                    p->st_vm_memory_physical_guest_visible, "available", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(p->st_vm_memory_physical->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
                 rrdlabels_add(p->st_pressure->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(p->st_vm_memory_physical_guest_visible->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(
+                    p->st_vm_memory_physical_guest_visible->rrdlabels,
+                    "vm_name",
+                    windows_shared_buffer,
+                    RRDLABEL_SRC_AUTO);
             }
         }
 
@@ -215,21 +224,21 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
         return false;
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
-    for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
         if (!pi)
             break;
 
-        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+        get_and_sanitize_instance_value(
+            pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
         struct hypervisor_partition *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
-        if(!p->collected_metadata) {
-
+        if (!p->collected_metadata) {
             p->collected_metadata = true;
         }
 
-        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
         GET_INSTANCE_COUNTER(RemotePhysicalPages);
@@ -266,11 +275,15 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_PhysicalPagesAllocated = rrddim_add(p->st_vm_vid_physical_pages_allocated, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            p->rd_RemotePhysicalPages = rrddim_add(p->st_vm_vid_remote_physical_pages, "remote_physical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_PhysicalPagesAllocated =
+                rrddim_add(p->st_vm_vid_physical_pages_allocated, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_RemotePhysicalPages =
+                rrddim_add(p->st_vm_vid_remote_physical_pages, "remote_physical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-            rrdlabels_add(p->st_vm_vid_physical_pages_allocated->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(p->st_vm_vid_remote_physical_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(
+                p->st_vm_vid_physical_pages_allocated->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(
+                p->st_vm_vid_remote_physical_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         SETP_DIM_VALUE(st_vm_vid_remote_physical_pages, RemotePhysicalPages);
@@ -399,7 +412,8 @@ struct hypervisor_root_partition {
 };
 
 // Initialize the keys for the root partition metrics
-void initialize_hyperv_root_partition_keys(struct hypervisor_root_partition *p) {
+void initialize_hyperv_root_partition_keys(struct hypervisor_root_partition *p)
+{
     p->DeviceSpacePages4K.key = "4K device pages";
     p->DeviceSpacePages2M.key = "2M device pages";
     p->DeviceSpacePages1G.key = "1G device pages";
@@ -422,7 +436,11 @@ void initialize_hyperv_root_partition_keys(struct hypervisor_root_partition *p) 
 }
 
 // Callback function for inserting root partition metrics into the dictionary
-void dict_hyperv_root_partition_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void dict_hyperv_root_partition_insert_cb(
+    const DICTIONARY_ITEM *item __maybe_unused,
+    void *value,
+    void *data __maybe_unused)
+{
     struct hypervisor_root_partition *p = value;
     initialize_hyperv_root_partition_keys(p);
 }
@@ -442,9 +460,10 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         if (!pi)
             break;
 
-        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+        get_and_sanitize_instance_value(
+            pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
-        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
         struct hypervisor_root_partition *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
@@ -471,7 +490,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         GET_INSTANCE_COUNTER(AddressSpaces);
         GET_INSTANCE_COUNTER(VirtualTLBPages);
         GET_INSTANCE_COUNTER(VirtualTLBFlushEntiresSec);
-
 
         // Create charts
         if (!p->charts_created) {
@@ -680,9 +698,9 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
         // Set the data for each dimension
 
-        SETP_DIM_VALUE(st_device_space_pages,DeviceSpacePages4K);
-        SETP_DIM_VALUE(st_device_space_pages,DeviceSpacePages2M);
-        SETP_DIM_VALUE(st_device_space_pages,DeviceSpacePages1G);
+        SETP_DIM_VALUE(st_device_space_pages, DeviceSpacePages4K);
+        SETP_DIM_VALUE(st_device_space_pages, DeviceSpacePages2M);
+        SETP_DIM_VALUE(st_device_space_pages, DeviceSpacePages1G);
 
         SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages4K);
         SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages2M);
@@ -744,9 +762,9 @@ struct hypervisor_storage_device {
     COUNTER_DATA ErrorCount;
 };
 
-
 // Initialize the keys for the root partition metrics
-void initialize_hyperv_storage_device_keys(struct hypervisor_storage_device *p) {
+void initialize_hyperv_storage_device_keys(struct hypervisor_storage_device *p)
+{
     p->ReadOperationsSec.key = "Read Operations/Sec";
     p->WriteOperationsSec.key = "Write Operations/Sec";
 
@@ -756,7 +774,11 @@ void initialize_hyperv_storage_device_keys(struct hypervisor_storage_device *p) 
 }
 
 // Callback function for inserting root partition metrics into the dictionary
-void dict_hyperv_storage_device_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void dict_hyperv_storage_device_insert_cb(
+    const DICTIONARY_ITEM *item __maybe_unused,
+    void *value,
+    void *data __maybe_unused)
+{
     struct hypervisor_storage_device *p = value;
     initialize_hyperv_storage_device_keys(p);
 }
@@ -769,16 +791,16 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
     if (!pObjectType)
         return false;
 
-
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
         if (!pi)
             break;
 
-        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+        get_and_sanitize_instance_value(
+            pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
-        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
         struct hypervisor_storage_device *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
@@ -796,14 +818,14 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
         GET_INSTANCE_COUNTER(ErrorCount);
 
         if (!p->charts_created) {
-            p->charts_created =  true;
+            p->charts_created = true;
             if (!p->st_operations) {
                 p->st_operations = rrdset_create_localhost(
                     "vm_storage_device_operations",
                     windows_shared_buffer,
                     NULL,
                     HYPERV,
-                    HYPERV".vm_storage_device_operations",
+                    HYPERV ".vm_storage_device_operations",
                     "VM storage device IOPS",
                     "operations/s",
                     _COMMON_PLUGIN_NAME,
@@ -813,9 +835,11 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     RRDSET_TYPE_LINE);
 
                 p->rd_ReadOperationsSec = rrddim_add(p->st_operations, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_WriteOperationsSec = rrddim_add(p->st_operations, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_WriteOperationsSec =
+                    rrddim_add(p->st_operations, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                rrdlabels_add(p->st_operations->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(
+                    p->st_operations->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
             if (!p->st_bytes) {
@@ -824,7 +848,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     windows_shared_buffer,
                     NULL,
                     HYPERV,
-                    HYPERV".vm_storage_device_bytes",
+                    HYPERV ".vm_storage_device_bytes",
                     "VM storage device IO",
                     "bytes/s",
                     _COMMON_PLUGIN_NAME,
@@ -845,7 +869,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     windows_shared_buffer,
                     NULL,
                     HYPERV,
-                    HYPERV".vm_storage_device_errors",
+                    HYPERV ".vm_storage_device_errors",
                     "VM storage device errors",
                     "errors/s",
                     _COMMON_PLUGIN_NAME,
@@ -860,13 +884,13 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             }
         }
 
-        SETP_DIM_VALUE(st_operations,ReadOperationsSec);
-        SETP_DIM_VALUE(st_operations,WriteOperationsSec);
+        SETP_DIM_VALUE(st_operations, ReadOperationsSec);
+        SETP_DIM_VALUE(st_operations, WriteOperationsSec);
 
-        SETP_DIM_VALUE(st_bytes,ReadBytesSec);
-        SETP_DIM_VALUE(st_bytes,WriteBytesSec);
+        SETP_DIM_VALUE(st_bytes, ReadBytesSec);
+        SETP_DIM_VALUE(st_bytes, WriteBytesSec);
 
-        SETP_DIM_VALUE(st_errors,ErrorCount);
+        SETP_DIM_VALUE(st_errors, ErrorCount);
 
         // Mark the charts as done
         rrdset_done(p->st_operations);
@@ -992,7 +1016,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
         get_and_sanitize_instance_value(
             pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
-        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
         struct hypervisor_switch *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
@@ -1029,7 +1053,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
         GET_INSTANCE_COUNTER(PurgedMacAddresses);
 
         if (!p->charts_created) {
-            p->charts_created =  true;
+            p->charts_created = true;
 
             p->st_bytes = rrdset_create_localhost(
                 "vswitch_traffic",
@@ -1256,7 +1280,6 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
         rrdset_done(p->st_flooded);
         rrdset_done(p->st_learned_mac);
         rrdset_done(p->st_purged_mac);
-
     }
     return true;
 }
@@ -1328,16 +1351,19 @@ void initialize_hyperv_network_adapter_keys(struct hypervisor_network_adapter *p
     p->BytesReceivedSec.key = "Bytes Received/sec";
 
     p->IPsecoffloadBytesReceivedSec.key = "IPsec offload Bytes Receive/sec";
-    p->IPsecoffloadBytesSentSec.key =     "IPsec offload Bytes Sent/sec";
-    p->DirectedPacketsSentSec.key =       "Directed Packets Sent/sec";
-    p->DirectedPacketsReceivedSec.key =   "Directed Packets Received/sec";
-    p->BroadcastPacketsSentSec.key =      "Broadcast Packets Sent/sec";
-    p->BroadcastPacketsReceivedSec.key =  "Broadcast Packets Received/sec";
-    p->MulticastPacketsSentSec.key =      "Multicast Packets Sent/sec";
-    p->MulticastPacketsReceivedSec.key =  "Multicast Packets Received/sec";
+    p->IPsecoffloadBytesSentSec.key = "IPsec offload Bytes Sent/sec";
+    p->DirectedPacketsSentSec.key = "Directed Packets Sent/sec";
+    p->DirectedPacketsReceivedSec.key = "Directed Packets Received/sec";
+    p->BroadcastPacketsSentSec.key = "Broadcast Packets Sent/sec";
+    p->BroadcastPacketsReceivedSec.key = "Broadcast Packets Received/sec";
+    p->MulticastPacketsSentSec.key = "Multicast Packets Sent/sec";
+    p->MulticastPacketsReceivedSec.key = "Multicast Packets Received/sec";
 }
 
-void dict_hyperv_network_adapter_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+void dict_hyperv_network_adapter_insert_cb(
+    const DICTIONARY_ITEM *item __maybe_unused,
+    void *value,
+    void *data __maybe_unused)
 {
     struct hypervisor_network_adapter *p = value;
     initialize_hyperv_network_adapter_keys(p);
@@ -1357,9 +1383,10 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
         if (!pi)
             break;
 
-        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+        get_and_sanitize_instance_value(
+            pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
-        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
         struct hypervisor_network_adapter *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
@@ -1396,7 +1423,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 windows_shared_buffer,
                 NULL,
                 HYPERV,
-                HYPERV".vm_net_interface_packets_dropped",
+                HYPERV ".vm_net_interface_packets_dropped",
                 "VM interface packets dropped",
                 "drops/s",
                 _COMMON_PLUGIN_NAME,
@@ -1405,10 +1432,13 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_DroppedPacketsIncomingSec = rrddim_add(p->st_dropped_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_DroppedPacketsOutgoingSec = rrddim_add(p->st_dropped_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_DroppedPacketsIncomingSec =
+                rrddim_add(p->st_dropped_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_DroppedPacketsOutgoingSec =
+                rrddim_add(p->st_dropped_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            rrdlabels_add(p->st_dropped_packets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(
+                p->st_dropped_packets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_send_receive_packets = rrdset_create_localhost(
                 "vm_net_interface_packets",
@@ -1424,28 +1454,34 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_PacketsReceivedSec = rrddim_add(p->st_send_receive_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_PacketsSentSec = rrddim_add(p->st_send_receive_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_PacketsReceivedSec =
+                rrddim_add(p->st_send_receive_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_PacketsSentSec =
+                rrddim_add(p->st_send_receive_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            rrdlabels_add(p->st_send_receive_packets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(
+                p->st_send_receive_packets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_send_receive_bytes = rrdset_create_localhost(
-              "vm_net_interface_traffic",
-              windows_shared_buffer,
-              NULL,
-              HYPERV,
-              HYPERV ".vm_net_interface_traffic",
-              "VM interface traffic",
-              "kilobits/s",
-              _COMMON_PLUGIN_NAME,
-              _COMMON_PLUGIN_MODULE_NAME,
-              NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_TRAFFIC,
-              update_every,
-              RRDSET_TYPE_AREA);
+                "vm_net_interface_traffic",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_net_interface_traffic",
+                "VM interface traffic",
+                "kilobits/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_TRAFFIC,
+                update_every,
+                RRDSET_TYPE_AREA);
 
-            p->rd_BytesReceivedSec = rrddim_add(p->st_send_receive_bytes, "received", NULL, 8, 1000, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_BytesSentSec = rrddim_add(p->st_send_receive_bytes, "sent", NULL, -8, 1000, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_send_receive_bytes->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            p->rd_BytesReceivedSec =
+                rrddim_add(p->st_send_receive_bytes, "received", NULL, 8, 1000, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_BytesSentSec =
+                rrddim_add(p->st_send_receive_bytes, "sent", NULL, -8, 1000, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_send_receive_bytes->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_IPsecoffloadBytes = rrdset_create_localhost(
                 "vm_net_interface_ipsec_traffic",
@@ -1530,8 +1566,6 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 rrddim_add(p->st_MulticastPackets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_MulticastPackets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-
         }
 
         SETP_DIM_VALUE(st_dropped_packets, DroppedPacketsIncomingSec);
@@ -1552,8 +1586,8 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
         SETP_DIM_VALUE(st_BroadcastPackets, BroadcastPacketsSentSec);
         SETP_DIM_VALUE(st_BroadcastPackets, BroadcastPacketsReceivedSec);
 
-        SETP_DIM_VALUE(st_MulticastPackets,MulticastPacketsSentSec);
-        SETP_DIM_VALUE(st_MulticastPackets,MulticastPacketsReceivedSec);
+        SETP_DIM_VALUE(st_MulticastPackets, MulticastPacketsSentSec);
+        SETP_DIM_VALUE(st_MulticastPackets, MulticastPacketsReceivedSec);
 
         rrdset_done(p->st_IPsecoffloadBytes);
         rrdset_done(p->st_DirectedPackets);
@@ -1565,7 +1599,6 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
     }
     return true;
 }
-
 
 // Hypervisor Virtual Processor
 struct hypervisor_processor {
@@ -1590,7 +1623,6 @@ struct hypervisor_processor {
     collected_number RemoteRunTime_total;
     collected_number TotalRunTime_total;
 };
-
 
 void initialize_hyperv_processor_keys(struct hypervisor_processor *p)
 {
@@ -1624,7 +1656,8 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
         if (!pi)
             break;
 
-        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+        get_and_sanitize_instance_value(
+            pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
@@ -1662,21 +1695,22 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
 
             p->rd_TotalRunTime =
                 rrddim_add(p->st_HypervisorProcessorTotal, "usage", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_HypervisorProcessorTotal->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(
+                p->st_HypervisorProcessorTotal->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_HypervisorProcessor = rrdset_create_localhost(
-               "vm_cpu_usage_by_run_context",
-               windows_shared_buffer,
-               NULL,
-               HYPERV,
-               HYPERV ".vm_cpu_usage_by_run_context",
-               "VM CPU usage by run context",
-               "percentage",
-               _COMMON_PLUGIN_NAME,
-               _COMMON_PLUGIN_MODULE_NAME,
-               NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE_BY_RUN_CONTEXT,
-               update_every,
-               RRDSET_TYPE_STACKED);
+                "vm_cpu_usage_by_run_context",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_cpu_usage_by_run_context",
+                "VM CPU usage by run context",
+                "percentage",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE_BY_RUN_CONTEXT,
+                update_every,
+                RRDSET_TYPE_STACKED);
 
             p->rd_GuestRunTime =
                 rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
@@ -1696,13 +1730,18 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
 
     {
         struct hypervisor_processor *p;
-        dfe_start_read(item->instance, p) {
-            rrddim_set_by_pointer(p->st_HypervisorProcessor, p->rd_HypervisorRunTime, (collected_number) p->HypervisorRunTime_total);
-            rrddim_set_by_pointer(p->st_HypervisorProcessor, p->rd_GuestRunTime, (collected_number) p->GuestRunTime_total);
-            rrddim_set_by_pointer(p->st_HypervisorProcessor, p->rd_RemoteRunTime, (collected_number) p->RemoteRunTime_total);
+        dfe_start_read(item->instance, p)
+        {
+            rrddim_set_by_pointer(
+                p->st_HypervisorProcessor, p->rd_HypervisorRunTime, (collected_number)p->HypervisorRunTime_total);
+            rrddim_set_by_pointer(
+                p->st_HypervisorProcessor, p->rd_GuestRunTime, (collected_number)p->GuestRunTime_total);
+            rrddim_set_by_pointer(
+                p->st_HypervisorProcessor, p->rd_RemoteRunTime, (collected_number)p->RemoteRunTime_total);
             rrdset_done(p->st_HypervisorProcessor);
 
-            rrddim_set_by_pointer(p->st_HypervisorProcessorTotal, p->rd_TotalRunTime, (collected_number) p->TotalRunTime_total);
+            rrddim_set_by_pointer(
+                p->st_HypervisorProcessorTotal, p->rd_TotalRunTime, (collected_number)p->TotalRunTime_total);
             rrdset_done(p->st_HypervisorProcessorTotal);
 
             p->GuestRunTime_total = 0;
@@ -1761,7 +1800,8 @@ hyperv_perf_item hyperv_perf_list[] = {
 
     {.registry_name = NULL, .function_collect = NULL}};
 
-int do_PerflibHyperV(int update_every, usec_t dt __maybe_unused) {
+int do_PerflibHyperV(int update_every, usec_t dt __maybe_unused)
+{
     static bool initialized = false;
 
     if (unlikely(!initialized)) {

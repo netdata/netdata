@@ -207,20 +207,19 @@ void *proc_main(void *ptr)
 
     rrd_collector_started();
 
-    if (config_get_boolean("plugin:proc", "/proc/net/dev", CONFIG_BOOLEAN_YES)) {
+    if (inicfg_get_boolean(&netdata_config, "plugin:proc", "/proc/net/dev", CONFIG_BOOLEAN_YES)) {
         netdata_log_debug(D_SYSTEM, "Starting thread %s.", THREAD_NETDEV_NAME);
         netdev_thread = nd_thread_create(THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, netdev_main, NULL);
     }
 
-    config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
-    config_get_boolean("plugin:proc", "/proc/spl/kstat/zfs/pool/state", CONFIG_BOOLEAN_NO);
+    inicfg_get_boolean(&netdata_config, "plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
 
     // check the enabled status for each module
     int i;
     for(i = 0; proc_modules[i].name; i++) {
         struct proc_module *pm = &proc_modules[i];
 
-        pm->enabled = config_get_boolean("plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
+        pm->enabled = inicfg_get_boolean(&netdata_config, "plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
         pm->rd = NULL;
 
         worker_register_job_name(i, proc_modules[i].dim);
@@ -278,7 +277,7 @@ int get_numa_node_count(void)
 
     char name[FILENAME_MAX + 1];
     snprintfz(name, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/node");
-    const char *dirname = config_get("plugin:proc:/sys/devices/system/node", "directory to monitor", name);
+    const char *dirname = inicfg_get(&netdata_config, "plugin:proc:/sys/devices/system/node", "directory to monitor", name);
 
     DIR *dir = opendir(dirname);
     if (dir) {

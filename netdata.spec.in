@@ -336,6 +336,7 @@ happened, on your systems and applications.
 	-DUSE_CXX_11=On \
 	%endif
 	%endif
+	-DDISABLE_LTO=On \
 	%if %{_have_cups}
 	-DENABLE_PLUGIN_CUPS=On \
 	%else
@@ -521,6 +522,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_unitdir}/%{name}-updater.service
 %{_presetdir}/50-%{name}.preset
 %{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf
+
+%{_datarootdir}/%{name}/build-info-cmake-cache.gz
 
 %dir %{_libexecdir}/%{name}
 %dir %{_libexecdir}/%{name}/plugins.d
@@ -806,9 +809,6 @@ Conflicts: %{name} < %{version}
 Suggests: nvme-cli
 Suggests: sudo
 %endif
-%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
-Recommends: lm_sensors
-%endif
 
 %description plugin-go
  This plugin adds a selection of additional collectors written in Go to the Netdata Agent
@@ -1005,11 +1005,13 @@ fi
 %{_datadir}/%{name}/web
 
 %changelog
-* Thu Aug 29 2024 Austin Hemmelgarn <austin@netdata.cloud>
+* Tue Jan 28 2025 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-30
+- Removed lm_sensors dependency for plugin-go package
+* Thu Aug 29 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-29
 - Split dashboard to it’s own package
-* Fri Jul 19 2024 Austin Hemmelgarn <austin@netdata.cloud>
+* Fri Jul 19 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-28
 - Fix dependency issues with old logs-management plugin
-* Tue Jul 16 2024 Austin Hemmelgarn <austin@netdata.cloud>
+* Tue Jul 16 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-27
 - Removed logs-management plugin
 * Wed Jul 03 2024 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-26
 - Added lm_sensors as weak dependency for plugin-go package

@@ -259,7 +259,7 @@ static cmd_status_t cmd_read_config_execute(char *args, char **message)
     const char *conf_file = temp; /* "cloud" is cloud.conf, otherwise netdata.conf */
     struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
 
-    const char *value = appconfig_get(tmp_config, temp + offset + 1, temp + offset2 + 1, NULL);
+    const char *value = inicfg_get(tmp_config, temp + offset + 1, temp + offset2 + 1, NULL);
     if (value == NULL) {
         netdata_log_error("Cannot execute read-config conf_file=%s section=%s / key=%s because no value set",
                           conf_file,
@@ -301,7 +301,7 @@ static cmd_status_t cmd_write_config_execute(char *args, char **message)
     const char *conf_file = temp; /* "cloud" is cloud.conf, otherwise netdata.conf */
     struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
 
-    appconfig_set(tmp_config, temp + offset + 1, temp + offset2 + 1, temp + offset3 + 1);
+    inicfg_set(tmp_config, temp + offset + 1, temp + offset2 + 1, temp + offset3 + 1);
     netdata_log_info("write-config conf_file=%s section=%s key=%s value=%s",conf_file, temp + offset + 1, temp + offset2 + 1,
          temp + offset3 + 1);
     freez(temp);
@@ -345,7 +345,7 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
     (void)args;
 
     BUFFER *wb = buffer_create(1024, NULL);
-    netdata_conf_generate(wb, 0);
+    inicfg_generate(&netdata_config, wb, 0, true);
     *message = strdupz(buffer_tostring(wb));
     buffer_free(wb);
     return CMD_STATUS_SUCCESS;

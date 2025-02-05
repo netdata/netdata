@@ -11,7 +11,7 @@ static BUFFER *preferred_sender_buffer(RRDHOST *host) {
         return sender_thread_buffer(host->sender);
 }
 
-RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t wall_clock_time) {
+ALWAYS_INLINE RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t wall_clock_time) {
     RRDHOST *host = st->rrdhost;
 
     // fetch the flags we need to check with one atomic operation

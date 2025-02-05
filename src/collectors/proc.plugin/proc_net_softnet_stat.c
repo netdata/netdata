@@ -26,13 +26,13 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
 
     if (unlikely(do_per_core == -1)) {
         do_per_core =
-            config_get_boolean("plugin:proc:/proc/net/softnet_stat", "softnet_stat per core", CONFIG_BOOLEAN_NO);
+            inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/softnet_stat", "softnet_stat per core", CONFIG_BOOLEAN_NO);
     }
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/softnet_stat");
-        ff = procfile_open(config_get("plugin:proc:/proc/net/softnet_stat", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, "plugin:proc:/proc/net/softnet_stat", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 

@@ -74,7 +74,7 @@ bool is_system_ieee754_double(void) {
     }
 }
 
-storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
+ALWAYS_INLINE storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
     // bit 32 = sign 0:positive, 1:negative
     // bit 31 = 0:divide, 1:multiply
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)

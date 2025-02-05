@@ -256,12 +256,9 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     netdata_log_debug(D_ACLK, "CreateNodeInstanceResult: guid:%s nodeid:%s", res.machine_guid, res.node_id);
 
     aclk_query_t query = aclk_query_new(CREATE_NODE_INSTANCE);
-    query->data.node_id = strdupz(res.node_id);
-    query->machine_guid = strdupz(res.machine_guid);
+    query->data.node_id = res.node_id;          // Will be freed on query free
+    query->machine_guid = res.machine_guid;     // Will be freed on query free
     aclk_add_job(query);
-
-    freez(res.node_id);
-    freez(res.machine_guid);
     return 0;
 }
 
@@ -306,10 +303,9 @@ int start_alarm_streaming(const char *msg, size_t msg_len)
         return 1;
     }
     aclk_query_t query = aclk_query_new(ALERT_START_STREAMING);
-    query->data.node_id = strdupz(res.node_id);
+    query->data.node_id = res.node_id;      // Will be freed on query free
     query->version = res.version;
     aclk_add_job(query);
-    freez(res.node_id);
     return 0;
 }
 
@@ -323,12 +319,10 @@ int send_alarm_checkpoint(const char *msg, size_t msg_len)
         return 1;
     }
     aclk_query_t query = aclk_query_new(ALERT_CHECKPOINT);
-    query->data.node_id = strdupz(sac.node_id);
-    query->claim_id = strdupz(sac.claim_id);
+    query->data.node_id = sac.node_id;  // Will be freed on query free
+    query->claim_id = sac.claim_id;
     query->version = sac.version;
     aclk_add_job(query);
-    freez(sac.node_id);
-    freez(sac.claim_id);
     return 0;
 }
 
@@ -354,8 +348,8 @@ int send_alarm_snapshot(const char *msg, size_t msg_len)
         return 1;
     }
     aclk_query_t query = aclk_query_new(ALERT_CHECKPOINT);
-    query->data.node_id = strdupz(sas->node_id);
-    query->claim_id = strdupz(sas->claim_id);
+    query->data.node_id = sas->node_id;     // Will be freed on query free
+    query->claim_id = sas->claim_id;        // Will be freed on query free
     query->version = 0; // force snapshot
     aclk_add_job(query);
     destroy_send_alarm_snapshot(sas);

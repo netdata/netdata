@@ -93,7 +93,7 @@ endfunction()
 
 # Add libbpf as a link dependency for the given target.
 function(netdata_add_libbpf_to_target _target)
-    target_link_libraries(${_target} PUBLIC libbpf_library)
+    target_link_libraries(${_target} libbpf_library)
     target_include_directories(${_target} BEFORE PUBLIC "${NETDATA_LIBBPF_INCLUDE_DIRECTORIES}")
     target_compile_options(${_target} PUBLIC "${NETDATA_LIBBPF_COMPILE_OPTIONS}")
     add_dependencies(${_target} libbpf)

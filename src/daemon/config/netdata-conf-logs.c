@@ -7,7 +7,7 @@ static void debug_flags_initialize(void) {
     // --------------------------------------------------------------------
     // get the debugging flags from the configuration file
 
-    const char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
+    const char *flags = inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
     nd_setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
     debug_flags = strtoull(flags, NULL, 0);
@@ -29,18 +29,18 @@ void netdata_conf_section_logs(void) {
     if(run) return;
     run = true;
 
-    nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
+    nd_log_set_facility(inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "facility", "daemon"));
 
     time_t period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
     size_t logs = ND_LOG_DEFAULT_THROTTLE_LOGS;
-    period = config_get_duration_seconds(CONFIG_SECTION_LOGS, "logs flood protection period", period);
-    logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "logs to trigger flood protection", (long long int)logs);
+    period = inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_LOGS, "logs flood protection period", period);
+    logs = (unsigned long)inicfg_get_number(&netdata_config, CONFIG_SECTION_LOGS, "logs to trigger flood protection", (long long int)logs);
     nd_log_set_flood_protection(logs, period);
 
     const char *netdata_log_level = getenv("NETDATA_LOG_LEVEL");
     netdata_log_level = netdata_log_level ? nd_log_id2priority(nd_log_priority2id(netdata_log_level)) : NDLP_INFO_STR;
 
-    nd_log_set_priority_level(config_get(CONFIG_SECTION_LOGS, "level", netdata_log_level));
+    nd_log_set_priority_level(inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "level", netdata_log_level));
 
     char filename[FILENAME_MAX + 1];
     char* os_default_method = NULL;
@@ -61,19 +61,19 @@ void netdata_conf_section_logs(void) {
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
 #endif
 
-    nd_log_set_user_settings(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
+    nd_log_set_user_settings(NDLS_DEBUG, inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "debug", filename));
 
     if(os_default_method)
         snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
     else
         snprintfz(filename, FILENAME_MAX, "%s/daemon.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "daemon", filename));
+    nd_log_set_user_settings(NDLS_DAEMON, inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "daemon", filename));
 
     if(os_default_method)
         snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
     else
         snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
+    nd_log_set_user_settings(NDLS_COLLECTORS, inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "collector", filename));
 
 #if defined(OS_WINDOWS)
     // on windows, access log goes to windows events
@@ -81,15 +81,15 @@ void netdata_conf_section_logs(void) {
 #else
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
 #endif
-    nd_log_set_user_settings(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
+    nd_log_set_user_settings(NDLS_ACCESS, inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "access", filename));
 
     if(os_default_method)
         snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
     else
         snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
+    nd_log_set_user_settings(NDLS_HEALTH, inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "health", filename));
 
-    aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
+    aclklog_enabled = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
 #if defined(OS_WINDOWS)
         // on windows, aclk log goes to windows events
@@ -97,7 +97,7 @@ void netdata_conf_section_logs(void) {
 #else
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
 #endif
-        nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
+        nd_log_set_user_settings(NDLS_ACLK, inicfg_get(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
 
     debug_flags_initialize();

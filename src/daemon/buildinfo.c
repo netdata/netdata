@@ -86,6 +86,7 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_LINUX_DISKSPACE,
     BIB_PLUGIN_FREEBSD,
     BIB_PLUGIN_MACOS,
+    BIB_PLUGIN_WINDOWS,
     BIB_PLUGIN_STATSD,
     BIB_PLUGIN_TIMEX,
     BIB_PLUGIN_IDLEJITTER,
@@ -94,6 +95,9 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_CUPS,
     BIB_PLUGIN_EBPF,
     BIB_PLUGIN_FREEIPMI,
+    BIB_PLUGIN_NETWORK_VIEWER,
+    BIB_PLUGIN_SYSTEMD_JOURNAL,
+    BIB_PLUGIN_WINDOWS_EVENTS,
     BIB_PLUGIN_NFACCT,
     BIB_PLUGIN_PERF,
     BIB_PLUGIN_SLABINFO,
@@ -114,6 +118,11 @@ typedef enum __attribute__((packed)) {
     BIB_EXPORT_SHELL,
     BIB_DEVEL_TRACE_ALLOCATIONS,
     BIB_DEVELOPER_MODE,
+    BIB_RUNTIME_PROFILE,
+    BIB_RUNTIME_PARENT,
+    BIB_RUNTIME_CHILD,
+    BIB_RUNTIME_MEM_TOTAL,
+    BIB_RUNTIME_MEM_AVAIL,
 
     // leave this last
     BIB_TERMINATOR,
@@ -131,7 +140,8 @@ typedef enum __attribute__((packed)) {
     BIC_LIBS,
     BIC_PLUGINS,
     BIC_EXPORTERS,
-    BIC_DEBUG_DEVEL
+    BIC_DEBUG_DEVEL,
+    BIC_RUNTIME,
 } BUILD_INFO_CATEGORY;
 
 typedef enum __attribute__((packed)) {
@@ -780,6 +790,14 @@ static struct {
                 .json = "macos",
                 .value = NULL,
         },
+        [BIB_PLUGIN_WINDOWS] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = NULL,
+            .print = "windows (monitor Windows systems)",
+            .json = "windows",
+            .value = NULL,
+        },
         [BIB_PLUGIN_STATSD] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
@@ -843,6 +861,30 @@ static struct {
                 .print = "freeipmi (monitor enterprise server H/W)",
                 .json = "freeipmi",
                 .value = NULL,
+        },
+        [BIB_PLUGIN_NETWORK_VIEWER] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = "NETWORK-VIEWER",
+            .print = "network-viewer (monitor TCP/UDP IPv4/6 sockets)",
+            .json = "network-viewer",
+            .value = NULL,
+        },
+        [BIB_PLUGIN_SYSTEMD_JOURNAL] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = "SYSTEMD-JOURNAL",
+            .print = "systemd-journal (monitor journal logs)",
+            .json = "systemd-journal",
+            .value = NULL,
+        },
+        [BIB_PLUGIN_WINDOWS_EVENTS] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = "WINDOWS-EVENTS",
+            .print = "windows-events (monitor Windows events)",
+            .json = "windows-events",
+            .value = NULL,
         },
         [BIB_PLUGIN_NFACCT] = {
                 .category = BIC_PLUGINS,
@@ -1004,6 +1046,46 @@ static struct {
                 .json = "dev-mode",
                 .value = NULL,
         },
+        [BIB_RUNTIME_PROFILE] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_STRING,
+            .analytics = "ConfigProfile",
+            .print = "Profile",
+            .json = "profile",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_PARENT] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_BOOLEAN,
+            .analytics = "StreamParent",
+            .print = "Stream Parent (accept data from Children)",
+            .json = "parent",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_CHILD] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_BOOLEAN,
+            .analytics = "StreamChild",
+            .print = "Stream Child (send data to a Parent)",
+            .json = "child",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_MEM_TOTAL] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_STRING,
+            .analytics = "TotalMemory",
+            .print = "Total System Memory",
+            .json = "mem-total",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_MEM_AVAIL] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_STRING,
+            .analytics = "AvailableMemory",
+            .print = "Available System Memory",
+            .json = "mem-available",
+            .value = NULL,
+        },
 
         // leave this last
         [BIB_TERMINATOR] = {
@@ -1069,6 +1151,8 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_PLUGIN_MACOS, true);
 #endif
 #ifdef OS_WINDOWS
+    build_info_set_status(BIB_PLUGIN_WINDOWS, true);
+    build_info_set_status(BIB_PLUGIN_WINDOWS_EVENTS, true);
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
 #if defined(__CYGWIN__) && defined(__MSYS__)
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows (MSYS)");
@@ -1209,6 +1293,12 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef ENABLE_PLUGIN_FREEIPMI
     build_info_set_status(BIB_PLUGIN_FREEIPMI, true);
+#endif
+#ifdef ENABLE_PLUGIN_SYSTEMD_JOURNAL
+    build_info_set_status(BIB_PLUGIN_SYSTEMD_JOURNAL, true);
+#endif
+#ifdef ENABLE_PLUGIN_NETWORK_VIEWER
+    build_info_set_status(BIB_PLUGIN_NETWORK_VIEWER, true);
 #endif
 #ifdef ENABLE_PLUGIN_NFACCT
     build_info_set_status(BIB_PLUGIN_NFACCT, true);
@@ -1410,9 +1500,26 @@ static void populate_packaging_info() {
             build_info_set_value(BIB_PACKAGING_INSTALL_TYPE, strdupz(BUILD_PACKAGING_INFO.install_type));
             build_info_set_value(BIB_PACKAGING_ARCHITECTURE, strdupz(BUILD_PACKAGING_INFO.prebuilt_arch));
             build_info_set_value(BIB_PACKAGING_DISTRO, strdupz(BUILD_PACKAGING_INFO.prebuilt_distro));
+
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            ND_PROFILE_2buffer(wb, nd_profile_detect_and_configure(false), " ");
+            build_info_set_value_strdupz(BIB_RUNTIME_PROFILE, buffer_tostring(wb));
+
+            build_info_set_status(BIB_RUNTIME_PARENT, stream_conf_is_parent(false));
+            build_info_set_status(BIB_RUNTIME_CHILD, stream_conf_is_child());
         }
         spinlock_unlock(&BUILD_PACKAGING_INFO.spinlock);
     }
+
+    OS_SYSTEM_MEMORY sm = os_system_memory(true);
+    char buf[1024];
+    snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_total_bytes);
+    // size_snprintf(buf, sizeof(buf), sm.ram_total_bytes, "B", false);
+    build_info_set_value_strdupz(BIB_RUNTIME_MEM_TOTAL, buf);
+
+    snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_available_bytes);
+    // size_snprintf(buf, sizeof(buf), sm.ram_available_bytes, "B", false);
+    build_info_set_value_strdupz(BIB_RUNTIME_MEM_AVAIL, buf);
 }
 
 // ----------------------------------------------------------------------------
@@ -1485,6 +1592,7 @@ void print_build_info(void) {
     print_build_info_category_to_console(BIC_PLUGINS, "Plugins");
     print_build_info_category_to_console(BIC_EXPORTERS, "Exporters");
     print_build_info_category_to_console(BIC_DEBUG_DEVEL, "Debug/Developer Features");
+    print_build_info_category_to_console(BIC_RUNTIME, "Runtime Information");
 }
 
 void build_info_to_json_object(BUFFER *b) {
@@ -1504,6 +1612,7 @@ void build_info_to_json_object(BUFFER *b) {
     print_build_info_category_to_json(b, BIC_PLUGINS, "plugins");
     print_build_info_category_to_json(b, BIC_EXPORTERS, "exporters");
     print_build_info_category_to_json(b, BIC_DEBUG_DEVEL, "debug-n-devel");
+    print_build_info_category_to_json(b, BIC_RUNTIME, "runtime");
 }
 
 void print_build_info_json(void) {
@@ -1539,3 +1648,22 @@ void analytics_build_info(BUFFER *b) {
     }
 }
 
+void print_build_info_cmake_cache(void) {
+        const char *path = NETDATA_RUNTIME_PREFIX "/"
+                           BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH "/"
+                           BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME;
+
+        gzFile f = gzopen(path, "rb");
+        if (!f) {
+            printf("Could not open build info cmake cache archive located at %s\n",
+                   path);
+            return;
+        }
+
+        char line[1024];
+        while (gzgets(f, line, sizeof(line))) {
+            printf("%s", line);
+        }
+
+        gzclose(f);
+}

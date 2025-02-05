@@ -222,7 +222,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                 CONFIG_BOOLEAN_AUTO);
 
         excluded_disks = simple_pattern_create(
-            config_get(CONFIG_SECTION_KERN_DEVSTAT, "disable by default disks matching", DEFAULT_EXCLUDED_DISKS),
+            inicfg_get(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "disable by default disks matching", DEFAULT_EXCLUDED_DISKS),
             NULL,
             SIMPLE_PATTERN_EXACT,
             true);

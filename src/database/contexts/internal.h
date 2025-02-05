@@ -126,7 +126,7 @@ extern struct rrdcontext_reason rrdcontext_reasons[];
 // NEVER alter RRD_FLAG_COLLECTED, RRD_FLAG_ARCHIVED, RRD_FLAG_DELETED with this
 #define rrd_flag_clear(obj, flag) __atomic_and_fetch(&((obj)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
-static inline RRD_FLAGS
+static ALWAYS_INLINE RRD_FLAGS
 rrd_flag_add_remove_atomic(RRD_FLAGS *flags, RRD_FLAGS check, RRD_FLAGS conditionally_add, RRD_FLAGS always_remove) {
     RRD_FLAGS expected, desired;
 
@@ -144,7 +144,7 @@ rrd_flag_add_remove_atomic(RRD_FLAGS *flags, RRD_FLAGS check, RRD_FLAGS conditio
     return expected;
 }
 
-static inline RRD_FLAGS
+static ALWAYS_INLINE RRD_FLAGS
 rrd_flags_replace_atomic(RRD_FLAGS *flags, RRD_FLAGS desired) {
     RRD_FLAGS expected;
     
@@ -298,25 +298,27 @@ typedef struct rrdcontext {
 // ----------------------------------------------------------------------------
 // helpers for counting collected metrics, instances and contexts
 
-static inline void rrdmetric_set_collected(RRDMETRIC *rm) {
+static ALWAYS_INLINE void rrdmetric_set_collected(RRDMETRIC *rm) {
     RRD_FLAGS old = rrd_flag_set_collected(rm);
     if(!(old & RRD_FLAG_COLLECTED))
         __atomic_add_fetch(&rm->ri->rc->rrdhost->collected.metrics_count, 1, __ATOMIC_RELAXED);
+
+    rm->rrddim->rrdcontexts.collected = true;
 }
 
-static inline void rrdmetric_set_archived(RRDMETRIC *rm) {
+static ALWAYS_INLINE void rrdmetric_set_archived(RRDMETRIC *rm) {
     RRD_FLAGS old = rrd_flag_set_archived(rm);
     if(old & RRD_FLAG_COLLECTED)
         __atomic_sub_fetch(&rm->ri->rc->rrdhost->collected.metrics_count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void rrdmetric_set_deleted(RRDMETRIC *rm, RRD_FLAGS reason) {
+static ALWAYS_INLINE void rrdmetric_set_deleted(RRDMETRIC *rm, RRD_FLAGS reason) {
     RRD_FLAGS old = rrd_flag_set_deleted(rm, reason);
     if(old & RRD_FLAG_COLLECTED)
         __atomic_sub_fetch(&rm->ri->rc->rrdhost->collected.metrics_count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void rrdmetric_set_deleted_overwrite(RRDMETRIC *rm, RRD_FLAGS replacement) {
+static ALWAYS_INLINE void rrdmetric_set_deleted_overwrite(RRDMETRIC *rm, RRD_FLAGS replacement) {
     replacement &= ~(RRD_FLAG_COLLECTED|RRD_FLAG_ARCHIVED|RRD_FLAG_DELETED);
     replacement |= RRD_FLAG_DELETED;
     RRD_FLAGS old = rrd_flags_replace_atomic(&rm->flags, replacement);
@@ -324,25 +326,25 @@ static inline void rrdmetric_set_deleted_overwrite(RRDMETRIC *rm, RRD_FLAGS repl
         __atomic_sub_fetch(&rm->ri->rc->rrdhost->collected.metrics_count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void rrdinstance_set_collected(RRDINSTANCE *ri) {
+static ALWAYS_INLINE void rrdinstance_set_collected(RRDINSTANCE *ri) {
     RRD_FLAGS old = rrd_flag_set_collected(ri);
     if(!(old & RRD_FLAG_COLLECTED))
         __atomic_add_fetch(&ri->rc->rrdhost->collected.instances_count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void rrdinstance_set_archived(RRDINSTANCE *ri) {
+static ALWAYS_INLINE void rrdinstance_set_archived(RRDINSTANCE *ri) {
     RRD_FLAGS old = rrd_flag_set_archived(ri);
     if(old & RRD_FLAG_COLLECTED)
         __atomic_sub_fetch(&ri->rc->rrdhost->collected.instances_count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void rrdinstance_set_deleted(RRDINSTANCE *ri, RRD_FLAGS reason) {
+static ALWAYS_INLINE void rrdinstance_set_deleted(RRDINSTANCE *ri, RRD_FLAGS reason) {
     RRD_FLAGS old = rrd_flag_set_deleted(ri, reason);
     if(old & RRD_FLAG_COLLECTED)
         __atomic_sub_fetch(&ri->rc->rrdhost->collected.instances_count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void rrdinstance_set_deleted_overwrite(RRDINSTANCE *ri, RRD_FLAGS replacement) {
+static ALWAYS_INLINE void rrdinstance_set_deleted_overwrite(RRDINSTANCE *ri, RRD_FLAGS replacement) {
     replacement &= ~(RRD_FLAG_COLLECTED|RRD_FLAG_ARCHIVED|RRD_FLAG_DELETED);
     replacement |= RRD_FLAG_DELETED;
     RRD_FLAGS old = rrd_flags_replace_atomic(&ri->flags, replacement);
@@ -350,19 +352,19 @@ static inline void rrdinstance_set_deleted_overwrite(RRDINSTANCE *ri, RRD_FLAGS 
         __atomic_sub_fetch(&ri->rc->rrdhost->collected.instances_count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void rrdcontext_set_collected(RRDCONTEXT *rc) {
+static ALWAYS_INLINE void rrdcontext_set_collected(RRDCONTEXT *rc) {
     RRD_FLAGS old = rrd_flag_set_collected(rc);
     if(!(old & RRD_FLAG_COLLECTED))
         __atomic_add_fetch(&rc->rrdhost->collected.contexts_count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void rrdcontext_set_archived(RRDCONTEXT *rc) {
+static ALWAYS_INLINE void rrdcontext_set_archived(RRDCONTEXT *rc) {
     RRD_FLAGS old = rrd_flag_set_archived(rc);
     if(old & RRD_FLAG_COLLECTED)
         __atomic_sub_fetch(&rc->rrdhost->collected.contexts_count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void rrdcontext_set_deleted(RRDCONTEXT *rc, RRD_FLAGS reason) {
+static ALWAYS_INLINE void rrdcontext_set_deleted(RRDCONTEXT *rc, RRD_FLAGS reason) {
     RRD_FLAGS old = rrd_flag_set_deleted(rc, reason);
     if(old & RRD_FLAG_COLLECTED)
         __atomic_sub_fetch(&rc->rrdhost->collected.contexts_count, 1, __ATOMIC_RELAXED);
@@ -373,16 +375,16 @@ static inline void rrdcontext_set_deleted(RRDCONTEXT *rc, RRD_FLAGS reason) {
 
 bool rrdmetric_update_retention(RRDMETRIC *rm);
 
-static inline RRDMETRIC *rrdmetric_acquired_value(RRDMETRIC_ACQUIRED *rma) {
+static ALWAYS_INLINE RRDMETRIC *rrdmetric_acquired_value(RRDMETRIC_ACQUIRED *rma) {
     return dictionary_acquired_item_value((DICTIONARY_ITEM *)rma);
 }
 
-static inline RRDMETRIC_ACQUIRED *rrdmetric_acquired_dup(RRDMETRIC_ACQUIRED *rma) {
+static ALWAYS_INLINE RRDMETRIC_ACQUIRED *rrdmetric_acquired_dup(RRDMETRIC_ACQUIRED *rma) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
     return (RRDMETRIC_ACQUIRED *)dictionary_acquired_item_dup(rm->ri->rrdmetrics, (DICTIONARY_ITEM *)rma);
 }
 
-static inline void rrdmetric_release(RRDMETRIC_ACQUIRED *rma) {
+static ALWAYS_INLINE void rrdmetric_release(RRDMETRIC_ACQUIRED *rma) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
     dictionary_acquired_item_release(rm->ri->rrdmetrics, (DICTIONARY_ITEM *)rma);
 }
@@ -390,20 +392,21 @@ static inline void rrdmetric_release(RRDMETRIC_ACQUIRED *rma) {
 void rrdmetric_rrddim_is_freed(RRDDIM *rd);
 void rrdmetric_updated_rrddim_flags(RRDDIM *rd);
 void rrdmetric_collected_rrddim(RRDDIM *rd);
+void rrdmetric_not_collected_rrddim(RRDDIM *rd);
 
 // ----------------------------------------------------------------------------
 // helper one-liners for RRDINSTANCE
 
-static inline RRDINSTANCE *rrdinstance_acquired_value(RRDINSTANCE_ACQUIRED *ria) {
+static ALWAYS_INLINE RRDINSTANCE *rrdinstance_acquired_value(RRDINSTANCE_ACQUIRED *ria) {
     return dictionary_acquired_item_value((DICTIONARY_ITEM *)ria);
 }
 
-static inline RRDINSTANCE_ACQUIRED *rrdinstance_acquired_dup(RRDINSTANCE_ACQUIRED *ria) {
+static ALWAYS_INLINE RRDINSTANCE_ACQUIRED *rrdinstance_acquired_dup(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     return (RRDINSTANCE_ACQUIRED *)dictionary_acquired_item_dup(ri->rc->rrdinstances, (DICTIONARY_ITEM *)ria);
 }
 
-static inline void rrdinstance_release(RRDINSTANCE_ACQUIRED *ria) {
+static ALWAYS_INLINE void rrdinstance_release(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     dictionary_acquired_item_release(ri->rc->rrdinstances, (DICTIONARY_ITEM *)ria);
 }
@@ -415,22 +418,23 @@ void rrdinstance_updated_rrdset_name(RRDSET *st);
 void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, RRDSET *st);
 void rrdinstance_updated_rrdset_flags(RRDSET *st);
 void rrdinstance_collected_rrdset(RRDSET *st);
+void rrdinstance_rrdset_not_collected(RRDSET *st);
 
 void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function, RRD_FLAGS flags);
 
 // ----------------------------------------------------------------------------
 // helper one-liners for RRDCONTEXT
 
-static inline RRDCONTEXT *rrdcontext_acquired_value(RRDCONTEXT_ACQUIRED *rca) {
+static ALWAYS_INLINE RRDCONTEXT *rrdcontext_acquired_value(RRDCONTEXT_ACQUIRED *rca) {
     return dictionary_acquired_item_value((DICTIONARY_ITEM *)rca);
 }
 
-static inline RRDCONTEXT_ACQUIRED *rrdcontext_acquired_dup(RRDCONTEXT_ACQUIRED *rca) {
+static ALWAYS_INLINE RRDCONTEXT_ACQUIRED *rrdcontext_acquired_dup(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
     return (RRDCONTEXT_ACQUIRED *)dictionary_acquired_item_dup(rc->rrdhost->rrdctx.contexts, (DICTIONARY_ITEM *)rca);
 }
 
-static inline void rrdcontext_release(RRDCONTEXT_ACQUIRED *rca) {
+static ALWAYS_INLINE void rrdcontext_release(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
     dictionary_acquired_item_release(rc->rrdhost->rrdctx.contexts, (DICTIONARY_ITEM *)rca);
 }

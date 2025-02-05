@@ -3,8 +3,7 @@
 #ifndef ACLK_CAPAS_H
 #define ACLK_CAPAS_H
 
-#include "daemon/common.h"
-#include "libnetdata/libnetdata.h"
+#include "database/rrd.h"
 
 #include "schema-wrappers/capability.h"
 

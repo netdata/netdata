@@ -82,8 +82,8 @@ static ND_UUID claimed_id_load_from_file(void) {
 }
 
 static ND_UUID claimed_id_get_from_cloud_conf(void) {
-    if(appconfig_exists(&cloud_config, CONFIG_SECTION_GLOBAL, "claimed_id")) {
-        const char *claimed_id = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "claimed_id", "");
+    if(inicfg_exists(&cloud_config, CONFIG_SECTION_GLOBAL, "claimed_id")) {
+        const char *claimed_id = inicfg_get(&cloud_config, CONFIG_SECTION_GLOBAL, "claimed_id", "");
         if(claimed_id && *claimed_id)
             return claimed_id_parse(claimed_id, "cloud.conf");
     }

@@ -7,9 +7,9 @@
 extern "C" {
 #endif
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "web/api/queries/rrdr.h"
-#include "database/sqlite/sqlite_db_migration.h"
+#include "database/sqlite/vendored/sqlite3.h"
 
 bool ml_capable();
 bool ml_enabled(RRDHOST *rh);

@@ -2,7 +2,7 @@
 
 #include "rrddim-collection.h"
 
-void store_metric_collection_completed() {
+ALWAYS_INLINE void store_metric_collection_completed() {
     pulse_queries_rrdset_collection_completed(rrdset_done_statistics_points_stored_per_tier);
 }
 

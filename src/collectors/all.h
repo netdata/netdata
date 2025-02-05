@@ -3,7 +3,7 @@
 #ifndef NETDATA_ALL_H
 #define NETDATA_ALL_H 1
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 // netdata internal data collection plugins
 

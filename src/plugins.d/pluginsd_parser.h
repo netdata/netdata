@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGINSD_PARSER_H
 #define NETDATA_PLUGINSD_PARSER_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
 #include "streaming/stream-receiver-internals.h"

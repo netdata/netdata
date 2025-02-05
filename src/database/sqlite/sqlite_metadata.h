@@ -15,16 +15,6 @@ typedef enum event_log_type {
 } event_log_type_t;
 void get_agent_event_time_median_init(void);
 
-// return a node list
-struct node_instance_list {
-    nd_uuid_t  node_id;
-    nd_uuid_t  host_id;
-    char *hostname;
-    int live;
-    int queryable;
-    int hops;
-};
-
 typedef enum db_check_action_type {
     DB_CHECK_NONE          = (1 << 0),
     DB_CHECK_RECLAIM_SPACE = (1 << 1),
@@ -43,14 +33,12 @@ void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid);
 void metaqueue_ml_load_models(RRDDIM *rd);
 void detect_machine_guid_change(nd_uuid_t *host_uuid);
 void metadata_queue_load_host_context(RRDHOST *host);
-void metadata_delete_host_chart_labels(char *machine_guid);
 void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc);
 
 int sql_metadata_cache_stats(int op);
 
 int get_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
-int sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
-struct node_instance_list *get_node_list(void);
+void sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
 void sql_load_node_id(RRDHOST *host);
 
 // Help build archived hosts in memory when agent starts
@@ -72,6 +60,7 @@ void commit_alert_transitions(RRDHOST *host);
 void metadata_sync_shutdown_background(void);
 void metadata_sync_shutdown_background_wait(void);
 void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context);
+void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter);
 
 // UNIT TEST
 int metadata_unittest(void);

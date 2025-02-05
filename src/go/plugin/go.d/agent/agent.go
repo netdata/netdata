@@ -104,7 +104,7 @@ func serve(a *Agent) {
 	var exit bool
 
 	for {
-		module.ObsoleteCharts(false)
+		module.ObsoleteCharts(true)
 
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -116,7 +116,6 @@ func serve(a *Agent) {
 			switch sig {
 			case syscall.SIGHUP:
 				a.Infof("received %s signal (%d). Restarting running instance", sig, sig)
-				module.ObsoleteCharts(true)
 			default:
 				a.Infof("received %s signal (%d). Terminating...", sig, sig)
 				exit = true
@@ -124,6 +123,10 @@ func serve(a *Agent) {
 		case <-a.quitCh:
 			a.Infof("received QUIT command. Terminating...")
 			exit = true
+		}
+
+		if exit {
+			module.ObsoleteCharts(false)
 		}
 
 		cancel()

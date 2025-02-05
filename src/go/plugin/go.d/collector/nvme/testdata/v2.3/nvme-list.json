@@ -1,0 +1,30 @@
+{
+  "Devices": [
+    {
+      "NameSpace": 1,
+      "DevicePath": "/dev/nvme0n1",
+      "Firmware": "SU6SM001",
+      "Index": 0,
+      "ModelNumber": "Seagate FireCuda 530 ZP4000GM30023",
+      "ProductName": "Non-Volatile memory controller: Seagate Technology PLC Device 0x5018",
+      "SerialNumber": "XXX00YYY",
+      "UsedBytes": 4000787030016,
+      "MaximumLBA": 7814037168,
+      "PhysicalSize": 4000787030016,
+      "SectorSize": 512
+    },
+    {
+      "NameSpace": 1,
+      "DevicePath": "/dev/nvme1n1",
+      "Firmware": "SU6SM001",
+      "Index": 1,
+      "ModelNumber": "Seagate FireCuda 530 ZP4000GM30023",
+      "ProductName": "Non-Volatile memory controller: Seagate Technology PLC Device 0x5018",
+      "SerialNumber": "XXX01YYY",
+      "UsedBytes": 4000787030016,
+      "MaximumLBA": 7814037168,
+      "PhysicalSize": 4000787030016,
+      "SectorSize": 512
+    }
+  ]
+}

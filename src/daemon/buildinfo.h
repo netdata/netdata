@@ -7,6 +7,8 @@ void print_build_info(void);
 
 void print_build_info_json(void);
 
+void print_build_info_cmake_cache(void);
+
 char *get_value_from_key(char *buffer, char *key);
 
 void get_install_type(struct rrdhost_system_info *system_info);

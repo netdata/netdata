@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-        <url>
-                <loc>https://my-netdata.io/</loc>
-                <lastmod>2017-01-02</lastmod>
-                <changefreq>always</changefreq>
-        </url>
-</urlset>

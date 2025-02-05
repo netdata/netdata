@@ -761,8 +761,8 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
             continue;
 
         if (anomaly_score < (100 * Cfg.dimension_anomaly_score_threshold)) {
-            pulse_ml_models_consulted(models_consulted);
             spinlock_unlock(&dim->slock);
+            pulse_ml_models_consulted(models_consulted);
             return false;
         }
 

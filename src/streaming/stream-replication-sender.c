@@ -1736,16 +1736,16 @@ void *replication_thread_main(void *ptr) {
     if (threads < 1) threads = 1;
     else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
 
-    threads = config_get_number(CONFIG_SECTION_DB, "replication threads", threads);
+    threads = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "replication threads", threads);
     if(threads < 1) {
         netdata_log_error("replication threads given %zu is invalid, resetting to 1", threads);
         threads = 1;
-        config_set_number(CONFIG_SECTION_DB, "replication threads", threads);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "replication threads", threads);
     }
     else if(threads > MAX_REPLICATION_THREADS) {
         netdata_log_error("replication threads given %zu is invalid, resetting to %d", threads, (int)MAX_REPLICATION_THREADS);
         threads = MAX_REPLICATION_THREADS;
-        config_set_number(CONFIG_SECTION_DB, "replication threads", threads);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "replication threads", threads);
     }
 
     if(--threads) {

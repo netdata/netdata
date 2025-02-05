@@ -609,7 +609,7 @@ static inline PARSER_RC pluginsd_label(char **words, size_t num_words, PARSER *p
         parser->user.new_host_labels = rrdlabels_create();
 
     if (strcmp(name,HOST_LABEL_IS_EPHEMERAL) == 0) {
-        int is_ephemeral = appconfig_test_boolean_value((char *) value);
+        int is_ephemeral = inicfg_test_boolean_value((char *) value);
         RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_LABEL);
         if (host) {
             if (is_ephemeral)
@@ -698,7 +698,7 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
     return PARSER_RC_OK;
 }
 
-static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER *parser) {
+static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER *parser) {
     timing_init();
 
     int idx = 1;
@@ -838,7 +838,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     return PARSER_RC_OK;
 }
 
-static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *parser) {
+static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *parser) {
     timing_init();
 
     int idx = 1;
@@ -977,7 +977,7 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
     return PARSER_RC_OK;
 }
 
-static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
+static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     timing_init();
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_END_V2);
@@ -1229,7 +1229,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 
 #include "gperf-hashtable.h"
 
-PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words) {
+ALWAYS_INLINE PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words) {
     // put all the keywords ordered by the frequency they are used
 
     switch(keyword->id) {

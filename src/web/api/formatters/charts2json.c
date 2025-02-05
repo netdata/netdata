@@ -44,7 +44,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
     time_t now = now_realtime_sec();
 
     if(unlikely(!custom_dashboard_info_js_filename))
-        custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
+        custom_dashboard_info_js_filename = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 

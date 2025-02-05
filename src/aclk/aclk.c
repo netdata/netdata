@@ -851,7 +851,7 @@ void *aclk_main(void *ptr)
     size_t default_ssl_log_filename_size = strlen(netdata_configured_log_dir) + strlen(DEFAULT_SSKEYLOGFILE_NAME) + 2;
     char *default_ssl_log_filename = mallocz(default_ssl_log_filename_size);
     snprintfz(default_ssl_log_filename, default_ssl_log_filename_size, "%s/%s", netdata_configured_log_dir, DEFAULT_SSKEYLOGFILE_NAME);
-    ssl_log_filename = config_get(CONFIG_SECTION_CLOUD, "aclk ssl keylog file", default_ssl_log_filename);
+    ssl_log_filename = inicfg_get(&netdata_config, CONFIG_SECTION_CLOUD, "aclk ssl keylog file", default_ssl_log_filename);
     freez(default_ssl_log_filename);
     if (ssl_log_filename) {
         error_report("SSLKEYLOGFILE active (path:\"%s\")!", ssl_log_filename);
@@ -932,148 +932,94 @@ bool aclk_host_state_update_auto(RRDHOST *host) {
     return true;
 }
 
-void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
+void aclk_create_node_instance_job(RRDHOST *host)
 {
-    ND_UUID node_id;
+    if (unlikely(!host))
+        return;
 
+    CLAIM_ID claim_id = claim_id_get();
+    if (!claim_id_is_set(claim_id))
+        return;
+
+    aclk_query_t query = aclk_query_new(REGISTER_NODE);
+    int32_t hops =  rrdhost_ingestion_hops(host);
+    node_instance_creation_t node_instance_creation = {
+        .hops = hops,
+        .hostname = rrdhost_hostname(host),
+        .machine_guid = host->machine_guid,
+        .claim_id = claim_id.str
+    };
+
+    query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
+    query->data.bin_payload.msg_name = "CreateNodeInstance";
+    query->data.bin_payload.payload = generate_node_instance_creation(&query->data.bin_payload.size, &node_instance_creation);
+
+    nd_log_daemon(NDLP_DEBUG, "Queuing registration for host=%s, hops=%d", host->machine_guid, hops);
+
+    aclk_add_job(query);
+}
+
+void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable)
+{
+    if (unlikely(!host))
+        return;
+
+    CLAIM_ID claim_id = claim_id_get();
+    if (!claim_id_is_set(claim_id))
+        return;
+
+    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
+
+    int32_t hops = rrdhost_ingestion_hops(host);
+    node_instance_connection_t node_state_update = {
+        .claim_id = claim_id.str,
+        .hops = hops,
+        .live = live,
+        .queryable = queryable,
+        .session_id = aclk_session_newarch};
+
+    char node_id[UUID_STR_LEN];
+    uuid_unparse_lower(host->node_id.uuid, node_id);
+
+    node_state_update.node_id = node_id;
+    node_state_update.capabilities = aclk_get_node_instance_capas(host);
+
+    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
+    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
+    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
+
+    nd_log_daemon(
+        NDLP_DEBUG,
+        "Queuing status update for node=%s, live=%d, hops=%d, queryable=%d",
+        (char *)node_state_update.node_id,
+        live,
+        hops,
+        queryable);
+
+    freez((void *)node_state_update.capabilities);
+    aclk_add_job(query);
+}
+
+void aclk_host_state_update(RRDHOST *host, int live, int queryable)
+{
     if (!aclk_online())
         return;
 
-    if (!UUIDiszero(host->node_id)) {
-        node_id = host->node_id;
-    }
-    else {
-        int ret = get_node_id(&host->host_id.uuid, &node_id.uuid);
-        if (ret > 0) {
-            // this means we were not able to check if node_id already present
-            netdata_log_error("ACLK: Unable to check for node_id. Ignoring the host state update.");
-            return;
-        }
-        if (ret < 0) {
-            // node_id not found
-            aclk_query_t create_query;
-            create_query = aclk_query_new(REGISTER_NODE);
-            CLAIM_ID claim_id = claim_id_get();
-
-            node_instance_creation_t node_instance_creation = {
-                .claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL,
-                .hops = rrdhost_ingestion_hops(host),
-                .hostname = rrdhost_hostname(host),
-                .machine_guid = host->machine_guid};
-
-            create_query->data.bin_payload.payload =
-                generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-
-            create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
-            create_query->data.bin_payload.msg_name = "CreateNodeInstance";
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "Registering host=%s, hops=%d", host->machine_guid,
-                   rrdhost_ingestion_hops(host));
-
-            aclk_add_job(create_query);
-            return;
-        }
-    }
-
-    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-    node_instance_connection_t node_state_update = {
-        .hops = rrdhost_ingestion_hops(host),
-        .live = cmd,
-        .queryable = queryable,
-        .session_id = aclk_session_newarch
-    };
-    node_state_update.node_id = mallocz(UUID_STR_LEN);
-    uuid_unparse_lower(node_id.uuid, (char*)node_state_update.node_id);
-
-    node_state_update.capabilities = aclk_get_agent_capas();
-
-    CLAIM_ID claim_id = claim_id_get();
-    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
-    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "Queuing status update for node=%s, live=%d, hops=%d, queryable=%d",
-           (char*)node_state_update.node_id, cmd,
-           rrdhost_ingestion_hops(host), queryable);
-
-    freez((void*)node_state_update.node_id);
-    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
-    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-    aclk_add_job(query);
+    if (uuid_is_null(host->node_id.uuid))
+        aclk_create_node_instance_job(host);
+    else
+        aclk_update_node_instance_job(host, live, queryable);
 }
 
 void aclk_send_node_instances()
 {
-    struct node_instance_list *list_head = get_node_list();
-    struct node_instance_list *list = list_head;
-    if (unlikely(!list)) {
-        error_report("Failure to get_node_list from DB!");
-        return;
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host)
+    {
+        int live = rrdhost_ingestion_status(host) == RRDHOST_INGEST_STATUS_ONLINE ? 1 : 0;
+        aclk_host_state_update(host, live, 1);
     }
-    while (!uuid_is_null(list->host_id)) {
-        if (!uuid_is_null(list->node_id)) {
-            aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-            node_instance_connection_t node_state_update = {
-                .live = list->live,
-                .hops = list->hops,
-                .queryable = 1,
-                .session_id = aclk_session_newarch
-            };
-            node_state_update.node_id = mallocz(UUID_STR_LEN);
-            uuid_unparse_lower(list->node_id, (char*)node_state_update.node_id);
-
-            char host_id[UUID_STR_LEN];
-            uuid_unparse_lower(list->host_id, host_id);
-
-            RRDHOST *host = rrdhost_find_by_guid(host_id);
-            if (unlikely(!host)) {
-                freez((void*)node_state_update.node_id);
-                freez(query);
-                continue;
-            }
-            node_state_update.capabilities = aclk_get_node_instance_capas(host);
-
-            CLAIM_ID claim_id = claim_id_get();
-            node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
-            query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "Queuing status update for node=%s, live=%d, hops=%d, queryable=1",
-                   (char*)node_state_update.node_id, list->live, list->hops);
-
-            freez((void*)node_state_update.capabilities);
-            freez((void*)node_state_update.node_id);
-            query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
-            query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-            aclk_add_job(query);
-        } else {
-            aclk_query_t create_query;
-            create_query = aclk_query_new(REGISTER_NODE);
-            node_instance_creation_t node_instance_creation = {
-                .hops = list->hops,
-                .hostname = list->hostname,
-            };
-            node_instance_creation.machine_guid = mallocz(UUID_STR_LEN);
-            uuid_unparse_lower(list->host_id, (char*)node_instance_creation.machine_guid);
-            create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
-            create_query->data.bin_payload.msg_name = "CreateNodeInstance";
-
-            CLAIM_ID claim_id = claim_id_get();
-            node_instance_creation.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL,
-            create_query->data.bin_payload.payload = generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "Queuing registration for host=%s, hops=%d",
-                   (char*)node_instance_creation.machine_guid, list->hops);
-
-            freez((void *)node_instance_creation.machine_guid);
-            aclk_add_job(create_query);
-        }
-        freez(list->hostname);
-
-        list++;
-    }
-    freez(list_head);
+    dfe_done(host);
 }
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
