@@ -111,6 +111,7 @@ static void rrdmetric_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *rrdinstance __maybe_unused) {
     RRDMETRIC *rm     = old_value;
     RRDMETRIC *rm_new = new_value;
+    rm_new->ri = rm->ri;
 
     internal_error(rm->id != rm_new->id,
                    "RRDMETRIC: '%s' cannot change id to '%s'",
@@ -132,8 +133,8 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         time_t new_first_time_s = 0;
         time_t new_last_time_s = 0;
         if(rrdmetric_update_retention(rm_new)) {
-            new_first_time_s = rm->first_time_s;
-            new_last_time_s = rm->last_time_s;
+            new_first_time_s = rm_new->first_time_s;
+            new_last_time_s = rm_new->last_time_s;
         }
 
         internal_error(true,

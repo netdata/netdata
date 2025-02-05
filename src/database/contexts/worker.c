@@ -559,14 +559,15 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count)
                 eng->api.metric_retention_delete_by_id(host->db[tier].si, rm->uuid);
             }
 
-            if(!rrdmetric_update_retention(rm)) {
-                metrics_cleared++;
-                metrics_deleted++;
-            }
+            metrics_cleared++;
+            metrics_deleted++;
+            rrdmetric_update_retention(rm);
+            rrdmetric_trigger_updates(rm, __FUNCTION__ );
         }
         dfe_done(rm);
 
         if(metrics_cleared) {
+            rrdinstance_trigger_updates(ri, __FUNCTION__ );
             instances_deleted++;
 
             if(--count == 0)
@@ -579,12 +580,12 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count)
         char from_txt[128], to_txt[128];
 
         if(!from_s || from_s == LONG_MAX)
-            from_txt[0] = '\0';
+            snprintfz(from_txt, sizeof(from_txt), "%s", "NONE");
         else
             rfc3339_datetime_ut(from_txt, sizeof(from_txt), from_s * USEC_PER_SEC, 0, true);
 
         if(!to_s)
-            to_txt[0] = '\0';
+            snprintfz(to_txt, sizeof(to_txt), "%s", "NONE");
         else
             rfc3339_datetime_ut(to_txt, sizeof(to_txt), to_s * USEC_PER_SEC, 0, true);
 
@@ -644,13 +645,13 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                     if(unlikely(live_retention && !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION)))
                         live_retention = false;
 
-                    if(unlikely(rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION)))
-                        instances_no_tier0++;
-
                     if (unlikely(rrdinstance_should_be_deleted(ri))) {
                         instances_deleted++;
                         continue;
                     }
+
+                    if(unlikely(rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION)))
+                        instances_no_tier0++;
 
                     bool ri_collected = rrd_flag_is_collected(ri);
 
@@ -688,9 +689,16 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                 }
         dfe_done(ri);
 
-        if(instances_no_tier0 >= extreme_cardinality.instances_count &&
-            (100 * instances_no_tier0 / instances_active) > extreme_cardinality.active_vs_archived_percentage)
-            ret = rrdinstance_forcefully_clear_retention(rc, instances_no_tier0 - instances_active);
+        if(instances_no_tier0 >= extreme_cardinality.instances_count) {
+            size_t percent = (100 * instances_no_tier0 / instances_active);
+            if(percent >= extreme_cardinality.active_vs_archived_percentage) {
+                size_t to_keep = extreme_cardinality.active_vs_archived_percentage * instances_active / 100;
+                size_t to_remove = instances_no_tier0 > to_keep ? instances_no_tier0 - to_keep : 0;
+
+                if(to_remove)
+                    ret = rrdinstance_forcefully_clear_retention(rc, to_remove);
+            }
+        }
 
         if(min_priority_collected != LONG_MAX)
             // use the collected priority
