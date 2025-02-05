@@ -87,25 +87,25 @@ void stream_select_receiver_compression_algorithm(struct receiver_state *rpt) {
 }
 
 bool stream_compression_initialize(struct sender_state *s) {
-    stream_compressor_destroy(&s->compressor);
+    stream_compressor_destroy(&s->thread.compressor);
 
     // IMPORTANT
     // KEEP THE SAME ORDER IN DECOMPRESSION
 
     if(stream_has_capability(s, STREAM_CAP_ZSTD))
-        s->compressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
+        s->thread.compressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
     else if(stream_has_capability(s, STREAM_CAP_LZ4))
-        s->compressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
+        s->thread.compressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
     else if(stream_has_capability(s, STREAM_CAP_BROTLI))
-        s->compressor.algorithm = COMPRESSION_ALGORITHM_BROTLI;
+        s->thread.compressor.algorithm = COMPRESSION_ALGORITHM_BROTLI;
     else if(stream_has_capability(s, STREAM_CAP_GZIP))
-        s->compressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
+        s->thread.compressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
     else
-        s->compressor.algorithm = COMPRESSION_ALGORITHM_NONE;
+        s->thread.compressor.algorithm = COMPRESSION_ALGORITHM_NONE;
 
-    if(s->compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
-        s->compressor.level = stream_send.compression.levels[s->compressor.algorithm];
-        stream_compressor_init(&s->compressor);
+    if(s->thread.compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
+        s->thread.compressor.level = stream_send.compression.levels[s->thread.compressor.algorithm];
+        stream_compressor_init(&s->thread.compressor);
         return true;
     }
 
@@ -143,7 +143,7 @@ bool stream_decompression_initialize(struct receiver_state *rpt) {
 * deactivate compression by downgrading the stream protocol.
 */
 void stream_compression_deactivate(struct sender_state *s) {
-    switch(s->compressor.algorithm) {
+    switch(s->thread.compressor.algorithm) {
         case COMPRESSION_ALGORITHM_MAX:
         case COMPRESSION_ALGORITHM_NONE:
             netdata_log_error("STREAM_COMPRESSION: compression error on 'host:%s' without any compression enabled. Ignoring error.",

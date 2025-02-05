@@ -103,7 +103,7 @@ static __attribute__((destructor)) void clocks_fin(void) {
 #endif
 }
 
-inline time_t now_sec(clockid_t clk_id) {
+ALWAYS_INLINE time_t now_sec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
         netdata_log_error("clock_gettime(%ld, &timespec) failed.", (long int)clk_id);
@@ -112,7 +112,7 @@ inline time_t now_sec(clockid_t clk_id) {
     return ts.tv_sec;
 }
 
-inline usec_t now_usec(clockid_t clk_id) {
+ALWAYS_INLINE usec_t now_usec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
         netdata_log_error("clock_gettime(%ld, &timespec) failed.", (long int)clk_id);
@@ -121,7 +121,7 @@ inline usec_t now_usec(clockid_t clk_id) {
     return (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)(ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
 }
 
-inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
+ALWAYS_INLINE int now_timeval(clockid_t clk_id, struct timeval *tv) {
     struct timespec ts;
 
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
@@ -136,67 +136,67 @@ inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     return 0;
 }
 
-inline time_t now_realtime_sec(void) {
+ALWAYS_INLINE time_t now_realtime_sec(void) {
     return now_sec(CLOCK_REALTIME);
 }
 
-inline msec_t now_realtime_msec(void) {
+ALWAYS_INLINE msec_t now_realtime_msec(void) {
     return now_usec(CLOCK_REALTIME) / USEC_PER_MS;
 }
 
-inline usec_t now_realtime_usec(void) {
+ALWAYS_INLINE usec_t now_realtime_usec(void) {
     return now_usec(CLOCK_REALTIME);
 }
 
-inline int now_realtime_timeval(struct timeval *tv) {
+ALWAYS_INLINE int now_realtime_timeval(struct timeval *tv) {
     return now_timeval(CLOCK_REALTIME, tv);
 }
 
-inline time_t now_monotonic_sec(void) {
+ALWAYS_INLINE time_t now_monotonic_sec(void) {
     return now_sec(clock_monotonic_to_use);
 }
 
-inline usec_t now_monotonic_usec(void) {
+ALWAYS_INLINE usec_t now_monotonic_usec(void) {
     return now_usec(clock_monotonic_to_use);
 }
 
-inline int now_monotonic_timeval(struct timeval *tv) {
+ALWAYS_INLINE int now_monotonic_timeval(struct timeval *tv) {
     return now_timeval(clock_monotonic_to_use, tv);
 }
 
-inline time_t now_monotonic_high_precision_sec(void) {
+ALWAYS_INLINE time_t now_monotonic_high_precision_sec(void) {
     return now_sec(CLOCK_MONOTONIC);
 }
 
-inline usec_t now_monotonic_high_precision_usec(void) {
+ALWAYS_INLINE usec_t now_monotonic_high_precision_usec(void) {
     return now_usec(CLOCK_MONOTONIC);
 }
 
-inline int now_monotonic_high_precision_timeval(struct timeval *tv) {
+ALWAYS_INLINE int now_monotonic_high_precision_timeval(struct timeval *tv) {
     return now_timeval(CLOCK_MONOTONIC, tv);
 }
 
-inline time_t now_boottime_sec(void) {
+ALWAYS_INLINE time_t now_boottime_sec(void) {
     return now_sec(clock_boottime_to_use);
 }
 
-inline usec_t now_boottime_usec(void) {
+ALWAYS_INLINE usec_t now_boottime_usec(void) {
     return now_usec(clock_boottime_to_use);
 }
 
-inline int now_boottime_timeval(struct timeval *tv) {
+ALWAYS_INLINE int now_boottime_timeval(struct timeval *tv) {
     return now_timeval(clock_boottime_to_use, tv);
 }
 
-inline usec_t timeval_usec(struct timeval *tv) {
+ALWAYS_INLINE usec_t timeval_usec(struct timeval *tv) {
     return (usec_t)tv->tv_sec * USEC_PER_SEC + (tv->tv_usec % USEC_PER_SEC);
 }
 
-inline msec_t timeval_msec(struct timeval *tv) {
+ALWAYS_INLINE msec_t timeval_msec(struct timeval *tv) {
     return (msec_t)tv->tv_sec * MSEC_PER_SEC + ((tv->tv_usec % USEC_PER_SEC) / MSEC_PER_SEC);
 }
 
-inline susec_t dt_usec_signed(struct timeval *now, struct timeval *old) {
+ALWAYS_INLINE susec_t dt_usec_signed(struct timeval *now, struct timeval *old) {
     usec_t ts1 = timeval_usec(now);
     usec_t ts2 = timeval_usec(old);
 
@@ -204,7 +204,7 @@ inline susec_t dt_usec_signed(struct timeval *now, struct timeval *old) {
     return -((susec_t)(ts2 - ts1));
 }
 
-inline usec_t dt_usec(struct timeval *now, struct timeval *old) {
+ALWAYS_INLINE usec_t dt_usec(struct timeval *now, struct timeval *old) {
     usec_t ts1 = timeval_usec(now);
     usec_t ts2 = timeval_usec(old);
     return (ts1 > ts2) ? (ts1 - ts2) : (ts2 - ts1);

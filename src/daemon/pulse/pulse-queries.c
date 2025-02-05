@@ -32,22 +32,22 @@ static struct query_statistics {
     PAD64(uint64_t) exporters_db_points_read;
 } query_statistics = { 0 };
 
-void pulse_queries_ml_query_completed(size_t points_read) {
+ALWAYS_INLINE void pulse_queries_ml_query_completed(size_t points_read) {
     __atomic_fetch_add(&query_statistics.ml_queries_made, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&query_statistics.ml_db_points_read, points_read, __ATOMIC_RELAXED);
 }
 
-void pulse_queries_exporters_query_completed(size_t points_read) {
+ALWAYS_INLINE void pulse_queries_exporters_query_completed(size_t points_read) {
     __atomic_fetch_add(&query_statistics.exporters_queries_made, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&query_statistics.exporters_db_points_read, points_read, __ATOMIC_RELAXED);
 }
 
-void pulse_queries_backfill_query_completed(size_t points_read) {
+ALWAYS_INLINE void pulse_queries_backfill_query_completed(size_t points_read) {
     __atomic_fetch_add(&query_statistics.backfill_queries_made, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&query_statistics.backfill_db_points_read, points_read, __ATOMIC_RELAXED);
 }
 
-void pulse_queries_rrdr_query_completed(size_t queries, uint64_t db_points_read, uint64_t result_points_generated, QUERY_SOURCE query_source) {
+ALWAYS_INLINE void pulse_queries_rrdr_query_completed(size_t queries, uint64_t db_points_read, uint64_t result_points_generated, QUERY_SOURCE query_source) {
     switch(query_source) {
         case QUERY_SOURCE_API_DATA:
             __atomic_fetch_add(&query_statistics.api_data_queries_made, queries, __ATOMIC_RELAXED);

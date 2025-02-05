@@ -20,6 +20,8 @@ bool replicate_chart_request(send_command callback, struct parser *parser,
                              time_t child_first_entry, time_t child_last_entry, time_t child_wall_clock_time,
                              time_t response_first_start_time, time_t response_last_end_time);
 
+bool stream_parse_enable_streaming(const char *start_streaming_txt);
+
 #ifdef __cplusplus
 }
 #endif

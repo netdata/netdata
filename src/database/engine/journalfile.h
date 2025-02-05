@@ -141,7 +141,7 @@ struct wal;
 void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 void journalfile_v2_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafile *datafile);
-void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, struct wal *wal, uv_loop_t *loop);
+void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, struct wal *wal);
 int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_unlink(struct rrdengine_journalfile *journalfile);
 int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);

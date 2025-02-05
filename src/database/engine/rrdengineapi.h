@@ -137,7 +137,7 @@ struct time_and_count {
     usec_t usec;
 };
 
-static inline void time_and_count_add(struct time_and_count *tc, usec_t dt) {
+static ALWAYS_INLINE void time_and_count_add(struct time_and_count *tc, usec_t dt) {
     __atomic_add_fetch(&tc->count, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&tc->usec, dt, __ATOMIC_RELAXED);
 }

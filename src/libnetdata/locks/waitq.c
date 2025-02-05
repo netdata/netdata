@@ -7,24 +7,24 @@
 #define PRIORITY_SHIFT 32
 #define NO_PRIORITY 0
 
-static inline uint64_t make_order(WAITQ_PRIORITY priority, uint64_t seqno) {
+static ALWAYS_INLINE uint64_t make_order(WAITQ_PRIORITY priority, uint64_t seqno) {
     return ((uint64_t)priority << PRIORITY_SHIFT) + seqno;
 }
 
-static inline uint64_t get_our_order(WAITQ *waitq, WAITQ_PRIORITY priority) {
+static ALWAYS_INLINE uint64_t get_our_order(WAITQ *waitq, WAITQ_PRIORITY priority) {
     uint64_t seqno = __atomic_add_fetch(&waitq->last_seqno, 1, __ATOMIC_RELAXED);
     return make_order(priority, seqno);
 }
 
-void waitq_init(WAITQ *waitq) {
+ALWAYS_INLINE void waitq_init(WAITQ *waitq) {
     spinlock_init(&waitq->spinlock);
     waitq->current_priority = 0;
     waitq->last_seqno = 0;
 }
 
-void waitq_destroy(WAITQ *wq __maybe_unused) { ; }
+ALWAYS_INLINE void waitq_destroy(WAITQ *wq __maybe_unused) { ; }
 
-static inline bool write_our_priority(WAITQ *waitq, uint64_t our_order) {
+static ALWAYS_INLINE bool write_our_priority(WAITQ *waitq, uint64_t our_order) {
     uint64_t current = __atomic_load_n(&waitq->current_priority, __ATOMIC_RELAXED);
     if(current == our_order) return true;
 
@@ -44,7 +44,7 @@ static inline bool write_our_priority(WAITQ *waitq, uint64_t our_order) {
     return true;
 }
 
-static inline bool clear_our_priority(WAITQ *waitq, uint64_t our_order) {
+static ALWAYS_INLINE bool clear_our_priority(WAITQ *waitq, uint64_t our_order) {
     uint64_t expected = our_order;
 
     return
@@ -57,7 +57,7 @@ static inline bool clear_our_priority(WAITQ *waitq, uint64_t our_order) {
             __ATOMIC_RELAXED);
 }
 
-bool waitq_try_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const char *func __maybe_unused) {
+ALWAYS_INLINE bool waitq_try_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const char *func __maybe_unused) {
     uint64_t our_order = get_our_order(waitq, priority);
 
     bool rc = write_our_priority(waitq, our_order) && spinlock_trylock(&waitq->spinlock);
@@ -69,7 +69,7 @@ bool waitq_try_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const c
     return rc;
 }
 
-void waitq_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const char *func) {
+ALWAYS_INLINE void waitq_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const char *func) {
     uint64_t our_order = get_our_order(waitq, priority);
 
     size_t spins = 0;
@@ -93,7 +93,7 @@ void waitq_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const char 
     }
 }
 
-void waitq_release(WAITQ *waitq) {
+ALWAYS_INLINE void waitq_release(WAITQ *waitq) {
     spinlock_unlock(&waitq->spinlock);
 }
 

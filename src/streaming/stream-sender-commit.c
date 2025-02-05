@@ -108,7 +108,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     // if there are data already in the buffer, we don't need to send an opcode
     bool enable_sending = stats->bytes_outstanding == 0;
 
-    if (s->compressor.initialized) {
+    if (s->thread.compressor.initialized) {
         // compressed traffic
         if(rrdhost_is_this_a_stream_thread(s->host))
             worker_is_busy(WORKER_STREAM_JOB_COMPRESS);
@@ -138,14 +138,14 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             }
 
             const char *dst;
-            size_t dst_len = stream_compress(&s->compressor, src, size_to_compress, &dst);
+            size_t dst_len = stream_compress(&s->thread.compressor, src, size_to_compress, &dst);
             if (!dst_len) {
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                     "STREAM SND '%s' [to %s]: COMPRESSION failed. Resetting compressor and re-trying",
                     rrdhost_hostname(s->host), s->remote_ip);
 
                 stream_compression_initialize(s);
-                dst_len = stream_compress(&s->compressor, src, size_to_compress, &dst);
+                dst_len = stream_compress(&s->thread.compressor, src, size_to_compress, &dst);
                 if (!dst_len)
                     goto compression_failed_with_lock;
             }

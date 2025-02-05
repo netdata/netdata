@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 // fill the gap of a tier
 
-bool backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
+NOT_INLINE_HOT bool backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
     if(unlikely(tier >= nd_profile.storage_tiers)) return false;
 #ifdef ENABLE_DBENGINE
     if(default_backfill == RRD_BACKFILL_NONE) return false;

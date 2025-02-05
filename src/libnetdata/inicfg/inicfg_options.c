@@ -46,6 +46,7 @@ void inicfg_option_free(struct config_option *opt) {
     freez(opt);
 }
 
+NEVERNULL
 struct config_option *inicfg_option_create(struct config_section *sect, const char *name, const char *value) {
     struct config_option *opt = callocz(1, sizeof(struct config_option));
     opt->name = string_strdupz(name);
@@ -123,8 +124,10 @@ void inicfg_get_raw_value_of_option(struct config_option *opt, const char *defau
         }
     }
 
-    if(!opt->value_default)
+    if(!(opt->flags & CONFIG_VALUE_DEFAULT_SET)) {
+        opt->flags |= CONFIG_VALUE_DEFAULT_SET;
         opt->value_default = string_strdupz(default_value);
+    }
 }
 
 struct config_option *inicfg_get_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb) {
@@ -134,7 +137,6 @@ struct config_option *inicfg_get_raw_value_of_option_in_section(struct config_se
     if (!opt) {
         if (!default_value) return NULL;
         opt = inicfg_option_create(sect, option, default_value);
-        if (!opt) return NULL;
     }
 
     inicfg_get_raw_value_of_option(opt, default_value, type, cb);

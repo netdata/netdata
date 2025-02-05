@@ -385,7 +385,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
     time_t first_entry_child = (time_t) str2ull_encoded(first_entry_child_txt);
     time_t last_entry_child = (time_t) str2ull_encoded(last_entry_child_txt);
 
-    bool start_streaming = (strcmp(start_streaming_txt, "true") == 0);
+    bool start_streaming = stream_parse_enable_streaming(start_streaming_txt);
     time_t first_entry_requested = (time_t) str2ull_encoded(first_entry_requested_txt);
     time_t last_entry_requested = (time_t) str2ull_encoded(last_entry_requested_txt);
 

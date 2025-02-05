@@ -40,7 +40,8 @@ typedef int32_t REFCOUNT;
     ((refcount) >= REFCOUNT_DELETED && (refcount) <= -REFCOUNT_MAX))
 
 // returns the non-usable refcount found when it fails, the final refcount when it succeeds
-static ALWAYS_INLINE REFCOUNT WARNUNUSED refcount_acquire_advanced_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
+ALWAYS_INLINE WARNUNUSED
+static REFCOUNT refcount_acquire_advanced_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
     REFCOUNT expected = refcount_references(refcount);
     REFCOUNT desired;
 
@@ -60,12 +61,14 @@ static ALWAYS_INLINE REFCOUNT WARNUNUSED refcount_acquire_advanced_with_trace(RE
     return desired;
 }
 
-static ALWAYS_INLINE bool WARNUNUSED refcount_acquire_with_trace(REFCOUNT *refcount, const char *func) {
+ALWAYS_INLINE WARNUNUSED
+static bool refcount_acquire_with_trace(REFCOUNT *refcount, const char *func) {
     return REFCOUNT_ACQUIRED(refcount_acquire_advanced_with_trace(refcount, func));
 }
 
 // returns the number of references remaining
-static ALWAYS_INLINE REFCOUNT refcount_release_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
+ALWAYS_INLINE
+static REFCOUNT refcount_release_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
     REFCOUNT expected, desired;
 
     do {
@@ -84,7 +87,8 @@ static ALWAYS_INLINE REFCOUNT refcount_release_with_trace(REFCOUNT *refcount, co
 }
 
 // returns true when the item can be deleted, false when the item is currently referenced
-static ALWAYS_INLINE bool WARNUNUSED refcount_acquire_for_deletion_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
+ALWAYS_INLINE WARNUNUSED
+static bool refcount_acquire_for_deletion_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
     REFCOUNT expected = 0;
     REFCOUNT desired = REFCOUNT_DELETED;
 
@@ -97,7 +101,8 @@ static ALWAYS_INLINE bool WARNUNUSED refcount_acquire_for_deletion_with_trace(RE
     return false;
 }
 
-static ALWAYS_INLINE bool WARNUNUSED refcount_release_and_acquire_for_deletion_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
+ALWAYS_INLINE WARNUNUSED
+static REFCOUNT refcount_release_and_acquire_for_deletion_advanced_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
     REFCOUNT expected, desired;
 
     do {
@@ -109,21 +114,27 @@ static ALWAYS_INLINE bool WARNUNUSED refcount_release_and_acquire_for_deletion_w
             // we can get it for deletion
             desired = REFCOUNT_DELETED;
             if (__atomic_compare_exchange_n(refcount, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
-                return true;
+                return desired;
         }
         else {
             // we can only release it
             desired = expected - 1;
             if (__atomic_compare_exchange_n(refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED))
-                return false;
+                return desired;
         }
     } while (true);
+}
+
+ALWAYS_INLINE WARNUNUSED
+static bool refcount_release_and_acquire_for_deletion_with_trace(REFCOUNT *refcount, const char *func __maybe_unused) {
+    return refcount_release_and_acquire_for_deletion_advanced_with_trace(refcount, func) == REFCOUNT_DELETED;
 }
 
 // this sleeps for 1 nanosecond (posix systems), or Sleep(0) on Windows
 void tinysleep(void);
 
-static ALWAYS_INLINE bool refcount_acquire_for_deletion_and_wait_with_trace(REFCOUNT *refcount, const char *func) {
+ALWAYS_INLINE
+static bool refcount_acquire_for_deletion_and_wait_with_trace(REFCOUNT *refcount, const char *func) {
     REFCOUNT expected = refcount_references(refcount);
     REFCOUNT desired;
 
@@ -149,6 +160,7 @@ static ALWAYS_INLINE bool refcount_acquire_for_deletion_and_wait_with_trace(REFC
 #define refcount_release(refcount) refcount_release_with_trace(refcount, __FUNCTION__)
 #define refcount_acquire_for_deletion(refcount) refcount_acquire_for_deletion_with_trace(refcount, __FUNCTION__)
 #define refcount_release_and_acquire_for_deletion(refcount) refcount_release_and_acquire_for_deletion_with_trace(refcount, __FUNCTION__)
+#define refcount_release_and_acquire_for_deletion_advanced(refcount) refcount_release_and_acquire_for_deletion_advanced_with_trace(refcount, __FUNCTION__)
 #define refcount_acquire_for_deletion_and_wait(refcount) refcount_acquire_for_deletion_and_wait_with_trace(refcount, __FUNCTION__)
 
 #endif //NETDATA_REFCOUNT_H

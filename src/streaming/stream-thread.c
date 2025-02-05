@@ -337,6 +337,7 @@ static void stream_thread_messages_resize(struct stream_thread *sth) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+ALWAYS_INLINE_HOT_FLATTEN
 static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_result_t *ev, usec_t now_ut, size_t *replay_entries) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
@@ -520,9 +521,8 @@ void *stream_thread(void *ptr) {
 
     rrd_collector_started();
 
+    usec_t now_ut = now_monotonic_usec();
     while(!exit_thread && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
-        usec_t now_ut = now_monotonic_usec();
-
         if(now_ut - last_dequeue_ut >= 100 * USEC_PER_MS) {
             last_dequeue_ut = now_ut;
 
@@ -541,6 +541,8 @@ void *stream_thread(void *ptr) {
             receivers_waiting = sth->queue.receivers_waiting;
             spinlock_unlock(&sth->queue.spinlock);
 
+            // process any opcodes waiting
+            stream_thread_process_opcodes(sth, NULL);
 
             if(now_ut - last_check_all_nodes_ut >= nd_profile.update_every * USEC_PER_SEC) {
                 last_check_all_nodes_ut = now_ut;
@@ -583,9 +585,11 @@ void *stream_thread(void *ptr) {
 
         worker_is_busy(WORKER_STREAM_JOB_PREP);
 
-        if (poll_rc == 0)
+        if (unlikely(poll_rc == 0)) {
             // nd_poll() timed out - just loop again
+            now_ut = now_monotonic_usec();
             continue;
+        }
 
         if(unlikely(poll_rc == -1)) {
             // nd_poll() returned an error
@@ -593,19 +597,23 @@ void *stream_thread(void *ptr) {
             worker_is_busy(WORKER_STREAM_JOB_POLL_ERROR);
             nd_log_limit_static_thread_var(erl, 1, 1 * USEC_PER_MS);
             nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu] nd_poll() returned error", sth->id);
+            now_ut = now_monotonic_usec();
             continue;
         }
 
-        if(nd_thread_signaled_to_cancel() || !service_running(SERVICE_STREAMING))
+        if(unlikely(nd_thread_signaled_to_cancel() || !service_running(SERVICE_STREAMING)))
             break;
 
         // nd_poll() may have received events for a socket we have already removed
         // so, if we don't find it in our meta index, do not access it - it has been removed
-        if(META_GET(&sth->run.meta, (Word_t)ev.data) != ev.data)
+        if(unlikely(META_GET(&sth->run.meta, (Word_t)ev.data) != ev.data)) {
+            now_ut = now_monotonic_usec();
             continue;
+        }
 
         now_ut = now_monotonic_usec();
         exit_thread = stream_thread_process_poll_slot(sth, &ev, now_ut, &replay_entries);
+        now_ut = now_monotonic_usec();
     }
 
     // dequeue
