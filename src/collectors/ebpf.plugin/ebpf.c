@@ -27,7 +27,8 @@ int isrh = 0;
 int main_thread_id = 0;
 int process_pid_fd = -1;
 uint64_t collect_pids = 0;
-uint32_t integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
+static uint32_t integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
+ND_THREAD *socket_ipc = NULL;
 static size_t global_iterations_counter = 1;
 bool publish_internal_metrics = true;
 
@@ -983,6 +984,7 @@ static void ebpf_exit()
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_integration_cleanup_shm();
 
     exit(0);
 }
@@ -4173,6 +4175,29 @@ static pid_t ebpf_read_previous_pid(char *filename)
 }
 
 /**
+ * Initialize Data Sharing
+ *
+ * Start sharing according to user configuration.
+ */
+static void ebpf_initialize_data_sharing()
+{
+    switch (integration_with_collectors) {
+        case NETDATA_EBPF_INTEGRATION_SOCKET: {
+            socket_ipc = nd_thread_create("ebpf_socket_ipc",
+                                          NETDATA_THREAD_OPTION_DEFAULT,
+                                          ebpf_socket_thread_ipc,
+                                          NULL);
+            break;
+        }
+        case NETDATA_EBPF_INTEGRATION_SHM:
+            netdata_integration_initialize_shm();
+        case NETDATA_EBPF_INTEGRATION_DISABLED:
+        default:
+            break;
+    }
+}
+
+/**
  * Kill previous process
  *
  * Kill previous process whether it was not closed.
@@ -4303,6 +4328,8 @@ int main(int argc, char **argv)
 
     cgroup_integration_thread.thread =
         nd_thread_create(cgroup_integration_thread.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_cgroup_integration, NULL);
+
+    ebpf_initialize_data_sharing();
 
     uint32_t i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {

@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ebpf-ipc.h"
-#include "libnetdata/libnetdata.h"
-
-#if defined(OS_LINUX)
 
 netdata_ebpf_pid_stats_t *integration_shm;
 int shm_fd_ebpf_integration = -1;
@@ -62,5 +59,3 @@ int netdata_integration_initialize_shm()
 end_shm:
     return -1;
 }
-
-#endif // defined(OS_LINUX)
