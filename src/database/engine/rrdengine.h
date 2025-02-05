@@ -248,7 +248,6 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_QUERY,
     RRDENG_OPCODE_EXTENT_WRITE,
     RRDENG_OPCODE_EXTENT_READ,
-    RRDENG_OPCODE_FLUSHED_TO_OPEN,
     RRDENG_OPCODE_DATABASE_ROTATE,
     RRDENG_OPCODE_JOURNAL_INDEX,
     RRDENG_OPCODE_FLUSH_MAIN,
@@ -269,10 +268,10 @@ enum rrdeng_opcode {
 // RRDENG_MAX_OPCODE + opcode            : reserved for the callbacks of each opcode
 // RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE : reserved for the timer
 #define RRDENG_TIMER_CB (RRDENG_OPCODE_MAX + RRDENG_OPCODE_MAX)
-#define RRDENG_FLUSH_TRANSACTION_BUFFER_CB (RRDENG_TIMER_CB + 1)
-#define RRDENG_OPCODES_WAITING             (RRDENG_TIMER_CB + 2)
-#define RRDENG_WORKS_DISPATCHED            (RRDENG_TIMER_CB + 3)
-#define RRDENG_WORKS_EXECUTING             (RRDENG_TIMER_CB + 4)
+#define RRDENG_OPCODES_WAITING             (RRDENG_TIMER_CB + 1)
+#define RRDENG_WORKS_DISPATCHED            (RRDENG_TIMER_CB + 2)
+#define RRDENG_WORKS_EXECUTING             (RRDENG_TIMER_CB + 3)
+#define RRDENG_RETENTION_TIMER_CB          (RRDENG_TIMER_CB + 4)
 
 struct extent_io_data {
     unsigned fileno;
@@ -291,7 +290,6 @@ struct extent_io_descriptor {
     struct wal *wal;
     uint64_t pos;
     unsigned bytes;
-    struct completion *completion;
     unsigned descr_count;
     struct page_descr_with_data *descr_array[MAX_PAGES_PER_EXTENT];
     struct rrdengine_datafile *datafile;
@@ -306,7 +304,6 @@ struct generic_io_descriptor {
     void *data;
     uint64_t pos;
     unsigned bytes;
-    struct completion *completion;
 };
 
 typedef struct wal {

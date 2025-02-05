@@ -1,34 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-static void after_extent_write_journalfile_v1_io(uv_fs_t* req)
-{
-    worker_is_busy(RRDENG_FLUSH_TRANSACTION_BUFFER_CB);
-
-    WAL *wal = req->data;
-    struct generic_io_descriptor *io_descr = &wal->io_descr;
-    struct rrdengine_instance *ctx = io_descr->ctx;
-
-    netdata_log_debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
-    if (req->result < 0) {
-        ctx_io_error(ctx);
-        netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
-    } else {
-        netdata_log_debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
-    }
-
-    uv_fs_req_cleanup(req);
-    wal_release(wal);
-
-    __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
-
-    worker_is_idle();
-}
-
 /* Careful to always call this before creating a new journal file */
-void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, WAL *wal, uv_loop_t *loop)
+void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, WAL *wal)
 {
-    int ret;
     struct generic_io_descriptor *io_descr;
     struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
@@ -48,12 +23,35 @@ void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengin
 
     io_descr->req.data = wal;
     io_descr->data = journalfile;
-    io_descr->completion = NULL;
 
     io_descr->iov = uv_buf_init((void *)io_descr->buf, wal->buf_size);
-    ret = uv_fs_write(loop, &io_descr->req, journalfile->file, &io_descr->iov, 1,
-                      (int64_t)io_descr->pos, after_extent_write_journalfile_v1_io);
-    fatal_assert(-1 != ret);
+
+    int retries = 10;
+    int ret = -1;
+    while (ret == -1 && --retries) {
+        ret = uv_fs_write(NULL, &io_descr->req, journalfile->file, &io_descr->iov, 1, (int64_t)io_descr->pos, NULL);
+        if (ret == -1)
+            sleep_usec(300 * USEC_PER_MS);
+    }
+
+    bool jf_write_error = (ret == -1 || io_descr->req.result < 0);
+
+    if (unlikely(jf_write_error)) {
+        ctx_io_error(ctx);
+        if (ret == -1)
+            netdata_log_error(
+                "DBENGINE: %s: uv_fs_write: failed to store metadata in journalfile %u, offset %ld",
+                __func__,
+                datafile->fileno,
+                (int64_t)io_descr->pos);
+        else
+            netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)io_descr->req.result));
+    }
+
+    uv_fs_req_cleanup(&io_descr->req);
+    wal_release(wal);
+    __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+    worker_is_idle();
 
     ctx_current_disk_space_increase(ctx, wal->buf_size);
     ctx_io_write_op_bytes(ctx, wal->buf_size);
@@ -534,13 +532,13 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path));
 
     if (journalfile->file) {
-    ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-        (void) close_uv_file(datafile, journalfile->file);
+        ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
+        if (ret < 0) {
+            netdata_log_error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
+            ctx_fs_error(ctx);
+        }
+        uv_fs_req_cleanup(&req);
+        (void)close_uv_file(datafile, journalfile->file);
     }
 
     // This is the new journal v2 index file
