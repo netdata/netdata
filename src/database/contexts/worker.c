@@ -187,17 +187,12 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
             rrd_flag_set(rm, RRD_FLAG_NO_TIER0_RETENTION);
     }
 
-    if((min_first_time_t == LONG_MAX || min_first_time_t == 0) && max_last_time_t == 0)
-        return false;
-
     if(min_first_time_t == LONG_MAX)
         min_first_time_t = 0;
 
     if(min_first_time_t > max_last_time_t) {
         internal_error(true, "RRDMETRIC: retention of '%s' is flipped, first_time_t = %ld, last_time_t = %ld", string2str(rm->id), min_first_time_t, max_last_time_t);
-        time_t tmp = min_first_time_t;
-        min_first_time_t = max_last_time_t;
-        max_last_time_t = tmp;
+        SWAP(min_first_time_t, max_last_time_t);
     }
 
     // check if retention changed
@@ -551,6 +546,8 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count)
             if(!rrd_flag_check(rm, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(rm) || rm->rrddim)
                 continue;
 
+            rrdmetric_update_retention(rm);
+
             if(rm->first_time_s < from_s)
                 from_s = rm->first_time_s;
 
@@ -562,8 +559,10 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count)
                 eng->api.metric_retention_delete_by_id(host->db[tier].si, rm->uuid);
             }
 
-            metrics_cleared++;
-            metrics_deleted++;
+            if(!rrdmetric_update_retention(rm)) {
+                metrics_cleared++;
+                metrics_deleted++;
+            }
         }
         dfe_done(rm);
 
@@ -690,7 +689,6 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
         dfe_done(ri);
 
         if(instances_no_tier0 >= extreme_cardinality.instances_count &&
-            instances_no_tier0 > instances_active &&
             (100 * instances_no_tier0 / instances_active) > extreme_cardinality.active_vs_archived_percentage)
             ret = rrdinstance_forcefully_clear_retention(rc, instances_no_tier0 - instances_active);
 

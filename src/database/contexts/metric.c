@@ -131,7 +131,7 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 
         time_t new_first_time_s = 0;
         time_t new_last_time_s = 0;
-        if(rrdmetric_update_retention(rm)) {
+        if(rrdmetric_update_retention(rm_new)) {
             new_first_time_s = rm->first_time_s;
             new_last_time_s = rm->last_time_s;
         }
