@@ -146,7 +146,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions));
 
         rrddim_set_by_pointer(st_memory, rd_replication,
-                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_sender_allocated_memory());
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + replication_sender_allocated_memory());
 #else
         uint64_t metadata =
             aral_by_size_used_bytes() +

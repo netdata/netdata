@@ -177,6 +177,8 @@ const char *inicfg_get(struct config *root, const char *section, const char *nam
 const char *inicfg_set(struct config *root, const char *section, const char *name, const char *value);
 
 long long inicfg_get_number(struct config *root, const char *section, const char *name, long long value);
+long long inicfg_get_number_range(struct config *root, const char *section, const char *name, long long value, long long min, long long max);
+
 long long inicfg_set_number(struct config *root, const char *section, const char *name, long long value);
 NETDATA_DOUBLE inicfg_get_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
 NETDATA_DOUBLE inicfg_set_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);

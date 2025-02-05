@@ -6,7 +6,7 @@
 #include "daemon/common.h"
 
 #if defined(PULSE_INTERNALS)
-extern size_t pulse_dbengine_total_memory;
+extern int64_t pulse_dbengine_total_memory;
 
 #if defined(ENABLE_DBENGINE)
 void pulse_dbengine_do(bool extended);

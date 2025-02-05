@@ -5,7 +5,8 @@
 const char *inicfg_get(struct config *root, const char *section, const char *name, const char *default_value) {
     struct config_option *opt = inicfg_get_raw_value(root, section, name, default_value, CONFIG_VALUE_TYPE_TEXT, NULL);
     if(!opt)
-        return default_value;
+        // the only way for opt to be NULL, is default_value to be NULL too
+        return NULL;
 
     return string2str(opt->value);
 }
@@ -216,6 +217,28 @@ long long inicfg_get_number(struct config *root, const char *section, const char
 
     const char *s = string2str(opt->value);
     return strtoll(s, NULL, 0);
+}
+
+long long inicfg_get_number_range(struct config *root, const char *section, const char *name, long long value, long long min, long long max) {
+    char buffer[100];
+    sprintf(buffer, "%lld", value);
+
+    struct config_option *opt = inicfg_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_INTEGER, NULL);
+    if(!opt) return value;
+
+    const char *s = string2str(opt->value);
+    long long rc = strtoll(s, NULL, 0);
+    long long rc2 = FIT_IN_RANGE(rc, min, max);
+
+    if(rc != rc2) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "CONFIG: out of range [%s].%s = %lld. Acceptable values: %lld to %lld inclusive. Setting it to %lld",
+               section, name, rc, min, max, rc2);
+
+        rc = rc2;
+        inicfg_set_number(root, section, name, rc);
+    }
+
+    return rc;
 }
 
 NETDATA_DOUBLE inicfg_get_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value) {

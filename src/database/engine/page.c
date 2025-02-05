@@ -442,7 +442,7 @@ ALWAYS_INLINE void dbengine_extent_free(void *extent, size_t size) {
 // ----------------------------------------------------------------------------
 // management api
 
-PGD *pgd_create(uint8_t type, uint32_t slots) {
+ALWAYS_INLINE PGD *pgd_create(uint8_t type, uint32_t slots) {
 
     PGD *pg = pgd_alloc(true); // this is malloc'd !
     pg->type = type;
@@ -493,7 +493,7 @@ PGD *pgd_create(uint8_t type, uint32_t slots) {
     return pg;
 }
 
-PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
+ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
 
     if (!size || size < page_type_size[type])
         return PGD_EMPTY;
@@ -714,7 +714,7 @@ ALWAYS_INLINE uint32_t pgd_capacity(PGD *pg) {
 }
 
 // return the overall memory footprint of the page, including all its structures and overheads
-uint32_t pgd_memory_footprint(PGD *pg)
+ALWAYS_INLINE uint32_t pgd_memory_footprint(PGD *pg)
 {
     if (!pg)
         return 0;
@@ -884,15 +884,17 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
 // data collection
 
 // returns additional memory that may have been allocated to store this point
-ALWAYS_INLINE size_t pgd_append_point(PGD *pg,
-                      usec_t point_in_time_ut __maybe_unused,
-                      NETDATA_DOUBLE n,
-                      NETDATA_DOUBLE min_value,
-                      NETDATA_DOUBLE max_value,
-                      uint16_t count,
-                      uint16_t anomaly_count,
-                      SN_FLAGS flags,
-                      uint32_t expected_slot)
+ALWAYS_INLINE_HOT_FLATTEN
+size_t pgd_append_point(
+    PGD *pg,
+    usec_t point_in_time_ut __maybe_unused,
+    NETDATA_DOUBLE n,
+    NETDATA_DOUBLE min_value,
+    NETDATA_DOUBLE max_value,
+    uint16_t count,
+    uint16_t anomaly_count,
+    SN_FLAGS flags,
+    uint32_t expected_slot)
 {
     if (pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING)
         pgd_fatal(pg, "Data collection on page already scheduled for flushing");
@@ -1037,7 +1039,8 @@ void pgdc_reset(PGDC *pgdc, PGD *pgd, uint32_t position)
     pgdc_seek(pgdc, position);
 }
 
-ALWAYS_INLINE bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, STORAGE_POINT *sp)
+ALWAYS_INLINE_HOT_FLATTEN
+bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, STORAGE_POINT *sp)
 {
     if (!pgdc->pgd || pgdc->pgd == PGD_EMPTY || pgdc->position >= pgdc->slots)
     {

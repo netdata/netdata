@@ -26,6 +26,11 @@ struct _stream_send {
     uint32_t buffer_max_size;
 
     struct {
+        size_t prefetch;
+        size_t threads;
+    } replication;
+
+    struct {
         STRING *destination;
         STRING *ssl_ca_path;
         STRING *ssl_ca_file;

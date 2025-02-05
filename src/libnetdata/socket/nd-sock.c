@@ -80,6 +80,7 @@ bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_por
     return true;
 }
 
+ALWAYS_INLINE
 ssize_t nd_sock_send_timeout(ND_SOCK *s, void *buf, size_t len, int flags, time_t timeout) {
     switch(wait_on_socket_or_cancel_with_timeout(&s->ssl, s->fd, (int)(timeout * 1000), POLLOUT, NULL)) {
         case 0: // data are waiting
@@ -112,6 +113,7 @@ ssize_t nd_sock_send_timeout(ND_SOCK *s, void *buf, size_t len, int flags, time_
     return send(s->fd, buf, len, flags);
 }
 
+ALWAYS_INLINE
 ssize_t nd_sock_recv_timeout(ND_SOCK *s, void *buf, size_t len, int flags, time_t timeout) {
     switch(wait_on_socket_or_cancel_with_timeout(&s->ssl, s->fd, (int)(timeout * 1000), POLLIN, NULL)) {
         case 0: // data are waiting

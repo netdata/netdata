@@ -12,6 +12,7 @@ int madvise_willneed(void *mem, size_t len);
 int madvise_dontneed(void *mem, size_t len);
 int madvise_dontdump(void *mem, size_t len);
 int madvise_mergeable(void *mem, size_t len);
+int madvise_thp(void *mem, size_t len);
 
 extern size_t nd_mmap_count;
 extern size_t nd_mmap_size;

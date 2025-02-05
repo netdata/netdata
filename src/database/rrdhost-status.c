@@ -258,7 +258,7 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
             else
                 s->stream.status = RRDHOST_STREAM_STATUS_ONLINE;
 
-            s->stream.compression = host->sender->compressor.initialized;
+            s->stream.compression = host->sender->thread.compressor.initialized;
         }
         else {
             s->stream.status = RRDHOST_STREAM_STATUS_OFFLINE;
