@@ -2,12 +2,14 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.4...HEAD)
 
 **Merged pull requests:**
 
+- fix\(go.d\): clean up charts for stopped and removed jobs [\#19573](https://github.com/netdata/netdata/pull/19573) ([ilyam8](https://github.com/ilyam8))
 - Fix memory leak [\#19569](https://github.com/netdata/netdata/pull/19569) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/prometheus-community/pro-bing from 0.6.0 to 0.6.1 in /src/go [\#19567](https://github.com/netdata/netdata/pull/19567) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Code cleanup on ACLK messages [\#19566](https://github.com/netdata/netdata/pull/19566) ([stelfrag](https://github.com/stelfrag))
 - Add a new agent status when connecting to the cloud [\#19564](https://github.com/netdata/netdata/pull/19564) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#19563](https://github.com/netdata/netdata/pull/19563) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/dnsquery\): support system DNS servers from /etc/resolv.conf [\#19562](https://github.com/netdata/netdata/pull/19562) ([ilyam8](https://github.com/ilyam8))
@@ -97,6 +99,10 @@
 - Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
 - Modify eBPF.plugin integration \(Part I\) [\#19219](https://github.com/netdata/netdata/pull/19219) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add CLR Remoting metadata [\#19203](https://github.com/netdata/netdata/pull/19203) ([thiagoftsm](https://github.com/thiagoftsm))
+
+## [v2.2.4](https://github.com/netdata/netdata/tree/v2.2.4) (2025-02-04)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.3...v2.2.4)
 
 ## [v2.2.3](https://github.com/netdata/netdata/tree/v2.2.3) (2025-01-31)
 
@@ -472,11 +478,6 @@
 - Fix MSSQL algorithm \(Windows.plugin\) [\#19035](https://github.com/netdata/netdata/pull/19035) ([thiagoftsm](https://github.com/thiagoftsm))
 - --dev option to installer [\#19034](https://github.com/netdata/netdata/pull/19034) ([ktsaou](https://github.com/ktsaou))
 - add `shutdown` keyword to ensure graceful service termination on FreeBSD [\#19033](https://github.com/netdata/netdata/pull/19033) ([ilyam8](https://github.com/ilyam8))
-- fix: ensure correct startup order for Netdata service on FreeBSD [\#19032](https://github.com/netdata/netdata/pull/19032) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/gorcon/rcon from 1.3.5 to 1.4.0 in /src/go [\#19031](https://github.com/netdata/netdata/pull/19031) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/vmware/govmomi from 0.46.0 to 0.46.1 in /src/go [\#19030](https://github.com/netdata/netdata/pull/19030) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Regenerate integrations.js [\#19029](https://github.com/netdata/netdata/pull/19029) ([netdatabot](https://github.com/netdatabot))
-- improvement\(windows/iis\): add requests by type chart [\#19028](https://github.com/netdata/netdata/pull/19028) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
