@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix static build conditions to run on release and nightly builds. [\#19579](https://github.com/netdata/netdata/pull/19579) ([Ferroin](https://github.com/Ferroin))
+- fix\(go.d/nvme\): add missing "/dev/" prefix to device path for v2.11 [\#19577](https://github.com/netdata/netdata/pull/19577) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d\): clean up charts for stopped and removed jobs [\#19573](https://github.com/netdata/netdata/pull/19573) ([ilyam8](https://github.com/ilyam8))
 - Fix memory leak [\#19569](https://github.com/netdata/netdata/pull/19569) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/prometheus-community/pro-bing from 0.6.0 to 0.6.1 in /src/go [\#19567](https://github.com/netdata/netdata/pull/19567) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -32,6 +34,7 @@
 - Use database/rrd.h instead of daemon/common.h [\#19540](https://github.com/netdata/netdata/pull/19540) ([vkalintiris](https://github.com/vkalintiris))
 - allow dbengine to read at offsets above 4GiB - again [\#19539](https://github.com/netdata/netdata/pull/19539) ([ktsaou](https://github.com/ktsaou))
 - allow dbengine to read at offsets above 4GiB [\#19538](https://github.com/netdata/netdata/pull/19538) ([ktsaou](https://github.com/ktsaou))
+- inline dbengine query critical path [\#19537](https://github.com/netdata/netdata/pull/19537) ([ktsaou](https://github.com/ktsaou))
 - Fix contexts stay not-live when children reconnect [\#19536](https://github.com/netdata/netdata/pull/19536) ([ktsaou](https://github.com/ktsaou))
 - Fix coverity issue [\#19535](https://github.com/netdata/netdata/pull/19535) ([stelfrag](https://github.com/stelfrag))
 - Actually handle the `-fexceptions` requirement correctly in our build system. [\#19534](https://github.com/netdata/netdata/pull/19534) ([Ferroin](https://github.com/Ferroin))
@@ -41,6 +44,7 @@
 - chore\(go.d/snmp\): enable create\_vnode by default [\#19529](https://github.com/netdata/netdata/pull/19529) ([ilyam8](https://github.com/ilyam8))
 - ci: bump static build timeout to 6hr [\#19528](https://github.com/netdata/netdata/pull/19528) ([ilyam8](https://github.com/ilyam8))
 - Fix MSSQL Instance [\#19527](https://github.com/netdata/netdata/pull/19527) ([thiagoftsm](https://github.com/thiagoftsm))
+- Improve data write [\#19525](https://github.com/netdata/netdata/pull/19525) ([stelfrag](https://github.com/stelfrag))
 - inline functions related to metrics ingestion [\#19524](https://github.com/netdata/netdata/pull/19524) ([ktsaou](https://github.com/ktsaou))
 - chore\(packaging\): remove old dashboard [\#19523](https://github.com/netdata/netdata/pull/19523) ([ilyam8](https://github.com/ilyam8))
 - Format PGDs on fatal\(\) [\#19521](https://github.com/netdata/netdata/pull/19521) ([vkalintiris](https://github.com/vkalintiris))
@@ -474,10 +478,6 @@
 - fix\(go.d/nvidia\_smi\): disable loop mode on Win [\#19040](https://github.com/netdata/netdata/pull/19040) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/nvidia\_smi\): disable loop mode by default on Win [\#19039](https://github.com/netdata/netdata/pull/19039) ([ilyam8](https://github.com/ilyam8))
 - improvement\(go.d.plugin\): terminate on QUIT command [\#19038](https://github.com/netdata/netdata/pull/19038) ([ilyam8](https://github.com/ilyam8))
-- fix\(windows/netframework\): dont sanitize proc name for labels [\#19036](https://github.com/netdata/netdata/pull/19036) ([ilyam8](https://github.com/ilyam8))
-- Fix MSSQL algorithm \(Windows.plugin\) [\#19035](https://github.com/netdata/netdata/pull/19035) ([thiagoftsm](https://github.com/thiagoftsm))
-- --dev option to installer [\#19034](https://github.com/netdata/netdata/pull/19034) ([ktsaou](https://github.com/ktsaou))
-- add `shutdown` keyword to ensure graceful service termination on FreeBSD [\#19033](https://github.com/netdata/netdata/pull/19033) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
