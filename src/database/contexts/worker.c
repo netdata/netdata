@@ -2,6 +2,14 @@
 
 #include "internal.h"
 
+static struct {
+    size_t instances_count;
+    size_t active_vs_archived_percentage;
+} extreme_cardinality = {
+    .instances_count = 1000,
+    .active_vs_archived_percentage = 50,
+};
+
 static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused);
@@ -681,7 +689,9 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                 }
         dfe_done(ri);
 
-        if(instances_no_tier0 >= 1000 && instances_no_tier0 > instances_active && (100 * instances_no_tier0 / instances_active) > 50)
+        if(instances_no_tier0 >= extreme_cardinality.instances_count &&
+            instances_no_tier0 > instances_active &&
+            (100 * instances_no_tier0 / instances_active) > extreme_cardinality.active_vs_archived_percentage)
             ret = rrdinstance_forcefully_clear_retention(rc, instances_no_tier0 - instances_active);
 
         if(min_priority_collected != LONG_MAX)
@@ -1130,6 +1140,14 @@ void *rrdcontext_main(void *ptr) {
 
     heartbeat_t hb;
     heartbeat_init(&hb, RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC);
+
+    extreme_cardinality.instances_count = inicfg_get_number_range(
+        &netdata_config, CONFIG_SECTION_DB, "extreme cardinality keep instances",
+        (long long)extreme_cardinality.instances_count, 1, 1000000);
+
+    extreme_cardinality.active_vs_archived_percentage = inicfg_get_number_range(
+        &netdata_config, CONFIG_SECTION_DB, "extreme cardinality min ephemerality",
+        (long long)extreme_cardinality.active_vs_archived_percentage, 0, 100);
 
     while (service_running(SERVICE_CONTEXT)) {
         worker_is_idle();
