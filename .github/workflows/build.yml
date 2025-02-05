@@ -185,7 +185,6 @@ jobs:
   static-matrix: # Generate the static build matrix.
     name: Prepare Build Matrix
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
