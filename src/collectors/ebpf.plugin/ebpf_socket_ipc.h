@@ -14,6 +14,9 @@
 #define NETDATA_EBPF_IPC_INTEGRATION_DISABLED "disabled"
 
 #include "ebpf.h"
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <semaphore.h>
 
 enum ebpf_integration_list { NETDATA_EBPF_INTEGRATION_DISABLED,
                              NETDATA_EBPF_INTEGRATION_SOCKET,
@@ -21,7 +24,8 @@ enum ebpf_integration_list { NETDATA_EBPF_INTEGRATION_DISABLED,
 };
 
 extern LISTEN_SOCKETS ipc_sockets;
-
+extern sem_t *shm_mutex_ebpf_integration;
 void *ebpf_socket_thread_ipc(void *ptr);
+void netdata_integration_cleanup_shm();
 
 #endif /* NETDATA_EBPF_SOCKET_IPC_H_ */

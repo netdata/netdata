@@ -7,6 +7,11 @@
 #define TASK_COMM_LEN 16
 #endif
 
+#include "libnetdata/libnetdata.h"
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <semaphore.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
