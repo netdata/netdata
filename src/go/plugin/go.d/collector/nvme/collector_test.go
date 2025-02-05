@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -515,9 +516,12 @@ func (m *mockNVMeCLIExec) list() (*nvmeDeviceList, error) {
 	return &v, nil
 }
 
-func (m *mockNVMeCLIExec) smartLog(_ string) (*nvmeDeviceSmartLog, error) {
+func (m *mockNVMeCLIExec) smartLog(device string) (*nvmeDeviceSmartLog, error) {
 	if m.errOnSmartLog {
 		return nil, errors.New("mock.smartLog() error")
+	}
+	if !strings.HasPrefix(device, "/dev/") {
+		return nil, errors.New("mock.smartLog() expects device path /dev/")
 	}
 
 	var v nvmeDeviceSmartLog
