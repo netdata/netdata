@@ -118,6 +118,7 @@ bool nd_poll_del(nd_poll_t *ndpl, int fd) {
 }
 
 // Update an existing file descriptor in the event poll
+ALWAYS_INLINE_HOT_FLATTEN
 bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events) {
     struct fd_info *fdi = POINTERS_GET(&ndpl->pointers, fd);
     if(!fdi) return false;
@@ -198,6 +199,7 @@ static void sort_events(nd_poll_t *ndpl) {
 }
 
 // Wait for events
+ALWAYS_INLINE_HOT_FLATTEN
 int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
     ndpl->iteration_counter++;
 
@@ -351,6 +353,7 @@ bool nd_poll_del(nd_poll_t *ndpl, int fd) {
 }
 
 // Update an existing file descriptor in the event poll
+ALWAYS_INLINE_HOT_FLATTEN
 bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events) {
     for (nfds_t i = 0; i < ndpl->nfds; i++) {
         if (ndpl->fds[i].fd == fd) {
@@ -399,6 +402,7 @@ static inline void rotate_fds(nd_poll_t *ndpl) {
 }
 
 // Wait for events
+ALWAYS_INLINE_HOT_FLATTEN
 int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
     if (nd_poll_get_next_event(ndpl, result))
         return 1; // Return immediately if there's a pending event

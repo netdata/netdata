@@ -94,7 +94,7 @@ static inline void mrg_stats_judy_mem(MRG *mrg, size_t partition, int64_t judy_m
     __atomic_add_fetch(&mrg->index[partition].stats.size, judy_mem, __ATOMIC_RELAXED);
 }
 
-static inline time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, METRIC *metric) {
+static ALWAYS_INLINE time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
 
     if(first_time_s <= 0) {
@@ -140,7 +140,7 @@ static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const cha
     );
 }
 
-static inline bool acquired_metric_has_retention(MRG *mrg, METRIC *metric) {
+static ALWAYS_INLINE bool acquired_metric_has_retention(MRG *mrg, METRIC *metric) {
     time_t first, last;
     mrg_metric_get_retention(mrg, metric, &first, &last, NULL);
     bool rc = (first != 0 && last != 0 && first <= last);
@@ -151,7 +151,7 @@ static inline bool acquired_metric_has_retention(MRG *mrg, METRIC *metric) {
     return rc;
 }
 
-static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric) {
+static ALWAYS_INLINE void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric) {
     JudyAllocThreadPulseReset();
 
     size_t partition = metric->partition;
@@ -191,7 +191,7 @@ static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric)
     mrg_stats_judy_mem(mrg, partition, JudyAllocThreadPulseGetAndReset());
 }
 
-static inline bool metric_acquire(MRG *mrg, METRIC *metric) {
+static ALWAYS_INLINE bool metric_acquire(MRG *mrg, METRIC *metric) {
     REFCOUNT rc = refcount_acquire_advanced(&metric->refcount);
     if(!REFCOUNT_ACQUIRED(rc))
         return false;
@@ -206,7 +206,7 @@ static inline bool metric_acquire(MRG *mrg, METRIC *metric) {
     return true;
 }
 
-static inline bool metric_release(MRG *mrg, METRIC *metric) {
+static ALWAYS_INLINE bool metric_release(MRG *mrg, METRIC *metric) {
     size_t partition = metric->partition;
 
     REFCOUNT refcount = refcount_release(&metric->refcount);
@@ -226,7 +226,7 @@ static inline bool metric_release(MRG *mrg, METRIC *metric) {
     return refcount == REFCOUNT_DELETED;
 }
 
-static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
+static ALWAYS_INLINE METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     JudyAllocThreadPulseReset();
 
     UUIDMAP_ID id = uuidmap_create(*entry->uuid);
@@ -299,7 +299,7 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     return metric;
 }
 
-static inline METRIC *metric_get_and_acquire_by_id(MRG *mrg, UUIDMAP_ID id, Word_t section) {
+static ALWAYS_INLINE METRIC *metric_get_and_acquire_by_id(MRG *mrg, UUIDMAP_ID id, Word_t section) {
     size_t partition = uuidmap_id_to_partition(id);
 
     while(1) {
@@ -357,7 +357,7 @@ struct aral_statistics *mrg_aral_stats(void) {
     return &mrg_aral_statistics;
 }
 
-inline void mrg_destroy(MRG *mrg __maybe_unused) {
+ALWAYS_INLINE void mrg_destroy(MRG *mrg __maybe_unused) {
     // no destruction possible
     // we can't traverse the metrics list
 
@@ -367,54 +367,54 @@ inline void mrg_destroy(MRG *mrg __maybe_unused) {
     pulse_aral_unregister(mrg->index[0].aral);
 }
 
-inline METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {
+ALWAYS_INLINE METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {
 //    internal_fatal(entry.latest_time_s > max_acceptable_collected_time(),
 //        "DBENGINE METRIC: metric latest time is in the future");
 
     return metric_add_and_acquire(mrg, &entry, ret);
 }
 
-inline METRIC *mrg_metric_get_and_acquire_by_uuid(MRG *mrg, nd_uuid_t *uuid, Word_t section) {
+ALWAYS_INLINE METRIC *mrg_metric_get_and_acquire_by_uuid(MRG *mrg, nd_uuid_t *uuid, Word_t section) {
     UUIDMAP_ID id = uuidmap_create(*uuid);
     METRIC *metric = metric_get_and_acquire_by_id(mrg, id, section);
     uuidmap_free(id);
     return metric;
 }
 
-inline METRIC *mrg_metric_get_and_acquire_by_id(MRG *mrg, UUIDMAP_ID id, Word_t section) {
+ALWAYS_INLINE METRIC *mrg_metric_get_and_acquire_by_id(MRG *mrg, UUIDMAP_ID id, Word_t section) {
     return metric_get_and_acquire_by_id(mrg, id, section);
 }
 
-inline bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric) {
+ALWAYS_INLINE bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric) {
     return metric_release(mrg, metric);
 }
 
-inline METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric) {
+ALWAYS_INLINE METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric) {
     metric_acquire(mrg, metric);
     return metric;
 }
 
-inline void mrg_metric_release(MRG *mrg, METRIC *metric) {
+ALWAYS_INLINE void mrg_metric_release(MRG *mrg, METRIC *metric) {
     metric_release(mrg, metric);
 }
 
-inline Word_t mrg_metric_id(MRG *mrg __maybe_unused, METRIC *metric) {
+ALWAYS_INLINE Word_t mrg_metric_id(MRG *mrg __maybe_unused, METRIC *metric) {
     return (Word_t)metric;
 }
 
-inline nd_uuid_t *mrg_metric_uuid(MRG *mrg __maybe_unused, METRIC *metric) {
+ALWAYS_INLINE nd_uuid_t *mrg_metric_uuid(MRG *mrg __maybe_unused, METRIC *metric) {
     return uuidmap_uuid_ptr(metric->uuid);
 }
 
-inline UUIDMAP_ID mrg_metric_uuidmap_id_dup(MRG *mrg __maybe_unused, METRIC *metric) {
+ALWAYS_INLINE UUIDMAP_ID mrg_metric_uuidmap_id_dup(MRG *mrg __maybe_unused, METRIC *metric) {
     return uuidmap_dup(metric->uuid);
 }
 
-inline Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {
+ALWAYS_INLINE Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {
     return metric->section;
 }
 
-inline bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
+ALWAYS_INLINE bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
     internal_fatal(first_time_s < 0, "DBENGINE METRIC: timestamp is negative");
 
     if(first_time_s == LONG_MAX)
@@ -428,7 +428,7 @@ inline bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric,
     return true;
 }
 
-inline void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s, time_t last_time_s, uint32_t update_every_s) {
+ALWAYS_INLINE void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s, time_t last_time_s, uint32_t update_every_s) {
     internal_fatal(first_time_s < 0 || last_time_s < 0,
                    "DBENGINE METRIC: timestamp is negative");
     internal_fatal(first_time_s > max_acceptable_collected_time(),
@@ -450,16 +450,16 @@ inline void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric,
         set_metric_field_with_condition(metric->latest_update_every_s, update_every_s, _current <= 0);
 }
 
-inline bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
+ALWAYS_INLINE bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
     internal_fatal(first_time_s < 0, "DBENGINE METRIC: timestamp is negative");
     return set_metric_field_with_condition(metric->first_time_s, first_time_s, _wanted != 0 && _wanted != LONG_MAX && _wanted > _current);
 }
 
-inline time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
+ALWAYS_INLINE time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     return mrg_metric_get_first_time_s_smart(mrg, metric);
 }
 
-inline void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, uint32_t *update_every_s) {
+ALWAYS_INLINE_HOT void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, uint32_t *update_every_s) {
     time_t clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
     time_t hot = __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED);
 
@@ -469,7 +469,7 @@ inline void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, ti
         *update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
 }
 
-inline bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
+ALWAYS_INLINE bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
     internal_fatal(latest_time_s < 0, "DBENGINE METRIC: timestamp is negative");
 
 //    internal_fatal(latest_time_s > max_acceptable_collected_time(),
@@ -490,7 +490,7 @@ inline bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *
 }
 
 // returns true when metric still has retention
-inline bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
+ALWAYS_INLINE bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
     Word_t section = mrg_metric_section(mrg, metric);
     bool do_again = false;
     size_t countdown = 5;
@@ -538,7 +538,7 @@ inline bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metr
     return (first && last && first < last);
 }
 
-inline bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
+ALWAYS_INLINE bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
     internal_fatal(latest_time_s < 0, "DBENGINE METRIC: timestamp is negative");
 
 //    internal_fatal(latest_time_s > max_acceptable_collected_time(),
@@ -552,38 +552,38 @@ inline bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *me
     return false;
 }
 
-inline time_t mrg_metric_get_latest_clean_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
+ALWAYS_INLINE time_t mrg_metric_get_latest_clean_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
     return clean;
 }
 
-inline time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
+ALWAYS_INLINE time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
     time_t hot = __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED);
 
     return MAX(clean, hot);
 }
 
-inline bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, uint32_t update_every_s) {
-    if(update_every_s > 0)
+ALWAYS_INLINE bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, uint32_t update_every_s) {
+    if(likely(update_every_s > 0))
         return set_metric_field_with_condition(metric->latest_update_every_s, update_every_s, true);
 
     return false;
 }
 
-inline bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, uint32_t update_every_s) {
-    if(update_every_s > 0)
+ALWAYS_INLINE_HOT bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, uint32_t update_every_s) {
+    if(likely(update_every_s > 0))
         return set_metric_field_with_condition(metric->latest_update_every_s, update_every_s, _current <= 0);
 
     return false;
 }
 
-inline uint32_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *metric) {
+ALWAYS_INLINE uint32_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *metric) {
     return __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
 }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-inline bool mrg_metric_set_writer(MRG *mrg, METRIC *metric) {
+ALWAYS_INLINE bool mrg_metric_set_writer(MRG *mrg, METRIC *metric) {
     pid_t expected = __atomic_load_n(&metric->writer, __ATOMIC_RELAXED);
     pid_t wanted = gettid_cached();
     bool done = true;
@@ -603,7 +603,7 @@ inline bool mrg_metric_set_writer(MRG *mrg, METRIC *metric) {
     return done;
 }
 
-inline bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
+ALWAYS_INLINE bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
     // this function can be called from a different thread than the one than the writer
 
     pid_t expected = __atomic_load_n(&metric->writer, __ATOMIC_RELAXED);

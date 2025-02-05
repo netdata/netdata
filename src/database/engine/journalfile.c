@@ -71,7 +71,7 @@ void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str
 
 // ----------------------------------------------------------------------------
 
-struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STATE *s) {
+ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STATE *s) {
     struct rrdengine_datafile *datafile = NULL;
 
     rw_spinlock_read_lock(&s->ctx->njfv2idx.spinlock);
@@ -328,7 +328,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     }
 }
 
-struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s) {
+ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s) {
     spinlock_lock(&journalfile->v2.spinlock);
 
     bool has_data = (journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
@@ -359,7 +359,7 @@ struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfi
     return NULL;
 }
 
-void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile) {
+ALWAYS_INLINE void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile) {
     spinlock_lock(&journalfile->v2.spinlock);
 
     internal_fatal(!journalfile->mmap.data, "trying to release a journalfile without data");

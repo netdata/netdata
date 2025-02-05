@@ -30,9 +30,6 @@
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
 
-#define MAX_REPLICATION_THREADS 256
-#define REQUESTS_AHEAD_PER_THREAD 0 // 0 = dynamic, 1 = enable synchronous queries, > 1 static
-
 static struct replication_query_statistics replication_queries = {
         .spinlock = SPINLOCK_INITIALIZER,
         .queries_started = 0,
@@ -105,6 +102,7 @@ struct replication_query {
     struct replication_dimension data[];
 };
 
+ALWAYS_INLINE
 static struct replication_query *replication_query_prepare(
         RRDSET *st,
         time_t db_first_entry,
@@ -446,13 +444,14 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 q->query.before = last_end_time_in_buffer;
                 q->query.enable_streaming = false;
 
-                internal_error(true,
-                               "STREAM SND REPLAY: current buffer size %zu is more than the "
-                               "max message size %zu for chart '%s' of host '%s'. "
-                               "Interrupting replication request (%ld to %ld, %s) at %ld to %ld, %s.",
-                               buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
-                               q->request.after, q->request.before, q->request.enable_streaming?"true":"false",
-                               q->query.after, q->query.before, q->query.enable_streaming?"true":"false");
+                internal_error(
+                    true,
+                    "STREAM SND REPLAY: current remaining sender buffer of %zu bytes cannot fit the "
+                    "message size %zu bytes for chart '%s' of host '%s'. "
+                    "Sending partial replication response %ld to %ld, %s (original: %ld to %ld, %s).",
+                    buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
+                    q->query.after, q->query.before, q->query.enable_streaming?"true":"false",
+                    q->request.after, q->request.before, q->request.enable_streaming?"true":"false");
 
                 q->query.interrupted = true;
 
@@ -548,6 +547,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
     return finished_with_gap;
 }
 
+ALWAYS_INLINE
 static struct replication_query *replication_response_prepare(
         RRDSET *st,
         bool requested_enable_streaming,
@@ -556,59 +556,44 @@ static struct replication_query *replication_response_prepare(
         STREAM_CAPABILITIES capabilities,
         bool synchronous
         ) {
-    time_t wall_clock_time = now_realtime_sec();
 
-    if(requested_after > requested_before) {
-        // flip them
-        time_t t = requested_before;
-        requested_before = requested_after;
-        requested_after = t;
-    }
-
-    if(requested_after > wall_clock_time) {
-        requested_after = 0;
-        requested_before = 0;
-        requested_enable_streaming = true;
-    }
-
-    if(requested_before > wall_clock_time) {
-        requested_before = wall_clock_time;
-        requested_enable_streaming = true;
-    }
-
+    bool query_enable_streaming = requested_enable_streaming;
     time_t query_after = requested_after;
     time_t query_before = requested_before;
-    bool query_enable_streaming = requested_enable_streaming;
+
+    time_t wall_clock_time = now_realtime_sec();
+
+    if(query_after > query_before)
+        SWAP(query_before, query_after);
+
+    if(!query_after || !query_before || query_after > wall_clock_time) {
+        query_after = 0;
+        query_before = 0;
+        query_enable_streaming = true;
+    }
+    else if(query_before >= (wall_clock_time - (st->update_every * 100))) {
+        query_before = wall_clock_time;
+        query_enable_streaming = true;
+    }
 
     time_t db_first_entry = 0, db_last_entry = 0;
     rrdset_get_retention_of_tier_for_collected_chart(
-            st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
+        st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
 
-    if(requested_after == 0 && requested_before == 0 && requested_enable_streaming == true) {
-        // no data requested - just enable streaming
-        ;
-    }
-    else {
+    if(query_after && query_before) {
         if (query_after < db_first_entry)
             query_after = db_first_entry;
 
         if (query_before > db_last_entry)
             query_before = db_last_entry;
 
-        // if the parent asked us to start streaming, then fill the rest with the data that we have
-        if (requested_enable_streaming)
+        if (query_after > query_before)
+            SWAP(query_after, query_before);
+
+        if (query_enable_streaming || query_before >= db_last_entry) {
             query_before = db_last_entry;
-
-        if (query_after > query_before) {
-            time_t tmp = query_before;
-            query_before = query_after;
-            query_after = tmp;
+            query_enable_streaming = true;
         }
-
-        query_enable_streaming = (requested_enable_streaming ||
-                                  query_before == db_last_entry ||
-                                  !requested_after ||
-                                  !requested_before) ? true : false;
     }
 
     return replication_query_prepare(
@@ -619,7 +604,7 @@ static struct replication_query *replication_response_prepare(
             wall_clock_time, capabilities, synchronous);
 }
 
-static void replication_response_cancel_and_finalize(struct replication_query *q) {
+static inline void replication_response_cancel_and_finalize(struct replication_query *q) {
     if(!q) return;
     replication_query_finalize(NULL, q, false);
 }
@@ -657,7 +642,7 @@ bool replication_response_execute_finalize_and_send(struct replication_query *q,
     if(q->query.execute)
         finished_with_gap = replication_query_execute(wb, q, max_msg_size);
 
-    time_t after = q->request.after;
+    time_t after = q->query.after;
     time_t before = q->query.before;
     bool enable_streaming = q->query.enable_streaming;
 
@@ -804,7 +789,7 @@ static struct replication_thread {
         size_t error_duplicate;         // the number of replication requests found duplicate (same chart)
         size_t error_flushed;           // the number of replication requests deleted due to disconnections
         size_t latest_first_time;       // the 'after' timestamp of the last request we executed
-        size_t memory;                  // the total memory allocated by replication
+        int64_t memory;                 // the total memory allocated by replication
     } atomic;                           // access should be with atomic operations
 
     struct {
@@ -853,7 +838,7 @@ static struct replication_thread {
         },
 };
 
-size_t replication_sender_allocated_memory(void) {
+int64_t replication_sender_allocated_memory(void) {
     return __atomic_load_n(&replication_globals.atomic.memory, __ATOMIC_RELAXED);
 }
 
@@ -962,17 +947,15 @@ static void replication_sort_entry_add(struct replication_request *rq) {
 
     Pvoid_t *inner_judy_ptr;
 
+    JudyAllocThreadPulseReset();
+
     // find the outer judy entry, using after as key
-    size_t mem_before_outer_judyl = JudyLMemUsed(replication_globals.unsafe.queue.JudyL_array);
     inner_judy_ptr = JudyLIns(&replication_globals.unsafe.queue.JudyL_array, (Word_t) rq->after, PJE0);
-    size_t mem_after_outer_judyl = JudyLMemUsed(replication_globals.unsafe.queue.JudyL_array);
     if(unlikely(!inner_judy_ptr || inner_judy_ptr == PJERR))
         fatal("REPLICATION: corrupted outer judyL");
 
     // add it to the inner judy, using unique_id as key
-    size_t mem_before_inner_judyl = JudyLMemUsed(*inner_judy_ptr);
     Pvoid_t *item = JudyLIns(inner_judy_ptr, rq->unique_id, PJE0);
-    size_t mem_after_inner_judyl = JudyLMemUsed(*inner_judy_ptr);
     if(unlikely(!item || item == PJERR))
         fatal("REPLICATION: corrupted inner judyL");
 
@@ -986,7 +969,7 @@ static void replication_sort_entry_add(struct replication_request *rq) {
 
     replication_recursive_unlock();
 
-    __atomic_add_fetch(&replication_globals.atomic.memory, (mem_after_inner_judyl - mem_before_inner_judyl) + (mem_after_outer_judyl - mem_before_outer_judyl), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&replication_globals.atomic.memory, JudyAllocThreadPulseGetAndReset(), __ATOMIC_RELAXED);
 }
 
 static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sort_entry *rse, Pvoid_t **inner_judy_ppptr, bool preprocessing) {
@@ -1002,27 +985,21 @@ static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sor
     rse->rq->indexed_in_judy = false;
     rse->rq->not_indexed_preprocessing = preprocessing;
 
-    size_t memory_saved = 0;
+    JudyAllocThreadPulseReset();
 
     // delete it from the inner judy
-    size_t mem_before_inner_judyl = JudyLMemUsed(**inner_judy_ppptr);
     JudyLDel(*inner_judy_ppptr, rse->rq->unique_id, PJE0);
-    size_t mem_after_inner_judyl = JudyLMemUsed(**inner_judy_ppptr);
-    memory_saved = mem_before_inner_judyl - mem_after_inner_judyl;
 
     // if no items left, delete it from the outer judy
     if(**inner_judy_ppptr == NULL) {
-        size_t mem_before_outer_judyl = JudyLMemUsed(replication_globals.unsafe.queue.JudyL_array);
         JudyLDel(&replication_globals.unsafe.queue.JudyL_array, rse->rq->after, PJE0);
-        size_t mem_after_outer_judyl = JudyLMemUsed(replication_globals.unsafe.queue.JudyL_array);
-        memory_saved += mem_before_outer_judyl - mem_after_outer_judyl;
         inner_judy_deleted = true;
     }
 
     // free memory
     replication_sort_entry_destroy(rse);
 
-    __atomic_sub_fetch(&replication_globals.atomic.memory, memory_saved, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&replication_globals.atomic.memory, JudyAllocThreadPulseGetAndReset(), __ATOMIC_RELAXED);
 
     return inner_judy_deleted;
 }
@@ -1057,6 +1034,7 @@ static void replication_sort_entry_del(struct replication_request *rq, bool buff
     replication_recursive_unlock();
 }
 
+ALWAYS_INLINE_HOT
 static struct replication_request replication_request_get_first_available() {
     Pvoid_t *inner_judy_pptr;
 
@@ -1210,6 +1188,7 @@ static bool sender_is_still_connected_for_this_request(struct replication_reques
     return rq->sender_circular_buffer_last_flush_ut == stream_circular_buffer_last_flush_ut(rq->sender->scb);
 }
 
+ALWAYS_INLINE_HOT
 static bool replication_execute_request(struct replication_request *rq, bool workers) {
     bool ret = false;
 
@@ -1552,18 +1531,7 @@ static int replication_pipeline_execute_next(void) {
     struct replication_request *rq;
 
     if(unlikely(!rtp.rqs)) {
-#if REQUESTS_AHEAD_PER_THREAD == 0
-        rtp.max_requests_ahead = (int)netdata_conf_cpus() / 2;
-
-        if (rtp.max_requests_ahead > libuv_worker_threads * 2)
-            rtp.max_requests_ahead = libuv_worker_threads * 2;
-
-        if (rtp.max_requests_ahead < 5)
-            rtp.max_requests_ahead = 5;
-#else
-        rtp.max_requests_ahead = REQUESTS_AHEAD_PER_THREAD;
-#endif
-
+        rtp.max_requests_ahead = stream_send.replication.prefetch;
         rtp.rqs = callocz(rtp.max_requests_ahead, sizeof(struct replication_request));
         __atomic_add_fetch(&replication_buffers_allocated, rtp.max_requests_ahead * sizeof(struct replication_request), __ATOMIC_RELAXED);
     }
@@ -1723,8 +1691,17 @@ static void replication_main_cleanup(void *pptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+struct aral_statistics aral_replication_stats = { 0 };
 void replication_initialize(void) {
-    replication_globals.aral_rse = aral_by_size_acquire(sizeof(struct replication_sort_entry));
+    replication_globals.aral_rse = aral_create(
+        "replication",
+        sizeof(struct replication_sort_entry),
+        0,
+        128 * 1024, // limit it so that when replication finishes, we will not have a lot of memory lost
+        &aral_replication_stats,
+        NULL, NULL, false, false, false);
+
+    pulse_aral_register_statistics(&aral_replication_stats, "replication");
 }
 
 void *replication_thread_main(void *ptr) {
@@ -1732,22 +1709,7 @@ void *replication_thread_main(void *ptr) {
 
     replication_initialize_workers(true);
 
-    size_t threads = netdata_conf_is_parent() ? (netdata_conf_cpus() / 3) : 1;
-    if (threads < 1) threads = 1;
-    else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
-
-    threads = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "replication threads", threads);
-    if(threads < 1) {
-        netdata_log_error("replication threads given %zu is invalid, resetting to 1", threads);
-        threads = 1;
-        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "replication threads", threads);
-    }
-    else if(threads > MAX_REPLICATION_THREADS) {
-        netdata_log_error("replication threads given %zu is invalid, resetting to %d", threads, (int)MAX_REPLICATION_THREADS);
-        threads = MAX_REPLICATION_THREADS;
-        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "replication threads", threads);
-    }
-
+    size_t threads = stream_send.replication.threads;
     if(--threads) {
         replication_globals.main_thread.threads = threads;
         replication_globals.main_thread.threads_ptrs = mallocz(threads * sizeof(ND_THREAD *));
@@ -1819,12 +1781,20 @@ void *replication_thread_main(void *ptr) {
                     run_verification_countdown = ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION;
             }
 
-            time_t latest_first_time_t = replication_get_latest_first_time();
-            if(latest_first_time_t && replication_globals.unsafe.pending) {
+            time_t current_s = replication_get_latest_first_time();
+            if(current_s && replication_globals.unsafe.pending) {
                 // completion percentage statistics
-                time_t now = now_realtime_sec();
-                time_t total = now - replication_globals.unsafe.first_time_t;
-                time_t done = latest_first_time_t - replication_globals.unsafe.first_time_t;
+                time_t now_s = now_realtime_sec();
+                if(current_s > now_s)
+                    current_s = now_s;
+
+                time_t started_s = replication_globals.unsafe.first_time_t;
+                if(current_s < started_s)
+                    replication_globals.unsafe.first_time_t = started_s = current_s;
+
+                time_t total = now_s - started_s;
+                time_t done = current_s - started_s;
+
                 worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION,
                                   (NETDATA_DOUBLE) done * 100.0 / (NETDATA_DOUBLE) total);
             }
@@ -1890,4 +1860,21 @@ void *replication_thread_main(void *ptr) {
     }
 
     return NULL;
+}
+
+int replication_threads_default(void) {
+    int threads = netdata_conf_is_parent() ? (int)MIN(netdata_conf_cpus(), 6) : 1;
+    threads = FIT_IN_RANGE(threads, 1, MAX_REPLICATION_THREADS);
+    return threads;
+}
+
+int replication_prefetch_default(void) {
+    // Our goal is to feed the pipeline with enough requests,
+    // since this will allow dbengine to merge the requests that load the same extents,
+    // providing the best performance and minimizing disk I/O.
+    int target = MAX(libuv_worker_threads / 2, (int)stream_send.replication.threads * 10);
+
+    int prefetch = (int)HOWMANY(target, stream_send.replication.threads);
+    prefetch = FIT_IN_RANGE(prefetch, 1, MAX_REPLICATION_PREFETCH);
+    return prefetch;
 }

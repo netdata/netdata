@@ -19,7 +19,7 @@ struct mrg_statistics {
     // --- non-atomic --- under a write lock
 
     size_t entries;
-    ssize_t size;    // total memory used, with indexing
+    int64_t size;    // total memory used, with indexing
 
     size_t additions;
     size_t additions_duplicate;

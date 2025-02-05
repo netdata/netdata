@@ -12,7 +12,7 @@ bool stream_sender_is_connected_with_ssl(struct rrdhost *host) {
 }
 
 bool stream_sender_has_compression(struct rrdhost *host) {
-    return host && host->sender && host->sender->compressor.initialized;
+    return host && host->sender && host->sender->thread.compressor.initialized;
 }
 
 void stream_sender_structures_init(RRDHOST *host, bool stream, STRING *parents, STRING *api_key, STRING *send_charts_matching) {
@@ -66,7 +66,7 @@ void stream_sender_structures_free(struct rrdhost *host) {
     stream_circular_buffer_destroy(host->sender->scb);
     host->sender->scb = NULL;
     waitq_destroy(&host->sender->waitq);
-    stream_compressor_destroy(&host->sender->compressor);
+    stream_compressor_destroy(&host->sender->thread.compressor);
 
     replication_sender_cleanup(host->sender);
 

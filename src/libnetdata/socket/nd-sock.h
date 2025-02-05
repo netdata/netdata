@@ -50,15 +50,18 @@ static inline void nd_sock_init(ND_SOCK *s, SSL_CTX *ctx, bool verify_certificat
     s->ctx = ctx;
 }
 
-static inline bool nd_sock_is_ssl(ND_SOCK *s) {
+ALWAYS_INLINE
+static bool nd_sock_is_ssl(ND_SOCK *s) {
     return SSL_connection(&s->ssl);
 }
 
-static inline SOCKET_PEERS nd_sock_socket_peers(ND_SOCK *s) {
+ALWAYS_INLINE
+static SOCKET_PEERS nd_sock_socket_peers(ND_SOCK *s) {
     return socket_peers(s->fd);
 }
 
-static inline void nd_sock_close(ND_SOCK *s) {
+ALWAYS_INLINE
+static void nd_sock_close(ND_SOCK *s) {
     netdata_ssl_close(&s->ssl);
 
     if(s->fd != -1) {
@@ -69,7 +72,8 @@ static inline void nd_sock_close(ND_SOCK *s) {
     s->error = ND_SOCK_ERR_NONE;
 }
 
-static inline ssize_t nd_sock_read(ND_SOCK *s, void *buf, size_t num, size_t retries) {
+ALWAYS_INLINE
+static ssize_t nd_sock_read(ND_SOCK *s, void *buf, size_t num, size_t retries) {
     ssize_t rc;
     do {
         if (nd_sock_is_ssl(s))
@@ -82,7 +86,8 @@ static inline ssize_t nd_sock_read(ND_SOCK *s, void *buf, size_t num, size_t ret
     return rc;
 }
 
-static inline ssize_t nd_sock_write(ND_SOCK *s, const void *buf, size_t num, size_t retries) {
+ALWAYS_INLINE
+static ssize_t nd_sock_write(ND_SOCK *s, const void *buf, size_t num, size_t retries) {
     ssize_t rc;
 
     do {
@@ -96,7 +101,8 @@ static inline ssize_t nd_sock_write(ND_SOCK *s, const void *buf, size_t num, siz
     return rc;
 }
 
-static inline ssize_t nd_sock_write_persist(ND_SOCK *s, const void *buf, const size_t num, size_t retries) {
+ALWAYS_INLINE
+static ssize_t nd_sock_write_persist(ND_SOCK *s, const void *buf, const size_t num, size_t retries) {
     const uint8_t *src = (const uint8_t *)buf;
     ssize_t bytes = 0;
 
@@ -110,14 +116,16 @@ static inline ssize_t nd_sock_write_persist(ND_SOCK *s, const void *buf, const s
     return bytes;
 }
 
-static inline ssize_t nd_sock_revc_nowait(ND_SOCK *s, void *buf, size_t num) {
+ALWAYS_INLINE
+static ssize_t nd_sock_revc_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_read(&s->ssl, buf, num);
     else
         return recv(s->fd, buf, num, MSG_DONTWAIT);
 }
 
-static inline ssize_t nd_sock_send_nowait(ND_SOCK *s, void *buf, size_t num) {
+ALWAYS_INLINE
+static ssize_t nd_sock_send_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_write(&s->ssl, buf, num);
     else

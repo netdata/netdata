@@ -28,12 +28,13 @@ typedef enum __attribute__((packed)) {
 } CONFIG_VALUE_TYPES;
 
 typedef enum __attribute__((packed)) {
-    CONFIG_VALUE_LOADED = (1 << 0),         // has been loaded from the config
-    CONFIG_VALUE_USED = (1 << 1),           // has been accessed from the program
-    CONFIG_VALUE_CHANGED = (1 << 2),        // has been changed from the loaded value or the internal default value
-    CONFIG_VALUE_CHECKED = (1 << 3),        // has been checked if the value is different from the default
-    CONFIG_VALUE_MIGRATED = (1 << 4),       // has been migrated from an old config
-    CONFIG_VALUE_REFORMATTED = (1 << 5),    // has been reformatted with the official formatting
+    CONFIG_VALUE_LOADED         = (1 << 0), // has been loaded from the config
+    CONFIG_VALUE_USED           = (1 << 1), // has been accessed from the program
+    CONFIG_VALUE_CHANGED        = (1 << 2), // has been changed from the loaded value or the internal default value
+    CONFIG_VALUE_CHECKED        = (1 << 3), // has been checked if the value is different from the default
+    CONFIG_VALUE_MIGRATED       = (1 << 4), // has been migrated from an old config
+    CONFIG_VALUE_REFORMATTED    = (1 << 5), // has been reformatted with the official formatting
+    CONFIG_VALUE_DEFAULT_SET    = (1 << 6), // the default value has been set
 } CONFIG_VALUE_FLAGS;
 
 struct config_option {
