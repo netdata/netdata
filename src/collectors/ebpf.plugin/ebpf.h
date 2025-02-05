@@ -368,7 +368,6 @@ static inline bool ebpf_plugin_stop(void)
 
 void ebpf_stop_threads(int sig);
 extern netdata_ebpf_judy_pid_t ebpf_judy_pid;
-extern uint32_t integration_with_collectors;
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
 
