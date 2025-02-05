@@ -2,7 +2,7 @@
 
 #include "aclk_query.h"
 #include "aclk_tx_msgs.h"
-#include "../../web/server/web_client_cache.h"
+#include "web/server/web_client_cache.h"
 
 static HTTP_ACL default_aclk_http_acl = HTTP_ACL_ALL_FEATURES;
 

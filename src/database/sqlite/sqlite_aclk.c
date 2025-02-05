@@ -9,9 +9,9 @@ void sanity_check(void) {
 }
 
 #include "sqlite_aclk_node.h"
-#include "../aclk_query_queue.h"
-#include "../aclk_query.h"
-#include "../aclk_capas.h"
+#include "aclk/aclk_query_queue.h"
+#include "aclk/aclk_query.h"
+#include "aclk/aclk_capas.h"
 
 static void create_node_instance_result_job(const char *machine_guid, const char *node_id)
 {
