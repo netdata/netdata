@@ -3,12 +3,13 @@
 #include "netdata-conf-db.h"
 #include "daemon/common.h"
 
+#define DAYS 86400
 int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
 bool dbengine_use_direct_io = true;
 static size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = {1, 60, 60, 60, 60};
-static double storage_tiers_retention_days[RRD_STORAGE_TIERS] = {14, 90, 2 * 365, 2 * 365, 2 * 365};
+static time_t storage_tiers_retention_time_s[RRD_STORAGE_TIERS] = {14 * DAYS, 90 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS};
 
 time_t rrdset_free_obsolete_time_s = 3600;
 time_t rrdhost_free_orphan_time_s = 3600;
@@ -275,12 +276,13 @@ void netdata_conf_dbengine_init(const char *hostname) {
         disk_space_mb = inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention time", tier);
-        storage_tiers_retention_days[tier] = inicfg_get_duration_days(&netdata_config, 
-            CONFIG_SECTION_DB, dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
+        storage_tiers_retention_time_s[tier] = inicfg_get_duration_days_to_seconds(
+            &netdata_config, CONFIG_SECTION_DB,
+            dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_time_s[tier] : 0);
 
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
         tiers_init[tier].tier = tier;
-        tiers_init[tier].retention_seconds = (size_t) (86400.0 * storage_tiers_retention_days[tier]);
+        tiers_init[tier].retention_seconds = (size_t) storage_tiers_retention_time_s[tier];
         strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
         tiers_init[tier].ret = 0;
 

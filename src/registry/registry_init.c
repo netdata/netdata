@@ -93,7 +93,8 @@ int registry_init(void) {
 
     // configuration options
     registry.save_registry_every_entries = (unsigned long long)inicfg_get_number(&netdata_config, CONFIG_SECTION_REGISTRY, "registry save db every new entries", 1000000);
-    registry.persons_expiration = inicfg_get_duration_days(&netdata_config, CONFIG_SECTION_REGISTRY, "registry expire idle persons", 365) * 86400;
+    registry.persons_expiration = inicfg_get_duration_days_to_seconds(
+                                      &netdata_config, CONFIG_SECTION_REGISTRY, "registry expire idle persons", 365 * 86400);
     registry.registry_domain = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry domain", "");
     registry.registry_to_announce = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io");
     registry.hostname = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry hostname", netdata_configured_hostname);

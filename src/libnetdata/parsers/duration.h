@@ -8,14 +8,14 @@
 int64_t duration_round_to_resolution(int64_t value, int64_t resolution);
 
 // duration (string to number)
-bool duration_parse(const char *duration, int64_t *result, const char *default_unit);
-#define duration_parse_nsec_t(duration, ns_ptr) duration_parse(duration, ns_ptr, "ns")
-#define duration_parse_usec_t(duration, us_ptr) duration_parse(duration, us_ptr, "us")
-#define duration_parse_msec_t(duration, ms_ptr) duration_parse(duration, ms_ptr, "ms")
-#define duration_parse_time_t(duration, secs_ptr) duration_parse(duration, secs_ptr, "s")
-#define duration_parse_mins(duration, mins_ptr) duration_parse(duration, mins_ptr, "m")
-#define duration_parse_hours(duration, hours_ptr) duration_parse(duration, hours_ptr, "h")
-#define duration_parse_days(duration, days_ptr) duration_parse(duration, days_ptr, "d")
+bool duration_parse(const char *duration, int64_t *result, const char *default_unit, const char *output_unit);
+#define duration_parse_nsec_t(duration, ns_ptr) duration_parse(duration, ns_ptr, "ns", "ns")
+#define duration_parse_usec_t(duration, us_ptr) duration_parse(duration, us_ptr, "us", "us")
+#define duration_parse_msec_t(duration, ms_ptr) duration_parse(duration, ms_ptr, "ms", "ms")
+#define duration_parse_time_t(duration, secs_ptr) duration_parse(duration, secs_ptr, "s", "s")
+#define duration_parse_mins(duration, mins_ptr) duration_parse(duration, mins_ptr, "m", "m")
+#define duration_parse_hours(duration, hours_ptr) duration_parse(duration, hours_ptr, "h", "h")
+#define duration_parse_days(duration, days_ptr) duration_parse(duration, days_ptr, "d", "d")
 
 // duration (number to string)
 ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char *unit, bool add_spaces);

@@ -82,7 +82,7 @@ inline int64_t duration_round_to_resolution(int64_t value, int64_t resolution) {
 // -------------------------------------------------------------------------------------------------------------------
 // parse a duration string
 
-bool duration_parse(const char *duration, int64_t *result, const char *default_unit) {
+bool duration_parse(const char *duration, int64_t *result, const char *default_unit, const char *output_unit) {
     if (!duration || !*duration) {
         *result = 0;
         return false;
@@ -90,6 +90,12 @@ bool duration_parse(const char *duration, int64_t *result, const char *default_u
 
     const struct duration_unit *du_def = duration_find_unit(default_unit);
     if(!du_def) {
+        *result = 0;
+        return false;
+    }
+
+    const struct duration_unit *du_out = duration_find_unit(output_unit);
+    if(!du_out) {
         *result = 0;
         return false;
     }
@@ -155,10 +161,16 @@ bool duration_parse(const char *duration, int64_t *result, const char *default_u
 
     v *= sign;
 
-    if(du_def->multiplier == 1)
+    // Convert the final value from nanoseconds to the desired output unit
+    // and apply appropriate rounding
+    if(du_out->multiplier == 1)
         *result = v;
-    else
-        *result = duration_round_to_resolution(v, du_def->multiplier);
+    else {
+        // First convert to the output unit
+        NETDATA_DOUBLE converted = (NETDATA_DOUBLE)v / (NETDATA_DOUBLE)du_out->multiplier;
+        // Then round to nearest integer in the output unit
+        *result = (int64_t)round(converted);
+    }
 
     return true;
 }
