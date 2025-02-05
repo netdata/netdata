@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "proto/agent/v1/connection.pb.h"
-#include "proto/agent/v1/disconnect.pb.h"
+#include "src/aclk/aclk-schemas/proto/agent/v1/connection.pb.h"
+#include "src/aclk/aclk-schemas/proto/agent/v1/disconnect.pb.h"
 #include "connection.h"
 
 #include "schema_wrapper_utils.h"
