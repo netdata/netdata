@@ -3,9 +3,11 @@
 #include "internal.h"
 
 static struct {
+    size_t db_rotations;
     size_t instances_count;
     size_t active_vs_archived_percentage;
 } extreme_cardinality = {
+    .db_rotations = 0,
     .instances_count = 1000,
     .active_vs_archived_percentage = 50,
 };
@@ -689,7 +691,8 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                 }
         dfe_done(ri);
 
-        if(instances_no_tier0 >= extreme_cardinality.instances_count) {
+        if(extreme_cardinality.db_rotations &&
+            instances_no_tier0 >= extreme_cardinality.instances_count) {
             size_t percent = (100 * instances_no_tier0 / instances_active);
             if(percent >= extreme_cardinality.active_vs_archived_percentage) {
                 size_t to_keep = extreme_cardinality.active_vs_archived_percentage * instances_active / 100;
@@ -1164,6 +1167,7 @@ void *rrdcontext_main(void *ptr) {
         usec_t now_ut = now_realtime_usec();
 
         if(rrdcontext_next_db_rotation_ut && now_ut > rrdcontext_next_db_rotation_ut) {
+            extreme_cardinality.db_rotations++;
             rrdcontext_recalculate_retention_all_hosts();
             rrdcontext_garbage_collect_for_all_hosts();
             rrdcontext_next_db_rotation_ut = 0;
