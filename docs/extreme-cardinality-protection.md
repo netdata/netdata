@@ -15,23 +15,33 @@ Despite the fact that Netdata performs better than most other observability solu
 -   **Operational Complexity:** High cardinality makes it harder to manage, visualize, and analyze data. Dashboards can become cluttered.
 -   **Scalability Challenges:** As the number of time series grows, the resources required for maintaining aggregation points (Netdata parents) increase too.
 
-## How It Works
+## Definition of Metrics Ephemerality
 
-The mechanism kicks in during tier0 (high-resolution) database rotations (i.e., when old samples are deleted) and proceeds as follows:
+Metrics ephemerality is the percentage of metrics that is no longer actively collected (old) compared to the total metrics available (sum of currently collected metrics and old metrics).
+
+- **Old Metrics** = The number of unique time-series that were once collected, but not currently.
+- **Current Metrics** = The number of unique time-series actively being collected.
+
+High Ephemerality (close to 100%): The system frequently generates new unique metrics for a short period, indicating a high turnover in metrics.
+Low Ephemerality (close to 0%): The system maintains a stable set of metrics over time, with little change in the total number of unique series.
+
+## How The Netdata Protection Works
+
+The mechanism kicks in during tier0 (high-resolution) database rotations (i.e., when the oldest tier0 samples are deleted) and proceeds as follows:
 
 1. **Counting Instances with Zero Tier0 Retention:**
     - For each context (e.g., containers, disks, network interfaces, etc), Netdata counts the number of instances that have **ZERO** retention in tier0.
 
 2. **Threshold Verification:**
-    - If the number of instances with zero tier0 retention is **greater than or equal to 1000** (the default threshold) **and** these instances make up more than **50%** (the default threshold) of the total instances in that context, further action is taken.
+    - If the number of instances with zero tier0 retention is **greater than or equal to 1000** (the default threshold) **and** these instances make up more than **50%** (the default Ephemerality threshold) of the total instances in that context, further action is taken.
 
 3. **Forceful Clearing in Long-Term Storage:**
-    - The system forcefully clears the retention of the excess time-series. This action automatically triggers the deletion of the associated metadata. So, Netdata "forgets" them. Their samples are still on disk, but they are no longer queriable.
+    - The system forcefully clears the retention of the excess time-series. This action automatically triggers the deletion of the associated metadata. So, Netdata "forgets" them. Their samples are still on disk, but they are no longer accessible.
 
 4. **Retention Rules:**
     - **Protected Data:**
         - Metrics that are actively collected (and thus present in tier0) are never deleted.
-        - A context with fewer than 1000 instances is considered safe and is not modified.
+        - A context with fewer than 1000 instances (as presented in the Netdata dashboards at the NIDL bar of the charts) is considered safe and is not modified.
     - **Clean-up Trigger:**
         - Only metrics that have lost their tier0 retention in a context that meets the thresholds (≥1000 instances and >50% ephemerality) will have their long-term retention cleared.
 
@@ -41,6 +51,7 @@ You can control the protection mechanism via the following settings in the `netd
 
 ```ini
 [db]
+    extreme cardinality protection = yes
     extreme cardinality keep instances = 1000
     extreme cardinality min ephemerality = 50
 ```

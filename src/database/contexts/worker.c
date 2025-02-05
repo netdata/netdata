@@ -3,6 +3,7 @@
 #include "internal.h"
 
 static struct {
+    bool enabled;
     size_t db_rotations;
     size_t instances_count;
     size_t active_vs_archived_percentage;
@@ -691,7 +692,8 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                 }
         dfe_done(ri);
 
-        if(extreme_cardinality.db_rotations &&
+        if(extreme_cardinality.enabled &&
+            extreme_cardinality.db_rotations &&
             instances_no_tier0 >= extreme_cardinality.instances_count) {
             size_t percent = (100 * instances_no_tier0 / instances_active);
             if(percent >= extreme_cardinality.active_vs_archived_percentage) {
@@ -1149,6 +1151,10 @@ void *rrdcontext_main(void *ptr) {
 
     heartbeat_t hb;
     heartbeat_init(&hb, RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC);
+
+    extreme_cardinality.enabled = inicfg_get_boolean(
+        &netdata_config, CONFIG_SECTION_DB, "extreme cardinality protection",
+        extreme_cardinality.enabled);
 
     extreme_cardinality.instances_count = inicfg_get_number_range(
         &netdata_config, CONFIG_SECTION_DB, "extreme cardinality keep instances",
