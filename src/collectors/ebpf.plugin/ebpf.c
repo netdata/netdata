@@ -27,6 +27,7 @@ int isrh = 0;
 int main_thread_id = 0;
 int process_pid_fd = -1;
 uint64_t collect_pids = 0;
+uint32_t integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
 static size_t global_iterations_counter = 1;
 bool publish_internal_metrics = true;
 
@@ -3182,6 +3183,38 @@ static void read_collector_values(int *disable_cgroups, int update_every, netdat
     }
 }
 
+static void ebpf_set_ipc_value(const char *integration)
+{
+    if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SHM)) {
+        integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
+        return;
+    }
+    else if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SOCKET)) {
+        integration_with_collectors = NETDATA_EBPF_INTEGRATION_SOCKET;
+        return;
+    }
+    integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
+}
+
+static void ebpf_parse_ipc_section()
+{
+    const char *integration = inicfg_get(&collector_config,
+                                         NETDATA_EBPF_IPC_SECTION,
+                                         NETDATA_EBPF_IPC_INTEGRATION,
+                                         NETDATA_EBPF_IPC_INTEGRATION_DISABLED);
+    ebpf_set_ipc_value(integration);
+
+    ipc_sockets.default_bind_to = inicfg_get(&collector_config,
+                                         NETDATA_EBPF_IPC_SECTION,
+                                         NETDATA_EBPF_IPC_BIND_TO,
+                                         NETDATA_EBPF_IPC_BIND_TO_DEFAULT);
+
+    ipc_sockets.backlog = (int)inicfg_get_number(&collector_config,
+                                                 NETDATA_EBPF_IPC_SECTION,
+                                                 NETDATA_EBPF_IPC_BACKLOG,
+                                          20);
+}
+
 /**
  * Load collector config
  *
@@ -3207,6 +3240,7 @@ static int ebpf_load_collector_config(char *path, int *disable_cgroups, int upda
         origin = EBPF_LOADED_FROM_USER;
 
     read_collector_values(disable_cgroups, update_every, origin);
+    ebpf_parse_ipc_section();
 
     return 0;
 }

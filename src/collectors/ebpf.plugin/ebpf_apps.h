@@ -33,6 +33,8 @@
 #include "ebpf_swap.h"
 #include "ebpf_vfs.h"
 
+#include "ebpf_socket_ipc.h"
+
 #define EBPF_MAX_COMPARE_NAME 95
 #define EBPF_MAX_NAME 100
 
