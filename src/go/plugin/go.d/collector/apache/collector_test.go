@@ -53,19 +53,19 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: false,
 			config:   New().Config,
 		},
+		"success when URL has no wantMetrics suffix": {
+			wantFail: false,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:38001"},
+				},
+			},
+		},
 		"fail when URL not set": {
 			wantFail: true,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{
 					RequestConfig: web.RequestConfig{URL: ""},
-				},
-			},
-		},
-		"fail when URL has no wantMetrics suffix": {
-			wantFail: true,
-			config: Config{
-				HTTPConfig: web.HTTPConfig{
-					RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:38001"},
 				},
 			},
 		},
