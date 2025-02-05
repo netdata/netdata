@@ -527,31 +527,82 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count)
 
     RRDHOST *host = rc->rrdhost;
 
+    time_t from_s = LONG_MAX;
+    time_t to_s = 0;
+
+    size_t instances_deleted = 0;
     size_t metrics_deleted = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
         if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(ri) || ri->rrdset)
             continue;
 
+        size_t metrics_cleared = 0;
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
             if(!rrd_flag_check(rm, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(rm) || rm->rrddim)
                 continue;
 
+            if(rm->first_time_s < from_s)
+                from_s = rm->first_time_s;
+
+            if(rm->last_time_s > to_s)
+                to_s = rm->last_time_s;
+
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
                 STORAGE_ENGINE *eng = host->db[tier].eng;
                 eng->api.metric_retention_delete_by_id(host->db[tier].si, rm->uuid);
             }
+
+            metrics_cleared++;
             metrics_deleted++;
         }
         dfe_done(rm);
 
-        if(--count == 0)
-            break;
+        if(metrics_cleared) {
+            instances_deleted++;
+
+            if(--count == 0)
+                break;
+        }
     }
     dfe_done(ri);
 
-    return metrics_deleted > 0;
+    if(metrics_deleted) {
+        char from_txt[128], to_txt[128];
+
+        if(!from_s || from_s == LONG_MAX)
+            from_txt[0] = '\0';
+        else
+            rfc3339_datetime_ut(from_txt, sizeof(from_txt), from_s * USEC_PER_SEC, 0, true);
+
+        if(!to_s)
+            to_txt[0] = '\0';
+        else
+            rfc3339_datetime_ut(to_txt, sizeof(to_txt), to_s * USEC_PER_SEC, 0, true);
+
+        ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_MODULE, "extreme cardinality protection"),
+            ND_LOG_FIELD_STR(NDF_NIDL_NODE, rc->rrdhost->hostname),
+            ND_LOG_FIELD_STR(NDF_NIDL_CONTEXT, rc->id),
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &extreme_cardinality_msgid),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "EXTREME CARDINALITY PROTECTION: on host '%s', for context '%s': "
+               "forcefully cleared the retention of %zu metrics and %zu instances, "
+               "having non-tier0 retention from %s to %s.",
+               rrdhost_hostname(rc->rrdhost),
+               string2str(rc->id),
+               metrics_deleted, instances_deleted,
+               from_txt, to_txt);
+
+        return true;
+    }
+
+    return false;
 }
 
 static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs) {
