@@ -79,7 +79,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *Charts {
+func (c *Collector) Charts() *module.Charts {
 	return charts.Copy()
 }
 

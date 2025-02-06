@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -36,23 +38,23 @@ func (c *Collector) collectMntr() (map[string]int64, error) {
 			continue
 		}
 
-		key, value := strings.TrimPrefix(parts[0], "zk_"), parts[1]
+		key, value := parts[0], parts[1]
+		if !zkMetrics[key] {
+			continue
+		}
+		key = strings.TrimPrefix(key, "zk_")
+
 		switch key {
-		case "version":
 		case "server_state":
-			mx[key] = convertServerState(value)
+			for _, v := range zkServerStates {
+				mx[key+"_"+v] = metrix.Bool(v == value)
+			}
 		case "min_latency", "avg_latency", "max_latency":
-			v, err := strconv.ParseFloat(value, 64)
-			if err != nil {
-				continue
-			}
-			mx[key] = int64(v * 1000)
+			writeMetric(mx, key, value, 1000, 1)
+		case "uptime":
+			writeMetric(mx, key, value, 1, 1000) // ms->seconds
 		default:
-			v, err := strconv.ParseFloat(value, 64)
-			if err != nil {
-				continue
-			}
-			mx[key] = int64(v)
+			writeMetric(mx, key, value, 1, 1)
 		}
 	}
 
@@ -63,17 +65,54 @@ func (c *Collector) collectMntr() (map[string]int64, error) {
 	return mx, nil
 }
 
-func convertServerState(state string) int64 {
-	switch state {
-	default:
-		return 0
-	case "leader":
-		return 1
-	case "follower":
-		return 2
-	case "observer":
-		return 3
-	case "standalone":
-		return 4
+func writeMetric(mx map[string]int64, metric, value string, mul, div float64) {
+	v, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return
 	}
+	if mul != 0 {
+		v *= mul
+	}
+	if div != 0 {
+		v /= div
+	}
+	mx[metric] = int64(v)
+
+}
+
+var zkServerStates = []string{
+	"leader",
+	"follower",
+	"observer",
+	"standalone",
+}
+
+var zkMetrics = map[string]bool{
+	"zk_server_state": true,
+
+	"zk_outstanding_requests":   true,
+	"zk_min_latency":            true,
+	"zk_avg_latency":            true,
+	"zk_max_latency":            true,
+	"zk_stale_requests":         true,
+	"zk_stale_requests_dropped": true,
+
+	"zk_num_alive_connections": true,
+	"zk_auth_failed_count":     true,
+	"zk_connection_drop_count": true,
+	"zk_connection_rejected":   true,
+	"zk_global_sessions":       true,
+
+	"zk_packets_received": true,
+	"zk_packets_sent":     true,
+
+	"zk_open_file_descriptor_count": true,
+	"zk_max_file_descriptor_count":  true,
+	"zk_znode_count":                true,
+	"zk_ephemerals_count":           true,
+	"zk_watch_count":                true,
+	"zk_approximate_data_size":      true,
+
+	"zk_uptime":        true,
+	"zk_throttled_ops": true,
 }
