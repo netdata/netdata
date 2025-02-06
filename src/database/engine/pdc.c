@@ -895,7 +895,7 @@ static ALWAYS_INLINE struct page_details *epdl_get_pd_load_link_list_from_metric
     return pd_list;
 }
 
-static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *epdl, struct rrdeng_extent_page_descr *descr, const char *msg) {
+static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *epdl, struct rrdeng_extent_page_descr *descr, const char *msg, ND_LOG_FIELD_PRIORITY priority) {
     char uuid[UUID_STR_LEN] = "";
     time_t start_time_s = 0;
     time_t end_time_s = 0;
@@ -950,7 +950,7 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
         log_date(end_time_str, LOG_DATE_LENGTH, end_time_s);
 
     nd_log_limit_static_global_var(erl, 1, 0);
-    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+    nd_log_limit(&erl, NDLS_DAEMON, priority,
                 "DBENGINE: error while reading extent from datafile %u of tier %d, at offset %" PRIu64 " (%u bytes) "
                 "%s from %ld (%s) to %ld (%s) %s%s: "
                 "%s",
@@ -1011,7 +1011,7 @@ static bool epdl_populate_pages_from_extent_data(
         (payload_length != trailer_offset - payload_offset) ||
         (data_length != payload_offset + payload_length + sizeof(*trailer))
         ) {
-        epdl_extent_loading_error_log(ctx, epdl, NULL, "header is INVALID");
+        epdl_extent_loading_error_log(ctx, epdl, NULL, "header is INVALID", NDLP_ERR);
         return false;
     }
 
@@ -1020,7 +1020,7 @@ static bool epdl_populate_pages_from_extent_data(
     if (unlikely(crc32cmp(trailer->checksum, crc))) {
         ctx_io_error(ctx);
         have_read_error = true;
-        epdl_extent_loading_error_log(ctx, epdl, NULL, "CRC32 checksum FAILED");
+        epdl_extent_loading_error_log(ctx, epdl, NULL, "CRC32 checksum FAILED", NDLP_ERR);
     }
 
     if(worker)
@@ -1081,7 +1081,7 @@ static bool epdl_populate_pages_from_extent_data(
         if(!page_length || !start_time_s) {
             char log[200 + 1];
             snprintfz(log, sizeof(log) - 1, "page %u (out of %u) is EMPTY", i, count);
-            epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);
+            epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log, NDLP_ERR);
             continue;
         }
 
@@ -1090,7 +1090,7 @@ static bool epdl_populate_pages_from_extent_data(
         if(!metric) {
             char log[200 + 1];
             snprintfz(log, sizeof(log) - 1, "page %u (out of %u) has unknown UUID", i, count);
-            epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);
+            epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log, NDLP_DEBUG);
             continue;
         }
         mrg_metric_release(main_mrg, metric);
@@ -1126,7 +1126,7 @@ static bool epdl_populate_pages_from_extent_data(
                     snprintfz(log, sizeof(log) - 1, "page %u (out of %u) offset %u + page length %zu, "
                                         "exceeds the uncompressed buffer size %u",
                                         i, count, page_offset, vd.page_length, uncompressed_payload_length);
-                    epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);
+                    epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log, NDLP_ERR);
 
                     pgd = PGD_EMPTY;
                     stats_load_invalid_page++;
