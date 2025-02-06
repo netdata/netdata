@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- fix\(go.d/apache\): make ?auto param check non-fatal [\#19580](https://github.com/netdata/netdata/pull/19580) ([ilyam8](https://github.com/ilyam8))
 - Fix static build conditions to run on release and nightly builds. [\#19579](https://github.com/netdata/netdata/pull/19579) ([Ferroin](https://github.com/Ferroin))
+- build\(deps\): update go toolchain to v1.23.6 [\#19578](https://github.com/netdata/netdata/pull/19578) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/nvme\): add missing "/dev/" prefix to device path for v2.11 [\#19577](https://github.com/netdata/netdata/pull/19577) ([ilyam8](https://github.com/ilyam8))
+- Generate protobuf source files in build dir. [\#19576](https://github.com/netdata/netdata/pull/19576) ([vkalintiris](https://github.com/vkalintiris))
 - fix\(go.d\): clean up charts for stopped and removed jobs [\#19573](https://github.com/netdata/netdata/pull/19573) ([ilyam8](https://github.com/ilyam8))
 - Fix memory leak [\#19569](https://github.com/netdata/netdata/pull/19569) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/prometheus-community/pro-bing from 0.6.0 to 0.6.1 in /src/go [\#19567](https://github.com/netdata/netdata/pull/19567) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -476,8 +479,6 @@
 - Add a special version number to bypass alert snapshots [\#19042](https://github.com/netdata/netdata/pull/19042) ([stelfrag](https://github.com/stelfrag))
 - Add Custom Actions \(Installer\) [\#19041](https://github.com/netdata/netdata/pull/19041) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(go.d/nvidia\_smi\): disable loop mode on Win [\#19040](https://github.com/netdata/netdata/pull/19040) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/nvidia\_smi\): disable loop mode by default on Win [\#19039](https://github.com/netdata/netdata/pull/19039) ([ilyam8](https://github.com/ilyam8))
-- improvement\(go.d.plugin\): terminate on QUIT command [\#19038](https://github.com/netdata/netdata/pull/19038) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
