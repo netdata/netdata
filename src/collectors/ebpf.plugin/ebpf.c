@@ -2757,15 +2757,11 @@ static void ebpf_link_hostnames(const char *parse)
  */
 void parse_network_viewer_section(struct config *cfg)
 {
-    network_viewer_opt.hostname_resolution_enabled = inicfg_get_boolean(cfg,
-                                                                           EBPF_NETWORK_VIEWER_SECTION,
-                                                                           EBPF_CONFIG_RESOLVE_HOSTNAME,
-                                                                           CONFIG_BOOLEAN_NO);
+    network_viewer_opt.hostname_resolution_enabled =
+        inicfg_get_boolean(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_RESOLVE_HOSTNAME, CONFIG_BOOLEAN_NO);
 
-    network_viewer_opt.service_resolution_enabled = inicfg_get_boolean(cfg,
-                                                                          EBPF_NETWORK_VIEWER_SECTION,
-                                                                          EBPF_CONFIG_RESOLVE_SERVICE,
-                                                                          CONFIG_BOOLEAN_YES);
+    network_viewer_opt.service_resolution_enabled =
+        inicfg_get_boolean(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_RESOLVE_SERVICE, CONFIG_BOOLEAN_YES);
 
     const char *value = inicfg_get(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_PORTS, NULL);
     ebpf_parse_ports(value);
@@ -2777,10 +2773,7 @@ void parse_network_viewer_section(struct config *cfg)
         netdata_log_info("Name resolution is disabled, collector will not parse \"hostnames\" list.");
     }
 
-    value = inicfg_get(cfg,
-                          EBPF_NETWORK_VIEWER_SECTION,
-                          "ips",
-                          NULL);
+    value = inicfg_get(cfg, EBPF_NETWORK_VIEWER_SECTION, "ips", NULL);
     //"ips", "!127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7 !::1/128");
     ebpf_parse_ips_unsafe(value);
 }
@@ -2950,8 +2943,7 @@ static void ebpf_update_interval(int update_every)
 {
     int i;
 
-    int value = (int) inicfg_get_number(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_EVERY,
-                                          update_every);
+    int value = (int)inicfg_get_number(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_EVERY, update_every);
 
     for (i = 0; ebpf_modules[i].info.thread_name; i++) {
         ebpf_modules[i].update_every = value;
@@ -2965,8 +2957,8 @@ static void ebpf_update_interval(int update_every)
  */
 static void ebpf_update_table_size()
 {
-    uint32_t value = (uint32_t) inicfg_get_number(&collector_config, EBPF_GLOBAL_SECTION,
-                                                    EBPF_CFG_PID_SIZE, ND_EBPF_DEFAULT_PID_SIZE);
+    uint32_t value = (uint32_t)inicfg_get_number(
+        &collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE, ND_EBPF_DEFAULT_PID_SIZE);
     for (int i = 0; ebpf_modules[i].info.thread_name; i++) {
         ebpf_modules[i].pid_map_size = value;
     }
@@ -2979,8 +2971,8 @@ static void ebpf_update_table_size()
  */
 static void ebpf_update_lifetime()
 {
-    uint32_t value = (uint32_t) inicfg_get_number(&collector_config, EBPF_GLOBAL_SECTION,
-                                                     EBPF_CFG_LIFETIME, EBPF_DEFAULT_LIFETIME);
+    uint32_t value =
+        (uint32_t)inicfg_get_number(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_LIFETIME, EBPF_DEFAULT_LIFETIME);
 
     for (int i = 0; ebpf_modules[i].info.thread_name; i++) {
         ebpf_modules[i].lifetime = value;
@@ -3021,8 +3013,7 @@ static inline void epbf_update_load_mode(const char *str, netdata_ebpf_load_mode
  */
 static void ebpf_update_map_per_core()
 {
-    int value = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION,
-                                      EBPF_CFG_MAPS_PER_CORE, CONFIG_BOOLEAN_YES);
+    int value = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_MAPS_PER_CORE, CONFIG_BOOLEAN_YES);
 
     for (int i = 0; ebpf_modules[i].info.thread_name; i++) {
         ebpf_modules[i].maps_per_core = value;
@@ -3047,8 +3038,7 @@ static void read_collector_values(int *disable_cgroups, int update_every, netdat
 
     ebpf_how_to_load(value);
 
-    btf_path = inicfg_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PROGRAM_PATH,
-                             EBPF_DEFAULT_BTF_PATH);
+    btf_path = inicfg_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PROGRAM_PATH, EBPF_DEFAULT_BTF_PATH);
 
 #ifdef LIBBPF_MAJOR_VERSION
     default_btf = ebpf_load_btf_file(btf_path, EBPF_DEFAULT_BTF_FILE);
@@ -3065,13 +3055,11 @@ static void read_collector_values(int *disable_cgroups, int update_every, netdat
     ebpf_update_lifetime();
 
     // This is kept to keep compatibility
-    uint32_t enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps",
-                                             CONFIG_BOOLEAN_NO);
+    uint32_t enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", CONFIG_BOOLEAN_NO);
     if (!enabled) {
         // Apps is a positive sentence, so we need to invert the values to disable apps.
-        enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
-                                        CONFIG_BOOLEAN_YES);
-        enabled =  (enabled == CONFIG_BOOLEAN_NO)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_NO;
+        enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION, CONFIG_BOOLEAN_YES);
+        enabled = (enabled == CONFIG_BOOLEAN_NO) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
     }
 
     ebpf_set_apps_mode(!enabled);
@@ -3079,34 +3067,38 @@ static void read_collector_values(int *disable_cgroups, int update_every, netdat
     // Cgroup is a positive sentence, so we need to invert the values to disable apps.
     // We are using the same pattern for cgroup and apps
     enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_CGROUP, CONFIG_BOOLEAN_NO);
-    *disable_cgroups =  (enabled == CONFIG_BOOLEAN_NO)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_NO;
+    *disable_cgroups = (enabled == CONFIG_BOOLEAN_NO) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
 
     ebpf_update_map_per_core();
 
     // Read ebpf programs section
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
-                                    ebpf_modules[EBPF_MODULE_PROCESS_IDX].info.config_name, CONFIG_BOOLEAN_YES);
+    enabled = inicfg_get_boolean(
+        &collector_config,
+        EBPF_PROGRAMS_SECTION,
+        ebpf_modules[EBPF_MODULE_PROCESS_IDX].info.config_name,
+        CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_cgroups);
     }
 
     // This is kept to keep compatibility
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer",
-                                    CONFIG_BOOLEAN_NO);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer", CONFIG_BOOLEAN_NO);
     if (!enabled)
-        enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
-                                        ebpf_modules[EBPF_MODULE_SOCKET_IDX].info.config_name,
-                                        CONFIG_BOOLEAN_NO);
+        enabled = inicfg_get_boolean(
+            &collector_config,
+            EBPF_PROGRAMS_SECTION,
+            ebpf_modules[EBPF_MODULE_SOCKET_IDX].info.config_name,
+            CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_cgroups);
     }
 
     // This is kept to keep compatibility
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring",
-                                    CONFIG_BOOLEAN_YES);
+    enabled = inicfg_get_boolean(
+        &collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring", CONFIG_BOOLEAN_YES);
     if (!enabled)
-        enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connections",
-                                        CONFIG_BOOLEAN_YES);
+        enabled =
+            inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connections", CONFIG_BOOLEAN_YES);
 
     network_viewer_opt.enabled = enabled;
     if (enabled) {
@@ -3119,86 +3111,72 @@ static void read_collector_values(int *disable_cgroups, int update_every, netdat
         ebpf_parse_service_name_section(&collector_config);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat",
-                                    CONFIG_BOOLEAN_NO);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat", CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "sync",
-                                    CONFIG_BOOLEAN_YES);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "sync", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "dcstat",
-                                    CONFIG_BOOLEAN_NO);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "dcstat", CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_DCSTAT_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "swap",
-                                    CONFIG_BOOLEAN_NO);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "swap", CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SWAP_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "vfs",
-                                    CONFIG_BOOLEAN_NO);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "vfs", CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_VFS_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "filesystem",
-                                    CONFIG_BOOLEAN_NO);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "filesystem", CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "disk",
-                                    CONFIG_BOOLEAN_NO);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "disk", CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_DISK_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mount",
-                                    CONFIG_BOOLEAN_YES);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mount", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "fd",
-                                    CONFIG_BOOLEAN_YES);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "fd", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_FD_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "hardirq",
-                                    CONFIG_BOOLEAN_YES);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "hardirq", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "softirq",
-                                    CONFIG_BOOLEAN_YES);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "softirq", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOFTIRQ_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "oomkill",
-                                    CONFIG_BOOLEAN_YES);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "oomkill", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_OOMKILL_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "shm",
-                                    CONFIG_BOOLEAN_YES);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "shm", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SHM_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mdflush",
-                                    CONFIG_BOOLEAN_NO);
+    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mdflush", CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_MDFLUSH_IDX, *disable_cgroups);
     }
