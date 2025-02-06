@@ -8,7 +8,7 @@ static struct {
     size_t instances_count;
     size_t active_vs_archived_percentage;
 } extreme_cardinality = {
-    .enabled = true,
+    .enabled = true, // this value is ignored - there is a dynamic condition to enable it
     .db_rotations = 0,
     .instances_count = 1000,
     .active_vs_archived_percentage = 50,
@@ -1161,7 +1161,8 @@ void *rrdcontext_main(void *ptr) {
 
     extreme_cardinality.enabled = inicfg_get_boolean(
         &netdata_config, CONFIG_SECTION_DB, "extreme cardinality protection",
-        extreme_cardinality.enabled);
+        nd_profile.storage_tiers > 1 && default_rrd_memory_mode == RRD_DB_MODE_DBENGINE
+    );
 
     extreme_cardinality.instances_count = inicfg_get_number_range(
         &netdata_config, CONFIG_SECTION_DB, "extreme cardinality keep instances",
