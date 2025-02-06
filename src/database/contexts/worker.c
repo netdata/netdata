@@ -529,7 +529,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
     rrd_flag_unset_updated(ri);
 }
 
-static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count) {
+static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count, const char *descr) {
     if(!count) return false;
 
     RRDHOST *host = rc->rrdhost;
@@ -603,11 +603,12 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count)
         ND_LOG_STACK_PUSH(lgs);
 
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "EXTREME CARDINALITY PROTECTION: on host '%s', for context '%s': "
+               "EXTREME CARDINALITY PROTECTION: host '%s', context '%s', %s: "
                "forcefully cleared the retention of %zu metrics and %zu instances, "
                "having non-tier0 retention from %s to %s.",
                rrdhost_hostname(rc->rrdhost),
                string2str(rc->id),
+               descr,
                metrics_deleted, instances_deleted,
                from_txt, to_txt);
 
@@ -701,8 +702,13 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                 size_t to_keep = extreme_cardinality.active_vs_archived_percentage * instances_active / 100;
                 size_t to_remove = instances_no_tier0 > to_keep ? instances_no_tier0 - to_keep : 0;
 
-                if(to_remove)
-                    ret = rrdinstance_forcefully_clear_retention(rc, to_remove);
+                if(to_remove) {
+                    char buf[256];
+                    snprintfz(buf, sizeof(buf),
+                              "total active instances %zu, not in tier0 %zu, ephemerality %zu%%",
+                              instances_active, instances_no_tier0, percent);
+                    ret = rrdinstance_forcefully_clear_retention(rc, to_remove, buf);
+                }
             }
         }
 
