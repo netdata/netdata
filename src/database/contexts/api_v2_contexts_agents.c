@@ -5,6 +5,17 @@
 
 void build_info_to_json_object(BUFFER *b);
 
+static time_t round_retention(time_t retention_seconds) {
+    if(retention_seconds > 60 * 86400)
+        retention_seconds = HOWMANY(retention_seconds, 86400) * 86400;
+    else if(retention_seconds > 86400)
+        retention_seconds = HOWMANY(retention_seconds, 3600) * 3600;
+    else
+        retention_seconds = HOWMANY(retention_seconds, 60) * 60;
+
+    return retention_seconds;
+}
+
 void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array) {
     if(!now_s)
         now_s = now_realtime_sec();
@@ -128,9 +139,9 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_uint64(wb, "tier", tier);
-            char human_retention[128];
-            duration_snprintf_time_t(human_retention, sizeof(human_retention), (stime_t)group_seconds);
-            buffer_json_member_add_string(wb, "granularity", human_retention);
+            char human_duration[128];
+            duration_snprintf_time_t(human_duration, sizeof(human_duration), (stime_t)group_seconds);
+            buffer_json_member_add_string(wb, "granularity", human_duration);
 
             buffer_json_member_add_uint64(wb, "metrics", storage_engine_metrics(eng->seb, localhost->db[tier].si));
             buffer_json_member_add_uint64(wb, "samples", storage_engine_samples(eng->seb, localhost->db[tier].si));
@@ -148,18 +159,10 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 buffer_json_member_add_time_t(wb, "to", now_s);
                 buffer_json_member_add_time_t(wb, "retention", retention);
 
-                if(retention < 60)
-                    duration_snprintf_time_t(human_retention, sizeof(human_retention), retention);
-                else if(retention < 24 * 60 * 60) {
-                    int64_t rounded_retention_mins = duration_round_to_resolution(retention, 60);
-                    duration_snprintf_mins(human_retention, sizeof(human_retention), rounded_retention_mins);
-                }
-                else {
-                    int64_t rounded_retention_hours = duration_round_to_resolution(retention, 3600);
-                    duration_snprintf_hours(human_retention, sizeof(human_retention), rounded_retention_hours);
-                }
+                duration_snprintf(human_duration, sizeof(human_duration),
+                                  round_retention(retention), "s", false);
 
-                buffer_json_member_add_string(wb, "retention_human", human_retention);
+                buffer_json_member_add_string(wb, "retention_human", human_duration);
 
                 if(used || max) { // we have disk space information
                     time_t time_retention = 0;
@@ -169,17 +172,18 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                     time_t space_retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
                     time_t actual_retention = MIN(space_retention, time_retention ? time_retention : space_retention);
 
-                    duration_snprintf_hours(human_retention, sizeof(human_retention),
-                                            (int)duration_round_to_resolution(time_retention, 3600));
+                    duration_snprintf(
+                        human_duration, sizeof(human_duration),
+                                            (int)time_retention, "s", false);
 
                     buffer_json_member_add_time_t(wb, "requested_retention", time_retention);
-                    buffer_json_member_add_string(wb, "requested_retention_human", human_retention);
+                    buffer_json_member_add_string(wb, "requested_retention_human", human_duration);
 
-                    duration_snprintf_hours(human_retention, sizeof(human_retention),
-                                            (int)duration_round_to_resolution(actual_retention, 3600));
+                    duration_snprintf(human_duration, sizeof(human_duration),
+                                      (int)round_retention(actual_retention), "s", false);
 
                     buffer_json_member_add_time_t(wb, "expected_retention", actual_retention);
-                    buffer_json_member_add_string(wb, "expected_retention_human", human_retention);
+                    buffer_json_member_add_string(wb, "expected_retention_human", human_duration);
                 }
             }
             buffer_json_object_close(wb);

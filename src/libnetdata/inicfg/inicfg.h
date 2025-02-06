@@ -208,7 +208,6 @@ msec_t inicfg_set_duration_ms(struct config *root, const char *section, const ch
 time_t inicfg_get_duration_seconds(struct config *root, const char *section, const char *name, time_t default_value);
 time_t inicfg_set_duration_seconds(struct config *root, const char *section, const char *name, time_t value);
 
-unsigned inicfg_get_duration_days(struct config *root, const char *section, const char *name, unsigned default_value);
-unsigned inicfg_set_duration_days(struct config *root, const char *section, const char *name, unsigned value);
+time_t inicfg_get_duration_days_to_seconds(struct config *root, const char *section, const char *name, unsigned default_value_seconds);
 
 #endif // LIBNETDATA_INICFG_H

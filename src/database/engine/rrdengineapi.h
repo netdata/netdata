@@ -6,7 +6,7 @@
 #include "rrdengine.h"
 
 #define RRDENG_MIN_PAGE_CACHE_SIZE_MB (8)
-#define RRDENG_MIN_DISK_SPACE_MB (256)
+#define RRDENG_MIN_DISK_SPACE_MB (25)
 #define RRDENG_DEFAULT_TIER_DISK_SPACE_MB (1024)
 
 #define RRDENG_NR_STATS (38)
@@ -78,6 +78,7 @@ void rrdeng_quiesce(struct rrdengine_instance *ctx);
 
 bool rrdeng_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s);
 bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);
+void rrdeng_metric_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 
 extern STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
 extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg);

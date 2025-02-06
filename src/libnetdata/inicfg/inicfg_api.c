@@ -166,13 +166,13 @@ msec_t inicfg_set_duration_ms(struct config *root, const char *section, const ch
     return value;
 }
 
-static STRING *reformat_duration_days(STRING *value) {
+static STRING *reformat_duration_days_to_seconds(STRING *value) {
     int64_t result = 0;
-    if(!duration_parse_days(string2str(value), &result))
+    if(!duration_parse(string2str(value), &result, "d", "s"))
         return value;
 
     char buf[128];
-    if(duration_snprintf_days(buf, sizeof(buf), result) > 0 && string_strcmp(value, buf) != 0) {
+    if(duration_snprintf(buf, sizeof(buf), result, "s", false) > 0 && string_strcmp(value, buf) != 0) {
         string_freez(value);
         return string_strdupz(buf);
     }
@@ -180,32 +180,28 @@ static STRING *reformat_duration_days(STRING *value) {
     return value;
 }
 
-unsigned inicfg_get_duration_days(struct config *root, const char *section, const char *name, unsigned default_value) {
+time_t inicfg_get_duration_days_to_seconds(struct config *root, const char *section, const char *name, unsigned default_value_seconds) {
     char default_str[128];
-    duration_snprintf_days(default_str, sizeof(default_str), (int)default_value);
+    duration_snprintf(default_str, sizeof(default_str), (int)default_value_seconds, "s", false);
 
     struct config_option *opt = inicfg_get_raw_value(
-        root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS, reformat_duration_days);
+        root, section, name, default_str,
+        CONFIG_VALUE_TYPE_DURATION_IN_DAYS_TO_SECONDS,
+        reformat_duration_days_to_seconds);
+
     if(!opt)
-        return default_value;
+        return default_value_seconds;
 
     const char *s = string2str(opt->value);
 
     int64_t result = 0;
-    if(!duration_parse_days(s, &result)) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS);
+    if(!duration_parse(s, &result, "d", "s")) {
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS_TO_SECONDS);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
-        return default_value;
+        return default_value_seconds;
     }
 
     return (unsigned)ABS(result);
-}
-
-unsigned inicfg_set_duration_days(struct config *root, const char *section, const char *name, unsigned value) {
-    char str[128];
-    duration_snprintf_days(str, sizeof(str), value);
-    inicfg_set_raw_value(root, section, name, str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS);
-    return value;
 }
 
 long long inicfg_get_number(struct config *root, const char *section, const char *name, long long value) {

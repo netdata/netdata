@@ -19,7 +19,7 @@ ENUM_STR_MAP_DEFINE(CONFIG_VALUE_TYPES) = {
     { .id = CONFIG_VALUE_TYPE_BOOLEAN_ONDEMAND, .name ="yes, no, or auto", },
     { .id = CONFIG_VALUE_TYPE_DURATION_IN_SECS, .name ="duration (seconds)", },
     { .id = CONFIG_VALUE_TYPE_DURATION_IN_MS, .name ="duration (ms)", },
-    { .id = CONFIG_VALUE_TYPE_DURATION_IN_DAYS, .name ="duration (days)", },
+    { .id = CONFIG_VALUE_TYPE_DURATION_IN_DAYS_TO_SECONDS, .name ="duration (days)", },
     { .id = CONFIG_VALUE_TYPE_SIZE_IN_BYTES, .name ="size (bytes)", },
     { .id = CONFIG_VALUE_TYPE_SIZE_IN_MB, .name ="size (MiB)", },
 };
