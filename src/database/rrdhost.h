@@ -5,6 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
+#define HOST_LABEL_IS_EPHEMERAL "_is_ephemeral"
+
 struct stream_thread;
 struct rrdset;
 

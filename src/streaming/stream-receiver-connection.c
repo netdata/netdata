@@ -701,9 +701,6 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         schedule_node_state_update(rpt->host, 300);
         rrdhost_set_is_parent_label();
 
-        if (rpt->config.ephemeral)
-            rrdhost_option_set(rpt->host, RRDHOST_OPTION_EPHEMERAL_HOST);
-
         // let it reconnect to parents asap
         rrdhost_stream_parents_reset(rpt->host, STREAM_HANDSHAKE_SP_PREPARING);
 

@@ -608,17 +608,6 @@ static inline PARSER_RC pluginsd_label(char **words, size_t num_words, PARSER *p
     if(unlikely(!(parser->user.new_host_labels)))
         parser->user.new_host_labels = rrdlabels_create();
 
-    if (strcmp(name,HOST_LABEL_IS_EPHEMERAL) == 0) {
-        int is_ephemeral = inicfg_test_boolean_value((char *) value);
-        RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_LABEL);
-        if (host) {
-            if (is_ephemeral)
-                rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
-            else
-                rrdhost_option_clear(host, RRDHOST_OPTION_EPHEMERAL_HOST);
-        }
-    }
-
     rrdlabels_add(parser->user.new_host_labels, name, store, str2l(label_source));
 
     if (allocated_store)
@@ -637,8 +626,22 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
         host->rrdlabels = rrdlabels_create();
 
     rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
-    if (rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST))
-        rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, "true", RRDLABEL_SRC_CONFIG);
+
+    {
+        char value[64];
+        rrdlabels_get_value_strcpyz(host->rrdlabels, value, sizeof(value), HOST_LABEL_IS_EPHEMERAL);
+        if(value[0] && inicfg_test_boolean_value(value)) {
+            rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+            strncpyz(value, "true", sizeof(value) - 1);
+        }
+        else {
+            rrdhost_option_clear(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+            strncpyz(value, "false", sizeof(value) - 1);
+        }
+
+        if(!rrdlabels_exist(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL))
+            rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, value, RRDLABEL_SRC_CONFIG);
+    }
 
     if(!rrdlabels_exist(host->rrdlabels, "_os"))
         rrdlabels_add(host->rrdlabels, "_os", string2str(host->os), RRDLABEL_SRC_AUTO);
