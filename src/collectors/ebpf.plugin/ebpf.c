@@ -3190,8 +3190,7 @@ static void ebpf_set_ipc_value(const char *integration)
     if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SHM)) {
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
         return;
-    }
-    else if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SOCKET)) {
+    } else if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SOCKET)) {
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_SOCKET;
         return;
     }
@@ -3200,21 +3199,18 @@ static void ebpf_set_ipc_value(const char *integration)
 
 static void ebpf_parse_ipc_section()
 {
-    const char *integration = inicfg_get(&collector_config,
-                                         NETDATA_EBPF_IPC_SECTION,
-                                         NETDATA_EBPF_IPC_INTEGRATION,
-                                         NETDATA_EBPF_IPC_INTEGRATION_DISABLED);
+    const char *integration = inicfg_get(
+        &collector_config,
+        NETDATA_EBPF_IPC_SECTION,
+        NETDATA_EBPF_IPC_INTEGRATION,
+        NETDATA_EBPF_IPC_INTEGRATION_DISABLED);
     ebpf_set_ipc_value(integration);
 
-    ipc_sockets.default_bind_to = inicfg_get(&collector_config,
-                                         NETDATA_EBPF_IPC_SECTION,
-                                         NETDATA_EBPF_IPC_BIND_TO,
-                                         NETDATA_EBPF_IPC_BIND_TO_DEFAULT);
+    ipc_sockets.default_bind_to = inicfg_get(
+        &collector_config, NETDATA_EBPF_IPC_SECTION, NETDATA_EBPF_IPC_BIND_TO, NETDATA_EBPF_IPC_BIND_TO_DEFAULT);
 
-    ipc_sockets.backlog = (int)inicfg_get_number(&collector_config,
-                                                 NETDATA_EBPF_IPC_SECTION,
-                                                 NETDATA_EBPF_IPC_BACKLOG,
-                                          20);
+    ipc_sockets.backlog =
+        (int)inicfg_get_number(&collector_config, NETDATA_EBPF_IPC_SECTION, NETDATA_EBPF_IPC_BACKLOG, 20);
 }
 
 /**
@@ -4183,10 +4179,8 @@ static void ebpf_initialize_data_sharing()
 {
     switch (integration_with_collectors) {
         case NETDATA_EBPF_INTEGRATION_SOCKET: {
-            socket_ipc = nd_thread_create("ebpf_socket_ipc",
-                                          NETDATA_THREAD_OPTION_DEFAULT,
-                                          ebpf_socket_thread_ipc,
-                                          NULL);
+            socket_ipc =
+                nd_thread_create("ebpf_socket_ipc", NETDATA_THREAD_OPTION_DEFAULT, ebpf_socket_thread_ipc, NULL);
             break;
         }
         case NETDATA_EBPF_INTEGRATION_SHM:
