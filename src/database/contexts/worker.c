@@ -700,6 +700,7 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
             size_t percent = (100 * instances_no_tier0 / instances_active);
             if(percent >= extreme_cardinality.active_vs_archived_percentage) {
                 size_t to_keep = extreme_cardinality.active_vs_archived_percentage * instances_active / 100;
+                to_keep = MAX(to_keep, extreme_cardinality.instances_count);
                 size_t to_remove = instances_no_tier0 > to_keep ? instances_no_tier0 - to_keep : 0;
 
                 if(to_remove) {
