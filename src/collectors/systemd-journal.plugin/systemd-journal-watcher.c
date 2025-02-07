@@ -298,6 +298,50 @@ void journal_watcher_restart(void) {
     __atomic_add_fetch(&journal_watcher_wanted_session_id, 1, __ATOMIC_RELAXED);
 }
 
+static bool process_inotify_events(struct buffered_reader *reader, Watcher *watcher, int inotifyFd) {
+    bool unmount_event = false;
+    ssize_t processed = 0;
+
+    // Process as many complete events as we can
+    while (processed + (ssize_t)sizeof(struct inotify_event) <= reader->read_len) {
+        struct inotify_event *event = (struct inotify_event *)(reader->read_buffer + processed);
+
+        if(event->len > NAME_MAX + 1) {
+            // The event length is impossibly large
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "JOURNAL WATCHER: received impossibly large event length %u - restarting",
+                   event->len);
+            return true; // force a restart
+        }
+
+        // Check if we have the complete event including the name
+        ssize_t total_size = (ssize_t)sizeof(struct inotify_event) + event->len;
+        if (processed + total_size > reader->read_len)
+            break;  // Wait for more data
+
+        if(event->mask & IN_UNMOUNT) {
+            unmount_event = true;
+            break;
+        }
+
+        process_event(watcher, inotifyFd, event);
+        processed += total_size;
+    }
+
+    // If we have unprocessed data, move it to the start
+    if (processed < reader->read_len) {
+        memmove(reader->read_buffer,
+                reader->read_buffer + processed,
+                reader->read_len - processed);
+        reader->read_len -= processed;
+    }
+    else
+        reader->read_len = 0;
+
+    reader->read_buffer[reader->read_len] = '\0';
+    return unmount_event;
+}
+
 void *journal_watcher_main(void *arg __maybe_unused) {
     while(1) {
         size_t journal_watcher_session_id = __atomic_load_n(&journal_watcher_wanted_session_id, __ATOMIC_RELAXED);
@@ -325,40 +369,22 @@ void *journal_watcher_main(void *arg __maybe_unused) {
 
         usec_t last_headers_update_ut = now_monotonic_usec();
         struct buffered_reader reader;
+        buffered_reader_init(&reader);
+
         while (journal_watcher_session_id == __atomic_load_n(&journal_watcher_wanted_session_id, __ATOMIC_RELAXED)) {
             buffered_reader_ret_t rc = buffered_reader_read_timeout(
                     &reader, inotifyFd, SYSTEMD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS, false);
 
-            if (rc != BUFFERED_READER_READ_OK && rc != BUFFERED_READER_READ_POLL_TIMEOUT) {
+            if(rc == BUFFERED_READER_READ_OK || rc == BUFFERED_READER_READ_BUFFER_FULL) {
+                if (process_inotify_events(&reader, &watcher, inotifyFd))
+                    break;
+            }
+            else if (rc != BUFFERED_READER_READ_POLL_TIMEOUT){
                 nd_log(NDLS_COLLECTORS, NDLP_CRIT,
                        "JOURNAL WATCHER: cannot read inotify events, buffered_reader_read_timeout() returned %d - "
                        "restarting the watcher.",
                        rc);
                 break;
-            }
-
-            if(rc == BUFFERED_READER_READ_OK) {
-                bool unmount_event = false;
-
-                ssize_t i = 0;
-                while (i < reader.read_len) {
-                    struct inotify_event *event = (struct inotify_event *) &reader.read_buffer[i];
-
-                    if(event->mask & IN_UNMOUNT) {
-                        unmount_event = true;
-                        break;
-                    }
-
-                    process_event(&watcher, inotifyFd, event);
-                    i += (ssize_t)EVENT_SIZE + event->len;
-                }
-
-                reader.read_buffer[0] = '\0';
-                reader.read_len = 0;
-                reader.pos = 0;
-
-                if(unmount_event)
-                    break;
             }
 
             usec_t ut = now_monotonic_usec();
