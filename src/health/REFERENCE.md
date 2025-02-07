@@ -779,16 +779,13 @@ warn: $this > (($status >= $WARNING)  ? (75) : (85))
 crit: $this > (($status == $CRITICAL) ? (85) : (95))
 ```
 
-| Alert State | Triggers At | Clears At | Explanation                                             |
-|-------------|-------------|-----------|---------------------------------------------------------|
-| Warning     | 85% CPU     | 75% CPU   | Once in warning state, requires a larger drop to clear  |
-| Critical    | 95% CPU     | 85% CPU   | Once in critical state, must drop back to warning level |
+| Alert State | Triggers At | Clears At | Explanation                                                               |
+|-------------|-------------|-----------|---------------------------------------------------------------------------|
+| Warning     | 85% CPU     | 75% CPU   | Creates a 10% buffer - CPU must drop below 75% to clear a warning state   |
+| Critical    | 95% CPU     | 85% CPU   | Creates a 10% buffer - CPU must drop below 85% to return to warning state |
 
-This creates a buffer zone that prevents alert flapping. For example:
 
-- If CPU usage bounces between 80–90%, you'll get just one warning (when it first hits 85%)
-- The warning won't clear until the CPU drops well below the trigger point (75%)
-- The Same principle applies to critical alerts—they won't clear until the CPU drops significantly (85%)
+If CPU usage fluctuates between 80–90%, you'll receive just one initial warning, rather than constant notifications.
 
 This approach gives you the best of both worlds: quick alerting when issues arise, but protection against notification spam when values hover near a threshold.
 
