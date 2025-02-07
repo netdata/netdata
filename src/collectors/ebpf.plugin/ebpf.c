@@ -4184,7 +4184,8 @@ static void ebpf_initialize_data_sharing()
             break;
         }
         case NETDATA_EBPF_INTEGRATION_SHM:
-            netdata_integration_initialize_shm();
+            // All pid_map_size have the same value
+            netdata_integration_initialize_shm(ebpf_modules[EBPF_MODULE_PROCESS_IDX].pid_map_size);
         case NETDATA_EBPF_INTEGRATION_DISABLED:
         default:
             break;
