@@ -35,7 +35,9 @@ ENUM_STR_MAP_DEFINE(INOTIFY_MASK) = {
     {.id = IN_ONLYDIR, .name = "IN_ONLYDIR"},
     {.id = IN_DONT_FOLLOW, .name = "IN_DONT_FOLLOW"},
     {.id = IN_EXCL_UNLINK, .name = "IN_EXCL_UNLINK"},
+#ifdef IN_MASK_CREATE
     {.id = IN_MASK_CREATE, .name = "IN_MASK_CREATE"},
+#endif
     {.id = IN_MASK_ADD, .name = "IN_MASK_ADD"},
     {.id = IN_ISDIR, .name = "IN_ISDIR"},
     {.id = IN_ONESHOT, .name = "IN_ONESHOT"},
