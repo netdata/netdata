@@ -696,6 +696,7 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 
         if(extreme_cardinality.enabled &&
             extreme_cardinality.db_rotations &&
+            instances_active &&
             instances_no_tier0 >= extreme_cardinality.instances_count) {
             size_t percent = (100 * instances_no_tier0 / instances_active);
             if(percent >= extreme_cardinality.active_vs_archived_percentage) {

@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#19585](https://github.com/netdata/netdata/pull/19585) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/zookeeper\): add more metrics [\#19584](https://github.com/netdata/netdata/pull/19584) ([ilyam8](https://github.com/ilyam8))
+- Format missing file \(eBPF.plugin\) [\#19582](https://github.com/netdata/netdata/pull/19582) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(go.d/apache\): make ?auto param check non-fatal [\#19580](https://github.com/netdata/netdata/pull/19580) ([ilyam8](https://github.com/ilyam8))
 - Fix static build conditions to run on release and nightly builds. [\#19579](https://github.com/netdata/netdata/pull/19579) ([Ferroin](https://github.com/Ferroin))
 - build\(deps\): update go toolchain to v1.23.6 [\#19578](https://github.com/netdata/netdata/pull/19578) ([ilyam8](https://github.com/ilyam8))
@@ -82,6 +85,7 @@
 - Further improve alert processing [\#19489](https://github.com/netdata/netdata/pull/19489) ([stelfrag](https://github.com/stelfrag))
 - LTO Benchmark [\#19488](https://github.com/netdata/netdata/pull/19488) ([ktsaou](https://github.com/ktsaou))
 - Improve alert transition processing [\#19487](https://github.com/netdata/netdata/pull/19487) ([stelfrag](https://github.com/stelfrag))
+- protection against extreme cardinality [\#19486](https://github.com/netdata/netdata/pull/19486) ([ktsaou](https://github.com/ktsaou))
 - add agent name and version in streaming function [\#19485](https://github.com/netdata/netdata/pull/19485) ([ktsaou](https://github.com/ktsaou))
 - Coverity fixes [\#19484](https://github.com/netdata/netdata/pull/19484) ([ktsaou](https://github.com/ktsaou))
 - add system-info columns to streaming function [\#19482](https://github.com/netdata/netdata/pull/19482) ([ktsaou](https://github.com/ktsaou))
@@ -475,10 +479,6 @@
 - feat\(go.d/pkg/web\): add "force\_http2" option [\#19047](https://github.com/netdata/netdata/pull/19047) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#19045](https://github.com/netdata/netdata/pull/19045) ([netdatabot](https://github.com/netdatabot))
 - Capitalize the word "Agent" [\#19044](https://github.com/netdata/netdata/pull/19044) ([Ancairon](https://github.com/Ancairon))
-- Capitalize the word "cloud" [\#19043](https://github.com/netdata/netdata/pull/19043) ([Ancairon](https://github.com/Ancairon))
-- Add a special version number to bypass alert snapshots [\#19042](https://github.com/netdata/netdata/pull/19042) ([stelfrag](https://github.com/stelfrag))
-- Add Custom Actions \(Installer\) [\#19041](https://github.com/netdata/netdata/pull/19041) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix\(go.d/nvidia\_smi\): disable loop mode on Win [\#19040](https://github.com/netdata/netdata/pull/19040) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
