@@ -22,7 +22,7 @@ void netdata_integration_cleanup_shm()
     }
 }
 
-int netdata_integration_initialize_shm()
+int netdata_integration_initialize_shm(size_t pids)
 {
     shm_fd_ebpf_integration = shm_open(NETDATA_EBPF_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
     if (shm_fd_ebpf_integration < 0) {
@@ -30,7 +30,7 @@ int netdata_integration_initialize_shm()
         return -1;
     }
 
-    size_t length = os_get_system_pid_max() * sizeof(netdata_ebpf_pid_stats_t);
+    size_t length = pids * sizeof(netdata_ebpf_pid_stats_t);
     if (ftruncate(shm_fd_ebpf_integration, (off_t)length)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot set size for shared memory.");
         goto end_shm;

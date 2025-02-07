@@ -202,7 +202,7 @@ typedef struct netdata_ebpf_pid_stats {
 #define NETDATA_EBPF_INTEGRATION_NAME "netdata_shm_integration_ebpf"
 #define NETDATA_EBPF_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpf"
 
-int netdata_integration_initialize_shm();
+int netdata_integration_initialize_shm(size_t pids);
 void netdata_integration_cleanup_shm();
 
 #ifdef __cplusplus
