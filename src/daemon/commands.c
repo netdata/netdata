@@ -47,23 +47,27 @@ static cmd_status_t cmd_ping_execute(char *args, char **message);
 static cmd_status_t cmd_aclk_state(char *args, char **message);
 static cmd_status_t cmd_version(char *args, char **message);
 static cmd_status_t cmd_dumpconfig(char *args, char **message);
-static cmd_status_t cmd_remove_node(char *args, char **message);
+static cmd_status_t cmd_remove_stale_node(char *args, char **message);
+static cmd_status_t cmd_mark_stale_nodes_ephemeral(char *args, char **message);
 
 static command_info_t command_info_array[] = {
-        {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
-        {"reload-health", cmd_reload_health_execute, CMD_TYPE_ORTHOGONAL},   // reload health configuration
-        {"reopen-logs", cmd_reopen_logs_execute, CMD_TYPE_ORTHOGONAL},       // Close and reopen log files
-        {"shutdown-agent", cmd_exit_execute, CMD_TYPE_EXCLUSIVE},            // exit cleanly
-        {"fatal-agent", cmd_fatal_execute, CMD_TYPE_HIGH_PRIORITY},          // exit with fatal error
-        {"reload-claiming-state", cmd_reload_claiming_state_execute, CMD_TYPE_ORTHOGONAL}, // reload claiming state
-        {"reload-labels", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL},   // reload the labels
-        {"read-config", cmd_read_config_execute, CMD_TYPE_CONCURRENT},
-        {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL},
-        {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL},
-        {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL},
-        {"version", cmd_version, CMD_TYPE_ORTHOGONAL},
-        {"dumpconfig", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL},
-        {"remove-stale-node", cmd_remove_node, CMD_TYPE_ORTHOGONAL}
+    {"help", "", "Show this help menu.", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                // show help menu
+    {"reload-health", "", "Reload health configuration.", cmd_reload_health_execute, CMD_TYPE_ORTHOGONAL}, // reload health configuration
+    {"reopen-logs", "", "Close and reopen log files.", cmd_reopen_logs_execute, CMD_TYPE_ORTHOGONAL},     // Close and reopen log files
+    {"shutdown-agent", "", "Cleanup and exit the netdata agent.", cmd_exit_execute, CMD_TYPE_EXCLUSIVE},          // exit cleanly
+    {"fatal-agent", "", "Log the state and halt the netdata agent.", cmd_fatal_execute, CMD_TYPE_HIGH_PRIORITY},        // exit with fatal error
+    {"reload-claiming-state", "", "Reload agent claiming state from disk.", cmd_reload_claiming_state_execute, CMD_TYPE_ORTHOGONAL}, // reload claiming state
+    {"reload-labels", "", "Reload all localhost labels.", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL},                 // reload the labels
+    {"read-config", "", "", cmd_read_config_execute, CMD_TYPE_CONCURRENT},
+    {"write-config", "", "", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL},
+    {"ping", "", "Return with 'pong' if agent is alive.", cmd_ping_execute, CMD_TYPE_ORTHOGONAL},
+    {"aclk-state", "[json]",  "Returns current state of ACLK and Netdata Cloud connection. (optionally in json).", cmd_aclk_state, CMD_TYPE_ORTHOGONAL},
+    {"version", "", "Returns the netdata version.", cmd_version, CMD_TYPE_ORTHOGONAL},
+    {"dumpconfig", "", "Returns the current netdata.conf on stdout.", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL},
+    {"remove-stale-node", "<node_id | machine_guid | hostname | ALL_NODES>",
+     "Marks one or all disconnected nodes as ephemeral, and removes them\n      so that they are no longer available for queries, from both this\n      Netdata Agent dashboard and Netdata Cloud.", cmd_remove_stale_node, CMD_TYPE_ORTHOGONAL},
+    {"mark-stale-nodes-ephemeral", "<node_id | machine_guid | hostname | ALL_NODES>",
+     "Marks one or all disconnected nodes as ephemeral, while keeping their retention\n      available for queries on both this Netdata Agent dashboard and Netdata Cloud", cmd_mark_stale_nodes_ephemeral, CMD_TYPE_ORTHOGONAL},
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -105,35 +109,26 @@ static command_lock_t *cmd_unlock_by_type[] = {
 static cmd_status_t cmd_help_execute(char *args, char **message)
 {
     (void)args;
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
-    *message = mallocz(MAX_COMMAND_LENGTH);
-    strncpyz(*message,
-             "\nThe commands are:\n\n"
-             "help\n"
-             "    Show this help menu.\n\n"
-             "reload-health\n"
-             "    Reload health configuration.\n\n"
-             "reload-labels\n"
-             "    Reload all labels.\n\n"
-             "reopen-logs\n"
-             "    Close and reopen log files.\n\n"
-             "shutdown-agent\n"
-             "    Cleanup and exit the netdata agent.\n\n"
-             "fatal-agent\n"
-             "    Log the state and halt the netdata agent.\n\n"
-             "reload-claiming-state\n"
-             "    Reload agent claiming state from disk.\n\n"
-             "ping\n"
-             "    Return with 'pong' if agent is alive.\n\n"
-             "aclk-state [json]\n"
-             "    Returns current state of ACLK and Cloud connection. (optionally in json).\n\n"
-             "dumpconfig\n"
-             "    Returns the current netdata.conf on stdout.\n\n"
-             "remove-stale-node <node_id | machine_guid | hostname | ALL_NODES>\n"
-             "    Unregisters and removes a node from the cloud.\n\n"
-             "version\n"
-             "    Returns the netdata version.\n",
-             MAX_COMMAND_LENGTH - 1);
+    buffer_strcat(wb, "The commands are:\n\n");
+    for(size_t i = 0; i < _countof(command_info_array); i++) {
+        const command_info_t *t = &command_info_array[i];
+        if(!t->help || !t->help[0]) continue;
+
+        buffer_strcat(wb, "  ");
+        buffer_strcat(wb, t->cmd_str);
+        if(t->params && t->params[0]) {
+            buffer_putc(wb, ' ');
+            buffer_strcat(wb, t->params);
+        }
+        buffer_putc(wb, '\n');
+        buffer_strcat(wb, "      ");
+        buffer_strcat(wb, t->help);
+        buffer_strcat(wb, "\n\n");
+    }
+
+    *message = strdupz(buffer_tostring(wb));
     return CMD_STATUS_SUCCESS;
 }
 
@@ -351,40 +346,51 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
-static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error)
+static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, bool unregister)
 {
     if (host == localhost) {
         if (report_error)
-            buffer_sprintf(wb, "You cannot unregister the parent node (%s)", rrdhost_hostname(host));
+            buffer_sprintf(wb, "Node '%s' (machine guid: %s) is our localhost - not changing it",
+                           rrdhost_hostname(host), host->machine_guid);
         return 0;
     }
 
     if (rrdhost_is_online(host)) {
         if (report_error)
-            buffer_sprintf(wb, "Cannot unregister a live node (%s)", rrdhost_hostname(host));
+            buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
+                           rrdhost_hostname(host), host->machine_guid);
         return 0;
     }
 
     if (!rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST)) {
         rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
         sql_set_host_label(&host->host_id.uuid, "_is_ephemeral", "true");
-        aclk_host_state_update(host, 0, 0);
-        unregister_node(host->machine_guid);
-        host->node_id = UUID_ZERO;
-        buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
-        rrd_wrlock();
-        rrdhost_free___while_having_rrd_wrlock(host, true);
-        rrd_wrunlock();
+
+        if(unregister) {
+            aclk_host_state_update(host, 0, 0);
+            unregister_node(host->machine_guid);
+            host->node_id = UUID_ZERO;
+            buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been unregistered",
+                           rrdhost_hostname(host), host->machine_guid);
+            rrd_wrlock();
+            rrdhost_free___while_having_rrd_wrlock(host);
+            rrd_wrunlock();
+        }
+        else
+            buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been marked ephemeral",
+                           rrdhost_hostname(host), host->machine_guid);
+
         return 1;
     }
     if (report_error)
-       buffer_sprintf(wb, "Node with machine guid %s, hostname = %s is already unregistered", host->machine_guid, rrdhost_hostname(host));
+       buffer_sprintf(wb, "Node '%s' (machine guid: %s) is already ephemeral - not changing it",
+                       rrdhost_hostname(host), host->machine_guid);
     return 0;
 }
 
 #define SQL_HOSTNAME_TO_REMOVE "SELECT host_id FROM host WHERE (hostname = @hostname OR @hostname = 'ALL_NODES')"
 
-static cmd_status_t cmd_remove_node(char *args, char **message)
+static cmd_status_t cmd_remove_stale_node_internal(char *args, char **message, bool unregister)
 {
     (void)args;
 
@@ -402,7 +408,7 @@ static cmd_status_t cmd_remove_node(char *args, char **message)
     if (!host) {
         sqlite3_stmt *res = NULL;
 
-        bool report_error = strcmp(args, "ALL_NODES");
+        bool report_error = strcmp(args, "ALL_NODES") != 0;
 
         if (!PREPARE_STATEMENT(db_meta, SQL_HOSTNAME_TO_REMOVE, &res)) {
             buffer_sprintf(wb, "Failed to prepare database statement to check for stale nodes");
@@ -421,7 +427,7 @@ static cmd_status_t cmd_remove_node(char *args, char **message)
             if (host) {
                 if (cnt)
                     buffer_fast_strcat(wb, "\n", 1);
-                cnt += remove_ephemeral_host(wb, host, report_error);
+                cnt += remove_ephemeral_host(wb, host, report_error, unregister);
             }
         }
         if (!cnt && buffer_strlen(wb) == 0) {
@@ -435,12 +441,22 @@ static cmd_status_t cmd_remove_node(char *args, char **message)
         SQLITE_FINALIZE(res);
     }
     else
-        (void) remove_ephemeral_host(wb, host, true);
+        (void) remove_ephemeral_host(wb, host, true, unregister);
 
 done:
     *message = strdupz(buffer_tostring(wb));
     buffer_free(wb);
     return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_remove_stale_node(char *args, char **message)
+{
+    return cmd_remove_stale_node_internal(args, message, true);
+}
+
+static cmd_status_t cmd_mark_stale_nodes_ephemeral(char *args, char **message)
+{
+    return cmd_remove_stale_node_internal(args, message, false);
 }
 
 static void cmd_lock_exclusive(unsigned index)
