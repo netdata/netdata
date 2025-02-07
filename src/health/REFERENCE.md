@@ -779,10 +779,10 @@ warn: $this > (($status >= $WARNING)  ? (75) : (85))
 crit: $this > (($status == $CRITICAL) ? (85) : (95))
 ```
 
-| Alert State | Triggers At | Triggers At | Explanation                                             |
-|-------------|-------------|-------------|---------------------------------------------------------|
-| Warning     | 85% CPU     | 75% CPU     | Once in warning state, requires a larger drop to clear  |
-| Critical    | 95% CPU     | 85% CPU     | Once in critical state, must drop back to warning level |
+| Alert State | Triggers At | Clears At | Explanation                                             |
+|-------------|-------------|-----------|---------------------------------------------------------|
+| Warning     | 85% CPU     | 75% CPU   | Once in warning state, requires a larger drop to clear  |
+| Critical    | 95% CPU     | 85% CPU   | Once in critical state, must drop back to warning level |
 
 This creates a buffer zone that prevents alert flapping. For example:
 
