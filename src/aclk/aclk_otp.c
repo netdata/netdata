@@ -368,7 +368,7 @@ static https_client_resp_t aclk_send_otp_response(const char *agent_id, const un
     BUFFER *resp_json = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20, &netdata_buffers_statistics.buffers_aclk);
 
     buffer_sprintf(url, "%s/node/%s/password", target->path, agent_id);
-    buffer_sprintf(resp_json, "{\"response\":\"%s\"}", base64);
+    buffer_sprintf(resp_json, "{\"agent_version\":\"%s\", \"response\":\"%s\"}", NETDATA_VERSION, base64);
 
     req.url = (char *)buffer_tostring(url);
     req.payload = (char *)buffer_tostring(resp_json);
