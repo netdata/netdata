@@ -49,12 +49,12 @@ void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengin
     }
 
     uv_fs_req_cleanup(&io_descr->req);
+    ctx_current_disk_space_increase(ctx, wal->buf_size);
+    ctx_io_write_op_bytes(ctx, wal->buf_size);
+
     wal_release(wal);
     __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
     worker_is_idle();
-
-    ctx_current_disk_space_increase(ctx, wal->buf_size);
-    ctx_io_write_op_bytes(ctx, wal->buf_size);
 }
 
 void journalfile_v2_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
