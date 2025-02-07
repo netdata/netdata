@@ -138,7 +138,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: zookeeper server
+        - name: ZooKeeper server
           description: These metrics refer to ZooKeeper servers.
           labels: []
           metrics:

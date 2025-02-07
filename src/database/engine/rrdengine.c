@@ -905,6 +905,7 @@ static void *extent_write_tp_worker(
             netdata_log_error(
                 "DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)xt_io_descr->uv_fs_request.result));
     }
+    uv_fs_req_cleanup(&xt_io_descr->uv_fs_request);
 
     if (likely(!df_write_error)) {
         journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
