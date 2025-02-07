@@ -86,8 +86,8 @@ static int add_watch(Watcher *watcher, int inotifyFd, const char *path) {
     else {
         t->path = strdupz(path);
 
-        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-               "JOURNAL WATCHER: watching directory: '%s'",
+        nd_log(NDLS_COLLECTORS, NDLP_INFO,
+               "JOURNAL WATCHER DEBUG: watching directory: '%s'",
                path);
 
     }
@@ -99,8 +99,8 @@ static void remove_watch(Watcher *watcher, int inotifyFd, int wd) {
     for (i = 0; i < watcher->watchCount; ++i) {
         if (watcher->watchList[i].wd == wd) {
 
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                   "JOURNAL WATCHER: removing watch from directory: '%s'",
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                   "JOURNAL WATCHER DEBUG: removing watch from directory: '%s'",
                    watcher->watchList[i].path);
 
             inotify_rm_watch(inotifyFd, watcher->watchList[i].wd);
@@ -224,8 +224,8 @@ void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
     if(event->mask & IN_ISDIR) {
         if (event->mask & (IN_DELETE | IN_MOVED_FROM)) {
             // A directory is deleted or moved out
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                    "JOURNAL WATCHER: Directory deleted or moved out: '%s'",
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                    "JOURNAL WATCHER DEBUG: Directory deleted or moved out: '%s'",
                     fullPath);
 
             // Remove the watch - implement this function based on how you manage your watches
@@ -233,8 +233,8 @@ void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
         }
         else if (event->mask & (IN_CREATE | IN_MOVED_TO)) {
             // A new directory is created or moved in
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                    "JOURNAL WATCHER: New directory created or moved in: '%s'",
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                    "JOURNAL WATCHER DEBUG: New directory created or moved in: '%s'",
                     fullPath);
 
             // Start watching the new directory - recursive watch
@@ -251,8 +251,8 @@ void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
         dictionary_set(watcher->pending, fullPath, NULL, 0);
     }
     else
-        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-               "JOURNAL WATCHER: ignoring event with mask %u for file '%s'",
+        nd_log(NDLS_COLLECTORS, NDLP_INFO,
+               "JOURNAL WATCHER DEBUG: ignoring event with mask %u for file '%s'",
                event->mask, fullPath);
 }
 
@@ -263,15 +263,15 @@ static void process_pending(Watcher *watcher) {
         const char *fullPath = x_dfe.name;
 
         if(stat(fullPath, &info) != 0) {
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                   "JOURNAL WATCHER: file '%s' no longer exists, removing it from the registry",
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                   "JOURNAL WATCHER DEBUG: file '%s' no longer exists, removing it from the registry",
                    fullPath);
 
             dictionary_del(journal_files_registry, fullPath);
         }
         else if(S_ISREG(info.st_mode)) {
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                    "JOURNAL WATCHER: file '%s' has been added/updated, updating the registry",
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                    "JOURNAL WATCHER DEBUG: file '%s' has been added/updated, updating the registry",
                     fullPath);
 
             struct journal_file t = {
