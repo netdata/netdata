@@ -15,7 +15,7 @@ files.
 
 ## Reload health configuration
 
-You do not need to restart the Netdata Agent between changes to health configuration files, such as specific health entities. Instead, you can use `netdatacli` and the `reload-health` option to prevent gaps in metrics collection.
+You don’t need to restart the Netdata Agent between changes to health configuration files, such as specific health entities. Instead, you can use `netdatacli` and the `reload-health` option to prevent gaps in metrics collection.
 
 ```bash
 sudo netdatacli reload-health
@@ -36,7 +36,7 @@ You can configure the Agent's health watchdog service by editing files in two lo
     [daemon configuration](/src/daemon/config/README.md#health-section-options) for a table of
     all the available settings, their default values, and what they control.
 
-- The individual `.conf` files in `health.d/`. These health entity files are organized by the type of metric they are
+- The individual `.conf` files in `health.d/`. These health entity files are organized by the type of metric they’re
     performing calculations on or their associated collector. You should edit these files using the `edit-config`
     script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
@@ -270,7 +270,7 @@ template: NAME
 ```
 
 `NAME` can be any alpha character, with `.` (period) and `_` (underscore) as the only allowed symbols, but the names
-cannot be `chart name`, `dimension name`, `family name`, or `chart variables names`.
+can’t be `chart name`, `dimension name`, `family name`, or `chart variables names`.
 
 #### Alert line `on`
 
@@ -516,7 +516,7 @@ including custom hooks.
 #### Alert line `delay`
 
 This is used to provide optional hysteresis settings for the notifications, to defend against notification floods. These
-settings do not affect the actual alert - only the time the `exec` script is executed.
+settings don’t affect the actual alert - only the time the `exec` script is executed.
 
 Format:
 
@@ -660,7 +660,7 @@ chart labels: mount_point=/mnt/disk1 device=sda
 ```
 
 Will create the alert if the `mount_point` is `/mnt/disk1` and the `device` is `sda`. Furthermore, if a chart label name
-is specified that does not exist in the chart, the chart won't be matched.
+is specified that doesn’t exist in the chart, the chart won't be matched.
 
 See our [simple patterns docs](/src/libnetdata/simple_pattern/README.md) for more examples.
 
@@ -770,36 +770,27 @@ There are two special values you can use:
 
 ### Special use of the conditional operator
 
-A common (but not necessarily obvious) use of the conditional evaluation operator is to provide
-[hysteresis](https://en.wikipedia.org/wiki/Hysteresis) around the critical or warning thresholds.  This usage helps to
-avoid bogus messages resulting from small variations in the value when it is varying regularly but staying close to the
-threshold value, without needing to delay sending messages at all.
+The conditional operator (`? :`) can create "sticky" alert thresholds that prevent alert spam when values fluctuate around a threshold. This is called [hysteresis](https://en.wikipedia.org/wiki/Hysteresis)—where the threshold to trigger an alert is different from the threshold to clear it.
 
-An example of such usage from the default CPU usage alerts bundled with Netdata is:
+**Example: CPU Usage Alert**
 
 ```yaml
 warn: $this > (($status >= $WARNING)  ? (75) : (85))
 crit: $this > (($status == $CRITICAL) ? (85) : (95))
 ```
 
-The above say:
+| Alert State | Triggers At | Triggers At | Explanation                                             |
+|-------------|-------------|-------------|---------------------------------------------------------|
+| Warning     | 85% CPU     | 75% CPU     | Once in warning state, requires a larger drop to clear  |
+| Critical    | 95% CPU     | 85% CPU     | Once in critical state, must drop back to warning level |
 
-- If the alert is currently a warning, then the threshold for being considered a warning is 75, otherwise it's 85.
+This creates a buffer zone that prevents alert flapping. For example:
 
-- If the alert is currently critical, then the threshold for being considered critical is 85, otherwise it's 95.
+- If CPU usage bounces between 80–90%, you'll get just one warning (when it first hits 85%)
+- The warning won't clear until the CPU drops well below the trigger point (75%)
+- The Same principle applies to critical alerts—they won't clear until the CPU drops significantly (85%)
 
-Which in turn, results in the following behavior:
-
-- While the value is rising, it will trigger a warning when it exceeds 85, and a critical alert when it exceeds 95.
-
-- While the value is falling, it will return to a warning state when it goes below 85, and a normal state when it goes
-    below 75.
-
-- If the value is constantly varying between 80 and 90, then it will trigger a warning the first time it goes above
-    85, but will remain a warning until it goes below 75 (or goes above 85).
-
-- If the value is constantly varying between 90 and 100, then it will trigger a critical alert the first time it goes
-    above 95, but will remain a critical alert goes below 85 (at which point it will return to being a warning).
+This approach gives you the best of both worlds: quick alerting when issues arise, but protection against notification spam when values hover near a threshold.
 
 ## Variables
 
@@ -935,7 +926,7 @@ If these result in non-zero or true, they trigger the alert.
 
 `$update_every` is the update frequency of the chart, in seconds.
 
-So, the warning condition checks if we have not collected data from apache for 5
+So, the warning condition checks if we haven’t collected data from apache for 5
 iterations and the critical condition checks for 10 iterations.
 
 ### Example 2 - disk space
@@ -1018,7 +1009,7 @@ The `lookup` line will calculate the sum of the all dropped packets in the last 
 
 The `crit` line will issue a critical alert if even a single packet has been dropped.
 
-Note that the drops chart does not exist if a network interface has never dropped a single packet.
+Note that the drops chart doesn’t exist if a network interface has never dropped a single packet.
 When Netdata detects a dropped packet, it will add the chart, and it will automatically attach this
 alert to it.
 
