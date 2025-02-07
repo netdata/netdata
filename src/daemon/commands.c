@@ -376,9 +376,11 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
             rrdhost_free___while_having_rrd_wrlock(host);
             rrd_wrunlock();
         }
-        else
+        else {
+            pulse_host_status(host, 0, 0);
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been marked ephemeral",
                            rrdhost_hostname(host), host->machine_guid);
+        }
 
         return 1;
     }
@@ -425,9 +427,11 @@ static cmd_status_t cmd_remove_stale_node_internal(char *args, char **message, b
             uuid_unparse_lower(*(nd_uuid_t *)sqlite3_column_blob(res, 0), guid);
             host = rrdhost_find_by_guid(guid);
             if (host) {
-                if (cnt)
+                int rc = remove_ephemeral_host(wb, host, report_error, unregister);
+                if(rc) {
+                    cnt += rc;
                     buffer_fast_strcat(wb, "\n", 1);
-                cnt += remove_ephemeral_host(wb, host, report_error, unregister);
+                }
             }
         }
         if (!cnt && buffer_strlen(wb) == 0) {
