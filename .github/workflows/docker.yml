@@ -70,6 +70,7 @@ jobs:
             .dockerignore
             CMakeLists.txt
             netdata-installer.sh
+            .github/data/distros.yml
             .github/workflows/docker.yml
             .github/scripts/docker-test.sh
             .github/scripts/gen-matrix-docker.py

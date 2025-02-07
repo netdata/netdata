@@ -60,7 +60,7 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per zookeeper server
+### Per ZooKeeper server
 
 These metrics refer to ZooKeeper servers.
 
