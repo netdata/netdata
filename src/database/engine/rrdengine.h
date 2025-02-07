@@ -283,27 +283,14 @@ struct extent_io_data {
 
 struct extent_io_descriptor {
     struct rrdengine_instance *ctx;
-    uv_fs_t uv_fs_request;
-    uv_buf_t iov;
-    uv_file file;
     void *buf;
-    struct wal *wal;
     uint64_t pos;
-    unsigned bytes;
     unsigned descr_count;
+    unsigned bytes;
+    struct wal *wal;
+    uv_file file;
     struct page_descr_with_data *descr_array[MAX_PAGES_PER_EXTENT];
     struct rrdengine_datafile *datafile;
-    struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
-};
-
-struct generic_io_descriptor {
-    struct rrdengine_instance *ctx;
-    uv_fs_t req;
-    uv_buf_t iov;
-    void *buf;
-    void *data;
-    uint64_t pos;
-    unsigned bytes;
 };
 
 typedef struct wal {
@@ -311,7 +298,6 @@ typedef struct wal {
     void *buf;
     size_t size;
     size_t buf_size;
-    struct generic_io_descriptor io_descr;
 
     struct {
         struct wal *prev;

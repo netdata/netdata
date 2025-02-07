@@ -620,10 +620,8 @@ static void journalfile_extent_build(struct rrdengine_instance *ctx, struct exte
     crc32set(jf_trailer->checksum, crc);
 }
 
-static void extent_flushed_to_open_tp_worker(
-    struct rrdengine_instance *ctx,
-    struct extent_io_descriptor *xt_io_descr,
-    bool have_error)
+static void
+extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr, bool have_error)
 {
     worker_is_busy(UV_EVENT_DBENGINE_FLUSHED_TO_OPEN);
 
@@ -730,7 +728,8 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
 /*
  * Take a page list in a judy array and write them
  */
-static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_data *base)
+static struct extent_io_descriptor *
+datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_data *base, uv_buf_t *iov)
 {
     int ret;
     unsigned i, count, size_bytes, pos, real_io_size;
@@ -760,7 +759,6 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     }
 
     xt_io_descr = extent_io_descriptor_get();
-    xt_io_descr->ctx = ctx;
     payload_offset = sizeof(*header) + count * sizeof(header->descr[0]);
     max_compressed_size = dbengine_max_compressed_size(uncompressed_payload_length, compression_algorithm);
     size_bytes = payload_offset + MAX(uncompressed_payload_length, max_compressed_size) + sizeof(*trailer);
@@ -846,14 +844,13 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     spinlock_unlock(&datafile->writers.spinlock);
 
     xt_io_descr->bytes = size_bytes;
-    xt_io_descr->uv_fs_request.data = xt_io_descr;
 
     trailer = xt_io_descr->buf + size_bytes - sizeof(*trailer);
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, xt_io_descr->buf, size_bytes - sizeof(*trailer));
     crc32set(trailer->checksum, crc);
 
-    xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
+    *iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
     journalfile_extent_build(ctx, xt_io_descr);
 
     ctx_last_flush_fileno_set(ctx, datafile->fileno);
@@ -875,23 +872,25 @@ static void *extent_write_tp_worker(
     uv_work_t *req __maybe_unused)
 {
     worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
+    uv_buf_t iov;
     struct page_descr_with_data *base = data;
-    struct extent_io_descriptor *xt_io_descr = datafile_extent_build(ctx, base);
+    struct extent_io_descriptor *xt_io_descr = datafile_extent_build(ctx, base, &iov);
 
     if (!xt_io_descr)
         goto done;
 
     struct rrdengine_datafile *datafile = xt_io_descr->datafile;
+    uv_fs_t request;
 
     int retries = 10;
     int ret = -1;
     while (ret == -1 && --retries) {
-        ret = uv_fs_write(NULL, &xt_io_descr->uv_fs_request, datafile->file, &xt_io_descr->iov, 1, (int64_t)xt_io_descr->pos, NULL);
+        ret = uv_fs_write(NULL, &request, datafile->file, &iov, 1, (int64_t)xt_io_descr->pos, NULL);
         if (ret == -1)
             sleep_usec(300 * USEC_PER_MS);
     }
 
-    bool df_write_error = (ret == -1 || xt_io_descr->uv_fs_request.result < 0);
+    bool df_write_error = (ret == -1 || request.result < 0);
 
     if (unlikely(df_write_error)) {
         ctx_io_error(ctx);
@@ -903,9 +902,9 @@ static void *extent_write_tp_worker(
                 (int64_t)xt_io_descr->pos);
         else
             netdata_log_error(
-                "DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)xt_io_descr->uv_fs_request.result));
+                "DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)request.result));
     }
-    uv_fs_req_cleanup(&xt_io_descr->uv_fs_request);
+    uv_fs_req_cleanup(&request);
 
     if (likely(!df_write_error)) {
         journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
@@ -916,7 +915,7 @@ static void *extent_write_tp_worker(
     datafile->writers.flushed_to_open_running++;
     spinlock_unlock(&datafile->writers.spinlock);
 
-    extent_flushed_to_open_tp_worker(ctx, xt_io_descr, df_write_error);
+    extent_flush_to_open(ctx, xt_io_descr, df_write_error);
 
      if(ctx_is_available_for_queries(ctx))
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);

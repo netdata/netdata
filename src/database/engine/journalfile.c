@@ -35,7 +35,7 @@ void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengin
         ctx_io_error(ctx);
         if (ret == -1)
             netdata_log_error(
-                "DBENGINE: %s: uv_fs_write: failed to store metadata in journalfile %u, offset %ld",
+                "DBENGINE: %s: uv_fs_write: failed to store metadata in journalfile %u, offset %"PRIu64,
                 __func__,
                 datafile->fileno,
                 journalfile_position);
