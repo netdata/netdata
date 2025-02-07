@@ -25,6 +25,8 @@ typedef enum {
     PULSE_HOST_STATUS_SND_REPLICATING       = (1 << 14),
     PULSE_HOST_STATUS_SND_RUNNING           = (1 << 15),
     PULSE_HOST_STATUS_DELETED               = (1 << 16),
+    PULSE_HOST_STATUS_EPHEMERAL             = (1 << 17),
+    PULSE_HOST_STATUS_PERMANENT = (1 << 18),
 } PULSE_HOST_STATUS;
 
 void pulse_host_status(RRDHOST *host, PULSE_HOST_STATUS status, STREAM_HANDSHAKE reason);
