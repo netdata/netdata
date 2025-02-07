@@ -112,8 +112,8 @@ This action requires that you [reload Netdata's health configuration](#reload-he
 
 ### Temporarily disable alerts at runtime
 
-When you need to frequently disable all or some alerts from triggering during certain times (for instance
-when running backups) you can use the
+When you need to frequently disable all or some alerts from triggering during certain times (for instance, 
+when running backups), you can use the
 [health management API](/src/web/api/health/README.md).
 The API allows you to issue commands to control the health engine's behavior without changing configuration,
 or restarting the Agent.
@@ -199,7 +199,7 @@ see it live on the local dashboard or Netdata Cloud.
 ## Health entity reference
 
 The following reference contains information about the syntax and options of _health entities_, which Netdata attaches
-to charts in order to trigger alerts.
+to charts to trigger alerts.
 
 ### Entity types
 
@@ -225,7 +225,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 - A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
     `!` for a negative match. Order is important, too! See our [simple patterns docs](/src/libnetdata/simple_pattern/README.md) for
     more examples.
-- Lines terminated by a `\` are spliced together with the next line. The backslash is removed and the following line is
+- Lines terminated by a `\` are spliced together with the next line. The backslash is removed, and the following line is
     joined with the current one. No space is inserted, so you may split a line anywhere, even in the middle of a word.
     This comes in handy if your `info` line consists of several sentences.  
 
@@ -390,17 +390,17 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 
 The full [database query API](/src/web/api/queries/README.md) is supported. In short:
 
-- `METHOD` is one of  the available [grouping methods](/src/web/api/queries/README.md#grouping-methods) such as `average`, `min`, `max` etc.
+- `METHOD` is one of the available [grouping methods](/src/web/api/queries/README.md#grouping-methods) such as `average`, `min`, `max` etc.
      This is required.
 
   - `GROUPING OPTIONS` are optional and can have the form `CONDITION VALUE`, where `CONDITION` is `!=`, `=`, `<=`, `<`, `>`, `>=` and `VALUE` is a number. The `CONDITION` and `VALUE` are required for `countif`, while `VALUE` is used by `percentile`, `trimmed_mean` and `trimmed_median`.
 
 - `AFTER` is a relative number of seconds, but it also accepts a single letter for changing
      the units, like `-1s` = 1 second in the past, `-1m` = 1 minute in the past, `-1h` = 1 hour
-     in the past, `-1d` = 1 day in the past. You need a negative number (i.e. how far in the past
+     in the past, `-1d` = 1 day in the past. You need a negative number (i.e., how far in the past
      to look for the value). **This is required**.
 
-- `at BEFORE` is by default 0 and is not required. Using this you can define the end of the
+- `at BEFORE` is by default 0 and is not required. Using this, you can define the end of the
      lookup. So data will be evaluated between `AFTER` and `BEFORE`.
 
 - `every DURATION` sets the updated frequency of the lookup (supports single letter units as
@@ -427,7 +427,7 @@ The full [database query API](/src/web/api/queries/README.md) is supported. In s
      for dimensions.
 
 The result of the lookup will be available as `$this` and `$NAME` in expressions.
-The timestamps of the timeframe evaluated by the database lookup is available as variables
+The timestamps of the timeframe evaluated by the database lookup are available as variables
 `$after` and `$before` (both are unix timestamps).
 
 #### Alert line `calc`
@@ -476,10 +476,10 @@ red: NUMBER
 
 #### Alert lines `warn` and `crit`
 
-Define the expression that triggers either a warning or critical alert. These are optional, and should evaluate to
+Define the expression that triggers either a warning or critical alert. These are optional and should evaluate to
 either true or false (or zero/non-zero).
 
-The format uses Netdata's [expressions syntax](#expressions).
+The format uses Netdata's [expression syntax](#expressions).
 
 ```yaml
 warn: EXPRESSION
@@ -525,13 +525,13 @@ delay: [[[up U] [down D] multiplier M] max X]
 ```
 
 - `up U` defines the delay to be applied to a notification for an alert that raised its status
-     (i.e. CLEAR to WARNING, CLEAR to CRITICAL, WARNING to CRITICAL). For example, `up 10s`, the
+     (i.e., CLEAR to WARNING, CLEAR to CRITICAL, WARNING to CRITICAL). For example, `up 10s`, the
      notification for this event will be sent 10 seconds after the actual event. This is used in
-     hope the alert will get back to its previous state within the duration given. The default `U`
+     the hope the alert will get back to its previous state within the duration given. The default `U`
      is zero.
 
 - `down D` defines the delay to be applied to a notification for an alert that moves to lower
-     state (i.e. CRITICAL to WARNING, CRITICAL to CLEAR, WARNING to CLEAR). For example, `down 1m`
+     state (i.e., CRITICAL to WARNING, CRITICAL to CLEAR, WARNING to CLEAR). For example, `down 1m`
      will delay the notification by 1 minute. This is used to prevent notifications for flapping
      alerts. The default `D` is zero.
 
@@ -539,7 +539,7 @@ delay: [[[up U] [down D] multiplier M] max X]
      delayed. The default multiplier is `1.0`.
 
 - `max X`  defines the maximum absolute notification delay an alert may get. The default `X`
-     is `max(U * M, D * M)` (i.e. the max duration of `U` or `D` multiplied once with `M`).
+     is `max(U * M, D * M)` (i.e., the max duration of `U` or `D` multiplied once with `M`).
 
     Example:
 
@@ -565,7 +565,7 @@ delay: [[[up U] [down D] multiplier M] max X]
 Defines the interval between repeating notifications for the alerts in CRITICAL or WARNING mode. This will override the
 default interval settings inherited from health settings in `netdata.conf`. The default settings for repeating
 notifications are `default repeat warning = DURATION` and `default repeat critical = DURATION` which can be found in
-health stock configuration, when one of these interval is bigger than 0, Netdata will activate the repeat notification
+health stock configuration, when one of these intervals is bigger than 0, Netdata will activate the repeat notification
 for `CRITICAL`, `CLEAR` and `WARNING` messages.
 
 Format:
@@ -574,7 +574,7 @@ Format:
 repeat: [off] [warning DURATION] [critical DURATION]
 ```
 
-- `off`: Turns off the repeating feature for the current alert. This is effective when the default repeat settings has
+- `off`: Turns off the repeating feature for the current alert. This is effective when the default repeat settings have
     been enabled in health configuration.
 - `warning DURATION`: Defines the interval when the alert is in WARNING state. Use `0s` to turn off the repeating
     notification for WARNING mode.
@@ -589,13 +589,13 @@ The only possible value for the `options` line is
 options: no-clear-notification
 ```
 
-For some alerts we need compare two time-frames, to detect anomalies. For example, `health.d/httpcheck.conf` has an
+For some alerts, we need to compare two time frames to detect anomalies. For example, `health.d/httpcheck.conf` has an
 alert template called `web_service_slow` that compares the average http call response time over the last 3 minutes,
 compared to the average over the last hour. It triggers a warning alert when the average of the last 3 minutes is twice
-the average of the last hour. In such cases, it is easy to trigger the alert, but difficult to tell when the alert is
+the average of the last hour. In such cases, it is easy to trigger the alert, but challenging to tell when the alert is
 cleared. As time passes, the newest window moves into the older, so the average response time of the last hour will keep
 increasing. Eventually, the comparison will find the averages in the two time-frames close enough to clear the alert.
-However, the issue was not resolved, it's just a matter of the newer data "polluting" the old. For such alerts, it's a
+However, the issue was not resolved; it's just a matter of the newer data "polluting" the old. For such alerts, it's a
 good idea to tell Netdata to not clear the notification, by using the `no-clear-notification` option.
 
 #### Alert line `host labels`
@@ -637,7 +637,7 @@ See our [simple patterns docs](/src/libnetdata/simple_pattern/README.md) for mor
 
 #### Alert line `chart labels`
 
-Similar to host labels, the `chart labels` key can be used to filter if an alert will load or not for a specific chart, based on
+Similar to host labels, the `chart labels` key can be used to filter if an alert loads or not for a specific chart, based on
 whether these chart labels match or not.
 
 The list of chart labels present on each chart can be obtained from <http://localhost:19999/api/v1/charts?all>
@@ -645,7 +645,7 @@ The list of chart labels present on each chart can be obtained from <http://loca
 For example, each `disk_space` chart defines a chart label called `mount_point` with each instance of this chart having
 a value there of which mount point it monitors.
 
-If you have an e.g. external disk mounted on `/mnt/disk1` and you don't wish any related disk space alerts running for
+If you have an e.g., external disk mounted on `/mnt/disk1` and you don't wish any related disk space alerts running for
 it (but you do for all other mount points), you can add the following to the alert's configuration:
 
 ```yaml
@@ -653,7 +653,7 @@ chart labels: mount_point=!/mnt/disk1 *
 ```
 
 The `chart labels` is a space-separated list that accepts simple patterns. If you use multiple different chart labels,
-then the result is an AND between them. i.e. the following:
+then the result is an AND between them. I.e. the following:
 
 ```yaml
 chart labels: mount_point=/mnt/disk1 device=sda
@@ -667,13 +667,13 @@ See our [simple patterns docs](/src/libnetdata/simple_pattern/README.md) for mor
 #### Alert line `summary`
 
 The summary field contains a brief title of the alert. It is used as the subject for the notifications, and in
-dashboard list of alerts. An example for the `ram_available` alert is:
+the dashboard list of alerts. An example for the `ram_available` alert is:
 
 ```yaml
 summary: Available Ram
 ```
 
-summary fields can contain special variables in their text that will be replaced during run-time to provide more specific
+Summary fields can contain special variables in their text that will be replaced during run-time to provide more specific
 alert information. Current variables supported are:
 
 | variable            | description                                                       |
@@ -704,7 +704,7 @@ notifications and UI elements whenever the specific alert is in focus. An exampl
 info: Percentage of estimated amount of RAM available for userspace processes, without causing swapping
 ```
 
-info fields can contain special variables in their text that will be replaced during run-time to provide more specific
+Info fields can contain special variables in their text that will be replaced during run-time to provide more specific
 alert information. Current variables supported are:
 
 | variable            | description                                                       |
@@ -747,7 +747,7 @@ structure that allows fast execution of them.
 These operators are supported `+`, `-`, `*`, `/`, `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`, `!`, `AND`, `OR`, `NOT`.
 Boolean operators result in either `1` (true) or `0` (false).
 
-The conditional evaluation operator `?` is supported too. Using this operator IF-THEN-ELSE conditional statements can be
+The conditional evaluation operator `?` is supported too. Using this operator, IF-THEN-ELSE conditional statements can be
 specified. The format is: `(condition) ? (true expression) : (false expression)`. So, Netdata will first evaluate the
 `condition` and based on the result will either evaluate `true expression` or `false expression`.
 
@@ -763,10 +763,10 @@ Expressions can have variables. Variables start with `$`. Check below for more i
 There are two special values you can use:
 
 - `nan`, for example `$this != nan` will check if the variable `this` is available. A variable can be `nan` if the
-    database lookup failed. All calculations (i.e. addition, multiplication, etc.) with a `nan` result in a `nan`.
+    database lookup failed. All calculations (i.e., addition, multiplication, etc.) with a `nan` result in a `nan`.
 
 - `inf`, for example `$this != inf` will check if `this` is not infinite. A value or variable can be set to infinite
-    if divided by zero. All calculations (i.e. addition, multiplication, etc.) with a `inf` result in a `inf`.
+    if divided by zero. All calculations (i.e., addition, multiplication, etc.) with a `inf` result in a `inf`.
 
 ### Special use of the conditional operator
 
@@ -801,7 +801,7 @@ registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu
 
 <!-- > If you don't know how to find the CHART_NAME, you can read about it [here](/src/web/README.md#charts). -->
 
-Netdata supports 3 internal indexes for variables that will be used in health monitoring.
+Netdata supports three internal indexes for variables that will be used in health monitoring.
 
 <details><summary>The variables below can be used in both chart alerts and context templates.</summary>
 
@@ -836,7 +836,7 @@ context are essentially identical, with the only difference being the family tha
   - `$this`, which is resolved to the value of the current alert.
 
   - `$status`, which is resolved to the current status of the alert (the current = the last
-         status, i.e. before the current database lookup and the evaluation of the `calc` line).
+         status, i.e., before the current database lookup and the evaluation of the `calc` line).
          This values can be compared with `$REMOVED`, `$UNINITIALIZED`, `$UNDEFINED`, `$CLEAR`,
          `$WARNING`, `$CRITICAL`. These values are incremental, e.g. `$status > $CLEAR` works as
          expected.
@@ -852,10 +852,10 @@ Alerts can have the following statuses:
 
 - `UNINITIALIZED` - the alert is not initialized yet
 
-- `UNDEFINED` - the alert failed to be calculated (i.e. the database lookup failed,
+- `UNDEFINED` - the alert failed to be calculated (i.e., the database lookup failed,
      a division by zero occurred, etc.)
 
-- `CLEAR` - the alert is not armed / raised (i.e. is OK)
+- `CLEAR` - the alert is not armed / raised (i.e., is OK)
 
 - `WARNING` - the warning expression resulted in true or non-zero
 
@@ -897,7 +897,7 @@ So, try to give something descriptive.
 ```
 
 The above applies the **template** to all charts that have `context = apache.requests`
-(i.e. all your apache servers).
+(i.e., all your apache servers).
 
 ```yaml
     calc: $now - $last_collected_t
@@ -919,19 +919,19 @@ The alert will be evaluated every 10 seconds.
     crit: $this > (10 * $update_every)
 ```
 
-If these result in non-zero or true, they trigger the alert.
+If these results in non-zero or true, they trigger the alert.
 
-- `$this` refers to the value of this alert (e.g. the result of the `calc` line).
+- `$this` refers to the value of this alert (e.g., the result of the `calc` line).
      We could also use `$apache_last_collected_secs`.
 
 `$update_every` is the update frequency of the chart, in seconds.
 
-So, the warning condition checks if we haven’t collected data from apache for 5
+So, the warning condition checks if we haven’t collected data from apache for five
 iterations and the critical condition checks for 10 iterations.
 
 ### Example 2 - disk space
 
-Check if any of the disks is critically low on disk space:
+Check if any of the disks are critically low on disk space:
 
 ```yaml
 template: disk_full_percent
@@ -947,12 +947,12 @@ template: disk_full_percent
 
 So, the `calc` line finds the percentage of used space. `$this` resolves to this percentage.
 
-This is a repeating alert and if the alert becomes CRITICAL it repeats the notifications every 10 seconds. It also
+This is a repeating alert, and if the alert becomes CRITICAL, it repeats the notifications every 10 seconds. It also
 repeats notifications every 2 minutes if the alert goes into WARNING mode.
 
 ### Example 3 - disk fill rate
 
-Predict if any disk will run out of space in the near future.
+Predict if any disk will run out of space soon.
 
 We do this in 2 steps:
 
@@ -966,8 +966,8 @@ Calculate the disk fill rate:
        every: 15s
 ```
 
-In the `calc` line: `$this` is the result of the `lookup` line (i.e. the free space 30 minutes
-ago) and `$avail` is the current disk free space. So the `calc` line will either have a positive
+In the `calc` line: `$this` is the result of the `lookup` line (i.e., the free space 30 minutes
+ago) and `$avail` is the current disk-free space. So the `calc` line will either have a positive
 number of GB/second if the disk is filling up, or a negative number of GB/second if the disk is
 freeing up space.
 
@@ -989,7 +989,7 @@ The `calc` line estimates the time in hours, we will run out of disk space. Of c
 positive values are interesting for this check, so the warning and critical conditions check
 for positive values and that we have enough free space for 48 and 24 hours respectively.
 
-Once this alert triggers we will receive an email like this:
+Once this alert triggers, we will receive an email like this:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/17839993/87872b32-6802-11e6-8e08-b2e4afef93bb.png)
 
@@ -1041,7 +1041,7 @@ Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) 
 
 ### Example 6 - [Anomaly rate](/src/ml/README.md#anomaly-rate) based CPU chart alert
 
-Warning if 5 minute rolling [anomaly rate](/src/ml/README.md#anomaly-rate) averaged across all CPU dimensions is above 5%, critical if it goes above 20%:
+Warning if the 5-minute rolling [anomaly rate](/src/ml/README.md#anomaly-rate) averaged across all CPU dimensions is above 5%, critical if it goes above 20%:
 
 ```yaml
 template: ml_5min_cpu_chart
@@ -1055,12 +1055,12 @@ template: ml_5min_cpu_chart
     info: rolling 5min anomaly rate for system.cpu chart
 ```
 
-The `lookup` line will calculate the average anomaly rate across all `system.cpu` dimensions over the last 5 minutes. In this case
+The `lookup` line will calculate the average anomaly rate across all `system.cpu` dimensions over the last 5 minutes. In this case, 
 Netdata will create one alert for the chart.
 
 ### Example 7 - [Anomaly rate](/src/ml/README.md#anomaly-rate) based node level alert
 
-Warning if 5 minute rolling [anomaly rate](/src/ml/README.md#anomaly-rate) averaged across all ML enabled dimensions is above 5%, critical if it goes above 20%:
+Warning if the 5-minute rolling [anomaly rate](/src/ml/README.md#anomaly-rate) averaged across all ML enabled dimensions is above 5%, critical if it goes above 20%:
 
 ```yaml
 template: ml_5min_node
