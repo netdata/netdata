@@ -106,6 +106,7 @@ static void free_slot(Watcher *watcher, WatchEntry *t) {
 static int add_watch(Watcher *watcher, int inotifyFd, const char *path) {
     WatchEntry *t = get_slot(watcher);
 
+    errno_clear();
     t->wd = inotify_add_watch(inotifyFd, path, WATCH_FOR);
     if (t->wd == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -133,6 +134,8 @@ static int add_watch(Watcher *watcher, int inotifyFd, const char *path) {
 }
 
 static void remove_watch(Watcher *watcher, int inotifyFd, int wd) {
+    errno_clear();
+
     int i;
     for (i = 0; i < watcher->watchCount; ++i) {
         if (watcher->watchList[i].wd == wd) {
@@ -141,7 +144,9 @@ static void remove_watch(Watcher *watcher, int inotifyFd, int wd) {
                    "JOURNAL WATCHER: removing watch from directory: '%s'",
                    watcher->watchList[i].path);
 
-            inotify_rm_watch(inotifyFd, watcher->watchList[i].wd);
+            if(inotify_rm_watch(inotifyFd, watcher->watchList[i].wd) == -1)
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "JOURNAL WATCHER: inotify_rm_watch() returned -1");
+
             free_slot(watcher, &watcher->watchList[i]);
             return;
         }
@@ -155,7 +160,8 @@ static void remove_watch(Watcher *watcher, int inotifyFd, int wd) {
 static void free_watches(Watcher *watcher, int inotifyFd) {
     for (int i = 0; i < watcher->watchCount; ++i) {
         if (watcher->watchList[i].wd != -1) {
-            inotify_rm_watch(inotifyFd, watcher->watchList[i].wd);
+            if(inotify_rm_watch(inotifyFd, watcher->watchList[i].wd) == -1)
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "JOURNAL WATCHER: inotify_rm_watch() returned -1");
             free_slot(watcher, &watcher->watchList[i]);
         }
     }
@@ -233,7 +239,8 @@ void remove_directory_watch(Watcher *watcher, int inotifyFd, const char *dirPath
     for (int i = 0; i < watcher->watchCount; ++i) {
         WatchEntry *t = &watcher->watchList[i];
         if (t->wd != -1 && is_subpath(t->path, dirPath)) {
-            inotify_rm_watch(inotifyFd, t->wd);
+            if(inotify_rm_watch(inotifyFd, t->wd) == -1)
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "JOURNAL WATCHER: inotify_rm_watch() returned -1");
             free_slot(watcher, t);
         }
     }
@@ -249,6 +256,8 @@ void remove_directory_watch(Watcher *watcher, int inotifyFd, const char *dirPath
 }
 
 void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event) {
+    errno_clear();
+
     if(!event->len) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         INOTIFY_MASK_2buffer(wb, event->mask, ", ");
@@ -337,6 +346,8 @@ void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
 }
 
 static void process_pending(Watcher *watcher) {
+    errno_clear();
+
     void *x;
     dfe_start_write(watcher->pending, x) {
         struct stat info;
@@ -379,6 +390,8 @@ void journal_watcher_restart(void) {
 }
 
 static bool process_inotify_events(struct buffered_reader *reader, Watcher *watcher, int inotifyFd) {
+    errno_clear();
+
     bool unmount_event = false;
     ssize_t processed = 0;
 
