@@ -1,0 +1,24 @@
+{
+  "PackageIdentifier": "netdata.netdata",
+  "PackageVersion": "1.0.0",
+  "PackageName": "Netdata",
+  "Publisher": "Netdata Inc.",
+  "Description": "Netdata is a high-performance, cloud-native, and on-premises observability platform designed to monitor metrics and logs with unparalleled efficiency.",
+  "License": "GPL-3.0",
+  "LicenseUrl": "https://www.gnu.org/licenses/gpl-3.0.txt",
+  "InstallerType": "msi",
+  "Installers": [
+    {
+      "Architecture": "x64",
+      "InstallerUrl": "https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi",
+      "InstallerSha256": "<SHA256_HASH>",
+      "ProductCode": "{<PRODUCT_CODE>}",
+      "Commands": {
+        "SilentInstall": "msiexec /i netdata-x64.msi /qn",
+        "SilentUninstall": "msiexec /x {<PRODUCT_CODE>} /qn"
+      }
+    }
+  ],
+  "ManifestType": "version",
+  "ManifestVersion": "1.0.0"
+}
