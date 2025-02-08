@@ -312,6 +312,7 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 
+ALWAYS_INLINE
 bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t before) {
     if(unlikely(!rca)) return false;
 
