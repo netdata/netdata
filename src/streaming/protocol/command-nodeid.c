@@ -51,10 +51,21 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
     bool claimed = is_agent_claimed();
     bool update_node_id = false;
 
+    // ----------------------------------------------------------------------------------------------------------------
+    // validate the parameters
+
     ND_UUID claim_id;
     if (uuid_parse(claim_id_str ? claim_id_str : "", claim_id.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND '%s' [to %s] [PCLAIMID]: received invalid claim id '%s'",
+               rrdhost_hostname(s->host), s->remote_ip,
+               claim_id_str ? claim_id_str : "(unset)");
+        return;
+    }
+
+    if(UUIDiszero(claim_id)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM SND '%s' [to %s] [PCLAIMID]: received zero claim id '%s'",
                rrdhost_hostname(s->host), s->remote_ip,
                claim_id_str ? claim_id_str : "(unset)");
         return;
@@ -69,21 +80,12 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
         return;
     }
 
-    if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_id)) {
-        if(claimed) {
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM SND '%s' [to %s] [PCLAIMID] parent reports different node id '%s', but we are claimed. Ignoring it.",
-                   rrdhost_hostname(s->host), s->remote_ip,
-                   node_id_str ? node_id_str : "(unset)");
-            return;
-        }
-        else {
-            update_node_id = true;
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM SND '%s' [to %s] [PCLAIMID] changed node id to %s",
-                   rrdhost_hostname(s->host), s->remote_ip,
-                   node_id_str ? node_id_str : "(unset)");
-        }
+    if(UUIDiszero(node_id)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM SND '%s' [to %s] [PCLAIMID]: received zero node id '%s'",
+               rrdhost_hostname(s->host), s->remote_ip,
+               node_id_str ? node_id_str : "(unset)");
+        return;
     }
 
     if(!url || !*url) {
@@ -94,13 +96,40 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
         return;
     }
 
-    if (UUIDiszero(s->host->aclk.claim_id_of_parent) || !UUIDeq(s->host->aclk.claim_id_of_parent, claim_id)) {
-        nd_log(NDLS_DAEMON, NDLP_INFO,
-               "STREAM SND '%s' [to %s] [PCLAIMID] changed parent's claim id to %s",
-               rrdhost_hostname(s->host), s->remote_ip,
-               claim_id_str ? claim_id_str : "(unset)");
+    // ----------------------------------------------------------------------------------------------------------------
+    // the parameters are ok
+    // apply the changes
+
+    if (!UUIDeq(s->host->aclk.claim_id_of_parent, claim_id)) {
+        if(UUIDiszero(s->host->aclk.claim_id_of_parent))
+            nd_log(NDLS_DAEMON, NDLP_INFO,
+                   "STREAM SND '%s' [to %s] [PCLAIMID] set parent's claim id to %s (was empty)",
+                   rrdhost_hostname(s->host), s->remote_ip,
+                   claim_id_str ? claim_id_str : "(unset)");
+        else
+            nd_log(NDLS_DAEMON, NDLP_INFO,
+                   "STREAM SND '%s' [to %s] [PCLAIMID] changed parent's claim id to %s (was set)",
+                   rrdhost_hostname(s->host), s->remote_ip,
+                   claim_id_str ? claim_id_str : "(unset)");
 
         s->host->aclk.claim_id_of_parent = claim_id;
+    }
+
+    if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_id)) {
+        if(claimed) {
+            update_node_id = false;
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM SND '%s' [to %s] [PCLAIMID] parent reports different node id '%s', but we are claimed. Ignoring it.",
+                   rrdhost_hostname(s->host), s->remote_ip,
+                   node_id_str ? node_id_str : "(unset)");
+        }
+        else {
+            update_node_id = true;
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM SND '%s' [to %s] [PCLAIMID] changed node id to %s",
+                   rrdhost_hostname(s->host), s->remote_ip,
+                   node_id_str ? node_id_str : "(unset)");
+        }
     }
 
     // There are some very strange corner cases here:
