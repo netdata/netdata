@@ -6,14 +6,23 @@
 
 **Merged pull requests:**
 
+- Add check for available active instances when checking for extreme cardinality [\#19594](https://github.com/netdata/netdata/pull/19594) ([stelfrag](https://github.com/stelfrag))
+- Free resources where writing datafile extents [\#19593](https://github.com/netdata/netdata/pull/19593) ([stelfrag](https://github.com/stelfrag))
+- fix incomplete implementation of journal watcher [\#19592](https://github.com/netdata/netdata/pull/19592) ([ktsaou](https://github.com/ktsaou))
+- docs\(health\): clarify "special user of the cond operator" p2 [\#19590](https://github.com/netdata/netdata/pull/19590) ([ilyam8](https://github.com/ilyam8))
+- docs\(health\): clarify "special user of the cond operator" [\#19589](https://github.com/netdata/netdata/pull/19589) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19588](https://github.com/netdata/netdata/pull/19588) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/zookeeper\): fix ZooKeeper server scope name [\#19587](https://github.com/netdata/netdata/pull/19587) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19585](https://github.com/netdata/netdata/pull/19585) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/zookeeper\): add more metrics [\#19584](https://github.com/netdata/netdata/pull/19584) ([ilyam8](https://github.com/ilyam8))
+- Add agent version during ACLK handshake [\#19583](https://github.com/netdata/netdata/pull/19583) ([stelfrag](https://github.com/stelfrag))
 - Format missing file \(eBPF.plugin\) [\#19582](https://github.com/netdata/netdata/pull/19582) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(go.d/apache\): make ?auto param check non-fatal [\#19580](https://github.com/netdata/netdata/pull/19580) ([ilyam8](https://github.com/ilyam8))
 - Fix static build conditions to run on release and nightly builds. [\#19579](https://github.com/netdata/netdata/pull/19579) ([Ferroin](https://github.com/Ferroin))
 - build\(deps\): update go toolchain to v1.23.6 [\#19578](https://github.com/netdata/netdata/pull/19578) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/nvme\): add missing "/dev/" prefix to device path for v2.11 [\#19577](https://github.com/netdata/netdata/pull/19577) ([ilyam8](https://github.com/ilyam8))
 - Generate protobuf source files in build dir. [\#19576](https://github.com/netdata/netdata/pull/19576) ([vkalintiris](https://github.com/vkalintiris))
+- Switch from x86 to ARM build host for POWER8+ builds. [\#19575](https://github.com/netdata/netdata/pull/19575) ([Ferroin](https://github.com/Ferroin))
 - fix\(go.d\): clean up charts for stopped and removed jobs [\#19573](https://github.com/netdata/netdata/pull/19573) ([ilyam8](https://github.com/ilyam8))
 - Fix memory leak [\#19569](https://github.com/netdata/netdata/pull/19569) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/prometheus-community/pro-bing from 0.6.0 to 0.6.1 in /src/go [\#19567](https://github.com/netdata/netdata/pull/19567) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -471,14 +480,6 @@
 - claim -\> connect in docs [\#19060](https://github.com/netdata/netdata/pull/19060) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump k8s.io/client-go from 0.31.2 to 0.31.3 in /src/go [\#19059](https://github.com/netdata/netdata/pull/19059) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/vmware/govmomi from 0.46.1 to 0.46.2 in /src/go [\#19058](https://github.com/netdata/netdata/pull/19058) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Windows doc updates [\#19054](https://github.com/netdata/netdata/pull/19054) ([Ancairon](https://github.com/Ancairon))
-- Securing Agents section docs cleanup [\#19053](https://github.com/netdata/netdata/pull/19053) ([Ancairon](https://github.com/Ancairon))
-- fix\(go.d/pkg/web\): correct close idle connections [\#19052](https://github.com/netdata/netdata/pull/19052) ([ilyam8](https://github.com/ilyam8))
-- Update documentation about our native package repos. [\#19049](https://github.com/netdata/netdata/pull/19049) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#19048](https://github.com/netdata/netdata/pull/19048) ([netdatabot](https://github.com/netdatabot))
-- feat\(go.d/pkg/web\): add "force\_http2" option [\#19047](https://github.com/netdata/netdata/pull/19047) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#19045](https://github.com/netdata/netdata/pull/19045) ([netdatabot](https://github.com/netdatabot))
-- Capitalize the word "Agent" [\#19044](https://github.com/netdata/netdata/pull/19044) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
