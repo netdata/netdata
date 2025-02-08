@@ -7,7 +7,13 @@
 
 // the child disconnected from the parent, and it has to clear the parent's claim id
 void stream_sender_clear_parent_claim_id(RRDHOST *host) {
-    host->aclk.claim_id_of_parent = UUID_ZERO;
+    if (!UUIDiszero(host->aclk.claim_id_of_parent)) {
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "Host '%s' [PCLAIMID] cleared parent's claim id",
+               rrdhost_hostname(host));
+
+        host->aclk.claim_id_of_parent = UUID_ZERO;
+    }
 }
 
 // the parent sends to the child its claim id, node id and cloud url
@@ -48,7 +54,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
     ND_UUID claim_id;
     if (uuid_parse(claim_id_str ? claim_id_str : "", claim_id.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SND '%s' [to %s] received invalid claim id '%s'",
+               "STREAM SND '%s' [to %s] [PCLAIMID]: received invalid claim id '%s'",
                rrdhost_hostname(s->host), s->remote_ip,
                claim_id_str ? claim_id_str : "(unset)");
         return;
@@ -57,22 +63,16 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
     ND_UUID node_id;
     if(uuid_parse(node_id_str ? node_id_str : "", node_id.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SND '%s' [to %s] received an invalid node id '%s'",
+               "STREAM SND '%s' [to %s] [PCLAIMID] received an invalid node id '%s'",
                rrdhost_hostname(s->host), s->remote_ip,
                node_id_str ? node_id_str : "(unset)");
         return;
     }
 
-    if (!UUIDiszero(s->host->aclk.claim_id_of_parent) && !UUIDeq(s->host->aclk.claim_id_of_parent, claim_id))
-        nd_log(NDLS_DAEMON, NDLP_INFO,
-               "STREAM SND '%s' [to %s] changed parent's claim id to %s",
-               rrdhost_hostname(s->host), s->remote_ip,
-               claim_id_str ? claim_id_str : "(unset)");
-
     if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_id)) {
         if(claimed) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM SND '%s' [to %s] parent reports different node id '%s', but we are claimed. Ignoring it.",
+                   "STREAM SND '%s' [to %s] [PCLAIMID] parent reports different node id '%s', but we are claimed. Ignoring it.",
                    rrdhost_hostname(s->host), s->remote_ip,
                    node_id_str ? node_id_str : "(unset)");
             return;
@@ -80,7 +80,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
         else {
             update_node_id = true;
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM SND '%s' [to %s] changed node id to %s",
+                   "STREAM SND '%s' [to %s] [PCLAIMID] changed node id to %s",
                    rrdhost_hostname(s->host), s->remote_ip,
                    node_id_str ? node_id_str : "(unset)");
         }
@@ -88,13 +88,20 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
 
     if(!url || !*url) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SND '%s' [to %s] received an invalid cloud URL '%s'",
+               "STREAM SND '%s' [to %s] [PCLAIMID] received an invalid cloud URL '%s'",
                rrdhost_hostname(s->host), s->remote_ip,
                url ? url : "(unset)");
         return;
     }
 
-    s->host->aclk.claim_id_of_parent = claim_id;
+    if (UUIDiszero(s->host->aclk.claim_id_of_parent) || !UUIDeq(s->host->aclk.claim_id_of_parent, claim_id)) {
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "STREAM SND '%s' [to %s] [PCLAIMID] changed parent's claim id to %s",
+               rrdhost_hostname(s->host), s->remote_ip,
+               claim_id_str ? claim_id_str : "(unset)");
+
+        s->host->aclk.claim_id_of_parent = claim_id;
+    }
 
     // There are some very strange corner cases here:
     //
