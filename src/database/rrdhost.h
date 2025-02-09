@@ -188,6 +188,7 @@ struct rrdhost {
 
                 time_t last_connected;              // last time child connected (stored in db)
                 uint32_t connections;               // the number of times this sender has connected
+                STREAM_HANDSHAKE reason;            // the last receiver exit reason
 
                 struct {
                     uint32_t counter_in;            // counts the number of replication statements we have received

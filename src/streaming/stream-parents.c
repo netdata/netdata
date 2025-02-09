@@ -576,7 +576,7 @@ bool stream_parent_connect_to_one_unsafe(
     usec_t now_ut = now_realtime_usec();
 
     // fetch stream info for all of them and put them in the array
-    size_t count = 0, skipped_but_useful = 0, skipped_not_useful = 0;
+    size_t count = 0, skipped_but_useful = 0, skipped_not_useful = 0, potential = 0;
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d && count < size ; d = d->next) {
         if (nd_thread_signaled_to_cancel()) {
             sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
@@ -584,16 +584,24 @@ bool stream_parent_connect_to_one_unsafe(
         }
 
         // make sure they all have a random number
-        // this is taken from the parent, but if the stream_info call fails
+        // this is taken from the parent, but if the stream_info call fails,
         // we generate a random number for every parent here
         d->remote.nonce = os_random32();
         d->banned_temporarily_erroneous = is_a_blocked_parent(d);
 
-        if (d->banned_permanently || d->banned_for_this_session || d->banned_temporarily_erroneous)
+        if (d->banned_permanently || d->banned_for_this_session)
             continue;
+
+        if (d->banned_temporarily_erroneous) {
+            potential++;
+            host->stream.snd.status.reason = d->reason;
+            continue;
+        }
 
         if (d->postpone_until_ut > now_ut) {
             skipped_but_useful++;
+            potential++;
+            host->stream.snd.status.reason = d->reason;
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM PARENTS '%s': skipping useful parent '%s': POSTPONED FOR %ld SECS MORE: %s",
                    rrdhost_hostname(host),
@@ -603,7 +611,6 @@ bool stream_parent_connect_to_one_unsafe(
             continue;
         }
 
-        bool skip = false;
         if(stream_info_fetch(d, host->machine_guid, default_port,
                               sender_sock, stream_parent_is_ssl(d), rrdhost_hostname(host))) {
             switch(d->remote.ingest_type) {
@@ -612,22 +619,23 @@ bool stream_parent_connect_to_one_unsafe(
                     d->reason = STREAM_HANDSHAKE_PARENT_IS_LOCALHOST;
                     d->since_ut = now_ut;
                     d->postpone_until_ut = randomize_wait_ut(3600, 7200);
+                    d->banned_permanently = true;
+                    skipped_not_useful++;
 
                     if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, 1)) {
                         // we passed hops == 1, to make sure this succeeds only when the parent
                         // is the origin child of this node
-                        d->banned_permanently = true;
-                        skipped_not_useful++;
                         nd_log(NDLS_DAEMON, NDLP_INFO,
                                "STREAM PARENTS '%s': destination '%s' is banned permanently because it is the origin server",
                                rrdhost_hostname(host), string2str(d->destination));
-                        continue;
                     }
                     else {
-                        pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
-                        skip = true;
+                        nd_log(NDLS_DAEMON, NDLP_WARNING,
+                               "STREAM PARENTS '%s': destination '%s' is banned permanently because it is the origin server, "
+                               "but it is not in the stream path before us!",
+                               rrdhost_hostname(host), string2str(d->destination));
                     }
-                    break;
+                    continue;
 
                 default:
                 case RRDHOST_INGEST_TYPE_CHILD:
@@ -641,8 +649,14 @@ bool stream_parent_connect_to_one_unsafe(
                     d->since_ut = now_ut;
                     d->postpone_until_ut = randomize_wait_ut(30, 60);
                     pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
-                    skip = true;
-                    break;
+                    skipped_but_useful++;
+                    potential++;
+                    host->stream.snd.status.reason = d->reason;
+                    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                           "STREAM PARENTS '%s': skipping useful parent '%s': %s",
+                           rrdhost_hostname(host), string2str(d->destination),
+                           stream_handshake_error_to_string(d->reason));
+                    continue;
 
                 case RRDHOST_INGEST_STATUS_REPLICATING:
                 case RRDHOST_INGEST_STATUS_ONLINE:
@@ -676,28 +690,23 @@ bool stream_parent_connect_to_one_unsafe(
         else
             pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
 
-        if(skip) {
-            skipped_but_useful++;
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM PARENTS '%s': skipping useful parent '%s': %s",
-                   rrdhost_hostname(host),
-                   string2str(d->destination),
-                   stream_handshake_error_to_string(d->reason));
-        }
-        else {
-            d->selection.skipped = false;
-            d->selection.batch = count + 1;
-            d->selection.order = count + 1;
-            array[count++] = d;
-        }
+        d->selection.skipped = false;
+        d->selection.batch = count + 1;
+        d->selection.order = count + 1;
+        array[count++] = d;
     }
 
     // can we use any parent?
     if(!count) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM PARENTS '%s': no parents available (%zu skipped but useful, %zu skipped not useful)",
-               rrdhost_hostname(host),
-            skipped_but_useful, skipped_not_useful);
+               "STREAM PARENTS '%s': no parents available (%zu skipped but useful, %zu skipped not useful, %zu potential)",
+               rrdhost_hostname(host), skipped_but_useful, skipped_not_useful, potential);
+
+        if(!potential && host->stream.snd.status.reason != STREAM_HANDSHAKE_SP_NO_DESTINATION) {
+            host->stream.snd.status.reason = STREAM_HANDSHAKE_SP_NO_DESTINATION;
+            pulse_sender_connection_failed(NULL, host->stream.snd.status.reason);
+        }
+
         return false;
     }
 
