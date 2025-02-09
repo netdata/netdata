@@ -221,10 +221,10 @@ struct rrdhost {
                 time_t last_disconnected;           // the time the last sender was disconnected
                 time_t last_chart;                  // the time of the last CHART streaming command
                 bool check_obsolete;                // set when child connects, will instruct parent to
-                                          // trigger a check for obsoleted charts since previous connect
+                                                    // trigger a check for obsoleted charts since previous connect
 
                 uint32_t connections;               // the number of times this receiver has connected
-                STREAM_HANDSHAKE exit_reason;       // the last receiver exit reason
+                STREAM_HANDSHAKE reason;            // the last receiver exit reason
 
                 struct {
                     uint32_t counter_in;            // counts the number of replication statements we have received

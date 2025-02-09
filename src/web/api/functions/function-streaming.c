@@ -59,6 +59,10 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
         max_out_local_port = 0,
         max_out_remote_port = 0;
 
+    uint32_t
+        max_in_connections = 0,
+        max_out_connections = 0;
+
     {
         RRDHOST *host;
         dfe_start_read(rrdhost_root_index, host) {
@@ -90,6 +94,40 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
             // Node
             buffer_json_add_array_item_string(wb, rrdhost_hostname(s.host));
+
+            // rowOptions
+            buffer_json_add_array_item_object(wb);
+            {
+                const char *severity = NULL; // normal, debug, notice, warning, critical
+                if(!rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST)) {
+                    switch(s.ingest.status) {
+                        case RRDHOST_INGEST_STATUS_OFFLINE:
+                        case RRDHOST_INGEST_STATUS_ARCHIVED:
+                            severity = "critical";
+                            break;
+
+                        default:
+                        case RRDHOST_INGEST_STATUS_INITIALIZING:
+                        case RRDHOST_INGEST_STATUS_ONLINE:
+                        case RRDHOST_INGEST_STATUS_REPLICATING:
+                            break;
+                    }
+
+                    switch(s.stream.status) {
+                        case RRDHOST_STREAM_STATUS_OFFLINE:
+                            if(!severity)
+                                severity = "warning";
+                            break;
+
+                        default:
+                        case RRDHOST_STREAM_STATUS_REPLICATING:
+                        case RRDHOST_STREAM_STATUS_ONLINE:
+                            break;
+                    }
+                }
+                buffer_json_member_add_string(wb, "severity", severity ? severity : "normal");
+            }
+            buffer_json_object_close(wb); // rowOptions
 
             // Ephemerality
             buffer_json_add_array_item_string(wb, rrdhost_option_check(s.host, RRDHOST_OPTION_EPHEMERAL_HOST) ? "ephemeral" : "permanent");
@@ -126,6 +164,12 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
             buffer_json_add_array_item_string(wb, rrdhost_ml_status_to_string(s.ml.status)); // MLStatus
 
             // collection
+
+            // InConnections
+            buffer_json_add_array_item_uint64(wb, s.host->stream.rcv.status.connections);
+            if(s.host->stream.rcv.status.connections > max_in_connections)
+                max_in_connections = s.host->stream.rcv.status.connections;
+
             if(s.ingest.since) {
                 uint64_t in_since = s.ingest.since * MSEC_PER_SEC;
                 buffer_json_add_array_item_uint64(wb, in_since); // InSince
@@ -170,6 +214,12 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
             buffer_json_add_array_item_uint64(wb, s.ingest.collected.contexts); // CollectedContexts
 
             // streaming
+
+            // OutConnections
+            buffer_json_add_array_item_uint64(wb, s.host->stream.snd.status.connections);
+            if(s.host->stream.snd.status.connections > max_out_connections)
+                max_out_connections = s.host->stream.snd.status.connections;
+
             if(s.stream.since) {
                 uint64_t out_since = s.stream.since * MSEC_PER_SEC;
                 buffer_json_add_array_item_uint64(wb, out_since); // OutSince
@@ -272,6 +322,12 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "rowOptions", "rowOptions",
+                                    RRDF_FIELD_TYPE_NONE, RRDR_FIELD_VISUAL_ROW_OPTIONS, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_FIXED, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE, RRDF_FIELD_OPTS_DUMMY,
                                     NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "Ephemerality", "The type of ephemerality for the node",
@@ -543,6 +599,12 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
         // --- collection ---
 
+        buffer_rrdf_table_add_field(wb, field_id++, "InConnections", "Number of times this child connected",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, (double)max_in_connections, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+
         buffer_rrdf_table_add_field(wb, field_id++, "InSince", "Last Data Collection Status Change",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, (double)max_in_since, RRDF_FIELD_SORT_DESCENDING, NULL,
@@ -635,6 +697,12 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // --- streaming ---
+
+        buffer_rrdf_table_add_field(wb, field_id++, "OutConnections", "Number of times connected to a parent",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, (double)max_out_connections, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutSince", "Last Streaming Status Change",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,

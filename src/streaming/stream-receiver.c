@@ -1116,7 +1116,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         host->receiver = rpt;
         rpt->host = host;
 
-        host->stream.rcv.status.exit_reason = (STREAM_HANDSHAKE)rpt->capabilities;
+        host->stream.rcv.status.reason = (STREAM_HANDSHAKE)rpt->capabilities;
         rpt->exit.reason = 0;
         __atomic_store_n(&rpt->exit.shutdown, false, __ATOMIC_RELEASE);
         host->stream.rcv.status.last_connected = now_realtime_sec();
@@ -1199,7 +1199,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
             stream_receiver_replication_reset(host);
             streaming_receiver_disconnected();
 
-            host->stream.rcv.status.exit_reason = rpt->exit.reason;
+            host->stream.rcv.status.reason = rpt->exit.reason;
             rpt->exit.reason = 0;
             __atomic_store_n(&rpt->exit.shutdown, false, __ATOMIC_RELEASE);
             host->stream.rcv.status.check_obsolete = false;
