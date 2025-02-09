@@ -64,7 +64,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
     }
 
     if(UUIDiszero(claim_id)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "STREAM SND '%s' [to %s] [PCLAIMID]: received zero claim id '%s'",
                rrdhost_hostname(s->host), s->remote_ip,
                claim_id_str ? claim_id_str : "(unset)");
@@ -81,7 +81,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
     }
 
     if(UUIDiszero(node_id)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "STREAM SND '%s' [to %s] [PCLAIMID]: received zero node id '%s'",
                rrdhost_hostname(s->host), s->remote_ip,
                node_id_str ? node_id_str : "(unset)");
