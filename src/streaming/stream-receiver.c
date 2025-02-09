@@ -1198,14 +1198,14 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
             stream_receiver_replication_reset(host);
             streaming_receiver_disconnected();
 
-            host->receiver->exit.reason = 0;
-            __atomic_store_n(&host->receiver->exit.shutdown, false, __ATOMIC_RELEASE);
+            host->stream.rcv.status.exit_reason = rpt->exit.reason;
+            rpt->exit.reason = 0;
+            __atomic_store_n(&rpt->exit.shutdown, false, __ATOMIC_RELEASE);
             host->stream.rcv.status.check_obsolete = false;
             host->stream.rcv.status.last_connected = 0;
             host->stream.rcv.status.last_disconnected = now_realtime_sec();
             host->health.enabled = false;
 
-            host->stream.rcv.status.exit_reason = rpt->exit.reason;
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
             host->receiver = NULL;
         }
