@@ -150,7 +150,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
     uint32_t replicating_instances = UINT32_MAX;
 
     time_t since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
-    STREAM_HANDSHAKE reason = (online) ? STREAM_HANDSHAKE_NEVER : host->stream.rcv.status.exit_reason;
+    STREAM_HANDSHAKE reason = host->stream.rcv.status.exit_reason;
 
     if (online) {
         if (db_status == RRDHOST_DB_STATUS_INITIALIZING)

@@ -139,7 +139,14 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                 buffer_json_add_array_item_string(wb, NULL); // InSince
                 buffer_json_add_array_item_string(wb, NULL); // InAge
             }
-            buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(s.ingest.reason)); // InReason
+
+            // InReason
+            if(s.ingest.type == RRDHOST_INGEST_TYPE_LOCALHOST)
+                buffer_json_add_array_item_string(wb, "LOCALHOST");
+            else if(s.ingest.type == RRDHOST_INGEST_TYPE_VIRTUAL)
+                buffer_json_add_array_item_string(wb, "VIRTUAL NODE");
+            else
+                buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(s.ingest.reason));
 
             buffer_json_add_array_item_int64(wb, s.ingest.hops); // InHops
             if(s.ingest.hops > max_in_hops) max_in_hops = s.ingest.hops;
