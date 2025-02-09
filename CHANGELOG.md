@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- dequeue from hub before deleting contexts [\#19599](https://github.com/netdata/netdata/pull/19599) ([ktsaou](https://github.com/ktsaou))
+- build\(deps\): bump github.com/gohugoio/hashstructure from 0.3.0 to 0.5.0 in /src/go [\#19598](https://github.com/netdata/netdata/pull/19598) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump golang.org/x/text from 0.21.0 to 0.22.0 in /src/go [\#19597](https://github.com/netdata/netdata/pull/19597) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Add check for available active instances when checking for extreme cardinality [\#19594](https://github.com/netdata/netdata/pull/19594) ([stelfrag](https://github.com/stelfrag))
 - Free resources where writing datafile extents [\#19593](https://github.com/netdata/netdata/pull/19593) ([stelfrag](https://github.com/stelfrag))
 - fix incomplete implementation of journal watcher [\#19592](https://github.com/netdata/netdata/pull/19592) ([ktsaou](https://github.com/ktsaou))
@@ -478,8 +481,6 @@
 - Register service to delay start [\#19063](https://github.com/netdata/netdata/pull/19063) ([stelfrag](https://github.com/stelfrag))
 - add links to mssql perflib object docs [\#19062](https://github.com/netdata/netdata/pull/19062) ([ilyam8](https://github.com/ilyam8))
 - claim -\> connect in docs [\#19060](https://github.com/netdata/netdata/pull/19060) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): bump k8s.io/client-go from 0.31.2 to 0.31.3 in /src/go [\#19059](https://github.com/netdata/netdata/pull/19059) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/vmware/govmomi from 0.46.1 to 0.46.2 in /src/go [\#19058](https://github.com/netdata/netdata/pull/19058) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
