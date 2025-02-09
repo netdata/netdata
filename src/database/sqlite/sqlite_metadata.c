@@ -775,9 +775,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         if (error_str)
             analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
         freez(error_str);
-        sqlite3_close(db_meta);
-        db_meta = NULL;
-        return 1;
+        goto close_database;
     }
 
     if (rebuild & DB_CHECK_RECLAIM_SPACE) {
