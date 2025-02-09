@@ -830,17 +830,22 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
 
     if (configure_sqlite_database(db_meta, target_version, "meta_config"))
-        return 1;
+        goto close_database;
 
     if (init_database_batch(db_meta, &database_config[0], "meta_init"))
-        return 1;
+        goto close_database;
 
     if (init_database_batch(db_meta, &database_cleanup[0], "meta_cleanup"))
-        return 1;
+        goto close_database;
 
     netdata_log_info("SQLite database initialization completed");
 
     return 0;
+
+close_database:
+    sqlite3_close(db_meta);
+    db_meta = NULL;
+    return 1;
 }
 
 // Metadata functions
