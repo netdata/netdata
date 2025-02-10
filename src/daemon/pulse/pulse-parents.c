@@ -66,6 +66,7 @@ struct {
         ssize_t nodes_replicating;
         ssize_t nodes_running;
         ssize_t nodes_no_dst;
+        ssize_t nodes_no_dst_failed;
     } sender;
 
 } p = { 0 };
@@ -194,6 +195,10 @@ static void pulse_host_add_sub_status(PULSE_HOST_STATUS status, ssize_t val, STR
 
             case PULSE_HOST_STATUS_SND_NO_DST:
                 __atomic_add_fetch(&p.sender.nodes_no_dst, val, __ATOMIC_RELAXED);
+                break;
+
+            case PULSE_HOST_STATUS_SND_NO_DST_FAILED:
+                __atomic_add_fetch(&p.sender.nodes_no_dst_failed, val, __ATOMIC_RELAXED);
                 break;
         }
 
@@ -409,6 +414,7 @@ void pulse_parents_do(bool extended) {
             static RRDDIM *rd_replicating = NULL;
             static RRDDIM *rd_running = NULL;
             static RRDDIM *rd_no_dst = NULL;
+            static RRDDIM *rd_no_dst_failed = NULL;
 
             if (unlikely(!st_nodes)) {
                 st_nodes = rrdset_create_localhost(
@@ -433,6 +439,7 @@ void pulse_parents_do(bool extended) {
                 rd_replicating = rrddim_add(st_nodes, "replicating", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_running = rrddim_add(st_nodes, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_no_dst = rrddim_add(st_nodes, "no dst", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_no_dst_failed = rrddim_add(st_nodes, "failed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
 
             rrddim_set_by_pointer(st_nodes, rd_connecting, (collected_number)__atomic_load_n(&p.sender.nodes_connecting, __ATOMIC_RELAXED));
@@ -442,6 +449,7 @@ void pulse_parents_do(bool extended) {
             rrddim_set_by_pointer(st_nodes, rd_replicating, (collected_number)__atomic_load_n(&p.sender.nodes_replicating, __ATOMIC_RELAXED));
             rrddim_set_by_pointer(st_nodes, rd_running, (collected_number)__atomic_load_n(&p.sender.nodes_running, __ATOMIC_RELAXED));
             rrddim_set_by_pointer(st_nodes, rd_no_dst, (collected_number)__atomic_load_n(&p.sender.nodes_no_dst, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(st_nodes, rd_no_dst_failed, (collected_number)__atomic_load_n(&p.sender.nodes_no_dst_failed, __ATOMIC_RELAXED));
 
             rrdset_done(st_nodes);
         }

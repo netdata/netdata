@@ -366,12 +366,12 @@ void stream_sender_remove(struct sender_state *s, STREAM_HANDSHAKE reason) {
                            RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     s->last_state_since_t = now_realtime_sec();
-    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, s->last_state_since_t);
+    stream_parent_set_host_disconnect_reason(s->host, reason, s->last_state_since_t);
     s->connector.id = -1;
 
     stream_sender_unlock(s);
 
-    rrdhost_stream_parents_reset(s->host, reason);
+    stream_parents_host_reset(s->host, reason);
 
 #ifdef NETDATA_LOG_STREAM_SENDER
     spinlock_lock(&s->log.spinlock);
@@ -446,7 +446,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
     nd_sock_close(&s->sock);
 
-    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, now_realtime_sec());
+    stream_parent_set_host_disconnect_reason(s->host, reason, now_realtime_sec());
     stream_sender_clear_parent_claim_id(s->host);
     sender_host_buffer_free(s->host);
 

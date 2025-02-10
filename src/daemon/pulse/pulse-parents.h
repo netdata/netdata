@@ -21,12 +21,13 @@ typedef enum {
     PULSE_HOST_STATUS_SND_PENDING           = (1 << 10),
     PULSE_HOST_STATUS_SND_CONNECTING        = (1 << 11),
     PULSE_HOST_STATUS_SND_NO_DST            = (1 << 12),
-    PULSE_HOST_STATUS_SND_WAITING           = (1 << 13),
-    PULSE_HOST_STATUS_SND_REPLICATING       = (1 << 14),
-    PULSE_HOST_STATUS_SND_RUNNING           = (1 << 15),
-    PULSE_HOST_STATUS_DELETED               = (1 << 16),
-    PULSE_HOST_STATUS_EPHEMERAL             = (1 << 17),
-    PULSE_HOST_STATUS_PERMANENT = (1 << 18),
+    PULSE_HOST_STATUS_SND_NO_DST_FAILED     = (1 << 13),
+    PULSE_HOST_STATUS_SND_WAITING           = (1 << 14),
+    PULSE_HOST_STATUS_SND_REPLICATING       = (1 << 15),
+    PULSE_HOST_STATUS_SND_RUNNING           = (1 << 16),
+    PULSE_HOST_STATUS_DELETED               = (1 << 17),
+    PULSE_HOST_STATUS_EPHEMERAL             = (1 << 18),
+    PULSE_HOST_STATUS_PERMANENT             = (1 << 19),
 } PULSE_HOST_STATUS;
 
 void pulse_host_status(RRDHOST *host, PULSE_HOST_STATUS status, STREAM_HANDSHAKE reason);

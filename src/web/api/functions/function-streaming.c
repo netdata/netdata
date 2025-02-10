@@ -115,7 +115,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
 
                     switch(s.stream.status) {
                         case RRDHOST_STREAM_STATUS_OFFLINE:
-                            if(!severity)
+                            if(!severity && s.stream.reason != STREAM_HANDSHAKE_SP_NO_DESTINATION)
                                 severity = "warning";
                             break;
 

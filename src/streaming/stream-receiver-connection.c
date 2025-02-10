@@ -702,7 +702,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         rrdhost_set_is_parent_label();
 
         // let it reconnect to parents asap
-        rrdhost_stream_parents_reset(rpt->host, STREAM_HANDSHAKE_SP_PREPARING);
+        stream_parents_host_reset(rpt->host, STREAM_HANDSHAKE_SP_PREPARING);
 
         // add it to a stream thread queue
         stream_receiver_add_to_queue(rpt);

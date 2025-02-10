@@ -88,7 +88,9 @@ STREAM_HANDSHAKE stream_parent_get_disconnect_reason(STREAM_PARENT *d) {
     return d->reason;
 }
 
-void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since) {
+void stream_parent_set_host_disconnect_reason(RRDHOST *host, STREAM_HANDSHAKE reason, time_t since) {
+    host->stream.snd.status.reason = reason;
+    struct stream_parent *d = host->stream.snd.parents.current;
     if(!d) return;
     d->since_ut = since * USEC_PER_SEC;
     d->reason = reason;
@@ -104,7 +106,7 @@ static inline usec_t randomize_wait_ut(time_t min, time_t max) {
     return now_realtime_usec() + wait_ut;
 }
 
-void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
+void stream_parents_host_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
     usec_t until_ut = randomize_wait_ut(stream_send.parents.reconnect_delay_s / 2, stream_send.parents.reconnect_delay_s + 5);
     rw_spinlock_write_lock(&host->stream.snd.parents.spinlock);
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
@@ -115,10 +117,25 @@ void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
     rw_spinlock_write_unlock(&host->stream.snd.parents.spinlock);
 }
 
-void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs) {
+static void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs) {
     if(!d) return;
     d->reason = reason;
     d->postpone_until_ut = randomize_wait_ut(5, secs);
+}
+
+void stream_parent_set_host_reconnect_delay(RRDHOST *host, STREAM_HANDSHAKE reason, time_t secs) {
+    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, reason, secs);
+}
+
+static void stream_parent_set_connect_failure_reason(RRDHOST *host, STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs) {
+    host->stream.snd.status.reason = reason;
+    pulse_host_status(host, PULSE_HOST_STATUS_SND_NO_DST_FAILED, reason);
+    pulse_sender_connection_failed(d ? string2str(d->destination) : NULL, reason);
+    stream_parent_set_reconnect_delay(d, reason, secs);
+}
+
+void stream_parent_set_host_connect_failure_reason(RRDHOST *host, STREAM_HANDSHAKE reason, time_t secs) {
+    stream_parent_set_connect_failure_reason(host, host->stream.snd.parents.current, reason, secs);
 }
 
 usec_t stream_parent_get_reconnection_ut(STREAM_PARENT *d) {
@@ -702,10 +719,15 @@ bool stream_parent_connect_to_one_unsafe(
                "STREAM PARENTS '%s': no parents available (%zu skipped but useful, %zu skipped not useful, %zu potential)",
                rrdhost_hostname(host), skipped_but_useful, skipped_not_useful, potential);
 
-        if(!potential && host->stream.snd.status.reason != STREAM_HANDSHAKE_SP_NO_DESTINATION) {
-            host->stream.snd.status.reason = STREAM_HANDSHAKE_SP_NO_DESTINATION;
-            pulse_sender_connection_failed(NULL, host->stream.snd.status.reason);
+        if(!potential) {
+            if(host->stream.snd.status.reason != STREAM_HANDSHAKE_SP_NO_DESTINATION) {
+                host->stream.snd.status.reason = STREAM_HANDSHAKE_SP_NO_DESTINATION;
+                pulse_sender_connection_failed(NULL, host->stream.snd.status.reason);
+            }
+            pulse_host_status(host, PULSE_HOST_STATUS_SND_NO_DST, 0);
         }
+        else
+            pulse_host_status(host, PULSE_HOST_STATUS_SND_NO_DST_FAILED, host->stream.snd.status.reason);
 
         return false;
     }
@@ -796,6 +818,8 @@ bool stream_parent_connect_to_one_unsafe(
 
         if(nd_thread_signaled_to_cancel()) {
             sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
+            host->stream.snd.status.reason = STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP;
+            pulse_host_status(host, PULSE_HOST_STATUS_SND_OFFLINE, host->stream.snd.status.reason);
             return false;
         }
 
@@ -834,11 +858,15 @@ bool stream_parent_connect_to_one_unsafe(
                    sender_sock->fd);
 
             sender_sock->error = ND_SOCK_ERR_NONE;
+            host->stream.snd.status.reason = STREAM_HANDSHAKE_SP_CONNECTED;
+            pulse_host_status(host, PULSE_HOST_STATUS_SND_CONNECTING, host->stream.snd.status.reason);
             return true;
         }
         else {
             stream_parent_nd_sock_error_to_reason(d, sender_sock);
+            host->stream.snd.status.reason = d->reason;
             pulse_sender_connection_failed(string2str(d->destination), d->reason);
+            pulse_host_status(host, PULSE_HOST_STATUS_SND_CONNECTING, host->stream.snd.status.reason);
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM PARENTS '%s': stream connection to '%s' failed (default port: %d): %s",
                    rrdhost_hostname(host),
@@ -847,6 +875,7 @@ bool stream_parent_connect_to_one_unsafe(
         }
     }
 
+    pulse_host_status(host, PULSE_HOST_STATUS_SND_OFFLINE, 0);
     return false;
 }
 

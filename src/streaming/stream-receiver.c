@@ -1147,7 +1147,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdhost_flag_set(rpt->host, RRDHOST_FLAG_COLLECTOR_ONLINE);
         aclk_queue_node_info(rpt->host, true);
 
-        rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_SP_PREPARING);
+        stream_parents_host_reset(host, STREAM_HANDSHAKE_SP_PREPARING);
 
         set_this = true;
     }
@@ -1190,7 +1190,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
                 if (rpt->config.health.enabled)
                     rrdcalc_child_disconnected(host);
 
-                rrdhost_stream_parents_reset(host, reason);
+                stream_parents_host_reset(host, reason);
             }
             rrdhost_receiver_lock(host);
 

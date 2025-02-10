@@ -247,7 +247,6 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
 
         if (rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED)) {
             s->stream.hops = host->sender->hops;
-            s->stream.reason = STREAM_HANDSHAKE_NEVER;
             s->stream.capabilities = host->sender->capabilities;
 
             s->stream.replication.completion = rrdhost_sender_replication_completion_unsafe(host, now, &s->stream.replication.instances);
@@ -263,8 +262,8 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
         else {
             s->stream.status = RRDHOST_STREAM_STATUS_OFFLINE;
             s->stream.hops = (int16_t)(s->ingest.hops + 1);
-            s->stream.reason = host->sender->exit.reason;
         }
+        s->stream.reason = host->stream.snd.status.reason;
 
         stream_sender_unlock(host->sender);
     }
