@@ -336,7 +336,9 @@ happened, on your systems and applications.
 	-DUSE_CXX_11=On \
 	%endif
 	%endif
-	-DDISABLE_LTO=On \
+	%if 0%{?suse_version}
+	-DUSE_LTO=Off \
+	%endif
 	%if %{_have_cups}
 	-DENABLE_PLUGIN_CUPS=On \
 	%else
