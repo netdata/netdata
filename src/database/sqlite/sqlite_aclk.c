@@ -141,7 +141,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
             rrdhost_free_ephemeral_time_s);
 
         if (!is_registered)
-            return 0;
+           goto done;
     }
 
     struct rrdhost_system_info *system_info = rrdhost_system_info_create();
@@ -196,6 +196,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"  ephemeral=%d",
                    rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
 #endif
+
+done:
     return 0;
 }
 
