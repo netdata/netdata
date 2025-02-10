@@ -1983,15 +1983,10 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         m->histogram.ext->last_min = (collected_number)roundndd(series[0] * statsd.decimal_detail);
         m->histogram.ext->last_max = (collected_number)roundndd(series[len - 1] * statsd.decimal_detail);
         m->last = (collected_number)roundndd(average(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_median = (collected_number)roundndd(median_on_sorted_series(series, len) * statsd.decimal_detail);
         m->histogram.ext->last_stddev = (collected_number)roundndd(standard_deviation(series, len) * statsd.decimal_detail);
         m->histogram.ext->last_sum = (collected_number)roundndd(sum(series, len) * statsd.decimal_detail);
-
-        size_t pct_len = (size_t)floor((double)len * statsd.histogram_percentile / 100.0);
-        if(pct_len < 1)
-            m->histogram.ext->last_percentile = (collected_number)(series[0] * statsd.decimal_detail);
-        else
-            m->histogram.ext->last_percentile = (collected_number)roundndd(series[pct_len - 1] * statsd.decimal_detail);
+        m->histogram.ext->last_median = (collected_number)roundndd(median_on_sorted_series(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_percentile = (collected_number)roundndd(percentile_on_sorted_series(series, len,  statsd.histogram_percentile / 100) * statsd.decimal_detail);
 
         netdata_mutex_unlock(&m->histogram.ext->mutex);
 
