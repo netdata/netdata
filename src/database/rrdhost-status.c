@@ -169,7 +169,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             status = RRDHOST_INGEST_STATUS_ONLINE;
     }
     else {
-        if(!since)
+        if(!host->stream.rcv.status.connections)
             status = RRDHOST_INGEST_STATUS_ARCHIVED;
         else
             status = RRDHOST_INGEST_STATUS_OFFLINE;

@@ -726,8 +726,6 @@ bool stream_parent_connect_to_one_unsafe(
             }
             pulse_host_status(host, PULSE_HOST_STATUS_SND_NO_DST, 0);
         }
-        else
-            pulse_host_status(host, PULSE_HOST_STATUS_SND_NO_DST_FAILED, host->stream.snd.status.reason);
 
         return false;
     }
