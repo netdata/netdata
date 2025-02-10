@@ -362,31 +362,36 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
         return 0;
     }
 
+    bool marked = false;
     if (!rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST)) {
         rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
-        sql_set_host_label(&host->host_id.uuid, "_is_ephemeral", "true");
+        marked = true;
+    }
 
-        if(unregister) {
-            aclk_host_state_update(host, 0, 0);
-            unregister_node(host->machine_guid);
-            host->node_id = UUID_ZERO;
-            buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been unregistered",
-                           rrdhost_hostname(host), host->machine_guid);
-            rrd_wrlock();
-            rrdhost_free___while_having_rrd_wrlock(host);
-            rrd_wrunlock();
-        }
-        else {
-            pulse_host_status(host, 0, 0);
-            buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been marked ephemeral",
-                           rrdhost_hostname(host), host->machine_guid);
-        }
+    sql_set_host_label(&host->host_id.uuid, "_is_ephemeral", "true");
+    pulse_host_status(host, 0, 0);
 
+    if(unregister) {
+        aclk_host_state_update(host, 0, 0);
+        unregister_node(host->machine_guid);
+        host->node_id = UUID_ZERO;
+        buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been unregistered",
+                       rrdhost_hostname(host), host->machine_guid);
+        rrd_wrlock();
+        rrdhost_free___while_having_rrd_wrlock(host);
+        rrd_wrunlock();
         return 1;
     }
-    if (report_error)
-       buffer_sprintf(wb, "Node '%s' (machine guid: %s) is already ephemeral - not changing it",
+    else if(marked) {
+        buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been marked ephemeral",
                        rrdhost_hostname(host), host->machine_guid);
+        return 1;
+    }
+    else if (report_error) {
+        buffer_sprintf(wb, "Node '%s' (machine guid: %s) is already ephemeral - not changing it",
+                       rrdhost_hostname(host), host->machine_guid);
+    }
+
     return 0;
 }
 
