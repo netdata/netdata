@@ -131,7 +131,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     char guid[UUID_STR_LEN];
     uuid_unparse_lower(*(nd_uuid_t *)argv[IDX_HOST_ID], guid);
 
-    if (is_ephemeral && rrdhost_free_ephemeral_time_s && age > rrdhost_free_ephemeral_time_s) {
+    if (is_ephemeral && ((!is_registered && last_connected == 1) || (rrdhost_free_ephemeral_time_s && age > rrdhost_free_ephemeral_time_s))) {
         netdata_log_info(
             "%s ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds)",
             is_registered ? "Loading registered" : "Skipping unregistered",
