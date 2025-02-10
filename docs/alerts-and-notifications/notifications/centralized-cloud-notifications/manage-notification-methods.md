@@ -34,7 +34,7 @@ To manage Space notification settings, you will need the following:
     - **Add a new** notification method configuration.
         - Choose the service from the list of available ones. The available options will depend on your subscription plan.
         - You can optionally provide a name for the configuration so you can refer to it.
-        - You can define the filtering criteria, regarding which Rooms the method will apply, and what notifications you want to receive (All Alerts and unreachable, All Alerts, Critical only).
+        - You can define the filtering criteria, regarding which Rooms the method will apply, and what notifications you want to receive (Critical, Warning, Clear, Reachable and Unreachable).
         - Depending on the service, different inputs will be present. Please note that there are mandatory and optional inputs.
             - If you have doubts on how to configure the service, you can find a link at the top of the modal that takes you to the specific documentation page to help you.
     - **Edit an existing** notification method configuration. Personal level ones can't be edited here, see [Manage User Notification Settings](#manage-user-notification-settings). You will be able to change:
@@ -67,6 +67,6 @@ To manage user-specific notification settings, you will need the following:
     - The list of Spaces and Rooms you have access to.
 3. On this modal you will be able to:
     - **Enable/Disable** the notification method on a personal scope, this applies across all Spaces and Rooms.
-    - **Define what notifications you want to receive** per Space/Room: Critical, Warning, Clear, Unreachable.
+    - **Define what notifications you want to receive** per Space/Room: Critical, Warning, Clear, Reachable and Unreachable.
     - **Join a Room and activate notifications**.
         - From the **All Rooms** tab, click on the Join button for the Room(s) you want.
