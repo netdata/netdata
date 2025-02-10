@@ -107,7 +107,7 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
 
             case CLOUD_STATUS_OFFLINE: {
                 // the agent is claimed, but cannot get online
-                CLAIM_ID claim_id = claim_id_get();
+                CLAIM_ID claim_id = rrdhost_claim_id_get(localhost);
                 buffer_json_member_add_string(wb, "claim_id", claim_id.str);
                 buffer_json_member_add_string(wb, "url", cloud_status_aclk_base_url());
                 buffer_json_member_add_string(wb, "reason", cloud_status_aclk_offline_reason());
