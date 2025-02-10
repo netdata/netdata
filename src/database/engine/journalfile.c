@@ -4,51 +4,48 @@
 /* Careful to always call this before creating a new journal file */
 void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, WAL *wal)
 {
-    struct generic_io_descriptor *io_descr;
+    uv_fs_t request;
     struct rrdengine_journalfile *journalfile = datafile->journalfile;
+    uv_buf_t iov;
 
-    io_descr = &wal->io_descr;
-    io_descr->ctx = ctx;
     if (wal->size < wal->buf_size) {
         /* simulate an empty transaction to skip the rest of the block */
         *(uint8_t *) (wal->buf + wal->size) = STORE_PADDING;
     }
-    io_descr->buf = wal->buf;
-    io_descr->bytes = wal->buf_size;
 
+    uint64_t journalfile_position;
     spinlock_lock(&journalfile->unsafe.spinlock);
-    io_descr->pos = journalfile->unsafe.pos;
+    journalfile_position = journalfile->unsafe.pos;
     journalfile->unsafe.pos += wal->buf_size;
     spinlock_unlock(&journalfile->unsafe.spinlock);
 
-    io_descr->req.data = wal;
-    io_descr->data = journalfile;
-
-    io_descr->iov = uv_buf_init((void *)io_descr->buf, wal->buf_size);
+    iov = uv_buf_init(wal->buf, wal->buf_size);
 
     int retries = 10;
     int ret = -1;
     while (ret == -1 && --retries) {
-        ret = uv_fs_write(NULL, &io_descr->req, journalfile->file, &io_descr->iov, 1, (int64_t)io_descr->pos, NULL);
-        if (ret == -1)
+        ret = uv_fs_write(NULL, &request, journalfile->file, &iov, 1, (int64_t)journalfile_position, NULL);
+        if (ret == -1) {
             sleep_usec(300 * USEC_PER_MS);
+            uv_fs_req_cleanup(&request);
+        }
     }
 
-    bool jf_write_error = (ret == -1 || io_descr->req.result < 0);
+    bool jf_write_error = (ret == -1 || request.result < 0);
 
     if (unlikely(jf_write_error)) {
         ctx_io_error(ctx);
         if (ret == -1)
             netdata_log_error(
-                "DBENGINE: %s: uv_fs_write: failed to store metadata in journalfile %u, offset %ld",
+                "DBENGINE: %s: uv_fs_write: failed to store metadata in journalfile %u, offset %"PRIu64,
                 __func__,
                 datafile->fileno,
-                (int64_t)io_descr->pos);
+                journalfile_position);
         else
-            netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)io_descr->req.result));
+            netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)request.result));
     }
 
-    uv_fs_req_cleanup(&io_descr->req);
+    uv_fs_req_cleanup(&request);
     ctx_current_disk_space_increase(ctx, wal->buf_size);
     ctx_io_write_op_bytes(ctx, wal->buf_size);
 
