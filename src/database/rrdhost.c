@@ -814,26 +814,22 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
     if(!host) return;
 
-    if (netdata_exit) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "RRD: 'host:%s' freeing memory...",
-               rrdhost_hostname(host));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRD: 'host:%s' freeing memory...",
+           rrdhost_hostname(host));
 
-        // ------------------------------------------------------------------------
-        // first remove it from the indexes, so that it will not be discoverable
+    // ------------------------------------------------------------------------
+    // first remove it from the indexes, so that it will not be discoverable
 
-        rrdhost_index_del_hostname(host);
-        rrdhost_index_del_by_guid(host);
+    rrdhost_index_del_hostname(host);
+    rrdhost_index_del_by_guid(host);
 
-        if (host->prev)
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(localhost, host, prev, next);
-    }
+    if (host->prev)
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(localhost, host, prev, next);
 
     // ------------------------------------------------------------------------
 
     rrdhost_cleanup_data_collection_and_health(host);
-    if (!netdata_exit)
-        return;
 
     // ------------------------------------------------------------------------
     // free it
