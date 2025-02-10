@@ -13,7 +13,7 @@ This change serves three key objectives:
 
 2.  **Enhanced Flexibility for Transient Environments**: Users managing auto-scaling cloud instances, containers, and other volatile infrastructure can now configure nodes as ephemeral, preventing unnecessary alerts and making monitoring more effective.
 
-3.  **Automated Cleanup for Ephemeral Nodes**: Netdata provides an automated way for the monitoring system to clean up itself by "forgetting" ephemeral nodes after a defined period. By default, the retention period is determined by the parent nodes' data retention settings, but users can configure a shorter expiration time for ephemeral nodes if needed.
+3.  **Automated Cleanup for Ephemeral Nodes**: Netdata provides an automated way for the monitoring system to clean up itself by "forgetting" ephemeral nodes after a defined period. By default, the retention period is determined by the parent nodes' data retention settings. However, given that Netdata's tiered storage may provide retention for months or years, users may configure a shorter expiration time for ephemeral nodes.
 
 By introducing these changes, Netdata significantly enhances its ability to monitor itself as a mesh-like distributed observability system, ensuring that alerts reflect actual system health rather than expected, routine disconnections. Additionally, the automatic cleanup feature prevents stale ephemeral nodes from accumulating in the monitoring system, keeping dashboards clean and up-to-date.
 
