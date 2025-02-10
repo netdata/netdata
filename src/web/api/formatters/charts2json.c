@@ -90,7 +90,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
         rrd_rdlock();
         RRDHOST *h;
         rrdhost_foreach_read(h) {
-            if(!rrdhost_should_be_removed(h, host, now) /*&& !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED) */) {
+            if(!rrdhost_should_be_cleaned_up(h, host, now) /*&& !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED) */) {
                 buffer_json_add_array_item_object(wb);
                 buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(h));
                 buffer_json_object_close(wb);

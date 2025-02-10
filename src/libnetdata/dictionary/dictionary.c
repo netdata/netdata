@@ -112,6 +112,7 @@ void dictionary_register_delete_callback(DICTIONARY *dict, dict_cb_delete_t dele
 // ----------------------------------------------------------------------------
 // dictionary statistics API
 
+ALWAYS_INLINE
 size_t dictionary_version(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
@@ -121,7 +122,8 @@ size_t dictionary_version(DICTIONARY *dict) {
     return __atomic_load_n(&dict->version, __ATOMIC_RELAXED);
 }
 
-ALWAYS_INLINE size_t dictionary_entries(DICTIONARY *dict) {
+ALWAYS_INLINE
+size_t dictionary_entries(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
     // this is required for views to return the right number
@@ -717,6 +719,7 @@ void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 // ----------------------------------------------------------------------------
 // DUP/REL an item (increase/decrease its reference counter)
 
+ALWAYS_INLINE
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     // we allow the item to be NULL here
     api_internal_check(dict, item, false, true);
@@ -729,6 +732,7 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, 
     return item;
 }
 
+ALWAYS_INLINE
 void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     // we allow the item to be NULL here
     api_internal_check(dict, item, false, true);
@@ -744,11 +748,13 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONA
 // ----------------------------------------------------------------------------
 // get the name/value of an item
 
-ALWAYS_INLINE const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+ALWAYS_INLINE
+const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     return item_get_name(item);
 }
 
-ALWAYS_INLINE void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+ALWAYS_INLINE
+void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     if(likely(item))
         return item->shared->value;
 

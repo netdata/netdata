@@ -178,6 +178,7 @@ void rrd_functions_host_init(RRDHOST *host) {
 
 void rrd_functions_host_destroy(RRDHOST *host) {
     dictionary_destroy(host->functions);
+    host->functions = NULL;
 }
 
 // ----------------------------------------------------------------------------

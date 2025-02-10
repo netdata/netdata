@@ -185,7 +185,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     }
     freez(thread_info);
     rrd_wrlock();
-    rrdhost_free___while_having_rrd_wrlock(localhost, true);
+    rrdhost_free___while_having_rrd_wrlock(localhost);
     rrd_wrunlock();
 }
 

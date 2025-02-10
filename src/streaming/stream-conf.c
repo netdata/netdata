@@ -326,11 +326,6 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
                 &stream_config, machine_guid, "compression algorithms order",
                 inicfg_get(&stream_config, api_key, "compression algorithms order", STREAM_COMPRESSION_ALGORITHMS_ORDER)));
     }
-
-    config->ephemeral =
-        inicfg_get_boolean(&stream_config, machine_guid, "is ephemeral node",
-        inicfg_get_boolean(&stream_config, api_key, "is ephemeral node",
-        CONFIG_BOOLEAN_NO));
 }
 
 bool stream_conf_is_key_type(const char *api_key, const char *type) {

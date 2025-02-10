@@ -395,7 +395,14 @@ void rrdlabels_key_to_buffer_array_item(RRDLABELS *labels, BUFFER *wb)
 // ----------------------------------------------------------------------------
 
 void rrdlabels_get_value_strcpyz(RRDLABELS *labels, char *dst, size_t dst_len, const char *key) {
-    if(!labels) return;
+    if(!dst || !dst_len)
+        return;
+
+    // make sure the output is empty if we can't find it
+    *dst = '\0';
+
+    if(!labels)
+        return;
 
     STRING *this_key = string_strdupz(key);
 
@@ -406,7 +413,7 @@ void rrdlabels_get_value_strcpyz(RRDLABELS *labels, char *dst, size_t dst_len, c
     {
         if (lb->index.key == this_key) {
             if (lb->index.value)
-                strncpyz(dst, string2str(lb->index.value), dst_len);
+                strncpyz(dst, string2str(lb->index.value), dst_len - 1);
             else
                 dst[0] = '\0';
             break;

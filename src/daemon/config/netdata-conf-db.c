@@ -12,8 +12,8 @@ static size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = {1, 60, 60,
 static time_t storage_tiers_retention_time_s[RRD_STORAGE_TIERS] = {14 * DAYS, 90 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS};
 
 time_t rrdset_free_obsolete_time_s = 3600;
-time_t rrdhost_free_orphan_time_s = 3600;
-time_t rrdhost_free_ephemeral_time_s = 86400;
+time_t rrdhost_cleanup_orphan_to_archive_time_s = 3600;
+time_t rrdhost_free_ephemeral_time_s = 0;
 
 size_t get_tier_grouping(size_t tier) {
     if(unlikely(tier >= nd_profile.storage_tiers)) tier = nd_profile.storage_tiers - 1;
@@ -345,11 +345,6 @@ void netdata_conf_section_db(void) {
     run = true;
 
     // ------------------------------------------------------------------------
-
-    rrdhost_free_orphan_time_s =
-        inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_free_orphan_time_s);
-
-    // ------------------------------------------------------------------------
     // get default database update frequency
 
     nd_profile.update_every = (int) inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "update every", nd_profile.update_every);
@@ -404,16 +399,27 @@ void netdata_conf_section_db(void) {
 
     // --------------------------------------------------------------------
 
+    rrdhost_cleanup_orphan_to_archive_time_s =
+        inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_cleanup_orphan_to_archive_time_s);
+    if(rrdhost_cleanup_orphan_to_archive_time_s < 10) {
+        rrdhost_cleanup_orphan_to_archive_time_s = 10;
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_cleanup_orphan_to_archive_time_s);
+    }
+
     rrdhost_free_ephemeral_time_s =
         inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup ephemeral hosts after", rrdhost_free_ephemeral_time_s);
+    if(rrdhost_free_ephemeral_time_s && rrdhost_free_ephemeral_time_s < rrdhost_cleanup_orphan_to_archive_time_s) {
+        // the free ephemeral time cannot be less than the cleanup orphan time
+        rrdhost_free_ephemeral_time_s = rrdhost_cleanup_orphan_to_archive_time_s;
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup ephemeral hosts after", rrdhost_free_ephemeral_time_s);
+    }
 
     rrdset_free_obsolete_time_s =
         inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
-
-    // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
-    // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
-    // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
     if (rrdset_free_obsolete_time_s < 10) {
+        // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
+        // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
+        // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
         rrdset_free_obsolete_time_s = 10;
         netdata_log_info("The \"cleanup obsolete charts after\" option was set to 10 seconds.");
         inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);

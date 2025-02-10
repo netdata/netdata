@@ -267,7 +267,7 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
             host->cache_dir);
 
         rrd_wrlock();
-        rrdhost_free___while_having_rrd_wrlock(host, true);
+        rrdhost_free___while_having_rrd_wrlock(host);
         rrd_wrunlock();
         return NULL;
     }
@@ -445,7 +445,7 @@ RRDHOST *rrdhost_create(
                rrdhost_hostname(host), host->machine_guid, rrdhost_hostname(t), t->machine_guid);
 
         if (!is_localhost)
-            rrdhost_free___while_having_rrd_wrlock(host, true);
+            rrdhost_free___while_having_rrd_wrlock(host);
 
         rrd_wrunlock();
         return NULL;
@@ -690,7 +690,7 @@ RRDHOST *rrdhost_find_or_create(
                rrd_memory_mode_name(mode));
 
         rrd_wrlock();
-        rrdhost_free___while_having_rrd_wrlock(host, true);
+        rrdhost_free___while_having_rrd_wrlock(host);
         host = NULL;
         rrd_wrunlock();
     }
@@ -755,7 +755,7 @@ RRDHOST *rrdhost_find_or_create(
     return host;
 }
 
-bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s) {
+bool rrdhost_should_be_cleaned_up(RRDHOST *host, RRDHOST *protected_host, time_t now_s) {
     if(host != protected_host
         && host != localhost
         && rrdhost_receiver_replicating_charts(host) == 0
@@ -764,7 +764,7 @@ bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t no
         && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_COLLECTOR_ONLINE)
         && health_evloop_current_iteration() - rrdhost_health_evloop_last_iteration(host) > 10
         && host->stream.rcv.status.last_disconnected
-        && host->stream.rcv.status.last_disconnected + rrdhost_free_orphan_time_s < now_s)
+        && host->stream.rcv.status.last_disconnected + rrdhost_cleanup_orphan_to_archive_time_s < now_s)
         return true;
 
     return false;
@@ -781,10 +781,40 @@ bool rrdhost_should_run_health(RRDHOST *host) {
 // ----------------------------------------------------------------------------
 // RRDHOST - free
 
-void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
+void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
+    stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP);
+
+    rrdhost_pluginsd_send_chart_slots_free(host);
+    rrdhost_pluginsd_receive_chart_slots_free(host);
+
+    rrdcalc_delete_all(host);
+    rrdset_index_destroy(host);
+    rrdcalc_rrdhost_index_destroy(host);
+    health_alarm_log_free(host);
+
+    ml_host_delete(host);
+
+    freez(host->exporting_flags);
+    host->exporting_flags = NULL;
+
+    rrd_functions_host_destroy(host);
+    rrdvariables_destroy(host->rrdvars);
+    host->rrdvars = NULL;
+
+    rrdhost_stream_path_clear(host, true);
+    stream_sender_structures_free(host);
+
+    rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRD: 'host:%s' is now in archive mode...",
+           rrdhost_hostname(host));
+}
+
+void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
     if(!host) return;
 
-    if (netdata_exit || force) {
+    if (netdata_exit) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "RRD: 'host:%s' freeing memory...",
                rrdhost_hostname(host));
@@ -801,78 +831,38 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
 
     // ------------------------------------------------------------------------
 
-    rrdhost_stream_path_clear(host, true);
-
-    // ------------------------------------------------------------------------
-    // clean up streaming chart slots
-
-    rrdhost_pluginsd_send_chart_slots_free(host);
-    rrdhost_pluginsd_receive_chart_slots_free(host);
-
-    // ------------------------------------------------------------------------
-    // clean up streaming
-
-    stream_sender_structures_free(host);
-
-    if (netdata_exit || force)
-        stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP);
-
-
-    // ------------------------------------------------------------------------
-    // clean up alarms
-
-    rrdcalc_delete_all(host);
-
-    // delete all the RRDSETs of the host
-    rrdset_index_destroy(host);
-    rrdcalc_rrdhost_index_destroy(host);
-
-    // cleanup ML resources
-    ml_host_delete(host);
-
-    freez(host->exporting_flags);
-
-    health_alarm_log_free(host);
-
-    if (!netdata_exit && !force) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "RRD: 'host:%s' is now in archive mode...",
-               rrdhost_hostname(host));
-
-        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
+    rrdhost_cleanup_data_collection_and_health(host);
+    if (!netdata_exit)
         return;
-    }
 
     // ------------------------------------------------------------------------
     // free it
 
+    pulse_host_status(host, PULSE_HOST_STATUS_DELETED, 0);
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
+
+    if (host == localhost)
+        health_plugin_destroy();
+
+    freez(host->cache_dir);
+    rrdhost_stream_parents_free(host, false);
+    simple_pattern_free(host->stream.snd.charts_matching);
+    rrdhost_system_info_free(host->system_info);
+
+    rrdhost_destroy_rrdcontexts(host);
     rrdlabels_destroy(host->rrdlabels);
+
+    string_freez(host->hostname);
     string_freez(host->os);
     string_freez(host->timezone);
     string_freez(host->abbrev_timezone);
     string_freez(host->program_name);
     string_freez(host->program_version);
-    rrdhost_system_info_free(host->system_info);
-    freez(host->cache_dir);
-    string_freez(host->stream.snd.api_key);
-    string_freez(host->stream.snd.destination);
-    rrdhost_stream_parents_free(host, false);
     string_freez(host->health.default_exec);
     string_freez(host->health.default_recipient);
     string_freez(host->registry_hostname);
-    simple_pattern_free(host->stream.snd.charts_matching);
-
-    rrd_functions_host_destroy(host);
-    rrdvariables_destroy(host->rrdvars);
-    if (host == localhost)
-        health_plugin_destroy();
-
-    rrdhost_destroy_rrdcontexts(host);
-
-    string_freez(host->hostname);
-    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
-
-    pulse_host_status(host, PULSE_HOST_STATUS_DELETED, 0);
+    string_freez(host->stream.snd.api_key);
+    string_freez(host->stream.snd.destination);
     freez(host);
 }
 
@@ -881,10 +871,10 @@ void rrdhost_free_all(void) {
 
     /* Make sure child-hosts are released before the localhost. */
     while(localhost && localhost->next)
-        rrdhost_free___while_having_rrd_wrlock(localhost->next, true);
+        rrdhost_free___while_having_rrd_wrlock(localhost->next);
 
     if(localhost)
-        rrdhost_free___while_having_rrd_wrlock(localhost, true);
+        rrdhost_free___while_having_rrd_wrlock(localhost);
 
     rrd_wrunlock();
 }

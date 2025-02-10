@@ -1116,6 +1116,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         host->receiver = rpt;
         rpt->host = host;
 
+        host->stream.rcv.status.reason = (STREAM_HANDSHAKE)rpt->capabilities;
         rpt->exit.reason = 0;
         __atomic_store_n(&rpt->exit.shutdown, false, __ATOMIC_RELEASE);
         host->stream.rcv.status.last_connected = now_realtime_sec();
@@ -1146,7 +1147,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdhost_flag_set(rpt->host, RRDHOST_FLAG_COLLECTOR_ONLINE);
         aclk_queue_node_info(rpt->host, true);
 
-        rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_SP_PREPARING);
+        stream_parents_host_reset(host, STREAM_HANDSHAKE_SP_PREPARING);
 
         set_this = true;
     }
@@ -1189,7 +1190,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
                 if (rpt->config.health.enabled)
                     rrdcalc_child_disconnected(host);
 
-                rrdhost_stream_parents_reset(host, reason);
+                stream_parents_host_reset(host, reason);
             }
             rrdhost_receiver_lock(host);
 
@@ -1198,14 +1199,14 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
             stream_receiver_replication_reset(host);
             streaming_receiver_disconnected();
 
-            host->receiver->exit.reason = 0;
-            __atomic_store_n(&host->receiver->exit.shutdown, false, __ATOMIC_RELEASE);
+            host->stream.rcv.status.reason = rpt->exit.reason;
+            rpt->exit.reason = 0;
+            __atomic_store_n(&rpt->exit.shutdown, false, __ATOMIC_RELEASE);
             host->stream.rcv.status.check_obsolete = false;
             host->stream.rcv.status.last_connected = 0;
             host->stream.rcv.status.last_disconnected = now_realtime_sec();
             host->health.enabled = false;
 
-            host->stream.rcv.status.exit_reason = rpt->exit.reason;
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
             host->receiver = NULL;
         }

@@ -5,6 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
+#define HOST_LABEL_IS_EPHEMERAL "_is_ephemeral"
+
 struct stream_thread;
 struct rrdset;
 
@@ -186,6 +188,7 @@ struct rrdhost {
 
                 time_t last_connected;              // last time child connected (stored in db)
                 uint32_t connections;               // the number of times this sender has connected
+                STREAM_HANDSHAKE reason;            // the last receiver exit reason
 
                 struct {
                     uint32_t counter_in;            // counts the number of replication statements we have received
@@ -219,10 +222,10 @@ struct rrdhost {
                 time_t last_disconnected;           // the time the last sender was disconnected
                 time_t last_chart;                  // the time of the last CHART streaming command
                 bool check_obsolete;                // set when child connects, will instruct parent to
-                                          // trigger a check for obsoleted charts since previous connect
+                                                    // trigger a check for obsoleted charts since previous connect
 
                 uint32_t connections;               // the number of times this receiver has connected
-                STREAM_HANDSHAKE exit_reason;       // the last receiver exit reason
+                STREAM_HANDSHAKE reason;            // the last receiver exit reason
 
                 struct {
                     uint32_t counter_in;            // counts the number of replication statements we have received
@@ -442,9 +445,10 @@ RRDHOST *rrdhost_find_or_create(
 
 void rrdhost_free_all(void);
 
-void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force);
+void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host);
+void rrdhost_cleanup_data_collection_and_health(RRDHOST *host);
 
-bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
+bool rrdhost_should_be_cleaned_up(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
 bool rrdhost_should_run_health(RRDHOST *host);
 
 void set_host_properties(
@@ -467,7 +471,7 @@ static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, tim
         *to = online ? now : last_time_s;
 }
 
-extern time_t rrdhost_free_orphan_time_s;
+extern time_t rrdhost_cleanup_orphan_to_archive_time_s;
 extern time_t rrdhost_free_ephemeral_time_s;
 
 #include "rrdhost-collection.h"

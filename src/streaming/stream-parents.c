@@ -88,7 +88,9 @@ STREAM_HANDSHAKE stream_parent_get_disconnect_reason(STREAM_PARENT *d) {
     return d->reason;
 }
 
-void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since) {
+void stream_parent_set_host_disconnect_reason(RRDHOST *host, STREAM_HANDSHAKE reason, time_t since) {
+    host->stream.snd.status.reason = reason;
+    struct stream_parent *d = host->stream.snd.parents.current;
     if(!d) return;
     d->since_ut = since * USEC_PER_SEC;
     d->reason = reason;
@@ -104,7 +106,7 @@ static inline usec_t randomize_wait_ut(time_t min, time_t max) {
     return now_realtime_usec() + wait_ut;
 }
 
-void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
+void stream_parents_host_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
     usec_t until_ut = randomize_wait_ut(stream_send.parents.reconnect_delay_s / 2, stream_send.parents.reconnect_delay_s + 5);
     rw_spinlock_write_lock(&host->stream.snd.parents.spinlock);
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
@@ -115,10 +117,25 @@ void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
     rw_spinlock_write_unlock(&host->stream.snd.parents.spinlock);
 }
 
-void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs) {
+static void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs) {
     if(!d) return;
     d->reason = reason;
     d->postpone_until_ut = randomize_wait_ut(5, secs);
+}
+
+void stream_parent_set_host_reconnect_delay(RRDHOST *host, STREAM_HANDSHAKE reason, time_t secs) {
+    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, reason, secs);
+}
+
+static void stream_parent_set_connect_failure_reason(RRDHOST *host, STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs) {
+    host->stream.snd.status.reason = reason;
+    pulse_host_status(host, PULSE_HOST_STATUS_SND_NO_DST_FAILED, reason);
+    pulse_sender_connection_failed(d ? string2str(d->destination) : NULL, reason);
+    stream_parent_set_reconnect_delay(d, reason, secs);
+}
+
+void stream_parent_set_host_connect_failure_reason(RRDHOST *host, STREAM_HANDSHAKE reason, time_t secs) {
+    stream_parent_set_connect_failure_reason(host, host->stream.snd.parents.current, reason, secs);
 }
 
 usec_t stream_parent_get_reconnection_ut(STREAM_PARENT *d) {
@@ -576,7 +593,7 @@ bool stream_parent_connect_to_one_unsafe(
     usec_t now_ut = now_realtime_usec();
 
     // fetch stream info for all of them and put them in the array
-    size_t count = 0, skipped_but_useful = 0, skipped_not_useful = 0;
+    size_t count = 0, skipped_but_useful = 0, skipped_not_useful = 0, potential = 0;
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d && count < size ; d = d->next) {
         if (nd_thread_signaled_to_cancel()) {
             sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
@@ -584,16 +601,24 @@ bool stream_parent_connect_to_one_unsafe(
         }
 
         // make sure they all have a random number
-        // this is taken from the parent, but if the stream_info call fails
+        // this is taken from the parent, but if the stream_info call fails,
         // we generate a random number for every parent here
         d->remote.nonce = os_random32();
         d->banned_temporarily_erroneous = is_a_blocked_parent(d);
 
-        if (d->banned_permanently || d->banned_for_this_session || d->banned_temporarily_erroneous)
+        if (d->banned_permanently || d->banned_for_this_session)
             continue;
+
+        if (d->banned_temporarily_erroneous) {
+            potential++;
+            host->stream.snd.status.reason = d->reason;
+            continue;
+        }
 
         if (d->postpone_until_ut > now_ut) {
             skipped_but_useful++;
+            potential++;
+            host->stream.snd.status.reason = d->reason;
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM PARENTS '%s': skipping useful parent '%s': POSTPONED FOR %ld SECS MORE: %s",
                    rrdhost_hostname(host),
@@ -603,7 +628,6 @@ bool stream_parent_connect_to_one_unsafe(
             continue;
         }
 
-        bool skip = false;
         if(stream_info_fetch(d, host->machine_guid, default_port,
                               sender_sock, stream_parent_is_ssl(d), rrdhost_hostname(host))) {
             switch(d->remote.ingest_type) {
@@ -612,22 +636,23 @@ bool stream_parent_connect_to_one_unsafe(
                     d->reason = STREAM_HANDSHAKE_PARENT_IS_LOCALHOST;
                     d->since_ut = now_ut;
                     d->postpone_until_ut = randomize_wait_ut(3600, 7200);
+                    d->banned_permanently = true;
+                    skipped_not_useful++;
 
                     if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, 1)) {
                         // we passed hops == 1, to make sure this succeeds only when the parent
                         // is the origin child of this node
-                        d->banned_permanently = true;
-                        skipped_not_useful++;
                         nd_log(NDLS_DAEMON, NDLP_INFO,
                                "STREAM PARENTS '%s': destination '%s' is banned permanently because it is the origin server",
                                rrdhost_hostname(host), string2str(d->destination));
-                        continue;
                     }
                     else {
-                        pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
-                        skip = true;
+                        nd_log(NDLS_DAEMON, NDLP_WARNING,
+                               "STREAM PARENTS '%s': destination '%s' is banned permanently because it is the origin server, "
+                               "but it is not in the stream path before us!",
+                               rrdhost_hostname(host), string2str(d->destination));
                     }
-                    break;
+                    continue;
 
                 default:
                 case RRDHOST_INGEST_TYPE_CHILD:
@@ -641,8 +666,14 @@ bool stream_parent_connect_to_one_unsafe(
                     d->since_ut = now_ut;
                     d->postpone_until_ut = randomize_wait_ut(30, 60);
                     pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
-                    skip = true;
-                    break;
+                    skipped_but_useful++;
+                    potential++;
+                    host->stream.snd.status.reason = d->reason;
+                    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                           "STREAM PARENTS '%s': skipping useful parent '%s': %s",
+                           rrdhost_hostname(host), string2str(d->destination),
+                           stream_handshake_error_to_string(d->reason));
+                    continue;
 
                 case RRDHOST_INGEST_STATUS_REPLICATING:
                 case RRDHOST_INGEST_STATUS_ONLINE:
@@ -676,28 +707,26 @@ bool stream_parent_connect_to_one_unsafe(
         else
             pulse_sender_stream_info_failed(string2str(d->destination), d->reason);
 
-        if(skip) {
-            skipped_but_useful++;
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM PARENTS '%s': skipping useful parent '%s': %s",
-                   rrdhost_hostname(host),
-                   string2str(d->destination),
-                   stream_handshake_error_to_string(d->reason));
-        }
-        else {
-            d->selection.skipped = false;
-            d->selection.batch = count + 1;
-            d->selection.order = count + 1;
-            array[count++] = d;
-        }
+        d->selection.skipped = false;
+        d->selection.batch = count + 1;
+        d->selection.order = count + 1;
+        array[count++] = d;
     }
 
     // can we use any parent?
     if(!count) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM PARENTS '%s': no parents available (%zu skipped but useful, %zu skipped not useful)",
-               rrdhost_hostname(host),
-            skipped_but_useful, skipped_not_useful);
+               "STREAM PARENTS '%s': no parents available (%zu skipped but useful, %zu skipped not useful, %zu potential)",
+               rrdhost_hostname(host), skipped_but_useful, skipped_not_useful, potential);
+
+        if(!potential) {
+            if(host->stream.snd.status.reason != STREAM_HANDSHAKE_SP_NO_DESTINATION) {
+                host->stream.snd.status.reason = STREAM_HANDSHAKE_SP_NO_DESTINATION;
+                pulse_sender_connection_failed(NULL, host->stream.snd.status.reason);
+            }
+            pulse_host_status(host, PULSE_HOST_STATUS_SND_NO_DST, 0);
+        }
+
         return false;
     }
 
@@ -787,6 +816,8 @@ bool stream_parent_connect_to_one_unsafe(
 
         if(nd_thread_signaled_to_cancel()) {
             sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
+            host->stream.snd.status.reason = STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP;
+            pulse_host_status(host, PULSE_HOST_STATUS_SND_OFFLINE, host->stream.snd.status.reason);
             return false;
         }
 
@@ -825,11 +856,15 @@ bool stream_parent_connect_to_one_unsafe(
                    sender_sock->fd);
 
             sender_sock->error = ND_SOCK_ERR_NONE;
+            host->stream.snd.status.reason = STREAM_HANDSHAKE_SP_CONNECTED;
+            pulse_host_status(host, PULSE_HOST_STATUS_SND_CONNECTING, host->stream.snd.status.reason);
             return true;
         }
         else {
             stream_parent_nd_sock_error_to_reason(d, sender_sock);
+            host->stream.snd.status.reason = d->reason;
             pulse_sender_connection_failed(string2str(d->destination), d->reason);
+            pulse_host_status(host, PULSE_HOST_STATUS_SND_CONNECTING, host->stream.snd.status.reason);
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM PARENTS '%s': stream connection to '%s' failed (default port: %d): %s",
                    rrdhost_hostname(host),
@@ -838,6 +873,7 @@ bool stream_parent_connect_to_one_unsafe(
         }
     }
 
+    pulse_host_status(host, PULSE_HOST_STATUS_SND_OFFLINE, 0);
     return false;
 }
 
