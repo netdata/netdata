@@ -25,8 +25,10 @@ void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengin
     int ret = -1;
     while (ret == -1 && --retries) {
         ret = uv_fs_write(NULL, &request, journalfile->file, &iov, 1, (int64_t)journalfile_position, NULL);
-        if (ret == -1)
+        if (ret == -1) {
             sleep_usec(300 * USEC_PER_MS);
+            uv_fs_req_cleanup(&request);
+        }
     }
 
     bool jf_write_error = (ret == -1 || request.result < 0);

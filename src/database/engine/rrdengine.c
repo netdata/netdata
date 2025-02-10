@@ -886,8 +886,10 @@ static void *extent_write_tp_worker(
     int ret = -1;
     while (ret == -1 && --retries) {
         ret = uv_fs_write(NULL, &request, datafile->file, &iov, 1, (int64_t)xt_io_descr->pos, NULL);
-        if (ret == -1)
+        if (ret == -1) {
             sleep_usec(300 * USEC_PER_MS);
+            uv_fs_req_cleanup(&request);
+        }
     }
 
     bool df_write_error = (ret == -1 || request.result < 0);
