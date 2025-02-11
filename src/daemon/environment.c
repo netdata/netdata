@@ -62,7 +62,7 @@ static const char *detect_ca_path(void) {
             return paths[i];
     }
 
-    return "";
+    return NULL;
 }
 
 void set_environment_for_plugins_and_scripts(void) {
@@ -130,7 +130,7 @@ void set_environment_for_plugins_and_scripts(void) {
     p = getenv("CURL_CA_BUNDLE");
     if(!p || !*p) p = detect_libcurl_default_ca();
     if(!p || !*p) p = detect_ca_path();
-    setenv("CURL_CA_BUNDLE", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "CURL_CA_BUNDLE", p), 1);
+    setenv("CURL_CA_BUNDLE", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "CURL_CA_BUNDLE", p ? p : ""), 1);
 
     // switch to standard locale for plugins
     setenv("LC_ALL", "C", 1);
