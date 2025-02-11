@@ -994,6 +994,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/get_system_pagesize.h
         src/libnetdata/os/hostname.c
         src/libnetdata/os/hostname.h
+        src/libnetdata/exit/exit_initiated.c
+        src/libnetdata/exit/exit_initiated.h
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})

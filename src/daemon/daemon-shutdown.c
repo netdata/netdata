@@ -136,8 +136,14 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
-void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
-    netdata_exit = 1;
+void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char *action_result, const char *action_data) {
+    exit_initiated_set(reason);
+    int ret = exit_initiated & EXIT_REASON_FATAL ? 1 : 0;
+
+    // don't recurse (due to a fatal, while exiting)
+    static bool run = false;
+    if(run) exit(ret);
+    run = true;
 
 #ifdef ENABLE_DBENGINE
     if(!ret && dbengine_enabled)

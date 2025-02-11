@@ -467,7 +467,7 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, saved_errno);
 
     const char *thread_tag = nd_thread_tag();
-    const char *tag_to_send =  thread_tag;
+    const char *tag_to_send = thread_tag;
 
     // anonymize thread names
     if(strncmp(thread_tag, THREAD_TAG_STREAM_RECEIVER, strlen(THREAD_TAG_STREAM_RECEIVER)) == 0)
@@ -475,8 +475,8 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     if(strncmp(thread_tag, THREAD_TAG_STREAM_SENDER, strlen(THREAD_TAG_STREAM_SENDER)) == 0)
         tag_to_send = THREAD_TAG_STREAM_SENDER;
 
-    char action_result[60+1];
-    snprintfz(action_result, 60, "%s:%s", program_name, tag_to_send);
+    char action_result[200+1];
+    snprintfz(action_result, 60, "%s:%s:%s", program_name, tag_to_send, function);
 
 #if !defined(ENABLE_SENTRY) && defined(HAVE_BACKTRACE)
     int fd = nd_log.sources[NDLS_DAEMON].fd;
@@ -495,5 +495,5 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     abort();
 #endif
 
-    netdata_cleanup_and_exit(1, "FATAL", action_result, action_data);
+    netdata_cleanup_and_exit(EXIT_REASON_FATAL, "FATAL", action_result, action_data);
 }

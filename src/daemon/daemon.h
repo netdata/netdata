@@ -5,8 +5,6 @@
 
 int become_daemon(int dont_fork, const char *user);
 
-void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data);
-
 void get_netdata_execution_path(void);
 
 extern char *pidfile;

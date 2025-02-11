@@ -95,7 +95,7 @@ static void *call_netdata_cleanup(void *arg)
 
     // Stop the agent
     netdata_service_log("Running netdata cleanup...");
-    netdata_cleanup_and_exit(0, NULL, NULL, NULL);
+    netdata_cleanup_and_exit(EXIT_REASON_SERVICE_STOP, NULL, NULL, NULL);
 
     // Close event handle
     netdata_service_log("Closing stop event handle...");
