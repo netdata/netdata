@@ -5,7 +5,6 @@
 volatile EXIT_REASON exit_initiated = EXIT_REASON_NONE;
 
 ENUM_STR_MAP_DEFINE(EXIT_REASON) = {
-    { EXIT_REASON_NONE, "none" },
     { EXIT_REASON_SIGINT, "signal-interrupt"},
     { EXIT_REASON_SIGQUIT, "signal-quit"},
     { EXIT_REASON_SIGTERM, "signal-terminate"},

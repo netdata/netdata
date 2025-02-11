@@ -435,9 +435,9 @@ static void process_pending(Watcher *watcher) {
             dictionary_del(journal_files_registry, fullPath);
         }
         else if(S_ISREG(info.st_mode)) {
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                    "JOURNAL WATCHER: file '%s' has been added/updated, updating the registry",
-                    fullPath);
+//            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+//                    "JOURNAL WATCHER: file '%s' has been added/updated, updating the registry",
+//                    fullPath);
 
             struct journal_file t = {
                     .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC +
