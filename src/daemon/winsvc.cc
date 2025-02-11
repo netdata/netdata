@@ -190,7 +190,7 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
 
     // Set status to running
     netdata_service_log("Setting service status to running...");
-    if (!ReportSvcStatus(SERVICE_RUNNING, 0, 5000, SERVICE_ACCEPT_STOP))
+    if (!ReportSvcStatus(SERVICE_RUNNING, 0, 5000, SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN))
     {
         netdata_service_log("Failed to set service status to running.");
         return;
