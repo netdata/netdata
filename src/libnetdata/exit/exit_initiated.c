@@ -111,4 +111,11 @@ void exit_initiated_set(EXIT_REASON reason) {
     // so that if this is called multiple times,
     // we will have all of them
     exit_initiated |= reason;
+
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    EXIT_REASON_2buffer(wb, exit_initiated, ", ");
+
+    nd_log(NDLS_DAEMON, NDLP_CRIT,
+           "EXIT INITIATED %s: %s",
+           program_name, buffer_tostring(wb));
 }

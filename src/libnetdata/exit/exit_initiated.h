@@ -8,19 +8,37 @@
 
 typedef enum {
     EXIT_REASON_NONE                = 0,
+
+    // automatically detect when exit_initiated_set() is called
+    // supports Linux, FreeBSD, MacOS, Windows
     EXIT_REASON_SYSTEM_SHUTDOWN     = (1 << 0),
-    EXIT_REASON_SIGINT              = (1 << 1),
-    EXIT_REASON_SIGQUIT             = (1 << 2),
-    EXIT_REASON_SIGTERM             = (1 << 3),
+
+    // signals - normal termination
+    EXIT_REASON_SIGQUIT             = (1 << 1),
+    EXIT_REASON_SIGTERM             = (1 << 2),
+
+    // signals - abnormal termination
+    EXIT_REASON_SIGINT              = (1 << 3),
     EXIT_REASON_SIGBUS              = (1 << 4),
     EXIT_REASON_SIGSEGV             = (1 << 5),
     EXIT_REASON_SIGFPE              = (1 << 6),
     EXIT_REASON_SIGILL              = (1 << 7),
+
+    // normal termination via APIs
     EXIT_REASON_API_QUIT            = (1 << 7),
     EXIT_REASON_CMD_EXIT            = (1 << 8),
+
+    // abnormal termination via a fatal message
     EXIT_REASON_FATAL               = (1 << 9),
+
+    // windows specific, service stop
     EXIT_REASON_SERVICE_STOP        = (1 << 10),
 } EXIT_REASON;
+
+#define EXIT_REASON_NORMAL (EXIT_REASON_SIGTERM|EXIT_REASON_SIGQUIT|EXIT_REASON_API_QUIT|EXIT_REASON_CMD_EXIT|EXIT_REASON_SERVICE_STOP)
+#define EXIT_REASON_ABNORMAL (EXIT_REASON_SIGINT|EXIT_REASON_SIGBUS|EXIT_REASON_SIGSEGV|EXIT_REASON_SIGFPE|EXIT_REASON_SIGILL|EXIT_REASON_FATAL)
+
+#define is_exit_reason_normal(reason) (((reason) & EXIT_REASON_NORMAL) && !((reason) & EXIT_REASON_ABNORMAL))
 
 typedef struct web_buffer BUFFER;
 BITMAP_STR_DEFINE_FUNCTIONS_EXTERN(EXIT_REASON);
