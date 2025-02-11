@@ -82,23 +82,7 @@ static bool is_system_shutdown(void) {
 #if defined(OS_WINDOWS)
 #include <windows.h>
 static bool is_system_shutdown(void) {
-    HANDLE hToken;
-    TOKEN_PRIVILEGES tkp;
-
-    if (!OpenProcessToken(GetCurrentProcess(),
-                          TOKEN_QUERY,
-                          &hToken))
-        return false;
-
-    DWORD reason;
-    if (GetSystemPowerStatus(&(SYSTEM_POWER_STATUS){0}) &&
-        GetSystemShutdownReason(&reason)) {
-        CloseHandle(hToken);
-        return true;
-    }
-
-    CloseHandle(hToken);
-    return false;
+    return GetSystemMetrics(SM_SHUTTINGDOWN) != 0;
 }
 #endif
 

@@ -87,7 +87,7 @@ static HANDLE CreateEventHandle(const char *msg)
 
 static void *call_netdata_cleanup(void *arg)
 {
-    UNUSED(arg);
+    DWORD controlCode = *((DWORD *)arg);
 
     // Wait until we have to stop the service
     netdata_service_log("Cleanup thread waiting for stop event...");
@@ -95,7 +95,20 @@ static void *call_netdata_cleanup(void *arg)
 
     // Stop the agent
     netdata_service_log("Running netdata cleanup...");
-    netdata_cleanup_and_exit(EXIT_REASON_SERVICE_STOP, NULL, NULL, NULL);
+    EXIT_REASON reason;
+    switch(controlCode) {
+        case SERVICE_CONTROL_SHUTDOWN:
+            reason = (EXIT_REASON)(EXIT_REASON_SERVICE_STOP|EXIT_REASON_SYSTEM_SHUTDOWN);
+            break;
+
+        case SERVICE_CONTROL_STOP:
+            // fall-through
+
+        default:
+            reason = EXIT_REASON_SERVICE_STOP;
+            break;
+    }
+    netdata_cleanup_and_exit(reason, NULL, NULL, NULL);
 
     // Close event handle
     netdata_service_log("Closing stop event handle...");
@@ -112,6 +125,7 @@ static void WINAPI ServiceControlHandler(DWORD controlCode)
 {
     switch (controlCode)
     {
+        case SERVICE_CONTROL_SHUTDOWN:
         case SERVICE_CONTROL_STOP:
         {
             if (svc_status.dwCurrentState != SERVICE_RUNNING)
@@ -126,7 +140,7 @@ static void WINAPI ServiceControlHandler(DWORD controlCode)
             netdata_service_log("Creating cleanup thread...");
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "CLEANUP");
-            cleanup_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, call_netdata_cleanup, NULL);
+            cleanup_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, call_netdata_cleanup, &controlCode);
 
             // Signal the stop request
             netdata_service_log("Signalling the cleanup thread...");
