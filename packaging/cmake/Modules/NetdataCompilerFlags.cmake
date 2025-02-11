@@ -97,4 +97,4 @@ foreach(FLAG function-sections data-sections)
 endforeach()
 
 add_simple_extra_compiler_flag("-Wbuiltin-macro-redefined" "-Wno-builtin-macro-redefined")
-add_simple_extra_compiler_flag("-fexecptions" "-fexceptions")
+add_simple_extra_compiler_flag("-fexceptions" "-fexceptions")
