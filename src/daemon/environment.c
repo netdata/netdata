@@ -129,6 +129,7 @@ void set_environment_for_plugins_and_scripts(void) {
 
     p = getenv("CURL_CA_BUNDLE");
     if(!p || !*p) p = detect_libcurl_default_ca();
+    if(!p || !*p) p = X509_get_default_cert_file();
     if(!p || !*p) p = detect_ca_path();
     setenv("CURL_CA_BUNDLE", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "CURL_CA_BUNDLE", p ? p : ""), 1);
 
