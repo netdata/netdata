@@ -67,35 +67,35 @@ const char *get_msg_symbol(MESSAGE_ID msg) {
 const char *get_msg_format(MESSAGE_ID msg) {
     switch(msg) {
         case MSGID_MESSAGE_ONLY:
-            return "%2(%12): %64\r\n";
+            return "%2(%12): %65\r\n";
 
         case MSGID_MESSAGE_ERRNO:
-            return "%2(%12): %64%n\r\n"
+            return "%2(%12): %65%n\r\n"
                    "%n\r\n"
                    "  Unix Errno   : %5%n\r\n"
                    "  Windows Error: %6%n\r\n"
                    ;
 
         case MSGID_REQUEST_ONLY:
-            return "%2(%12): %63\r\n";
+            return "%2(%12): %64\r\n";
 
         case MSGID_ACCESS_MESSAGE:
-            return "%64\r\n";
+            return "%65\r\n";
 
         case MSGID_ACCESS_MESSAGE_REQUEST:
-            return "%64%n\r\n"
+            return "%65%n\r\n"
                    "%n\r\n"
-                   "  Request: %63%n\r\n"
+                   "  Request: %64%n\r\n"
                     ;
 
         case MSGID_ACCESS_MESSAGE_USER:
-            return "%64%n\r\n"
+            return "%65%n\r\n"
                    "%n\r\n"
                    "  User: %21, role: %22, permissions: %23%n\r\n"
                    ;
 
         case MSGID_ACCESS:
-            return "%33 %63%n\r\n"
+            return "%33 %64%n\r\n"
                    "%n\r\n"
                    "  Response Code : %34%n\r\n"
                    "  Transaction ID: %36%n\r\n"
@@ -103,7 +103,7 @@ const char *get_msg_format(MESSAGE_ID msg) {
                    ;
 
         case MSGID_ACCESS_USER:
-            return "%33 %63%n\r\n"
+            return "%33 %64%n\r\n"
                    "%n\r\n"
                    "  Response Code : %34%n\r\n"
                    "  Transaction ID: %36%n\r\n"
@@ -112,7 +112,7 @@ const char *get_msg_format(MESSAGE_ID msg) {
                    ;
 
         case MSGID_ACCESS_FORWARDER:
-            return "%33 %63%n\r\n"
+            return "%33 %64%n\r\n"
                    "%n\r\n"
                    "  Response Code : %34%n\r\n"
                    "  Transaction ID: %36%n\r\n"
@@ -120,7 +120,7 @@ const char *get_msg_format(MESSAGE_ID msg) {
                    ;
 
         case MSGID_ACCESS_FORWARDER_USER:
-            return "%33 %63%n\r\n"
+            return "%33 %64%n\r\n"
                    "%n\r\n"
                    "  Response Code : %34%n\r\n"
                    "  Transaction ID: %36%n\r\n"
@@ -282,8 +282,9 @@ int main(int argc, const char **argv) {
                  "                        <data name=\"AlertSummary\" inType=\"win:UnicodeString\"/>        <!-- 60 (NDF_ALERT_SUMMARY) -->\r\n"
                  "                        <data name=\"AlertInfo\" inType=\"win:UnicodeString\"/>           <!-- 61 (NDF_ALERT_INFO) -->\r\n"
                  "                        <data name=\"AlertNotificationTime\" inType=\"win:UnicodeString\"/>      <!-- 62 (NDF_ALERT_NOTIFICATION_REALTIME_USEC) -->\r\n"
-                 "                        <data name=\"Request\" inType=\"win:UnicodeString\"/>             <!-- 63 (NDF_REQUEST) -->\r\n"
-                 "                        <data name=\"Message\" inType=\"win:UnicodeString\"/>             <!-- 64 (NDF_MESSAGE) -->\r\n"
+                 "                        <data name=\"StackTrace\" inType=\"win:UnicodeString\"/>          <!-- 63 (NDF_STACK_TRACE) -->\r\n"
+                 "                        <data name=\"Request\" inType=\"win:UnicodeString\"/>             <!-- 64 (NDF_REQUEST) -->\r\n"
+                 "                        <data name=\"Message\" inType=\"win:UnicodeString\"/>             <!-- 65 (NDF_MESSAGE) -->\r\n"
                  "                    </template>\r\n"
                  "                </templates>\r\n"
                  "\r\n"
