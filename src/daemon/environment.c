@@ -35,14 +35,14 @@ static const char *verify_or_create_required_private_directory(const char *dir) 
 }
 
 const char *detect_libcurl_default_ca() {
+#if CURLVERSION_NOW >= CURLVERSION_SEVENTH
     curl_version_info_data *info = curl_version_info(CURLVERSION_NOW);
     if (info) {
-
         // Check built-in CA bundle
         if (info->cainfo && access(info->cainfo, R_OK) == 0)
             return info->cainfo;
     }
-
+#endif
     return NULL;
 }
 
