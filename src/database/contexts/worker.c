@@ -2,6 +2,8 @@
 
 #include "internal.h"
 
+static void rrdcontext_dequeue_from_hub_queue(RRDCONTEXT *rc);
+
 static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused);
@@ -707,6 +709,7 @@ void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc) {
 }
 
 void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc) {
+    rrdcontext_dequeue_from_hub_queue(rc);
     rrdcontext_dequeue_from_post_processing(rc);
     dictionary_del(host->rrdctx.contexts, string2str(rc->id));
 }
