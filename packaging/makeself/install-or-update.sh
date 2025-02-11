@@ -252,23 +252,49 @@ replace_symlink() {
     ln -s "${target}" "${name}"
 }
 
+prep_ssl_dir() {
+  [ -L /opt/netdata/etc/ssl ] && rm /opt/netdata/etc/ssl
+  mkdir -p /opt/netdata/etc/ssl
+}
+
+select_cert_dir() {
+  prefix="/opt/netdata/etc/ssl/certs"
+
+  mkdir -p "${prefix}"
+
+  for bundle in ca-certificates.crt ca-bundle.crt; do
+    if [ -r "${1}/${bundle}" ]; then
+      replace_symlink "${1}/${bundle}" "${prefix}/ca-certificates.crt"
+      break
+    fi
+  done
+}
+
 select_system_certs() {
-  if [ -d /etc/pki/tls ] ; then
-    echo "${1} /etc/pki/tls for TLS configuration and certificates"
-    replace_symlink /etc/pki/tls /opt/netdata/etc/ssl
-  elif [ -d /etc/ssl ] ; then
-    echo "${1} /etc/ssl for TLS configuration and certificates"
-    replace_symlink /etc/ssl /opt/netdata/etc/ssl
-  fi
+  prep_ssl_dir
+
+  for dir in /etc/pki/tls /etc/ssl ; do
+    if [ -d "${dir}" ] ; then
+      echo "${1} ${dir} for TLS configuration and certificates"
+      select_cert_dir "${dir}/certs"
+      replace_symlink "${dir}/openssl.cnf" /opt/netdata/etc/ssl/openssl.cnf
+      echo "${dir}" > /opt/netdata/etc/ssl/selected
+      break
+    fi
+  done
 }
 
 select_internal_certs() {
   echo "Using bundled TLS configuration and certificates"
-  replace_symlink /opt/netdata/share/ssl /opt/netdata/etc/ssl
+  prep_ssl_dir
+  src="/opt/netdata/share/ssl"
+  select_cert_dir "${src}/certs"
+  replace_symlink "${src}/openssl.cnf" /opt/netdata/etc/ssl/openssl.cnf
+  echo "${src}" > /opt/netdata/etc/ssl/selected
 }
 
 certs_selected() {
-  [ -L /opt/netdata/etc/ssl ] || return 1
+  [ -e /opt/netdata/etc/ssl/selected ] && return 0
 }
 
 test_certs() {
@@ -284,7 +310,7 @@ test_certs() {
 }
 
 # If the user has manually set up certificates, don’t mess with it.
-if [ ! -L /opt/netdata/etc/ssl ] && [ -d /opt/netdata/etc/ssl ] ; then
+if [ ! -L /opt/netdata/etc/ssl ] && [ -d /opt/netdata/etc/ssl ] && [ ! -e /opt/netdata/etc/ssl/selected ] ; then
   echo "Preserving existing user configuration for TLS"
 else
   echo "Configure TLS certificate paths (mode: ${NETDATA_CERT_MODE})"
