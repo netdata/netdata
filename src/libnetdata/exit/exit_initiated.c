@@ -107,4 +107,11 @@ void exit_initiated_set(EXIT_REASON reason) {
     nd_log(NDLS_DAEMON, is_exit_reason_normal(exit_initiated) ? NDLP_NOTICE : NDLP_CRIT,
            "EXIT INITIATED %s: %s",
            program_name, buffer_tostring(wb));
+
+    /* Write the exit reason buffer to /tmp/exit.reason */
+    FILE *fp = fopen("/var/lib/netdata/exit.reason", "w");
+    if (fp) {
+        fprintf(fp, "%s", buffer_tostring(wb));
+        fclose(fp);
+    }
 }
