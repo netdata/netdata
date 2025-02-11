@@ -24,16 +24,17 @@ typedef struct daemon_status_file {
     EXIT_REASON reason;     // the exit reason (maybe empty)
     DAEMON_STATUS status;   // the daemon status
 
+    time_t init_dt;
+    time_t exit_dt;
+
     struct {
         long line;
         const char *filename;
         const char *function;
         const char *stack_trace;
+        const char *message;
     } fatal;
 } DAEMON_STATUS_FILE;
-
-// returns the current status
-DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status);
 
 // loads the last status saved
 DAEMON_STATUS_FILE daemon_status_file_load(void);
@@ -46,5 +47,7 @@ void daemon_status_file_check_crash(void);
 
 bool daemon_status_file_has_last_crashed(void);
 bool daemon_status_file_was_incomplete_shutdown(void);
+
+void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *stack_trace, long line);
 
 #endif //NETDATA_DAEMON_STATUS_FILE_H

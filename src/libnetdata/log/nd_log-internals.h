@@ -125,6 +125,7 @@ struct nd_log {
     nd_uuid_t invocation_id;
 
     ND_LOG_SOURCES overwrite_process_source;
+    log_event_t log_event_cb;
 
     struct nd_log_source sources[_NDLS_MAX];
 
@@ -209,6 +210,7 @@ const char *winerror_annotator(struct log_field *lf);
 
 uint64_t log_field_to_uint64(struct log_field *lf);
 int64_t log_field_to_int64(struct log_field *lf);
+char *log_field_strdupz(struct log_field *lf);
 
 // --------------------------------------------------------------------------------------------------------------------
 // common text formatters

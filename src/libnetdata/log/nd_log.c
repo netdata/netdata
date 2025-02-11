@@ -109,11 +109,40 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+
+static __thread bool nd_log_event_this = false;
+
+static void nd_log_event(struct log_field *fields, size_t fields_max __maybe_unused) {
+    if(!nd_log_event_this)
+        return;
+
+    nd_log_event_this = false;
+
+    if(!nd_log.log_event_cb)
+        return;
+
+    const char *filename = log_field_strdupz(&fields[NDF_FILE]);
+    const char *message = log_field_strdupz(&fields[NDF_MESSAGE]);
+    const char *function = log_field_strdupz(&fields[NDF_FUNC]);
+    const char *stack_trace = log_field_strdupz(&fields[NDF_STACK_TRACE]);
+    long line = log_field_to_int64(&fields[NDF_LINE]);
+
+    nd_log.log_event_cb(filename, function, message, stack_trace, line);
+}
+
+void nd_log_register_event_cb(log_event_t cb) {
+    nd_log.log_event_cb = cb;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // high level logger
 
 static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
                                  ND_LOG_METHOD output, struct nd_log_source *source,
                                  struct log_field *fields, size_t fields_max) {
+
+    nd_log_event(fields, fields_max);
+
     if(spinlock)
         spinlock_lock(spinlock);
 
@@ -436,6 +465,9 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         _exit(1);
 #endif
     }
+
+    // send this event to deamon_status_file
+    nd_log_event_this = true;
 
     int saved_errno = errno;
     size_t saved_winerror = 0;

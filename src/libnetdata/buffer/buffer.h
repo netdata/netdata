@@ -84,7 +84,8 @@ static inline void _buffer_overflow_check(BUFFER *b __maybe_unused) {
                    "BUFFER: detected overflow.");
 }
 
-static ALWAYS_INLINE void buffer_flush(BUFFER *wb) {
+ALWAYS_INLINE
+static void buffer_flush(BUFFER *wb) {
     wb->len = 0;
 
     wb->json.depth = 0;
@@ -117,7 +118,8 @@ void buffer_char_replace(BUFFER *wb, char from, char to);
 
 void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit);
 
-static ALWAYS_INLINE void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
+ALWAYS_INLINE
+static void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
     if(unlikely(buffer->len + needed_free_size >= buffer->size))
         buffer_increase(buffer, needed_free_size + 1);
 }
@@ -127,7 +129,8 @@ void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value
 
 void buffer_json_finalize(BUFFER *wb);
 
-static ALWAYS_INLINE const char *buffer_tostring(BUFFER *wb)
+ALWAYS_INLINE
+static const char *buffer_tostring(BUFFER *wb)
 {
     if(unlikely(!wb))
         return NULL;
@@ -140,7 +143,8 @@ static ALWAYS_INLINE const char *buffer_tostring(BUFFER *wb)
     return(wb->buffer);
 }
 
-static ALWAYS_INLINE void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE type) {
+ALWAYS_INLINE
+static void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE type) {
 #ifdef NETDATA_INTERNAL_CHECKS
     assert(wb->json.depth <= BUFFER_JSON_MAX_DEPTH && "BUFFER JSON: max nesting reached");
 #endif
@@ -152,18 +156,21 @@ static ALWAYS_INLINE void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_T
     wb->json.stack[wb->json.depth].type = type;
 }
 
-static ALWAYS_INLINE void _buffer_json_depth_pop(BUFFER *wb) {
+ALWAYS_INLINE
+static void _buffer_json_depth_pop(BUFFER *wb) {
     wb->json.depth--;
 }
 
-static ALWAYS_INLINE void buffer_putc(BUFFER *wb, char c) {
+ALWAYS_INLINE
+static void buffer_putc(BUFFER *wb, char c) {
     buffer_need_bytes(wb, 2);
     wb->buffer[wb->len++] = c;
     wb->buffer[wb->len] = '\0';
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
+ALWAYS_INLINE
+static void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt || !len)) return;
 
     buffer_need_bytes(wb, len + 1);
@@ -182,7 +189,8 @@ static ALWAYS_INLINE void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
+ALWAYS_INLINE
+static void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt || !len)) return;
 
     buffer_need_bytes(wb, len + 1);
@@ -209,7 +217,8 @@ static ALWAYS_INLINE void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_strcat(BUFFER *wb, const char *txt) {
+ALWAYS_INLINE
+static void buffer_strcat(BUFFER *wb, const char *txt) {
     if(unlikely(!txt || !*txt)) return;
 
     const char *t = txt;
@@ -231,7 +240,8 @@ static ALWAYS_INLINE void buffer_strcat(BUFFER *wb, const char *txt) {
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_contents_replace(BUFFER *wb, const char *txt, size_t len) {
+ALWAYS_INLINE
+static void buffer_contents_replace(BUFFER *wb, const char *txt, size_t len) {
     wb->len = 0;
     buffer_need_bytes(wb, len + 1);
 
@@ -242,7 +252,8 @@ static ALWAYS_INLINE void buffer_contents_replace(BUFFER *wb, const char *txt, s
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_strncat(BUFFER *wb, const char *txt, size_t len) {
+ALWAYS_INLINE
+static void buffer_strncat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt)) return;
 
     buffer_need_bytes(wb, len + 1);
@@ -255,7 +266,8 @@ static ALWAYS_INLINE void buffer_strncat(BUFFER *wb, const char *txt, size_t len
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_memcat(BUFFER *wb, const void *mem, size_t bytes) {
+ALWAYS_INLINE
+static void buffer_memcat(BUFFER *wb, const void *mem, size_t bytes) {
     if(unlikely(!mem)) return;
 
     buffer_need_bytes(wb, bytes + 1);
@@ -268,7 +280,8 @@ static ALWAYS_INLINE void buffer_memcat(BUFFER *wb, const void *mem, size_t byte
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_json_strcat(BUFFER *wb, const char *txt)
+ALWAYS_INLINE
+static void buffer_json_strcat(BUFFER *wb, const char *txt)
 {
     if(unlikely(!txt || !*txt)) return;
 
@@ -333,7 +346,8 @@ static ALWAYS_INLINE void buffer_json_strcat(BUFFER *wb, const char *txt)
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_json_quoted_strcat(BUFFER *wb, const char *txt) {
+ALWAYS_INLINE
+static void buffer_json_quoted_strcat(BUFFER *wb, const char *txt) {
     if(unlikely(!txt || !*txt)) return;
 
     if(*txt == '"')
@@ -372,13 +386,15 @@ static ALWAYS_INLINE void buffer_json_quoted_strcat(BUFFER *wb, const char *txt)
 // point the remaining value fits in 32 bits, and then calls
 // print_number_lu_r() to print the rest with 32 bit arithmetic.
 
-static ALWAYS_INLINE char *print_uint32_reversed(char *dst, uint32_t value) {
+ALWAYS_INLINE
+static char *print_uint32_reversed(char *dst, uint32_t value) {
     char *d = dst;
     do *d++ = (char)('0' + (value % 10)); while((value /= 10));
     return d;
 }
 
-static ALWAYS_INLINE char *print_uint64_reversed(char *dst, uint64_t value) {
+ALWAYS_INLINE
+static char *print_uint64_reversed(char *dst, uint64_t value) {
 #ifdef ENV32BIT
     if(value <= (uint64_t)0xffffffff)
         return print_uint32_reversed(dst, value);
@@ -394,14 +410,16 @@ static ALWAYS_INLINE char *print_uint64_reversed(char *dst, uint64_t value) {
 #endif
 }
 
-static ALWAYS_INLINE char *print_uint32_hex_reversed(char *dst, uint32_t value) {
+ALWAYS_INLINE
+static char *print_uint32_hex_reversed(char *dst, uint32_t value) {
     static const char *digits = "0123456789ABCDEF";
     char *d = dst;
     do *d++ = digits[value & 0xf]; while((value >>= 4));
     return d;
 }
 
-static ALWAYS_INLINE char *print_uint64_hex_reversed(char *dst, uint64_t value) {
+ALWAYS_INLINE
+static char *print_uint64_hex_reversed(char *dst, uint64_t value) {
 #ifdef ENV32BIT
     if(value <= (uint64_t)0xffffffff)
         return print_uint32_hex_reversed(dst, value);
@@ -417,7 +435,8 @@ static ALWAYS_INLINE char *print_uint64_hex_reversed(char *dst, uint64_t value) 
 #endif
 }
 
-static ALWAYS_INLINE char *print_uint64_hex_reversed_full(char *dst, uint64_t value) {
+ALWAYS_INLINE
+static char *print_uint64_hex_reversed_full(char *dst, uint64_t value) {
     char *d = dst;
     for(size_t c = 0; c < sizeof(uint64_t) * 2; c++) {
         *d++ = hex_digits[value & 0xf];
@@ -427,19 +446,22 @@ static ALWAYS_INLINE char *print_uint64_hex_reversed_full(char *dst, uint64_t va
     return d;
 }
 
-static ALWAYS_INLINE char *print_uint64_base64_reversed(char *dst, uint64_t value) {
+ALWAYS_INLINE
+static char *print_uint64_base64_reversed(char *dst, uint64_t value) {
     char *d = dst;
     do *d++ = base64_digits[value & 63]; while ((value >>= 6));
     return d;
 }
 
-static ALWAYS_INLINE void char_array_reverse(char *from, char *to) {
+ALWAYS_INLINE
+static void char_array_reverse(char *from, char *to) {
     // from and to are inclusive
     char *begin = from, *end = to, aux;
     while (end > begin) aux = *end, *end-- = *begin, *begin++ = aux;
 }
 
-static ALWAYS_INLINE int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
+ALWAYS_INLINE
+static int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
     char *s = dst;
 
     if(unlikely(value < 0)) {
@@ -502,7 +524,8 @@ static ALWAYS_INLINE int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
     return (int)(d - dst);
 }
 
-static ALWAYS_INLINE size_t print_uint64(char *dst, uint64_t value) {
+ALWAYS_INLINE
+static size_t print_uint64(char *dst, uint64_t value) {
     char *s = dst;
     char *d = print_uint64_reversed(s, value);
     char_array_reverse(s, d - 1);
@@ -510,7 +533,8 @@ static ALWAYS_INLINE size_t print_uint64(char *dst, uint64_t value) {
     return d - s;
 }
 
-static ALWAYS_INLINE size_t print_int64(char *dst, int64_t value) {
+ALWAYS_INLINE
+static size_t print_int64(char *dst, int64_t value) {
     size_t len = 0;
 
     if(value < 0) {
@@ -523,20 +547,23 @@ static ALWAYS_INLINE size_t print_int64(char *dst, int64_t value) {
 }
 
 #define UINT64_MAX_LENGTH (24) // 21 should be enough
-static ALWAYS_INLINE void buffer_print_uint64(BUFFER *wb, uint64_t value) {
+ALWAYS_INLINE
+static void buffer_print_uint64(BUFFER *wb, uint64_t value) {
     buffer_need_bytes(wb, UINT64_MAX_LENGTH);
     wb->len += print_uint64(&wb->buffer[wb->len], value);
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_print_int64(BUFFER *wb, int64_t value) {
+ALWAYS_INLINE
+static void buffer_print_int64(BUFFER *wb, int64_t value) {
     buffer_need_bytes(wb, UINT64_MAX_LENGTH);
     wb->len += print_int64(&wb->buffer[wb->len], value);
     buffer_overflow_check(wb);
 }
 
 #define UINT64_HEX_MAX_LENGTH ((sizeof(HEX_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
-static ALWAYS_INLINE size_t print_uint64_hex(char *dst, uint64_t value) {
+ALWAYS_INLINE
+static size_t print_uint64_hex(char *dst, uint64_t value) {
     char *d = dst;
 
     const char *s = HEX_PREFIX;
@@ -548,7 +575,8 @@ static ALWAYS_INLINE size_t print_uint64_hex(char *dst, uint64_t value) {
     return e - dst;
 }
 
-static ALWAYS_INLINE size_t print_uint64_hex_full(char *dst, uint64_t value) {
+ALWAYS_INLINE
+static size_t print_uint64_hex_full(char *dst, uint64_t value) {
     char *d = dst;
 
     const char *s = HEX_PREFIX;
@@ -560,20 +588,23 @@ static ALWAYS_INLINE size_t print_uint64_hex_full(char *dst, uint64_t value) {
     return e - dst;
 }
 
-static ALWAYS_INLINE void buffer_print_uint64_hex(BUFFER *wb, uint64_t value) {
+ALWAYS_INLINE
+static void buffer_print_uint64_hex(BUFFER *wb, uint64_t value) {
     buffer_need_bytes(wb, UINT64_HEX_MAX_LENGTH);
     wb->len += print_uint64_hex(&wb->buffer[wb->len], value);
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_print_uint64_hex_full(BUFFER *wb, uint64_t value) {
+ALWAYS_INLINE
+static void buffer_print_uint64_hex_full(BUFFER *wb, uint64_t value) {
     buffer_need_bytes(wb, UINT64_HEX_MAX_LENGTH);
     wb->len += print_uint64_hex_full(&wb->buffer[wb->len], value);
     buffer_overflow_check(wb);
 }
 
 #define UINT64_B64_MAX_LENGTH ((sizeof(IEEE754_UINT64_B64_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
-static ALWAYS_INLINE void buffer_print_uint64_base64(BUFFER *wb, uint64_t value) {
+ALWAYS_INLINE
+static void buffer_print_uint64_base64(BUFFER *wb, uint64_t value) {
     buffer_need_bytes(wb, UINT64_B64_MAX_LENGTH);
 
     buffer_fast_strcat(wb, IEEE754_UINT64_B64_PREFIX, sizeof(IEEE754_UINT64_B64_PREFIX) - 1);
@@ -587,7 +618,8 @@ static ALWAYS_INLINE void buffer_print_uint64_base64(BUFFER *wb, uint64_t value)
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
+ALWAYS_INLINE
+static void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
     buffer_need_bytes(wb, 2);
 
     if(value < 0) {
@@ -600,7 +632,8 @@ static ALWAYS_INLINE void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_print_int64_base64(BUFFER *wb, int64_t value) {
+ALWAYS_INLINE
+static void buffer_print_int64_base64(BUFFER *wb, int64_t value) {
     buffer_need_bytes(wb, 2);
 
     if(value < 0) {
@@ -614,7 +647,9 @@ static ALWAYS_INLINE void buffer_print_int64_base64(BUFFER *wb, int64_t value) {
 }
 
 #define DOUBLE_MAX_LENGTH (512) // 318 should be enough, including null
-static ALWAYS_INLINE void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value) {
+
+ALWAYS_INLINE
+static void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_need_bytes(wb, DOUBLE_MAX_LENGTH);
 
     if(isnan(value) || isinf(value)) {
@@ -632,7 +667,8 @@ static ALWAYS_INLINE void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE
 }
 
 #define DOUBLE_HEX_MAX_LENGTH ((sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
-static ALWAYS_INLINE void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE value) {
+ALWAYS_INLINE
+static void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_need_bytes(wb, DOUBLE_HEX_MAX_LENGTH);
 
     uint64_t *ptr = (uint64_t *) (&value);
@@ -648,7 +684,8 @@ static ALWAYS_INLINE void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DO
 }
 
 #define DOUBLE_B64_MAX_LENGTH ((sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
-static ALWAYS_INLINE void buffer_print_netdata_double_base64(BUFFER *wb, NETDATA_DOUBLE value) {
+ALWAYS_INLINE
+static void buffer_print_netdata_double_base64(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_need_bytes(wb, DOUBLE_B64_MAX_LENGTH);
 
     uint64_t *ptr = (uint64_t *) (&value);
@@ -669,7 +706,8 @@ typedef enum {
     NUMBER_ENCODING_BASE64,
 } NUMBER_ENCODING;
 
-static ALWAYS_INLINE void buffer_print_int64_encoded(BUFFER *wb, NUMBER_ENCODING encoding, int64_t value) {
+ALWAYS_INLINE
+static void buffer_print_int64_encoded(BUFFER *wb, NUMBER_ENCODING encoding, int64_t value) {
     if(encoding == NUMBER_ENCODING_BASE64)
         return buffer_print_int64_base64(wb, value);
 
@@ -679,7 +717,8 @@ static ALWAYS_INLINE void buffer_print_int64_encoded(BUFFER *wb, NUMBER_ENCODING
     return buffer_print_int64(wb, value);
 }
 
-static ALWAYS_INLINE void buffer_print_uint64_encoded(BUFFER *wb, NUMBER_ENCODING encoding, uint64_t value) {
+ALWAYS_INLINE
+static void buffer_print_uint64_encoded(BUFFER *wb, NUMBER_ENCODING encoding, uint64_t value) {
     if(encoding == NUMBER_ENCODING_BASE64)
         return buffer_print_uint64_base64(wb, value);
 
@@ -689,7 +728,8 @@ static ALWAYS_INLINE void buffer_print_uint64_encoded(BUFFER *wb, NUMBER_ENCODIN
     return buffer_print_uint64(wb, value);
 }
 
-static ALWAYS_INLINE void buffer_print_netdata_double_encoded(BUFFER *wb, NUMBER_ENCODING encoding, NETDATA_DOUBLE value) {
+ALWAYS_INLINE
+static void buffer_print_netdata_double_encoded(BUFFER *wb, NUMBER_ENCODING encoding, NETDATA_DOUBLE value) {
     if(encoding == NUMBER_ENCODING_BASE64)
         return buffer_print_netdata_double_base64(wb, value);
 
@@ -699,7 +739,8 @@ static ALWAYS_INLINE void buffer_print_netdata_double_encoded(BUFFER *wb, NUMBER
     return buffer_print_netdata_double(wb, value);
 }
 
-static ALWAYS_INLINE void buffer_print_spaces(BUFFER *wb, size_t spaces) {
+ALWAYS_INLINE
+static void buffer_print_spaces(BUFFER *wb, size_t spaces) {
     buffer_need_bytes(wb, spaces * 4 + 1);
 
     char *d = &wb->buffer[wb->len];
@@ -716,12 +757,14 @@ static ALWAYS_INLINE void buffer_print_spaces(BUFFER *wb, size_t spaces) {
     buffer_overflow_check(wb);
 }
 
-static ALWAYS_INLINE void buffer_print_json_comma(BUFFER *wb) {
+ALWAYS_INLINE
+static void buffer_print_json_comma(BUFFER *wb) {
     if(wb->json.stack[wb->json.depth].count)
         buffer_putc(wb, ',');
 }
 
-static ALWAYS_INLINE void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
+ALWAYS_INLINE
+static void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
     buffer_print_json_comma(wb);
 
     if((wb->json.options & BUFFER_JSON_OPTIONS_MINIFY) ||
@@ -732,13 +775,15 @@ static ALWAYS_INLINE void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
     buffer_print_spaces(wb, wb->json.depth + 1);
 }
 
-static ALWAYS_INLINE void buffer_print_json_key(BUFFER *wb, const char *key) {
+ALWAYS_INLINE
+static void buffer_print_json_key(BUFFER *wb, const char *key) {
     buffer_strcat(wb, wb->json.key_quote);
     buffer_json_strcat(wb, key);
     buffer_strcat(wb, wb->json.key_quote);
 }
 
-static ALWAYS_INLINE void buffer_json_add_string_value(BUFFER *wb, const char *value) {
+ALWAYS_INLINE
+static void buffer_json_add_string_value(BUFFER *wb, const char *value) {
     if(value) {
         buffer_strcat(wb, wb->json.value_quote);
         buffer_json_strcat(wb, value);
@@ -748,7 +793,8 @@ static ALWAYS_INLINE void buffer_json_add_string_value(BUFFER *wb, const char *v
         buffer_fast_strcat(wb, "null", 4);
 }
 
-static ALWAYS_INLINE void buffer_json_add_quoted_string_value(BUFFER *wb, const char *value) {
+ALWAYS_INLINE
+static void buffer_json_add_quoted_string_value(BUFFER *wb, const char *value) {
     if(value) {
         buffer_strcat(wb, wb->json.value_quote);
         buffer_json_quoted_strcat(wb, value);
