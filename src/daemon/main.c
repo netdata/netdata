@@ -2,7 +2,8 @@
 
 #include "common.h"
 #include "buildinfo.h"
-#include "daemon/daemon-shutdown-watcher.h"
+#include "daemon-shutdown-watcher.h"
+#include "daemon-status-file.h"
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 
@@ -759,6 +760,10 @@ int netdata_main(int argc, char **argv) {
         netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
     }
 
+    // check for a crash
+    daemon_status_file_check_crash();
+    daemon_status_file_save(DAEMON_STATUS_INITIALIZING);
+
     // ----------------------------------------------------------------------------------------------------------------
     // global configuration
 
@@ -964,18 +969,6 @@ int netdata_main(int argc, char **argv) {
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
     }
 
-    delta_startup_time("check for incomplete shutdown");
-
-    char agent_crash_file[FILENAME_MAX + 1];
-    char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
-    snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
-    int incomplete_shutdown_detected = (unlink(agent_incomplete_shutdown_file) == 0);
-    snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
-    int crash_detected = (unlink(agent_crash_file) == 0);
-    int fd = open(agent_crash_file, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 444);
-    if (fd >= 0)
-        close(fd);
-
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
 
@@ -1035,16 +1028,16 @@ int netdata_main(int argc, char **argv) {
 
     analytics_statistic_t start_statistic = { "START", "-",  "-" };
     analytics_statistic_send(&start_statistic);
-    if (crash_detected) {
+    if (daemon_status_file_has_last_crashed()) {
         analytics_statistic_t crash_statistic = { "CRASH", "-",  "-" };
         analytics_statistic_send(&crash_statistic);
     }
-    if (incomplete_shutdown_detected) {
+    if (daemon_status_file_was_incomplete_shutdown()) {
         analytics_statistic_t incomplete_shutdown_statistic = { "INCOMPLETE_SHUTDOWN", "-", "-" };
         analytics_statistic_send(&incomplete_shutdown_statistic);
     }
 
-    //check if ANALYTICS needs to start
+    // check if ANALYTICS needs to start
     if (netdata_anonymous_statistics_enabled == 1) {
         for (i = 0; static_threads[i].name != NULL; i++) {
             if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
@@ -1057,6 +1050,8 @@ int netdata_main(int argc, char **argv) {
     }
 
     webrtc_initialize();
+
+    daemon_status_file_save(DAEMON_STATUS_RUNNING);
     return 10;
 }
 

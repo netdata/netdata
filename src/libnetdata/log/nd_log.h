@@ -31,6 +31,7 @@ ND_LOG_FIELD_ID nd_log_field_id_by_journal_name(const char *field, size_t len);
 int nd_log_priority2id(const char *priority);
 const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 const char *nd_log_method_for_external_plugins(const char *s);
+ND_UUID nd_log_get_invocation_id(void);
 
 int nd_log_health_fd(void);
 int nd_log_collectors_fd(void);

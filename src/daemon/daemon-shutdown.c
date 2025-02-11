@@ -2,6 +2,7 @@
 
 #include "daemon-shutdown.h"
 #include "daemon-service.h"
+#include "daemon-status-file.h"
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"
@@ -15,6 +16,21 @@
 void web_client_cache_destroy(void);
 
 extern struct netdata_static_thread *static_threads;
+
+void netdata_log_exit_reason(void) {
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    EXIT_REASON_2buffer(wb, exit_initiated, ", ");
+
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_exit_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_DAEMON, is_exit_reason_normal(exit_initiated) ? NDLP_NOTICE : NDLP_CRIT,
+           "EXIT INITIATED %s: %s",
+           program_name, buffer_tostring(wb));
+}
 
 void cancel_main_threads(void) {
     nd_log_limits_unlimited();
@@ -142,8 +158,15 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 
     // don't recurse (due to a fatal, while exiting)
     static bool run = false;
-    if(run) exit(ret);
+    if(run) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "EXIT: Recursion detected. Exiting immediately.");
+        daemon_status_file_save(DAEMON_STATUS_EXITED);
+        exit(ret);
+    }
     run = true;
+
+    netdata_log_exit_reason();
+    daemon_status_file_save(DAEMON_STATUS_EXITING);
 
 #ifdef ENABLE_DBENGINE
     if(!ret && dbengine_enabled)
@@ -165,11 +188,6 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     statistic = (analytics_statistic_t) {"EXIT", ret?"ERROR":"OK","-"};
     analytics_statistic_send(&statistic);
 
-    char agent_crash_file[FILENAME_MAX + 1];
-    char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
-    snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
-    snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
-    (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
     watcher_step_complete(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
 
     netdata_main_spawn_server_cleanup();
@@ -290,12 +308,13 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     netdata_ssl_cleanup();
     watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
 
-    (void) unlink(agent_incomplete_shutdown_file);
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE);
 
     watcher_shutdown_end();
     watcher_thread_stop();
     curl_global_cleanup();
+
+    daemon_status_file_save(DAEMON_STATUS_EXITED);
 
 #ifdef OS_WINDOWS
     return;

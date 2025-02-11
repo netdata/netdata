@@ -25,6 +25,17 @@
     }                                                                                                           \
 } while(0)
 
+#define JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                 \
+    json_object *_j;                                                                                            \
+    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
+        strncpyz(dst, json_object_get_string(_j), sizeof(dst) - 1);                                             \
+    }                                                                                                           \
+    else if(required) {                                                                                         \
+        buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                      \
+        return false;                                                                                           \
+    }                                                                                                           \
+} while(0)
+
 #define JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {              \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
@@ -234,5 +245,8 @@
 typedef bool (*json_parse_function_payload_t)(json_object *jobj, const char *path, void *data, BUFFER *error);
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER *payload, int *code, json_parse_function_payload_t cb, void *cb_data);
+
+// return HTTP response code
+int json_parse_payload_or_error(BUFFER *payload, BUFFER *error, json_parse_function_payload_t cb, void *cb_data);
 
 #endif //NETDATA_JSON_C_PARSER_INLINE_H

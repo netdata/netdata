@@ -1184,6 +1184,8 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-db-dbengine-retention.h
         src/daemon/pulse/pulse-parents.c
         src/daemon/pulse/pulse-parents.h
+        src/daemon/daemon-status-file.c
+        src/daemon/daemon-status-file.h
 )
 
 set(H2O_FILES
