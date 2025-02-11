@@ -4,6 +4,8 @@ package mysql
 
 import (
 	"strings"
+
+	"github.com/blang/semver/v4"
 )
 
 const queryShowUserStatistics = "SHOW USER_STATISTICS;"
@@ -25,7 +27,14 @@ func (c *Collector) collectUserStatistics(mx map[string]int64) error {
 				c.addUserStatisticsCharts(user)
 			}
 		case "Cpu_time":
-			mx[strings.ToLower(prefix+column)] = int64(parseFloat(value) * 1000)
+			if c.isMariaDB && c.version.GTE(semver.Version{Major: 11, Minor: 4, Patch: 5}) {
+				// TODO: theoretically should divide by 1e6 to convert to seconds,
+				// but empirically need 1e7 to match pre-11.4.5 values.
+				// Needs investigation - possible unit reporting inconsistency in MariaDB
+				mx[strings.ToLower(prefix+column)] = int64(parseFloat(value) / 1e7 * 1000)
+			} else {
+				mx[strings.ToLower(prefix+column)] = int64(parseFloat(value) * 1000)
+			}
 		case
 			"Total_connections",
 			"Lost_connections",

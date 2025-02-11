@@ -60,3 +60,12 @@ void nd_sentry_set_user(const char *guid)
     sentry_value_set_by_key(user, "id", sentry_value_new_string(guid));
     sentry_set_user(user);
 }
+
+void nd_sentry_add_breadcrumb(const char *message)
+{
+    if (sentry_telemetry_disabled())
+        return;
+
+    sentry_value_t crumb = sentry_value_new_breadcrumb("fatal", message);
+    sentry_add_breadcrumb(crumb);
+}
