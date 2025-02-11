@@ -98,7 +98,13 @@ void exit_initiated_set(EXIT_REASON reason) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     EXIT_REASON_2buffer(wb, exit_initiated, ", ");
 
-    nd_log(NDLS_DAEMON, NDLP_CRIT,
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_exit_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_DAEMON, is_exit_reason_normal(exit_initiated) ? NDLP_NOTICE : NDLP_CRIT,
            "EXIT INITIATED %s: %s",
            program_name, buffer_tostring(wb));
 }
