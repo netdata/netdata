@@ -303,6 +303,9 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 
 #ifdef ENABLE_SENTRY
     if (ret) {
+        if (action_data) {
+            nd_sentry_add_breadcrumb(action_data);
+        }
         abort();
     } else {
         nd_sentry_fini();
