@@ -102,8 +102,11 @@ void health_prototype_metadata_foreach(void *data, prototype_metadata_cb_t cb);
 uint64_t health_evloop_current_iteration(void);
 void rrdhost_set_health_evloop_iteration(RRDHOST *host);
 uint64_t rrdhost_health_evloop_last_iteration(RRDHOST *host);
-void register_host_to_health(RRDHOST *host);
+void health_register_host(RRDHOST *host, time_t run_at);
 void health_event_loop_init(void);
+void health_unregister_host(RRDHOST *host);
+void health_shutdown();
+
 
 void health_load_config_defaults(void);
 

@@ -279,6 +279,10 @@ static void health_raised_summary_add_alert(struct health_raised_summary *hrm, c
 }
 
 void alerts_raised_summary_free(struct health_raised_summary *hrm) {
+
+    if (!hrm)
+        return;
+
     for(size_t i = 0; i < hrm->active_alerts.used ;i++)
         dictionary_acquired_item_release(hrm->rrdcalc_dict, hrm->active_alerts.array[i]);
 

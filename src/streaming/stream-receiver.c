@@ -1136,7 +1136,10 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
                        "Postponing health checks for %" PRId64 " seconds, because it was just connected.",
                        rrdhost_hostname(host), rpt->remote_ip, rpt->remote_port,
                        (int64_t) rpt->config.health.delay);
+                health_register_host(host, host->health.delay_up_to);
             }
+            else
+                health_register_host(host, 0);
         }
 
         host->health_log.health_log_retention_s = rpt->config.health.history;
@@ -1210,6 +1213,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
             host->stream.rcv.status.last_connected = 0;
             host->stream.rcv.status.last_disconnected = now_realtime_sec();
             host->health.enabled = false;
+            health_unregister_host(host);
 
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
             host->receiver = NULL;
