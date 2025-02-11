@@ -91,7 +91,6 @@ RUN mkdir -p /opt/src /var/log/netdata && \
     ln -sf /dev/stderr /var/log/netdata/error.log && \
     ln -sf /dev/stderr /var/log/netdata/daemon.log && \
     ln -sf /dev/stdout /var/log/netdata/collector.log && \
-    ln -sf /dev/stdout /var/log/netdata/fluentbit.log && \
     ln -sf /dev/stdout /var/log/netdata/health.log
 
 COPY --from=builder /app /
