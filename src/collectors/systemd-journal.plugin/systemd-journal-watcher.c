@@ -296,7 +296,7 @@ void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
         return;
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#if 0
     {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         INOTIFY_MASK_2buffer(wb, event->mask, ", ");
