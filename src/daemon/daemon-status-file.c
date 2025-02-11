@@ -24,23 +24,24 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_time_t(wb, "boottime", ds->boottime);
     buffer_json_member_add_time_t(wb, "uptime", ds->uptime);
     buffer_json_member_add_time_t(wb, "timestamp", ds->timestamp);
-    buffer_json_member_add_time_t(wb, "init_dt", ds->init_dt);
-    buffer_json_member_add_time_t(wb, "exit_dt", ds->exit_dt);
     buffer_json_member_add_uuid_compact(wb, "invocation", ds->invocation.uuid);
     buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
     EXIT_REASON_2json(wb, "reason", ds->reason);
 
-    if(ds->fatal.filename || ds->fatal.function || ds->fatal.message || ds->fatal.stack_trace || ds->fatal.line) {
-        buffer_json_member_add_object(wb, "fatal");
-        {
-            buffer_json_member_add_uint64(wb, "line", ds->fatal.line);
-            buffer_json_member_add_string_or_empty(wb, "filename", ds->fatal.filename);
-            buffer_json_member_add_string_or_empty(wb, "function", ds->fatal.function);
-            buffer_json_member_add_string_or_empty(wb, "message", ds->fatal.message);
-            buffer_json_member_add_string_or_empty(wb, "stack_trace", ds->fatal.stack_trace);
-        }
-        buffer_json_object_close(wb);
+    buffer_json_member_add_time_t(wb, "init_dt", ds->init_dt);
+    buffer_json_member_add_time_t(wb, "exit_dt", ds->exit_dt);
+    buffer_json_member_add_uint64(wb, "ram_total", ds->memory.ram_total_bytes);
+    buffer_json_member_add_uint64(wb, "ram_available", ds->memory.ram_available_bytes);
+
+    buffer_json_member_add_object(wb, "fatal");
+    {
+        buffer_json_member_add_uint64(wb, "line", ds->fatal.line);
+        buffer_json_member_add_string_or_empty(wb, "filename", ds->fatal.filename);
+        buffer_json_member_add_string_or_empty(wb, "function", ds->fatal.function);
+        buffer_json_member_add_string_or_empty(wb, "message", ds->fatal.message);
+        buffer_json_member_add_string_or_empty(wb, "stack_trace", ds->fatal.stack_trace);
     }
+    buffer_json_object_close(wb);
 }
 
 static bool daemon_status_file_from_json_fatal(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required __maybe_unused) {
@@ -58,11 +59,15 @@ static bool daemon_status_file_from_json(json_object *jobj, const char *path, vo
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "boottime", ds->boottime, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->uptime, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "timestamp", ds->timestamp, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init_dt", ds->init_dt, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit_dt", ds->exit_dt, error, false);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "invocation", ds->invocation.uuid, error, false);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "status", DAEMON_STATUS_2id, ds->status, error, false);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "reason", EXIT_REASON_2id_one, ds->reason, error, false);
+
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init_dt", ds->init_dt, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit_dt", ds->exit_dt, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ram_total", ds->memory.ram_total_bytes, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ram_available", ds->memory.ram_available_bytes, error, false);
+
     JSONC_PARSE_SUBOBJECT(jobj, path, "fatal", ds, daemon_status_file_from_json_fatal, error, false);
     return true;
 }
@@ -87,6 +92,7 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     session_status.invocation = nd_log_get_invocation_id();
     session_status.reason = exit_initiated;
     session_status.status = status;
+    session_status.memory = os_system_memory(true);
 
     return session_status;
 }
@@ -135,13 +141,19 @@ void daemon_status_file_save(DAEMON_STATUS status) {
     daemon_status_file_to_json(wb, &ds);
     buffer_json_finalize(wb);
 
-    char filename[FILENAME_MAX];
-    snprintfz(filename, sizeof(filename), "%s/.status.%s", netdata_configured_varlib_dir, program_name);
+    char temp_filename[FILENAME_MAX];
+    snprintfz(temp_filename, sizeof(temp_filename), "%s/.status.%s.tmp", netdata_configured_varlib_dir, program_name);
 
-    FILE *fp = fopen(filename, "w");
+    FILE *fp = fopen(temp_filename, "w");
     if (fp) {
-        fwrite(buffer_tostring(wb), 1, buffer_strlen(wb), fp);
+        bool ok = fwrite(buffer_tostring(wb), 1, buffer_strlen(wb), fp) == buffer_strlen(wb);
         fclose(fp);
+
+        if(ok) {
+            char filename[FILENAME_MAX];
+            snprintfz(filename, sizeof(filename), "%s/.status.%s", netdata_configured_varlib_dir, program_name);
+            rename(temp_filename, filename);
+        }
     }
 
     spinlock_unlock(&spinlock);

@@ -26,6 +26,7 @@ typedef struct daemon_status_file {
 
     time_t init_dt;
     time_t exit_dt;
+    OS_SYSTEM_MEMORY memory;
 
     struct {
         long line;

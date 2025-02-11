@@ -151,7 +151,7 @@
             typeof(dst) _bit = converter(_option_str);                                                          \
             if (_bit == 0) {                                                                                    \
                 buffer_sprintf(error, "unknown option '%s' in '%s.%s' at index %zu", _option_str, path, member, _i); \
-                return false;                                                                                   \
+                /* return false; */                                                                             \
             }                                                                                                   \
             dst |= _bit;                                                                                        \
         }                                                                                                       \
