@@ -25,6 +25,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_time_t(wb, "uptime", ds->uptime);
     buffer_json_member_add_time_t(wb, "timestamp", ds->timestamp);
     buffer_json_member_add_uuid_compact(wb, "invocation", ds->invocation.uuid);
+    buffer_json_member_add_uuid(wb, "machine_guid", ds->machine_guid.uuid);
     buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
     EXIT_REASON_2json(wb, "reason", ds->reason);
 
@@ -60,6 +61,7 @@ static bool daemon_status_file_from_json(json_object *jobj, const char *path, vo
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->uptime, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "timestamp", ds->timestamp, error, false);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "invocation", ds->invocation.uuid, error, false);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "machine_guid", ds->machine_guid.uuid, error, false);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "status", DAEMON_STATUS_2id, ds->status, error, false);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "reason", EXIT_REASON_2id_one, ds->reason, error, false);
 
@@ -90,6 +92,19 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     session_status.uptime = now_boottime_sec() - netdata_boottime_time;
     session_status.timestamp = now;
     session_status.invocation = nd_log_get_invocation_id();
+
+    if(localhost)
+        session_status.machine_guid = localhost->host_id;
+    else if(!UUIDiszero(last_session_status.machine_guid))
+        session_status.machine_guid = last_session_status.machine_guid;
+    else {
+        const char *machine_guid = registry_get_this_machine_guid();
+        if(machine_guid && *machine_guid)
+            uuid_parse_flexi(machine_guid, session_status.machine_guid.uuid);
+        else
+            session_status.machine_guid = UUID_ZERO;
+    }
+
     session_status.reason = exit_initiated;
     session_status.status = status;
     session_status.memory = os_system_memory(true);

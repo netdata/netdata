@@ -740,11 +740,13 @@ int netdata_main(int argc, char **argv) {
         netdata_conf_load(NULL, 0, &user);
         cloud_conf_load(0);
     }
+    registry_init(); // for machine_guid, safe to call multiple times
 
     // ----------------------------------------------------------------------------------------------------------------
     // initialize the logging system
     // IMPORTANT: KEEP THIS FIRST SO THAT THE REST OF NETDATA WILL LOG PROPERLY
 
+    netdata_conf_section_directories();
     netdata_conf_section_logs();
     nd_log_limits_unlimited();
 
@@ -941,7 +943,7 @@ int netdata_main(int argc, char **argv) {
 
     // initialize internal registry
     delta_startup_time("initialize registry");
-    registry_init();
+    registry_load();
     cloud_conf_init_after_registry();
     netdata_random_session_id_generate();
 

@@ -29,6 +29,8 @@ void netdata_conf_section_logs(void) {
     if(run) return;
     run = true;
 
+    netdata_conf_section_directories();
+
     nd_log_set_facility(inicfg_get(&netdata_config, CONFIG_SECTION_LOGS, "facility", "daemon"));
 
     time_t period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
