@@ -20,7 +20,9 @@ typedef struct daemon_status_file {
     time_t boottime;        // system boottime
     time_t uptime;          // netdata uptime
     time_t timestamp;       // the timestamp of the status file
-    ND_UUID machine_guid;   // the machine guid of the agent
+    ND_UUID host_id;        // the machine guid of the agent
+    ND_UUID node_id;        // the Netdata Cloud node id of the agent
+    ND_UUID claim_id;       // the Netdata Cloud claim id of the agent
     ND_UUID invocation;     // the netdata invocation id generated the file
     EXIT_REASON reason;     // the exit reason (maybe empty)
     DAEMON_STATUS status;   // the daemon status

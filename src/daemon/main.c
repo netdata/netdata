@@ -766,7 +766,6 @@ int netdata_main(int argc, char **argv) {
 
     // check for a crash
     daemon_status_file_check_crash();
-    daemon_status_file_save(DAEMON_STATUS_INITIALIZING);
 
     // ----------------------------------------------------------------------------------------------------------------
     // global configuration

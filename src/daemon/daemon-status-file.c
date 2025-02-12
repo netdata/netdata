@@ -25,7 +25,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_time_t(wb, "uptime", ds->uptime);
     buffer_json_member_add_time_t(wb, "timestamp", ds->timestamp);
     buffer_json_member_add_uuid_compact(wb, "invocation", ds->invocation.uuid);
-    buffer_json_member_add_uuid(wb, "machine_guid", ds->machine_guid.uuid);
+    buffer_json_member_add_uuid(wb, "host_id", ds->host_id.uuid);
+    buffer_json_member_add_uuid(wb, "node_id", ds->node_id.uuid);
+    buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
     buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
     EXIT_REASON_2json(wb, "reason", ds->reason);
 
@@ -61,7 +63,9 @@ static bool daemon_status_file_from_json(json_object *jobj, const char *path, vo
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->uptime, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "timestamp", ds->timestamp, error, false);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "invocation", ds->invocation.uuid, error, false);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "machine_guid", ds->machine_guid.uuid, error, false);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", ds->host_id.uuid, error, false);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "node_id", ds->node_id.uuid, error, false);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "claim_id", ds->claim_id.uuid, error, false);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "status", DAEMON_STATUS_2id, ds->status, error, false);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "reason", EXIT_REASON_2id_one, ds->reason, error, false);
 
@@ -93,19 +97,30 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     session_status.timestamp = now;
     session_status.invocation = nd_log_get_invocation_id();
 
-    if(localhost)
-        session_status.machine_guid = localhost->host_id;
-    else if(!UUIDiszero(last_session_status.machine_guid))
-        session_status.machine_guid = last_session_status.machine_guid;
+    session_status.claim_id = claim_id_get_uuid();
+
+    if(localhost) {
+        session_status.host_id = localhost->host_id;
+        session_status.node_id = localhost->node_id;
+    }
+    else if(!UUIDiszero(last_session_status.host_id))
+        session_status.host_id = last_session_status.host_id;
     else {
         const char *machine_guid = registry_get_this_machine_guid();
         if(machine_guid && *machine_guid) {
-            if (uuid_parse_flexi(machine_guid, session_status.machine_guid.uuid) != 0)
-                session_status.machine_guid = UUID_ZERO;
+            if (uuid_parse_flexi(machine_guid, session_status.host_id.uuid) != 0)
+                session_status.host_id = UUID_ZERO;
         }
         else
-            session_status.machine_guid = UUID_ZERO;
+            session_status.host_id = UUID_ZERO;
     }
+
+    if(UUIDiszero(session_status.claim_id))
+        session_status.claim_id = last_session_status.claim_id;
+    if(UUIDiszero(session_status.node_id))
+        session_status.node_id = last_session_status.node_id;
+    if(UUIDiszero(session_status.host_id))
+        session_status.host_id = last_session_status.host_id;
 
     session_status.reason = exit_initiated;
     session_status.status = status;
@@ -178,39 +193,52 @@ void daemon_status_file_save(DAEMON_STATUS status) {
 
 void daemon_status_file_check_crash(void) {
     last_session_status = daemon_status_file_load();
+    daemon_status_file_save(DAEMON_STATUS_INITIALIZING);
 
-    bool log = false;
+    const char *msg;
     switch(last_session_status.status) {
         case DAEMON_STATUS_NONE:
             // probably a previous version of netdata was running
+            msg = "No status file found for the previous session";
             break;
 
         case DAEMON_STATUS_EXITED:
-            // netdata exited gracefully
-            if(!is_exit_reason_normal(last_session_status.reason)) {
-                // it did not exit normally
-                log = true;
-            }
+            if(last_session_status.reason == EXIT_REASON_NONE)
+                msg = "Netdata was last stopped gracefully (no exit reason set)";
+            else if(!is_exit_reason_normal(last_session_status.reason))
+                msg = "Netdata was last stopped gracefully (encountered an error)";
+            else
+                msg = "Netdata was last stopped gracefully (instructed to do so)";
             break;
 
         case DAEMON_STATUS_INITIALIZING:
+            msg = "Netdata was last killed/crashed while starting";
+            break;
+
         case DAEMON_STATUS_EXITING:
+            msg = "Netdata was last killed/crashed while exiting";
+            break;
+
         case DAEMON_STATUS_RUNNING:
-            // this is a crash!
-            log = true;
+            if(session_status.boottime <= last_session_status.boottime)
+                msg = "The system was abnormally powered off while Netdata was running";
+            else
+                msg = "Netdata was last killed/crashed while operating normally";
             break;
     }
 
-    if(log) {
-        CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-        daemon_status_file_to_json(wb, &last_session_status);
-        buffer_json_finalize(wb);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    daemon_status_file_to_json(wb, &last_session_status);
+    buffer_json_finalize(wb);
 
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "LAST SESSION CRASH: Netdata crashed the last time it was running!\n\n%s",
-               buffer_tostring(wb));
-    }
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_last_exit_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_DAEMON, NDLP_ERR, "LAST EXIT STATUS: %s:\n\n%s", msg, buffer_tostring(wb));
 }
 
 bool daemon_status_file_has_last_crashed(void) {

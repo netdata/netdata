@@ -620,6 +620,7 @@ static void netdata_systemd_journal_message_ids_init(void) {
     msgid_into_dict("acb33cb95778476baac702eb7e4e151d", "Netdata Cloud connection");
     msgid_into_dict("d1f59606dd4d41e3b217a0cfcae8e632", "Netdata extreme cardinality");
     msgid_into_dict("02f47d350af5449197bf7a95b605a468", "Netdata exit reason");
+    msgid_into_dict("ea02337b81b2498185f3f8a31db4d390", "Netdata last exit status");
 }
 
 void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
