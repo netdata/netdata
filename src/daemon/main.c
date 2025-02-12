@@ -910,11 +910,6 @@ int netdata_main(int argc, char **argv) {
     netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
     watcher_thread_start();
 
-    // init sentry
-#ifdef ENABLE_SENTRY
-        nd_sentry_init();
-#endif
-
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
     struct passwd *pw = getpwuid(getuid());
     if (inicfg_exists(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
@@ -949,12 +944,6 @@ int netdata_main(int argc, char **argv) {
     rrdhost_system_info_detect(system_info);
 
     const char *guid = registry_get_this_machine_guid();
-#ifdef ENABLE_SENTRY
-    nd_sentry_set_user(guid);
-#else
-    UNUSED(guid);
-#endif
-
     get_install_type(system_info);
 
     delta_startup_time("initialize RRD structures");
@@ -963,6 +952,17 @@ int netdata_main(int argc, char **argv) {
         set_late_analytics_variables(system_info);
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
     }
+
+    // init sentry
+#ifdef ENABLE_SENTRY
+    nd_sentry_init();
+#endif
+
+#ifdef ENABLE_SENTRY
+    nd_sentry_set_user(guid);
+#else
+    UNUSED(guid);
+#endif
 
     delta_startup_time("check for incomplete shutdown");
 
