@@ -71,7 +71,7 @@ int perflibQueryAndTraverse(DWORD id,
                                perflib_counter_cb counterCb,
                                void *data);
 
-bool ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType);
+BOOL ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType);
 
 BOOL getInstanceName(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance,
                      char *buffer, size_t bufferLen);
