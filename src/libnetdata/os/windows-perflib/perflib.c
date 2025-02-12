@@ -251,7 +251,7 @@ static BOOL isValidStructure(PERF_DATA_BLOCK *pDataBlock, void *ptr, size_t leng
         !length || length > pDataBlock->TotalByteLength ||
         (PBYTE)ptr < (PBYTE)pDataBlock ||
         (PBYTE)ptr > (PBYTE)ptr + length || // Check for pointer arithmetic overflow
-        (PBYTE)ptr + length >= (PBYTE)pDataBlock + pDataBlock->TotalByteLength ? FALSE : TRUE;
+        (PBYTE)ptr + length > (PBYTE)pDataBlock + pDataBlock->TotalByteLength ? FALSE : TRUE;
 }
 
 static inline PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer) {
