@@ -536,6 +536,9 @@ failed:
 }
 
 bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, COUNTER_DATA *cd) {
+    if (unlikely(!pObjectType))
+        goto cleanup;
+
     PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
     for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
         pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
@@ -565,6 +568,7 @@ bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObj
         return cd->updated;
     }
 
+cleanup:
     cd->previous = cd->current;
     cd->current = RAW_DATA_EMPTY;
     cd->updated = false;
