@@ -762,6 +762,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     // global configuration
 
+    netdata_conf_ssl();
     netdata_conf_section_global();
 
     // Get execution path before switching user to avoid permission issues
@@ -959,10 +960,12 @@ int netdata_main(int argc, char **argv) {
 
     delta_startup_time("initialize RRD structures");
 
+    abort_on_fatal_disable();
     if(rrd_init(netdata_configured_hostname, system_info, false)) {
         set_late_analytics_variables(system_info);
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
     }
+    abort_on_fatal_enable();
 
     delta_startup_time("check for incomplete shutdown");
 
