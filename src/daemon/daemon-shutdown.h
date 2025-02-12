@@ -7,4 +7,7 @@
 
 void cancel_main_threads(void);
 
+void abort_on_fatal_disable(void);
+void abort_on_fatal_enable(void);
+
 #endif //NETDATA_DAEMON_SHUTDOWN_H
