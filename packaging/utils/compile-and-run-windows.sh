@@ -23,6 +23,8 @@ install_dependencies() {
         msys/libcurl msys/libcurl-devel
 }
 
+BUILD_FOR_PACKAGING="Off"
+
 if [ "${1}" = "install" ]
 then
 	install_dependencies || exit 1
@@ -32,10 +34,10 @@ fi
 if [ "${1}" = "service" ]
 then
 	RUN_AS_SERVICE=1
+  BUILD_FOR_PACKAGING="On"
 	shift
 fi
 
-BUILD_FOR_PACKAGING="Off"
 if [ "${1}" = "package" ]
 then
 	BUILD_FOR_PACKAGING="On"
