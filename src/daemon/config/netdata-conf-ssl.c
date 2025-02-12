@@ -76,6 +76,7 @@ static const char *detect_ca_path(void) {
 void netdata_conf_ssl(void) {
     netdata_ssl_initialize_openssl();
 
+#ifdef NETDATA_STATIC_BUILD
     const char *p = getenv("CURL_CA_BUNDLE");
     if(!p || !*p) p = getenv("SSL_CERT_FILE");
     if(!p || !*p) {
@@ -87,4 +88,6 @@ void netdata_conf_ssl(void) {
     if(!p || !*p) p = detect_ca_path();
     setenv("CURL_CA_BUNDLE", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "CURL_CA_BUNDLE", p ? p : ""), 1);
     setenv("SSL_CERT_FILE", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "SSL_CERT_FILE", p ? p : ""), 1);
+#endif
+
 }
