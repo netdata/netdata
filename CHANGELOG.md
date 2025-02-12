@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Switch to Ubuntu 22.04 runner images for CI build jobs. [\#19619](https://github.com/netdata/netdata/pull/19619) ([Ferroin](https://github.com/Ferroin))
 - fix\(go.d/mysql\): handle Cpu\_time in microseconds in v11.4.5+ [\#19618](https://github.com/netdata/netdata/pull/19618) ([ilyam8](https://github.com/ilyam8))
 - improvement\(health\): clarify clickhouse\_replicated\_readonly\_tables info [\#19616](https://github.com/netdata/netdata/pull/19616) ([ilyam8](https://github.com/ilyam8))
 - fix: correct typo in NetdataCompilerFlags [\#19614](https://github.com/netdata/netdata/pull/19614) ([ilyam8](https://github.com/ilyam8))
@@ -482,7 +483,6 @@
 - update integrations gen script [\#19085](https://github.com/netdata/netdata/pull/19085) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/hpssa\): handle HPE Smart Array line [\#19084](https://github.com/netdata/netdata/pull/19084) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d.plugin\): renames [\#19081](https://github.com/netdata/netdata/pull/19081) ([ilyam8](https://github.com/ilyam8))
-- Use mimalloc [\#19080](https://github.com/netdata/netdata/pull/19080) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
