@@ -862,13 +862,117 @@ void dict_hyperv_storage_device_insert_cb(
     initialize_hyperv_storage_device_keys(p);
 }
 
+static void hyperv_storage_device_chart(struct hypervisor_storage_device *p, int update_every)
+{
+    if (!p->charts_created) {
+        p->charts_created = true;
+        if (!p->st_operations) {
+            p->st_operations = rrdset_create_localhost(
+                "vm_storage_device_operations",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_storage_device_operations",
+                "VM storage device IOPS",
+                "operations/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_OPERATIONS,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_ReadOperationsSec = rrddim_add(p->st_operations, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_WriteOperationsSec =
+                rrddim_add(p->st_operations, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(
+                p->st_operations->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_bytes) {
+            p->st_bytes = rrdset_create_localhost(
+                "vm_storage_device_bytes",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_storage_device_bytes",
+                "VM storage device IO",
+                "bytes/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_BYTES,
+                update_every,
+                RRDSET_TYPE_AREA);
+
+            p->rd_ReadBytesSec = rrddim_add(p->st_bytes, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_WriteBytesSec = rrddim_add(p->st_bytes, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_bytes->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_errors) {
+            p->st_errors = rrdset_create_localhost(
+                "vm_storage_device_errors",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_storage_device_errors",
+                "VM storage device errors",
+                "errors/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_ERRORS,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_ErrorCount = rrddim_add(p->st_errors, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_errors->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+    }
+
+    SETP_DIM_VALUE(st_operations, ReadOperationsSec);
+    SETP_DIM_VALUE(st_operations, WriteOperationsSec);
+
+    SETP_DIM_VALUE(st_bytes, ReadBytesSec);
+    SETP_DIM_VALUE(st_bytes, WriteBytesSec);
+
+    SETP_DIM_VALUE(st_errors, ErrorCount);
+
+    // Mark the charts as done
+    rrdset_done(p->st_operations);
+    rrdset_done(p->st_bytes);
+    rrdset_done(p->st_errors);
+}
+
 static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
 {
+    struct hypervisor_storage_device *p;
     hyperv_perf_item *item = data;
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
     if (!pObjectType)
         return false;
+
+    if (!pObjectType->NumInstances) {
+        static struct hypervisor_storage_device static_hs_device;
+        p = &static_hs_device;
+        if (!p->charts_created) {
+            initialize_hyperv_storage_device_keys(p);
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+        }
+
+        // Fetch counters
+        GET_OBJECT_COUNTER(ReadOperationsSec);
+        GET_OBJECT_COUNTER(WriteOperationsSec);
+
+        GET_OBJECT_COUNTER(ReadBytesSec);
+        GET_OBJECT_COUNTER(WriteBytesSec);
+        GET_OBJECT_COUNTER(ErrorCount);
+
+        hyperv_storage_device_chart(p, update_every);
+        return true;
+    }
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -882,7 +986,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct hypervisor_storage_device *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+        p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
         if (!p->collected_metadata) {
             p->collected_metadata = true;
@@ -896,85 +1000,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
         GET_INSTANCE_COUNTER(WriteBytesSec);
         GET_INSTANCE_COUNTER(ErrorCount);
 
-        if (!p->charts_created) {
-            p->charts_created = true;
-            if (!p->st_operations) {
-                p->st_operations = rrdset_create_localhost(
-                    "vm_storage_device_operations",
-                    windows_shared_buffer,
-                    NULL,
-                    HYPERV,
-                    HYPERV ".vm_storage_device_operations",
-                    "VM storage device IOPS",
-                    "operations/s",
-                    _COMMON_PLUGIN_NAME,
-                    _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_OPERATIONS,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-                p->rd_ReadOperationsSec = rrddim_add(p->st_operations, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_WriteOperationsSec =
-                    rrddim_add(p->st_operations, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-                rrdlabels_add(
-                    p->st_operations->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            }
-
-            if (!p->st_bytes) {
-                p->st_bytes = rrdset_create_localhost(
-                    "vm_storage_device_bytes",
-                    windows_shared_buffer,
-                    NULL,
-                    HYPERV,
-                    HYPERV ".vm_storage_device_bytes",
-                    "VM storage device IO",
-                    "bytes/s",
-                    _COMMON_PLUGIN_NAME,
-                    _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_BYTES,
-                    update_every,
-                    RRDSET_TYPE_AREA);
-
-                p->rd_ReadBytesSec = rrddim_add(p->st_bytes, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_WriteBytesSec = rrddim_add(p->st_bytes, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-                rrdlabels_add(p->st_bytes->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            }
-
-            if (!p->st_errors) {
-                p->st_errors = rrdset_create_localhost(
-                    "vm_storage_device_errors",
-                    windows_shared_buffer,
-                    NULL,
-                    HYPERV,
-                    HYPERV ".vm_storage_device_errors",
-                    "VM storage device errors",
-                    "errors/s",
-                    _COMMON_PLUGIN_NAME,
-                    _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_ERRORS,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-                p->rd_ErrorCount = rrddim_add(p->st_errors, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-                rrdlabels_add(p->st_errors->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            }
-        }
-
-        SETP_DIM_VALUE(st_operations, ReadOperationsSec);
-        SETP_DIM_VALUE(st_operations, WriteOperationsSec);
-
-        SETP_DIM_VALUE(st_bytes, ReadBytesSec);
-        SETP_DIM_VALUE(st_bytes, WriteBytesSec);
-
-        SETP_DIM_VALUE(st_errors, ErrorCount);
-
-        // Mark the charts as done
-        rrdset_done(p->st_operations);
-        rrdset_done(p->st_bytes);
-        rrdset_done(p->st_errors);
+        hyperv_storage_device_chart(p, update_every);
     }
 
     return true;
