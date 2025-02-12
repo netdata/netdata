@@ -212,7 +212,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
         GET_OBJECT_COUNTER(GuestAvailableMemory);
 
         hyperv_memory_chart(p, update_every);
-        return false;
+        return true;
     }
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
@@ -304,7 +304,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
         GET_OBJECT_COUNTER(PhysicalPagesAllocated);
 
         hyperv_vid_partition_chart(p, update_every);
-        return false;
+        return true;
     }
 
     if (!pObjectType->NumInstances) {
@@ -488,13 +488,290 @@ void dict_hyperv_root_partition_insert_cb(
 }
 
 // Function to handle "Hyper-V Hypervisor Root Partition" metrics (Device Space and GPA Space)
+static void hyperv_root_partition_chart(struct hypervisor_root_partition *p, int update_every)
+{
+    // Create charts
+    if (!p->charts_created) {
+        p->charts_created = true;
+        p->st_device_space_pages = rrdset_create_localhost(
+            "root_partition_device_space_pages",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_device_space_pages",
+            "Root partition device space pages",
+            "pages",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_SPACE_PAGES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_DeviceSpacePages4K = rrddim_add(p->st_device_space_pages, "4K", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_DeviceSpacePages2M = rrddim_add(p->st_device_space_pages, "2M", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_DeviceSpacePages1G = rrddim_add(p->st_device_space_pages, "1G", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->st_gpa_space_pages = rrdset_create_localhost(
+            "root_partition_gpa_space_pages",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_gpa_space_pages",
+            "Root partition GPA space pages",
+            "pages",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_GPA_SPACE_PAGES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_GPASpacePages4K = rrddim_add(p->st_gpa_space_pages, "4K", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_GPASpacePages2M = rrddim_add(p->st_gpa_space_pages, "2M", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_GPASpacePages1G = rrddim_add(p->st_gpa_space_pages, "1G", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->st_gpa_space_modifications = rrdset_create_localhost(
+            "root_partition_gpa_space_modifications",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_gpa_space_modifications",
+            "Root partition GPA space modifications",
+            "modifications/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_GPA_SPACE_MODIFICATIONS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_GPASpaceModifications =
+            rrddim_add(p->st_gpa_space_modifications, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->st_attached_devices = rrdset_create_localhost(
+            "root_partition_attached_devices",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_attached_devices",
+            "Root partition attached devices",
+            "devices",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_ATTACHED_DEVICES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_AttachedDevices = rrddim_add(p->st_attached_devices, "attached", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->st_deposited_pages = rrdset_create_localhost(
+            "root_partition_deposited_pages",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_deposited_pages",
+            "Root partition deposited pages",
+            "pages",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEPOSITED_PAGES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_DepositedPages = rrddim_add(p->st_deposited_pages, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->st_DeviceDMAErrors = rrdset_create_localhost(
+            "root_partition_device_dma_errors",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_device_dma_errors",
+            "Root partition illegal DMA requests",
+            "requests",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_DMA_ERRORS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_DeviceDMAErrors = rrddim_add(p->st_DeviceDMAErrors, "illegal_dma", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->st_DeviceInterruptErrors = rrdset_create_localhost(
+            "root_partition_device_interrupt_errors",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_device_interrupt_errors",
+            "Root partition illegal interrupt requests",
+            "requests",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_INTERRUPT_ERRORS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_DeviceInterruptErrors =
+            rrddim_add(p->st_DeviceInterruptErrors, "illegal_interrupt", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->st_DeviceInterruptThrottleEvents = rrdset_create_localhost(
+            "root_partition_device_interrupt_throttle_events",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_device_interrupt_throttle_events",
+            "Root partition throttled interrupts",
+            "events",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_INTERRUPT_THROTTLE_EVENTS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_DeviceInterruptThrottleEvents =
+            rrddim_add(p->st_DeviceInterruptThrottleEvents, "throttling", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->st_IOΤLBFlushesSec = rrdset_create_localhost(
+            "root_partition_io_tlb_flush",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_io_tlb_flush",
+            "Root partition flushes of I/O TLBs",
+            "flushes/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_IO_TLB_FLUSH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_IOΤLBFlushesSec = rrddim_add(p->st_IOΤLBFlushesSec, "gpa", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        p->st_AddressSpaces = rrdset_create_localhost(
+            "root_partition_address_space",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_address_space",
+            "Root partition address spaces in the virtual TLB",
+            "address spaces",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_ADDRESS_SPACE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_AddressSpaces = rrddim_add(p->st_AddressSpaces, "address_spaces", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->st_VirtualTLBPages = rrdset_create_localhost(
+            "root_partition_virtual_tlb_pages",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_virtual_tlb_pages",
+            "Root partition pages used by the virtual TLB",
+            "pages",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_VIRTUAL_TLB_PAGES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_VirtualTLBPages = rrddim_add(p->st_VirtualTLBPages, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->st_VirtualTLBFlushEntiresSec = rrdset_create_localhost(
+            "root_partition_virtual_tlb_flush_entries",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".root_partition_virtual_tlb_flush_entries",
+            "Root partition flushes of the entire virtual TLB",
+            "flushes/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_VIRTUAL_TLB_FLUSH_ENTRIES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_VirtualTLBFlushEntiresSec =
+            rrddim_add(p->st_VirtualTLBFlushEntiresSec, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    // Set the data for each dimension
+
+    SETP_DIM_VALUE(st_device_space_pages, DeviceSpacePages4K);
+    SETP_DIM_VALUE(st_device_space_pages, DeviceSpacePages2M);
+    SETP_DIM_VALUE(st_device_space_pages, DeviceSpacePages1G);
+
+    SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages4K);
+    SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages2M);
+    SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages1G);
+
+    SETP_DIM_VALUE(st_gpa_space_modifications, GPASpaceModifications);
+
+    SETP_DIM_VALUE(st_attached_devices, AttachedDevices);
+    SETP_DIM_VALUE(st_deposited_pages, DepositedPages);
+
+    SETP_DIM_VALUE(st_DeviceDMAErrors, DeviceDMAErrors);
+    SETP_DIM_VALUE(st_DeviceInterruptErrors, DeviceInterruptErrors);
+    SETP_DIM_VALUE(st_DeviceInterruptThrottleEvents, DeviceInterruptThrottleEvents);
+    SETP_DIM_VALUE(st_IOΤLBFlushesSec, IOΤLBFlushesSec);
+    SETP_DIM_VALUE(st_AddressSpaces, AddressSpaces);
+    SETP_DIM_VALUE(st_VirtualTLBPages, VirtualTLBPages);
+    SETP_DIM_VALUE(st_VirtualTLBFlushEntiresSec, VirtualTLBFlushEntiresSec);
+
+    // Mark the charts as done
+    rrdset_done(p->st_device_space_pages);
+    rrdset_done(p->st_gpa_space_pages);
+    rrdset_done(p->st_gpa_space_modifications);
+    rrdset_done(p->st_attached_devices);
+    rrdset_done(p->st_deposited_pages);
+    rrdset_done(p->st_DeviceInterruptErrors);
+    rrdset_done(p->st_DeviceInterruptThrottleEvents);
+    rrdset_done(p->st_IOΤLBFlushesSec);
+    rrdset_done(p->st_AddressSpaces);
+    rrdset_done(p->st_DeviceDMAErrors);
+    rrdset_done(p->st_VirtualTLBPages);
+    rrdset_done(p->st_VirtualTLBFlushEntiresSec);
+}
+
 static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
 {
     hyperv_perf_item *item = data;
+    struct hypervisor_root_partition *p;
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
     if (!pObjectType)
         return false;
+
+    if (!pObjectType->NumInstances) {
+        static struct hypervisor_root_partition static_rpartition = {};
+        p = &static_rpartition;
+
+        if (!p->charts_created) {
+            initialize_hyperv_root_partition_keys(p);
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+        }
+
+        // Fetch counters
+        GET_OBJECT_COUNTER(DeviceSpacePages4K);
+        GET_OBJECT_COUNTER(DeviceSpacePages2M);
+        GET_OBJECT_COUNTER(DeviceSpacePages1G);
+        GET_OBJECT_COUNTER(GPASpacePages4K);
+        GET_OBJECT_COUNTER(GPASpacePages2M);
+        GET_OBJECT_COUNTER(GPASpacePages1G);
+        GET_OBJECT_COUNTER(GPASpaceModifications);
+        GET_OBJECT_COUNTER(AttachedDevices);
+        GET_OBJECT_COUNTER(DepositedPages);
+
+        GET_OBJECT_COUNTER(DeviceDMAErrors);
+        GET_OBJECT_COUNTER(DeviceInterruptErrors);
+        GET_OBJECT_COUNTER(DeviceInterruptThrottleEvents);
+        GET_OBJECT_COUNTER(IOΤLBFlushesSec);
+        GET_OBJECT_COUNTER(AddressSpaces);
+        GET_OBJECT_COUNTER(VirtualTLBPages);
+        GET_OBJECT_COUNTER(VirtualTLBFlushEntiresSec);
+
+        hyperv_root_partition_chart(p, update_every);
+        return true;
+    }
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -508,7 +785,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct hypervisor_root_partition *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+        p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
         if (!p->collected_metadata) {
             p->collected_metadata = true;
@@ -533,247 +810,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         GET_INSTANCE_COUNTER(VirtualTLBPages);
         GET_INSTANCE_COUNTER(VirtualTLBFlushEntiresSec);
 
-        // Create charts
-        if (!p->charts_created) {
-            p->charts_created = true;
-            p->st_device_space_pages = rrdset_create_localhost(
-                "root_partition_device_space_pages",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_device_space_pages",
-                "Root partition device space pages",
-                "pages",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_SPACE_PAGES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_DeviceSpacePages4K = rrddim_add(p->st_device_space_pages, "4K", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            p->rd_DeviceSpacePages2M = rrddim_add(p->st_device_space_pages, "2M", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            p->rd_DeviceSpacePages1G = rrddim_add(p->st_device_space_pages, "1G", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            p->st_gpa_space_pages = rrdset_create_localhost(
-                "root_partition_gpa_space_pages",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_gpa_space_pages",
-                "Root partition GPA space pages",
-                "pages",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_GPA_SPACE_PAGES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_GPASpacePages4K = rrddim_add(p->st_gpa_space_pages, "4K", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            p->rd_GPASpacePages2M = rrddim_add(p->st_gpa_space_pages, "2M", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            p->rd_GPASpacePages1G = rrddim_add(p->st_gpa_space_pages, "1G", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            p->st_gpa_space_modifications = rrdset_create_localhost(
-                "root_partition_gpa_space_modifications",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_gpa_space_modifications",
-                "Root partition GPA space modifications",
-                "modifications/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_GPA_SPACE_MODIFICATIONS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_GPASpaceModifications =
-                rrddim_add(p->st_gpa_space_modifications, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            p->st_attached_devices = rrdset_create_localhost(
-                "root_partition_attached_devices",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_attached_devices",
-                "Root partition attached devices",
-                "devices",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_ATTACHED_DEVICES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_AttachedDevices = rrddim_add(p->st_attached_devices, "attached", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            p->st_deposited_pages = rrdset_create_localhost(
-                "root_partition_deposited_pages",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_deposited_pages",
-                "Root partition deposited pages",
-                "pages",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEPOSITED_PAGES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_DepositedPages = rrddim_add(p->st_deposited_pages, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            p->st_DeviceDMAErrors = rrdset_create_localhost(
-                "root_partition_device_dma_errors",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_device_dma_errors",
-                "Root partition illegal DMA requests",
-                "requests",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_DMA_ERRORS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_DeviceDMAErrors =
-                rrddim_add(p->st_DeviceDMAErrors, "illegal_dma", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            p->st_DeviceInterruptErrors = rrdset_create_localhost(
-                "root_partition_device_interrupt_errors",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_device_interrupt_errors",
-                "Root partition illegal interrupt requests",
-                "requests",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_INTERRUPT_ERRORS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_DeviceInterruptErrors =
-                rrddim_add(p->st_DeviceInterruptErrors, "illegal_interrupt", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            p->st_DeviceInterruptThrottleEvents = rrdset_create_localhost(
-                "root_partition_device_interrupt_throttle_events",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_device_interrupt_throttle_events",
-                "Root partition throttled interrupts",
-                "events",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_INTERRUPT_THROTTLE_EVENTS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_DeviceInterruptThrottleEvents =
-                rrddim_add(p->st_DeviceInterruptThrottleEvents, "throttling", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            p->st_IOΤLBFlushesSec = rrdset_create_localhost(
-                "root_partition_io_tlb_flush",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_io_tlb_flush",
-                "Root partition flushes of I/O TLBs",
-                "flushes/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_IO_TLB_FLUSH,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_IOΤLBFlushesSec = rrddim_add(p->st_IOΤLBFlushesSec, "gpa", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            p->st_AddressSpaces = rrdset_create_localhost(
-                "root_partition_address_space",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_address_space",
-                "Root partition address spaces in the virtual TLB",
-                "address spaces",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_ADDRESS_SPACE,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_AddressSpaces = rrddim_add(p->st_AddressSpaces, "address_spaces", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            p->st_VirtualTLBPages = rrdset_create_localhost(
-                "root_partition_virtual_tlb_pages",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_virtual_tlb_pages",
-                "Root partition pages used by the virtual TLB",
-                "pages",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_VIRTUAL_TLB_PAGES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_VirtualTLBPages = rrddim_add(p->st_VirtualTLBPages, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            p->st_VirtualTLBFlushEntiresSec = rrdset_create_localhost(
-                "root_partition_virtual_tlb_flush_entries",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".root_partition_virtual_tlb_flush_entries",
-                "Root partition flushes of the entire virtual TLB",
-                "flushes/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_VIRTUAL_TLB_FLUSH_ENTRIES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_VirtualTLBFlushEntiresSec =
-                rrddim_add(p->st_VirtualTLBFlushEntiresSec, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        // Set the data for each dimension
-
-        SETP_DIM_VALUE(st_device_space_pages, DeviceSpacePages4K);
-        SETP_DIM_VALUE(st_device_space_pages, DeviceSpacePages2M);
-        SETP_DIM_VALUE(st_device_space_pages, DeviceSpacePages1G);
-
-        SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages4K);
-        SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages2M);
-        SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages1G);
-
-        SETP_DIM_VALUE(st_gpa_space_modifications, GPASpaceModifications);
-
-        SETP_DIM_VALUE(st_attached_devices, AttachedDevices);
-        SETP_DIM_VALUE(st_deposited_pages, DepositedPages);
-
-        SETP_DIM_VALUE(st_DeviceDMAErrors, DeviceDMAErrors);
-        SETP_DIM_VALUE(st_DeviceInterruptErrors, DeviceInterruptErrors);
-        SETP_DIM_VALUE(st_DeviceInterruptThrottleEvents, DeviceInterruptThrottleEvents);
-        SETP_DIM_VALUE(st_IOΤLBFlushesSec, IOΤLBFlushesSec);
-        SETP_DIM_VALUE(st_AddressSpaces, AddressSpaces);
-        SETP_DIM_VALUE(st_VirtualTLBPages, VirtualTLBPages);
-        SETP_DIM_VALUE(st_VirtualTLBFlushEntiresSec, VirtualTLBFlushEntiresSec);
-
-        // Mark the charts as done
-        rrdset_done(p->st_device_space_pages);
-        rrdset_done(p->st_gpa_space_pages);
-        rrdset_done(p->st_gpa_space_modifications);
-        rrdset_done(p->st_attached_devices);
-        rrdset_done(p->st_deposited_pages);
-        rrdset_done(p->st_DeviceInterruptErrors);
-        rrdset_done(p->st_DeviceInterruptThrottleEvents);
-        rrdset_done(p->st_IOΤLBFlushesSec);
-        rrdset_done(p->st_AddressSpaces);
-        rrdset_done(p->st_DeviceDMAErrors);
-        rrdset_done(p->st_VirtualTLBPages);
-        rrdset_done(p->st_VirtualTLBFlushEntiresSec);
+        hyperv_root_partition_chart(p, update_every);
     }
 
     return true;
