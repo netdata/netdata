@@ -29,6 +29,12 @@ then
 	exit 0
 fi
 
+if [ "${1}" = "service" ]
+then
+	RUN_AS_SERVICE=1
+	shift
+fi
+
 BUILD_FOR_PACKAGING="Off"
 if [ "${1}" = "package" ]
 then
