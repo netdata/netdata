@@ -159,7 +159,5 @@ void netdata_conf_web_security_init(void) {
 
     tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
-
-    netdata_ssl_initialize_openssl();
 }
 
