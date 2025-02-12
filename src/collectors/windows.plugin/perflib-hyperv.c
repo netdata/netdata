@@ -1104,13 +1104,286 @@ void dict_hyperv_switch_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
     initialize_hyperv_switch_keys(p);
 }
 
+static void hyperv_switch_chart(struct hypervisor_switch *p, int update_every)
+{
+    if (!p->charts_created) {
+        p->charts_created = true;
+
+        p->st_bytes = rrdset_create_localhost(
+            "vswitch_traffic",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vswitch_traffic",
+            "Virtual switch traffic",
+            "kilobits/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_TRAFFIC,
+            update_every,
+            RRDSET_TYPE_AREA);
+
+        p->rd_BytesReceivedSec = rrddim_add(p->st_bytes, "received", NULL, 8, 1000, RRD_ALGORITHM_INCREMENTAL);
+        p->rd_BytesSentSec = rrddim_add(p->st_bytes, "sent", NULL, -8, 1000, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_bytes->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        p->st_packets = rrdset_create_localhost(
+            "vswitch_packets",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vswitch_packets",
+            "Virtual switch packets",
+            "packets/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PACKETS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_PacketsReceivedSec = rrddim_add(p->st_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        p->rd_PacketsSentSec = rrddim_add(p->st_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        p->st_directed_packets = rrdset_create_localhost(
+            "vswitch_directed_packets",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vswitch_directed_packets",
+            "Virtual switch directed packets",
+            "packets/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_DIRECTED_PACKETS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_DirectedPacketsReceivedSec =
+            rrddim_add(p->st_directed_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        p->rd_DirectedPacketsSentSec =
+            rrddim_add(p->st_directed_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_directed_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        p->st_broadcast_packets = rrdset_create_localhost(
+            "vswitch_broadcast_packets",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vswitch_broadcast_packets",
+            "Virtual switch broadcast packets",
+            "packets/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_BROADCAST_PACKETS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_BroadcastPacketsReceivedSec =
+            rrddim_add(p->st_broadcast_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        p->rd_BroadcastPacketsSentSec =
+            rrddim_add(p->st_broadcast_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_broadcast_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        p->st_multicast_packets = rrdset_create_localhost(
+            "vswitch_multicast_packets",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vswitch_multicast_packets",
+            "Virtual switch multicast packets",
+            "packets/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_MULTICAST_PACKETS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_MulticastPacketsReceivedSec =
+            rrddim_add(p->st_multicast_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        p->rd_MulticastPacketsSentSec =
+            rrddim_add(p->st_multicast_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_multicast_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        p->st_dropped_packets = rrdset_create_localhost(
+            "vswitch_dropped_packets",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vswitch_dropped_packets",
+            "Virtual switch dropped packets",
+            "drops/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_DROPPED_PACKETS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_DroppedPacketsIncomingSec =
+            rrddim_add(p->st_dropped_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        p->rd_DroppedPacketsOutgoingSec =
+            rrddim_add(p->st_dropped_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_dropped_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        p->st_ext_dropped_packets = rrdset_create_localhost(
+            "vswitch_extensions_dropped_packets",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vswitch_extensions_dropped_packets",
+            "Virtual switch extensions dropped packets",
+            "drops/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_EXTENSIONS_DROPPED_PACKETS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_ExtensionsDroppedPacketsIncomingSec =
+            rrddim_add(p->st_ext_dropped_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        p->rd_ExtensionsDroppedPacketsOutgoingSec =
+            rrddim_add(p->st_ext_dropped_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_ext_dropped_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        p->st_flooded = rrdset_create_localhost(
+            "vswitch_packets_flooded",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vswitch_packets_flooded",
+            "Virtual switch flooded packets",
+            "packets/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PACKETS_FLOODED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_PacketsFlooded = rrddim_add(p->st_flooded, "flooded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_flooded->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        p->st_learned_mac = rrdset_create_localhost(
+            "vswitch_learned_mac_addresses",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vswitch_learned_mac_addresses",
+            "Virtual switch learned MAC addresses",
+            "mac addresses/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_LEARNED_MAC_ADDRESSES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_LearnedMacAddresses = rrddim_add(p->st_learned_mac, "learned", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_learned_mac->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        p->st_purged_mac = rrdset_create_localhost(
+            "vswitch_purged_mac_addresses",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vswitch_purged_mac_addresses",
+            "Virtual switch purged MAC addresses",
+            "mac addresses/s",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PURGED_MAC_ADDRESSES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_PurgedMacAddresses = rrddim_add(p->st_purged_mac, "purged", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_purged_mac->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+    }
+
+    SETP_DIM_VALUE(st_packets, PacketsReceivedSec);
+    SETP_DIM_VALUE(st_packets, PacketsSentSec);
+
+    SETP_DIM_VALUE(st_bytes, BytesReceivedSec);
+    SETP_DIM_VALUE(st_bytes, BytesSentSec);
+
+    SETP_DIM_VALUE(st_directed_packets, DirectedPacketsSentSec);
+    SETP_DIM_VALUE(st_directed_packets, DirectedPacketsReceivedSec);
+
+    SETP_DIM_VALUE(st_broadcast_packets, BroadcastPacketsSentSec);
+    SETP_DIM_VALUE(st_broadcast_packets, BroadcastPacketsReceivedSec);
+
+    SETP_DIM_VALUE(st_multicast_packets, MulticastPacketsSentSec);
+    SETP_DIM_VALUE(st_multicast_packets, MulticastPacketsReceivedSec);
+
+    SETP_DIM_VALUE(st_dropped_packets, DroppedPacketsOutgoingSec);
+    SETP_DIM_VALUE(st_dropped_packets, DroppedPacketsIncomingSec);
+
+    SETP_DIM_VALUE(st_ext_dropped_packets, ExtensionsDroppedPacketsOutgoingSec);
+    SETP_DIM_VALUE(st_ext_dropped_packets, ExtensionsDroppedPacketsIncomingSec);
+
+    SETP_DIM_VALUE(st_flooded, PacketsFlooded);
+    SETP_DIM_VALUE(st_learned_mac, LearnedMacAddresses);
+    SETP_DIM_VALUE(st_purged_mac, PurgedMacAddresses);
+
+    // Mark the charts as done
+    rrdset_done(p->st_packets);
+    rrdset_done(p->st_bytes);
+
+    rrdset_done(p->st_directed_packets);
+    rrdset_done(p->st_broadcast_packets);
+    rrdset_done(p->st_multicast_packets);
+    rrdset_done(p->st_dropped_packets);
+    rrdset_done(p->st_ext_dropped_packets);
+    rrdset_done(p->st_flooded);
+    rrdset_done(p->st_learned_mac);
+    rrdset_done(p->st_purged_mac);
+}
+
 static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
 {
+    struct hypervisor_switch *p;
     hyperv_perf_item *item = data;
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
     if (!pObjectType)
         return false;
+
+    if (!pObjectType->NumInstances) {
+        struct hypervisor_switch static_switch = {};
+        p = &static_switch;
+
+        if (!p->charts_created) {
+            initialize_hyperv_switch_keys(p);
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+        }
+
+        GET_OBJECT_COUNTER(BytesReceivedSec);
+        GET_OBJECT_COUNTER(BytesSentSec);
+
+        GET_OBJECT_COUNTER(PacketsReceivedSec);
+        GET_OBJECT_COUNTER(PacketsSentSec);
+
+        GET_OBJECT_COUNTER(DirectedPacketsSentSec);
+        GET_OBJECT_COUNTER(DirectedPacketsReceivedSec);
+
+        GET_OBJECT_COUNTER(BroadcastPacketsSentSec);
+        GET_OBJECT_COUNTER(BroadcastPacketsReceivedSec);
+
+        GET_OBJECT_COUNTER(MulticastPacketsSentSec);
+        GET_OBJECT_COUNTER(MulticastPacketsReceivedSec);
+
+        GET_OBJECT_COUNTER(DroppedPacketsOutgoingSec);
+        GET_OBJECT_COUNTER(DroppedPacketsIncomingSec);
+
+        GET_OBJECT_COUNTER(ExtensionsDroppedPacketsOutgoingSec);
+        GET_OBJECT_COUNTER(ExtensionsDroppedPacketsIncomingSec);
+
+        GET_OBJECT_COUNTER(PacketsFlooded);
+
+        GET_OBJECT_COUNTER(LearnedMacAddresses);
+
+        GET_OBJECT_COUNTER(PurgedMacAddresses);
+
+        hyperv_switch_chart(p, update_every);
+        return true;
+    }
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -1124,7 +1397,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct hypervisor_switch *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+        p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
         if (!p->collected_metadata) {
             p->collected_metadata = true;
@@ -1157,234 +1430,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
         GET_INSTANCE_COUNTER(PurgedMacAddresses);
 
-        if (!p->charts_created) {
-            p->charts_created = true;
-
-            p->st_bytes = rrdset_create_localhost(
-                "vswitch_traffic",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vswitch_traffic",
-                "Virtual switch traffic",
-                "kilobits/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_TRAFFIC,
-                update_every,
-                RRDSET_TYPE_AREA);
-
-            p->rd_BytesReceivedSec = rrddim_add(p->st_bytes, "received", NULL, 8, 1000, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_BytesSentSec = rrddim_add(p->st_bytes, "sent", NULL, -8, 1000, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_bytes->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-            p->st_packets = rrdset_create_localhost(
-                "vswitch_packets",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vswitch_packets",
-                "Virtual switch packets",
-                "packets/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PACKETS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_PacketsReceivedSec = rrddim_add(p->st_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_PacketsSentSec = rrddim_add(p->st_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-            p->st_directed_packets = rrdset_create_localhost(
-                "vswitch_directed_packets",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vswitch_directed_packets",
-                "Virtual switch directed packets",
-                "packets/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_DIRECTED_PACKETS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_DirectedPacketsReceivedSec =
-                rrddim_add(p->st_directed_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_DirectedPacketsSentSec =
-                rrddim_add(p->st_directed_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_directed_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-            p->st_broadcast_packets = rrdset_create_localhost(
-                "vswitch_broadcast_packets",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vswitch_broadcast_packets",
-                "Virtual switch broadcast packets",
-                "packets/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_BROADCAST_PACKETS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_BroadcastPacketsReceivedSec =
-                rrddim_add(p->st_broadcast_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_BroadcastPacketsSentSec =
-                rrddim_add(p->st_broadcast_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_broadcast_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-            p->st_multicast_packets = rrdset_create_localhost(
-                "vswitch_multicast_packets",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vswitch_multicast_packets",
-                "Virtual switch multicast packets",
-                "packets/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_MULTICAST_PACKETS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_MulticastPacketsReceivedSec =
-                rrddim_add(p->st_multicast_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_MulticastPacketsSentSec =
-                rrddim_add(p->st_multicast_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_multicast_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-            p->st_dropped_packets = rrdset_create_localhost(
-                "vswitch_dropped_packets",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vswitch_dropped_packets",
-                "Virtual switch dropped packets",
-                "drops/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_DROPPED_PACKETS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_DroppedPacketsIncomingSec =
-                rrddim_add(p->st_dropped_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_DroppedPacketsOutgoingSec =
-                rrddim_add(p->st_dropped_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_dropped_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-            p->st_ext_dropped_packets = rrdset_create_localhost(
-                "vswitch_extensions_dropped_packets",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vswitch_extensions_dropped_packets",
-                "Virtual switch extensions dropped packets",
-                "drops/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_EXTENSIONS_DROPPED_PACKETS,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_ExtensionsDroppedPacketsIncomingSec =
-                rrddim_add(p->st_ext_dropped_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_ExtensionsDroppedPacketsOutgoingSec =
-                rrddim_add(p->st_ext_dropped_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_ext_dropped_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-            p->st_flooded = rrdset_create_localhost(
-                "vswitch_packets_flooded",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vswitch_packets_flooded",
-                "Virtual switch flooded packets",
-                "packets/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PACKETS_FLOODED,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_PacketsFlooded = rrddim_add(p->st_flooded, "flooded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_flooded->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-            p->st_learned_mac = rrdset_create_localhost(
-                "vswitch_learned_mac_addresses",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vswitch_learned_mac_addresses",
-                "Virtual switch learned MAC addresses",
-                "mac addresses/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_LEARNED_MAC_ADDRESSES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_LearnedMacAddresses = rrddim_add(p->st_learned_mac, "learned", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_learned_mac->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-            p->st_purged_mac = rrdset_create_localhost(
-                "vswitch_purged_mac_addresses",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vswitch_purged_mac_addresses",
-                "Virtual switch purged MAC addresses",
-                "mac addresses/s",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PURGED_MAC_ADDRESSES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_PurgedMacAddresses = rrddim_add(p->st_purged_mac, "purged", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_purged_mac->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-        }
-
-        SETP_DIM_VALUE(st_packets, PacketsReceivedSec);
-        SETP_DIM_VALUE(st_packets, PacketsSentSec);
-
-        SETP_DIM_VALUE(st_bytes, BytesReceivedSec);
-        SETP_DIM_VALUE(st_bytes, BytesSentSec);
-
-        SETP_DIM_VALUE(st_directed_packets, DirectedPacketsSentSec);
-        SETP_DIM_VALUE(st_directed_packets, DirectedPacketsReceivedSec);
-
-        SETP_DIM_VALUE(st_broadcast_packets, BroadcastPacketsSentSec);
-        SETP_DIM_VALUE(st_broadcast_packets, BroadcastPacketsReceivedSec);
-
-        SETP_DIM_VALUE(st_multicast_packets, MulticastPacketsSentSec);
-        SETP_DIM_VALUE(st_multicast_packets, MulticastPacketsReceivedSec);
-
-        SETP_DIM_VALUE(st_dropped_packets, DroppedPacketsOutgoingSec);
-        SETP_DIM_VALUE(st_dropped_packets, DroppedPacketsIncomingSec);
-
-        SETP_DIM_VALUE(st_ext_dropped_packets, ExtensionsDroppedPacketsOutgoingSec);
-        SETP_DIM_VALUE(st_ext_dropped_packets, ExtensionsDroppedPacketsIncomingSec);
-
-        SETP_DIM_VALUE(st_flooded, PacketsFlooded);
-        SETP_DIM_VALUE(st_learned_mac, LearnedMacAddresses);
-        SETP_DIM_VALUE(st_purged_mac, PurgedMacAddresses);
-
-        // Mark the charts as done
-        rrdset_done(p->st_packets);
-        rrdset_done(p->st_bytes);
-
-        rrdset_done(p->st_directed_packets);
-        rrdset_done(p->st_broadcast_packets);
-        rrdset_done(p->st_multicast_packets);
-        rrdset_done(p->st_dropped_packets);
-        rrdset_done(p->st_ext_dropped_packets);
-        rrdset_done(p->st_flooded);
-        rrdset_done(p->st_learned_mac);
-        rrdset_done(p->st_purged_mac);
+        hyperv_switch_chart(p, update_every);
     }
     return true;
 }
