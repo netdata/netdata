@@ -762,6 +762,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     // global configuration
 
+    netdata_conf_ssl();
     netdata_conf_section_global();
 
     // Get execution path before switching user to avoid permission issues
