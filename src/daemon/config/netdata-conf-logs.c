@@ -25,9 +25,7 @@ static void debug_flags_initialize(void) {
 }
 
 void netdata_conf_section_logs(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     netdata_conf_section_directories();
 

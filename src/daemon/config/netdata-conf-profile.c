@@ -94,9 +94,7 @@ ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
 struct nd_profile_t nd_profile = { 0 };
 
 void nd_profile_setup(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     ND_PROFILE profile = nd_profile_detect_and_configure(true); (void)profile;
     if(netdata_conf_is_iot()) {

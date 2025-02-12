@@ -86,6 +86,10 @@ void libuv_initialize(void) {
 }
 
 void netdata_conf_section_global(void) {
+    FUNCTION_RUN_ONCE();
+
+    netdata_conf_section_directories();
+
     // ------------------------------------------------------------------------
     // get the hostname
 

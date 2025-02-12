@@ -745,7 +745,6 @@ int netdata_main(int argc, char **argv) {
     // initialize the logging system
     // IMPORTANT: KEEP THIS FIRST SO THAT THE REST OF NETDATA WILL LOG PROPERLY
 
-    netdata_conf_section_directories();
     netdata_conf_section_logs();
     nd_log_limits_unlimited();
 
@@ -762,8 +761,8 @@ int netdata_main(int argc, char **argv) {
     }
     nd_log_register_event_cb(daemon_status_file_register_fatal);
 
-    netdata_conf_section_global();
-    registry_init(); // must be after netdata_conf_section_global()
+    netdata_conf_section_global(); // get hostname, host prefix, profile, etc
+    registry_init(); // for machine_guid, must be after netdata_conf_section_global()
 
     // check for a crash
     daemon_status_file_check_crash();

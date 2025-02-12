@@ -27,9 +27,7 @@ size_t get_tier_grouping(size_t tier) {
 }
 
 static void netdata_conf_dbengine_pre_logs(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     errno_clear();
 
@@ -340,9 +338,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
 }
 
 void netdata_conf_section_db(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     // ------------------------------------------------------------------------
     // get default database update frequency

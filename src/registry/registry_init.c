@@ -63,9 +63,9 @@ void registry_generate_curl_urls(void) {
 }
 
 void registry_init(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
+
+    netdata_conf_section_global();
 
     char filename[FILENAME_MAX + 1];
 
