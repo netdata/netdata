@@ -99,8 +99,10 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
         session_status.machine_guid = last_session_status.machine_guid;
     else {
         const char *machine_guid = registry_get_this_machine_guid();
-        if(machine_guid && *machine_guid)
-            uuid_parse_flexi(machine_guid, session_status.machine_guid.uuid);
+        if(machine_guid && *machine_guid) {
+            if (uuid_parse_flexi(machine_guid, session_status.machine_guid.uuid) != 0)
+                session_status.machine_guid = UUID_ZERO;
+        }
         else
             session_status.machine_guid = UUID_ZERO;
     }

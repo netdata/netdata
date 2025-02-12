@@ -740,7 +740,6 @@ int netdata_main(int argc, char **argv) {
         netdata_conf_load(NULL, 0, &user);
         cloud_conf_load(0);
     }
-    registry_init(); // for machine_guid, safe to call multiple times
 
     // ----------------------------------------------------------------------------------------------------------------
     // initialize the logging system
@@ -763,6 +762,9 @@ int netdata_main(int argc, char **argv) {
     }
     nd_log_register_event_cb(daemon_status_file_register_fatal);
 
+    netdata_conf_section_global();
+    registry_init(); // must be after netdata_conf_section_global()
+
     // check for a crash
     daemon_status_file_check_crash();
     daemon_status_file_save(DAEMON_STATUS_INITIALIZING);
@@ -770,7 +772,6 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     // global configuration
 
-    netdata_conf_section_global();
 
     // Get execution path before switching user to avoid permission issues
     get_netdata_execution_path();
