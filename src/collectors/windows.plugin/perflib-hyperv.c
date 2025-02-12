@@ -1823,13 +1823,83 @@ void dict_hyperv_processor_insert_cb(const DICTIONARY_ITEM *item __maybe_unused,
     initialize_hyperv_processor_keys(p);
 }
 
+static void hyperv_processor_chart(struct hypervisor_processor *p, int update_every)
+{
+    if (!p->charts_created) {
+        p->charts_created = true;
+        p->st_HypervisorProcessorTotal = rrdset_create_localhost(
+            "vm_cpu_usage",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vm_cpu_usage",
+            "VM CPU usage",
+            "percentage",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE,
+            update_every,
+            RRDSET_TYPE_AREA);
+
+        p->rd_TotalRunTime =
+            rrddim_add(p->st_HypervisorProcessorTotal, "usage", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(p->st_HypervisorProcessorTotal->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        p->st_HypervisorProcessor = rrdset_create_localhost(
+            "vm_cpu_usage_by_run_context",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vm_cpu_usage_by_run_context",
+            "VM CPU usage by run context",
+            "percentage",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE_BY_RUN_CONTEXT,
+            update_every,
+            RRDSET_TYPE_STACKED);
+
+        p->rd_GuestRunTime =
+            rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+        p->rd_HypervisorRunTime =
+            rrddim_add(p->st_HypervisorProcessor, "hypervisor", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+        p->rd_RemoteRunTime =
+            rrddim_add(p->st_HypervisorProcessor, "remote", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(p->st_HypervisorProcessor->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+    }
+
+    p->GuestRunTime_total += (collected_number)p->GuestRunTime.current.Data;
+    p->HypervisorRunTime_total += (collected_number)p->HypervisorRunTime.current.Data;
+    p->RemoteRunTime_total += (collected_number)p->RemoteRunTime.current.Data;
+    p->TotalRunTime_total += (collected_number)p->TotalRunTime.current.Data;
+}
+
 static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
 {
+    struct hypervisor_processor *p;
     hyperv_perf_item *item = data;
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
     if (!pObjectType)
         return false;
+
+    if (!pObjectType->NumInstances) {
+        struct hypervisor_processor static_processor = {};
+        p = &static_processor;
+        if (!p->charts_created) {
+            initialize_hyperv_processor_keys(p);
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+        }
+
+        GET_OBJECT_COUNTER(GuestRunTime);
+        GET_OBJECT_COUNTER(HypervisorRunTime);
+        GET_OBJECT_COUNTER(RemoteRunTime);
+        GET_OBJECT_COUNTER(TotalRunTime);
+
+        hyperv_processor_chart(p, update_every);
+        return true;
+    }
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -1858,59 +1928,10 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
         GET_INSTANCE_COUNTER(RemoteRunTime);
         GET_INSTANCE_COUNTER(TotalRunTime);
 
-        if (!p->charts_created) {
-            p->charts_created = true;
-            p->st_HypervisorProcessorTotal = rrdset_create_localhost(
-                "vm_cpu_usage",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vm_cpu_usage",
-                "VM CPU usage",
-                "percentage",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE,
-                update_every,
-                RRDSET_TYPE_AREA);
-
-            p->rd_TotalRunTime =
-                rrddim_add(p->st_HypervisorProcessorTotal, "usage", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(
-                p->st_HypervisorProcessorTotal->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-
-            p->st_HypervisorProcessor = rrdset_create_localhost(
-                "vm_cpu_usage_by_run_context",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vm_cpu_usage_by_run_context",
-                "VM CPU usage by run context",
-                "percentage",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE_BY_RUN_CONTEXT,
-                update_every,
-                RRDSET_TYPE_STACKED);
-
-            p->rd_GuestRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_HypervisorRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "hypervisor", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_RemoteRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "remote", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
-
-            rrdlabels_add(p->st_HypervisorProcessor->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-        }
-
-        p->GuestRunTime_total += (collected_number)p->GuestRunTime.current.Data;
-        p->HypervisorRunTime_total += (collected_number)p->HypervisorRunTime.current.Data;
-        p->RemoteRunTime_total += (collected_number)p->RemoteRunTime.current.Data;
-        p->TotalRunTime_total += (collected_number)p->TotalRunTime.current.Data;
+        hyperv_processor_chart(p, update_every);
     }
 
     {
-        struct hypervisor_processor *p;
         dfe_start_read(item->instance, p)
         {
             rrddim_set_by_pointer(
