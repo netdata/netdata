@@ -967,10 +967,12 @@ int netdata_main(int argc, char **argv) {
 
     delta_startup_time("initialize RRD structures");
 
+    abort_on_fatal_disable();
     if(rrd_init(netdata_configured_hostname, system_info, false)) {
         set_late_analytics_variables(system_info);
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
     }
+    abort_on_fatal_enable();
 
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
