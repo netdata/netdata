@@ -6,9 +6,15 @@
 
 **Merged pull requests:**
 
+- Switch to Ubuntu 22.04 runner images for CI build jobs. [\#19619](https://github.com/netdata/netdata/pull/19619) ([Ferroin](https://github.com/Ferroin))
+- fix\(go.d/mysql\): handle Cpu\_time in microseconds in v11.4.5+ [\#19618](https://github.com/netdata/netdata/pull/19618) ([ilyam8](https://github.com/ilyam8))
+- improvement\(health\): clarify clickhouse\_replicated\_readonly\_tables info [\#19616](https://github.com/netdata/netdata/pull/19616) ([ilyam8](https://github.com/ilyam8))
+- fix: correct typo in NetdataCompilerFlags [\#19614](https://github.com/netdata/netdata/pull/19614) ([ilyam8](https://github.com/ilyam8))
+- chore: remove fluentbit.log from Dockerfile [\#19613](https://github.com/netdata/netdata/pull/19613) ([ilyam8](https://github.com/ilyam8))
 - Allow indirect access when agent is claimed, but offline \(indirect cloud connectivity\) [\#19611](https://github.com/netdata/netdata/pull/19611) ([ktsaou](https://github.com/ktsaou))
 - silence new alerts [\#19610](https://github.com/netdata/netdata/pull/19610) ([ktsaou](https://github.com/ktsaou))
 - Do not register removed node on agent restart [\#19609](https://github.com/netdata/netdata/pull/19609) ([stelfrag](https://github.com/stelfrag))
+- Add sentry fatal message breadcrumb. [\#19608](https://github.com/netdata/netdata/pull/19608) ([vkalintiris](https://github.com/vkalintiris))
 - Disable LTO for openSUSE package builds. [\#19607](https://github.com/netdata/netdata/pull/19607) ([Ferroin](https://github.com/Ferroin))
 - add interpolation to median and percentile [\#19606](https://github.com/netdata/netdata/pull/19606) ([ktsaou](https://github.com/ktsaou))
 - docs: reword nodes-ephemerality for clarity [\#19604](https://github.com/netdata/netdata/pull/19604) ([ilyam8](https://github.com/ilyam8))
@@ -477,12 +483,6 @@
 - update integrations gen script [\#19085](https://github.com/netdata/netdata/pull/19085) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/hpssa\): handle HPE Smart Array line [\#19084](https://github.com/netdata/netdata/pull/19084) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d.plugin\): renames [\#19081](https://github.com/netdata/netdata/pull/19081) ([ilyam8](https://github.com/ilyam8))
-- Use mimalloc [\#19080](https://github.com/netdata/netdata/pull/19080) ([vkalintiris](https://github.com/vkalintiris))
-- Regenerate integrations.js [\#19079](https://github.com/netdata/netdata/pull/19079) ([netdatabot](https://github.com/netdatabot))
-- Remove Go windows integration [\#19078](https://github.com/netdata/netdata/pull/19078) ([Ancairon](https://github.com/Ancairon))
-- Split database overview and configuration reference [\#19077](https://github.com/netdata/netdata/pull/19077) ([Ancairon](https://github.com/Ancairon))
-- Database docs edits [\#19075](https://github.com/netdata/netdata/pull/19075) ([Ancairon](https://github.com/Ancairon))
-- RAM and CPU resource util pages [\#19074](https://github.com/netdata/netdata/pull/19074) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
