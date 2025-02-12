@@ -238,6 +238,10 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
 static void hyperv_vid_partition_chart(struct hypervisor_partition *p, int update_every)
 {
+    if (!p->collected_metadata) {
+        p->collected_metadata = true;
+    }
+
     if (!p->charts_created) {
         p->charts_created = true;
 
@@ -321,10 +325,6 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
             pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
         p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
-
-        if (!p->collected_metadata) {
-            p->collected_metadata = true;
-        }
 
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
@@ -490,6 +490,10 @@ void dict_hyperv_root_partition_insert_cb(
 // Function to handle "Hyper-V Hypervisor Root Partition" metrics (Device Space and GPA Space)
 static void hyperv_root_partition_chart(struct hypervisor_root_partition *p, int update_every)
 {
+    if (!p->collected_metadata) {
+        p->collected_metadata = true;
+    }
+
     // Create charts
     if (!p->charts_created) {
         p->charts_created = true;
@@ -787,10 +791,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
         p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
-        if (!p->collected_metadata) {
-            p->collected_metadata = true;
-        }
-
         // Fetch counters
         GET_INSTANCE_COUNTER(DeviceSpacePages4K);
         GET_INSTANCE_COUNTER(DeviceSpacePages2M);
@@ -864,6 +864,10 @@ void dict_hyperv_storage_device_insert_cb(
 
 static void hyperv_storage_device_chart(struct hypervisor_storage_device *p, int update_every)
 {
+    if (!p->collected_metadata) {
+        p->collected_metadata = true;
+    }
+
     if (!p->charts_created) {
         p->charts_created = true;
         if (!p->st_operations) {
@@ -986,10 +990,6 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
         p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
-        if (!p->collected_metadata) {
-            p->collected_metadata = true;
-        }
-
         // Fetch counters
         GET_INSTANCE_COUNTER(ReadOperationsSec);
         GET_INSTANCE_COUNTER(WriteOperationsSec);
@@ -1104,6 +1104,10 @@ void dict_hyperv_switch_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
 
 static void hyperv_switch_chart(struct hypervisor_switch *p, int update_every)
 {
+    if (!p->collected_metadata) {
+        p->collected_metadata = true;
+    }
+
     if (!p->charts_created) {
         p->charts_created = true;
 
@@ -1396,10 +1400,6 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
             continue;
 
         p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
-
-        if (!p->collected_metadata) {
-            p->collected_metadata = true;
-        }
 
         GET_INSTANCE_COUNTER(BytesReceivedSec);
         GET_INSTANCE_COUNTER(BytesSentSec);
