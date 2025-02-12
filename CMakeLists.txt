@@ -1186,6 +1186,8 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-parents.h
         src/daemon/daemon-status-file.c
         src/daemon/daemon-status-file.h
+        src/daemon/config/netdata-conf-ssl.c
+        src/daemon/config/netdata-conf-ssl.h
 )
 
 set(H2O_FILES

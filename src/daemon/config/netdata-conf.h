@@ -16,5 +16,6 @@ bool netdata_conf_load(char *filename, char overwrite_used, const char **user);
 #include "netdata-conf-logs.h"
 #include "netdata-conf-web.h"
 #include "netdata-conf-cloud.h"
+#include "netdata-conf-ssl.h"
 
 #endif //NETDATA_DAEMON_NETDATA_CONF_H

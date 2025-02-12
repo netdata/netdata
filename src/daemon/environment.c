@@ -81,7 +81,8 @@ void set_environment_for_plugins_and_scripts(void) {
         freez((char *)default_port);
 
     // set the path we need
-    char path[4096], *p = getenv("PATH");
+    char path[4096];
+    const char *p = getenv("PATH");
     if (!p) p = "/bin:/usr/bin";
     snprintfz(path, sizeof(path), "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
     setenv("PATH", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
