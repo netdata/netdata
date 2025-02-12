@@ -209,6 +209,9 @@ mark_as_advanced(ENABLE_H2O)
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
 mark_as_advanced(ENABLE_SENTRY)
 
+cmake_dependent_option(ENABLE_SYSTEMD_NOTIFY "Build with systemd NOTIFY_SOCKET support" True "OS_LINUX" False)
+mark_as_advanced(ENABLE_SYSTEMD_NOTIFY)
+
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
@@ -1183,6 +1186,15 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-parents.c
         src/daemon/pulse/pulse-parents.h
 )
+
+set(SYSTEMD_NOTIFY_FILES
+  src/daemon/systemd-notify.c
+  src/daemon/systemd-notify.h
+)
+
+if(ENABLE_SYSTEMD_NOTIFY)
+  list(APPEND DAEMON_FILES ${SYSTEMD_NOTIFY_FILES})
+endif()
 
 set(H2O_FILES
         src/web/server/h2o/http_server.c

@@ -17,6 +17,10 @@
 #include "sentry-native/sentry-native.h"
 #endif
 
+#ifdef ENABLE_SYSTEMD_NOTIFY
+#include "systemd-notify.h"
+#endif
+
 #if defined(ENV32BIT)
 #warning COMPILING 32BIT NETDATA
 #endif
@@ -729,6 +733,11 @@ int netdata_main(int argc, char **argv) {
         }
     }
 
+#ifdef ENABLE_SYSTEMD_NOTIFY
+    // FIXME: This should be computed dynamically and updated later on during startup
+    notify_extend_timeout(300000000);
+#endif
+
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
@@ -1032,6 +1041,10 @@ int netdata_main(int argc, char **argv) {
 
     cleanup_agent_event_log();
     netdata_ready = true;
+
+#ifdef ENABLE_SYSTEMD_NOTIFY
+    notify_ready();
+#endif
 
     analytics_statistic_t start_statistic = { "START", "-",  "-" };
     analytics_statistic_send(&start_statistic);

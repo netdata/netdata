@@ -197,6 +197,8 @@
 #cmakedefine HAVE_ETW
 #cmakedefine RUN_UNDER_CLION
 
+#cmakedefine ENABLE_SYSTEMD_NOTIFY
+
 // /* Enable GNU extensions on systems that have them.  */
 // #ifndef _GNU_SOURCE
 // # define _GNU_SOURCE 1
