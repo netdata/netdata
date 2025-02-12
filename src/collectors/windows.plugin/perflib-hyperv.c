@@ -112,13 +112,108 @@ void dict_hyperv_partition_insert_cb(const DICTIONARY_ITEM *item __maybe_unused,
     initialize_hyperv_partition_keys(p);
 }
 
+static void hyperv_memory_chart(struct hypervisor_memory *p, int update_every)
+{
+    if (!p->collected_metadata) {
+        p->collected_metadata = true;
+    }
+
+    if (!p->charts_created) {
+        p->charts_created = true;
+        if (!p->st_vm_memory_physical) {
+            p->st_vm_memory_physical = rrdset_create_localhost(
+                "vm_memory_physical",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_memory_physical",
+                "VM assigned memory",
+                "bytes",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PHYSICAL,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->st_vm_memory_physical_guest_visible = rrdset_create_localhost(
+                "vm_memory_physical_guest_visible",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_memory_physical_guest_visible",
+                "VM guest visible memory",
+                "bytes",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PHYSICAL_GUEST_VISIBLE,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->st_pressure = rrdset_create_localhost(
+                "vm_memory_pressure_current",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_memory_pressure_current",
+                "VM Memory Pressure",
+                "percentage",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PRESSURE_CURRENT,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_CurrentPressure = rrddim_add(p->st_pressure, "pressure", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_PhysicalMemory =
+                rrddim_add(p->st_vm_memory_physical, "assigned", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_GuestVisiblePhysicalMemory = rrddim_add(
+                p->st_vm_memory_physical_guest_visible, "visible", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_GuestAvailableMemory = rrddim_add(
+                p->st_vm_memory_physical_guest_visible, "available", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrdlabels_add(p->st_vm_memory_physical->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_pressure->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(
+                p->st_vm_memory_physical_guest_visible->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+    }
+
+    SETP_DIM_VALUE(st_pressure, CurrentPressure);
+    SETP_DIM_VALUE(st_vm_memory_physical, PhysicalMemory);
+    SETP_DIM_VALUE(st_vm_memory_physical_guest_visible, GuestVisiblePhysicalMemory);
+    SETP_DIM_VALUE(st_vm_memory_physical_guest_visible, GuestAvailableMemory);
+
+    rrdset_done(p->st_pressure);
+    rrdset_done(p->st_vm_memory_physical);
+    rrdset_done(p->st_vm_memory_physical_guest_visible);
+}
+
 static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
 {
     hyperv_perf_item *item = data;
+    struct hypervisor_memory *p;
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
     if (!pObjectType)
         return false;
+
+    if (!pObjectType->NumInstances) {
+        static struct hypervisor_memory static_mem = {};
+        p = &static_mem;
+
+        if (!static_mem.charts_created) {
+            initialize_hyperv_memory_keys(p);
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+        }
+
+        GET_OBJECT_COUNTER(CurrentPressure);
+        GET_OBJECT_COUNTER(PhysicalMemory);
+        GET_OBJECT_COUNTER(GuestVisiblePhysicalMemory);
+        GET_OBJECT_COUNTER(GuestAvailableMemory);
+
+        hyperv_memory_chart(p, update_every);
+        return false;
+    }
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -129,88 +224,13 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
         get_and_sanitize_instance_value(
             pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
-        struct hypervisor_memory *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
-
-        if (!p->collected_metadata) {
-            p->collected_metadata = true;
-        }
+        p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
         GET_INSTANCE_COUNTER(CurrentPressure);
         GET_INSTANCE_COUNTER(PhysicalMemory);
         GET_INSTANCE_COUNTER(GuestVisiblePhysicalMemory);
         GET_INSTANCE_COUNTER(GuestAvailableMemory);
-
-        if (!p->charts_created) {
-            p->charts_created = true;
-            if (!p->st_vm_memory_physical) {
-                p->st_vm_memory_physical = rrdset_create_localhost(
-                    "vm_memory_physical",
-                    windows_shared_buffer,
-                    NULL,
-                    HYPERV,
-                    HYPERV ".vm_memory_physical",
-                    "VM assigned memory",
-                    "bytes",
-                    _COMMON_PLUGIN_NAME,
-                    _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PHYSICAL,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-                p->st_vm_memory_physical_guest_visible = rrdset_create_localhost(
-                    "vm_memory_physical_guest_visible",
-                    windows_shared_buffer,
-                    NULL,
-                    HYPERV,
-                    HYPERV ".vm_memory_physical_guest_visible",
-                    "VM guest visible memory",
-                    "bytes",
-                    _COMMON_PLUGIN_NAME,
-                    _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PHYSICAL_GUEST_VISIBLE,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-                p->st_pressure = rrdset_create_localhost(
-                    "vm_memory_pressure_current",
-                    windows_shared_buffer,
-                    NULL,
-                    HYPERV,
-                    HYPERV ".vm_memory_pressure_current",
-                    "VM Memory Pressure",
-                    "percentage",
-                    _COMMON_PLUGIN_NAME,
-                    _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PRESSURE_CURRENT,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-                p->rd_CurrentPressure = rrddim_add(p->st_pressure, "pressure", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                p->rd_PhysicalMemory =
-                    rrddim_add(p->st_vm_memory_physical, "assigned", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
-                p->rd_GuestVisiblePhysicalMemory = rrddim_add(
-                    p->st_vm_memory_physical_guest_visible, "visible", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
-                p->rd_GuestAvailableMemory = rrddim_add(
-                    p->st_vm_memory_physical_guest_visible, "available", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
-
-                rrdlabels_add(p->st_vm_memory_physical->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(p->st_pressure->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(
-                    p->st_vm_memory_physical_guest_visible->rrdlabels,
-                    "vm_name",
-                    windows_shared_buffer,
-                    RRDLABEL_SRC_AUTO);
-            }
-        }
-
-        SETP_DIM_VALUE(st_pressure, CurrentPressure);
-        SETP_DIM_VALUE(st_vm_memory_physical, PhysicalMemory);
-        SETP_DIM_VALUE(st_vm_memory_physical_guest_visible, GuestVisiblePhysicalMemory);
-        SETP_DIM_VALUE(st_vm_memory_physical_guest_visible, GuestAvailableMemory);
-
-        rrdset_done(p->st_pressure);
-        rrdset_done(p->st_vm_memory_physical);
-        rrdset_done(p->st_vm_memory_physical_guest_visible);
+        hyperv_memory_chart(p, update_every);
     }
 
     return true;
