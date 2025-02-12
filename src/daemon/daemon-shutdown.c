@@ -12,6 +12,16 @@
 #include "sentry-native/sentry-native.h"
 #endif
 
+static bool abort_on_fatal = true;
+
+void abort_on_fatal_disable(void) {
+    abort_on_fatal = false;
+}
+
+void abort_on_fatal_enable(void) {
+    abort_on_fatal = true;
+}
+
 void web_client_cache_destroy(void);
 
 extern struct netdata_static_thread *static_threads;
@@ -296,7 +306,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 #endif
 
 #ifdef ENABLE_SENTRY
-    if (ret) {
+    if (ret && abort_on_fatal) {
         if (action_data) {
             nd_sentry_add_breadcrumb(action_data);
         }
