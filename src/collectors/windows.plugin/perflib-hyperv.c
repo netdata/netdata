@@ -201,7 +201,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
         static struct hypervisor_memory static_mem = {};
         p = &static_mem;
 
-        if (!static_mem.charts_created) {
+        if (!p->charts_created) {
             initialize_hyperv_memory_keys(p);
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
         }
@@ -299,7 +299,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
     if (!pObjectType) {
         static struct hypervisor_partition static_partition = {};
         p = &static_partition;
-        if (!static_partition.charts_created) {
+        if (!p->charts_created) {
             initialize_hyperv_partition_keys(p);
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
         }
