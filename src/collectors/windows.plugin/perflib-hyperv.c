@@ -882,11 +882,9 @@ static void hyperv_storage_device_chart(struct hypervisor_storage_device *p, int
                 RRDSET_TYPE_LINE);
 
             p->rd_ReadOperationsSec = rrddim_add(p->st_operations, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_WriteOperationsSec =
-                rrddim_add(p->st_operations, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_WriteOperationsSec = rrddim_add(p->st_operations, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            rrdlabels_add(
-                p->st_operations->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_operations->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         if (!p->st_bytes) {
