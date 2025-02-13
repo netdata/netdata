@@ -38,8 +38,8 @@ void netdata_log_exit_reason(void) {
     ND_LOG_STACK_PUSH(lgs);
 
     nd_log(NDLS_DAEMON, is_exit_reason_normal(exit_initiated) ? NDLP_NOTICE : NDLP_CRIT,
-           "EXIT INITIATED %s: %s",
-           program_name, buffer_tostring(wb));
+           "NETDATA SHUTDOWN: initializing shutdown with code due to: %s",
+           buffer_tostring(wb));
 }
 
 void cancel_main_threads(void) {
@@ -173,21 +173,20 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
         exit(ret);
     }
     run = true;
-
-    netdata_log_exit_reason();
     daemon_status_file_save(DAEMON_STATUS_EXITING);
+
+    nd_log_limits_unlimited();
+    netdata_log_exit_reason();
+
+    watcher_thread_start();
+    usec_t shutdown_start_time = now_monotonic_usec();
+    watcher_shutdown_begin();
 
 #ifdef ENABLE_DBENGINE
     if(!ret && dbengine_enabled)
         // flush all dirty pages asap
         rrdeng_flush_everything_and_wait(false, false);
 #endif
-
-    usec_t shutdown_start_time = now_monotonic_usec();
-    watcher_shutdown_begin();
-
-    nd_log_limits_unlimited();
-    netdata_log_info("NETDATA SHUTDOWN: initializing shutdown with code %d...", ret);
 
     // send the stat from our caller
     analytics_statistic_t statistic = { action, action_result, action_data };
