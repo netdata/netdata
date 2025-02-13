@@ -757,7 +757,7 @@ int netdata_main(int argc, char **argv) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "Netdata agent version '%s' is starting", NETDATA_VERSION);
     }
     nd_log_register_event_cb(daemon_status_file_register_fatal);
 
