@@ -136,10 +136,14 @@ finish:
 
 #endif
 
-void *systemd_watcher_thread(void *arg __maybe_unused) {
+void *systemd_watcher_thread(void *arg) {
+    struct netdata_static_thread *static_thread = arg;
+
 #ifdef ENABLE_SYSTEMD_DBUS
     listen_for_systemd_dbus_events();
 #endif
 
+    worker_unregister();
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
 }
