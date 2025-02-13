@@ -353,7 +353,7 @@ static const char *get_field_value_unsafe(struct log_field *fields, ND_LOG_FIELD
                 break;
             case NDFT_UUID:
                 if (!uuid_is_null(*fields[i].entry.uuid)) {
-                    uuid_unparse_lower(*fields[i].entry.uuid, number_str);
+                    uuid_unparse_lower_compact(*fields[i].entry.uuid, number_str);
                     s = number_str;
                 }
                 break;
