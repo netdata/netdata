@@ -24,11 +24,7 @@ further analysis, or correlation with data from other sources.
 
 ### Prerequisites
 
-#### 
-
-- You have already installed Netdata and Graphite.
-
-
+No action required.
 
 ### Configuration
 
