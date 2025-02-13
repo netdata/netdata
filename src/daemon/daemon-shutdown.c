@@ -341,6 +341,9 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
         exit(ret);
     }
 #else
-    exit(ret);
+    if(ret)
+        _exit(ret);
+    else
+        exit(ret);
 #endif
 }

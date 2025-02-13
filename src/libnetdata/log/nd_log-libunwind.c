@@ -32,11 +32,11 @@ bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
     unw_getcontext(&context);
     unw_init_local(&cursor, &context);
 
-    // Skip first 3 frames (our logging infrastructure)
-    for (int i = 0; i < 3; i++) {
-        if (unw_step(&cursor) <= 0)
-            goto cleanup; // Ensure proper cleanup if unwinding fails early
-    }
+//    // Skip first 3 frames (our logging infrastructure)
+//    for (int i = 0; i < 3; i++) {
+//        if (unw_step(&cursor) <= 0)
+//            goto cleanup; // Ensure proper cleanup if unwinding fails early
+//    }
 
     while (unw_step(&cursor) > 0) {
         unw_word_t offset, pc;
