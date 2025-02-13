@@ -863,7 +863,7 @@ void dict_hyperv_storage_device_insert_cb(
     initialize_hyperv_storage_device_keys(p);
 }
 
-static void hyperv_storage_chart(struct hypervisor_storage_device *p, int update_every)
+static void hyperv_storage_device_chart(struct hypervisor_storage_device *p, int update_every)
 {
     if (!p->collected_metadata) {
         p->collected_metadata = true;
@@ -998,7 +998,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
         GET_INSTANCE_COUNTER(WriteBytesSec);
         GET_INSTANCE_COUNTER(ErrorCount);
 
-        hyperv_storage_chart(p, update_every);
+        hyperv_storage_device_chart(p, update_every);
     }
 
     return true;
