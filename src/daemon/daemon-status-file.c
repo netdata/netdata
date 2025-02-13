@@ -282,16 +282,18 @@ void daemon_status_file_check_crash(void) {
             pri = NDLP_ERR;
             break;
 
-        case DAEMON_STATUS_RUNNING:
-            if(session_status.boottime <= last_session_status.boottime) {
+        case DAEMON_STATUS_RUNNING: {
+            usec_t this_boot_timestamp_ut = session_status.timestamp_ut - session_status.boottime * USEC_PER_SEC;
+            usec_t last_boot_timestamp_ut = last_session_status.timestamp_ut - last_session_status.boottime * USEC_PER_SEC;
+            if (last_boot_timestamp_ut + 3 * USEC_PER_SEC < this_boot_timestamp_ut) {
                 msg = "The system was abnormally powered off while Netdata was running";
                 pri = NDLP_CRIT;
-            }
-            else {
+            } else {
                 msg = "Netdata was last killed/crashed while operating normally";
                 pri = NDLP_CRIT;
             }
             break;
+        }
     }
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
