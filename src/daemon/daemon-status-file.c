@@ -250,16 +250,20 @@ void daemon_status_file_check_crash(void) {
     daemon_status_file_save(DAEMON_STATUS_INITIALIZING);
     ND_LOG_FIELD_PRIORITY pri = NDLP_NOTICE;
 
+    bool dump_json = true;
     const char *msg;
     switch(last_session_status.status) {
         case DAEMON_STATUS_NONE:
             // probably a previous version of netdata was running
-            msg = "No status file found for the previous session";
+            msg = "No status found for the previous Netdata session";
             break;
 
         case DAEMON_STATUS_EXITED:
-            if(last_session_status.reason == EXIT_REASON_NONE)
+            if(last_session_status.reason == EXIT_REASON_NONE) {
                 msg = "Netdata was last stopped gracefully (no exit reason set)";
+                if(!last_session_status.timestamp_ut)
+                    dump_json = false;
+            }
             else if(!is_exit_reason_normal(last_session_status.reason)) {
                 msg = "Netdata was last stopped gracefully (encountered an error)";
                 pri = NDLP_ERR;
@@ -267,7 +271,11 @@ void daemon_status_file_check_crash(void) {
             else if(last_session_status.reason & EXIT_REASON_SYSTEM_SHUTDOWN)
                 msg = "Netdata has gracefully stopped due to system shutdown";
             else if(last_session_status.reason & EXIT_REASON_UPDATE)
-                msg = "Netdata has gracefully restarted due to an update";
+                msg = "Netdata has gracefully restarted to update to a new version";
+            else if(strcmp(last_session_status.version, session_status.version) != 0) {
+                msg = "Netdata has gracefully restarted and updated to a new version";
+                last_session_status.reason |= EXIT_REASON_UPDATE;
+            }
             else
                 msg = "Netdata was last stopped gracefully (instructed to do so)";
             break;
@@ -298,16 +306,19 @@ void daemon_status_file_check_crash(void) {
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-    daemon_status_file_to_json(wb, &last_session_status);
+    if(dump_json)
+        daemon_status_file_to_json(wb, &last_session_status);
     buffer_json_finalize(wb);
 
     ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_last_exit_msgid),
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_startup_msgid),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    nd_log(NDLS_DAEMON, pri, "LAST EXIT STATUS: %s:\n\n%s", msg, buffer_tostring(wb));
+    nd_log(NDLS_DAEMON, pri, "Netdata Agent version '%s' is starting...\n"
+                             "Last exit status: %s:\n\n%s",
+           NETDATA_VERSION, msg, buffer_tostring(wb));
 }
 
 bool daemon_status_file_has_last_crashed(void) {
