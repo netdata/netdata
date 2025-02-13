@@ -597,8 +597,7 @@ static void hyperv_root_partition_chart(struct hypervisor_root_partition *p, int
             update_every,
             RRDSET_TYPE_LINE);
 
-        p->rd_DeviceDMAErrors =
-            rrddim_add(p->st_DeviceDMAErrors, "illegal_dma", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_DeviceDMAErrors = rrddim_add(p->st_DeviceDMAErrors, "illegal_dma", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         p->st_DeviceInterruptErrors = rrdset_create_localhost(
             "root_partition_device_interrupt_errors",
@@ -888,11 +887,9 @@ static void hyperv_storage_chart(struct hypervisor_storage_device *p, int update
                 RRDSET_TYPE_LINE);
 
             p->rd_ReadOperationsSec = rrddim_add(p->st_operations, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_WriteOperationsSec =
-                rrddim_add(p->st_operations, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_WriteOperationsSec = rrddim_add(p->st_operations, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            rrdlabels_add(
-                p->st_operations->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_operations->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         if (!p->st_bytes) {
