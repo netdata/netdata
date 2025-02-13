@@ -250,6 +250,7 @@ void daemon_status_file_check_crash(void) {
     daemon_status_file_save(DAEMON_STATUS_INITIALIZING);
     ND_LOG_FIELD_PRIORITY pri = NDLP_NOTICE;
 
+    bool send_report = false;
     bool dump_json = true;
     const char *msg;
     switch(last_session_status.status) {
@@ -267,6 +268,7 @@ void daemon_status_file_check_crash(void) {
             else if(!is_exit_reason_normal(last_session_status.reason)) {
                 msg = "Netdata was last stopped gracefully (encountered an error)";
                 pri = NDLP_ERR;
+                send_report = true;
             }
             else if(last_session_status.reason & EXIT_REASON_SYSTEM_SHUTDOWN)
                 msg = "Netdata has gracefully stopped due to system shutdown";
@@ -283,11 +285,13 @@ void daemon_status_file_check_crash(void) {
         case DAEMON_STATUS_INITIALIZING:
             msg = "Netdata was last killed/crashed while starting";
             pri = NDLP_ERR;
+            send_report = true;
             break;
 
         case DAEMON_STATUS_EXITING:
             msg = "Netdata was last killed/crashed while exiting";
             pri = NDLP_ERR;
+            send_report = true;
             break;
 
         case DAEMON_STATUS_RUNNING: {
@@ -316,9 +320,15 @@ void daemon_status_file_check_crash(void) {
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    nd_log(NDLS_DAEMON, pri, "Netdata Agent version '%s' is starting...\n"
-                             "Last exit status: %s:\n\n%s",
+    nd_log(NDLS_DAEMON, pri,
+           "Netdata Agent version '%s' is starting...\n"
+           "Last exit status: %s:\n\n%s",
            NETDATA_VERSION, msg, buffer_tostring(wb));
+
+    if(send_report) {
+        netdata_conf_ssl();
+        // TODO: send crash report
+    }
 }
 
 bool daemon_status_file_has_last_crashed(void) {

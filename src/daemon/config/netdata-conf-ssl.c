@@ -74,6 +74,8 @@ static const char *detect_ca_path(void) {
 }
 
 void netdata_conf_ssl(void) {
+    FUNCTION_RUN_ONCE();
+
     netdata_ssl_initialize_openssl();
 
 #if 0

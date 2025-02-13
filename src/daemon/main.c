@@ -759,11 +759,7 @@ int netdata_main(int argc, char **argv) {
     exit_initiated_reset();
     daemon_status_file_check_crash();
 
-    // ----------------------------------------------------------------------------------------------------------------
-    // global configuration
-
     netdata_conf_ssl();
-    netdata_conf_section_global();
 
     // Get execution path before switching user to avoid permission issues
     get_netdata_execution_path();
