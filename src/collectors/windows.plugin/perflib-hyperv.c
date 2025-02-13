@@ -1701,7 +1701,7 @@ static void hyperv_network_adapter_chart(struct hypervisor_network_adapter *p, i
 
 static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
 {
-    struct hypervisor_network_adapter *p);
+    struct hypervisor_network_adapter *p;
     hyperv_perf_item *item = data;
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
