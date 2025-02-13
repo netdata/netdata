@@ -177,6 +177,9 @@
                   # send hosts matching = localhost *
 - <<: *graphexport
   id: 'export-blueflood'
+  overview:
+    exporter_description: |
+      Export your Netdata metrics to Blueflood DB using the Graphite protocol, allowing you to archive your data for long-term storage, further analysis, or correlation with data from other sources.
   meta:
     <<: *meta
     name: Blueflood
@@ -188,6 +191,9 @@
       - graphite
 - <<: *graphexport
   id: 'export-kairosdb'
+  overview:
+    exporter_description: |
+      Export your Netdata metrics to KairosDB using the Graphite protocol, allowing you to archive your data for long-term storage, further analysis, or correlation with data from other sources.
   meta:
     <<: *meta
     name: KairosDB
