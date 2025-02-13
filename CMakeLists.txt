@@ -449,12 +449,23 @@ check_function_exists(arc4random_uniform HAVE_ARC4RANDOM_UNIFORM)
 check_function_exists(getrandom HAVE_GETRANDOM)
 check_function_exists(sysinfo HAVE_SYSINFO)
 
+check_function_exists(timegm HAVE_TIMEGM)
+
 #
 # check source compilation
 #
 
 include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
+
+check_c_source_compiles("
+#include <time.h>
+int main(void) {
+    struct tm t;
+    (void)t.tm_gmtoff;
+    return 0;
+}
+" HAVE_TM_GMTOFF)
 
 set(CMAKE_REQUIRED_LIBRARIES pthread)
 check_c_source_compiles("
@@ -996,6 +1007,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/hostname.h
         src/libnetdata/exit/exit_initiated.c
         src/libnetdata/exit/exit_initiated.h
+        src/libnetdata/os/disk_space.c
+        src/libnetdata/os/disk_space.h
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})

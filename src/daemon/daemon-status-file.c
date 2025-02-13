@@ -21,20 +21,40 @@ ENUM_STR_DEFINE_FUNCTIONS(DAEMON_STATUS, DAEMON_STATUS_NONE, "none");
 
 static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_string(wb, "version", ds->version);
+    buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
+    EXIT_REASON_2json(wb, "reason", ds->reason);
+    ND_PROFILE_2json(wb, "profile", ds->profile);
+
     buffer_json_member_add_time_t(wb, "boottime", ds->boottime);
     buffer_json_member_add_time_t(wb, "uptime", ds->uptime);
-    buffer_json_member_add_time_t(wb, "timestamp", ds->timestamp);
+    buffer_json_member_add_datetime_rfc3339(wb, "wallclock", ds->timestamp_ut, true);
     buffer_json_member_add_uuid_compact(wb, "invocation", ds->invocation.uuid);
     buffer_json_member_add_uuid(wb, "host_id", ds->host_id.uuid);
     buffer_json_member_add_uuid(wb, "node_id", ds->node_id.uuid);
     buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
-    buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
-    EXIT_REASON_2json(wb, "reason", ds->reason);
 
-    buffer_json_member_add_time_t(wb, "init_dt", ds->init_dt);
-    buffer_json_member_add_time_t(wb, "exit_dt", ds->exit_dt);
-    buffer_json_member_add_uint64(wb, "ram_total", ds->memory.ram_total_bytes);
-    buffer_json_member_add_uint64(wb, "ram_available", ds->memory.ram_available_bytes);
+    buffer_json_member_add_object(wb, "timings");
+    {
+        buffer_json_member_add_time_t(wb, "init", ds->timings.init);
+        buffer_json_member_add_time_t(wb, "exit", ds->timings.exit);
+    }
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_object(wb, "ram");
+    {
+        buffer_json_member_add_uint64(wb, "total", ds->memory.ram_total_bytes);
+        buffer_json_member_add_uint64(wb, "free", ds->memory.ram_available_bytes);
+    }
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_object(wb, "db_disk");
+    {
+        buffer_json_member_add_uint64(wb, "total", ds->var_cache.total_bytes);
+        buffer_json_member_add_uint64(wb, "free", ds->var_cache.free_bytes);
+        buffer_json_member_add_uint64(wb, "inodes_total", ds->var_cache.total_inodes);
+        buffer_json_member_add_uint64(wb, "inodes_free", ds->var_cache.free_inodes);
+    }
+    buffer_json_object_close(wb);
 
     buffer_json_member_add_object(wb, "fatal");
     {
@@ -47,6 +67,20 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_object_close(wb);
 }
 
+static bool daemon_status_file_from_json_cache_dir(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required __maybe_unused) {
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->var_cache.total_bytes, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->var_cache.free_bytes, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_total", ds->var_cache.total_inodes, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_free", ds->var_cache.free_inodes, error, false);
+    return true;
+}
+
+static bool daemon_status_file_from_json_ram(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required __maybe_unused) {
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->memory.ram_total_bytes, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, false);
+    return true;
+}
+
 static bool daemon_status_file_from_json_fatal(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required __maybe_unused) {
     JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "filename", ds->fatal.filename, error, false);
     JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "function", ds->fatal.function, error, false);
@@ -56,24 +90,35 @@ static bool daemon_status_file_from_json_fatal(json_object *jobj, const char *pa
     return true;
 }
 
+static bool daemon_status_file_from_json_timings(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required __maybe_unused) {
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init", ds->timings.init, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit", ds->timings.exit, error, false);
+    return true;
+}
+
 static bool daemon_status_file_from_json(json_object *jobj, const char *path, void *data, BUFFER *error) {
+    char datetime[RFC3339_MAX_LENGTH]; datetime[0] = '\0';
+
     DAEMON_STATUS_FILE *ds = data;
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->version, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "boottime", ds->boottime, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->uptime, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "timestamp", ds->timestamp, error, false);
+
+    JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "wallclock", datetime, error, false);
+    if(datetime[0])
+        ds->timestamp_ut = rfc3339_parse_ut(datetime, NULL);
+
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "invocation", ds->invocation.uuid, error, false);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", ds->host_id.uuid, error, false);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "node_id", ds->node_id.uuid, error, false);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "claim_id", ds->claim_id.uuid, error, false);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "status", DAEMON_STATUS_2id, ds->status, error, false);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "reason", EXIT_REASON_2id_one, ds->reason, error, false);
+    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "profile", ND_PROFILE_2id_one, ds->profile, error, false);
 
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init_dt", ds->init_dt, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit_dt", ds->exit_dt, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ram_total", ds->memory.ram_total_bytes, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ram_available", ds->memory.ram_available_bytes, error, false);
-
+    JSONC_PARSE_SUBOBJECT(jobj, path, "timings", ds, daemon_status_file_from_json_timings, error, false);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "db_disk", ds, daemon_status_file_from_json_cache_dir, error, false);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "ram", ds, daemon_status_file_from_json_ram, error, false);
     JSONC_PARSE_SUBOBJECT(jobj, path, "fatal", ds, daemon_status_file_from_json_fatal, error, false);
     return true;
 }
@@ -83,18 +128,18 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     if (!netdata_boottime_time)
         netdata_boottime_time = now_boottime_sec();
 
-    time_t now = now_realtime_sec();
+    usec_t now_ut = now_realtime_usec();
 
     if(session_status.status == DAEMON_STATUS_INITIALIZING && status == DAEMON_STATUS_RUNNING)
-        session_status.init_dt = now - session_status.timestamp;
+        session_status.timings.init = (time_t)((now_ut - session_status.timestamp_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
     if(session_status.status == DAEMON_STATUS_EXITING && status == DAEMON_STATUS_EXITED)
-        session_status.exit_dt = now - session_status.timestamp;
+        session_status.timings.exit = (time_t)((now_ut - session_status.timestamp_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
     strncpyz(session_status.version, NETDATA_VERSION, sizeof(session_status.version) - 1);
     session_status.boottime = now_boottime_sec();
     session_status.uptime = now_boottime_sec() - netdata_boottime_time;
-    session_status.timestamp = now;
+    session_status.timestamp_ut = now_ut;
     session_status.invocation = nd_log_get_invocation_id();
 
     session_status.claim_id = claim_id_get_uuid();
@@ -123,8 +168,11 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
         session_status.host_id = last_session_status.host_id;
 
     session_status.reason = exit_initiated;
+    session_status.profile = nd_profile_detect_and_configure(false);
     session_status.status = status;
+
     session_status.memory = os_system_memory(true);
+    session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
 
     return session_status;
 }
@@ -133,14 +181,14 @@ DAEMON_STATUS_FILE daemon_status_file_load(void) {
     DAEMON_STATUS_FILE status = {
         .boottime = 0,
         .uptime = 0,
-        .timestamp = 0,
+        .timestamp_ut = 0,
         .invocation = UUID_ZERO,
         .reason = EXIT_REASON_NONE,
         .status = DAEMON_STATUS_NONE,
     };
 
     char filename[FILENAME_MAX];
-    snprintfz(filename, sizeof(filename), "%s/.status.%s", netdata_configured_varlib_dir, program_name);
+    snprintfz(filename, sizeof(filename), "%s/status-netdata.json", netdata_configured_varlib_dir);
     FILE *fp = fopen(filename, "r");
     if (fp) {
         fseek(fp, 0, SEEK_END);
@@ -174,7 +222,7 @@ void daemon_status_file_save(DAEMON_STATUS status) {
     buffer_json_finalize(wb);
 
     char temp_filename[FILENAME_MAX];
-    snprintfz(temp_filename, sizeof(temp_filename), "%s/.status.%s.tmp", netdata_configured_varlib_dir, program_name);
+    snprintfz(temp_filename, sizeof(temp_filename), "%s/status-netdata.tmp", netdata_configured_varlib_dir);
 
     FILE *fp = fopen(temp_filename, "w");
     if (fp) {
@@ -183,7 +231,7 @@ void daemon_status_file_save(DAEMON_STATUS status) {
 
         if(ok) {
             char filename[FILENAME_MAX];
-            snprintfz(filename, sizeof(filename), "%s/.status.%s", netdata_configured_varlib_dir, program_name);
+            snprintfz(filename, sizeof(filename), "%s/status-netdata.json", netdata_configured_varlib_dir);
             rename(temp_filename, filename);
         }
     }

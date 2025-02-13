@@ -4,6 +4,7 @@
 #define NETDATA_DAEMON_STATUS_FILE_H
 
 #include "libnetdata/libnetdata.h"
+#include "daemon/config/netdata-conf-profile.h"
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -17,19 +18,26 @@ ENUM_STR_DEFINE_FUNCTIONS_EXTERN(DAEMON_STATUS);
 
 typedef struct daemon_status_file {
     char version[32];       // the netdata version
+    DAEMON_STATUS status;   // the daemon status
+    EXIT_REASON reason;     // the exit reason (maybe empty)
+    ND_PROFILE profile;     // the profile of the agent
+
     time_t boottime;        // system boottime
     time_t uptime;          // netdata uptime
-    time_t timestamp;       // the timestamp of the status file
+    usec_t timestamp_ut;    // the timestamp of the status file
+
+    ND_UUID invocation;     // the netdata invocation id generated the file
     ND_UUID host_id;        // the machine guid of the agent
     ND_UUID node_id;        // the Netdata Cloud node id of the agent
     ND_UUID claim_id;       // the Netdata Cloud claim id of the agent
-    ND_UUID invocation;     // the netdata invocation id generated the file
-    EXIT_REASON reason;     // the exit reason (maybe empty)
-    DAEMON_STATUS status;   // the daemon status
 
-    time_t init_dt;
-    time_t exit_dt;
+    struct {
+        time_t init;
+        time_t exit;
+    } timings;
+
     OS_SYSTEM_MEMORY memory;
+    OS_SYSTEM_DISK_SPACE var_cache;
 
     struct {
         long line;

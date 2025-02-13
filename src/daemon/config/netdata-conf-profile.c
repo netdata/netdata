@@ -31,6 +31,7 @@ ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
 
     // required for detecting the profile
     stream_conf_load();
+    netdata_conf_section_directories();
 
     ND_PROFILE def_profile = ND_PROFILE_NONE;
 
