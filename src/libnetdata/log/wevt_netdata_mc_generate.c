@@ -284,6 +284,7 @@ int main(int argc, const char **argv) {
                  "                        <data name=\"AlertNotificationTime\" inType=\"win:UnicodeString\"/>      <!-- 62 (NDF_ALERT_NOTIFICATION_REALTIME_USEC) -->\r\n"
                  "                        <data name=\"Request\" inType=\"win:UnicodeString\"/>             <!-- 63 (NDF_REQUEST) -->\r\n"
                  "                        <data name=\"Message\" inType=\"win:UnicodeString\"/>             <!-- 64 (NDF_MESSAGE) -->\r\n"
+                 "                        <data name=\"StackTrace\" inType=\"win:UnicodeString\"/>          <!-- 65 (NDF_STACK_TRACE) -->\r\n"
                  "                    </template>\r\n"
                  "                </templates>\r\n"
                  "\r\n"
