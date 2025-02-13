@@ -264,6 +264,8 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last stopped gracefully (encountered an error)";
                 pri = NDLP_ERR;
             }
+            else if(last_session_status.reason & EXIT_REASON_SYSTEM_SHUTDOWN)
+                msg = "Netdata has gracefully stopped due to system shutdown";
             else if(last_session_status.reason & EXIT_REASON_UPDATE)
                 msg = "Netdata has gracefully restarted due to an update";
             else
