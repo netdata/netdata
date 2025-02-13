@@ -83,8 +83,10 @@ if ($LastExitcode -ne 0) {
     }
 }
 
+$wixVersion = "5.0.2"
+
 Write-Host "Installing WiX toolset"
-dotnet tool install -g wix
+dotnet tool install -g wix --version $wixVersion
 
 if ($LastExitcode -ne 0) {
     exit 1
@@ -92,13 +94,13 @@ if ($LastExitcode -ne 0) {
 
 Write-Host "Adding WiX extensions"
 
-wix extension -g add WixToolset.Util.wixext
+wix extension -g add WixToolset.Util.wixext/$wixVersion
 
 if ($LastExitcode -ne 0) {
     exit 1
 }
 
-wix extension -g add WixToolset.UI.wixext
+wix extension -g add WixToolset.UI.wixext/$wixVersion
 
 if ($LastExitcode -ne 0) {
     exit 1
