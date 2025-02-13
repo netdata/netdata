@@ -26,10 +26,6 @@ ENUM_STR_MAP_DEFINE(EXIT_REASON) = {
 BITMAP_STR_DEFINE_FUNCTIONS(EXIT_REASON, EXIT_REASON_NONE, "none");
 
 #if defined(OS_LINUX)
-static bool is_system_shutdown_systemd(void) {
-    return access("/run/systemd/shutdown/scheduled", F_OK) == 0;
-}
-
 static bool is_system_shutdown_sysv(void) {
     const char *shutdown_files[] = {
         "/etc/nologin",          // Created during shutdown
@@ -47,7 +43,7 @@ static bool is_system_shutdown_sysv(void) {
 }
 
 static bool is_system_shutdown(void) {
-    return is_system_shutdown_systemd() || is_system_shutdown_sysv();
+    return is_system_shutdown_sysv();
 }
 #endif
 
@@ -100,7 +96,7 @@ void exit_initiated_reset(void) {
 }
 
 void exit_initiated_set(EXIT_REASON reason) {
-    if(is_system_shutdown())
+    if(exit_initiated == EXIT_REASON_NONE && !(reason & EXIT_REASON_SYSTEM_SHUTDOWN) && is_system_shutdown())
         reason |= EXIT_REASON_SYSTEM_SHUTDOWN;
 
     if(exit_initiated == EXIT_REASON_NONE && self_path && OS_FILE_METADATA_OK(self)) {

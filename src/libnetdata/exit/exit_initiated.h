@@ -11,14 +11,14 @@ typedef enum {
 
     // automatically detect when exit_initiated_set() is called
     // supports Linux, FreeBSD, MacOS, Windows
-    EXIT_REASON_SYSTEM_SHUTDOWN     = (1 << 0),
+    EXIT_REASON_SYSTEM_SHUTDOWN     = (1 << 0), // detected
 
     // signals - normal termination
-    EXIT_REASON_SIGQUIT             = (1 << 1),
-    EXIT_REASON_SIGTERM             = (1 << 2),
+    EXIT_REASON_SIGQUIT             = (1 << 1), // rare, but graceful
+    EXIT_REASON_SIGTERM             = (1 << 2), // received on Linux, FreeBSD, MacOS
+    EXIT_REASON_SIGINT              = (1 << 3), // received on Windows on normal termination
 
     // signals - abnormal termination
-    EXIT_REASON_SIGINT              = (1 << 3),
     EXIT_REASON_SIGBUS              = (1 << 4),
     EXIT_REASON_SIGSEGV             = (1 << 5),
     EXIT_REASON_SIGFPE              = (1 << 6),
@@ -38,7 +38,7 @@ typedef enum {
     EXIT_REASON_UPDATE              = (1 << 11),
 } EXIT_REASON;
 
-#define EXIT_REASON_NORMAL (EXIT_REASON_SIGINT|EXIT_REASON_SIGTERM|EXIT_REASON_SIGQUIT|EXIT_REASON_API_QUIT|EXIT_REASON_CMD_EXIT|EXIT_REASON_SERVICE_STOP)
+#define EXIT_REASON_NORMAL (EXIT_REASON_SIGINT|EXIT_REASON_SIGTERM|EXIT_REASON_SIGQUIT|EXIT_REASON_API_QUIT|EXIT_REASON_CMD_EXIT|EXIT_REASON_SERVICE_STOP|EXIT_REASON_SYSTEM_SHUTDOWN|EXIT_REASON_UPDATE)
 #define EXIT_REASON_ABNORMAL (EXIT_REASON_SIGBUS|EXIT_REASON_SIGSEGV|EXIT_REASON_SIGFPE|EXIT_REASON_SIGILL|EXIT_REASON_FATAL)
 
 #define is_exit_reason_normal(reason) (((reason) & EXIT_REASON_NORMAL) && !((reason) & EXIT_REASON_ABNORMAL))
