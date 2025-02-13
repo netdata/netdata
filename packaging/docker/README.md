@@ -38,16 +38,18 @@ along with their descriptions.
 <details open>
 <summary>Mounts</summary>
 
-|       Component        |           Mounts           | Description                                                                                                                                |
-|:----------------------:|:--------------------------:|--------------------------------------------------------------------------------------------------------------------------------------------|
-|        netdata         |      /etc/os-release       | Host info detection.                                                                                                                       |
-|    diskspace.plugin    |             /              | Host mount points monitoring.                                                                                                              |
-|     cgroups.plugin     | /sys, /var/run/docker.sock | Docker containers monitoring and name resolution.                                                                                          |
-|      go.d.plugin       |    /var/run/docker.sock    | Docker Engine and containers monitoring. See [docker](https://github.com/netdata/go.d.plugin/tree/master/modules/docker#readme) collector. |
-|      go.d.plugin       |          /var/log          | Web servers logs tailing. See [weblog](https://github.com/netdata/go.d.plugin/tree/master/modules/weblog#readme) collector.                |
-|      apps.plugin       |  /etc/passwd, /etc/group   | Monitoring of host system resource usage by each user and user group.                                                                      |
-|      proc.plugin       |           /proc            | Host system monitoring (CPU, memory, network interfaces, disks, etc.).                                                                     |
-| systemd-journal.plugin |          /var/log          | Viewing, exploring and analyzing systemd journal logs.                                                                                     |
+|       Component        |           Mounts           | Description                                                                                                                                      |
+|:----------------------:|:--------------------------:|--------------------------------------------------------------------------------------------------------------------------------------------------|
+|        netdata         |      /etc/os-release       | Host info detection.                                                                                                                             |
+|    diskspace.plugin    |             /              | Host mount points monitoring.                                                                                                                    |
+|     cgroups.plugin     | /sys, /var/run/docker.sock | Docker containers monitoring and name resolution.                                                                                                |
+|      go.d.plugin       |    /var/run/docker.sock    | Docker Engine and containers monitoring. See [docker](https://github.com/netdata/go.d.plugin/tree/master/modules/docker#readme) collector.       |
+|      go.d.plugin       |          /var/log          | Web servers logs tailing. See [weblog](https://github.com/netdata/go.d.plugin/tree/master/modules/weblog#readme) collector.                      |
+|      apps.plugin       |  /etc/passwd, /etc/group   | Monitoring of host system resource usage by each user and user group.                                                                            |
+|      proc.plugin       |           /proc            | Host system monitoring (CPU, memory, network interfaces, disks, etc.).                                                                           |
+| systemd-journal.plugin |          /var/log          | Viewing, exploring and analyzing systemd journal logs.                                                                                           |
+| systemd-journal.plugin |         /run/dbus          | Systemd-list-units function: information about all systemd units, including their active state, description, whether they are enabled, and more. |
+|      go.d.plugin       |         /run/dbus          | [go.d/systemdunits](https://github.com/netdata/go.d.plugin/tree/master/modules/systemdunits#readme)                                              |
 
 </details>
 
@@ -81,6 +83,7 @@ docker run -d --name=netdata \
   -v /etc/os-release:/host/etc/os-release:ro \
   -v /var/log:/host/var/log:ro \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v -v /run/dbus:/run/dbus:ro \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --cap-add SYS_ADMIN \
@@ -123,6 +126,7 @@ services:
       - /etc/os-release:/host/etc/os-release:ro
       - /var/log:/host/var/log:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/dbus:/run/dbus:ro
 
 volumes:
   netdataconfig:
@@ -137,34 +141,6 @@ volumes:
 >
 > If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "
 > Add Nodes" button in your Space's "Nodes" view.
-
-### With systemd units monitoring
-
-Monitoring systemd units requires mounting `/run/dbus`. This mount is not available on non-systemd systems, so we cannot
-use it in the Recommended Way.
-
-Mounting `/run/dbus` provides:
-
-- [go.d/systemdunits](https://github.com/netdata/go.d.plugin/tree/master/modules/systemdunits#readme).
-- Systemd-list-units function: information about all systemd units, including their active state, description, whether
-  they are enabled, and more.
-
-<Tabs>
-<TabItem value="docker_run" label="docker run">
-
-<h3> Using the <code>docker run</code> command </h3>
-
-Add `-v /run/dbus:/run/dbus:ro` to your `docker run`.
-
-</TabItem>
-<TabItem value="docker compose" label="docker-compose">
-
-<h3> Using the <code>docker-compose</code> command</h3>
-
-Add `- /run/dbus:/run/dbus:ro` to the netdata service `volumes`.
-
-</TabItem>
-</Tabs>
 
 ### With NVIDIA GPUs monitoring
 
