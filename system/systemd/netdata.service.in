@@ -18,7 +18,6 @@ ExecStart=@sbindir_POST@/netdata -P /run/netdata/netdata.pid -D
 ExecStartPre=/bin/mkdir -p @localstatedir_POST@/cache/netdata
 ExecStartPre=/bin/chown -R @netdata_user_POST@ @localstatedir_POST@/cache/netdata
 ExecStartPre=/bin/mkdir -p /run/netdata
-ExecStartPre=/bin/chown -R @netdata_user_POST@ /run/netdata
 PermissionsStartOnly=true
 
 # saving a big db on slow disks may need some time
