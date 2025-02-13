@@ -2,10 +2,19 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.4...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.5...HEAD)
 
 **Merged pull requests:**
 
+- fix windows logs [\#19632](https://github.com/netdata/netdata/pull/19632) ([ktsaou](https://github.com/ktsaou))
+- more perflib error checking [\#19631](https://github.com/netdata/netdata/pull/19631) ([ktsaou](https://github.com/ktsaou))
+- Revert "HyperV Adjusts \(windows.plugin\)" [\#19630](https://github.com/netdata/netdata/pull/19630) ([ilyam8](https://github.com/ilyam8))
+- do not send sentry reports on rrd\_init\(\) failures [\#19628](https://github.com/netdata/netdata/pull/19628) ([ktsaou](https://github.com/ktsaou))
+- build\(deps\): bump golang.org/x/net from 0.34.0 to 0.35.0 in /src/go [\#19626](https://github.com/netdata/netdata/pull/19626) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/vmware/govmomi from 0.48.0 to 0.48.1 in /src/go [\#19625](https://github.com/netdata/netdata/pull/19625) ([dependabot[bot]](https://github.com/apps/dependabot))
+- feat\(health\): add system\_reboot\_detection alarm [\#19624](https://github.com/netdata/netdata/pull/19624) ([ilyam8](https://github.com/ilyam8))
+- HyperV Adjusts \(windows.plugin\) [\#19623](https://github.com/netdata/netdata/pull/19623) ([thiagoftsm](https://github.com/thiagoftsm))
+- detect the system ca bundle at runtime [\#19622](https://github.com/netdata/netdata/pull/19622) ([ktsaou](https://github.com/ktsaou))
 - Switch to Ubuntu 22.04 runner images for CI build jobs. [\#19619](https://github.com/netdata/netdata/pull/19619) ([Ferroin](https://github.com/Ferroin))
 - fix\(go.d/mysql\): handle Cpu\_time in microseconds in v11.4.5+ [\#19618](https://github.com/netdata/netdata/pull/19618) ([ilyam8](https://github.com/ilyam8))
 - improvement\(health\): clarify clickhouse\_replicated\_readonly\_tables info [\#19616](https://github.com/netdata/netdata/pull/19616) ([ilyam8](https://github.com/ilyam8))
@@ -140,6 +149,10 @@
 - Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
 - Modify eBPF.plugin integration \(Part I\) [\#19219](https://github.com/netdata/netdata/pull/19219) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add CLR Remoting metadata [\#19203](https://github.com/netdata/netdata/pull/19203) ([thiagoftsm](https://github.com/thiagoftsm))
+
+## [v2.2.5](https://github.com/netdata/netdata/tree/v2.2.5) (2025-02-12)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.4...v2.2.5)
 
 ## [v2.2.4](https://github.com/netdata/netdata/tree/v2.2.4) (2025-02-04)
 
@@ -474,15 +487,6 @@
 - Update Registry docs [\#19095](https://github.com/netdata/netdata/pull/19095) ([Ancairon](https://github.com/Ancairon))
 - Collected and available metrics, instances and contexts [\#19094](https://github.com/netdata/netdata/pull/19094) ([ktsaou](https://github.com/ktsaou))
 - docs\(systemd-journal.plugin\): correct full-text search [\#19093](https://github.com/netdata/netdata/pull/19093) ([ilyam8](https://github.com/ilyam8))
-- Daemon docs edits [\#19091](https://github.com/netdata/netdata/pull/19091) ([Ancairon](https://github.com/Ancairon))
-- chore\(go.d.plugin\): renames part 2  [\#19090](https://github.com/netdata/netdata/pull/19090) ([ilyam8](https://github.com/ilyam8))
-- remove stale docs, and update links and optimization documentation [\#19089](https://github.com/netdata/netdata/pull/19089) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#19088](https://github.com/netdata/netdata/pull/19088) ([netdatabot](https://github.com/netdatabot))
-- docs: fix go.d modules rename leftovers [\#19087](https://github.com/netdata/netdata/pull/19087) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#19086](https://github.com/netdata/netdata/pull/19086) ([netdatabot](https://github.com/netdatabot))
-- update integrations gen script [\#19085](https://github.com/netdata/netdata/pull/19085) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/hpssa\): handle HPE Smart Array line [\#19084](https://github.com/netdata/netdata/pull/19084) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d.plugin\): renames [\#19081](https://github.com/netdata/netdata/pull/19081) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 

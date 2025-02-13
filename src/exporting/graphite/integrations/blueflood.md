@@ -13,8 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/blueflood.png" width="150"/>
 
 
-Use the Graphite connector for the exporting engine to archive your Netdata metrics to Graphite providers for long-term storage,
-further analysis, or correlation with data from other sources.
+Export your Netdata metrics to Blueflood DB using the Graphite protocol, allowing you to archive your data for long-term storage, further analysis, or correlation with data from other sources.
 
 
 
@@ -24,11 +23,7 @@ further analysis, or correlation with data from other sources.
 
 ### Prerequisites
 
-#### 
-
-- You have already installed Netdata and Graphite.
-
-
+No action required.
 
 ### Configuration
 
