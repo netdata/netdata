@@ -58,7 +58,6 @@ bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
         }
     }
 
-cleanup:
     in_stack_trace = false; // Ensure the flag is reset
     return true;
 }

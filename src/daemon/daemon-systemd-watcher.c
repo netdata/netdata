@@ -2,6 +2,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include "daemon-systemd-watcher.h"
+#include "daemon-service.h"
 
 #ifdef ENABLE_SYSTEMD_DBUS
 
@@ -106,7 +107,7 @@ static void listen_for_systemd_dbus_events(void) {
     }
 
     // Process incoming D-Bus messages.
-    for (;;) {
+    while (service_running(SERVICE_SYSTEMD)) {
         // Process any pending messages.
         r = sd_bus_process(bus, NULL);
         if (r < 0) {
@@ -118,13 +119,14 @@ static void listen_for_systemd_dbus_events(void) {
         if (r > 0) // Message was processed; check for more.
             continue;
 
-        // Wait for the next signal (blocking indefinitely).
-        r = sd_bus_wait(bus, (uint64_t) -1);
+        // Wait for the next signal.
+        r = 0;
+        while(r == 0 && service_running(SERVICE_SYSTEMD))
+            r = sd_bus_wait(bus, USEC_PER_SEC);
+
         if (r < 0) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "SYSTEMD DBUS: Failed to wait on bus: %s",
-                   strerror(-r));
-            goto finish;
+            nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEMD DBUS: Failed to wait on bus: %s", strerror(-r));
+            break;
         }
     }
 
@@ -139,10 +141,13 @@ finish:
 void *systemd_watcher_thread(void *arg) {
     struct netdata_static_thread *static_thread = arg;
 
+    service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
+
 #ifdef ENABLE_SYSTEMD_DBUS
     listen_for_systemd_dbus_events();
 #endif
 
+    service_exits();
     worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
