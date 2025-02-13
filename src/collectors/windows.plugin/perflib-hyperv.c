@@ -237,12 +237,84 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
     return true;
 }
 
+static void hyperv_vid_partition_chart(struct hypervisor_partition *p, int update_every)
+{
+    if (!p->collected_metadata) {
+        p->collected_metadata = true;
+    }
+
+    if (!p->charts_created) {
+        p->charts_created = true;
+
+        p->st_vm_vid_physical_pages_allocated = rrdset_create_localhost(
+            "vm_vid_physical_pages_allocated",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vm_vid_physical_pages_allocated",
+            "VM physical pages allocated",
+            "pages",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_VID_PHYSICAL_PAGES_ALLOCATED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->st_vm_vid_remote_physical_pages = rrdset_create_localhost(
+            "vm_vid_remote_physical_pages",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV ".vm_vid_remote_physical_pages",
+            "VM physical pages not allocated from the preferred NUMA node",
+            "pages",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_VID_REMOTE_PHYSICAL_PAGES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_PhysicalPagesAllocated =
+            rrddim_add(p->st_vm_vid_physical_pages_allocated, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_RemotePhysicalPages =
+            rrddim_add(p->st_vm_vid_remote_physical_pages, "remote_physical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            p->st_vm_vid_physical_pages_allocated->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(
+            p->st_vm_vid_remote_physical_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+    }
+
+    SETP_DIM_VALUE(st_vm_vid_remote_physical_pages, RemotePhysicalPages);
+    SETP_DIM_VALUE(st_vm_vid_physical_pages_allocated, PhysicalPagesAllocated);
+
+    rrdset_done(p->st_vm_vid_physical_pages_allocated);
+    rrdset_done(p->st_vm_vid_remote_physical_pages);
+}
+
 static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
 {
     hyperv_perf_item *item = data;
+    struct hypervisor_partition *p;
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
     if (!pObjectType)
         return false;
+
+    if (!pObjectType->NumInstances) {
+        hyperv_vid_partition_chart(p, update_every);
+        static struct hypervisor_partition static_partition = {};
+
+        p = &static_partition;
+        if (!p->charts_created) {
+            initialize_hyperv_partition_keys(p);
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+        }
+
+        GET_OBJECT_COUNTER(RemotePhysicalPages);
+        GET_OBJECT_COUNTER(PhysicalPagesAllocated);
+
+        return true;
+    }
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -253,11 +325,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
         get_and_sanitize_instance_value(
             pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
-        struct hypervisor_partition *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
-
-        if (!p->collected_metadata) {
-            p->collected_metadata = true;
-        }
+        p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
@@ -265,53 +333,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
         GET_INSTANCE_COUNTER(RemotePhysicalPages);
         GET_INSTANCE_COUNTER(PhysicalPagesAllocated);
 
-        if (!p->charts_created) {
-            p->charts_created = true;
-
-            p->st_vm_vid_physical_pages_allocated = rrdset_create_localhost(
-                "vm_vid_physical_pages_allocated",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vm_vid_physical_pages_allocated",
-                "VM physical pages allocated",
-                "pages",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_VID_PHYSICAL_PAGES_ALLOCATED,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->st_vm_vid_remote_physical_pages = rrdset_create_localhost(
-                "vm_vid_remote_physical_pages",
-                windows_shared_buffer,
-                NULL,
-                HYPERV,
-                HYPERV ".vm_vid_remote_physical_pages",
-                "VM physical pages not allocated from the preferred NUMA node",
-                "pages",
-                _COMMON_PLUGIN_NAME,
-                _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_VID_REMOTE_PHYSICAL_PAGES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_PhysicalPagesAllocated =
-                rrddim_add(p->st_vm_vid_physical_pages_allocated, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            p->rd_RemotePhysicalPages =
-                rrddim_add(p->st_vm_vid_remote_physical_pages, "remote_physical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            rrdlabels_add(
-                p->st_vm_vid_physical_pages_allocated->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_vm_vid_remote_physical_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-        }
-
-        SETP_DIM_VALUE(st_vm_vid_remote_physical_pages, RemotePhysicalPages);
-        SETP_DIM_VALUE(st_vm_vid_physical_pages_allocated, PhysicalPagesAllocated);
-
-        rrdset_done(p->st_vm_vid_physical_pages_allocated);
-        rrdset_done(p->st_vm_vid_remote_physical_pages);
+        hyperv_vid_partition_chart(p, update_every);
     }
 
     return true;
