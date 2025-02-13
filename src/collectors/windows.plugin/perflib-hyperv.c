@@ -202,8 +202,8 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
         p = &static_mem;
 
         if (!static_mem.charts_created) {
-            initialize_hyperv_memory_keys(p);
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+            initialize_hyperv_memory_keys(p);
         }
 
         GET_OBJECT_COUNTER(CurrentPressure);
@@ -306,8 +306,8 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
 
         p = &static_partition;
         if (!p->charts_created) {
-            initialize_hyperv_partition_keys(p);
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+            initialize_hyperv_partition_keys(p);
         }
 
         GET_OBJECT_COUNTER(RemotePhysicalPages);
@@ -751,8 +751,8 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         p = &static_rpartition;
 
         if (!p->charts_created) {
-            initialize_hyperv_root_partition_keys(p);
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+            initialize_hyperv_root_partition_keys(p);
         }
 
         // Fetch counters
