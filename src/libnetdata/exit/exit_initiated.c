@@ -17,6 +17,7 @@ ENUM_STR_MAP_DEFINE(EXIT_REASON) = {
     { EXIT_REASON_FATAL, "fatal"},
     { EXIT_REASON_SYSTEM_SHUTDOWN, "system-shutdown"},
     { EXIT_REASON_SERVICE_STOP, "service-stop"},
+    { EXIT_REASON_UPDATE, "update"},
 
     // terminator
     {0, NULL},
@@ -86,9 +87,27 @@ static bool is_system_shutdown(void) {
 }
 #endif
 
+static const char *self_path = NULL;
+static OS_FILE_METADATA self = { 0 };
+
+void exit_initiated_reset(void) {
+    exit_initiated = EXIT_REASON_NONE;
+
+    freez((char *)self_path);
+    self_path = os_get_process_path();
+    if(self_path)
+        self = os_get_file_metadata(self_path);
+}
+
 void exit_initiated_set(EXIT_REASON reason) {
     if(is_system_shutdown())
         reason |= EXIT_REASON_SYSTEM_SHUTDOWN;
+
+    if(exit_initiated == EXIT_REASON_NONE && self_path && OS_FILE_METADATA_OK(self)) {
+        OS_FILE_METADATA self_now = os_get_file_metadata(self_path);
+        if(OS_FILE_METADATA_OK(self_now) && (self_now.modified_time != self.modified_time || self_now.size_bytes != self.size_bytes))
+            reason |= EXIT_REASON_UPDATE;
+    }
 
     // we combine all of them together
     // so that if this is called multiple times,

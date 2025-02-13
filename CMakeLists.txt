@@ -1009,6 +1009,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/exit/exit_initiated.h
         src/libnetdata/os/disk_space.c
         src/libnetdata/os/disk_space.h
+        src/libnetdata/os/file_metadata.c
+        src/libnetdata/os/file_metadata.h
+        src/libnetdata/os/process_path.c
+        src/libnetdata/os/process_path.h
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})

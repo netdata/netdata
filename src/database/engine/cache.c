@@ -401,7 +401,7 @@ static ssize_t cache_usage_per1000(PGC *cache, int64_t *size_to_evict) {
     if(cache->config.out_of_memory_protection_bytes) {
         // out of memory protection
         OS_SYSTEM_MEMORY sm = os_system_memory(false);
-        if(sm.ram_total_bytes) {
+        if(OS_SYSTEM_MEMORY_OK(sm)) {
             // when the total exists, ram_available_bytes is also right
 
             const int64_t ram_available_bytes = (int64_t)sm.ram_available_bytes;

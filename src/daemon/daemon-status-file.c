@@ -41,18 +41,19 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_object_close(wb);
 
     buffer_json_member_add_object(wb, "ram");
-    {
+    if(OS_SYSTEM_MEMORY_OK(ds->memory)) {
         buffer_json_member_add_uint64(wb, "total", ds->memory.ram_total_bytes);
         buffer_json_member_add_uint64(wb, "free", ds->memory.ram_available_bytes);
     }
     buffer_json_object_close(wb);
 
     buffer_json_member_add_object(wb, "db_disk");
-    {
+    if(OS_SYSTEM_DISK_SPACE_OK(ds->var_cache)) {
         buffer_json_member_add_uint64(wb, "total", ds->var_cache.total_bytes);
         buffer_json_member_add_uint64(wb, "free", ds->var_cache.free_bytes);
         buffer_json_member_add_uint64(wb, "inodes_total", ds->var_cache.total_inodes);
         buffer_json_member_add_uint64(wb, "inodes_free", ds->var_cache.free_inodes);
+        buffer_json_member_add_boolean(wb, "read_only", ds->var_cache.is_read_only);
     }
     buffer_json_object_close(wb);
 
@@ -72,12 +73,17 @@ static bool daemon_status_file_from_json_cache_dir(json_object *jobj, const char
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->var_cache.free_bytes, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_total", ds->var_cache.total_inodes, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_free", ds->var_cache.free_inodes, error, false);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "read_only", ds->var_cache.is_read_only, error, false);
+    if(!OS_SYSTEM_DISK_SPACE_OK(ds->var_cache))
+        ds->var_cache = OS_SYSTEM_DISK_SPACE_EMPTY;
     return true;
 }
 
 static bool daemon_status_file_from_json_ram(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required __maybe_unused) {
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->memory.ram_total_bytes, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, false);
+    if(!OS_SYSTEM_MEMORY_OK(ds->memory))
+        ds->memory = OS_SYSTEM_MEMORY_EMPTY;
     return true;
 }
 
@@ -258,6 +264,8 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last stopped gracefully (encountered an error)";
                 pri = NDLP_ERR;
             }
+            else if(last_session_status.reason & EXIT_REASON_UPDATE)
+                msg = "Netdata has gracefully restarted due to an update";
             else
                 msg = "Netdata was last stopped gracefully (instructed to do so)";
             break;

@@ -760,11 +760,11 @@ int netdata_main(int argc, char **argv) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE, "Netdata agent version '%s' is starting", NETDATA_VERSION);
     }
     nd_log_register_event_cb(daemon_status_file_register_fatal);
-
     netdata_conf_section_global(); // get hostname, host prefix, profile, etc
     registry_init(); // for machine_guid, must be after netdata_conf_section_global()
 
-    // check for a crash
+    // status and crash/update/exit detection
+    exit_initiated_reset();
     daemon_status_file_check_crash();
 
     // ----------------------------------------------------------------------------------------------------------------

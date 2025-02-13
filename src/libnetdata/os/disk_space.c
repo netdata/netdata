@@ -6,7 +6,7 @@
 #include <sys/statvfs.h>
 
 OS_SYSTEM_DISK_SPACE os_disk_space(const char *path) {
-    OS_SYSTEM_DISK_SPACE space = {0};
+    OS_SYSTEM_DISK_SPACE space = OS_SYSTEM_DISK_SPACE_EMPTY;
     struct statvfs buf;
 
     if (statvfs(path, &buf) != 0) {
@@ -19,6 +19,7 @@ OS_SYSTEM_DISK_SPACE os_disk_space(const char *path) {
     space.free_bytes    = buf.f_bavail * buf.f_frsize;
     space.total_inodes  = buf.f_files;
     space.free_inodes   = buf.f_favail;
+    space.is_read_only  = (buf.f_flag & ST_RDONLY) != 0;
     return space;
 }
 #endif
@@ -28,7 +29,7 @@ OS_SYSTEM_DISK_SPACE os_disk_space(const char *path) {
 #include <sys/mount.h>
 
 OS_SYSTEM_DISK_SPACE os_disk_space(const char *path) {
-    OS_SYSTEM_DISK_SPACE space = {0};
+    OS_SYSTEM_DISK_SPACE space = OS_SYSTEM_DISK_SPACE_EMPTY;
     struct statfs buf;
 
     if (statfs(path, &buf) != 0) {
@@ -40,6 +41,7 @@ OS_SYSTEM_DISK_SPACE os_disk_space(const char *path) {
     space.free_bytes    = buf.f_bavail * buf.f_bsize;
     space.total_inodes  = buf.f_files;
     space.free_inodes   = buf.f_ffree;
+    space.is_read_only  = (buf.f_flags & MNT_RDONLY) != 0;
     return space;
 }
 #endif
@@ -48,7 +50,7 @@ OS_SYSTEM_DISK_SPACE os_disk_space(const char *path) {
 #include <windows.h>
 
 OS_SYSTEM_DISK_SPACE os_disk_space(const char *path_utf8) {
-    OS_SYSTEM_DISK_SPACE space = {0};
+    OS_SYSTEM_DISK_SPACE space = OS_SYSTEM_DISK_SPACE_EMPTY;
 
     // Convert the UTF-8 path to a wide-character string.
     int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path_utf8, -1, NULL, 0);
@@ -71,6 +73,12 @@ OS_SYSTEM_DISK_SPACE os_disk_space(const char *path_utf8) {
         // API call failed; optionally, GetLastError() can provide more details.
         freez(wpath);
         return space;
+    }
+
+    // Get the drive type and attributes
+    DWORD attributes = GetFileAttributesW(wpath);
+    if (attributes != INVALID_FILE_ATTRIBUTES) {
+        space.is_read_only = (attributes & FILE_ATTRIBUTE_READONLY) != 0;
     }
 
     freez(wpath);

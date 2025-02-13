@@ -33,6 +33,9 @@ typedef enum {
 
     // windows specific, service stop
     EXIT_REASON_SERVICE_STOP        = (1 << 10),
+
+    // netdata update
+    EXIT_REASON_UPDATE              = (1 << 11),
 } EXIT_REASON;
 
 #define EXIT_REASON_NORMAL (EXIT_REASON_SIGINT|EXIT_REASON_SIGTERM|EXIT_REASON_SIGQUIT|EXIT_REASON_API_QUIT|EXIT_REASON_CMD_EXIT|EXIT_REASON_SERVICE_STOP)
@@ -45,6 +48,7 @@ BITMAP_STR_DEFINE_FUNCTIONS_EXTERN(EXIT_REASON);
 
 extern volatile EXIT_REASON exit_initiated;
 
+void exit_initiated_reset(void);
 void exit_initiated_set(EXIT_REASON reason);
 
 #endif //NETDATA_EXIT_INITIATED_H
