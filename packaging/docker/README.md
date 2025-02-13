@@ -5,13 +5,13 @@ import TabItem from '@theme/TabItem';
 
 ## Limitations running the Agent in Docker
 
-We do not officially support running our Docker images with the Docker CLI `--user` option or the Docker Compose
+We don’t officially support running our Docker images with the Docker CLI `--user` option or the Docker Compose
 `user:` parameter. Such usage will usually still work, but some features will not be available when run this
 way. Note that the Agent will drop privileges appropriately inside the container during startup, meaning that even
-when run without these options almost nothing in the container will actually run with an effective UID of 0.
+when run without these options, almost nothing in the container will actually run with an effective UID of 0.
 
-Our POWER8+ Docker images do not support our FreeIPMI collector. This is a technical limitation in FreeIPMI itself,
-and unfortunately not something we can realistically work around.
+Our POWER8+ Docker images don’t support our FreeIPMI collector. This is a technical limitation in FreeIPMI itself,
+and unfortunately, not something we can realistically work around.
 
 ## Create a new Netdata Agent container
 
@@ -139,8 +139,7 @@ volumes:
 
 > :bookmark_tabs: Note
 >
-> If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "
-> Add Nodes" button in your Space's "Nodes" view.
+> If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
 
 ### With NVIDIA GPUs monitoring
 
@@ -181,7 +180,7 @@ Add the following to the netdata service.
 
 Use a [bind mount](https://docs.docker.com/storage/bind-mounts/) for `/etc/netdata` rather than a volume.
 
-This example assumes that you have created `netdataconfig/` in your home directory.
+This example assumes that you’ve created `netdataconfig/` in your home directory.
 
 ```bash
 mkdir netdataconfig
@@ -459,8 +458,8 @@ other services that require access.
 Netdata can be run successfully in a non-root environment, such as [rootless Docker](https://docs.docker.com/engine/security/rootless/).
 
 However, it should be noted that Netdata's data collection capabilities are considerably restricted in rootless Docker
-due to its inherent limitations. While Netdata can function in a rootless environment, it cannot access certain
-resources that require elevated privileges. The following components do not work:
+due to its inherent limitations. While Netdata can function in a rootless environment, it can’t access certain
+resources that require elevated privileges. The following components don’t work:
 
 - container network interfaces monitoring (cgroup-network helper)
 - disk I/O and file descriptors of applications and processes (apps.plugin)
@@ -507,8 +506,7 @@ docker run -d --name=netdata \
 
 > :bookmark_tabs: Note
 >
-> If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "
-> Add Nodes" button in your Space's "Nodes" view.
+> If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
 
 ## Docker tags
 
@@ -575,12 +573,12 @@ how you created the container.
 
 Alternatively, you can directly use the hostname from the node running the container by mounting `/etc/hostname` from
 the host in the container. With `docker run`, this can be done by adding `--volume /etc/hostname:/host/etc/hostname:ro` to
-the options. If you are using Docker Compose, you can add an entry to the container's `volumes` section
+the options. If you’re using Docker Compose, you can add an entry to the container's `volumes` section
 reading `- /etc/hostname:/host/etc/hostname:ro`.
 
 ## Adding extra packages at runtime
 
-By default, the official Netdata container images do not include a number of optional runtime dependencies. You
+By default, the official Netdata container images don’t include a number of optional runtime dependencies. You
 can add these dependencies, or any other APT packages, at runtime by listing them in the environment variable
 `NETDATA_EXTRA_DEB_PACKAGES`.
 
@@ -598,12 +596,12 @@ You can control how the health checks run by using the environment variable `NET
 
 - If left unset, the health check will attempt to access the `/api/v1/info` endpoint of the Agent.
 - If set to the exact value 'cli', the health check script will use `netdatacli ping` to determine if the Agent is
-  running correctly or not. This is sufficient to ensure that Netdata did not hang during startup, but does not provide
+  running correctly or not. This is sufficient to ensure that Netdata didn’t hang during startup, but doesn’t provide
   a rigorous verification that the daemon is collecting data or is otherwise usable.
 - If set to anything else, the health check will treat the value as a URL to check for a 200 status code on. In most
   cases, this should start with `http://localhost:19999/` to check the Agent running in the container.
 
-In most cases, the default behavior of checking the `/api/v1/info` endpoint will be sufficient. If you are using a
+In most cases, the default behavior of checking the `/api/v1/info` endpoint will be enough. If you’re using a
 configuration which disables the web server or restricts access to certain APIs, you will need to use a non-default
 configuration for health checks to work.
 
