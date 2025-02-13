@@ -187,18 +187,6 @@
       - Blueflood
       - graphite
 - <<: *graphexport
-  id: 'export-influxdb'
-  meta:
-    <<: *meta
-    name: InfluxDB
-    link: https://www.influxdata.com/
-    icon_filename: 'influxdb.svg'
-    keywords:
-      - InfluxDB
-      - Influx
-      - export
-      - graphite
-- <<: *graphexport
   id: 'export-kairosdb'
   meta:
     <<: *meta
