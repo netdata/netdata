@@ -242,6 +242,7 @@ void daemon_status_file_save(DAEMON_STATUS status) {
 void daemon_status_file_check_crash(void) {
     last_session_status = daemon_status_file_load();
     daemon_status_file_save(DAEMON_STATUS_INITIALIZING);
+    ND_LOG_FIELD_PRIORITY pri = NDLP_NOTICE;
 
     const char *msg;
     switch(last_session_status.status) {
@@ -253,25 +254,33 @@ void daemon_status_file_check_crash(void) {
         case DAEMON_STATUS_EXITED:
             if(last_session_status.reason == EXIT_REASON_NONE)
                 msg = "Netdata was last stopped gracefully (no exit reason set)";
-            else if(!is_exit_reason_normal(last_session_status.reason))
+            else if(!is_exit_reason_normal(last_session_status.reason)) {
                 msg = "Netdata was last stopped gracefully (encountered an error)";
+                pri = NDLP_ERR;
+            }
             else
                 msg = "Netdata was last stopped gracefully (instructed to do so)";
             break;
 
         case DAEMON_STATUS_INITIALIZING:
             msg = "Netdata was last killed/crashed while starting";
+            pri = NDLP_ERR;
             break;
 
         case DAEMON_STATUS_EXITING:
             msg = "Netdata was last killed/crashed while exiting";
+            pri = NDLP_ERR;
             break;
 
         case DAEMON_STATUS_RUNNING:
-            if(session_status.boottime <= last_session_status.boottime)
+            if(session_status.boottime <= last_session_status.boottime) {
                 msg = "The system was abnormally powered off while Netdata was running";
-            else
+                pri = NDLP_CRIT;
+            }
+            else {
                 msg = "Netdata was last killed/crashed while operating normally";
+                pri = NDLP_CRIT;
+            }
             break;
     }
 
@@ -286,7 +295,7 @@ void daemon_status_file_check_crash(void) {
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    nd_log(NDLS_DAEMON, NDLP_ERR, "LAST EXIT STATUS: %s:\n\n%s", msg, buffer_tostring(wb));
+    nd_log(NDLS_DAEMON, pri, "LAST EXIT STATUS: %s:\n\n%s", msg, buffer_tostring(wb));
 }
 
 bool daemon_status_file_has_last_crashed(void) {
