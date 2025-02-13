@@ -117,15 +117,12 @@ typedef enum __attribute__((__packed__)) {
     NDF_ALERT_SUMMARY = 60,
     NDF_ALERT_INFO = 61,
     NDF_ALERT_NOTIFICATION_REALTIME_USEC = 62,
-
-    NDF_STACK_TRACE = 63,                           // stack trace of the thread logging
-    NDF_REQUEST = 64,                               // the request we are currently working on
-    NDF_MESSAGE = 65,                               // the log message, if any
-
-    // DO NOT CHANGE OR RENUMBER ANY OF THE ABOVE
-    // THEY ARE HARDCODED INTO THE WEVT MANIFEST!
+    NDF_REQUEST = 63,                               // the request we are currently working on
+    NDF_MESSAGE = 64,                               // the log message, if any
+    NDF_STACK_TRACE = 65,                           // stack trace of the thread logging
 
     // put new items here
+    // NEVER RENUMBER FIELDS - RENUMBERING BREAKS EXISTING WINDOWS MESSAGES
 
     // terminator
     _NDF_MAX,
