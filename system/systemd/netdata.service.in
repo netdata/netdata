@@ -10,6 +10,7 @@ Wants=network-online.target nss-lookup.target
 LogNamespace=netdata
 Type=simple
 User=root
+Group=netdata
 RuntimeDirectory=netdata
 RuntimeDirectoryMode=0775
 PIDFile=/run/netdata/netdata.pid
