@@ -301,7 +301,6 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
         return false;
 
     if (!pObjectType->NumInstances) {
-        hyperv_vid_partition_chart(p, update_every);
         static struct hypervisor_partition static_partition = {};
 
         p = &static_partition;
@@ -313,6 +312,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
         GET_OBJECT_COUNTER(RemotePhysicalPages);
         GET_OBJECT_COUNTER(PhysicalPagesAllocated);
 
+        hyperv_vid_partition_chart(p, update_every);
         return true;
     }
 
