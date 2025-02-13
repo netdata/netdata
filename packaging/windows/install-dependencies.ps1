@@ -92,13 +92,13 @@ if ($LastExitcode -ne 0) {
 
 Write-Host "Adding WiX extensions"
 
-wix extension -g add WixToolset.Util.wixext --version 5.0.2
+wix extension -g add WixToolset.Util.wixext/5.0.2
 
 if ($LastExitcode -ne 0) {
     exit 1
 }
 
-wix extension -g add WixToolset.UI.wixext --version 5.0.2
+wix extension -g add WixToolset.UI.wixext/5.0.2
 
 if ($LastExitcode -ne 0) {
     exit 1
