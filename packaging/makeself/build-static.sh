@@ -40,7 +40,7 @@ case "${BUILDARCH}" in
     armv7l) # Baseline ARMv7 CPU
         QEMU_ARCH="arm"
         QEMU_CPU="cortex-a7"
-        TUNING_FLAGS="-march=armv7-a"
+        TUNING_FLAGS="-march=armv7-a+fp"
         GOARM="7"
         ;;
     aarch64) # Baseline ARMv8 CPU
