@@ -262,9 +262,12 @@ select_cert_dir() {
 
   mkdir -p "${prefix}"
 
-  for bundle in ca-certificates.crt ca-bundle.crt; do
+  for bundle in ca-certificates.crt ca-bundle.crt ca-bundle.pem cert.pem certs.pem; do
     if [ -r "${1}/${bundle}" ]; then
       replace_symlink "${1}/${bundle}" "${prefix}/ca-certificates.crt"
+      break
+    elif [ -r "${1}/certs/${bundle}" ]; then
+      replace_symlink "${1}/certs/${bundle}" "${prefix}/ca-certificates.crt"
       break
     fi
   done
@@ -276,7 +279,7 @@ select_system_certs() {
   for dir in /etc/pki/tls /etc/ssl ; do
     if [ -d "${dir}" ] ; then
       echo "${1} ${dir} for TLS configuration and certificates"
-      select_cert_dir "${dir}/certs"
+      select_cert_dir "${dir}"
       replace_symlink "${dir}/openssl.cnf" /opt/netdata/etc/ssl/openssl.cnf
       echo "${dir}" > /opt/netdata/etc/ssl/selected
       break
@@ -288,7 +291,7 @@ select_internal_certs() {
   echo "Using bundled TLS configuration and certificates"
   prep_ssl_dir
   src="/opt/netdata/share/ssl"
-  select_cert_dir "${src}/certs"
+  select_cert_dir "${src}"
   replace_symlink "${src}/openssl.cnf" /opt/netdata/etc/ssl/openssl.cnf
   echo "${src}" > /opt/netdata/etc/ssl/selected
 }
