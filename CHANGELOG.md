@@ -6,6 +6,17 @@
 
 **Merged pull requests:**
 
+- make onewayalloc fallback to malloc [\#19646](https://github.com/netdata/netdata/pull/19646) ([ktsaou](https://github.com/ktsaou))
+- docs: move /run/dbus mount to Docker recommended way [\#19645](https://github.com/netdata/netdata/pull/19645) ([ilyam8](https://github.com/ilyam8))
+- ci: fix win build [\#19642](https://github.com/netdata/netdata/pull/19642) ([ilyam8](https://github.com/ilyam8))
+- fix windows logs 2 - do not renumber - append fields [\#19640](https://github.com/netdata/netdata/pull/19640) ([ktsaou](https://github.com/ktsaou))
+- Revert "fix windows logs" [\#19639](https://github.com/netdata/netdata/pull/19639) ([ktsaou](https://github.com/ktsaou))
+- add Group=netdata to systemd unit file [\#19638](https://github.com/netdata/netdata/pull/19638) ([ilyam8](https://github.com/ilyam8))
+- docs: add missing prop to graphite meta [\#19637](https://github.com/netdata/netdata/pull/19637) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19636](https://github.com/netdata/netdata/pull/19636) ([netdatabot](https://github.com/netdatabot))
+- docs\(exporting\): clarify graphite exporters [\#19635](https://github.com/netdata/netdata/pull/19635) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19634](https://github.com/netdata/netdata/pull/19634) ([netdatabot](https://github.com/netdatabot))
+- docs\(exporting\): remove influxdb \(via graphite\) exporter [\#19633](https://github.com/netdata/netdata/pull/19633) ([ilyam8](https://github.com/ilyam8))
 - fix windows logs [\#19632](https://github.com/netdata/netdata/pull/19632) ([ktsaou](https://github.com/ktsaou))
 - more perflib error checking [\#19631](https://github.com/netdata/netdata/pull/19631) ([ktsaou](https://github.com/ktsaou))
 - Revert "HyperV Adjusts \(windows.plugin\)" [\#19630](https://github.com/netdata/netdata/pull/19630) ([ilyam8](https://github.com/ilyam8))
@@ -476,17 +487,6 @@
 - fix\(proc/reboot\_required\): disable on non Debian-based systems [\#19110](https://github.com/netdata/netdata/pull/19110) ([ilyam8](https://github.com/ilyam8))
 - feat\(proc.plugin\): add Reboot Required collector [\#19109](https://github.com/netdata/netdata/pull/19109) ([ilyam8](https://github.com/ilyam8))
 - docs: update On-Prem System Requirements [\#19107](https://github.com/netdata/netdata/pull/19107) ([ilyam8](https://github.com/ilyam8))
-- On-prem docs edits 2 [\#19105](https://github.com/netdata/netdata/pull/19105) ([Ancairon](https://github.com/Ancairon))
-- Docs edits on Cloud versions and On Prem [\#19104](https://github.com/netdata/netdata/pull/19104) ([Ancairon](https://github.com/Ancairon))
-- chore\(go.d/pkg/socket\): add err to callback return values [\#19103](https://github.com/netdata/netdata/pull/19103) ([ilyam8](https://github.com/ilyam8))
-- docs: fix img tag [\#19102](https://github.com/netdata/netdata/pull/19102) ([ilyam8](https://github.com/ilyam8))
-- Edit the organize doc [\#19101](https://github.com/netdata/netdata/pull/19101) ([Ancairon](https://github.com/Ancairon))
-- Update connecting documentation [\#19100](https://github.com/netdata/netdata/pull/19100) ([Ancairon](https://github.com/Ancairon))
-- Claiming proxy defaults and additonal log info [\#19098](https://github.com/netdata/netdata/pull/19098) ([ktsaou](https://github.com/ktsaou))
-- Reset parameter when generating an alert snapshot [\#19097](https://github.com/netdata/netdata/pull/19097) ([stelfrag](https://github.com/stelfrag))
-- Update Registry docs [\#19095](https://github.com/netdata/netdata/pull/19095) ([Ancairon](https://github.com/Ancairon))
-- Collected and available metrics, instances and contexts [\#19094](https://github.com/netdata/netdata/pull/19094) ([ktsaou](https://github.com/ktsaou))
-- docs\(systemd-journal.plugin\): correct full-text search [\#19093](https://github.com/netdata/netdata/pull/19093) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
