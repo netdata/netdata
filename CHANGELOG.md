@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump k8s.io/client-go from 0.32.1 to 0.32.2 in /src/go [\#19652](https://github.com/netdata/netdata/pull/19652) ([dependabot[bot]](https://github.com/apps/dependabot))
 - make onewayalloc fallback to malloc [\#19646](https://github.com/netdata/netdata/pull/19646) ([ktsaou](https://github.com/ktsaou))
 - docs: move /run/dbus mount to Docker recommended way [\#19645](https://github.com/netdata/netdata/pull/19645) ([ilyam8](https://github.com/ilyam8))
 - ci: fix win build [\#19642](https://github.com/netdata/netdata/pull/19642) ([ilyam8](https://github.com/ilyam8))
@@ -485,8 +486,6 @@
 - docs: format, typos, and some simplifications in `docs/` [\#19112](https://github.com/netdata/netdata/pull/19112) ([ilyam8](https://github.com/ilyam8))
 - change dim order because of colours in reboot\_required [\#19111](https://github.com/netdata/netdata/pull/19111) ([ilyam8](https://github.com/ilyam8))
 - fix\(proc/reboot\_required\): disable on non Debian-based systems [\#19110](https://github.com/netdata/netdata/pull/19110) ([ilyam8](https://github.com/ilyam8))
-- feat\(proc.plugin\): add Reboot Required collector [\#19109](https://github.com/netdata/netdata/pull/19109) ([ilyam8](https://github.com/ilyam8))
-- docs: update On-Prem System Requirements [\#19107](https://github.com/netdata/netdata/pull/19107) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
