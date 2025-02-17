@@ -227,7 +227,7 @@ static void create_removed_event_for_rc(RRDHOST *host, RRDCALC *rc, time_t now)
     }
 }
 
-static void health_database_lookup_for_rc(RRDCALC *rc)
+static void health_database_lookup_for_rc(RRDHOST *host __maybe_unused, RRDCALC *rc)
 {
     worker_is_busy(WORKER_HEALTH_JOB_DB_QUERY);
 
@@ -564,7 +564,7 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
         // if there is database lookup, do it
 
         if (unlikely(RRDCALC_HAS_DB_LOOKUP(rc)))
-            health_database_lookup_for_rc(rc);
+            health_database_lookup_for_rc(host, rc);
 
         // ------------------------------------------------------------
         // if there is calculation expression, run it
