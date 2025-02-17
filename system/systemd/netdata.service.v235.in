@@ -10,6 +10,7 @@ Wants=network-online.target nss-lookup.target
 LogNamespace=netdata
 Type=simple
 User=root
+Group=netdata
 EnvironmentFile=-/etc/default/netdata
 ExecStart=@sbindir_POST@/netdata -D $EXTRA_OPTS
 
