@@ -56,6 +56,11 @@ const (
 )
 
 const (
+	prioReplicasetReplicas = 50500 + iota
+	prioReplicasetAge
+)
+
+const (
 	labelKeyPrefix = "k8s_"
 	//labelKeyLabelPrefix      = labelKeyPrefix + "label_"
 	//labelKeyAnnotationPrefix = labelKeyPrefix + "annotation_"
@@ -71,6 +76,7 @@ const (
 	labelKeyContainerName  = labelKeyPrefix + "container_name"
 	labelKeyContainerID    = labelKeyPrefix + "container_id"
 	labelKeyQoSClass       = labelKeyPrefix + "qos_class"
+	labelKeyReplicasetName = labelKeyPrefix + "replicaset_name"
 )
 
 var baseCharts = module.Charts{
@@ -120,6 +126,11 @@ var containerChartsTmpl = module.Charts{
 	containersStateChartTmpl.Copy(),
 	containersStateWaitingChartTmpl.Copy(),
 	containersStateTerminatedChartTmpl.Copy(),
+}
+
+var replicasetChartsTmpl = module.Charts{
+	replicasetReplicasChartTmpl.Copy(),
+	replicasetAgeChartTmpl.Copy(),
 }
 
 var (
@@ -429,12 +440,7 @@ func (c *Collector) addNodeCharts(ns *nodeState) {
 
 func (c *Collector) removeNodeCharts(ns *nodeState) {
 	prefix := fmt.Sprintf("node_%s", replaceDots(ns.id()))
-	for _, c := range *c.Charts() {
-		if strings.HasPrefix(c.ID, prefix) {
-			c.MarkRemove()
-			c.MarkNotCreated()
-		}
-	}
+	c.removeCharts(prefix)
 }
 
 var (
@@ -645,12 +651,7 @@ func updateNodeLabel(c *module.Chart, nodeName string) {
 
 func (c *Collector) removePodCharts(ps *podState) {
 	prefix := fmt.Sprintf("pod_%s", replaceDots(ps.id()))
-	for _, c := range *c.Charts() {
-		if strings.HasPrefix(c.ID, prefix) {
-			c.MarkRemove()
-			c.MarkNotCreated()
-		}
-	}
+	c.removeCharts(prefix)
 }
 
 var (
@@ -754,6 +755,71 @@ func (c *Collector) addContainerCharts(ps *podState, cs *containerState) {
 	charts := c.newContainerCharts(ps, cs)
 	if err := c.Charts().Add(*charts...); err != nil {
 		c.Warning(err)
+	}
+}
+
+var (
+	replicasetReplicasChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "replicaset_%s.replicas",
+		Title:    "Replicas",
+		Units:    "replicas",
+		Fam:      "replicaset replicas",
+		Ctx:      "k8s_state.replicaset_replicas",
+		Priority: prioReplicasetReplicas,
+		Dims: module.Dims{
+			{ID: "rs_%s_desired_replicas", Name: "desired"},
+			{ID: "rs_%s_current_replicas", Name: "current"},
+			{ID: "rs_%s_ready_replicas", Name: "ready"},
+		},
+	}
+	replicasetAgeChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "replicaset_%s.age",
+		Title:    "Age",
+		Units:    "seconds",
+		Fam:      "replicaset age",
+		Ctx:      "k8s_state.replicaset_age",
+		Priority: prioReplicasetAge,
+		Dims: module.Dims{
+			{ID: "rs_%s_age", Name: "age"},
+		},
+	}
+)
+
+func (c *Collector) addReplicasetCharts(rs *replicasetState) {
+	charts := replicasetChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, replaceDots(rs.id()))
+		chart.Labels = []module.Label{
+			{Key: labelKeyClusterID, Value: c.kubeClusterID, Source: module.LabelSourceK8s},
+			{Key: labelKeyClusterName, Value: c.kubeClusterName, Source: module.LabelSourceK8s},
+			{Key: labelKeyReplicasetName, Value: rs.name, Source: module.LabelSourceK8s},
+			{Key: labelKeyNamespace, Value: rs.namespace, Source: module.LabelSourceK8s},
+			{Key: labelKeyControllerName, Value: rs.controllerName, Source: module.LabelSourceK8s},
+		}
+		for _, d := range chart.Dims {
+			d.ID = fmt.Sprintf(d.ID, rs.id())
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) removeReplicasetCharts(rs *replicasetState) {
+	prefix := fmt.Sprintf("replicaset_%s", replaceDots(rs.id()))
+	c.removeCharts(prefix)
+}
+
+func (c *Collector) removeCharts(prefix string) {
+	for _, c := range *c.Charts() {
+		if strings.HasPrefix(c.ID, prefix) {
+			c.MarkRemove()
+			c.MarkNotCreated()
+		}
 	}
 }
 

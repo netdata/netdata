@@ -11,9 +11,10 @@ import (
 
 func newKubeState() *kubeState {
 	return &kubeState{
-		Mutex: &sync.Mutex{},
-		nodes: make(map[string]*nodeState),
-		pods:  make(map[string]*podState),
+		Mutex:       &sync.Mutex{},
+		nodes:       make(map[string]*nodeState),
+		pods:        make(map[string]*podState),
+		replicasets: make(map[string]*replicasetState),
 	}
 }
 
@@ -39,10 +40,17 @@ func newContainerState() *containerState {
 	}
 }
 
+func newReplicasetState() *replicasetState {
+	return &replicasetState{
+		new: true,
+	}
+}
+
 type kubeState struct {
 	*sync.Mutex
-	nodes map[string]*nodeState
-	pods  map[string]*podState
+	nodes       map[string]*nodeState
+	pods        map[string]*podState
+	replicasets map[string]*replicasetState
 }
 
 type (
@@ -149,3 +157,21 @@ type containerState struct {
 	waitingReason    string
 	terminatedReason string
 }
+
+type replicasetState struct {
+	new     bool
+	deleted bool
+
+	uid            string
+	name           string
+	namespace      string
+	controllerKind string
+	controllerName string
+
+	creationTime      time.Time
+	replicas          int64 // desired
+	availableReplicas int64 // current
+	readyReplicas     int64
+}
+
+func (rs replicasetState) id() string { return rs.namespace + "_" + rs.name }

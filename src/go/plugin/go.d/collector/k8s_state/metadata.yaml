@@ -213,6 +213,34 @@ modules:
               chart_type: line
               dimensions:
                 - name: age
+        - name: replicaset
+          description: These metrics refer to the ReplicaSet.
+          labels:
+            - name: k8s_cluster_id
+              description: Cluster ID. This is equal to the kube-system namespace UID.
+            - name: k8s_cluster_name
+              description: Cluster name. Cluster name discovery only works in GKE.
+            - name: k8s_replicaset_name
+              description: ReplicaSet name.
+            - name: k8s_namespace
+              description: Namespace.
+            - name: k8s_controller_name
+              description: Controller name (DaemonSet name).
+          metrics:
+            - name: k8s_state.replicaset_replicas
+              description: Replicas
+              unit: 'replicas'
+              chart_type: line
+              dimensions:
+                - name: desired
+                - name: current
+                - name: ready
+            - name: k8s_state.replicaset_age
+              description: Age
+              unit: 'seconds'
+              chart_type: line
+              dimensions:
+                - name: age
         - name: pod
           description: These metrics refer to the Pod.
           labels:

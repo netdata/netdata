@@ -14,6 +14,8 @@ func (c *Collector) runUpdateState(in <-chan resource) {
 				c.updateNodeState(r)
 			case kubeResourcePod:
 				c.updatePodState(r)
+			case kubeResourceReplicaset:
+				c.updateReplicaSetState(r)
 			}
 			c.state.Unlock()
 		}
