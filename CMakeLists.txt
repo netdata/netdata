@@ -162,6 +162,10 @@ endif()
 option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
+# User information
+set(NETDATA_USER netdata CACHE STRING "User name for the user Netdata should run as")
+set(NETDATA_GROUP "${NETDATA_USER}" CACHE STRING "Group name for the group Netdata should run as")
+
 # High-level features
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 
@@ -212,11 +216,28 @@ option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" Fal
 mark_as_advanced(ENABLE_WEBRTC)
 
 # Other optional functionality
+cmake_dependent_option(USE_FILE_CAPABILITIES "Enable usage of file capabilities instead of SUID on Linux systems" True "OS_LINUX" False)
+
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
 mark_as_advanced(ENABLE_SENTRY)
 
-option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
+option(BUILD_FOR_PACKAGING "Build for a packaging target" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
+cmake_dependent_option(CREATE_USER "Create the netdata user and group if they don’t exist on the system" True "NOT BUILD_FOR_PACKAGING AND NOT OS_WINDOWS" False)
+if(BUILD_FOR_PACKAGING)
+  set(PACKAGE_TYPE "none" CACHE STRING "Specify the type of package to build for.")
+  mark_as_advanced(PACKAGE_TYPE)
+  set(SUPPORTED_PACKAGE_TYPES "docker;static;windows;deb")
+  set(NATIVE_PACKAGE_TYPES "deb")
+  string(TOLOWER "${PACKAGE_TYPE}" PACKAGE_TYPE)
+
+  if(PACKAGE_TYPE STREQUAL "none")
+    message(FATAL_ERROR "Must specify a package type when BUILD_FOR_PACKAGING is true.")
+  elseif(NOT PACKAGE_TYPE IN_LIST SUPPORTED_PACKAGE_TYPES)
+    list(JOIN SUPPORTED_PACKAGE_TYPES ", " SUPPORTED_TYPES)
+    message(FATAL_ERROR "Unknown package type '${PACKAGE_TYPE}'. Supported types are: ${SUPPORTED_TYPES}")
+  endif()
+endif()
 
 cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS OR OS_FREEBSD" False)
 mark_as_advanced(ENABLE_LIBBACKTRACE)
@@ -405,6 +426,7 @@ endif()
 # Custom Modules
 #
 
+include(NetdataPermissions)
 include(NetdataJSONC)
 include(NetdataYAML)
 include(NetdataBacktrace)
@@ -2491,6 +2513,9 @@ if(ENABLE_PLUGIN_DEBUGFS)
     install(TARGETS debugfs.plugin
             COMPONENT plugin-debugfs
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/debugfs.plugin
+                            COMPONENT plugin-debugfs
+                            PERMISSIONS dac_read_search)
 
     install(FILES
             src/collectors/debugfs.plugin/libsensors/vendored/etc/sensors.conf.default
@@ -2499,7 +2524,7 @@ if(ENABLE_PLUGIN_DEBUGFS)
             RENAME sensors3.conf)
 
     # Install additional packaging files if building for packaging
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-debugfs
@@ -2542,12 +2567,15 @@ if(ENABLE_PLUGIN_APPS)
     install(TARGETS apps.plugin
             COMPONENT plugin-apps
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/apps.plugin
+                            COMPONENT plugin-apps
+                            PERMISSIONS dac_read_search sys_ptrace)
 
     install(FILES src/collectors/apps.plugin/apps_groups.conf
             COMPONENT plugin-apps
             DESTINATION usr/lib/netdata/conf.d)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-apps
@@ -2572,8 +2600,11 @@ if(ENABLE_PLUGIN_FREEIPMI)
     install(TARGETS freeipmi.plugin
             COMPONENT plugin-freeipmi
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/freeipmi.plugin
+                            COMPONENT plugin-freeipmi
+                            PERMISSIONS suid)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-freeipmi
@@ -2598,8 +2629,11 @@ if(ENABLE_PLUGIN_NFACCT)
     install(TARGETS nfacct.plugin
             COMPONENT plugin-nfacct
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/nfacct.plugin
+                            COMPONENT plugin-nfacct
+                            PERMISSIONS suid)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-nfacct
@@ -2621,8 +2655,11 @@ if(ENABLE_PLUGIN_XENSTAT)
     install(TARGETS xenstat.plugin
             COMPONENT plugin-xenstat
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/xenstat.plugin
+                            COMPONENT plugin-xenstat
+                            PERMISSIONS suid)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-xenstat
@@ -2639,8 +2676,11 @@ if(ENABLE_PLUGIN_PERF)
     install(TARGETS perf.plugin
             COMPONENT plugin-perf
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/perf.plugin
+                            COMPONENT plugin-perf
+                            PERMISSIONS perfmon)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
          install(FILES
                  ${PKG_FILES_PATH}/copyright
                  COMPONENT plugin-perf
@@ -2657,15 +2697,17 @@ if(ENABLE_PLUGIN_SLABINFO)
     install(TARGETS slabinfo.plugin
             COMPONENT plugin-slabinfo
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/slabinfo.plugin
+                            COMPONENT plugin-slabinfo
+                            PERMISSIONS dac_read_search)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-slabinfo
                 DESTINATION usr/share/doc/netdata-plugin-slabinfo)
     endif()
 endif()
-
 
 if(ENABLE_PLUGIN_CUPS)
     pkg_check_modules(CUPS libcups)
@@ -2697,8 +2739,11 @@ if(ENABLE_PLUGIN_CUPS)
         install(TARGETS cups.plugin
                 COMPONENT plugin-cups
                 DESTINATION usr/libexec/netdata/plugins.d)
+        netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/cups.plugin
+                                COMPONENT plugin-cups
+                                PERMISSIONS restrict)
 
-        if(BUILD_FOR_PACKAGING)
+        if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
                 install(FILES
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-cups
@@ -2715,6 +2760,9 @@ if(NEED_NDSUDO)
     install(TARGETS ndsudo
             COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/ndsudo
+                            COMPONENT netdata
+                            PERMISSIONS suid)
 endif()
 
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
@@ -2726,6 +2774,9 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     install(TARGETS cgroup-network
             COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/cgroup-network
+                            COMPONENT netdata
+                            PERMISSIONS suid)
 endif()
 
 # Enable rust implementation if we don't have systemd and we want the journal plugin
@@ -2774,8 +2825,11 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
         install(TARGETS systemd-journal.plugin
                 COMPONENT plugin-systemd-journal
                 DESTINATION usr/libexec/netdata/plugins.d)
+        netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/systemd-journal.plugin
+                                COMPONENT plugin-systemd-journal
+                                PERMISSIONS dac_read_search)
 
-        if(BUILD_FOR_PACKAGING)
+        if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
                 install(FILES
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-systemd-journal
@@ -2877,6 +2931,9 @@ if(ENABLE_PLUGIN_EBPF)
     install(TARGETS ebpf.plugin
             COMPONENT plugin-ebpf
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/ebpf.plugin
+                            COMPONENT plugin-ebpf
+                            PERMISSIONS suid)
 
     install(FILES
             src/collectors/ebpf.plugin/ebpf.d.conf
@@ -2904,7 +2961,7 @@ if(ENABLE_PLUGIN_EBPF)
             COMPONENT plugin-ebpf
             DESTINATION usr/lib/netdata/conf.d/ebpf.d)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-ebpf
@@ -2934,6 +2991,9 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         install(TARGETS local-listeners
                 COMPONENT netdata
                 DESTINATION usr/libexec/netdata/plugins.d)
+        netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/local-listeners
+                                COMPONENT netdata
+                                PERMISSIONS suid)
 endif()
 
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
@@ -2954,8 +3014,11 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         install(TARGETS network-viewer.plugin
                 COMPONENT plugin-network-viewer
                 DESTINATION usr/libexec/netdata/plugins.d)
+        netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/network-viewer.plugin
+                                COMPONENT plugin-network-viewer
+                                PERMISSIONS dac_read_search sys_admin sys_ptrace)
 
-        if(BUILD_FOR_PACKAGING)
+        if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
                 install(FILES
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-network-viewer
@@ -3159,6 +3222,10 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/libexec/netdata/plugins.d)
 
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/go.d.plugin
+                            COMPONENT plugin-go
+                            PERMISSIONS dac_read_search net_raw net_admin)
+
     # Build and install nd-mcp (stdio-golang bridge) exactly like go.d.plugin
     if (OS_WINDOWS)
         set(ND_MCP_NAME nd-mcp.exe)
@@ -3236,7 +3303,7 @@ list(APPEND CONFIGURE_OPTIONS
 string(JOIN " " CONFIGURE_COMMAND "cmake" ${CONFIGURE_OPTIONS})
 
 if (NOT NETDATA_USER)
-        set(NETDATA_USER "netdata")
+  set(NETDATA_USER "netdata")
 endif()
 
 set(BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME "build-info-cmake-cache.gz")
@@ -3300,6 +3367,9 @@ install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-network-helper.sh
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
+netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/cgroup-network-helper.sh
+                        COMPONENT netdata
+                        PERMISSIONS restrict)
 
 configure_file(src/collectors/cgroups.plugin/cgroup-name.sh.in
                src/collectors/cgroups.plugin/cgroup-name.sh @ONLY)
@@ -3436,20 +3506,19 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
-
-if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
-                COMPONENT netdata
-                DESTINATION lib/systemd/system)
-        install(DIRECTORY
-                COMPONENT netdata
-                DESTINATION usr/lib/systemd/journald@netdata.conf.d)
-        install(FILES
-                system/systemd/journald@netdata.conf
-                COMPONENT netdata
-                DESTINATION usr/lib/systemd/journald@netdata.conf.d
-                RENAME netdata.conf)
+if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+          COMPONENT netdata
+          DESTINATION lib/systemd/system)
+  install(DIRECTORY
+          COMPONENT netdata
+          DESTINATION usr/lib/systemd/journald@netdata.conf.d)
+  install(FILES
+          system/systemd/journald@netdata.conf
+          COMPONENT netdata
+          DESTINATION usr/lib/systemd/journald@netdata.conf.d
+          RENAME netdata.conf)
 endif()
 
 install(FILES
@@ -3472,25 +3541,25 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION etc/netdata)
 
-if(BUILD_FOR_PACKAGING)
-        set(NETDATA_CONF_DEST "etc/netdata")
+if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
+  set(NETDATA_CONF_DEST "etc/netdata")
 else()
-        set(NETDATA_CONF_DEST "usr/lib/netdata/conf.d")
+  set(NETDATA_CONF_DEST "usr/lib/netdata/conf.d")
 endif()
 
 #
 # misc files
 #
-if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/deb/netdata/etc/default/netdata
-                COMPONENT netdata
-                DESTINATION etc/default)
+if(PACKAGE_TYPE STREQUAL "deb")
+  install(FILES
+          ${PKG_FILES_PATH}/deb/netdata/etc/default/netdata
+          COMPONENT netdata
+          DESTINATION etc/default)
 
-        install(PROGRAMS
-                ${PKG_FILES_PATH}/deb/netdata/etc/init.d/netdata
-                COMPONENT netdata
-                DESTINATION etc/init.d)
+  install(PROGRAMS
+          ${PKG_FILES_PATH}/deb/netdata/etc/init.d/netdata
+          COMPONENT netdata
+          DESTINATION etc/init.d)
 endif()
 
 if(NOT OS_WINDOWS)
@@ -3620,6 +3689,9 @@ if(ENABLE_PLUGIN_CHARTS)
           ${CMAKE_BINARY_DIR}/src/collectors/charts.d.plugin/charts.d.plugin
           COMPONENT plugin-chartsd
           DESTINATION usr/libexec/netdata/plugins.d)
+  netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/charts.d.plugin
+                          COMPONENT plugin-chartsd
+                          PERMISSIONS restrict)
 
   install(PROGRAMS
           src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
@@ -3645,7 +3717,7 @@ if(ENABLE_PLUGIN_CHARTS)
           COMPONENT plugin-chartsd
           DESTINATION usr/lib/netdata/conf.d/charts.d)
 
-  if(BUILD_FOR_PACKAGING)
+  if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
     install(FILES
             ${PKG_FILES_PATH}/copyright
             COMPONENT plugin-chartsd
@@ -3691,6 +3763,9 @@ if(ENABLE_PLUGIN_PYTHON)
   install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
           COMPONENT plugin-pythond
           DESTINATION usr/libexec/netdata/plugins.d)
+  netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/python.d.plugin
+                          COMPONENT plugin-pythond
+                          PERMISSIONS restrict)
 
   install(DIRECTORY src/collectors/python.d.plugin/python_modules
           COMPONENT plugin-pythond
@@ -3723,7 +3798,7 @@ if(ENABLE_PLUGIN_PYTHON)
           COMPONENT plugin-pythond
           DESTINATION usr/libexec/netdata/python.d)
 
-  if(BUILD_FOR_PACKAGING)
+  if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
     install(FILES
             ${PKG_FILES_PATH}/copyright
             COMPONENT plugin-pythond
@@ -3739,6 +3814,9 @@ configure_file(src/collectors/ioping.plugin/ioping.plugin.in src/collectors/iopi
 install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
+netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/ioping.plugin
+                        COMPONENT netdata
+                        PERMISSIONS suid)
 
 #
 # go.d.plugin
@@ -3778,7 +3856,7 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/default)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-go
@@ -3838,3 +3916,6 @@ endif()
 #
 
 include(Packaging)
+# Must come after including the Packaging module _and_ after all
+# `install()` directives in the file.
+netdata_install_extra_permissions()
