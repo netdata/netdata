@@ -808,8 +808,9 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
     };
     ND_LOG_STACK_PUSH(lgs);
 
+    size_t count = 1; // how many reads to do per host, before moving to the next host
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
-    while(status == EVLOOP_STATUS_CONTINUE) {
+    while(status == EVLOOP_STATUS_CONTINUE && count-- > 0) {
         bool removed = false;
         ssize_t rc = stream_receive_and_process(sth, rpt, parser, now_ut, &removed);
         if(unlikely(removed))
