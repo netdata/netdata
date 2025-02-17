@@ -20,7 +20,7 @@ type kubeResourceKind uint8
 const (
 	kubeResourceNode kubeResourceKind = iota + 1
 	kubeResourcePod
-	kubeResourceReplicaset
+	kubeResourceDeployment
 )
 
 func toNode(i any) (*corev1.Node, error) {
@@ -45,13 +45,13 @@ func toPod(i any) (*corev1.Pod, error) {
 	}
 }
 
-func toReplicaset(i any) (*appsv1.ReplicaSet, error) {
+func toDeployment(i any) (*appsv1.Deployment, error) {
 	switch v := i.(type) {
-	case *appsv1.ReplicaSet:
+	case *appsv1.Deployment:
 		return v, nil
 	case resource:
-		return toReplicaset(v.value())
+		return toDeployment(v.value())
 	default:
-		return nil, fmt.Errorf("unexpected type: %T (expected %T or %T)", v, &appsv1.ReplicaSet{}, resource(nil))
+		return nil, fmt.Errorf("unexpected type: %T (expected %T or %T)", v, &appsv1.Deployment{}, resource(nil))
 	}
 }

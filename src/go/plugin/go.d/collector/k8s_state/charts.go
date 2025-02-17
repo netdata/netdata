@@ -56,8 +56,8 @@ const (
 )
 
 const (
-	prioReplicasetReplicas = 50500 + iota
-	prioReplicasetAge
+	prioDeploymentReplicas = 50500 + iota
+	prioDeploymentAge
 )
 
 const (
@@ -76,7 +76,7 @@ const (
 	labelKeyContainerName  = labelKeyPrefix + "container_name"
 	labelKeyContainerID    = labelKeyPrefix + "container_id"
 	labelKeyQoSClass       = labelKeyPrefix + "qos_class"
-	labelKeyReplicasetName = labelKeyPrefix + "replicaset_name"
+	labelKeyDeploymentName = labelKeyPrefix + "deployment_name"
 )
 
 var baseCharts = module.Charts{
@@ -128,9 +128,9 @@ var containerChartsTmpl = module.Charts{
 	containersStateTerminatedChartTmpl.Copy(),
 }
 
-var replicasetChartsTmpl = module.Charts{
-	replicasetReplicasChartTmpl.Copy(),
-	replicasetAgeChartTmpl.Copy(),
+var deploymentChartsTmpl = module.Charts{
+	deploymentReplicasChartTmpl.Copy(),
+	deploymentAgeChartTmpl.Copy(),
 }
 
 var (
@@ -759,45 +759,44 @@ func (c *Collector) addContainerCharts(ps *podState, cs *containerState) {
 }
 
 var (
-	replicasetReplicasChartTmpl = module.Chart{
+	deploymentReplicasChartTmpl = module.Chart{
 		IDSep:    true,
-		ID:       "replicaset_%s.replicas",
-		Title:    "Replicas",
+		ID:       "deployment_%s.replicas",
+		Title:    "Deployment Replicas",
 		Units:    "replicas",
-		Fam:      "replicaset replicas",
-		Ctx:      "k8s_state.replicaset_replicas",
-		Priority: prioReplicasetReplicas,
+		Fam:      "deployment replicas",
+		Ctx:      "k8s_state.deployment_replicas",
+		Priority: prioDeploymentReplicas,
 		Dims: module.Dims{
-			{ID: "rs_%s_desired_replicas", Name: "desired"},
-			{ID: "rs_%s_current_replicas", Name: "current"},
-			{ID: "rs_%s_ready_replicas", Name: "ready"},
+			{ID: "deploy_%s_desired_replicas", Name: "desired"},
+			{ID: "deploy_%s_current_replicas", Name: "current"},
+			{ID: "deploy_%s_ready_replicas", Name: "ready"},
 		},
 	}
-	replicasetAgeChartTmpl = module.Chart{
+	deploymentAgeChartTmpl = module.Chart{
 		IDSep:    true,
-		ID:       "replicaset_%s.age",
-		Title:    "Age",
+		ID:       "deployment_%s.age",
+		Title:    "Deployment Age",
 		Units:    "seconds",
-		Fam:      "replicaset age",
-		Ctx:      "k8s_state.replicaset_age",
-		Priority: prioReplicasetAge,
+		Fam:      "deployment age",
+		Ctx:      "k8s_state.deployment_age",
+		Priority: prioDeploymentAge,
 		Dims: module.Dims{
-			{ID: "rs_%s_age", Name: "age"},
+			{ID: "deploy_%s_age", Name: "age"},
 		},
 	}
 )
 
-func (c *Collector) addReplicasetCharts(rs *replicasetState) {
-	charts := replicasetChartsTmpl.Copy()
+func (c *Collector) addDeploymentCharts(rs *deploymentState) {
+	charts := deploymentChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, replaceDots(rs.id()))
 		chart.Labels = []module.Label{
 			{Key: labelKeyClusterID, Value: c.kubeClusterID, Source: module.LabelSourceK8s},
 			{Key: labelKeyClusterName, Value: c.kubeClusterName, Source: module.LabelSourceK8s},
-			{Key: labelKeyReplicasetName, Value: rs.name, Source: module.LabelSourceK8s},
+			{Key: labelKeyDeploymentName, Value: rs.name, Source: module.LabelSourceK8s},
 			{Key: labelKeyNamespace, Value: rs.namespace, Source: module.LabelSourceK8s},
-			{Key: labelKeyControllerName, Value: rs.controllerName, Source: module.LabelSourceK8s},
 		}
 		for _, d := range chart.Dims {
 			d.ID = fmt.Sprintf(d.ID, rs.id())
@@ -809,8 +808,8 @@ func (c *Collector) addReplicasetCharts(rs *replicasetState) {
 	}
 }
 
-func (c *Collector) removeReplicasetCharts(rs *replicasetState) {
-	prefix := fmt.Sprintf("replicaset_%s", replaceDots(rs.id()))
+func (c *Collector) removeDeploymentCharts(rs *deploymentState) {
+	prefix := fmt.Sprintf("deployment_%s", replaceDots(rs.id()))
 	c.removeCharts(prefix)
 }
 

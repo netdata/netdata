@@ -11,12 +11,11 @@ import (
 	"testing"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -358,15 +357,15 @@ func TestCollector_Collect(t *testing.T) {
 				}
 			},
 		},
-		"Nodes and Pods and Replicasets": {
+		"Nodes and Pods and Deployment": {
 			create: func(t *testing.T) testCase {
 				node := newNode("node01")
 				pod := newPod(node.Name, "pod01")
-				rs := newReplicaset("replicaset01")
+				deploy := newDeployment("replicaset01")
 				client := fake.NewClientset(
 					node,
 					pod,
-					rs,
+					deploy,
 				)
 
 				step1 := func(t *testing.T, collr *Collector) {
@@ -481,10 +480,10 @@ func TestCollector_Collect(t *testing.T) {
 						"pod_default_pod01_status_reason_Other":                                                  0,
 						"pod_default_pod01_status_reason_Shutdown":                                               0,
 						"pod_default_pod01_status_reason_UnexpectedAdmissionError":                               0,
-						"rs_default_replicaset01_age":                                                            3,
-						"rs_default_replicaset01_current_replicas":                                               1,
-						"rs_default_replicaset01_desired_replicas":                                               2,
-						"rs_default_replicaset01_ready_replicas":                                                 3,
+						"deploy_default_replicaset01_age":                                                        3,
+						"deploy_default_replicaset01_current_replicas":                                           1,
+						"deploy_default_replicaset01_desired_replicas":                                           2,
+						"deploy_default_replicaset01_ready_replicas":                                             3,
 					}
 
 					copyAge(expected, mx)
@@ -494,7 +493,7 @@ func TestCollector_Collect(t *testing.T) {
 						len(nodeChartsTmpl)+
 							len(podChartsTmpl)+
 							len(containerChartsTmpl)*len(pod.Spec.Containers)+
-							len(replicasetChartsTmpl)+
+							len(deploymentChartsTmpl)+
 							len(baseCharts),
 						len(*collr.Charts()),
 					)
@@ -979,20 +978,14 @@ func newPod(nodeName, name string) *corev1.Pod {
 	}
 }
 
-func newReplicaset(name string) *appsv1.ReplicaSet {
-	return &appsv1.ReplicaSet{
+func newDeployment(name string) *appsv1.Deployment {
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         corev1.NamespaceDefault,
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					Kind: "Deployment",
-					Name: "netdata-k8s-state",
-				},
-			},
 		},
-		Status: appsv1.ReplicaSetStatus{
+		Status: appsv1.DeploymentStatus{
 			AvailableReplicas: 1,
 			Replicas:          2,
 			ReadyReplicas:     3,

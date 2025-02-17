@@ -133,16 +133,16 @@ func (d *kubeDiscovery) setupDiscoverers(ctx context.Context) []discoverer {
 		},
 	}
 
-	rs := d.client.AppsV1().ReplicaSets(corev1.NamespaceAll)
-	rsWatcher := &cache.ListWatch{
-		ListFunc:  func(options metav1.ListOptions) (runtime.Object, error) { return rs.List(ctx, options) },
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) { return rs.Watch(ctx, options) },
+	deploy := d.client.AppsV1().Deployments(corev1.NamespaceAll)
+	deployWatcher := &cache.ListWatch{
+		ListFunc:  func(options metav1.ListOptions) (runtime.Object, error) { return deploy.List(ctx, options) },
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) { return deploy.Watch(ctx, options) },
 	}
 
 	return []discoverer{
 		newNodeDiscoverer(cache.NewSharedInformer(nodeWatcher, &corev1.Node{}, resyncPeriod), d.Logger),
 		newPodDiscoverer(cache.NewSharedInformer(podWatcher, &corev1.Pod{}, resyncPeriod), d.Logger),
-		newReplicasetDiscoverer(cache.NewSharedInformer(rsWatcher, &appsv1.ReplicaSet{}, resyncPeriod), d.Logger),
+		newDeploymentDiscoverer(cache.NewSharedInformer(deployWatcher, &appsv1.Deployment{}, resyncPeriod), d.Logger),
 	}
 }
 

@@ -11,9 +11,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
-func newReplicasetDiscoverer(si cache.SharedInformer, l *logger.Logger) *rsDiscoverer {
+func newDeploymentDiscoverer(si cache.SharedInformer, l *logger.Logger) *deploymentDiscoverer {
 	if si == nil {
-		panic("nil replicaset shared informer")
+		panic("nil deployment& shared informer")
 	}
 
 	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{Name: "replicaset"})
@@ -24,7 +24,7 @@ func newReplicasetDiscoverer(si cache.SharedInformer, l *logger.Logger) *rsDisco
 		DeleteFunc: func(obj any) { enqueue(queue, obj) },
 	})
 
-	return &rsDiscoverer{
+	return &deploymentDiscoverer{
 		Logger:   l,
 		informer: si,
 		queue:    queue,
@@ -33,16 +33,16 @@ func newReplicasetDiscoverer(si cache.SharedInformer, l *logger.Logger) *rsDisco
 	}
 }
 
-type rsResource struct {
+type deployResource struct {
 	src string
 	val any
 }
 
-func (r rsResource) source() string         { return r.src }
-func (r rsResource) kind() kubeResourceKind { return kubeResourceReplicaset }
-func (r rsResource) value() any             { return r.val }
+func (r deployResource) source() string         { return r.src }
+func (r deployResource) kind() kubeResourceKind { return kubeResourceDeployment }
+func (r deployResource) value() any             { return r.val }
 
-type rsDiscoverer struct {
+type deploymentDiscoverer struct {
 	*logger.Logger
 	informer cache.SharedInformer
 	queue    *workqueue.Typed[any]
@@ -50,9 +50,9 @@ type rsDiscoverer struct {
 	stopCh   chan struct{}
 }
 
-func (d *rsDiscoverer) run(ctx context.Context, in chan<- resource) {
-	d.Info("replicaset_discoverer is started")
-	defer func() { close(d.stopCh); d.Info("replicaset_discoverer is stopped") }()
+func (d *deploymentDiscoverer) run(ctx context.Context, in chan<- resource) {
+	d.Info("deployment_discoverer is started")
+	defer func() { close(d.stopCh); d.Info("deployment_discoverer is stopped") }()
 
 	defer d.queue.ShutDown()
 
@@ -69,10 +69,10 @@ func (d *rsDiscoverer) run(ctx context.Context, in chan<- resource) {
 	<-ctx.Done()
 }
 
-func (d *rsDiscoverer) ready() bool   { return isChanClosed(d.readyCh) }
-func (d *rsDiscoverer) stopped() bool { return isChanClosed(d.stopCh) }
+func (d *deploymentDiscoverer) ready() bool   { return isChanClosed(d.readyCh) }
+func (d *deploymentDiscoverer) stopped() bool { return isChanClosed(d.stopCh) }
 
-func (d *rsDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
+func (d *deploymentDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
 	for {
 		item, shutdown := d.queue.Get()
 		if shutdown {
@@ -93,7 +93,7 @@ func (d *rsDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
 				return
 			}
 
-			r := &rsResource{src: rsSource(ns, name)}
+			r := &deployResource{src: deploymentSource(ns, name)}
 			if exists {
 				r.val = item
 			}
@@ -102,6 +102,6 @@ func (d *rsDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
 	}
 }
 
-func rsSource(namespace, name string) string {
+func deploymentSource(namespace, name string) string {
 	return "k8s/rs/" + namespace + "/" + name
 }

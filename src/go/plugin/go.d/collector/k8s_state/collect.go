@@ -108,7 +108,7 @@ func (c *Collector) collectKubeState(mx map[string]int64) {
 	}
 	c.collectPodsState(mx)
 	c.collectNodesState(mx)
-	c.collectReplicasetState(mx)
+	c.collectDeploymentState(mx)
 }
 
 func (c *Collector) collectPodsState(mx map[string]int64) {
@@ -310,26 +310,26 @@ func (c *Collector) collectNodesState(mx map[string]int64) {
 	}
 }
 
-func (c *Collector) collectReplicasetState(mx map[string]int64) {
+func (c *Collector) collectDeploymentState(mx map[string]int64) {
 	now := time.Now()
 
-	maps.DeleteFunc(c.state.replicasets, func(s string, rs *replicasetState) bool {
-		if rs.deleted {
-			c.removeReplicasetCharts(rs)
+	maps.DeleteFunc(c.state.deployments, func(s string, ds *deploymentState) bool {
+		if ds.deleted {
+			c.removeDeploymentCharts(ds)
 			return true
 		}
 
-		if rs.new {
-			rs.new = false
-			c.addReplicasetCharts(rs)
+		if ds.new {
+			ds.new = false
+			c.addDeploymentCharts(ds)
 		}
 
-		px := fmt.Sprintf("rs_%s_", rs.id())
+		px := fmt.Sprintf("deploy_%s_", ds.id())
 
-		mx[px+"age"] = int64(now.Sub(rs.creationTime).Seconds())
-		mx[px+"desired_replicas"] = rs.replicas
-		mx[px+"current_replicas"] = rs.availableReplicas
-		mx[px+"ready_replicas"] = rs.readyReplicas
+		mx[px+"age"] = int64(now.Sub(ds.creationTime).Seconds())
+		mx[px+"desired_replicas"] = ds.replicas
+		mx[px+"current_replicas"] = ds.availableReplicas
+		mx[px+"ready_replicas"] = ds.readyReplicas
 
 		return false
 	})
