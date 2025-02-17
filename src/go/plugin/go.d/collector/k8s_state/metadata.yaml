@@ -213,6 +213,32 @@ modules:
               chart_type: line
               dimensions:
                 - name: age
+        - name: deployment
+          description: These metrics refer to Deployments.
+          labels:
+            - name: k8s_cluster_id
+              description: Cluster ID. This is equal to the kube-system namespace UID.
+            - name: k8s_cluster_name
+              description: Cluster name. Cluster name discovery only works in GKE.
+            - name: k8s_deployment_name
+              description: Deployment name.
+            - name: k8s_namespace
+              description: Namespace.
+          metrics:
+            - name: k8s_state.deployment_replicas
+              description: Deployment Replicas
+              unit: 'replicas'
+              chart_type: line
+              dimensions:
+                - name: desired
+                - name: current
+                - name: ready
+            - name: k8s_state.deployment_age
+              description: Deployment Age
+              unit: 'seconds'
+              chart_type: line
+              dimensions:
+                - name: age
         - name: pod
           description: These metrics refer to the Pod.
           labels:

@@ -5,6 +5,7 @@ package k8s_state
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -107,6 +108,7 @@ func (c *Collector) collectKubeState(mx map[string]int64) {
 	}
 	c.collectPodsState(mx)
 	c.collectNodesState(mx)
+	c.collectDeploymentState(mx)
 }
 
 func (c *Collector) collectPodsState(mx map[string]int64) {
@@ -306,6 +308,31 @@ func (c *Collector) collectNodesState(mx map[string]int64) {
 		mx[px+"init_containers_state_waiting"] = ns.stats.initContStateWaiting
 		mx[px+"init_containers_state_terminated"] = ns.stats.initContStateTerminated
 	}
+}
+
+func (c *Collector) collectDeploymentState(mx map[string]int64) {
+	now := time.Now()
+
+	maps.DeleteFunc(c.state.deployments, func(s string, ds *deploymentState) bool {
+		if ds.deleted {
+			c.removeDeploymentCharts(ds)
+			return true
+		}
+
+		if ds.new {
+			ds.new = false
+			c.addDeploymentCharts(ds)
+		}
+
+		px := fmt.Sprintf("deploy_%s_", ds.id())
+
+		mx[px+"age"] = int64(now.Sub(ds.creationTime).Seconds())
+		mx[px+"desired_replicas"] = ds.replicas
+		mx[px+"current_replicas"] = ds.availableReplicas
+		mx[px+"ready_replicas"] = ds.readyReplicas
+
+		return false
+	})
 }
 
 func condStatusToInt(cs corev1.ConditionStatus) int64 {
