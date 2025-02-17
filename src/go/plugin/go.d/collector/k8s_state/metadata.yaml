@@ -225,6 +225,14 @@ modules:
             - name: k8s_namespace
               description: Namespace.
           metrics:
+            - name: k8s_state.deployment_conditions
+              description: Deployment Conditions
+              unit: 'status'
+              chart_type: line
+              dimensions:
+                - name: available
+                - name: replica_failure
+                - name: progressing
             - name: k8s_state.deployment_replicas
               description: Deployment Replicas
               unit: 'replicas'
