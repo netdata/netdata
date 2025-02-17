@@ -10,6 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -132,9 +133,16 @@ func (d *kubeDiscovery) setupDiscoverers(ctx context.Context) []discoverer {
 		},
 	}
 
+	deploy := d.client.AppsV1().Deployments(corev1.NamespaceAll)
+	deployWatcher := &cache.ListWatch{
+		ListFunc:  func(options metav1.ListOptions) (runtime.Object, error) { return deploy.List(ctx, options) },
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) { return deploy.Watch(ctx, options) },
+	}
+
 	return []discoverer{
 		newNodeDiscoverer(cache.NewSharedInformer(nodeWatcher, &corev1.Node{}, resyncPeriod), d.Logger),
 		newPodDiscoverer(cache.NewSharedInformer(podWatcher, &corev1.Pod{}, resyncPeriod), d.Logger),
+		newDeploymentDiscoverer(cache.NewSharedInformer(deployWatcher, &appsv1.Deployment{}, resyncPeriod), d.Logger),
 	}
 }
 
