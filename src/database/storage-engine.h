@@ -17,12 +17,12 @@ typedef enum __attribute__ ((__packed__)) storage_priority {
     // query priorities
     STORAGE_PRIORITY_HIGH,
     STORAGE_PRIORITY_NORMAL,
+    STORAGE_PRIORITY_SYNCHRONOUS_FIRST,
     STORAGE_PRIORITY_LOW,
     STORAGE_PRIORITY_BEST_EFFORT,
 
     // synchronous query, not to be dispatched to workers or queued
     STORAGE_PRIORITY_SYNCHRONOUS,
-    STORAGE_PRIORITY_SYNCHRONOUS_FIRST,
 
     STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE,
 } STORAGE_PRIORITY;
