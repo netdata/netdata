@@ -524,17 +524,18 @@ static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PR
 static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker) {
     struct rrdeng_cmd *cmd = NULL;
     enum LIBUV_WORKERS_STATUS status = work_request_full();
-
     STORAGE_PRIORITY min_priority, max_priority;
-    min_priority = STORAGE_PRIORITY_INTERNAL_DBENGINE;
-    max_priority = (status != LIBUV_WORKERS_RELAXED) ? STORAGE_PRIORITY_INTERNAL_DBENGINE : STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE - 1;
 
-    if(from_worker) {
+    if(unlikely(from_worker)) {
         if(status == LIBUV_WORKERS_CRITICAL)
             return opcode_empty;
 
         min_priority = STORAGE_PRIORITY_INTERNAL_QUERY_PREP;
         max_priority = STORAGE_PRIORITY_BEST_EFFORT;
+    }
+    else {
+        min_priority = STORAGE_PRIORITY_INTERNAL_DBENGINE;
+        max_priority = (status != LIBUV_WORKERS_RELAXED) ? STORAGE_PRIORITY_INTERNAL_DBENGINE : STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE - 1;
     }
 
     // find an opcode to execute from the queue
@@ -1914,7 +1915,15 @@ void dbengine_event_loop(void* arg) {
         uv_run(&main->loop, UV_RUN_DEFAULT);
 
         /* wait for commands */
+        size_t count = 0;
         do {
+            count++;
+
+            if(count % 100 == 0) {
+                worker_is_idle();
+                uv_run(&main->loop, UV_RUN_NOWAIT);
+            }
+
             worker_is_busy(RRDENG_OPCODE_MAX);
             cmd = rrdeng_deq_cmd(RRDENG_OPCODE_NOOP);
             opcode = cmd.opcode;
