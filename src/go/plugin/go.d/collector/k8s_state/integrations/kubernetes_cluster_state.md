@@ -108,6 +108,7 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
+| k8s_state.deployment_conditions | available, replica_failure, progressing | status |
 | k8s_state.deployment_replicas | desired, current, ready | replicas |
 | k8s_state.deployment_age | age | seconds |
 
