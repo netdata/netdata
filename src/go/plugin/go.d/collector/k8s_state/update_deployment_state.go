@@ -29,6 +29,8 @@ func (c *Collector) updateDeploymentState(r resource) {
 		ds.creationTime = deploy.CreationTimestamp.Time
 	}
 
+	ds.conditions = deploy.Status.Conditions
+
 	ds.replicas = int64(deploy.Status.Replicas)
 	ds.availableReplicas = int64(deploy.Status.AvailableReplicas)
 	ds.readyReplicas = int64(deploy.Status.ReadyReplicas)

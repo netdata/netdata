@@ -56,7 +56,8 @@ const (
 )
 
 const (
-	prioDeploymentReplicas = 50500 + iota
+	prioDeploymentConditions = 50500 + iota
+	prioDeploymentReplicas
 	prioDeploymentAge
 )
 
@@ -129,6 +130,7 @@ var containerChartsTmpl = module.Charts{
 }
 
 var deploymentChartsTmpl = module.Charts{
+	deploymentConditionStatusChartTmpl.Copy(),
 	deploymentReplicasChartTmpl.Copy(),
 	deploymentAgeChartTmpl.Copy(),
 }
@@ -759,6 +761,20 @@ func (c *Collector) addContainerCharts(ps *podState, cs *containerState) {
 }
 
 var (
+	deploymentConditionStatusChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "deployment_%s.conditions",
+		Title:    "Deployment Conditions",
+		Units:    "status",
+		Fam:      "deployment conditions",
+		Ctx:      "k8s_state.deployment_conditions",
+		Priority: prioDeploymentConditions,
+		Dims: module.Dims{
+			{ID: "deploy_%s_condition_available", Name: "available"},
+			{ID: "deploy_%s_condition_replica_failure", Name: "replica_failure"},
+			{ID: "deploy_%s_condition_progressing", Name: "progressing"},
+		},
+	}
 	deploymentReplicasChartTmpl = module.Chart{
 		IDSep:    true,
 		ID:       "deployment_%s.replicas",

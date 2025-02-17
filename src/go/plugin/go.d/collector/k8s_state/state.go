@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -165,6 +166,8 @@ type deploymentState struct {
 	uid       string
 	name      string
 	namespace string
+
+	conditions []appsv1.DeploymentCondition
 
 	creationTime      time.Time
 	replicas          int64 // desired
