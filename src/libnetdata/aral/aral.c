@@ -888,7 +888,9 @@ static inline void aral_add_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *pa
     ARAL_FREE *fr = (ARAL_FREE *)ptr;
     fr->size = ar->config.element_size;
 
-    size_t start = gettid_cached() % ARAL_PAGE_INCOMING_PARTITIONS;
+    // use the slot id of the item to be freed to determine the partition number
+    size_t start = (((uint8_t *)ptr - page->data) / ar->config.element_size) % ARAL_PAGE_INCOMING_PARTITIONS;
+
     while (true) {
         for (size_t partition = start; partition < ARAL_PAGE_INCOMING_PARTITIONS; partition++) {
             if (aral_page_incoming_trylock(ar, page, partition)) {
@@ -1026,19 +1028,31 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
 
     // release it
     if(unlikely(aral_page_release(page))) {
-        __atomic_sub_fetch(&ar->ops[idx].atomic.deallocators, 1, __ATOMIC_RELAXED);
-
         internal_fatal(page->page_lock.used_elements, "page has used elements but has been acquired for deletion");
         internal_fatal(page->page_lock.marked_elements, "page has marked elements but not used ones");
 
         aral_lock(ar);
         internal_fatal(!is_page_in_list(*page->aral_lock.head_ptr, page), "Page is not in this list");
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(*page->aral_lock.head_ptr, page, aral_lock.prev, aral_lock.next);
-        aral_unlock(ar);
 
-        aral_page_unlock(ar, page);
-        aral_del_page___no_lock_needed(ar, page TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
-        return;
+        if(*page->aral_lock.head_ptr != page || page->aral_lock.prev != page || page->aral_lock.next != NULL) {
+            // there are more pages with free items  - delete it
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(*page->aral_lock.head_ptr, page, aral_lock.prev, aral_lock.next);
+            aral_unlock(ar);
+            aral_page_unlock(ar, page);
+            __atomic_sub_fetch(&ar->ops[idx].atomic.deallocators, 1, __ATOMIC_RELAXED);
+            aral_del_page___no_lock_needed(ar, page TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+            return;
+        }
+
+        // this is the last page with free items - keep it
+        page->available.list = NULL;
+        page->incoming_partition_bitmap = 0;
+        for(size_t p = 0; p < ARAL_PAGE_INCOMING_PARTITIONS; p++)
+            page->incoming[p].list = NULL;
+
+        __atomic_store_n(&page->elements_segmented, 0, __ATOMIC_RELEASE);
+        __atomic_store_n(&page->refcount, 0, __ATOMIC_RELAXED);
+        aral_unlock(ar);
     }
     else if(unlikely(unmark)) {
         aral_lock(ar);

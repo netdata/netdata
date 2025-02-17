@@ -91,6 +91,26 @@ Metrics:
 | k8s_state.node_init_containers_state | running, waiting, terminated | containers |
 | k8s_state.node_age | age | seconds |
 
+### Per deployment
+
+These metrics refer to Deployments.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| k8s_cluster_id | Cluster ID. This is equal to the kube-system namespace UID. |
+| k8s_cluster_name | Cluster name. Cluster name discovery only works in GKE. |
+| k8s_deployment_name | Deployment name. |
+| k8s_namespace | Namespace. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| k8s_state.deployment_replicas | desired, current, ready | replicas |
+| k8s_state.deployment_age | age | seconds |
+
 ### Per pod
 
 These metrics refer to the Pod.
