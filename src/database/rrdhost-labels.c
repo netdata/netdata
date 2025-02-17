@@ -83,6 +83,9 @@ static void rrdhost_load_auto_labels(void) {
 
     if (localhost->stream.snd.destination)
         rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);
+
+    rrdlabels_add(labels, "_timezone", rrdhost_timezone(localhost), RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_abbrev_timezone", rrdhost_abbrev_timezone(localhost), RRDLABEL_SRC_AUTO);
 }
 
 void reload_host_labels(void) {
