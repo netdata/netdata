@@ -15,6 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -356,13 +357,15 @@ func TestCollector_Collect(t *testing.T) {
 				}
 			},
 		},
-		"Nodes and Pods": {
+		"Nodes and Pods and Deployment": {
 			create: func(t *testing.T) testCase {
 				node := newNode("node01")
 				pod := newPod(node.Name, "pod01")
+				deploy := newDeployment("replicaset01")
 				client := fake.NewClientset(
 					node,
 					pod,
+					deploy,
 				)
 
 				step1 := func(t *testing.T, collr *Collector) {
@@ -477,13 +480,21 @@ func TestCollector_Collect(t *testing.T) {
 						"pod_default_pod01_status_reason_Other":                                                  0,
 						"pod_default_pod01_status_reason_Shutdown":                                               0,
 						"pod_default_pod01_status_reason_UnexpectedAdmissionError":                               0,
+						"deploy_default_replicaset01_age":                                                        3,
+						"deploy_default_replicaset01_current_replicas":                                           1,
+						"deploy_default_replicaset01_desired_replicas":                                           2,
+						"deploy_default_replicaset01_ready_replicas":                                             3,
 					}
 
 					copyAge(expected, mx)
 
 					assert.Equal(t, expected, mx)
 					assert.Equal(t,
-						len(nodeChartsTmpl)+len(podChartsTmpl)+len(containerChartsTmpl)*len(pod.Spec.Containers)+len(baseCharts),
+						len(nodeChartsTmpl)+
+							len(podChartsTmpl)+
+							len(containerChartsTmpl)*len(pod.Spec.Containers)+
+							len(deploymentChartsTmpl)+
+							len(baseCharts),
 						len(*collr.Charts()),
 					)
 					module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
@@ -963,6 +974,21 @@ func newPod(nodeName, name string) *corev1.Pod {
 					State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
 				},
 			},
+		},
+	}
+}
+
+func newDeployment(name string) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			Namespace:         corev1.NamespaceDefault,
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+		},
+		Status: appsv1.DeploymentStatus{
+			AvailableReplicas: 1,
+			Replicas:          2,
+			ReadyReplicas:     3,
 		},
 	}
 }
