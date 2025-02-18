@@ -1202,6 +1202,11 @@ void *rrdcontext_main(void *ptr) {
             if(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
                 continue;
 
+            if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION)) {
+                rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, false);
+                rrdhost_flag_clear(host, RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION);
+            }
+
             worker_is_busy(WORKER_JOB_HOSTS);
 
             if(host->rrdctx.pp_queue) {

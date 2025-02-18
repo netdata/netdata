@@ -14,7 +14,7 @@ static inline time_t tier_next_point_time_s(RRDDIM *rd, struct rrddim_tier *t, t
 #define LAST_COMPLETED_POINT_EXISTS(t) (t->last_completed_point.end_time_s != 0)
 
 ALWAYS_INLINE_HOT
-void store_metric_at_tier_flush_last_completed(RRDDIM *rd, size_t tier, struct rrddim_tier *t) {
+void store_metric_at_tier_flush_last_completed(RRDDIM *rd __maybe_unused, size_t tier, struct rrddim_tier *t) {
     // when there is no end_time_s we do not have a saved last_completed_point
     if(!LAST_COMPLETED_POINT_EXISTS(t)) return;
 
