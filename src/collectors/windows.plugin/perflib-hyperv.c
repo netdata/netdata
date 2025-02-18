@@ -1771,18 +1771,6 @@ hyperv_perf_item hyperv_perf_list[] = {
         .function_collect = do_hyperv_health_summary,
     },
 
-    {
-        .registry_name = "Hyper-V Hypervisor Root Partition",
-        .function_collect = do_hyperv_root_partition,
-        .dict_insert_cb = dict_hyperv_root_partition_insert_cb,
-        .dict_size = sizeof(struct hypervisor_root_partition),
-    },
-
-    {.registry_name = "Hyper-V Virtual Storage Device",
-     .function_collect = do_hyperv_storage_device,
-     .dict_insert_cb = dict_hyperv_storage_device_insert_cb,
-     .dict_size = sizeof(struct hypervisor_storage_device)},
-
     {.registry_name = "Hyper-V Virtual Switch",
      .function_collect = do_hyperv_switch,
      .dict_insert_cb = dict_hyperv_switch_insert_cb,
@@ -1797,6 +1785,16 @@ hyperv_perf_item hyperv_perf_list[] = {
      .function_collect = do_hyperv_processor,
      .dict_insert_cb = dict_hyperv_processor_insert_cb,
      .dict_size = sizeof(struct hypervisor_processor)},
+
+    {.registry_name = "Hyper-V Hypervisor Root Partition",
+     .function_collect = do_hyperv_root_partition,
+     .dict_insert_cb = dict_hyperv_root_partition_insert_cb,
+     .dict_size = sizeof(struct hypervisor_root_partition)},
+
+    {.registry_name = "Hyper-V Virtual Storage Device",
+     .function_collect = do_hyperv_storage_device,
+     .dict_insert_cb = dict_hyperv_storage_device_insert_cb,
+     .dict_size = sizeof(struct hypervisor_storage_device)},
 
     {.registry_name = NULL, .function_collect = NULL}};
 
