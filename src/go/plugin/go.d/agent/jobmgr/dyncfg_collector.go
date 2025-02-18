@@ -178,6 +178,8 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 		jn = fn.Args[2]
 	}
 
+	m.Infof("dyncfg: test: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
+
 	if err := validateJobName(jn); err != nil {
 		m.Warningf("dyncfg: test: module %s: unacceptable job name '%s': %v", mn, jn, err)
 		m.dyncfgRespf(fn, 400, "Unacceptable job name '%s': %v.", jn, err)
@@ -252,6 +254,8 @@ func (m *Manager) dyncfgConfigSchema(fn functions.Function) {
 		return
 	}
 
+	m.Infof("dyncfg: schema: %s module by user '%s'", mn, getFnSourceValue(fn, "user"))
+
 	if mod.JobConfigSchema == "" {
 		m.Warningf("dyncfg: schema: module %s: schema not found", mn)
 		m.dyncfgRespf(fn, 500, "Module %s configuration schema not found.", mn)
@@ -277,6 +281,8 @@ func (m *Manager) dyncfgConfigGet(fn functions.Function) {
 		m.dyncfgRespf(fn, 404, "The specified module '%s' is not registered.", mn)
 		return
 	}
+
+	m.Infof("dyncfg: get: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
 
 	ecfg, ok := m.exposedConfigs.lookupByName(mn, jn)
 	if !ok {
@@ -347,6 +353,8 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 	default:
 	}
 
+	m.Infof("dyncfg: restart: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
+
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
 		ecfg.status = dyncfgFailed
@@ -414,6 +422,10 @@ func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
 		m.dyncfgRespf(fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
 		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
 		return
+	}
+
+	if ecfg.status == dyncfgDisabled {
+		m.Infof("dyncfg: enable: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
 	}
 
 	if err := job.AutoDetection(); err != nil {
@@ -493,6 +505,8 @@ func (m *Manager) dyncfgConfigDisable(fn functions.Function) {
 	default:
 	}
 
+	m.Infof("dyncfg: disable: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
+
 	ecfg.status = dyncfgDisabled
 	m.dyncfgRespf(fn, 200, "")
 	m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
@@ -541,6 +555,8 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 		return
 	}
 
+	m.Infof("dyncfg: add: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
+
 	if ecfg, ok := m.exposedConfigs.lookup(cfg); ok {
 		if scfg, ok := m.seenConfigs.lookup(ecfg.cfg); ok && isDyncfg(scfg.cfg) {
 			m.seenConfigs.remove(ecfg.cfg)
@@ -579,6 +595,8 @@ func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
 		m.dyncfgRespf(fn, 405, "Removing jobs of type '%s' is not supported. Only 'dyncfg' jobs can be removed.", ecfg.cfg.SourceType())
 		return
 	}
+
+	m.Infof("dyncfg: remove: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
 
 	m.seenConfigs.remove(ecfg.cfg)
 	m.exposedConfigs.remove(ecfg.cfg)
@@ -636,6 +654,8 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
 		return
 	}
+
+	m.Infof("dyncfg: update: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
 
 	m.exposedConfigs.remove(ecfg.cfg)
 	m.stopRunningJob(ecfg.cfg.FullName())
