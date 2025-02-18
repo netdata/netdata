@@ -139,7 +139,7 @@ func (m *Manager) dyncfgVnodeAdd(fn functions.Function) {
 		return
 	}
 
-	dyncfgUpdateVnodeConfig(cfg, name)
+	dyncfgUpdateVnodeConfig(cfg, name, fn)
 
 	if err := m.verifyVnodeUnique(cfg); err != nil {
 		m.Warningf("dyncfg: add: vnode job %s: %v", name, err)
@@ -213,7 +213,7 @@ func (m *Manager) dyncfgVnodeTest(fn functions.Function) {
 		return
 	}
 
-	dyncfgUpdateVnodeConfig(cfg, name)
+	dyncfgUpdateVnodeConfig(cfg, name, fn)
 
 	if err := m.verifyVnodeUnique(cfg); err != nil {
 		m.Warningf("dyncfg: test: vnode job %s: %v", name, err)
@@ -252,7 +252,7 @@ func (m *Manager) dyncfgVnodeUpdate(fn functions.Function) {
 		return
 	}
 
-	dyncfgUpdateVnodeConfig(cfg, name)
+	dyncfgUpdateVnodeConfig(cfg, name, fn)
 
 	if orig.Equal(cfg) {
 		m.dyncfgRespf(fn, 202, "")
@@ -309,13 +309,17 @@ func (m *Manager) verifyVnodeUnique(newCfg *vnodes.VirtualNode) error {
 	return nil
 }
 
-func dyncfgUpdateVnodeConfig(cfg *vnodes.VirtualNode, name string) {
+func dyncfgUpdateVnodeConfig(cfg *vnodes.VirtualNode, name string, fn functions.Function) {
+	cfg.SourceType = confgroup.TypeDyncfg
+	src := "type=dyncfg"
+	if v := getFnSourceValue(fn, "user"); v != "" {
+		src += fmt.Sprintf(", user=%s", v)
+	}
+	cfg.Source = src
 	cfg.Name = name
 	if cfg.Hostname == "" {
 		cfg.Hostname = name
 	}
-	cfg.SourceType = confgroup.TypeDyncfg
-	cfg.Source = "type=dyncfg"
 }
 
 func vnodeConfigFromPayload(fn functions.Function) (*vnodes.VirtualNode, error) {
@@ -339,7 +343,7 @@ func vnodeUserconfigFromPayload(fn functions.Function) ([]byte, error) {
 		name = fn.Args[2]
 	}
 
-	dyncfgUpdateVnodeConfig(cfg, name)
+	dyncfgUpdateVnodeConfig(cfg, name, fn)
 
 	bs, err := yaml.Marshal([]any{cfg})
 	if err != nil {
