@@ -166,6 +166,13 @@ HTTP_ACCESS http_access_from_hex(const char *str) {
     return (HTTP_ACCESS)strtoull(str, NULL, 16) & HTTP_ACCESS_ALL;
 }
 
+HTTP_ACCESS http_access_from_hex_str(const char *str) {
+    if (!str || !*str)
+        return HTTP_ACCESS_NONE;
+
+    return (HTTP_ACCESS)strtoull(str, NULL, 16) & HTTP_ACCESS_ALL;
+}
+
 HTTP_ACCESS http_access_from_source(const char *str) {
     if(!str || !*str)
         return HTTP_ACCESS_NONE;
@@ -174,7 +181,7 @@ HTTP_ACCESS http_access_from_source(const char *str) {
 
     const char *permissions = strstr(str, "permissions=");
     if(permissions)
-        access = (HTTP_ACCESS)strtoull(permissions + 12, NULL, 16) & HTTP_ACCESS_ALL;
+        access = http_access_from_hex_str(permissions + 12);
 
     return access;
 }

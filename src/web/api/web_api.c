@@ -138,42 +138,6 @@ void nd_web_api_init(void) {
     time_grouping_init();
 }
 
-
-bool request_source_is_cloud(const char *source) {
-    return source && *source && strstartswith(source, "method=NC,");
-}
-
-void web_client_api_request_vX_source_to_buffer(struct web_client *w, BUFFER *source) {
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_CLOUD))
-        buffer_sprintf(source, "method=NC");
-    else if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_BEARER))
-        buffer_sprintf(source, "method=api-bearer");
-    else
-        buffer_sprintf(source, "method=api");
-
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_GOD))
-        buffer_strcat(source, ",role=god");
-    else
-        buffer_sprintf(source, ",role=%s", http_id2user_role(w->user_role));
-
-    buffer_sprintf(source, ",permissions="HTTP_ACCESS_FORMAT, (HTTP_ACCESS_FORMAT_CAST)w->access);
-
-    if(w->auth.client_name[0])
-        buffer_sprintf(source, ",user=%s", w->auth.client_name);
-
-    if(!uuid_is_null(w->auth.cloud_account_id)) {
-        char uuid_str[UUID_COMPACT_STR_LEN];
-        uuid_unparse_lower_compact(w->auth.cloud_account_id, uuid_str);
-        buffer_sprintf(source, ",account=%s", uuid_str);
-    }
-
-    if(w->client_ip[0])
-        buffer_sprintf(source, ",ip=%s", w->client_ip);
-
-    if(w->forwarded_for)
-        buffer_sprintf(source, ",forwarded_for=%s", w->forwarded_for);
-}
-
 void web_client_progress_functions_update(void *data, size_t done, size_t all) {
     // handle progress updates from the plugin
     struct web_client *w = data;
