@@ -1817,7 +1817,7 @@ int do_PerflibHyperV(int update_every, usec_t dt __maybe_unused)
         // Find the registry ID using the registry name
         DWORD id = RegistryFindIDByName(hyperv_perf_list[i].registry_name);
         if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
-            continue;
+            return -1;
 
         // Get the performance data using the registry ID
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
