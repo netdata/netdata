@@ -1432,42 +1432,6 @@ static bool check_label_metadata(struct metadata_wc *wc)
     return false;
 }
 
-static void cleanup_health_log(struct metadata_wc *wc)
-{
-    static time_t next_execution_t = 0;
-
-    time_t now = now_realtime_sec();
-
-    if (!next_execution_t)
-        next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
-
-    if (next_execution_t && next_execution_t > now)
-        return;
-
-    next_execution_t = now + METADATA_HEALTH_LOG_INTERVAL;
-
-    RRDHOST *host;
-    worker_is_busy(UV_EVENT_HEALTH_LOG_CLEANUP);
-
-    dfe_start_reentrant(rrdhost_root_index, host)
-    {
-        sql_health_alarm_log_cleanup(host);
-        if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
-            break;
-    }
-    dfe_done(host);
-
-    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))) {
-        worker_is_idle();
-        return;
-    }
-
-    (void) db_execute(db_health,"DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)");
-    (void) db_execute(db_health,"DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
-    (void) db_execute(db_aclk,"DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
-    worker_is_idle();
-}
-
 //
 // EVENT LOOP STARTS HERE
 //
@@ -1714,8 +1678,6 @@ void run_metadata_cleanup(struct metadata_wc *wc)
     if (check_dimension_metadata(wc))
         if (check_chart_metadata(wc))
             check_label_metadata(wc);
-
-    cleanup_health_log(wc);
 
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
        return;
