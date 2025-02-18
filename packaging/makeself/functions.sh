@@ -80,7 +80,7 @@ fetch() {
 
     set -e
     cd "${NETDATA_MAKESELF_PATH}/tmp"
-    run tar -axpf "${tar}"
+    run tar -axf "${tar}"
     cd -
 
     CACHE_HIT=0
