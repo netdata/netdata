@@ -260,7 +260,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     datafile->file = file;
     __atomic_add_fetch(&ctx->stats.datafile_creations, 1, __ATOMIC_RELAXED);
 
-    ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
+    ret = posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
@@ -278,7 +278,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
         ctx_io_error(ctx);
     }
     uv_fs_req_cleanup(&req);
-    posix_memfree(superblock);
+    posix_memalign_freez(superblock);
     if (ret < 0) {
         destroy_data_file_unsafe(datafile);
         return ret;
@@ -297,7 +297,7 @@ static int check_data_file_superblock(uv_file file)
     uv_buf_t iov;
     uv_fs_t req;
 
-    ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
+    ret = posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
@@ -321,7 +321,7 @@ static int check_data_file_superblock(uv_file file)
         ret = 0;
     }
     error:
-    posix_memfree(superblock);
+        posix_memalign_freez(superblock);
     return ret;
 }
 

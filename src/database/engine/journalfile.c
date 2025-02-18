@@ -580,7 +580,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     journalfile->file = file;
     __atomic_add_fetch(&ctx->stats.journalfile_creations, 1, __ATOMIC_RELAXED);
 
-    ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
+    ret = posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
@@ -597,7 +597,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
         ctx_io_error(ctx);
     }
     uv_fs_req_cleanup(&req);
-    posix_memfree(superblock);
+    posix_memalign_freez(superblock);
     if (ret < 0) {
         journalfile_destroy_unsafe(journalfile, datafile);
         return ret;
@@ -617,7 +617,7 @@ static int journalfile_check_superblock(uv_file file)
     uv_buf_t iov;
     uv_fs_t req;
 
-    ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
+    ret = posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
@@ -643,7 +643,7 @@ static int journalfile_check_superblock(uv_file file)
         ret = 0;
     }
     error:
-    posix_memfree(superblock);
+        posix_memalign_freez(superblock);
     return ret;
 }
 
@@ -813,7 +813,7 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
     file_size = journalfile->unsafe.pos;
 
     max_id = 1;
-    ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
+    ret = posix_memalignz((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
     if (unlikely(ret))
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
 
@@ -844,7 +844,7 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
         }
     }
 skip_file:
-    posix_memfree(buf);
+    posix_memalign_freez(buf);
     return max_id;
 }
 
