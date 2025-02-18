@@ -655,6 +655,7 @@ enum health_opcode {
     HEALTH_HOST_REGISTER,
     HEALTH_HOST_UNREGISTER,
     HEALTH_RUN_JOBS,
+    HEALTH_HOST_MAINTENANCE,
     HEALTH_SHUTDOWN,
 
     // leave this last
@@ -670,6 +671,7 @@ struct health_cmd {
 typedef enum health_job_type_t {
     HEALTH_JOB_HOST_RUN,
     HEALTH_JOB_HOST_INIT,
+    HEALTH_JOB_HOST_MAINT,
     //
     HEALTH_JOB_MAX,
 } health_job_type_t;
@@ -753,6 +755,33 @@ struct worker_data {
     time_t next_run;
     struct health_config_s *config;
 };
+
+static void after_host_health_maintenance(uv_work_t *req, int status __maybe_unused)
+{
+    struct worker_data *data = req->data;
+    struct health_config_s *config = data->config;
+    config->job_list[HEALTH_JOB_HOST_MAINT]->running--;
+    RRDHOST *host = data->payload;
+    health_host_run(host);
+    freez(data);
+}
+
+static void host_health_maintenance(uv_work_t *req __maybe_unused)
+{
+    register_libuv_worker_jobs();
+    struct worker_data *data = req->data;
+    RRDHOST *host = data->payload;
+    worker_is_busy(UV_EVENT_HEALTH_LOG_CLEANUP);
+
+    sql_health_alarm_log_cleanup(host);
+
+//    (void) db_execute(db_health,"DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)");
+//    (void) db_execute(db_health,"DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
+//    (void) db_execute(db_aclk,"DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
+
+    worker_is_idle();
+}
+
 
 static void after_host_initialize_alerts(uv_work_t *req, int status __maybe_unused)
 {
@@ -874,6 +903,9 @@ int send_job_to_worker(struct health_config_s *config, struct job_list_t *job, R
         case HEALTH_JOB_HOST_RUN:
             rc = uv_queue_work(&config->loop, &data->request, host_evaluate_alerts, after_host_evaluate_alerts);
             break;
+        case HEALTH_JOB_HOST_MAINT:
+            rc = uv_queue_work(&config->loop, &data->request, host_health_maintenance, after_host_health_maintenance);
+            break;
         default:
             break;
     }
@@ -923,13 +955,13 @@ void del_job(struct job_list_t *job, Word_t Index)
     (void)JudyLDel(&job->JudyL, Index, PJE0);
 }
 
-void schedule_job_to_run(struct health_config_s *config, health_job_type_t job_type, int query_thread_count, RRDHOST *host)
+void schedule_job_to_run(struct health_config_s *config, health_job_type_t job_type, int max_threads, RRDHOST *host)
 {
     Pvoid_t *Pvalue;
     RRDHOST *host_in_queue;
 
     struct job_list_t *job = config->job_list[job_type];
-    bool too_busy = (job->running >= query_thread_count);
+    bool too_busy = (job->running >= max_threads);
 
     // If we are busy and it's just a ping to run, leave
     if (too_busy && !host)
@@ -946,7 +978,7 @@ void schedule_job_to_run(struct health_config_s *config, health_job_type_t job_t
     // if we dont, it was a ping from the callback
 
     // Lets try to queue as many of the pending commands
-    while (!too_busy && job->pending && job->running < query_thread_count) {
+    while (!too_busy && job->pending && job->running < max_threads) {
         Word_t Index = 0;
         Pvalue = get_job(job, &Index);
         if (Pvalue == NULL)
@@ -1002,8 +1034,8 @@ static void health_ev_loop(void *arg)
     config->timer_req.data = config;
     fatal_assert(0 == uv_timer_start(&config->timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
-    int query_thread_count = netdata_conf_cloud_query_threads();
-    netdata_log_info("Starting health with %d threads", query_thread_count);
+    int max_thread_count = netdata_conf_cloud_query_threads();
+    netdata_log_info("Starting health with %d threads", max_thread_count);
 
     config->initialized = true;
 
@@ -1011,9 +1043,11 @@ static void health_ev_loop(void *arg)
     RRDHOST *host;
     config->job_list[HEALTH_JOB_HOST_RUN] = callocz(1, sizeof(config->job_list));
     config->job_list[HEALTH_JOB_HOST_INIT] = callocz(1, sizeof(config->job_list));
+    config->job_list[HEALTH_JOB_HOST_MAINT] = callocz(1, sizeof(config->job_list));
 
     config->job_list[HEALTH_JOB_HOST_RUN]->job_type = HEALTH_JOB_HOST_RUN;
     config->job_list[HEALTH_JOB_HOST_INIT]->job_type = HEALTH_JOB_HOST_INIT;
+    config->job_list[HEALTH_JOB_HOST_MAINT]->job_type = HEALTH_JOB_HOST_MAINT;
 
     health_register_host(localhost, localhost->health.delay_up_to);
     HEALTH *host_health;
@@ -1080,17 +1114,23 @@ static void health_ev_loop(void *arg)
 
                 case HEALTH_HOST_INIT:
                     host = cmd.param[0];
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, query_thread_count, host);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, max_thread_count, host);
                     break;
 
                 case HEALTH_HOST_RUN:
                     host = cmd.param[0];
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_RUN, query_thread_count, host);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_RUN, max_thread_count, host);
                     break;
 
                 case HEALTH_RUN_JOBS:
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, query_thread_count, NULL);
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_RUN, query_thread_count, NULL);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, max_thread_count, NULL);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_RUN, max_thread_count, NULL);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_MAINT, max_thread_count, NULL);
+                    break;
+
+                case HEALTH_HOST_MAINTENANCE:
+                    host = cmd.param[0];
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_MAINT, max_thread_count, host);
                     break;
 
                 case HEALTH_SHUTDOWN:
