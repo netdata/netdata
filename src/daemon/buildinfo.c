@@ -1532,7 +1532,6 @@ static void populate_directories(void) {
     build_info_set_value(BIB_DIR_PLUGINS, netdata_configured_primary_plugins_dir);
     build_info_set_value(BIB_DIR_WEB, netdata_configured_web_dir);
     build_info_set_value(BIB_DIR_LOG, netdata_configured_log_dir);
-    build_info_set_value(BIB_DIR_LOCK, netdata_configured_lock_dir);
     build_info_set_value(BIB_DIR_HOME, netdata_configured_home_dir);
 }
 
