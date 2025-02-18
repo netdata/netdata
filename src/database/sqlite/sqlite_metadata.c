@@ -45,14 +45,6 @@ const char *database_config[] = {
 
     "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created)",
 
-    "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
-    "on_key text, class text, component text, type text, os text, hosts text, lookup text, "
-    "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
-    "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
-    "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
-    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text, "
-    "summary text, time_group_condition INT, time_group_value DOUBLE, dims_group INT, data_source INT)",
-
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key))",
 
@@ -62,40 +54,11 @@ const char *database_config[] = {
     "CREATE TRIGGER IF NOT EXISTS ins_host AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created)"
     " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END",
 
-    "CREATE TABLE IF NOT EXISTS health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, "
-    "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "
-    "chart_context text, last_transition_id blob, chart_name text, UNIQUE (host_id, alarm_id))",
-
-    "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, "
-    "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
-    "flags int, exec_run_timestamp int, delay_up_to_timestamp int, "
-    "info text, exec_code int, new_status real, old_status real, delay int, "
-    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text)",
-
     "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id)",
     "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_9 ON health_log_detail (unique_id DESC, health_log_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_6 on health_log_detail (health_log_id, when_key)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
 
     "CREATE TABLE IF NOT EXISTS agent_event_log (id INTEGER PRIMARY KEY, version TEXT, event_type INT, value, date_created INT)",
     "CREATE INDEX IF NOT EXISTS idx_agent_event_log1 on agent_event_log (event_type)",
-
-    "CREATE TABLE IF NOT EXISTS alert_queue "
-    " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
-    " UNIQUE(host_id, health_log_id, alarm_id))",
-
-    "CREATE INDEX IF NOT EXISTS ind_alert_queue1 ON alert_queue(host_id, date_scheduled)",
-
-    "CREATE TABLE IF NOT EXISTS alert_version (health_log_id INTEGER PRIMARY KEY, unique_id INT, status INT, "
-    "version INT, date_submitted INT)",
-
-    "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
-    "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
 
     "CREATE TABLE IF NOT EXISTS ctx_metadata_cleanup (id INTEGER PRIMARY KEY, host_id BLOB, context TEXT NOT NULL, date_created INT NOT NULL, "
     "UNIQUE (host_id, context))",
@@ -661,49 +624,6 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
         (void) sqlite3_close(database);
 }
 
-
-static void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
-{
-    nd_uuid_t  uuid;
-
-    if ( argc != 1 ){
-        sqlite3_result_null(context);
-        return ;
-    }
-    int rc = uuid_parse((const char *) sqlite3_value_text(argv[0]), uuid);
-    if (rc == -1)  {
-        sqlite3_result_null(context);
-        return ;
-    }
-
-    sqlite3_result_blob(context, &uuid, sizeof(nd_uuid_t), SQLITE_TRANSIENT);
-}
-
-void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv)
-{
-    if (argc != 1 ){
-        sqlite3_result_null(context);
-        return ;
-    }
-
-    if (sqlite3_value_int(argv[0]) != 0) {
-        struct timespec req = {.tv_sec = 0, .tv_nsec = 1};
-        nanosleep(&req, NULL);
-    }
-
-    sqlite3_result_int64(context, (sqlite_int64) now_realtime_usec());
-}
-
-void sqlite_uuid_random(sqlite3_context *context, int argc, sqlite3_value **argv)
-{
-    (void)argc;
-    (void)argv;
-
-    nd_uuid_t uuid;
-    uuid_generate_random(uuid);
-    sqlite3_result_blob(context, &uuid, sizeof(nd_uuid_t), SQLITE_TRANSIENT);
-}
-
 static int64_t sql_get_wal_size(const char *database_file)
 {
     char filename[FILENAME_MAX + 1];
@@ -810,17 +730,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     errno_clear();
     netdata_log_info("SQLite database %s initialization", sqlite_database);
 
-    rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to register internal u2h function");
-
-    rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to register internal now_usec function");
-
-    rc = sqlite3_create_function(db_meta, "uuid_random", 0, SQLITE_ANY, 0, sqlite_uuid_random, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to register internal uuid_random function");
+    create_user_database_functions(db_meta);
 
     int target_version = DB_METADATA_VERSION;
 
@@ -1552,9 +1462,9 @@ static void cleanup_health_log(struct metadata_wc *wc)
         return;
     }
 
-    (void) db_execute(db_meta,"DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)");
-    (void) db_execute(db_meta,"DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
-    (void) db_execute(db_meta,"DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
+    (void) db_execute(db_health,"DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)");
+    (void) db_execute(db_health,"DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
+    (void) db_execute(db_aclk,"DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
     worker_is_idle();
 }
 
