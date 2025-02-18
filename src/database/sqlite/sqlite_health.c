@@ -20,6 +20,91 @@ extern __thread bool is_health_thread;
             NULL;                                                                                                      \
     })
 
+
+#define DB_HEALTH_VERSION 1
+
+const char *database_health_config[] = {
+
+    "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
+    "on_key text, class text, component text, type text, os text, hosts text, lookup text, "
+    "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
+    "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
+    "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
+    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text, "
+    "summary text, time_group_condition INT, time_group_value DOUBLE, dims_group INT, data_source INT)",
+
+    "CREATE TABLE IF NOT EXISTS health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, "
+    "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "
+    "chart_context text, last_transition_id blob, chart_name text, UNIQUE (host_id, alarm_id))",
+
+    "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, "
+    "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
+    "flags int, exec_run_timestamp int, delay_up_to_timestamp int, "
+    "info text, exec_code int, new_status real, old_status real, delay int, "
+    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text)",
+
+    "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_9 ON health_log_detail (unique_id DESC, health_log_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_6 on health_log_detail (health_log_id, when_key)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
+
+    NULL
+};
+
+const char *database_health_cleanup[] = {
+    "VACUUM",
+    NULL
+};
+
+sqlite3 *db_health = NULL;
+/*
+ * Initialize the SQLite database
+ * Return 0 on success
+ */
+int sql_init_health_database(bool in_memory)
+{
+    char sqlite_database[FILENAME_MAX + 1];
+    int rc;
+
+    if (likely(!in_memory))
+        snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-health.db", netdata_configured_cache_dir);
+    else
+        strcpy(sqlite_database, ":memory:");
+
+    rc = sqlite3_open(sqlite_database, &db_health);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
+        sqlite3_close(db_health);
+        db_health = NULL;
+        return 1;
+    }
+
+    errno_clear();
+    netdata_log_info("SQLite database %s initialization", sqlite_database);
+    create_user_database_functions(db_health);
+
+    if (attach_database(db_health, "netdata-meta.db", "meta", in_memory))
+        return 1;
+
+    int target_version = DB_HEALTH_VERSION;
+    if (likely(!in_memory))
+        target_version = perform_health_database_migration(db_health, DB_HEALTH_VERSION);
+
+    if (configure_sqlite_database(db_health, target_version, "health_config"))
+        return 1;
+
+    if (init_database_batch(db_health, &database_health_config[0], "health_init"))
+        return 1;
+
+    if (init_database_batch(db_health, &database_health_cleanup[0], "health_cleanup"))
+        return 1;
+
+    return 0;
+}
+
 /* Health related SQL queries
    Updates an entry in the table
 */
@@ -34,12 +119,12 @@ static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_HEALTH_LOG, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_health, SQL_UPDATE_HEALTH_LOG, &compiled_res))
                 return;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_HEALTH_LOG, &res))
+        if (!PREPARE_STATEMENT(db_health, SQL_UPDATE_HEALTH_LOG, &res))
             return;
     }
 
@@ -169,12 +254,12 @@ static void insert_alert_queue(
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_INSERT_ALERT_PENDING_QUEUE, &compiled_res))
                 return;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
+        if (!PREPARE_STATEMENT(db_aclk, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
             return;
     }
 
@@ -222,12 +307,12 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_health, SQL_INSERT_HEALTH_LOG_DETAIL, &compiled_res))
                 return;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &res))
+        if (!PREPARE_STATEMENT(db_health, SQL_INSERT_HEALTH_LOG_DETAIL, &res))
             return;
     }
 
@@ -291,12 +376,12 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_health, SQL_INSERT_HEALTH_LOG, &compiled_res))
                 return;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG, &res))
+        if (!PREPARE_STATEMENT(db_health, SQL_INSERT_HEALTH_LOG, &res))
             return;
     }
 
@@ -357,7 +442,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host)
     sqlite3_stmt *res = NULL;
     int rc;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_CLEANUP_HEALTH_LOG_DETAIL, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_CLEANUP_HEALTH_LOG_DETAIL, &res))
         return;
 
     int param = 0;
@@ -383,7 +468,7 @@ bool sql_update_transition_in_health_log(RRDHOST *host, uint32_t alarm_id, nd_uu
     int rc = 0;
     sqlite3_stmt *res;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_TRANSITION_IN_HEALTH_LOG, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_UPDATE_TRANSITION_IN_HEALTH_LOG, &res))
         return false;
 
     int param = 0;
@@ -413,7 +498,7 @@ bool sql_set_updated_by_in_health_log_detail(uint32_t unique_id, uint32_t max_un
     int rc = 0;
     sqlite3_stmt *res;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_SET_UPDATED_BY_IN_HEALTH_LOG_DETAIL, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_SET_UPDATED_BY_IN_HEALTH_LOG_DETAIL, &res))
         return false;
 
     int param = 0;
@@ -456,7 +541,7 @@ static void sql_inject_removed_status(
 
     sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_INJECT_REMOVED, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_INJECT_REMOVED, &res))
         return;
 
     nd_uuid_t transition_id;
@@ -499,7 +584,7 @@ uint32_t sql_get_max_unique_id (RRDHOST *host)
 
     sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_MAX_UNIQUE_ID, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_SELECT_MAX_UNIQUE_ID, &res))
         return 0;
 
     int param = 0;
@@ -525,7 +610,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
     sqlite3_stmt *res = NULL;
     nd_uuid_t transition_id;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_LAST_STATUSES, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_SELECT_LAST_STATUSES, &res))
         return;
 
     int param = 0;
@@ -567,7 +652,7 @@ static void sql_remove_alerts_from_deleted_charts(RRDHOST *host, nd_uuid_t *host
     if (!actual_uuid)
         return;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_MISSING_CHART_ALERT, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_DELETE_MISSING_CHART_ALERT, &res))
         return;
 
     int param = 0;
@@ -635,12 +720,9 @@ void sql_health_alarm_log_load(RRDHOST *host)
     sqlite3_stmt *res = NULL;
     ssize_t errored = 0, loaded = 0;
 
-    if (!REQUIRE_DB(db_meta))
-        return;
-
     sql_check_removed_alerts_state(host);
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_LOAD_HEALTH_LOG, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_LOAD_HEALTH_LOG, &res))
         return;
 
     int param = 0;
@@ -817,7 +899,7 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
     static __thread sqlite3_stmt *res = NULL;
     int param = 0;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_STORE_ALERT_CONFIG_HASH, &res))
+    if (!PREPARE_COMPILED_STATEMENT(db_health, SQL_STORE_ALERT_CONFIG_HASH, &res))
         return;
 
     CLEAN_BUFFER *buf = buffer_create(128, NULL);
@@ -943,12 +1025,12 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_health, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, &compiled_res))
                 return ret;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, &res))
+        if (!PREPARE_STATEMENT(db_health, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, &res))
             return ret;
     }
 
@@ -1007,7 +1089,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
 
          buffer_strcat(command, " ORDER BY hld.unique_id DESC LIMIT @limit");
 
-         rc = prepare_statement(db_meta, buffer_tostring(command), active_stmt);
+         rc = prepare_statement(db_health, buffer_tostring(command), active_stmt);
          buffer_free(command);
 
          if (unlikely(rc != SQLITE_OK)) {
@@ -1269,7 +1351,7 @@ static uint32_t get_next_alarm_event_id(uint64_t health_log_id, uint32_t alarm_i
     sqlite3_stmt *res = NULL;
     uint32_t next_event_id = alarm_id;
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_GET_EVENT_ID, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, SQL_GET_EVENT_ID, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to get an event id");
         return alarm_id;
@@ -1298,7 +1380,7 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
     uint32_t alarm_id = 0;
     uint64_t health_log_id = 0;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_GET_ALARM_ID, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_GET_ALARM_ID, &res))
         return alarm_id;
 
     int param = 0;
@@ -1338,7 +1420,7 @@ bool sql_find_alert_transition(
     if (uuid_parse(transition, transition_uuid))
         return false;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_GET_ALARM_ID_FROM_TRANSITION_ID, &res))
+    if (!PREPARE_COMPILED_STATEMENT(db_health, SQL_GET_ALARM_ID_FROM_TRANSITION_ID, &res))
         return false;
 
     bool ok = false;
@@ -1409,7 +1491,7 @@ void sql_alert_transitions(
             return;
         }
 
-        if (!PREPARE_STATEMENT(db_meta, SQL_SEARCH_ALERT_TRANSITION_DIRECT, &res))
+        if (!PREPARE_STATEMENT(db_health, SQL_SEARCH_ALERT_TRANSITION_DIRECT, &res))
             goto done_only_drop;
 
         SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &transition_uuid, sizeof(transition_uuid), SQLITE_STATIC));
@@ -1417,14 +1499,14 @@ void sql_alert_transitions(
     }
 
     snprintfz(sql, sizeof(sql) - 1, SQL_BUILD_ALERT_TRANSITION, nodes);
-    rc = db_execute(db_meta, sql);
+    rc = db_execute(db_health, sql);
     if (rc)
         return;
 
     snprintfz(sql, sizeof(sql) - 1, SQL_POPULATE_TEMP_ALERT_TRANSITION_TABLE, nodes);
 
     // Prepare statement to add things
-    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, sql, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to INSERT into v_%p", nodes);
         goto done_only_drop;
@@ -1461,7 +1543,7 @@ void sql_alert_transitions(
 
     buffer_strcat(command, " ORDER BY d.global_id DESC");
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, buffer_tostring(command), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement sql_alert_transitions");
         goto done_only_drop;
@@ -1524,7 +1606,7 @@ done:
 done_only_drop:
     if (likely(!transition)) {
         (void)snprintfz(sql, sizeof(sql) - 1, "DROP TABLE IF EXISTS v_%p", nodes);
-        (void)db_execute(db_meta, sql);
+        (void)db_execute(db_health, sql);
         buffer_free(command);
     }
 }
@@ -1557,14 +1639,14 @@ int sql_get_alert_configuration(
         return added;
 
     snprintfz(sql, sizeof(sql) - 1, SQL_BUILD_CONFIG_TARGET_LIST, configs);
-    rc = db_execute(db_meta, sql);
+    rc = db_execute(db_health, sql);
     if (rc)
         return added;
 
     snprintfz(sql, sizeof(sql) - 1, SQL_POPULATE_TEMP_CONFIG_TARGET_TABLE, configs);
 
     // Prepare statement to add things
-    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, sql, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to INSERT into c_%p", configs);
         goto fail_only_drop;
@@ -1593,7 +1675,7 @@ int sql_get_alert_configuration(
 
     buffer_sprintf(command, SQL_SEARCH_CONFIG_LIST, configs);
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_health, buffer_tostring(command), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement sql_get_alert_configuration");
         goto fail_only_drop;
@@ -1650,7 +1732,7 @@ int sql_get_alert_configuration(
 
 fail_only_drop:
     (void)snprintfz(sql, sizeof(sql) - 1, "DROP TABLE IF EXISTS c_%p", configs);
-    (void)db_execute(db_meta, sql);
+    (void)db_execute(db_health, sql);
     buffer_free(command);
     return added;
 }
