@@ -54,7 +54,6 @@ func main() {
 		ServiceDiscoveryConfigDir: cfg.serviceDiscoveryDir,
 		CollectorsConfigWatchPath: cfg.collectorsWatchPath,
 		StateFile:                 cfg.stateFile,
-		LockDir:                   cfg.lockDir,
 		RunModule:                 opts.Module,
 		MinUpdateEvery:            opts.UpdateEvery,
 	})
