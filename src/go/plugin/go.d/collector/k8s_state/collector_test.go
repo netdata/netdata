@@ -373,8 +373,8 @@ func TestCollector_Collect(t *testing.T) {
 					expected := map[string]int64{
 						"deploy_default_replicaset01_age":                                                        3,
 						"deploy_default_replicaset01_condition_available":                                        1,
-						"deploy_default_replicaset01_condition_progressing":                                      0,
-						"deploy_default_replicaset01_condition_replica_failure":                                  0,
+						"deploy_default_replicaset01_condition_progressing":                                      1,
+						"deploy_default_replicaset01_condition_replica_failure":                                  1,
 						"deploy_default_replicaset01_current_replicas":                                           1,
 						"deploy_default_replicaset01_desired_replicas":                                           2,
 						"deploy_default_replicaset01_ready_replicas":                                             3,
@@ -992,6 +992,14 @@ func newDeployment(name string) *appsv1.Deployment {
 			Conditions: []appsv1.DeploymentCondition{
 				{
 					Type:   appsv1.DeploymentAvailable,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   appsv1.DeploymentProgressing,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   appsv1.DeploymentReplicaFailure,
 					Status: corev1.ConditionTrue,
 				},
 			},
