@@ -343,7 +343,7 @@ func (c *Collector) collectDeploymentState(mx map[string]int64) {
 				// https://github.com/kubernetes/kubernetes/blob/2b3da7dfc846fec7c4044a320f8f38b4a45367a3/pkg/controller/deployment/sync.go#L518-L525
 				mx[px+"condition_available"] = v
 			case appsv1.DeploymentProgressing:
-				mx[px+"condition_available"] = v
+				mx[px+"condition_progressing"] = v
 			case appsv1.DeploymentReplicaFailure:
 				mx[px+"condition_replica_failure"] = v
 			}
