@@ -12,6 +12,83 @@ void sanity_check(void) {
 #include "aclk/aclk_query_queue.h"
 #include "aclk/aclk_query.h"
 #include "aclk/aclk_capas.h"
+#include "sqlite_db_migration.h"
+
+#define DB_ACLK_VERSION 1
+
+const char *database_aclk_config[] = {
+
+    "CREATE TABLE IF NOT EXISTS alert_queue "
+    " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
+    " UNIQUE(host_id, health_log_id, alarm_id))",
+
+    "CREATE INDEX IF NOT EXISTS ind_alert_queue1 ON alert_queue(host_id, date_scheduled)",
+
+    "CREATE TABLE IF NOT EXISTS alert_version (health_log_id INTEGER PRIMARY KEY, unique_id INT, status INT, "
+    "version INT, date_submitted INT)",
+
+    "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
+    "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
+
+    NULL
+};
+
+const char *database_aclk_cleanup[] = {
+    "VACUUM",
+    NULL
+};
+
+sqlite3 *db_aclk = NULL;
+
+/*
+ * Initialize the SQLite database
+ * Return 0 on success
+ */
+int sql_init_aclk_database(bool in_memory)
+{
+    char sqlite_database[FILENAME_MAX + 1];
+    int rc;
+
+    if (likely(!in_memory))
+        snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-aclk.db", netdata_configured_cache_dir);
+    else
+        strcpy(sqlite_database, ":memory:");
+
+    rc = sqlite3_open(sqlite_database, &db_aclk);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
+        sqlite3_close(db_aclk);
+        db_aclk = NULL;
+        return 1;
+    }
+
+    errno = 0;
+    netdata_log_info("SQLite database %s initialization", sqlite_database);
+    create_user_database_functions(db_aclk);
+
+    int target_version = DB_ACLK_VERSION;
+
+    if (attach_database(db_aclk, "netdata-meta.db", "meta", in_memory))
+        return 1;
+
+    if (attach_database(db_aclk, "netdata-health.db", "health", in_memory))
+        return 1;
+
+    if (likely(!in_memory))
+        target_version = perform_aclk_database_migration(db_aclk, DB_ACLK_VERSION);
+
+    if (configure_sqlite_database(db_aclk, target_version, "aclk_config"))
+        return 1;
+
+    if (init_database_batch(db_aclk, &database_aclk_config[0], "aclk_init"))
+        return 1;
+
+    if (init_database_batch(db_aclk, &database_aclk_cleanup[0], "aclk_cleanup"))
+        return 1;
+
+    return 0;
+}
+
 
 static void create_node_instance_result_job(const char *machine_guid, const char *node_id)
 {
