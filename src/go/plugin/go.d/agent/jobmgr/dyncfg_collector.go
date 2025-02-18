@@ -701,12 +701,8 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 }
 
 func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string, fn functions.Function) {
-	src := fmt.Sprintf("type=dyncfg,module=%s,job=%s", module, name)
-	if v := getFnSourceValue(fn, "user"); v != "" {
-		src += fmt.Sprintf(", user=%s", v)
-	}
 	cfg.SetProvider("dyncfg")
-	cfg.SetSource(src)
+	cfg.SetSource(fn.Source)
 	cfg.SetSourceType("dyncfg")
 	cfg.SetModule(module)
 	cfg.SetName(name)
