@@ -21,6 +21,7 @@ func init() {
 		JobConfigSchema: configSchema,
 		Defaults: module.Defaults{
 			UpdateEvery: 10,
+			Disabled:    true,
 		},
 		Create: func() module.Module { return New() },
 		Config: func() any { return &Config{} },
