@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- add k8s\_state\_deployment\_condition\_available alert [\#19664](https://github.com/netdata/netdata/pull/19664) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19663](https://github.com/netdata/netdata/pull/19663) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/k8sstate\): add deployment conditions [\#19662](https://github.com/netdata/netdata/pull/19662) ([ilyam8](https://github.com/ilyam8))
+- avoid dbengine event loop starvation by running uv\_run periodically [\#19661](https://github.com/netdata/netdata/pull/19661) ([ktsaou](https://github.com/ktsaou))
+- speed up aral when a single item is allocated and freed repeateadly [\#19660](https://github.com/netdata/netdata/pull/19660) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#19658](https://github.com/netdata/netdata/pull/19658) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/k8sstate\): collect deployments [\#19657](https://github.com/netdata/netdata/pull/19657) ([ilyam8](https://github.com/ilyam8))
+- add agent timezones as host labels [\#19656](https://github.com/netdata/netdata/pull/19656) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump k8s.io/client-go from 0.32.1 to 0.32.2 in /src/go [\#19652](https://github.com/netdata/netdata/pull/19652) ([dependabot[bot]](https://github.com/apps/dependabot))
 - make onewayalloc fallback to malloc [\#19646](https://github.com/netdata/netdata/pull/19646) ([ktsaou](https://github.com/ktsaou))
 - docs: move /run/dbus mount to Docker recommended way [\#19645](https://github.com/netdata/netdata/pull/19645) ([ilyam8](https://github.com/ilyam8))
@@ -478,14 +486,6 @@
 - Avoid scanning charts for replication status [\#19124](https://github.com/netdata/netdata/pull/19124) ([stelfrag](https://github.com/stelfrag))
 - Address installer minor issues \(Windows\) [\#19122](https://github.com/netdata/netdata/pull/19122) ([thiagoftsm](https://github.com/thiagoftsm))
 - Move eBPF code from linetdata to src/collector [\#19121](https://github.com/netdata/netdata/pull/19121) ([thiagoftsm](https://github.com/thiagoftsm))
-- change default nice level to 0 [\#19120](https://github.com/netdata/netdata/pull/19120) ([ilyam8](https://github.com/ilyam8))
-- Disable mimalloc by default / enable explicitly if needed [\#19118](https://github.com/netdata/netdata/pull/19118) ([stelfrag](https://github.com/stelfrag))
-- Reduce EBPF memory usage [\#19117](https://github.com/netdata/netdata/pull/19117) ([stelfrag](https://github.com/stelfrag))
-- Fix undefined behaviour. [\#19116](https://github.com/netdata/netdata/pull/19116) ([vkalintiris](https://github.com/vkalintiris))
-- disable python.d/example [\#19114](https://github.com/netdata/netdata/pull/19114) ([ilyam8](https://github.com/ilyam8))
-- docs: format, typos, and some simplifications in `docs/` [\#19112](https://github.com/netdata/netdata/pull/19112) ([ilyam8](https://github.com/ilyam8))
-- change dim order because of colours in reboot\_required [\#19111](https://github.com/netdata/netdata/pull/19111) ([ilyam8](https://github.com/ilyam8))
-- fix\(proc/reboot\_required\): disable on non Debian-based systems [\#19110](https://github.com/netdata/netdata/pull/19110) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
