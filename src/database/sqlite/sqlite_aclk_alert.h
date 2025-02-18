@@ -4,6 +4,8 @@
 #define NETDATA_SQLITE_ACLK_ALERT_H
 
 extern sqlite3 *db_meta;
+extern sqlite3 *db_aclk;
+extern sqlite3 *db_health;
 
 void aclk_send_alert_configuration(char *config_hash);
 void aclk_push_alert_config_event(char *node_id, char *config_hash);
