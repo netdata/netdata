@@ -2,6 +2,9 @@
 
 #include "judy-malloc.h"
 
+// --------------------------------------------------------------------------------------------------------------------
+// Judy using ARAL
+
 #define MAX_JUDY_SIZE_TO_ARAL 24
 static bool judy_sizes_config[MAX_JUDY_SIZE_TO_ARAL + 1] = {
     [3] = true,
@@ -15,11 +18,11 @@ static bool judy_sizes_config[MAX_JUDY_SIZE_TO_ARAL + 1] = {
     [15] = true,
     [23] = true,
 };
-static ARAL *judy_sizes_aral[MAX_JUDY_SIZE_TO_ARAL + 1] = {};
+static ARAL *judy_sizes_aral[MAX_JUDY_SIZE_TO_ARAL + 1] = { 0 };
 
-struct aral_statistics judy_sizes_aral_statistics = {};
+struct aral_statistics judy_sizes_aral_statistics = { 0 };
 
-__attribute__((constructor)) void aral_judy_init(void) {
+static void aral_judy_init(void) {
     for(size_t Words = 0; Words <= MAX_JUDY_SIZE_TO_ARAL; Words++)
         if(judy_sizes_config[Words]) {
             char buf[30+1];
@@ -53,6 +56,9 @@ static ARAL *judy_size_aral(Word_t Words) {
     return NULL;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// Judy memory tracking
+
 static __thread int64_t judy_allocated = 0;
 
 ALWAYS_INLINE void JudyAllocThreadPulseReset(void) {
@@ -65,14 +71,57 @@ ALWAYS_INLINE int64_t JudyAllocThreadPulseGetAndReset(void) {
     return rc;
 }
 
-inline Word_t JudyMalloc(Word_t Words) {
+// --------------------------------------------------------------------------------------------------------------------
+// Judy dedicated jemalloc arena
+
+static unsigned jemalloc_arena_index = 0;
+static bool jemalloc_initialized = false;
+
+#ifdef HAVE_JEMALLOC_ARENA_API
+#include <jemalloc/jemalloc.h>
+static void jemalloc_init(void) {
+    // Create shared arena
+    size_t sz = sizeof(unsigned);
+    if (mallctl("arenas.create", &jemalloc_arena_index, &sz, NULL, 0) != 0)
+        return;
+
+    // Disable thread cache for direct arena access
+    int cache_enabled = 0;
+    if (mallctl("thread.tcache.enabled", NULL, NULL, &cache_enabled, sizeof(bool)) != 0)
+        return;
+
+    jemalloc_initialized = true;
+}
+
+static void *jemalloc_malloc(Word_t Words) {
+    return mallocx(Words * sizeof(Word_t), MALLOCX_ARENA(jemalloc_arena_index));
+}
+
+static void jemalloc_free(void * PWord, Word_t Words) {
+    if(PWord)
+        dallocx(PWord, MALLOCX_ARENA(jemalloc_arena_index));
+}
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
+// Judy API
+
+inline Word_t JudyMalloc(Word_t Words)
+{
     Word_t Addr;
 
-    ARAL *ar = judy_size_aral(Words);
-    if(ar)
-        Addr = (Word_t) aral_mallocz(ar);
+#ifdef HAVE_JEMALLOC_ARENA_API
+    if(jemalloc_initialized)
+        Addr = (Word_t)jemalloc_malloc(Words);
     else
-        Addr = (Word_t) mallocz(Words * sizeof(Word_t));
+#endif
+    {
+        ARAL *ar = judy_size_aral(Words);
+        if (ar)
+            Addr = (Word_t)aral_mallocz(ar);
+        else
+            Addr = (Word_t)mallocz(Words * sizeof(Word_t));
+    }
 
     judy_allocated += Words * sizeof(Word_t);
 
@@ -80,11 +129,18 @@ inline Word_t JudyMalloc(Word_t Words) {
 }
 
 inline void JudyFree(void * PWord, Word_t Words) {
-    ARAL *ar = judy_size_aral(Words);
-    if(ar)
-        aral_freez(ar, PWord);
+#ifdef HAVE_JEMALLOC_ARENA_API
+    if(jemalloc_initialized)
+        jemalloc_free(PWord, Words);
     else
-        freez(PWord);
+#endif
+    {
+        ARAL *ar = judy_size_aral(Words);
+        if (ar)
+            aral_freez(ar, PWord);
+        else
+            freez(PWord);
+    }
 
     judy_allocated -= Words * sizeof(Word_t);
 }
@@ -96,3 +152,15 @@ Word_t JudyMallocVirtual(Word_t Words) {
 void JudyFreeVirtual(void * PWord, Word_t Words) {
     JudyFree(PWord, Words);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// initialization
+
+__attribute__((constructor)) void libjudy_malloc_init(void) {
+#ifdef HAVE_JEMALLOC_ARENA_API
+    jemalloc_init();
+    if(!jemalloc_initialized)
+#endif
+        aral_judy_init();
+}
+
