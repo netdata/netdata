@@ -533,7 +533,7 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 		return
 	}
 
-	m.dyncfgSetConfigMeta(cfg, mn, jn)
+	m.dyncfgSetConfigMeta(cfg, mn, jn, fn)
 
 	if _, err := m.createCollectorJob(cfg); err != nil {
 		m.Warningf("dyncfg: add: module %s job %s: failed to apply config: %v", mn, jn, err)
@@ -614,7 +614,7 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 		return
 	}
 
-	m.dyncfgSetConfigMeta(cfg, mn, jn)
+	m.dyncfgSetConfigMeta(cfg, mn, jn, fn)
 
 	if ecfg.status == dyncfgRunning && ecfg.cfg.UID() == cfg.UID() {
 		m.dyncfgRespf(fn, 200, "")
@@ -680,9 +680,13 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 	m.dyncfgJobStatus(scfg.cfg, scfg.status)
 }
 
-func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string) {
+func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string, fn functions.Function) {
+	src := fmt.Sprintf("type=dyncfg,module=%s,job=%s", module, name)
+	if v := getFnSourceValue(fn, "user"); v != "" {
+		src += fmt.Sprintf(", user=%s", v)
+	}
 	cfg.SetProvider("dyncfg")
-	cfg.SetSource(fmt.Sprintf("type=dyncfg,module=%s,job=%s", module, name))
+	cfg.SetSource(src)
 	cfg.SetSourceType("dyncfg")
 	cfg.SetModule(module)
 	cfg.SetName(name)
