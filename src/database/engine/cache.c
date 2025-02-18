@@ -1042,11 +1042,13 @@ static inline void remove_and_free_page_not_in_any_queue_and_acquired_for_deleti
 static inline bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page) {
     pointer_check(cache, page);
 
+    WAITQ_PRIORITY prio = is_page_clean(page) ? PGC_QUEUE_LOCK_PRIO_EVICTORS : PGC_QUEUE_LOCK_PRIO_COLLECTORS;
+
     page_transition_lock(cache, page);
-    pgc_queue_lock(cache, &cache->clean, PGC_QUEUE_LOCK_PRIO_EVICTORS);
+    pgc_queue_lock(cache, &cache->clean, prio);
 
     // make it clean - it does not have any accesses, so it will be prepended
-    page_set_clean(cache, page, true, true, PGC_QUEUE_LOCK_PRIO_EVICTORS);
+    page_set_clean(cache, page, true, true, prio);
 
     if(!acquired_page_get_for_deletion_or_release_it(cache, page)) {
         pgc_queue_unlock(cache, &cache->clean);
@@ -1055,7 +1057,7 @@ static inline bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache
     }
 
     // remove it from the linked list
-    pgc_queue_del(cache, &cache->clean, page, true, PGC_QUEUE_LOCK_PRIO_EVICTORS);
+    pgc_queue_del(cache, &cache->clean, page, true, prio);
     pgc_queue_unlock(cache, &cache->clean);
     page_transition_unlock(cache, page);
 
