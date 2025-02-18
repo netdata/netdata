@@ -342,7 +342,6 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 		return
 	case dyncfgRunning:
 		m.FileStatus.Remove(ecfg.cfg)
-		m.FileLock.Unlock(ecfg.cfg.FullName())
 		m.stopRunningJob(ecfg.cfg.FullName())
 	default:
 	}
@@ -351,14 +350,6 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 		job.Cleanup()
 		ecfg.status = dyncfgFailed
 		m.dyncfgRespf(fn, 422, "Job restart failed: %v", err)
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		return
-	}
-
-	if ok, err := m.FileLock.Lock(ecfg.cfg.FullName()); !ok && err == nil {
-		job.Cleanup()
-		ecfg.status = dyncfgFailed
-		m.dyncfgRespf(fn, 500, "Job restart failed: cannot filelock.")
 		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
 		return
 	}
@@ -439,14 +430,6 @@ func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
 		return
 	}
 
-	if ok, err := m.FileLock.Lock(ecfg.cfg.FullName()); !ok && err == nil {
-		job.Cleanup()
-		ecfg.status = dyncfgFailed
-		m.dyncfgRespf(fn, 500, "Job enable failed: can not filelock.")
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		return
-	}
-
 	ecfg.status = dyncfgRunning
 
 	if isDyncfg(ecfg.cfg) {
@@ -489,7 +472,6 @@ func (m *Manager) dyncfgConfigDisable(fn functions.Function) {
 		if isDyncfg(ecfg.cfg) {
 			m.FileStatus.Remove(ecfg.cfg)
 		}
-		m.FileLock.Unlock(ecfg.cfg.FullName())
 	default:
 	}
 
@@ -583,7 +565,6 @@ func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
 	m.seenConfigs.remove(ecfg.cfg)
 	m.exposedConfigs.remove(ecfg.cfg)
 	m.stopRunningJob(ecfg.cfg.FullName())
-	m.FileLock.Unlock(ecfg.cfg.FullName())
 	m.FileStatus.Remove(ecfg.cfg)
 
 	m.dyncfgRespf(fn, 200, "")
@@ -662,14 +643,6 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 		job.Cleanup()
 		scfg.status = dyncfgFailed
 		m.dyncfgRespf(fn, 200, "Job update failed: %v", err)
-		m.dyncfgJobStatus(scfg.cfg, scfg.status)
-		return
-	}
-
-	if ok, err := m.FileLock.Lock(scfg.cfg.FullName()); !ok && err == nil {
-		job.Cleanup()
-		scfg.status = dyncfgFailed
-		m.dyncfgRespf(fn, 500, "Job update failed: cannot create file lock.")
 		m.dyncfgJobStatus(scfg.cfg, scfg.status)
 		return
 	}
