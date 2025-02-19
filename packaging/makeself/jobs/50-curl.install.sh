@@ -13,7 +13,7 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/curl" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/curl"
 fi
 
-fetch_git curl "${CURL_SOURCE}" "${CURL_VERSION}" "${CURL_VERSION}"
+fetch_git curl "${CURL_REPO}" "${CURL_VERSION}" "${CURL_VERSION}"
 
 export CFLAGS="${TUNING_FLAGS} -I/openssl-static/include -pipe"
 export CXXFLAGS="${CFLAGS}"

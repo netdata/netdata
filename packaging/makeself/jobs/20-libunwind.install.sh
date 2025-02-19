@@ -28,7 +28,7 @@ if [ -d "${cache}" ]; then
   CACHE_HIT=1
 else
   echo "No cached copy of build directory for libunwind found, fetching sources instead."
-  run git clone "${LIBUNWIND_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
+  run git clone "${LIBUNWIND_REPO}" "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
   cd "${NETDATA_MAKESELF_PATH}/tmp/libunwind" && run git checkout "${LIBUNWIND_VERSION}"
   CACHE_HIT=0
 fi

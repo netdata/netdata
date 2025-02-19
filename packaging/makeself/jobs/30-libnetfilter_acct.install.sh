@@ -17,8 +17,7 @@ export LDFLAGS="-static"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/libmnl-static/lib/pkgconfig"
 
-fetch "libnetfilter_acct-${LIBNETFILTER_ACT_VERSION}" "${LIBNETFILTER_ACT_SOURCE}/libnetfilter_acct-${LIBNETFILTER_ACT_VERSION}.tar.bz2" \
-    "${LIBNETFILTER_ACT_ARTIFACT_SHA256}" libnetfilter_acct
+fetch_git libnetfilter_acct "${LIBNETFILTER_ACCT_REPO}" "${LIBNETFILTER_ACCT_VERSION}" "${LIBNETFILTER_ACCT_VERSION}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run ./configure \

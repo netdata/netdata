@@ -21,7 +21,7 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/openssl" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/openssl"
 fi
 
-fetch_git openssl "${OPENSSL_SOURCE}" "${OPENSSL_VERSION}" "${OPENSSL_VERSION}"
+fetch_git openssl "${OPENSSL_REPO}" "${OPENSSL_VERSION}" "${OPENSSL_VERSION}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
   COMMON_CONFIG="-static threads no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl"
