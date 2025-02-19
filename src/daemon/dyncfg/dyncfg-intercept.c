@@ -6,10 +6,10 @@
 struct dyncfg_call {
     ND_UUID transaction;
     BUFFER *payload;
-    char *function;
-    char *id;
-    char *add_name;
-    char *source;
+    const char *function;
+    const char *id;
+    const char *add_name;
+    const char *source;
     DYNCFG_CMDS cmd;
     rrd_function_result_callback_t result_cb;
     void *result_cb_data;
@@ -36,7 +36,7 @@ ENUM_STR_MAP_DEFINE(DYNCFG_CMDS) = {
 
 ENUM_STR_DEFINE_FUNCTIONS(DYNCFG_CMDS, DYNCFG_CMD_NONE, "none");
 
-static void dyncfg_log_successful_action(DYNCFG *df, struct dyncfg_call *dc) {
+static void dyncfg_log_user_action(DYNCFG *df, struct dyncfg_call *dc) {
     if(dc->cmd == DYNCFG_CMD_USERCONFIG || dc->cmd == DYNCFG_CMD_GET || dc->cmd == DYNCFG_CMD_SCHEMA)
         return;
 
@@ -199,7 +199,7 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                 if (save_required || old_user_disabled != df->dyncfg.user_disabled)
                     dyncfg_file_save(dc->id, df);
 
-                dyncfg_log_successful_action(df, dc);
+                dyncfg_log_user_action(df, dc);
             }
             else
                 nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -218,10 +218,10 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
         dc->result_cb(wb, code, dc->result_cb_data);
 
     buffer_free(dc->payload);
-    freez(dc->function);
-    freez(dc->id);
-    freez(dc->source);
-    freez(dc->add_name);
+    freez((void *)dc->function);
+    freez((void *)dc->id);
+    freez((void *)dc->source);
+    freez((void *)dc->add_name);
     freez(dc);
 }
 
@@ -470,6 +470,24 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
                 if (df->dyncfg.user_disabled != old_user_disabled)
                     dyncfg_file_save(id, df);
+
+                // log it
+                {
+                    struct dyncfg_call dc = {
+                        .function = rfe->function,
+                        .id = id,
+                        .source = rfe->source,
+                        .add_name = add_name,
+                        .cmd = cmd,
+                        .result_cb = NULL,
+                        .result_cb_data = NULL,
+                        .payload = rfe->payload,
+                        .from_dyncfg_echo = called_from_dyncfg_echo,
+                    };
+                    uuid_copy(dc.transaction.uuid, *rfe->transaction);
+
+                    dyncfg_log_user_action(df, &dc);
+                }
             }
 
             dyncfg_apply_action_on_all_template_jobs(rfe, id, cmd);
