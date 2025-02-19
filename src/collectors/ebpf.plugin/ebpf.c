@@ -27,6 +27,8 @@ int isrh = 0;
 int main_thread_id = 0;
 int process_pid_fd = -1;
 uint64_t collect_pids = 0;
+static uint32_t integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
+ND_THREAD *socket_ipc = NULL;
 static size_t global_iterations_counter = 1;
 bool publish_internal_metrics = true;
 
@@ -982,6 +984,7 @@ static void ebpf_exit()
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
+    netdata_integration_cleanup_shm();
 
     exit(0);
 }
@@ -3182,6 +3185,34 @@ static void read_collector_values(int *disable_cgroups, int update_every, netdat
     }
 }
 
+static void ebpf_set_ipc_value(const char *integration)
+{
+    if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SHM)) {
+        integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
+        return;
+    } else if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SOCKET)) {
+        integration_with_collectors = NETDATA_EBPF_INTEGRATION_SOCKET;
+        return;
+    }
+    integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
+}
+
+static void ebpf_parse_ipc_section()
+{
+    const char *integration = inicfg_get(
+        &collector_config,
+        NETDATA_EBPF_IPC_SECTION,
+        NETDATA_EBPF_IPC_INTEGRATION,
+        NETDATA_EBPF_IPC_INTEGRATION_DISABLED);
+    ebpf_set_ipc_value(integration);
+
+    ipc_sockets.default_bind_to = inicfg_get(
+        &collector_config, NETDATA_EBPF_IPC_SECTION, NETDATA_EBPF_IPC_BIND_TO, NETDATA_EBPF_IPC_BIND_TO_DEFAULT);
+
+    ipc_sockets.backlog =
+        (int)inicfg_get_number(&collector_config, NETDATA_EBPF_IPC_SECTION, NETDATA_EBPF_IPC_BACKLOG, 20);
+}
+
 /**
  * Load collector config
  *
@@ -3207,6 +3238,7 @@ static int ebpf_load_collector_config(char *path, int *disable_cgroups, int upda
         origin = EBPF_LOADED_FROM_USER;
 
     read_collector_values(disable_cgroups, update_every, origin);
+    ebpf_parse_ipc_section();
 
     return 0;
 }
@@ -4139,6 +4171,28 @@ static pid_t ebpf_read_previous_pid(char *filename)
 }
 
 /**
+ * Initialize Data Sharing
+ *
+ * Start sharing according to user configuration.
+ */
+static void ebpf_initialize_data_sharing()
+{
+    switch (integration_with_collectors) {
+        case NETDATA_EBPF_INTEGRATION_SOCKET: {
+            socket_ipc =
+                nd_thread_create("ebpf_socket_ipc", NETDATA_THREAD_OPTION_DEFAULT, ebpf_socket_thread_ipc, NULL);
+            break;
+        }
+        case NETDATA_EBPF_INTEGRATION_SHM:
+            // All pid_map_size have the same value
+            netdata_integration_initialize_shm(ebpf_modules[EBPF_MODULE_PROCESS_IDX].pid_map_size);
+        case NETDATA_EBPF_INTEGRATION_DISABLED:
+        default:
+            break;
+    }
+}
+
+/**
  * Kill previous process
  *
  * Kill previous process whether it was not closed.
@@ -4269,6 +4323,8 @@ int main(int argc, char **argv)
 
     cgroup_integration_thread.thread =
         nd_thread_create(cgroup_integration_thread.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_cgroup_integration, NULL);
+
+    ebpf_initialize_data_sharing();
 
     uint32_t i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
