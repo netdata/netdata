@@ -311,11 +311,7 @@ func (m *Manager) verifyVnodeUnique(newCfg *vnodes.VirtualNode) error {
 
 func dyncfgUpdateVnodeConfig(cfg *vnodes.VirtualNode, name string, fn functions.Function) {
 	cfg.SourceType = confgroup.TypeDyncfg
-	src := "type=dyncfg"
-	if v := getFnSourceValue(fn, "user"); v != "" {
-		src += fmt.Sprintf(", user=%s", v)
-	}
-	cfg.Source = src
+	cfg.Source = fn.Source
 	cfg.Name = name
 	if cfg.Hostname == "" {
 		cfg.Hostname = name
