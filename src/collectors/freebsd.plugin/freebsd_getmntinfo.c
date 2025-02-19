@@ -135,12 +135,12 @@ int do_getmntinfo(int update_every, usec_t dt) {
     static SIMPLE_PATTERN *excluded_filesystems = NULL;
 
     if (unlikely(enable_new_mount_points == -1)) {
-        enable_new_mount_points = config_get_boolean_ondemand(CONFIG_SECTION_GETMNTINFO,
+        enable_new_mount_points = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETMNTINFO,
                                                               "enable new mount points detected at runtime",
                                                               CONFIG_BOOLEAN_AUTO);
 
-        do_space  = config_get_boolean_ondemand(CONFIG_SECTION_GETMNTINFO, "space usage for all disks",  CONFIG_BOOLEAN_AUTO);
-        do_inodes = config_get_boolean_ondemand(CONFIG_SECTION_GETMNTINFO, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
+        do_space  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETMNTINFO, "space usage for all disks",  CONFIG_BOOLEAN_AUTO);
+        do_inodes = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETMNTINFO, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
 
         excluded_mountpoints = simple_pattern_create(
             inicfg_get(&netdata_config, CONFIG_SECTION_GETMNTINFO, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS),
@@ -195,13 +195,13 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                        || simple_pattern_matches(excluded_filesystems, mntbuf[i].f_fstypename));
 
                     snprintfz(var_name, 4096, "%s:%s", CONFIG_SECTION_GETMNTINFO, mntbuf[i].f_mntonname);
-                    m->enabled = config_get_boolean_ondemand(var_name, "enabled", m->enabled);
+                    m->enabled = inicfg_get_boolean_ondemand(&netdata_config, var_name, "enabled", m->enabled);
 
                     if (unlikely(m->enabled == CONFIG_BOOLEAN_NO))
                         continue;
 
-                    m->do_space  = config_get_boolean_ondemand(var_name, "space usage",  do_space);
-                    m->do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", do_inodes);
+                    m->do_space  = inicfg_get_boolean_ondemand(&netdata_config, var_name, "space usage",  do_space);
+                    m->do_inodes = inicfg_get_boolean_ondemand(&netdata_config, var_name, "inodes usage", do_inodes);
                 }
 
                 if (unlikely(!m->enabled))
