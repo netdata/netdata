@@ -79,8 +79,8 @@ static void perform_repeated_alarm(RRDHOST *host, RRDCALC *rc,  struct health_ra
     health_send_notification(host, ae, hrm);
     netdata_log_debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
     health_alarm_wait_for_execution(ae);
-    health_alarm_log_free_one_nochecks_nounlink(ae);
-     worker_is_idle();
+    health_alarm_log_free_one_nochecks_nounlink(host, ae);
+    worker_is_idle();
 }
 
 void do_rc_status_change(RRDHOST *host, RRDCALC *rc, RRDCALC_STATUS status, time_t now)
@@ -504,14 +504,6 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
 
     rrdhost_set_health_evloop_iteration(host);
 
-    if (unlikely(__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED))) {
-        nd_log_daemon(
-            NDLP_DEBUG,
-            "Host \"%s\" has pending alert transitions to save, postponing health checks",
-            rrdhost_hostname(host));
-        return;
-    }
-
     if (unlikely(
             !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
             rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION))) {
@@ -627,21 +619,40 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
         alerts_raised_summary_free(hrm);
     }
 
-    int32_t pending = __atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED);
-    if (pending)
-        commit_alert_transitions(host);
 
-    if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
-        struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (wc && wc->send_snapshot == 1) {
-            wc->send_snapshot = 2;
-            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-        } else {
-            worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);
-            if (process_alert_pending_queue(host))
-                rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-        }
+    // Store all transitions
+    Word_t Index = 0;
+    bool first = true;
+    Pvoid_t *Pvalue;
+    while ((Pvalue = JudyLFirstThenNext(host->health.JudyL_ae, &Index, &first))) {
+        ALARM_ENTRY *ae = *Pvalue;
+
+        sql_health_alarm_log_save(host, ae);
+
+        __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELAXED);
     }
+    (void) JudyLFreeArray(&host->health.JudyL_ae, PJE0);
+
+    // Delete AE as needed
+    Index = 0;
+    first = true;
+    while ((Pvalue = JudyLFirstThenNext(host->health.JudyL_del_ae, &Index, &first))) {
+        ALARM_ENTRY *ae = *Pvalue;
+        if (!ae->pending_save_count)
+            health_alarm_log_free_one_nochecks_nounlink(host, ae);
+    }
+    (void) JudyLFreeArray(&host->health.JudyL_del_ae, PJE0);
+
+    struct aclk_sync_cfg_t *wc = host->aclk_config;
+    if (wc && wc->send_snapshot == 1) {
+        wc->send_snapshot = 2;
+        rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+    } else {
+        worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);
+        if (process_alert_pending_queue(host))
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+    }
+
     worker_is_idle();
 }
 
@@ -672,6 +683,7 @@ typedef enum health_job_type_t {
     HEALTH_JOB_HOST_RUN,
     HEALTH_JOB_HOST_INIT,
     HEALTH_JOB_HOST_MAINT,
+    HEALTH_JOB_HOST_CALC_CLEANUP,
     //
     HEALTH_JOB_MAX,
 } health_job_type_t;
@@ -681,11 +693,15 @@ struct health_config_s {
     uv_thread_t thread;
     uv_loop_t loop;
     uv_timer_t timer_req;
+    uv_timer_t timer_ae;
     uv_async_t async;
     SPINLOCK cmd_queue_lock;
     struct health_cmd *cmd_base;
     struct job_list_t *job_list[HEALTH_JOB_MAX];
     bool initialized;
+    bool running_ae;
+    uint32_t pending_ae_count;
+    Pvoid_t ae_DelJudyL;
     ARAL *ar;
 } health_config_s = { 0 };
 
@@ -727,6 +743,7 @@ struct job_list_t {
     health_job_type_t job_type;
     int pending;
     int running;
+    int max_threads;
     Pvoid_t JudyL;
     Word_t count;
 };
@@ -756,6 +773,28 @@ struct worker_data {
     struct health_config_s *config;
 };
 
+static void after_host_rrdcalc_cleanup(uv_work_t *req, int status __maybe_unused)
+{
+    struct worker_data *data = req->data;
+    RRDHOST *host = data->payload;
+    host->health.rrdcalc_cleanup_running = false;
+    struct health_config_s *config = data->config;
+    config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP]->running--;
+    freez(data);
+}
+
+static void host_rrdcalc_cleanup(uv_work_t *req)
+{
+    register_libuv_worker_jobs();
+    struct worker_data *data = req->data;
+    RRDHOST *host = data->payload;
+    worker_is_busy(UV_EVENT_HOST_CALC_CLEANUP);
+
+    rrdcalc_child_disconnected(host);
+
+    worker_is_idle();
+}
+
 static void after_host_health_maintenance(uv_work_t *req, int status __maybe_unused)
 {
     struct worker_data *data = req->data;
@@ -766,7 +805,7 @@ static void after_host_health_maintenance(uv_work_t *req, int status __maybe_unu
     freez(data);
 }
 
-static void host_health_maintenance(uv_work_t *req __maybe_unused)
+static void host_health_maintenance(uv_work_t *req)
 {
     register_libuv_worker_jobs();
     struct worker_data *data = req->data;
@@ -867,6 +906,11 @@ static void host_evaluate_alerts(uv_work_t *req)
 
     data->next_run = (start_ut / USEC_PER_SEC) + health_globals.config.run_at_least_every_seconds;
 
+    if (host_health->rrdcalc_cleanup_running) {
+        worker_is_idle();
+        return;
+    }
+
     // Just reschedule
     if (!stream_control_health_should_be_running()) {
         worker_is_idle();
@@ -883,7 +927,6 @@ static void host_evaluate_alerts(uv_work_t *req)
     host_health->last_runtime  = now_realtime_usec() - start_ut;
     COMPUTE_DURATION(report_duration, "us", 0, host_health->last_runtime);
     netdata_log_debug(D_HEALTH, "Alerts evaluated for \"%s\" in %s", rrdhost_hostname(host), report_duration);
-
     worker_is_idle();
 }
 
@@ -905,6 +948,9 @@ int send_job_to_worker(struct health_config_s *config, struct job_list_t *job, R
             break;
         case HEALTH_JOB_HOST_MAINT:
             rc = uv_queue_work(&config->loop, &data->request, host_health_maintenance, after_host_health_maintenance);
+            break;
+        case HEALTH_JOB_HOST_CALC_CLEANUP:
+            rc = uv_queue_work(&config->loop, &data->request, host_rrdcalc_cleanup, after_host_rrdcalc_cleanup);
             break;
         default:
             break;
@@ -955,12 +1001,13 @@ void del_job(struct job_list_t *job, Word_t Index)
     (void)JudyLDel(&job->JudyL, Index, PJE0);
 }
 
-void schedule_job_to_run(struct health_config_s *config, health_job_type_t job_type, int max_threads, RRDHOST *host)
+void schedule_job_to_run(struct health_config_s *config, health_job_type_t job_type, RRDHOST *host)
 {
     Pvoid_t *Pvalue;
     RRDHOST *host_in_queue;
 
     struct job_list_t *job = config->job_list[job_type];
+    int max_threads = job->max_threads;
     bool too_busy = (job->running >= max_threads);
 
     // If we are busy and it's just a ping to run, leave
@@ -1044,14 +1091,23 @@ static void health_ev_loop(void *arg)
     config->job_list[HEALTH_JOB_HOST_RUN] = callocz(1, sizeof(config->job_list));
     config->job_list[HEALTH_JOB_HOST_INIT] = callocz(1, sizeof(config->job_list));
     config->job_list[HEALTH_JOB_HOST_MAINT] = callocz(1, sizeof(config->job_list));
+    config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP] = callocz(1, sizeof(config->job_list));
 
     config->job_list[HEALTH_JOB_HOST_RUN]->job_type = HEALTH_JOB_HOST_RUN;
     config->job_list[HEALTH_JOB_HOST_INIT]->job_type = HEALTH_JOB_HOST_INIT;
     config->job_list[HEALTH_JOB_HOST_MAINT]->job_type = HEALTH_JOB_HOST_MAINT;
+    config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP]->job_type = HEALTH_JOB_HOST_CALC_CLEANUP;
+
+    config->job_list[HEALTH_JOB_HOST_RUN]->max_threads = max_thread_count;
+    config->job_list[HEALTH_JOB_HOST_INIT]->max_threads = 2;
+    config->job_list[HEALTH_JOB_HOST_MAINT]->max_threads = 2;
+    config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP]->max_threads = 2;
 
     health_register_host(localhost, localhost->health.delay_up_to);
     HEALTH *host_health;
     bool is_shutdown = false;
+    config->pending_ae_count = 0;
+
     while (likely(false == is_shutdown)) {
         enum health_opcode opcode;
         worker_is_idle();
@@ -1103,6 +1159,7 @@ static void health_ev_loop(void *arg)
                     break;
                 case HEALTH_HOST_UNREGISTER:
                     host = cmd.param[0];
+                    bool rrdcalc_cleanup = (bool)(uintptr_t)cmd.param[1];
                     host_health = &host->health;
                     if (!host_health->timer_initialized)
                         break;
@@ -1110,27 +1167,34 @@ static void health_ev_loop(void *arg)
                         uv_timer_stop(&host_health->timer);
                         netdata_log_debug(D_HEALTH,"Host \"%s\" is now unregistered from health", rrdhost_hostname(host));
                     }
+
+                    if (false == rrdcalc_cleanup)
+                        break;
+
+                    host_health->rrdcalc_cleanup_running = true;
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_CALC_CLEANUP, host);
                     break;
 
                 case HEALTH_HOST_INIT:
                     host = cmd.param[0];
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, max_thread_count, host);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, host);
                     break;
 
                 case HEALTH_HOST_RUN:
                     host = cmd.param[0];
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_RUN, max_thread_count, host);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_RUN, host);
                     break;
 
                 case HEALTH_RUN_JOBS:
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, max_thread_count, NULL);
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_RUN, max_thread_count, NULL);
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_MAINT, max_thread_count, NULL);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, NULL);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_RUN, NULL);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_MAINT, NULL);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_CALC_CLEANUP, NULL);
                     break;
 
                 case HEALTH_HOST_MAINTENANCE:
                     host = cmd.param[0];
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_MAINT, max_thread_count, host);
+                    schedule_job_to_run(config, HEALTH_JOB_HOST_MAINT, host);
                     break;
 
                 case HEALTH_SHUTDOWN:
@@ -1236,9 +1300,10 @@ void health_register_host(RRDHOST *host, time_t run_at)
     queue_health_cmd(HEALTH_HOST_REGISTER, host, (void *)(uintptr_t)delay);
 }
 
-void health_unregister_host(RRDHOST *host)
+void health_unregister_host(RRDHOST *host, bool rrdcalc_cleanup)
 {
-    queue_health_cmd(HEALTH_HOST_UNREGISTER, host, NULL);
+    // This should run a cleanup for the host
+    queue_health_cmd(HEALTH_HOST_UNREGISTER, host, (void *)(uintptr_t)rrdcalc_cleanup);
 }
 
 void health_run_jobs()
@@ -1249,4 +1314,20 @@ void health_run_jobs()
 void health_shutdown()
 {
     queue_health_cmd(HEALTH_SHUTDOWN, NULL, NULL);
+}
+
+void health_schedule_ae_save(RRDHOST *host, ALARM_ENTRY *ae)
+{
+    __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
+
+    Pvoid_t *Pvalue = JudyLIns(&host->health.JudyL_ae, ++host->health.count, PJE0);
+    if (Pvalue)
+        *Pvalue = (void *)ae;
+}
+
+void health_queue_ae_deletion(RRDHOST *host, ALARM_ENTRY *ae)
+{
+    Pvoid_t *Pvalue = JudyLIns(&host->health.JudyL_del_ae, ++host->health.delete_count, PJE0);
+    if (Pvalue)
+        *Pvalue = (void *)ae;
 }
