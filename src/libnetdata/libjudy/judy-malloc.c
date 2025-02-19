@@ -97,7 +97,7 @@ static void *jemalloc_malloc(Word_t Words) {
     return mallocx(Words * sizeof(Word_t), MALLOCX_ARENA(jemalloc_arena_index));
 }
 
-static void jemalloc_free(void * PWord, Word_t Words) {
+static void jemalloc_free(void * PWord, Word_t Words __maybe_unused) {
     if(PWord)
         dallocx(PWord, MALLOCX_ARENA(jemalloc_arena_index));
 }
