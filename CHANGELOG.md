@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- fix\(go.d dyncfg\): don't overwrite source [\#19673](https://github.com/netdata/netdata/pull/19673) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d dyncfg\): log collector dyncfg actions [\#19672](https://github.com/netdata/netdata/pull/19672) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/k8sstate\): correct deployment conditions [\#19671](https://github.com/netdata/netdata/pull/19671) ([ilyam8](https://github.com/ilyam8))
+- chore: remove netdata\_configured\_lock\_dir [\#19669](https://github.com/netdata/netdata/pull/19669) ([ilyam8](https://github.com/ilyam8))
+- chore: remove lock files from go.d/python.d [\#19668](https://github.com/netdata/netdata/pull/19668) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/sensors\): disable by default [\#19667](https://github.com/netdata/netdata/pull/19667) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d dyncfg\): add user to source [\#19666](https://github.com/netdata/netdata/pull/19666) ([ilyam8](https://github.com/ilyam8))
 - add k8s\_state\_deployment\_condition\_available alert [\#19664](https://github.com/netdata/netdata/pull/19664) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19663](https://github.com/netdata/netdata/pull/19663) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/k8sstate\): add deployment conditions [\#19662](https://github.com/netdata/netdata/pull/19662) ([ilyam8](https://github.com/ilyam8))
@@ -480,12 +487,6 @@
 - chore\(windows/hyperv\): small Hyper-V fixes [\#19130](https://github.com/netdata/netdata/pull/19130) ([ilyam8](https://github.com/ilyam8))
 - docs\(windows/hyperv\): add Hyper-V metadata [\#19129](https://github.com/netdata/netdata/pull/19129) ([ilyam8](https://github.com/ilyam8))
 - fix\(system-info\): change id\_like and name mac -\> macOS [\#19128](https://github.com/netdata/netdata/pull/19128) ([ilyam8](https://github.com/ilyam8))
-- fix\(packaging\): correct go linux 386 checksum [\#19127](https://github.com/netdata/netdata/pull/19127) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19126](https://github.com/netdata/netdata/pull/19126) ([netdatabot](https://github.com/netdatabot))
-- Integrations gha, remove .js and .json files after the process [\#19125](https://github.com/netdata/netdata/pull/19125) ([Ancairon](https://github.com/Ancairon))
-- Avoid scanning charts for replication status [\#19124](https://github.com/netdata/netdata/pull/19124) ([stelfrag](https://github.com/stelfrag))
-- Address installer minor issues \(Windows\) [\#19122](https://github.com/netdata/netdata/pull/19122) ([thiagoftsm](https://github.com/thiagoftsm))
-- Move eBPF code from linetdata to src/collector [\#19121](https://github.com/netdata/netdata/pull/19121) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
