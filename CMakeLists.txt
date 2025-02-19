@@ -1673,6 +1673,8 @@ set(WEB_PLUGIN_FILES
         src/web/api/queries/backfill.h
         src/web/api/functions/function-metrics-cardinality.c
         src/web/api/functions/function-metrics-cardinality.h
+        src/web/api/request_source.c
+        src/web/api/request_source.h
 )
 
 set(CLAIM_PLUGIN_FILES
