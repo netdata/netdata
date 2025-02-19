@@ -9,8 +9,11 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building bash" || true
 
-fetch "bash-${BASH_VERSION}" "${BASH_ARTIFACT_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
-    "${BASH_ARTIFACT_SHA256}" bash
+# For some stupid reason, the GNU bash project does not actually tag
+# releases, so we need to use a branch ofr the version, and that in turn
+# only tracks down to the minor version. Thus, we need to cache by day to
+# ensure we get the latest copy.
+fetch_git bash "${BASH_REPO}" "${BASH_VERSION}" "${BASH_VERSION}-$(date +%F)"
 
 export CFLAGS="${TUNING_FLAGS} -pipe"
 export CXXFLAGS="${CFLAGS}"

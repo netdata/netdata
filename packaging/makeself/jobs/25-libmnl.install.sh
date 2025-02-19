@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Install the libmnl and it's dependency libmnl
-
+# Install libmnl
 
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
@@ -17,8 +16,7 @@ export CXXFLAGS="${CFLAGS}"
 export LDFLAGS="-static"
 export PKG_CONFIG="pkg-config --static"
 
-fetch "libmnl-${LIBMNL_VERSION}" "${LIBMNL_SOURCE}/libmnl-${LIBMNL_VERSION}.tar.bz2" \
-    "${LIBMNL_ARTIFACT_SHA256}" libmnl
+fetch_git libmnl "${LIBMNL_REPO}" "${LIBMNL_VERSION}" "${LIBMNL_VERSION}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run ./configure \

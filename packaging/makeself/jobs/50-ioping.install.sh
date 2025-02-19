@@ -9,8 +9,7 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building ioping" || true
 
-fetch "ioping-${IOPING_VERSION}" "${IOPING_SOURCE}/archive/refs/tags/v${IOPING_VERSION}.tar.gz" \
-    "${IOPING_ARTIFACT_SHA256}" ioping
+fetch_git ioping "${IOPING_REPO}" "${IOPING_VERSION}" "ioping-${IOPING_VERSION}"
 
 export CFLAGS="${TUNING_FLAGS} -static -pipe"
 export CXXFLAGS="${CFLAGS}"
