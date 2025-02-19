@@ -55,6 +55,8 @@ add_cmake_option BUILD_FOR_PACKAGING On
 
 case "${PKG_TYPE}" in
     DEB)
+        add_cmake_option PACKAGE_TYPE deb
+
         case "$(dpkg-architecture -q DEB_TARGET_ARCH)" in
             amd64)
                 add_cmake_option ENABLE_PLUGIN_XENSTAT On
@@ -70,7 +72,9 @@ case "${PKG_TYPE}" in
                 ;;
         esac
         ;;
-    RPM) ;;
+    RPM)
+        add_cmake_optkon PACKAGE_TYPE rpm
+        ;;
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;
 esac
 
