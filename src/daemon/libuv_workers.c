@@ -57,7 +57,7 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_METADATA_ML_LOAD, "metadata load ml models");
     worker_register_job_name(UV_EVENT_CTX_CLEANUP_SCHEDULE, "metadata ctx cleanup schedule");
     worker_register_job_name(UV_EVENT_CTX_CLEANUP, "metadata ctx cleanup");
-    worker_register_job_name(UV_EVENT_STORE_ALERT_TRANSITIONS, "metadata store alert transitions");
+//    worker_register_job_name(UV_EVENT_STORE_ALERT_TRANSITIONS, "metadata store alert transitions");
     worker_register_job_name(UV_EVENT_CHART_LABEL_CLEANUP, "metadata chart label cleanup");
     worker_register_job_name(UV_EVENT_HEALTH_LOG_CLEANUP, "alert transitions cleanup");
     worker_register_job_name(UV_EVENT_UUID_DELETION, "metadata dimension deletion");
@@ -86,7 +86,12 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_ALERT_START_STREAMING, "alert start streaming");
     worker_register_job_name(UV_EVENT_ALERT_CHECKPOINT, "alert checkpoint");
     worker_register_job_name(UV_EVENT_CREATE_NODE_INSTANCE, "create node instance");
-    worker_register_job_name(UV_EVENT_UNREGISTER_NODE, "unregister node locally");
+
+    // health
+    worker_register_job_name(UV_EVENT_HOST_HEALTH_INIT, "host health initialization");
+    worker_register_job_name(UV_EVENT_HOST_HEALTH_RUN, "host health run");
+    worker_register_job_name(UV_EVENT_HOST_CALC_CLEANUP, "host calc cleanup");
+
 
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");

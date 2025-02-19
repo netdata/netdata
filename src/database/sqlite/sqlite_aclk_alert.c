@@ -25,12 +25,12 @@ static inline bool is_event_from_alert_variable_config(int64_t unique_id, nd_uui
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_health, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &compiled_res))
                 return false;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &res))
+        if (!PREPARE_STATEMENT(db_health, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &res))
             return false;
     }
 
@@ -62,12 +62,12 @@ static void update_alert_version_transition(int64_t health_log_id, int64_t uniqu
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION_TRANSITION, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_UPDATE_ALERT_VERSION_TRANSITION, &compiled_res))
                 return;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION_TRANSITION, &res))
+        if (!PREPARE_STATEMENT(db_aclk, SQL_UPDATE_ALERT_VERSION_TRANSITION, &res))
             return;
     }
 
@@ -99,12 +99,12 @@ static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status)
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_LAST_ALERT_STATUS, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_SELECT_LAST_ALERT_STATUS, &compiled_res))
                 return true;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_LAST_ALERT_STATUS, &res))
+        if (!PREPARE_STATEMENT(db_aclk, SQL_SELECT_LAST_ALERT_STATUS, &res))
             return true;
     }
 
@@ -157,12 +157,12 @@ static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, ui
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_QUEUE_ALERT_TO_CLOUD, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_QUEUE_ALERT_TO_CLOUD, &compiled_res))
                 return -1;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_QUEUE_ALERT_TO_CLOUD, &res))
+        if (!PREPARE_STATEMENT(db_aclk, SQL_QUEUE_ALERT_TO_CLOUD, &res))
             return -1;
     }
 
@@ -195,7 +195,7 @@ static int delete_alert_from_submit_queue(RRDHOST *host, int64_t first_seq_id, i
 {
     sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_QUEUE_ALERT_TO_CLOUD, &res))
+    if (!PREPARE_STATEMENT(db_aclk, SQL_DELETE_QUEUE_ALERT_TO_CLOUD, &res))
         return -1;
 
     int param = 0;
@@ -278,7 +278,7 @@ static void sql_update_alert_version(
     sqlite3_stmt **res)
 {
     if (!*res) {
-        if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION, res))
+        if (!PREPARE_STATEMENT(db_aclk, SQL_UPDATE_ALERT_VERSION, res))
             return;
     }
 
@@ -314,7 +314,7 @@ static void commit_alert_events(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_DUMMY, &res))
+    if (!PREPARE_STATEMENT(db_aclk, SQL_SELECT_ALERT_TO_DUMMY, &res))
         return;
 
     int param = 0;
@@ -485,7 +485,7 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
         return;
 
     if (!*res) {
-        if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_PUSH, res))
+        if (!PREPARE_STATEMENT(db_aclk, SQL_SELECT_ALERT_TO_PUSH, res))
             return;
     }
 
@@ -550,12 +550,12 @@ static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row)
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_DELETE_PROCESSED_ROWS, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_DELETE_PROCESSED_ROWS, &compiled_res))
                 return;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_PROCESSED_ROWS, &res))
+        if (!PREPARE_STATEMENT(db_aclk, SQL_DELETE_PROCESSED_ROWS, &res))
             return;
     }
 
@@ -589,7 +589,7 @@ void rebuild_host_alert_version_table(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_HOST_ALERT_VERSION_TABLE, &res))
+    if (!PREPARE_STATEMENT(db_aclk, SQL_DELETE_HOST_ALERT_VERSION_TABLE, &res))
         return;
 
     int param = 0;
@@ -603,7 +603,7 @@ void rebuild_host_alert_version_table(RRDHOST *host)
     }
 
     SQLITE_FINALIZE(res);
-    if (!PREPARE_STATEMENT(db_meta, SQL_REBUILD_HOST_ALERT_VERSION_TABLE, &res))
+    if (!PREPARE_STATEMENT(db_aclk, SQL_REBUILD_HOST_ALERT_VERSION_TABLE, &res))
         return;
 
     param = 0;
@@ -630,12 +630,12 @@ bool process_alert_pending_queue(RRDHOST *host)
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_PROCESS_ALERT_PENDING_QUEUE, &compiled_res))
                 return false;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &res))
+        if (!PREPARE_STATEMENT(db_aclk, SQL_PROCESS_ALERT_PENDING_QUEUE, &res))
             return false;
     }
 
@@ -750,7 +750,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
         return;
     }
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_CONFIG, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_SELECT_ALERT_CONFIG, &res))
         return;
 
     nd_uuid_t hash_uuid;
@@ -850,7 +850,7 @@ uint64_t calculate_node_alert_version(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_ALERT_VERSION_CALC, &res))
+    if (!PREPARE_STATEMENT(db_aclk, SQL_ALERT_VERSION_CALC, &res))
         return 0;
 
     uint64_t version = 0;
@@ -916,7 +916,7 @@ static int calculate_alert_snapshot_entries(nd_uuid_t *host_uuid)
 
     sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_COUNT_SNAPSHOT_ENTRIES, &res))
+    if (!PREPARE_STATEMENT(db_aclk, SQL_COUNT_SNAPSHOT_ENTRIES, &res))
         return 0;
 
     int param = 0;
@@ -967,7 +967,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         return;
 
     sqlite3_stmt *res = NULL;
-    if (!PREPARE_STATEMENT(db_meta, SQL_GET_SNAPSHOT_ENTRIES, &res))
+    if (!PREPARE_STATEMENT(db_aclk, SQL_GET_SNAPSHOT_ENTRIES, &res))
         return;
 
     int param = 0;

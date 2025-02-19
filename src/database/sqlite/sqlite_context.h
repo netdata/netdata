@@ -66,7 +66,6 @@ int ctx_store_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data
 
 int ctx_delete_context(nd_uuid_t *host_id, VERSIONED_CONTEXT_DATA *context_data);
 
-int sql_init_context_database(int memory);
 uint64_t sqlite_get_context_space(void);
 int ctx_unittest(void);
 #endif //NETDATA_SQLITE_CONTEXT_H
