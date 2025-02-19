@@ -160,6 +160,7 @@ BuildRequires: pkgconfig(libcurl)
 BuildRequires: pkgconfig(liblz4)
 BuildRequires: pkgconfig(yaml-0.1)
 BuildRequires: pkgconfig(json-c)
+BuildRequires: pkgconfig(libunwind)
 %if %{_have_log2journal}
 BuildRequires: pkgconfig(libpcre2-8)
 %endif
@@ -406,7 +407,8 @@ happened, on your systems and applications.
 	-DENABLE_PLUGIN_SYSTEMD_JOURNAL=On \
 	-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On \
 	-DENABLE_BUNDLED_JSONC=Off \
-	-DENABLE_BUNDLED_YAML=Off
+	-DENABLE_BUNDLED_YAML=Off \
+	-DENABLE_LBIUNWIND=On
 
 # Build step
 %{cmake_build}
