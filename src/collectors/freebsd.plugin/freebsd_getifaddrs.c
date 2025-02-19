@@ -153,27 +153,27 @@ int do_getifaddrs(int update_every, usec_t dt) {
     static SIMPLE_PATTERN *excluded_interfaces = NULL, *physical_interfaces = NULL;
 
     if (unlikely(enable_new_interfaces == -1)) {
-        enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS,
+        enable_new_interfaces = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETIFADDRS,
                                                               "enable new interfaces detected at runtime",
                                                               CONFIG_BOOLEAN_AUTO);
 
-        do_bandwidth_net  = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "total bandwidth for physical interfaces",
+        do_bandwidth_net  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETIFADDRS, "total bandwidth for physical interfaces",
                                                        CONFIG_BOOLEAN_AUTO);
-        do_packets_net    = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "total packets for physical interfaces",
+        do_packets_net    = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETIFADDRS, "total packets for physical interfaces",
                                                        CONFIG_BOOLEAN_AUTO);
-        do_bandwidth_ipv4 = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "total bandwidth for ipv4 interfaces",
+        do_bandwidth_ipv4 = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETIFADDRS, "total bandwidth for ipv4 interfaces",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_bandwidth_ipv6 = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "total bandwidth for ipv6 interfaces",
+        do_bandwidth_ipv6 = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETIFADDRS, "total bandwidth for ipv6 interfaces",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_bandwidth      = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "bandwidth for all interfaces",
+        do_bandwidth      = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETIFADDRS, "bandwidth for all interfaces",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_packets        = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "packets for all interfaces",
+        do_packets        = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETIFADDRS, "packets for all interfaces",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_errors         = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "errors for all interfaces",
+        do_errors         = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETIFADDRS, "errors for all interfaces",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_drops          = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "drops for all interfaces",
+        do_drops          = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETIFADDRS, "drops for all interfaces",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_events         = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "collisions for all interfaces",
+        do_events         = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_GETIFADDRS, "collisions for all interfaces",
                                                         CONFIG_BOOLEAN_AUTO);
 
         excluded_interfaces = simple_pattern_create(
@@ -406,16 +406,16 @@ int do_getifaddrs(int update_every, usec_t dt) {
                         ifm->enabled = !simple_pattern_matches(excluded_interfaces, ifa->ifa_name);
 
                     snprintfz(var_name, 4096, "%s:%s", CONFIG_SECTION_GETIFADDRS, ifa->ifa_name);
-                    ifm->enabled = config_get_boolean_ondemand(var_name, "enabled", ifm->enabled);
+                    ifm->enabled = inicfg_get_boolean_ondemand(&netdata_config, var_name, "enabled", ifm->enabled);
 
                     if (unlikely(ifm->enabled == CONFIG_BOOLEAN_NO))
                         continue;
 
-                    ifm->do_bandwidth = config_get_boolean_ondemand(var_name, "bandwidth", do_bandwidth);
-                    ifm->do_packets   = config_get_boolean_ondemand(var_name, "packets",   do_packets);
-                    ifm->do_errors    = config_get_boolean_ondemand(var_name, "errors",    do_errors);
-                    ifm->do_drops     = config_get_boolean_ondemand(var_name, "drops",     do_drops);
-                    ifm->do_events    = config_get_boolean_ondemand(var_name, "events",    do_events);
+                    ifm->do_bandwidth = inicfg_get_boolean_ondemand(&netdata_config, var_name, "bandwidth", do_bandwidth);
+                    ifm->do_packets   = inicfg_get_boolean_ondemand(&netdata_config, var_name, "packets",   do_packets);
+                    ifm->do_errors    = inicfg_get_boolean_ondemand(&netdata_config, var_name, "errors",    do_errors);
+                    ifm->do_drops     = inicfg_get_boolean_ondemand(&netdata_config, var_name, "drops",     do_drops);
+                    ifm->do_events    = inicfg_get_boolean_ondemand(&netdata_config, var_name, "events",    do_events);
                 }
 
                 if (unlikely(!ifm->enabled))
