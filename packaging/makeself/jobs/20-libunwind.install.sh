@@ -23,20 +23,7 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libunwind" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
 fi
 
-cache="$(cache_path)"
-
-if [ -d "${cache}" ]; then
-  echo "Found cached copy of build directory for libunwind, using it."
-  cp -a "${cache}/libunwind" "${NETDATA_MAKESELF_PATH}/tmp/"
-  CACHE_HIT=1
-else
-  echo "No cached copy of build directory for libunwind found, fetching sources instead."
-  run git clone "${LIBUNWIND_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
-  cd "${NETDATA_MAKESELF_PATH}/tmp/libunwind" && run git checkout "${LIBUNWIND_VERSION}"
-  CACHE_HIT=0
-fi
-
-cd "${NETDATA_MAKESELF_PATH}/tmp/libunwind" || exit 1
+fetch_git libunwind "${LIBUNWIND_SOURCE}" "${LIBUNWIND_VERSION}" "libunwind-${LIBUNWIND_VERSION}" fetch-via-checkout
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
   run autoreconf -ivf
