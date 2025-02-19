@@ -2008,7 +2008,7 @@ PGC *pgc_create(const char *name,
     cache->config.out_of_memory_protection_bytes    = (int64_t)dbengine_out_of_memory_protection;
 
     // partitions
-    if(partitions == 0) partitions  = netdata_conf_cpus();
+    if(partitions == 0) partitions  = netdata_conf_cpus() * 2;
     if(partitions <= 4) partitions  = 4;
     if(partitions > 256) partitions = 256;
     cache->config.partitions        = partitions;
