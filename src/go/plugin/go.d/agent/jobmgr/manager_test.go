@@ -567,6 +567,7 @@ FUNCTION_RESULT_END
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: bs,
 						})
@@ -589,7 +590,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-get 200 application/json
 {"option_str":"1","option_int":1}
@@ -684,6 +685,7 @@ func TestManager_Run_Dyncfg_Add(t *testing.T) {
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -702,7 +704,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -715,6 +717,7 @@ CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg '
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -733,7 +736,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -746,11 +749,13 @@ CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'typ
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "2-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -769,13 +774,13 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -826,6 +831,7 @@ FUNCTION_RESULT_END
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -848,7 +854,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -867,6 +873,7 @@ CONFIG go.d:collector:success:test status running
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -893,7 +900,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -918,6 +925,7 @@ CONFIG go.d:collector:success:test status running
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -940,7 +948,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -959,6 +967,7 @@ CONFIG go.d:collector:fail:test status failed
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -985,7 +994,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -1048,6 +1057,7 @@ FUNCTION_RESULT_END
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -1070,7 +1080,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1089,6 +1099,7 @@ CONFIG go.d:collector:success:test status disabled
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -1115,7 +1126,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1140,6 +1151,7 @@ CONFIG go.d:collector:success:test status disabled
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -1162,7 +1174,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1181,6 +1193,7 @@ CONFIG go.d:collector:fail:test status disabled
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -1207,7 +1220,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1270,6 +1283,7 @@ FUNCTION_RESULT_END
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -1292,7 +1306,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-restart 405 application/json
 {"status":405,"message":"Restarting data collection job is not allowed in 'accepted' state."}
@@ -1311,6 +1325,7 @@ CONFIG go.d:collector:success:test status accepted
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -1337,7 +1352,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1362,6 +1377,7 @@ CONFIG go.d:collector:success:test status running
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -1388,7 +1404,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1413,6 +1429,7 @@ CONFIG go.d:collector:success:test status disabled
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -1443,7 +1460,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1607,6 +1624,7 @@ FUNCTION_RESULT_END
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -1625,7 +1643,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-remove 200 application/json
 {"status":200,"message":""}
@@ -1644,6 +1662,7 @@ CONFIG go.d:collector:success:test delete
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
 						})
@@ -1666,7 +1685,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1735,6 +1754,7 @@ FUNCTION_RESULT_END
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(origCfg.Module()), "add", origCfg.Name()},
 							Payload: origBs,
 						})
@@ -1744,6 +1764,7 @@ FUNCTION_RESULT_END
 						})
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "3-update",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgJobID(origCfg), "update"},
 							Payload: updBs,
 						})
@@ -1762,7 +1783,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1792,6 +1813,7 @@ CONFIG go.d:collector:success:test status running
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "1-add",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgModID(origCfg.Module()), "add", origCfg.Name()},
 							Payload: origBs,
 						})
@@ -1801,6 +1823,7 @@ CONFIG go.d:collector:success:test status running
 						})
 						mgr.dyncfgConfig(functions.Function{
 							UID:     "3-update",
+							Source:  "type=dyncfg",
 							Args:    []string{dyncfgJobID(origCfg), "update"},
 							Payload: updBs,
 						})
@@ -1819,7 +1842,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1886,7 +1909,7 @@ func prepareDyncfgCfg(module, job string) confgroup.Config {
 	return confgroup.Config{}.
 		SetSourceType(confgroup.TypeDyncfg).
 		SetProvider("dyncfg").
-		SetSource(fmt.Sprintf("type=dyncfg,module=%s,job=%s", module, job)).
+		SetSource("type=dyncfg").
 		SetModule(module).
 		SetName(job)
 }
