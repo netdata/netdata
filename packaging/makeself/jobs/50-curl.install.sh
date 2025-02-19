@@ -13,7 +13,8 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/curl" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/curl"
 fi
 
-fetch_git curl "${CURL_REPO}" "${CURL_VERSION}" "${CURL_VERSION}"
+cache_key="${CURL_VERSION}"
+fetch_git curl "${CURL_REPO}" "${CURL_VERSION}" "${cache_key}"
 
 export CFLAGS="${TUNING_FLAGS} -I/openssl-static/include -pipe"
 export CXXFLAGS="${CFLAGS}"
@@ -62,7 +63,7 @@ fi
 
 run make install
 
-store_cache curl "${NETDATA_MAKESELF_PATH}/tmp/curl"
+store_cache "${cache_key}" "${NETDATA_MAKESELF_PATH}/tmp/curl"
 
 cp /curl-local/bin/curl "${NETDATA_INSTALL_PATH}"/bin/curl
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then

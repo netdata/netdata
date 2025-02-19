@@ -17,9 +17,12 @@ export LDFLAGS="-static"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/libmnl-static/lib/pkgconfig"
 
-fetch_git libnetfilter_acct "${LIBNETFILTER_ACCT_REPO}" "${LIBNETFILTER_ACCT_VERSION}" "${LIBNETFILTER_ACCT_VERSION}"
+cache_key="${LIBNETFILTER_ACCT_VERSION}"
+fetch_git libnetfilter_acct "${LIBNETFILTER_ACCT_REPO}" "${LIBNETFILTER_ACCT_VERSION}" "${cache_key}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
+    run autoreconf -ivf
+
     run ./configure \
         --prefix="/libnetfilter-acct-static" \
         --exec-prefix="/libnetfilter-acct-static"
@@ -30,7 +33,7 @@ fi
 
 run make install
 
-store_cache libnetfilter_acct "${NETDATA_MAKESELF_PATH}/tmp/libnetfilter_acct-${LIBNETFILTER_ACT_VERSION}"
+store_cache "${cache_key}" "${NETDATA_MAKESELF_PATH}/tmp/libnetfilter_acct"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true
