@@ -61,3 +61,46 @@ $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/n
 2. **Grant Administrator Privileges**: You'll need to provide administrator permissions to install the Netdata service.
 
 Once installed, you can access your Netdata dashboard at `localhost:19999`.
+
+## Installing Netdata using Winget
+
+This section provides instructions for installing Netdata using Winget, the official Windows package manager by Microsoft.
+
+### Prerequisites
+
+Ensure you have Winget installed on your system. If not, follow the instructions on the [Winget documentation](https://learn.microsoft.com/en-us/windows/package-manager/winget/).
+
+### Install Netdata
+
+To install Netdata using Winget, run the following command:
+
+```powershell
+winget install netdata.netdata
+```
+
+### Update Netdata
+
+To update Netdata to the latest version using Winget, run the following command:
+
+```powershell
+winget upgrade netdata.netdata
+```
+
+### Uninstall Netdata
+
+To uninstall Netdata using Winget, run the following command:
+
+```powershell
+winget uninstall netdata.netdata
+```
+
+### Troubleshooting Winget Installation
+
+If you encounter issues while installing Netdata using Winget, consider the following troubleshooting steps:
+
+1. **Ensure Winget is up to date**: Run `winget --version` to check the version and update if necessary.
+2. **Check network connectivity**: Ensure your system has a stable internet connection.
+3. **Verify package identifier**: Ensure you are using the correct package identifier (`netdata.netdata`).
+4. **Review Winget logs**: Check the Winget logs for any error messages or details about the installation process.
+
+For further assistance, refer to the [Winget documentation](https://learn.microsoft.com/en-us/windows/package-manager/winget/) or seek help from the Netdata community.
