@@ -13,19 +13,7 @@ export CXXFLAGS="${CFLAGS}"
 #export LDFLAGS="-static"
 #export PKG_CONFIG="pkg-config --static"
 
-cache="$(cache_path libelf)"
-
-if [ -d "${cache}" ]; then
-  echo "Found cached copy of build directory for libelf, using it."
-  cp -a "${cache}/libelf" "${NETDATA_MAKESELF_PATH}/tmp/"
-  CACHE_HIT=1
-else
-  echo "No cached copy of build directory for libelf found, fetching sources instead."
-  run git clone --branch "${LIBELF_VERSION}" --single-branch --depth 1 "${LIBELF_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/libelf"
-  CACHE_HIT=0
-fi
-
-cd "${NETDATA_MAKESELF_PATH}/tmp/libelf" || exit 1
+fetch_git libelf "${LIBELF_SOURCE}" "${LIBELF_VERSION}" "${LIBELF_VERSION}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
   patch -p1 <<-'EOF'

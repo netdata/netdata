@@ -89,6 +89,29 @@ fetch() {
   run cd "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
 }
 
+fetch_git() {
+  local dir="${1}" url="${2}" tag="${3}" key="${4}"
+  local cache
+  cache="$(cache_path "${key}")"
+  local path="${NETDATA_MAKESELF_PATH}/tmp/${dir}"
+
+  if [ -d "${path}" ]; then
+    rm -rf "${path}"
+  fi
+
+  if [ -d "${cache}/${dir}" ]; then
+    echo "Found cached copy of build directory for ${key}, using it."
+    cp -a "${cache}/${dir}" "${NETDATA_MAKESELF_PATH}/tmp/"
+    CACHE_HIT=1
+  else
+    echo "No cached copy of build directory for ${key} found, fetching sources instead."
+    run git clone --branch "${tag}" --single-branch --depth 1 "${url}" "${path}"
+    CACHE_HIT=0
+  fi
+
+  run cd "${path}" || exit 1
+}
+
 store_cache() {
   local key="${1}"
   local src="${2}"
