@@ -49,7 +49,6 @@ void set_environment_for_plugins_and_scripts(void) {
     nd_setenv("NETDATA_WEB_DIR", verify_required_directory(netdata_configured_web_dir), 1);
     nd_setenv("NETDATA_CACHE_DIR", verify_or_create_required_directory(netdata_configured_cache_dir), 1);
     nd_setenv("NETDATA_LIB_DIR", verify_or_create_required_directory(netdata_configured_varlib_dir), 1);
-    nd_setenv("NETDATA_LOCK_DIR", verify_or_create_required_directory(netdata_configured_lock_dir), 1);
     nd_setenv("NETDATA_LOG_DIR", verify_or_create_required_directory(netdata_configured_log_dir), 1);
     nd_setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 

@@ -19,7 +19,6 @@ type envConfig struct {
 	userDir    string
 	stockDir   string
 	varLibDir  string
-	lockDir    string
 	watchPath  string
 	logLevel   string
 }
@@ -30,7 +29,6 @@ func newEnvConfig() *envConfig {
 		userDir:    os.Getenv("NETDATA_USER_CONFIG_DIR"),
 		stockDir:   os.Getenv("NETDATA_STOCK_CONFIG_DIR"),
 		varLibDir:  os.Getenv("NETDATA_LIB_DIR"),
-		lockDir:    os.Getenv("NETDATA_LOCK_DIR"),
 		watchPath:  os.Getenv("NETDATA_PLUGINS_GOD_WATCH_PATH"),
 		logLevel:   os.Getenv("NETDATA_LOG_LEVEL"),
 	}
@@ -38,7 +36,6 @@ func newEnvConfig() *envConfig {
 	cfg.userDir = cfg.handleDirOnWin(cfg.userDir)
 	cfg.stockDir = cfg.handleDirOnWin(cfg.stockDir)
 	cfg.varLibDir = cfg.handleDirOnWin(cfg.varLibDir)
-	cfg.lockDir = cfg.handleDirOnWin(cfg.lockDir)
 	cfg.watchPath = cfg.handleDirOnWin(cfg.watchPath)
 
 	return cfg
@@ -66,7 +63,6 @@ type config struct {
 	collectorsWatchPath []string
 	serviceDiscoveryDir multipath.MultiPath
 	stateFile           string
-	lockDir             string
 }
 
 func newConfig(opts *cli.Option, env *envConfig) *config {
@@ -79,7 +75,6 @@ func newConfig(opts *cli.Option, env *envConfig) *config {
 	cfg.collectorsWatchPath = cfg.initCollectorsWatchPaths(opts, env)
 	cfg.serviceDiscoveryDir = cfg.initServiceDiscoveryConfigDir()
 	cfg.stateFile = cfg.initStateFile(env)
-	cfg.lockDir = env.lockDir
 
 	return cfg
 }

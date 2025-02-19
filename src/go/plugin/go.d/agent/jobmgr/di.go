@@ -9,12 +9,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
 
-type FileLocker interface {
-	Lock(name string) (bool, error)
-	Unlock(name string)
-	UnlockAll()
-}
-
 type FileStatus interface {
 	Save(cfg confgroup.Config, state string)
 	Remove(cfg confgroup.Config)

@@ -371,6 +371,13 @@ func TestCollector_Collect(t *testing.T) {
 				step1 := func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
+						"deploy_default_replicaset01_age":                                                        3,
+						"deploy_default_replicaset01_condition_available":                                        1,
+						"deploy_default_replicaset01_condition_progressing":                                      1,
+						"deploy_default_replicaset01_condition_replica_failure":                                  1,
+						"deploy_default_replicaset01_current_replicas":                                           1,
+						"deploy_default_replicaset01_desired_replicas":                                           2,
+						"deploy_default_replicaset01_ready_replicas":                                             3,
 						"discovery_node_discoverer_state":                                                        1,
 						"discovery_pod_discoverer_state":                                                         1,
 						"node_node01_age":                                                                        3,
@@ -480,10 +487,6 @@ func TestCollector_Collect(t *testing.T) {
 						"pod_default_pod01_status_reason_Other":                                                  0,
 						"pod_default_pod01_status_reason_Shutdown":                                               0,
 						"pod_default_pod01_status_reason_UnexpectedAdmissionError":                               0,
-						"deploy_default_replicaset01_age":                                                        3,
-						"deploy_default_replicaset01_current_replicas":                                           1,
-						"deploy_default_replicaset01_desired_replicas":                                           2,
-						"deploy_default_replicaset01_ready_replicas":                                             3,
 					}
 
 					copyAge(expected, mx)
@@ -986,6 +989,20 @@ func newDeployment(name string) *appsv1.Deployment {
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
 		Status: appsv1.DeploymentStatus{
+			Conditions: []appsv1.DeploymentCondition{
+				{
+					Type:   appsv1.DeploymentAvailable,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   appsv1.DeploymentProgressing,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   appsv1.DeploymentReplicaFailure,
+					Status: corev1.ConditionTrue,
+				},
+			},
 			AvailableReplicas: 1,
 			Replicas:          2,
 			ReadyReplicas:     3,
