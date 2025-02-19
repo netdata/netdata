@@ -1181,6 +1181,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
         if (host->receiver == rpt) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
 
+            bool rrdcalc_cleanup = false;
             rrdhost_receiver_unlock(host);
             {
                 // this will wait until all workers finish
@@ -1194,8 +1195,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
                 stream_sender_signal_to_stop_and_wait(host, reason, false);
                 rrdcontext_host_child_disconnected(host);
 
-                if (rpt->config.health.enabled)
-                    rrdcalc_child_disconnected(host);
+                rrdcalc_cleanup = rpt->config.health.enabled;
 
                 stream_parents_host_reset(host, reason);
             }
@@ -1213,7 +1213,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
             host->stream.rcv.status.last_connected = 0;
             host->stream.rcv.status.last_disconnected = now_realtime_sec();
             host->health.enabled = false;
-            health_unregister_host(host);
+            health_unregister_host(host, rrdcalc_cleanup);
 
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
             host->receiver = NULL;
