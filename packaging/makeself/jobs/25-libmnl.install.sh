@@ -16,9 +16,12 @@ export CXXFLAGS="${CFLAGS}"
 export LDFLAGS="-static"
 export PKG_CONFIG="pkg-config --static"
 
-fetch_git libmnl "${LIBMNL_REPO}" "${LIBMNL_VERSION}" "${LIBMNL_VERSION}"
+cache_key="${LIBMNL_VERSION}"
+fetch_git libmnl "${LIBMNL_REPO}" "${LIBMNL_VERSION}" "${cache_key}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
+    run autoreconf -ivf
+
     run ./configure \
         --prefix="/libmnl-static" \
         --exec-prefix="/libmnl-static"
@@ -29,7 +32,7 @@ fi
 
 run make install
 
-store_cache libmnl "${NETDATA_MAKESELF_PATH}/tmp/libmnl-${LIBMNL_VERSION}"
+store_cache "${cache_key}" "${NETDATA_MAKESELF_PATH}/tmp/libmnl"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

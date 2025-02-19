@@ -13,7 +13,8 @@ export CXXFLAGS="${CFLAGS}"
 #export LDFLAGS="-static"
 #export PKG_CONFIG="pkg-config --static"
 
-fetch_git libelf "${LIBELF_SOURCE}" "${LIBELF_VERSION}" "${LIBELF_VERSION}"
+cache_key="${LIBELF_VERSION}"
+fetch_git libelf "${LIBELF_REPO}" "${LIBELF_VERSION}" "${cache_key}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
   patch -p1 <<-'EOF'
@@ -56,7 +57,7 @@ if [ -d "/libelf-static/lib" ]; then
   cd - || exit 1
 fi
 
-store_cache libelf "${NETDATA_MAKESELF_PATH}/tmp/libelf"
+store_cache "${cache_key}" "${NETDATA_MAKESELF_PATH}/tmp/libelf"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

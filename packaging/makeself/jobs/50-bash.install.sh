@@ -13,7 +13,8 @@
 # releases, so we need to use a branch ofr the version, and that in turn
 # only tracks down to the minor version. Thus, we need to cache by day to
 # ensure we get the latest copy.
-fetch_git bash "${BASH_REPO}" "${BASH_VERSION}" "${BASH_VERSION}-$(date +%F)"
+cache_key="${BASH_VERSION}-$(date +%F)"
+fetch_git bash "${BASH_REPO}" "${BASH_VERSION}" "${cache_key}"
 
 export CFLAGS="${TUNING_FLAGS} -pipe"
 export CXXFLAGS="${CFLAGS}"
@@ -43,7 +44,7 @@ fi
 
 run make install
 
-store_cache bash "${NETDATA_MAKESELF_PATH}/tmp/bash-${BASH_VERSION}"
+store_cache "${cache_key}" "${NETDATA_MAKESELF_PATH}/tmp/bash"
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/bash
