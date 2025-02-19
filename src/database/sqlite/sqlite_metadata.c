@@ -159,8 +159,6 @@ enum metadata_opcode {
     METADATA_SCAN_HOSTS,
     METADATA_LOAD_HOST_CONTEXT,
     METADATA_DELETE_HOST_CHART_LABELS,
-    METADATA_ADD_HOST_AE,
-    METADATA_DEL_HOST_AE,
     METADATA_ADD_CTX_CLEANUP,
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
@@ -189,7 +187,6 @@ struct metadata_wc {
     uv_async_t async;
     uv_timer_t timer_req;
     time_t metadata_check_after;
-    Pvoid_t ae_DelJudyL;
     METADATA_FLAG flags;
     struct completion start_stop_complete;
     struct completion *scan_complete;
@@ -1690,7 +1687,6 @@ void run_metadata_cleanup(struct metadata_wc *wc)
 struct scan_metadata_payload {
     uv_work_t request;
     struct metadata_wc *wc;
-    void *pending_alert_list;
     void *pending_ctx_cleanup_list;
     void *pending_uuid_deletion;
     BUFFER *work_buffer;
@@ -1901,19 +1897,6 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     struct scan_metadata_payload *data = req->data;
     struct metadata_wc *wc = data->wc;
 
-    bool first = true;
-    Word_t Index = 0;
-    Pvoid_t *Pvalue;
-    while ((Pvalue = JudyLFirstThenNext(wc->ae_DelJudyL, &Index, &first))) {
-        ALARM_ENTRY *ae = (ALARM_ENTRY *) Index;
-        if(!__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED)) {
-            health_alarm_log_free_one_nochecks_nounlink(ae);
-            (void) JudyLDel(&wc->ae_DelJudyL, Index, PJE0);
-            first = true;
-            Index = 0;
-        }
-    }
-
     metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
 
     if (unlikely(wc->scan_complete))
@@ -2041,11 +2024,6 @@ static void store_host_and_system_info(RRDHOST *host, size_t *query_counter)
     }
 }
 
-struct judy_list_t {
-    Pvoid_t JudyL;
-    Word_t count;
-};
-
 static void do_pending_uuid_deletion(struct metadata_wc *wc, struct judy_list_t *pending_uuid_deletion)
 {
     if (!pending_uuid_deletion)
@@ -2119,44 +2097,6 @@ static void store_ctx_cleanup_list(struct metadata_wc *wc, struct judy_list_t *p
     nd_log_daemon(
         NDLP_DEBUG,
         "Stored %zu host context cleanup items in %0.2f ms",
-        entries,
-        (double)(ended_ut - started_ut) / USEC_PER_MS);
-
-    worker_is_idle();
-}
-
-static void store_alert_transitions(struct judy_list_t *pending_alert_list)
-{
-    if (!pending_alert_list)
-        return;
-
-    worker_is_busy(UV_EVENT_STORE_ALERT_TRANSITIONS);
-
-    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
-
-    size_t entries = pending_alert_list->count;
-    Word_t Index = 0;
-    bool first = true;
-    Pvoid_t *Pvalue;
-    while ((Pvalue = JudyLFirstThenNext(pending_alert_list->JudyL, &Index, &first))) {
-        RRDHOST *host = *Pvalue;
-
-        Pvalue = JudyLGet(pending_alert_list->JudyL, ++Index, PJE0);
-        ALARM_ENTRY *ae = *Pvalue;
-
-        sql_health_alarm_log_save(host, ae);
-
-        __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&host->health.pending_transitions, -1, __ATOMIC_RELAXED);
-    }
-    (void) JudyLFreeArray(&pending_alert_list->JudyL, PJE0);
-    freez(pending_alert_list);
-
-    usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
-    nd_log(
-        NDLS_DAEMON,
-        NDLP_DEBUG,
-        "Stored and processed %zu alert transitions in %0.2f ms",
         entries,
         (double)(ended_ut - started_ut) / USEC_PER_MS);
 
@@ -2242,7 +2182,6 @@ static void start_metadata_hosts(uv_work_t *req)
     BUFFER *work_buffer = data->work_buffer;
     usec_t all_started_ut = now_monotonic_usec();
 
-    store_alert_transitions((struct judy_list_t *)data->pending_alert_list);
     store_ctx_cleanup_list(wc, (struct judy_list_t *)data->pending_ctx_cleanup_list);
 
     worker_is_busy(UV_EVENT_METADATA_STORE);
@@ -2298,8 +2237,6 @@ static void metadata_event_loop(void *arg)
     worker_register_job_name(METADATA_ADD_CTX_CLEANUP, "host ctx cleanup");
     worker_register_job_name(METADATA_SCAN_HOSTS, "host metadata store");
     worker_register_job_name(METADATA_LOAD_HOST_CONTEXT, "host load context");
-    worker_register_job_name(METADATA_ADD_HOST_AE, "add host alert entry");
-    worker_register_job_name(METADATA_DEL_HOST_AE, "delete host alert entry");
 
     int ret;
     uv_loop_t *loop;
@@ -2346,14 +2283,11 @@ static void metadata_event_loop(void *arg)
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     struct scan_metadata_payload *data;
     Pvoid_t *Pvalue;
-    struct judy_list_t *pending_ae_list = NULL;
     struct judy_list_t *pending_ctx_cleanup_list = NULL;
     struct judy_list_t *pending_uuid_deletion = NULL;
 
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
         nd_uuid_t  *uuid;
-        RRDHOST *host = NULL;
-        ALARM_ENTRY *ae = NULL;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -2425,12 +2359,10 @@ static void metadata_event_loop(void *arg)
                     data = mallocz(sizeof(*data));
                     data->request.data = data;
                     data->wc = wc;
-                    data->pending_alert_list = pending_ae_list;
                     data->pending_ctx_cleanup_list = pending_ctx_cleanup_list;
                     data->pending_uuid_deletion = pending_uuid_deletion;
 
                     data->work_buffer = work_buffer;
-                    pending_ae_list = NULL;
                     pending_ctx_cleanup_list = NULL;
                     pending_uuid_deletion = NULL;
 
@@ -2441,7 +2373,6 @@ static void metadata_event_loop(void *arg)
                     if (uv_queue_work(loop, &data->request, start_metadata_hosts, after_metadata_hosts)) {
                         // Failed to launch worker -- let the event loop handle completion
                         cmd.completion = wc->scan_complete;
-                        pending_ae_list = data->pending_alert_list;
                         pending_ctx_cleanup_list = data->pending_ctx_cleanup_list;
                         pending_uuid_deletion = data->pending_uuid_deletion;
                         freez(data);
@@ -2458,24 +2389,6 @@ static void metadata_event_loop(void *arg)
                     if (uv_queue_work(loop, &data->request, start_all_host_load_context, after_start_host_load_context)) {
                         freez(data);
                     }
-                    break;
-                case METADATA_ADD_HOST_AE:
-                    host = (RRDHOST *) cmd.param[0];
-                    ae = (ALARM_ENTRY *) cmd.param[1];
-
-                    if (!pending_ae_list)
-                        pending_ae_list = callocz(1, sizeof(*pending_ae_list));
-
-                    Pvalue = JudyLIns(&pending_ae_list->JudyL, ++pending_ae_list->count, PJE0);
-                    if (Pvalue)
-                        *Pvalue = (void *)host;
-
-                    Pvalue = JudyLIns(&pending_ae_list->JudyL, ++pending_ae_list->count, PJE0);
-                    if (Pvalue)
-                        *Pvalue = (void *)ae;
-                    break;
-                case METADATA_DEL_HOST_AE:
-                    (void) JudyLIns(&wc->ae_DelJudyL, (Word_t) (void *) cmd.param[0], PJE0);
                     break;
                 case METADATA_UNITTEST:;
                     struct thread_unittest *tu = (struct thread_unittest *) cmd.param[0];
@@ -2513,11 +2426,6 @@ static void metadata_event_loop(void *arg)
 
     Word_t Index;
     bool first;
-
-    if (pending_ae_list) {
-        (void)JudyLFreeArray(&pending_ae_list->JudyL, PJE0);
-        freez(pending_ae_list);
-    }
 
     if (pending_ctx_cleanup_list) {
         Index = 0;
@@ -2693,23 +2601,6 @@ void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context)
     ctx_cleanup->context = string_strdupz(context);
 
     queue_metadata_cmd(METADATA_ADD_CTX_CLEANUP, ctx_cleanup, NULL);
-}
-
-void metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae)
-{
-    if (unlikely(!metasync_worker.loop))
-        return;
-    __atomic_add_fetch(&host->health.pending_transitions, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
-    queue_metadata_cmd(METADATA_ADD_HOST_AE, host, ae);
-}
-
-void metadata_queue_ae_deletion(ALARM_ENTRY *ae)
-{
-    if (unlikely(!metasync_worker.loop))
-        return;
-
-    queue_metadata_cmd(METADATA_DEL_HOST_AE, ae, NULL);
 }
 
 void commit_alert_transitions(RRDHOST *host __maybe_unused)

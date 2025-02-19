@@ -93,6 +93,11 @@ SQLITE_API int sqlite3_exec_monitored(
     char **errmsg                              /* Error msg written here */
     );
 
+struct judy_list_t {
+    Pvoid_t JudyL;
+    Word_t count;
+};
+
 // Initialization and shutdown
 int init_database_batch(sqlite3 *database, const char *batch[], const char *description);
 int configure_sqlite_database(sqlite3 *database, int target_version, const char *description);

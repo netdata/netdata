@@ -376,11 +376,6 @@ static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_un
     return 0;
 }
 
-struct judy_list_t {
-    Pvoid_t JudyL;
-    Word_t count;
-};
-
 static void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
