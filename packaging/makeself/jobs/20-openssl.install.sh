@@ -21,19 +21,7 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/openssl" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/openssl"
 fi
 
-cache="$(cache_path openssl)"
-
-if [ -d "${cache}" ]; then
-  echo "Found cached copy of build directory for openssl, using it."
-  cp -a "${cache}/openssl" "${NETDATA_MAKESELF_PATH}/tmp/"
-  CACHE_HIT=1
-else
-  echo "No cached copy of build directory for openssl found, fetching sources instead."
-  run git clone --branch "${OPENSSL_VERSION}" --single-branch --depth 1 "${OPENSSL_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/openssl"
-  CACHE_HIT=0
-fi
-
-cd "${NETDATA_MAKESELF_PATH}/tmp/openssl" || exit 1
+fetch_git openssl "${OPENSSL_SOURCE}" "${OPENSSL_VERSION}" "${OPENSSL_VERSION}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
   COMMON_CONFIG="-static threads no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl"

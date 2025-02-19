@@ -13,19 +13,7 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/curl" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/curl"
 fi
 
-cache="$(cache_path curl)"
-
-if [ -d "${cache}" ]; then
-  echo "Found cached copy of build directory for curl, using it."
-  cp -a "${cache}/curl" "${NETDATA_MAKESELF_PATH}/tmp/"
-  CACHE_HIT=1
-else
-  echo "No cached copy of build directory for curl found, fetching sources instead."
-  run git clone --branch "${CURL_VERSION}" --single-branch --depth 1 "${CURL_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/curl"
-  CACHE_HIT=0
-fi
-
-cd "${NETDATA_MAKESELF_PATH}/tmp/curl" || exit 1
+fetch_git curl "${CURL_SOURCE}" "${CURL_VERSION}" "${CURL_VERSION}"
 
 export CFLAGS="${TUNING_FLAGS} -I/openssl-static/include -pipe"
 export CXXFLAGS="${CFLAGS}"
