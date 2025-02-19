@@ -79,7 +79,7 @@ static void perform_repeated_alarm(RRDHOST *host, RRDCALC *rc,  struct health_ra
     health_send_notification(host, ae, hrm);
     netdata_log_debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
     health_alarm_wait_for_execution(ae);
-    health_alarm_log_free_one_nochecks_nounlink(host, ae);
+    health_queue_ae_deletion(host, ae);
     worker_is_idle();
 }
 
@@ -134,7 +134,7 @@ void do_rc_status_change(RRDHOST *host, RRDCALC *rc, RRDCALC_STATUS status, time
          (rrdcalc_isrepeating(rc) ? HEALTH_ENTRY_FLAG_IS_REPEATING : 0)));
 
     health_log_alert(host, ae);
-    health_alarm_log_add_entry(host, ae, false);
+    health_alarm_log_add_entry(host, ae);
 
     nd_log_daemon(
         NDLP_DEBUG,
@@ -215,7 +215,7 @@ static void create_removed_event_for_rc(RRDHOST *host, RRDCALC *rc, time_t now)
                 rrdcalc_isrepeating(rc) ? HEALTH_ENTRY_FLAG_IS_REPEATING : 0);
 
             health_log_alert(host, ae);
-            health_alarm_log_add_entry(host, ae, false);
+            health_alarm_log_add_entry(host, ae);
 
             rc->old_status = rc->status;
             rc->status = RRDCALC_STATUS_REMOVED;
@@ -626,10 +626,7 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
     Pvoid_t *Pvalue;
     while ((Pvalue = JudyLFirstThenNext(host->health.JudyL_ae, &Index, &first))) {
         ALARM_ENTRY *ae = *Pvalue;
-
         sql_health_alarm_log_save(host, ae);
-
-        __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELAXED);
     }
     (void) JudyLFreeArray(&host->health.JudyL_ae, PJE0);
 
@@ -638,10 +635,9 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
     first = true;
     while ((Pvalue = JudyLFirstThenNext(host->health.JudyL_del_ae, &Index, &first))) {
         ALARM_ENTRY *ae = *Pvalue;
-        if (!ae->pending_save_count)
-            health_alarm_log_free_one_nochecks_nounlink(host, ae);
+        health_alarm_log_free_one_nochecks_nounlink(ae);
     }
-    (void) JudyLFreeArray(&host->health.JudyL_del_ae, PJE0);
+    (void)JudyLFreeArray(&host->health.JudyL_del_ae, PJE0);
 
     struct aclk_sync_cfg_t *wc = host->aclk_config;
     if (wc && wc->send_snapshot == 1) {
@@ -1318,8 +1314,6 @@ void health_shutdown()
 
 void health_schedule_ae_save(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
-
     Pvoid_t *Pvalue = JudyLIns(&host->health.JudyL_ae, ++host->health.count, PJE0);
     if (Pvalue)
         *Pvalue = (void *)ae;

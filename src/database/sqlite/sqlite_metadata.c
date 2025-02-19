@@ -140,7 +140,6 @@ sqlite3 *db_meta = NULL;
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_REPEAT (60)            // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_MAINTENANCE_CTX_CLEAN_REPEAT (300) // Repeat if last run for dimensions, charts, labels needs more work
-#define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
 #define METADATA_LABEL_CHECK_INTERVAL (3600)        // Repeat maintenance for labels
 #define METADATA_RUNTIME_THRESHOLD (5)              // Run time threshold for cleanup task
 
