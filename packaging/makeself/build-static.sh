@@ -40,7 +40,7 @@ case "${BUILDARCH}" in
     armv7l) # Baseline ARMv7 CPU
         QEMU_ARCH="arm"
         QEMU_CPU="cortex-a7"
-        TUNING_FLAGS="-march=armv7-a"
+        TUNING_FLAGS="-march=armv7-a+fp"
         GOARM="7"
         ;;
     aarch64) # Baseline ARMv8 CPU
@@ -63,7 +63,7 @@ if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
     ${docker} run --rm --privileged tonistiigi/binfmt:master --install "${QEMU_ARCH}" || exit 1
 fi
 
-DOCKER_IMAGE_NAME="netdata/static-builder:v1"
+DOCKER_IMAGE_NAME="netdata/static-builder:v2"
 
 if ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
     if ${docker} image inspect "${DOCKER_IMAGE_NAME}" | grep -q 'Variant'; then
@@ -85,6 +85,7 @@ fi
 if [ -t 1 ]; then
   run ${docker} run --rm -e BUILDARCH="${BUILDARCH}" -a stdin -a stdout -a stderr -i -t -v "$(pwd)":/netdata:rw \
     --platform "${platform}" ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
+    ${DEBUG_BUILD_INFRA:+-e DEBUG_BUILD_INFRA=1} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
     -e TUNING_FLAGS="${TUNING_FLAGS}" \
     ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \

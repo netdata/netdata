@@ -40,11 +40,17 @@ set -euo pipefail
 
 # -----------------------------------------------------------------------------
 
+cache_path() {
+  local key="${1}"
+  echo "${NETDATA_SOURCE_PATH}/artifacts/cache/v2/${BUILDARCH}/${key}"
+}
+
 fetch() {
   local dir="${1}" url="${2}" sha256="${3}" key="${4}"
   local tar
   tar="$(basename "${2}")"
-  local cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
+  local cache
+  cache="$(cache_path "${key}")"
 
   if [ -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]; then
     rm -rf "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
@@ -74,7 +80,7 @@ fetch() {
 
     set -e
     cd "${NETDATA_MAKESELF_PATH}/tmp"
-    run tar -axpf "${tar}"
+    run tar -axf "${tar}"
     cd -
 
     CACHE_HIT=0
@@ -83,21 +89,45 @@ fetch() {
   run cd "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
 }
 
+fetch_git() {
+  local dir="${1}" url="${2}" tag="${3}" key="${4}"
+  local cache
+  cache="$(cache_path "${key}")"
+  local path="${NETDATA_MAKESELF_PATH}/tmp/${dir}"
+
+  if [ -d "${path}" ]; then
+    rm -rf "${path}"
+  fi
+
+  if [ -d "${cache}/${dir}" ]; then
+    echo "Found cached copy of build directory for ${key}, using it."
+    cp -a "${cache}/${dir}" "${NETDATA_MAKESELF_PATH}/tmp/"
+    CACHE_HIT=1
+  else
+    echo "No cached copy of build directory for ${key} found, fetching sources instead."
+    run git clone --branch "${tag}" --single-branch --depth 1 "${url}" "${path}"
+    CACHE_HIT=0
+  fi
+
+  run cd "${path}" || exit 1
+}
+
 store_cache() {
-    key="${1}"
-    src="${2}"
+  local key="${1}"
+  local src="${2}"
 
-    cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
+  local cache
+  cache="$(cache_path "${key}")"
 
-    if [ "${CACHE_HIT:-0}" -eq 0 ]; then
-        if [ -d "${cache}" ]; then
-            rm -rf "${cache}"
-        fi
-
-        mkdir -p "${cache}"
-
-        cp -a "${src}" "${cache}"
+  if [ "${CACHE_HIT:-0}" -eq 0 ]; then
+    if [ -d "${cache}" ]; then
+      rm -rf "${cache}"
     fi
+
+    mkdir -p "${cache}"
+
+    cp -a "${src}" "${cache}"
+  fi
 }
 
 # -----------------------------------------------------------------------------
