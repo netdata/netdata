@@ -86,7 +86,7 @@ struct aral_ops {
     struct {
         PAD64(size_t) allocators; // the number of threads currently trying to allocate memory
         PAD64(size_t) deallocators; // the number of threads currently trying to deallocate memory
-        PAD64(bool) last_allocated_or_deallocated; // stability detector, true when was last allocated
+        PAD64(bool) last_allocated_page; // stability detector, true when was last allocated
     } atomic;
 
     struct {
@@ -97,6 +97,16 @@ struct aral_ops {
 };
 
 struct aral {
+    struct {
+        SPINLOCK spinlock;
+        size_t file_number;             // for mmap
+
+        ARAL_PAGE *pages_free;          // pages with free items
+        ARAL_PAGE *pages_full;          // pages that are completely full
+
+        ARAL_PAGE *pages_marked_free;   // pages with marked items and free slots
+        ARAL_PAGE *pages_marked_full;   // pages with marked items completely full
+    } aral_lock;
 
     struct {
         char name[ARAL_MAX_NAME + 1];
@@ -120,22 +130,8 @@ struct aral {
     } config;
 
     struct {
-        SPINLOCK spinlock;
-        size_t file_number;             // for mmap
-
-        ARAL_PAGE *pages_free;          // pages with free items
-        ARAL_PAGE *pages_full;          // pages that are completely full
-
-        ARAL_PAGE *pages_marked_free;   // pages with marked items and free slots
-        ARAL_PAGE *pages_marked_full;   // pages with marked items completely full
-
-        size_t defragment_operations;
-        size_t defragment_linked_list_traversals;
-    } aral_lock;
-
-    struct {
-        size_t user_malloc_operations;
-        size_t user_free_operations;
+        PAD64(size_t) user_malloc_operations;
+        PAD64(size_t) user_free_operations;
     } atomic;
 
     struct aral_ops ops[2];
@@ -497,8 +493,10 @@ static ALWAYS_INLINE size_t aral_next_allocation_size___adders_lock_needed(ARAL 
     size_t idx = mark_to_idx(marked);
     size_t size = ar->ops[idx].adders.allocation_size;
 
-    bool last_allocated = __atomic_load_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, __ATOMIC_RELAXED);
-    if(last_allocated) {
+    bool last_allocated_page = __atomic_load_n(&ar->ops[idx].atomic.last_allocated_page, __ATOMIC_RELAXED);
+    if(last_allocated_page) {
+        // we are growing, double the size
+
         size *= 2;
         if(size > ar->config.max_allocation_size)
             size = ar->config.max_allocation_size;
@@ -512,7 +510,7 @@ static ALWAYS_INLINE size_t aral_next_allocation_size___adders_lock_needed(ARAL 
             memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT);
     }
 
-    __atomic_store_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, true, __ATOMIC_RELAXED);
+    __atomic_store_n(&ar->ops[idx].atomic.last_allocated_page, true, __ATOMIC_RELAXED);
 
     return size;
 }
@@ -615,7 +613,7 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
 
 static void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     size_t idx = mark_to_idx(page->started_marked);
-    __atomic_store_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, true, __ATOMIC_RELAXED);
+    __atomic_store_n(&ar->ops[idx].atomic.last_allocated_page, false, __ATOMIC_RELAXED);
 
     struct aral_page_type_stats *stats;
     size_t max_elements = page->max_elements;
