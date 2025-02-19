@@ -5,12 +5,9 @@
 
 // ----------------------------------------------------------------------------
 
-inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
+inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    if (async)
-        metadata_queue_ae_save(host, ae);
-    else
-        sql_health_alarm_log_save(host, ae);
+    health_schedule_ae_save(host, ae);
 }
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function) {
@@ -228,7 +225,7 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
                     ae->non_clear_duration += t->non_clear_duration;
 
-                health_alarm_log_save(host, t, async);
+                health_alarm_log_save(host, t);
             }
 
             // no need to continue
@@ -237,12 +234,13 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
     }
     rw_spinlock_read_unlock(&host->health_log.spinlock);
 
-    health_alarm_log_save(host, ae, async);
+    health_alarm_log_save(host, ae);
 }
 
-inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
+inline void health_alarm_log_free_one_nochecks_nounlink(RRDHOST *host, ALARM_ENTRY *ae)
+{
     if(__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED))
-        metadata_queue_ae_deletion(ae);
+        health_queue_ae_deletion(host, ae);
     else {
         string_freez(ae->name);
         string_freez(ae->chart);
@@ -267,7 +265,7 @@ inline void health_alarm_log_free(RRDHOST *host) {
     ALARM_ENTRY *ae;
     while((ae = host->health_log.alarms)) {
         host->health_log.alarms = ae->next;
-        health_alarm_log_free_one_nochecks_nounlink(ae);
+        health_alarm_log_free_one_nochecks_nounlink(host, ae);
     }
 
     rw_spinlock_write_unlock(&host->health_log.spinlock);
