@@ -584,7 +584,7 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
                 // because we may have to also remove the next item
             }
 
-            health_alarm_log_free_one_nochecks_nounlink(host, ae);
+            health_queue_ae_deletion(host, ae);
         }
         else
             prev = ae;
