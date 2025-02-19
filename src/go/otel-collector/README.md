@@ -12,4 +12,3 @@ cd src/go/otel-collector
 builder --config=builder-config.yaml
 build/otelcol.plugin
 ```
-a
