@@ -1776,6 +1776,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: flushed
+            - name: mssql.database_data_files_size
+              description: Current database size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework
