@@ -3,20 +3,111 @@
 #include "dyncfg-internals.h"
 #include "dyncfg.h"
 
-// ----------------------------------------------------------------------------
-// we intercept the config function calls of the plugin
-
 struct dyncfg_call {
+    ND_UUID transaction;
     BUFFER *payload;
-    char *function;
-    char *id;
-    char *add_name;
-    char *source;
+    const char *function;
+    const char *id;
+    const char *add_name;
+    const char *source;
     DYNCFG_CMDS cmd;
     rrd_function_result_callback_t result_cb;
     void *result_cb_data;
     bool from_dyncfg_echo;
 };
+
+// ----------------------------------------------------------------------------
+
+ENUM_STR_MAP_DEFINE(DYNCFG_CMDS) = {
+    { DYNCFG_CMD_GET, "get" },
+    { DYNCFG_CMD_SCHEMA, "schema" },
+    { DYNCFG_CMD_UPDATE, "update" },
+    { DYNCFG_CMD_ADD, "add" },
+    { DYNCFG_CMD_TEST, "test" },
+    { DYNCFG_CMD_REMOVE, "remove" },
+    { DYNCFG_CMD_ENABLE, "enable" },
+    { DYNCFG_CMD_DISABLE, "disable" },
+    { DYNCFG_CMD_RESTART, "restart" },
+    { DYNCFG_CMD_USERCONFIG, "userconfig" },
+
+    // terminator
+    { 0, NULL }
+};
+
+ENUM_STR_DEFINE_FUNCTIONS(DYNCFG_CMDS, DYNCFG_CMD_NONE, "none");
+
+static void dyncfg_log_user_action(DYNCFG *df, struct dyncfg_call *dc) {
+    if(dc->cmd == DYNCFG_CMD_USERCONFIG || dc->cmd == DYNCFG_CMD_GET || dc->cmd == DYNCFG_CMD_SCHEMA)
+        return;
+
+    const char *type;
+    switch(df->type) {
+        default:
+        case DYNCFG_TYPE_SINGLE:
+            type = "on";
+            break;
+
+        case DYNCFG_TYPE_TEMPLATE:
+            type = "on template";
+            break;
+        case DYNCFG_TYPE_JOB:
+            type = "on job";
+            break;
+    }
+
+    PARSED_REQUEST_SOURCE req;
+    if(!parse_request_source(dc->source, &req)) {
+        ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_MODULE, "DYNCFG"),
+            ND_LOG_FIELD_STR(NDF_NIDL_NODE, localhost->hostname),
+            ND_LOG_FIELD_TXT(NDF_REQUEST, dc->function),
+            ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &dc->transaction.uuid),
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &dyncfg_user_action_msgid),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "DYNCFG USER ACTION '%s' %s%s%s '%s' from source: %s",
+               DYNCFG_CMDS_2str(dc->cmd),
+               dc->add_name ? dc->add_name : "",
+               dc->add_name ? " " : "",
+               type, dc->id, dc->source);
+
+        return;
+    }
+
+    char access_str[1024];
+    http_access2txt(access_str, sizeof(access_str), " ", req.access);
+
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_TXT(NDF_MODULE, "DYNCFG"),
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, localhost->hostname),
+        ND_LOG_FIELD_TXT(NDF_REQUEST, dc->function),
+        ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &dc->transaction.uuid),
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &dyncfg_user_action_msgid),
+
+        ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &req.cloud_account_id.uuid),
+        ND_LOG_FIELD_TXT(NDF_SRC_IP, req.client_ip),
+        ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, req.forwarded_for),
+        ND_LOG_FIELD_TXT(NDF_USER_NAME, req.client_name),
+        ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(req.user_role)),
+        ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &req.access),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+           "DYNCFG USER ACTION '%s' %s%s%s '%s' by user '%s', IP '%s'",
+           DYNCFG_CMDS_2str(dc->cmd),
+           dc->add_name ? dc->add_name : "",
+           dc->add_name ? " " : "",
+           type, dc->id, req.client_name,
+           req.forwarded_for[0] ? req.forwarded_for : req.client_ip);
+}
+
+// ----------------------------------------------------------------------------
+// we intercept the config function calls of the plugin
 
 static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template, int code, struct dyncfg_call *dc) {
     char id[strlen(dc->id) + 1 + strlen(dc->add_name) + 1];
@@ -107,6 +198,8 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
 
                 if (save_required || old_user_disabled != df->dyncfg.user_disabled)
                     dyncfg_file_save(dc->id, df);
+
+                dyncfg_log_user_action(df, dc);
             }
             else
                 nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -125,10 +218,10 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
         dc->result_cb(wb, code, dc->result_cb_data);
 
     buffer_free(dc->payload);
-    freez(dc->function);
-    freez(dc->id);
-    freez(dc->source);
-    freez(dc->add_name);
+    freez((void *)dc->function);
+    freez((void *)dc->id);
+    freez((void *)dc->source);
+    freez((void *)dc->add_name);
     freez(dc);
 }
 
@@ -377,6 +470,24 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
                 if (df->dyncfg.user_disabled != old_user_disabled)
                     dyncfg_file_save(id, df);
+
+                // log it
+                {
+                    struct dyncfg_call dc = {
+                        .function = rfe->function,
+                        .id = id,
+                        .source = rfe->source,
+                        .add_name = add_name,
+                        .cmd = cmd,
+                        .result_cb = NULL,
+                        .result_cb_data = NULL,
+                        .payload = rfe->payload,
+                        .from_dyncfg_echo = called_from_dyncfg_echo,
+                    };
+                    uuid_copy(dc.transaction.uuid, *rfe->transaction);
+
+                    dyncfg_log_user_action(df, &dc);
+                }
             }
 
             dyncfg_apply_action_on_all_template_jobs(rfe, id, cmd);
@@ -405,6 +516,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
     if(make_the_call_to_plugin) {
         struct dyncfg_call *dc = callocz(1, sizeof(*dc));
+        uuid_copy(dc->transaction.uuid, *rfe->transaction);
         dc->function = strdupz(rfe->function);
         dc->id = strdupz(id);
         dc->source = rfe->source ? strdupz(rfe->source) : NULL;
