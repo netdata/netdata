@@ -90,11 +90,13 @@ STORAGE_ENGINE* storage_engine_foreach_next(STORAGE_ENGINE* it);
 
 struct rrddim_tier {
     STORAGE_POINT virtual_point;
-    STORAGE_ENGINE_BACKEND seb;
+    STORAGE_POINT last_completed_point;         // tier1/2 spread over time
     SPINLOCK spinlock;
+    STORAGE_ENGINE_BACKEND seb;
+    uint16_t last_completed_point_flush_modulo; // tier1/2 spread over time
     uint32_t tier_grouping;
     time_t next_point_end_time_s;
-    STORAGE_METRIC_HANDLE *smh;                     // the metric handle inside the database
+    STORAGE_METRIC_HANDLE *smh;    // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *sch;   // the data collection handle
 };
 

@@ -16,17 +16,21 @@ static struct {
     const char *name;       // the name of the signal
     size_t count;           // the number of signals received
     SIGNAL_ACTION action;   // the action to take
+    EXIT_REASON reason;
 } signals_waiting[] = {
-        { SIGPIPE, "SIGPIPE", 0, NETDATA_SIGNAL_IGNORE        },
-        { SIGINT , "SIGINT",  0, NETDATA_SIGNAL_EXIT_CLEANLY  },
-        { SIGQUIT, "SIGQUIT", 0, NETDATA_SIGNAL_EXIT_CLEANLY  },
-        { SIGTERM, "SIGTERM", 0, NETDATA_SIGNAL_EXIT_CLEANLY  },
-        { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS   },
-        { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH },
-        { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_FATAL         },
+    { SIGPIPE, "SIGPIPE", 0, NETDATA_SIGNAL_IGNORE, EXIT_REASON_NONE },
+    { SIGINT , "SIGINT",  0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGINT },
+    { SIGQUIT, "SIGQUIT", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGQUIT },
+    { SIGTERM, "SIGTERM", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGTERM },
+    { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS, EXIT_REASON_NONE },
+    { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH, EXIT_REASON_NONE },
+    { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_FATAL, EXIT_REASON_SIGBUS },
+    { SIGSEGV, "SIGSEGV", 0, NETDATA_SIGNAL_FATAL, EXIT_REASON_SIGSEGV },
+    { SIGFPE,  "SIGFPE",  0, NETDATA_SIGNAL_FATAL, EXIT_REASON_SIGFPE },
+    { SIGILL,  "SIGILL",  0, NETDATA_SIGNAL_FATAL, EXIT_REASON_SIGILL },
 
-        // terminator
-        { 0,       "NONE",    0, NETDATA_SIGNAL_END_OF_LIST   }
+    // terminator
+    { 0,       "NONE",    0, NETDATA_SIGNAL_END_OF_LIST, 0   }
 };
 
 static void signal_handler(int signo) {
@@ -144,11 +148,12 @@ void nd_process_signals(void) {
                                 nd_log_limits_unlimited();
                                 netdata_log_info("SIGNAL: Received %s. Cleaning up to exit...", name);
                                 commands_exit();
-                                netdata_cleanup_and_exit(0, NULL, NULL, NULL);
+                                netdata_cleanup_and_exit(signals_waiting[i].reason, NULL, NULL, NULL);
                                 exit(0);
                                 break;
 
                             case NETDATA_SIGNAL_FATAL:
+                                exit_initiated_set(signals_waiting[i].reason);
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
                                 break;
 

@@ -8,8 +8,6 @@
 
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 
-volatile sig_atomic_t netdata_exit = 0;
-
 // --------------------------------------------------------------------------------------------------------------------
 
 void json_escape_string(char *dst, const char *src, size_t size) {

@@ -15,7 +15,7 @@ OS_SYSTEM_MEMORY os_last_reported_system_memory(void) {
 #include <windows.h>
 
 OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram __maybe_unused) {
-    OS_SYSTEM_MEMORY sm = {0, 0};
+    OS_SYSTEM_MEMORY sm = OS_SYSTEM_MEMORY_EMPTY;
 
     MEMORYSTATUSEX statex;
     statex.dwLength = sizeof(statex);
@@ -29,55 +29,11 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram __maybe_unused) {
 }
 #endif
 
-// macOS
-#if defined(OS_MACOS)
-#include <mach/mach.h>
-#include <sys/sysctl.h>
-
-OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram) {
-    static uint64_t total_ram = 0;
-    static uint64_t page_size = 0;
-
-    if (page_size == 0) {
-        size_t len = sizeof(page_size);
-        if (sysctlbyname("hw.pagesize", &page_size, &len, NULL, 0) != 0)
-            return (OS_SYSTEM_MEMORY){ 0, 0 };
-    }
-
-    if (query_total_ram || total_ram == 0) {
-        size_t len = sizeof(total_ram);
-        if (sysctlbyname("hw.memsize", &total_ram, &len, NULL, 0) != 0)
-            return (OS_SYSTEM_MEMORY){ 0, 0 };
-    }
-
-    uint64_t ram_available = 0;
-    if (page_size > 0) {
-        vm_statistics64_data_t vm_info;
-        mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
-        mach_port_t mach_port = mach_host_self();
-
-        if (host_statistics64(mach_port, HOST_VM_INFO64, (host_info_t)&vm_info, &count) != KERN_SUCCESS) {
-            mach_port_deallocate(mach_task_self(), mach_port);
-            return (OS_SYSTEM_MEMORY){0, 0};
-        }
-
-        ram_available = (vm_info.free_count + vm_info.inactive_count + vm_info.purgeable_count) * page_size;
-        mach_port_deallocate(mach_task_self(), mach_port);
-    }
-
-    os_system_memory_last = (OS_SYSTEM_MEMORY){
-        .ram_total_bytes = total_ram,
-        .ram_available_bytes = ram_available,
-    };
-    return os_system_memory_last;
-}
-#endif
-
 // Linux
 #if defined(OS_LINUX)
 
 static OS_SYSTEM_MEMORY os_system_memory_cgroup_v1(bool query_total_ram __maybe_unused) {
-    static OS_SYSTEM_MEMORY sm = {0, 0};
+    static OS_SYSTEM_MEMORY sm = OS_SYSTEM_MEMORY_EMPTY;
     char buf[4096];
     uint64_t used = 0, inactive = 0;
 
@@ -118,13 +74,12 @@ done:
     return sm;
 
 failed:
-    sm.ram_total_bytes = 0;
-    sm.ram_available_bytes = 0;
+    sm = OS_SYSTEM_MEMORY_EMPTY;
     return sm;
 }
 
 static OS_SYSTEM_MEMORY os_system_memory_cgroup_v2(bool query_total_ram __maybe_unused) {
-    static OS_SYSTEM_MEMORY sm = {0, 0};
+    static OS_SYSTEM_MEMORY sm = OS_SYSTEM_MEMORY_EMPTY;
     char buf[4096];
     uint64_t used = 0, inactive = 0;
 
@@ -169,8 +124,7 @@ done:
     return sm;
 
 failed:
-    sm.ram_total_bytes = 0;
-    sm.ram_available_bytes = 0;
+    sm = OS_SYSTEM_MEMORY_EMPTY;
     return sm;
 }
 
@@ -178,7 +132,7 @@ failed:
 #define MEMINFO_MEMAVAILABLE "MemAvailable:"
 
 static OS_SYSTEM_MEMORY os_system_memory_meminfo(bool query_total_ram __maybe_unused) {
-    static OS_SYSTEM_MEMORY sm = {0, 0};
+    static OS_SYSTEM_MEMORY sm = OS_SYSTEM_MEMORY_EMPTY;
 
     char buf[4096];
     if (read_txt_file("/proc/meminfo", buf, sizeof(buf)) != 0)
@@ -212,7 +166,7 @@ typedef enum {
 } OS_MEM_SRC;
 
 OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram __maybe_unused) {
-    static OS_SYSTEM_MEMORY sm = {0, 0};
+    static OS_SYSTEM_MEMORY sm = OS_SYSTEM_MEMORY_EMPTY;
     static usec_t last_ut = 0, last_total_ut = 0;
     static OS_MEM_SRC src = OS_MEM_SRC_UNKNOWN;
 
@@ -284,7 +238,7 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram __maybe_unused) {
 #include <sys/sysctl.h>
 
 OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram) {
-    static OS_SYSTEM_MEMORY sm = {0, 0};
+    static OS_SYSTEM_MEMORY sm = OS_SYSTEM_MEMORY_EMPTY;
 
     // Query the total RAM only if needed or if it hasn't been cached
     if (query_total_ram || sm.ram_total_bytes == 0) {
@@ -319,8 +273,51 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram) {
     return sm;
 
 failed:
-    sm.ram_total_bytes = 0;
-    sm.ram_available_bytes = 0;
+    sm = OS_SYSTEM_MEMORY_EMPTY;
     return sm;
+}
+#endif
+
+// macOS
+#if defined(OS_MACOS)
+#include <mach/mach.h>
+#include <sys/sysctl.h>
+
+OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram) {
+    static uint64_t total_ram = 0;
+    static uint64_t page_size = 0;
+
+    if (page_size == 0) {
+        size_t len = sizeof(page_size);
+        if (sysctlbyname("hw.pagesize", &page_size, &len, NULL, 0) != 0)
+            return OS_SYSTEM_MEMORY_EMPTY;
+    }
+
+    if (query_total_ram || total_ram == 0) {
+        size_t len = sizeof(total_ram);
+        if (sysctlbyname("hw.memsize", &total_ram, &len, NULL, 0) != 0)
+            return OS_SYSTEM_MEMORY_EMPTY;
+    }
+
+    uint64_t ram_available = 0;
+    if (page_size > 0) {
+        vm_statistics64_data_t vm_info;
+        mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+        mach_port_t mach_port = mach_host_self();
+
+        if (host_statistics64(mach_port, HOST_VM_INFO64, (host_info_t)&vm_info, &count) != KERN_SUCCESS) {
+            mach_port_deallocate(mach_task_self(), mach_port);
+            return OS_SYSTEM_MEMORY_EMPTY;
+        }
+
+        ram_available = (vm_info.free_count + vm_info.inactive_count + vm_info.purgeable_count) * page_size;
+        mach_port_deallocate(mach_task_self(), mach_port);
+    }
+
+    os_system_memory_last = (OS_SYSTEM_MEMORY){
+        .ram_total_bytes = total_ram,
+        .ram_available_bytes = ram_available,
+    };
+    return os_system_memory_last;
 }
 #endif

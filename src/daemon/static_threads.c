@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "web/api/queries/backfill.h"
+#include "daemon-systemd-watcher.h"
 
 void *aclk_main(void *ptr);
 void *analytics_main(void *ptr);
@@ -200,6 +201,16 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = backfill_thread
+    },
+    {
+        .name = "SDBUSWATCHER",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enable_routine = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = systemd_watcher_thread
     },
 
     // terminator

@@ -172,9 +172,27 @@ static void etw_set_source_meta(struct nd_log_source *source, USHORT channelID, 
     source->Keyword = ed->Keyword;
 }
 
+// Callback for provider enable/disable notifications
+static void NTAPI ProviderEnableCallback(
+        LPCGUID SourceId __maybe_unused,
+        ULONG IsEnabled,
+        UCHAR Level __maybe_unused,
+        ULONGLONG MatchAnyKeyword __maybe_unused,
+        ULONGLONG MatchAllKeyword __maybe_unused,
+        PEVENT_FILTER_DESCRIPTOR FilterData __maybe_unused,
+        PVOID CallbackContext __maybe_unused
+) {
+    spinlock_lock(&nd_log.eventlog.provider_lock);
+    nd_log.eventlog.provider_enabled = IsEnabled ? true : false;
+    spinlock_unlock(&nd_log.eventlog.provider_lock);
+}
+
 static bool etw_register_provider(void) {
+    spinlock_init(&nd_log.eventlog.provider_lock);
+    nd_log.eventlog.provider_enabled = false;
+
     // Register the ETW provider
-    if (EventRegister(&NETDATA_ETW_PROVIDER_GUID, NULL, NULL, &regHandle) != ERROR_SUCCESS)
+    if (EventRegister(&NETDATA_ETW_PROVIDER_GUID, ProviderEnableCallback, NULL, &regHandle) != ERROR_SUCCESS)
         return false;
 
     etw_set_source_meta(&nd_log.sources[NDLS_DAEMON], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
@@ -185,7 +203,23 @@ static bool etw_register_provider(void) {
     etw_set_source_meta(&nd_log.sources[NDLS_UNSET], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
     etw_set_source_meta(&nd_log.sources[NDLS_DEBUG], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
 
-    return true;
+    DWORD wait_start = GetTickCount();
+    while(true) {
+        spinlock_lock(&nd_log.eventlog.provider_lock);
+        bool enabled = nd_log.eventlog.provider_enabled;
+        spinlock_unlock(&nd_log.eventlog.provider_lock);
+
+        if(enabled)
+            return true;
+
+        // Timeout after 5 seconds
+        if(GetTickCount() - wait_start > 5000) {
+            EventUnregister(regHandle);
+            return false;
+        }
+
+        Sleep(10); // Short sleep between checks
+    }
 }
 #endif
 
@@ -353,7 +387,7 @@ static const char *get_field_value_unsafe(struct log_field *fields, ND_LOG_FIELD
                 break;
             case NDFT_UUID:
                 if (!uuid_is_null(*fields[i].entry.uuid)) {
-                    uuid_unparse_lower(*fields[i].entry.uuid, number_str);
+                    uuid_unparse_lower_compact(*fields[i].entry.uuid, number_str);
                     s = number_str;
                 }
                 break;

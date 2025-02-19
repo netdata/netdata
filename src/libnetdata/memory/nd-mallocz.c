@@ -387,6 +387,8 @@ void freez_int(void *ptr, const char *file, const char *function, size_t line) {
 #else
 
 ALWAYS_INLINE char *strdupz(const char *s) {
+    workers_memory_call(WORKERS_MEMORY_CALL_LIBC_STRDUP);
+
     char *t = strdup(s);
     if (unlikely(!t)) {
         OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
@@ -396,6 +398,8 @@ ALWAYS_INLINE char *strdupz(const char *s) {
 }
 
 ALWAYS_INLINE char *strndupz(const char *s, size_t len) {
+    workers_memory_call(WORKERS_MEMORY_CALL_LIBC_STRNDUP);
+
     char *t = strndup(s, len);
     if (unlikely(!t)) {
         OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
@@ -406,10 +410,14 @@ ALWAYS_INLINE char *strndupz(const char *s, size_t len) {
 
 // If ptr is NULL, no operation is performed.
 ALWAYS_INLINE void freez(void *ptr) {
-    if(likely(ptr)) free(ptr);
+    if(likely(ptr)) {
+        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
+        free(ptr);
+    }
 }
 
 ALWAYS_INLINE void *mallocz(size_t size) {
+    workers_memory_call(WORKERS_MEMORY_CALL_LIBC_MALLOC);
     void *p = malloc(size);
     if (unlikely(!p)) {
         OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
@@ -419,6 +427,7 @@ ALWAYS_INLINE void *mallocz(size_t size) {
 }
 
 ALWAYS_INLINE void *callocz(size_t nmemb, size_t size) {
+    workers_memory_call(WORKERS_MEMORY_CALL_LIBC_CALLOC);
     void *p = calloc(nmemb, size);
     if (unlikely(!p)) {
         OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
@@ -428,6 +437,7 @@ ALWAYS_INLINE void *callocz(size_t nmemb, size_t size) {
 }
 
 ALWAYS_INLINE void *reallocz(void *ptr, size_t size) {
+    workers_memory_call(WORKERS_MEMORY_CALL_LIBC_REALLOC);
     void *p = realloc(ptr, size);
     if (unlikely(!p)) {
         OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
@@ -436,7 +446,13 @@ ALWAYS_INLINE void *reallocz(void *ptr, size_t size) {
     return p;
 }
 
-ALWAYS_INLINE void posix_memfree(void *ptr) {
+ALWAYS_INLINE int posix_memalignz(void **memptr, size_t alignment, size_t size) {
+    workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN);
+    return posix_memalign(memptr, alignment, size);
+}
+
+ALWAYS_INLINE void posix_memalign_freez(void *ptr) {
+    workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN_FREE);
     free(ptr);
 }
 #endif

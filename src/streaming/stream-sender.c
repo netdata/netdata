@@ -521,9 +521,9 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
 
         nd_poll_event_t wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
         if(unlikely(s->thread.wanted != wanted)) {
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM SND[%zu] '%s' [to %s]: nd_poll() wanted events mismatch.",
-                   sth->id, rrdhost_hostname(s->host), s->remote_ip);
+//            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+//                   "STREAM SND[%zu] '%s' [to %s]: nd_poll() wanted events mismatch.",
+//                   sth->id, rrdhost_hostname(s->host), s->remote_ip);
 
             s->thread.wanted = wanted;
             if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted))

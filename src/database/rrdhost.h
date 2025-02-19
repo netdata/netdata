@@ -84,6 +84,7 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 27), // metadata needs to be stored in the database
 
     RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 28), // set when the host has updated global functions
+    RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION       = (1 << 29), // set when rrdcontext needs to update the retention of the host
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_get(host)                         atomic_flags_get(&((host)->flags))

@@ -11,6 +11,7 @@ extern "C" {
 #include "memory/alignment.h"
 #include "memory/nd-mallocz.h"
 #include "memory/nd-mmap.h"
+#include "libnetdata/exit/exit_initiated.h"
 #include "log/nd_log-fatal.h"
 #include "atomics/atomics.h"
 
@@ -39,8 +40,6 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
 int verify_netdata_host_prefix(bool log_msg);
 
-extern volatile sig_atomic_t netdata_exit;
-
 char *read_by_filename(const char *filename, long *file_size);
 char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
@@ -58,9 +57,9 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
 struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
 
 #ifdef OS_WINDOWS
-void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data);
+void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char *action_result, const char *action_data);
 #else
-void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) NORETURN;
+void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char *action_result, const char *action_data) NORETURN;
 #endif
 
 extern const char *netdata_configured_host_prefix;

@@ -1512,14 +1512,16 @@ static void populate_packaging_info() {
     }
 
     OS_SYSTEM_MEMORY sm = os_system_memory(true);
-    char buf[1024];
-    snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_total_bytes);
-    // size_snprintf(buf, sizeof(buf), sm.ram_total_bytes, "B", false);
-    build_info_set_value_strdupz(BIB_RUNTIME_MEM_TOTAL, buf);
+    if(OS_SYSTEM_MEMORY_OK(sm)) {
+        char buf[1024];
+        snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_total_bytes);
+        // size_snprintf(buf, sizeof(buf), sm.ram_total_bytes, "B", false);
+        build_info_set_value_strdupz(BIB_RUNTIME_MEM_TOTAL, buf);
 
-    snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_available_bytes);
-    // size_snprintf(buf, sizeof(buf), sm.ram_available_bytes, "B", false);
-    build_info_set_value_strdupz(BIB_RUNTIME_MEM_AVAIL, buf);
+        snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_available_bytes);
+        // size_snprintf(buf, sizeof(buf), sm.ram_available_bytes, "B", false);
+        build_info_set_value_strdupz(BIB_RUNTIME_MEM_AVAIL, buf);
+    }
 }
 
 // ----------------------------------------------------------------------------

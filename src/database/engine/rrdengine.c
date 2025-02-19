@@ -367,7 +367,7 @@ static void wal_cleanup1(void) {
     spinlock_unlock(&wal_globals.protected.spinlock);
 
     if(wal) {
-        posix_memfree(wal->buf);
+        posix_memalign_freez(wal->buf);
         freez(wal);
         __atomic_sub_fetch(&wal_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
@@ -393,7 +393,7 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
     if(unlikely(!wal)) {
         wal = mallocz(sizeof(WAL));
         wal->buf_size = RRDENG_BLOCK_SIZE;
-        int ret = posix_memalign((void *)&wal->buf, RRDFILE_ALIGNMENT, wal->buf_size);
+        int ret = posix_memalignz((void *)&wal->buf, RRDFILE_ALIGNMENT, wal->buf_size);
         if (unlikely(ret))
             fatal("DBENGINE: posix_memalign:%s", strerror(ret));
         __atomic_add_fetch(&wal_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
@@ -649,7 +649,7 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
         page_descriptor_release(descr);
     }
 
-    posix_memfree(xt_io_descr->buf);
+    posix_memalign_freez(xt_io_descr->buf);
     extent_io_descriptor_release(xt_io_descr);
 
     spinlock_lock(&datafile->writers.spinlock);
@@ -763,7 +763,7 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     payload_offset = sizeof(*header) + count * sizeof(header->descr[0]);
     max_compressed_size = dbengine_max_compressed_size(uncompressed_payload_length, compression_algorithm);
     size_bytes = payload_offset + MAX(uncompressed_payload_length, max_compressed_size) + sizeof(*trailer);
-    ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
+    ret = posix_memalignz((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
     if (unlikely(ret)) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
         /* freez(xt_io_descr);*/

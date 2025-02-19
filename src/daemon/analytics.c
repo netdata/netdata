@@ -71,45 +71,125 @@ void analytics_log_data(void)
 void analytics_free_data(void)
 {
     freez(analytics_data.netdata_config_stream_enabled);
+    analytics_data.netdata_config_stream_enabled = NULL;
+
     freez(analytics_data.netdata_config_memory_mode);
+    analytics_data.netdata_config_memory_mode = NULL;
+
     freez(analytics_data.netdata_config_exporting_enabled);
+    analytics_data.netdata_config_exporting_enabled = NULL;
+
     freez(analytics_data.netdata_exporting_connectors);
+    analytics_data.netdata_exporting_connectors = NULL;
+
     freez(analytics_data.netdata_allmetrics_prometheus_used);
+    analytics_data.netdata_allmetrics_prometheus_used = NULL;
+
     freez(analytics_data.netdata_allmetrics_shell_used);
+    analytics_data.netdata_allmetrics_shell_used = NULL;
+
     freez(analytics_data.netdata_allmetrics_json_used);
+    analytics_data.netdata_allmetrics_json_used = NULL;
+
     freez(analytics_data.netdata_dashboard_used);
+    analytics_data.netdata_dashboard_used = NULL;
+
     freez(analytics_data.netdata_collectors);
+    analytics_data.netdata_collectors = NULL;
+
     freez(analytics_data.netdata_collectors_count);
+    analytics_data.netdata_collectors_count = NULL;
+
     freez(analytics_data.netdata_buildinfo);
+    analytics_data.netdata_buildinfo = NULL;
+
     freez(analytics_data.netdata_config_page_cache_size);
+    analytics_data.netdata_config_page_cache_size = NULL;
+
     freez(analytics_data.netdata_config_multidb_disk_quota);
+    analytics_data.netdata_config_multidb_disk_quota = NULL;
+
     freez(analytics_data.netdata_config_https_enabled);
+    analytics_data.netdata_config_https_enabled = NULL;
+
     freez(analytics_data.netdata_config_web_enabled);
+    analytics_data.netdata_config_web_enabled = NULL;
+
     freez(analytics_data.netdata_config_release_channel);
+    analytics_data.netdata_config_release_channel = NULL;
+
     freez(analytics_data.netdata_mirrored_host_count);
+    analytics_data.netdata_mirrored_host_count = NULL;
+
     freez(analytics_data.netdata_mirrored_hosts_reachable);
+    analytics_data.netdata_mirrored_hosts_reachable = NULL;
+
     freez(analytics_data.netdata_mirrored_hosts_unreachable);
+    analytics_data.netdata_mirrored_hosts_unreachable = NULL;
+
     freez(analytics_data.netdata_notification_methods);
+    analytics_data.netdata_notification_methods = NULL;
+
     freez(analytics_data.netdata_alarms_normal);
+    analytics_data.netdata_alarms_normal = NULL;
+
     freez(analytics_data.netdata_alarms_warning);
+    analytics_data.netdata_alarms_warning = NULL;
+
     freez(analytics_data.netdata_alarms_critical);
+    analytics_data.netdata_alarms_critical = NULL;
+
     freez(analytics_data.netdata_charts_count);
+    analytics_data.netdata_charts_count = NULL;
+
     freez(analytics_data.netdata_metrics_count);
+    analytics_data.netdata_metrics_count = NULL;
+
     freez(analytics_data.netdata_config_is_parent);
+    analytics_data.netdata_config_is_parent = NULL;
+
     freez(analytics_data.netdata_config_hosts_available);
+    analytics_data.netdata_config_hosts_available = NULL;
+
     freez(analytics_data.netdata_host_cloud_available);
+    analytics_data.netdata_host_cloud_available = NULL;
+
     freez(analytics_data.netdata_host_aclk_available);
+    analytics_data.netdata_host_aclk_available = NULL;
+
     freez(analytics_data.netdata_host_aclk_protocol);
+    analytics_data.netdata_host_aclk_protocol = NULL;
+
     freez(analytics_data.netdata_host_aclk_implementation);
+    analytics_data.netdata_host_aclk_implementation = NULL;
+
     freez(analytics_data.netdata_host_agent_claimed);
+    analytics_data.netdata_host_agent_claimed = NULL;
+
     freez(analytics_data.netdata_host_cloud_enabled);
+    analytics_data.netdata_host_cloud_enabled = NULL;
+
     freez(analytics_data.netdata_config_https_available);
+    analytics_data.netdata_config_https_available = NULL;
+
     freez(analytics_data.netdata_install_type);
+    analytics_data.netdata_install_type = NULL;
+
     freez(analytics_data.netdata_config_is_private_registry);
+    analytics_data.netdata_config_is_private_registry = NULL;
+
     freez(analytics_data.netdata_config_use_private_registry);
+    analytics_data.netdata_config_use_private_registry = NULL;
+
     freez(analytics_data.netdata_config_oom_score);
+    analytics_data.netdata_config_oom_score = NULL;
+
     freez(analytics_data.netdata_prebuilt_distro);
+    analytics_data.netdata_prebuilt_distro = NULL;
+
     freez(analytics_data.netdata_fail_reason);
+    analytics_data.netdata_fail_reason = NULL;
+
 }
 
 /*

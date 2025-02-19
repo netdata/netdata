@@ -55,7 +55,8 @@
 
 // initialize the registry
 // should only happen when netdata starts
-int registry_init(void);
+void registry_init(void);
+bool registry_load(void);
 
 // free all data held by the registry
 // should only happen when netdata exits

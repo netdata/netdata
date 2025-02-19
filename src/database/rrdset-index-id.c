@@ -4,6 +4,22 @@
 #include "rrdset-index-name.h"
 #include "rrdset-slots.h"
 
+// --------------------------------------------------------------------------------------------------------------------
+// tier1/2 spread over time
+
+static size_t global_rrdset_counter = 0;
+static uint16_t rrdset_collection_modulo_init(void) {
+    return __atomic_fetch_add(&global_rrdset_counter, 1, __ATOMIC_RELAXED) % 65535;
+}
+
+uint16_t rrddim_collection_modulo(RRDSET *st, uint32_t spread) {
+    if(!spread) spread = 65535;
+    spread = MIN(spread, 65535);
+    return 1 + (st->collection_modulo % spread);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 static inline void rrdset_update_permanent_labels(RRDSET *st) {
     if(!st->rrdlabels) return;
 
@@ -11,7 +27,7 @@ static inline void rrdset_update_permanent_labels(RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO | RRDLABEL_FLAG_DONT_DELETE);
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // RRDSET index
 
 struct rrdset_constructor {
@@ -55,6 +71,8 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if(!st->name)
         st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->id);
     rrdset_index_add_name(host, st);
+
+    st->collection_modulo = rrdset_collection_modulo_init();
 
     st->parts.id = string_strdupz(ctr->id);
     st->parts.type = string_strdupz(ctr->type);

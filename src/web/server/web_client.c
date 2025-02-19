@@ -1185,13 +1185,13 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             w->response.data->content_type = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
 
-            if(!netdata_exit)
+            if(!exit_initiated)
                 buffer_strcat(w->response.data, "ok, will do...");
             else
                 buffer_strcat(w->response.data, "I am doing it already");
 
             netdata_log_error("web request to exit received.");
-            netdata_cleanup_and_exit(0, NULL, NULL, NULL);
+            netdata_cleanup_and_exit(EXIT_REASON_API_QUIT, NULL, NULL, NULL);
             return HTTP_RESP_OK;
         }
         else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {

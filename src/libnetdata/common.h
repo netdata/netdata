@@ -426,6 +426,11 @@ typedef uint32_t uid_t;
 
 // --------------------------------------------------------------------------------------------------------------------
 
+#define FUNCTION_RUN_ONCE() { static bool __run_once = false; if(__run_once) return; __run_once = true; }
+#define FUNCTION_RUN_ONCE_RET(ret) { static bool __run_once = false; if(__run_once) return (ret); __run_once = true; }
+
+// --------------------------------------------------------------------------------------------------------------------
+
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 256
 #endif

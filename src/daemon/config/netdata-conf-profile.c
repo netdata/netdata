@@ -31,13 +31,14 @@ ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
 
     // required for detecting the profile
     stream_conf_load();
+    netdata_conf_section_directories();
 
     ND_PROFILE def_profile = ND_PROFILE_NONE;
 
     OS_SYSTEM_MEMORY mem = os_system_memory(true);
     size_t cpus = os_get_system_cpus_uncached();
 
-    if(cpus <= 1 || (mem.ram_total_bytes && mem.ram_total_bytes < 1ULL * 1024 * 1024 * 1024))
+    if(cpus <= 1 || (OS_SYSTEM_MEMORY_OK(mem) && mem.ram_total_bytes < 1ULL * 1024 * 1024 * 1024))
         def_profile = ND_PROFILE_IOT;
 
     else if(stream_conf_is_parent(true))
@@ -94,15 +95,13 @@ ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
 struct nd_profile_t nd_profile = { 0 };
 
 void nd_profile_setup(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     ND_PROFILE profile = nd_profile_detect_and_configure(true); (void)profile;
     if(netdata_conf_is_iot()) {
         nd_profile.storage_tiers = 3;       // MUST BE 1
         nd_profile.update_every = 1;        // MUST BE 2
-        nd_profile.malloc_arenas = 1;
+        nd_profile.malloc_arenas = 4;
         nd_profile.malloc_trim = 32 * 1024;
         nd_profile.stream_sender_compression = ND_COMPRESSION_FASTEST;
         // web server threads = 6

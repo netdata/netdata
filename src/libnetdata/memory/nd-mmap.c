@@ -130,6 +130,7 @@ int nd_munmap(void *ptr, size_t size) {
     malloc_trace_munmap(size);
 #endif
 
+    workers_memory_call(WORKERS_MEMORY_CALL_MUNMAP);
     int rc = munmap(ptr, size);
 
     if(rc == 0) {
@@ -141,6 +142,8 @@ int nd_munmap(void *ptr, size_t size) {
 }
 
 void *nd_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset) {
+    workers_memory_call(WORKERS_MEMORY_CALL_MMAP);
+
     void *rc = mmap(addr, len, prot, flags, fd, offset);
 
     if(rc != MAP_FAILED) {

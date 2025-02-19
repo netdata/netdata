@@ -60,6 +60,8 @@ void freez(void *ptr);
 #endif // NETDATA_TRACE_ALLOCATIONS
 
 void mallocz_release_as_much_memory_to_the_system(void);
-void posix_memfree(void *ptr);
+
+int posix_memalignz(void **memptr, size_t alignment, size_t size);
+void posix_memalign_freez(void *ptr);
 
 #endif //NETDATA_ND_MALLOCZ_H

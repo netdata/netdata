@@ -90,7 +90,7 @@ bool service_running(SERVICE_TYPE service) {
     if (sth->type == SERVICE_THREAD_TYPE_NETDATA)
         cancelled = nd_thread_signaled_to_cancel();
 
-    return !sth->stop_immediately && !netdata_exit && !cancelled;
+    return !sth->stop_immediately && !exit_initiated && !cancelled;
 }
 
 void service_signal_exit(SERVICE_TYPE service) {

@@ -86,6 +86,10 @@ void libuv_initialize(void) {
 }
 
 void netdata_conf_section_global(void) {
+    FUNCTION_RUN_ONCE();
+
+    netdata_conf_section_directories();
+
     // ------------------------------------------------------------------------
     // get the hostname
 
@@ -98,8 +102,6 @@ void netdata_conf_section_global(void) {
 
     netdata_configured_hostname = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "hostname", buf);
     netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
-
-    netdata_conf_section_directories();
 
     nd_profile_setup(); // required for configuring the database
     netdata_conf_section_db();

@@ -344,9 +344,9 @@ void journal_file_update_header(const char *filename, struct journal_file *jf) {
 
     jf->last_scan_header_vs_last_modified_ut = jf->file_last_modified_ut;
 
-    nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-           "Journal file header updated '%s'",
-           jf->filename);
+//    nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+//           "Journal file header updated '%s'",
+//           jf->filename);
 }
 
 static STRING *string_strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix) {
@@ -459,9 +459,9 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unuse
 
         jf->msg_last_ut = jf->file_last_modified_ut;
 
-        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-               "Journal file updated to the journal files registry '%s'",
-               jf->filename);
+//        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+//               "Journal file updated to the journal files registry '%s'",
+//               jf->filename);
     }
 
     return false;

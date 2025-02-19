@@ -1863,7 +1863,7 @@ void *replication_thread_main(void *ptr) {
 }
 
 int replication_threads_default(void) {
-    int threads = netdata_conf_is_parent() ? (int)MIN(netdata_conf_cpus(), 6) : 1;
+    int threads = netdata_conf_is_parent() ? (int)MAX(netdata_conf_cpus() / 3, 4) : 1;
     threads = FIT_IN_RANGE(threads, 1, MAX_REPLICATION_THREADS);
     return threads;
 }

@@ -15,4 +15,6 @@ void rrddim_store_metric_with_trace(RRDDIM *rd, usec_t point_end_time_ut, NETDAT
 void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags);
 #endif
 
+void store_metric_at_tier_flush_last_completed(RRDDIM *rd, size_t tier, struct rrddim_tier *t);
+
 #endif //NETDATA_RRDDIM_COLLECTION_H

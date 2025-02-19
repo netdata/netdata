@@ -62,7 +62,11 @@ void registry_generate_curl_urls(void) {
     fclose(fp);
 }
 
-int registry_init(void) {
+void registry_init(void) {
+    FUNCTION_RUN_ONCE();
+
+    netdata_conf_section_global();
+
     char filename[FILENAME_MAX + 1];
 
     // registry enabled?
@@ -70,7 +74,7 @@ int registry_init(void) {
         registry.enabled = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "enabled", 0);
     }
     else {
-        netdata_log_info("Registry is disabled - use the central netdata");
+        netdata_log_info("Registry is disabled");
         inicfg_set_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "enabled", 0);
         registry.enabled = 0;
     }
@@ -117,8 +121,6 @@ int registry_init(void) {
         inicfg_set_number(&netdata_config, CONFIG_SECTION_REGISTRY, "max URL name length", (long long)registry.max_name_length);
     }
 
-    bool use_mmap = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "use mmap", false);
-
     // initialize entries counters
     registry.persons_count = 0;
     registry.machines_count = 0;
@@ -128,9 +130,12 @@ int registry_init(void) {
 
     // initialize locks
     netdata_mutex_init(&registry.lock);
+}
 
-    // load the registry database
+bool registry_load(void) {
     if(registry.enabled) {
+        bool use_mmap = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "use mmap", false);
+
         // create dictionaries
         registry.persons = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
         registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
@@ -180,12 +185,14 @@ int registry_init(void) {
         if(unlikely(registry_db_should_be_saved()))
             registry_db_save();
 
-//        registry_db_stats();
-//        registry_generate_curl_urls();
-//        exit(0);
+        //        registry_db_stats();
+        //        registry_generate_curl_urls();
+        //        exit(0);
+
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 static int machine_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {

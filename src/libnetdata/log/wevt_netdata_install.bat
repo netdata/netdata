@@ -48,5 +48,12 @@ if %errorlevel% neq 0 (
 )
 
 echo.
+echo Setting default event sizes...
+wevtutil sl "Netdata/Daemon" /ms:104857600
+wevtutil sl "Netdata/Collectors" /ms:104857600
+wevtutil sl "Netdata/Health" /ms:104857600
+wevtutil sl "Netdata/Access" /ms:104857600
+
+echo.
 echo Netdata Event Tracing for Windows manifest installed successfully.
 exit /b 0

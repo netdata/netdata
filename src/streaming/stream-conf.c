@@ -115,9 +115,7 @@ bool stream_conf_receiver_needs_dbengine(void) {
 }
 
 void stream_conf_load() {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     stream_conf_load_internal();
     check_local_streaming_capabilities();

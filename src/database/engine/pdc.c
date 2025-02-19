@@ -1216,7 +1216,7 @@ static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file
     uv_fs_t request;
 
     unsigned real_io_size = ALIGN_BYTES_CEILING(size_bytes);
-    int ret = posix_memalign(&buffer, RRDFILE_ALIGNMENT, real_io_size);
+    int ret = posix_memalignz(&buffer, RRDFILE_ALIGNMENT, real_io_size);
     if (unlikely(ret))
         fatal("DBENGINE: posix_memalign(): %s", strerror(ret));
 
@@ -1224,7 +1224,7 @@ static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file
     ret = uv_fs_read(NULL, &request, file, &iov, 1, (int64_t)pos, NULL);
     if (unlikely(-1 == ret)) {
         ctx_io_error(ctx);
-        posix_memfree(buffer);
+        posix_memalign_freez(buffer);
         buffer = NULL;
     }
     else
@@ -1236,7 +1236,7 @@ static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file
 }
 
 static inline void datafile_extent_read_free(void *buffer) {
-    posix_memfree(buffer);
+    posix_memalign_freez(buffer);
 }
 
 NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {

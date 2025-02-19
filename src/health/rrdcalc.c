@@ -257,7 +257,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
         return;
     }
 
-    if (!netdata_exit) {
+    if (!exit_initiated) {
         RRDHOST *host = st->rrdhost;
 
         time_t now = now_realtime_sec();
