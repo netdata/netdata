@@ -190,7 +190,6 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->flags |= flags;
 
     ae->last_repeat = 0;
-    ae->pending_save_count = 0;
 
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
         ae->non_clear_duration += ae->duration;
@@ -198,7 +197,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     return ae;
 }
 
-inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async)
+inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae)
 {
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
@@ -237,26 +236,22 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
     health_alarm_log_save(host, ae);
 }
 
-inline void health_alarm_log_free_one_nochecks_nounlink(RRDHOST *host, ALARM_ENTRY *ae)
+inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae)
 {
-    if(__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED))
-        health_queue_ae_deletion(host, ae);
-    else {
-        string_freez(ae->name);
-        string_freez(ae->chart);
-        string_freez(ae->chart_context);
-        string_freez(ae->classification);
-        string_freez(ae->component);
-        string_freez(ae->type);
-        string_freez(ae->exec);
-        string_freez(ae->recipient);
-        string_freez(ae->source);
-        string_freez(ae->units);
-        string_freez(ae->info);
-        string_freez(ae->old_value_string);
-        string_freez(ae->new_value_string);
-        freez(ae);
-    }
+    string_freez(ae->name);
+    string_freez(ae->chart);
+    string_freez(ae->chart_context);
+    string_freez(ae->classification);
+    string_freez(ae->component);
+    string_freez(ae->type);
+    string_freez(ae->exec);
+    string_freez(ae->recipient);
+    string_freez(ae->source);
+    string_freez(ae->units);
+    string_freez(ae->info);
+    string_freez(ae->old_value_string);
+    string_freez(ae->new_value_string);
+    freez(ae);
 }
 
 inline void health_alarm_log_free(RRDHOST *host) {
@@ -265,7 +260,7 @@ inline void health_alarm_log_free(RRDHOST *host) {
     ALARM_ENTRY *ae;
     while((ae = host->health_log.alarms)) {
         host->health_log.alarms = ae->next;
-        health_alarm_log_free_one_nochecks_nounlink(host, ae);
+        health_alarm_log_free_one_nochecks_nounlink(ae);
     }
 
     rw_spinlock_write_unlock(&host->health_log.spinlock);
