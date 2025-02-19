@@ -77,15 +77,12 @@ static void clean_directory(const char *dirname)
 static void prepare_required_directories(uid_t uid, gid_t gid) {
     change_dir_ownership(netdata_configured_cache_dir, uid, gid, true);
     change_dir_ownership(netdata_configured_varlib_dir, uid, gid, false);
-    change_dir_ownership(netdata_configured_lock_dir, uid, gid, false);
     change_dir_ownership(netdata_configured_log_dir, uid, gid, false);
     change_dir_ownership(netdata_configured_cloud_dir, uid, gid, false);
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
     change_dir_ownership(filename, uid, gid, false);
-
-    clean_directory(netdata_configured_lock_dir);
 }
 
 static int become_user(const char *username, int pid_fd) {

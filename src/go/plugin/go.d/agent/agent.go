@@ -18,7 +18,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/filelock"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/filestatus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/jobmgr"
@@ -37,7 +36,6 @@ type Config struct {
 	CollectorsConfigWatchPath []string
 	ServiceDiscoveryConfigDir []string
 	StateFile                 string
-	LockDir                   string
 	ModuleRegistry            module.Registry
 	RunModule                 string
 	MinUpdateEvery            int
@@ -55,7 +53,6 @@ type Agent struct {
 	ServiceDiscoveryConfigDir multipath.MultiPath
 
 	StateFile string
-	LockDir   string
 
 	RunModule      string
 	MinUpdateEvery int
@@ -80,7 +77,6 @@ func New(cfg Config) *Agent {
 		ServiceDiscoveryConfigDir: cfg.ServiceDiscoveryConfigDir,
 		CollectorsConfigWatchPath: cfg.CollectorsConfigWatchPath,
 		StateFile:                 cfg.StateFile,
-		LockDir:                   cfg.LockDir,
 		RunModule:                 cfg.RunModule,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
 		ModuleRegistry:            module.DefaultRegistry,
@@ -203,10 +199,6 @@ func (a *Agent) run(ctx context.Context) {
 
 	if reg := a.setupVnodeRegistry(); len(reg) > 0 {
 		jobMgr.Vnodes = reg
-	}
-
-	if a.LockDir != "" {
-		jobMgr.FileLock = filelock.New(a.LockDir)
 	}
 
 	var fsMgr *filestatus.Manager

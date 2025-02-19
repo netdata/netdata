@@ -33,7 +33,6 @@ func New() *Manager {
 			slog.String("component", "job manager"),
 		),
 		Out:             io.Discard,
-		FileLock:        noop{},
 		FileStatus:      noop{},
 		FileStatusStore: noop{},
 		FnReg:           noop{},
@@ -64,7 +63,6 @@ type Manager struct {
 	Modules        module.Registry
 	ConfigDefaults confgroup.Registry
 
-	FileLock        FileLocker
 	FileStatus      FileStatus
 	FileStatusStore FileStatusStore
 	FnReg           FunctionRegistry
@@ -193,7 +191,6 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 		}
 		if ecfg.status == dyncfgRunning {
 			m.stopRunningJob(ecfg.cfg.FullName())
-			m.FileLock.Unlock(ecfg.cfg.FullName())
 			m.FileStatus.Remove(ecfg.cfg)
 		}
 		scfg.status = dyncfgAccepted
@@ -226,7 +223,6 @@ func (m *Manager) removeConfig(cfg confgroup.Config) {
 
 	m.exposedConfigs.remove(cfg)
 	m.stopRunningJob(cfg.FullName())
-	m.FileLock.Unlock(cfg.FullName())
 	m.FileStatus.Remove(cfg)
 
 	if !isStock(cfg) || ecfg.status == dyncfgRunning {
@@ -273,7 +269,6 @@ func (m *Manager) stopRunningJob(name string) {
 }
 
 func (m *Manager) cleanup() {
-	m.FileLock.UnlockAll()
 	m.FnReg.Unregister("config")
 
 	m.runningJobs.lock()
