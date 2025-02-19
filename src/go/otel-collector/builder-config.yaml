@@ -1,0 +1,21 @@
+dist:
+  name: otelcol.plugin
+  module: github.com/netdata/netdata/otel-collector
+  description: OpenTelemetry Collector Distribution built for Netdata
+  output_path: ./build
+  version: 0.0.0
+  debug_compilation: false
+
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.120.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.120.0
+
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.120.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.120.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.120.0
+  - gomod: github.com/netdata/netdata/otel-collector/exporter/journaldexporter v0.0.0
+
+replaces:
+  - github.com/netdata/netdata/otel-collector/exporter/journaldexporter => ../exporter/journaldexporter
