@@ -27,13 +27,18 @@ func (c *Collector) collectUserStatistics(mx map[string]int64) error {
 				c.addUserStatisticsCharts(user)
 			}
 		case "Cpu_time":
-			if c.isMariaDB && c.version.GTE(semver.Version{Major: 11, Minor: 4, Patch: 5}) {
+			needsDivision := c.isMariaDB &&
+				((c.version.Major == 10 && c.version.GTE(semver.Version{Major: 10, Minor: 11, Patch: 11})) ||
+					c.version.GTE(semver.Version{Major: 11, Minor: 4, Patch: 5}))
+
+			key := strings.ToLower(prefix + column)
+			if needsDivision {
 				// TODO: theoretically should divide by 1e6 to convert to seconds,
 				// but empirically need 1e7 to match pre-11.4.5 values.
 				// Needs investigation - possible unit reporting inconsistency in MariaDB
-				mx[strings.ToLower(prefix+column)] = int64(parseFloat(value) / 1e7 * 1000)
+				mx[key] = int64(parseFloat(value) / 1e7 * 1000)
 			} else {
-				mx[strings.ToLower(prefix+column)] = int64(parseFloat(value) * 1000)
+				mx[key] = int64(parseFloat(value) * 1000)
 			}
 		case
 			"Total_connections",
