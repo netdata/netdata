@@ -511,35 +511,33 @@ static inline bool json_parse_array(LOG_JSON_STATE *js) {
 
     json_consume_char(js);
 
-    size_t index = 0;
-    do {
-        const char *s = json_current_pos(js);
-        if(*s == ']') {
-            json_consume_char(js);
-            break;
-        }
-
-        if(!json_key_index_and_push(js, index))
-            return false;
-
-        if(!json_parse_value(js))
-            return false;
-
-        json_key_pop(js);
-
-        if(!json_expect_char_after_white_space(js, ",]"))
-            return false;
-
-        s = json_current_pos(js);
+    const char *s = json_current_pos(js);
+    if(*s == ']')
         json_consume_char(js);
-        if(*s == ',') {
-            index++;
-            continue;
-        }
-        else // }
-            break;
+    else {
+        size_t index = 0;
+        do {
+            if (!json_key_index_and_push(js, index))
+                return false;
 
-    } while(true);
+            if (!json_parse_value(js))
+                return false;
+
+            json_key_pop(js);
+
+            if (!json_expect_char_after_white_space(js, ",]"))
+                return false;
+
+            s = json_current_pos(js);
+            json_consume_char(js);
+            if (*s == ',') {
+                index++;
+                continue;
+            } else // ']'
+                break;
+
+        } while (true);
+    }
 
     return true;
 }
@@ -550,40 +548,39 @@ static inline bool json_parse_object(LOG_JSON_STATE *js) {
 
     json_consume_char(js);
 
-    do {
-        const char *s = json_current_pos(js);
-        if(*s == '}') {
+    const char *s = json_current_pos(js);
+    if(*s == '}')
+        json_consume_char(js);
+    else {
+        do {
+            if (!json_expect_char_after_white_space(js, "\""))
+                return false;
+
+            if (!json_parse_key_and_push(js))
+                return false;
+
+            if (!json_expect_char_after_white_space(js, ":"))
+                return false;
+
             json_consume_char(js);
-            break;
-        }
 
-        if (!json_expect_char_after_white_space(js, "\""))
-            return false;
+            if (!json_parse_value(js))
+                return false;
 
-        if(!json_parse_key_and_push(js))
-            return false;
+            json_key_pop(js);
 
-        if(!json_expect_char_after_white_space(js, ":"))
-            return false;
+            if (!json_expect_char_after_white_space(js, ",}"))
+                return false;
 
-        json_consume_char(js);
+            s = json_current_pos(js);
+            json_consume_char(js);
+            if (*s == ',')
+                continue;
+            else // '}'
+                break;
 
-        if(!json_parse_value(js))
-            return false;
-
-        json_key_pop(js);
-
-        if(!json_expect_char_after_white_space(js, ",}"))
-            return false;
-
-        s = json_current_pos(js);
-        json_consume_char(js);
-        if(*s == ',')
-            continue;
-        else // }
-            break;
-
-    } while(true);
+        } while (true);
+    }
 
     return true;
 }
