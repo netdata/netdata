@@ -3,10 +3,12 @@
 package snmp
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
 	"github.com/google/uuid"
@@ -15,7 +17,7 @@ import (
 
 func (c *Collector) collect() (map[string]int64, error) {
 	if c.sysInfo == nil {
-		si, err := c.getSysInfo()
+		si, err := snmpsd.GetSysInfo(c.snmpClient)
 		if err != nil {
 			return nil, err
 		}
@@ -49,6 +51,24 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
+func (c *Collector) collectSysUptime(mx map[string]int64) error {
+	resp, err := c.snmpClient.Get([]string{snmpsd.OidSysUptime})
+	if err != nil {
+		return err
+	}
+	if len(resp.Variables) == 0 {
+		return errors.New("no system uptime")
+	}
+	v, err := pduToInt(resp.Variables[0])
+	if err != nil {
+		return err
+	}
+
+	mx["uptime"] = v / 100 // the time is in hundredths of a second
+
+	return nil
+}
+
 func (c *Collector) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
 	if c.snmpClient.Version() == gosnmp.Version1 {
 		return c.snmpClient.WalkAll(rootOid)
@@ -56,12 +76,12 @@ func (c *Collector) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
 	return c.snmpClient.BulkWalkAll(rootOid)
 }
 
-func (c *Collector) setupVnode(si *sysInfo) *vnodes.VirtualNode {
+func (c *Collector) setupVnode(si *snmpsd.SysInfo) *vnodes.VirtualNode {
 	if c.Vnode.GUID == "" {
 		c.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(c.Hostname)).String()
 	}
 
-	hostnames := []string{c.Vnode.Hostname, si.name, "snmp-device"}
+	hostnames := []string{c.Vnode.Hostname, si.Name, "snmp-device"}
 	i := slices.IndexFunc(hostnames, func(s string) bool { return s != "" })
 
 	c.Vnode.Hostname = fmt.Sprintf("%s(%s)", hostnames[i], c.Hostname)
@@ -71,17 +91,17 @@ func (c *Collector) setupVnode(si *sysInfo) *vnodes.VirtualNode {
 	for k, v := range c.Vnode.Labels {
 		labels[k] = v
 	}
-	if si.descr != "" {
-		labels["sysDescr"] = si.descr
+	if si.Descr != "" {
+		labels["sysDescr"] = si.Descr
 	}
-	if si.contact != "" {
-		labels["sysContact"] = si.contact
+	if si.Contact != "" {
+		labels["sysContact"] = si.Contact
 	}
-	if si.location != "" {
-		labels["sysLocation"] = si.location
+	if si.Location != "" {
+		labels["sysLocation"] = si.Location
 	}
 	// FIXME: vendor should be obtained from sysDescr, org should be used as a fallback
-	labels["vendor"] = si.organization
+	labels["vendor"] = si.Organization
 
 	return &vnodes.VirtualNode{
 		GUID:     c.Vnode.GUID,

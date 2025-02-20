@@ -62,7 +62,7 @@ type config struct {
 	collectorsDir       multipath.MultiPath
 	collectorsWatchPath []string
 	serviceDiscoveryDir multipath.MultiPath
-	stateFile           string
+	varLibDir           string
 }
 
 func newConfig(opts *cli.Option, env *envConfig) *config {
@@ -74,7 +74,7 @@ func newConfig(opts *cli.Option, env *envConfig) *config {
 	cfg.collectorsDir = cfg.initCollectorsDir(opts)
 	cfg.collectorsWatchPath = cfg.initCollectorsWatchPaths(opts, env)
 	cfg.serviceDiscoveryDir = cfg.initServiceDiscoveryConfigDir()
-	cfg.stateFile = cfg.initStateFile(env)
+	cfg.varLibDir = env.varLibDir
 
 	return cfg
 }
@@ -154,13 +154,6 @@ func (c *config) initCollectorsWatchPaths(opts *cli.Option, env *envConfig) []st
 		return opts.WatchPath
 	}
 	return append(opts.WatchPath, env.watchPath)
-}
-
-func (c *config) initStateFile(env *envConfig) string {
-	if env.varLibDir == "" {
-		return ""
-	}
-	return filepath.Join(env.varLibDir, "god-jobs-statuses.json")
 }
 
 func (c *config) mustPluginDir() {

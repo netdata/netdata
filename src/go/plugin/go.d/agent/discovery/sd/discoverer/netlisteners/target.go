@@ -20,7 +20,7 @@ func (g *targetGroup) Source() string          { return g.source }
 func (g *targetGroup) Targets() []model.Target { return g.targets }
 
 type target struct {
-	model.Base
+	model.Base `hash:"ignore"`
 
 	hash uint64
 

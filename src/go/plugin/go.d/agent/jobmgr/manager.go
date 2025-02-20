@@ -60,7 +60,7 @@ type Manager struct {
 	Out            io.Writer
 	Modules        module.Registry
 	ConfigDefaults confgroup.Registry
-	StateFile      string
+	VarLibDir      string
 	FnReg          FunctionRegistry
 	Vnodes         map[string]*vnodes.VirtualNode
 
