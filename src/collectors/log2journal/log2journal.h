@@ -41,7 +41,7 @@ static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2);
 
 // ----------------------------------------------------------------------------
 
-#define MAX_OUTPUT_KEYS 100
+#define MAX_OUTPUT_KEYS 1024
 #define MAX_LINE_LENGTH (1024 * 1024)
 #define MAX_INJECTIONS (MAX_OUTPUT_KEYS / 2)
 #define MAX_REWRITES (MAX_OUTPUT_KEYS / 2)
