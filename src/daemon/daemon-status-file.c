@@ -301,6 +301,7 @@ void daemon_status_file_check_crash(void) {
 
     bool new_version = strcmp(last_session_status.version, session_status.version) != 0;
     bool post_crash_report = false;
+    bool disable_crash_report = false;
     bool dump_json = true;
     const char *msg, *cause;
     switch(last_session_status.status) {
@@ -309,6 +310,7 @@ void daemon_status_file_check_crash(void) {
             // probably a previous version of netdata was running
             cause = "no last status";
             msg = "No status found for the previous Netdata session";
+            disable_crash_report = true;
             break;
 
         case DAEMON_STATUS_EXITED:
@@ -406,7 +408,7 @@ void daemon_status_file_check_crash(void) {
            "Last exit status: %s (%s):\n\n%s",
            NETDATA_VERSION, msg, cause, buffer_tostring(wb));
 
-    if(analytics_check_enabled() || post_crash_report) {
+    if(!disable_crash_report && (analytics_check_enabled() || post_crash_report)) {
         netdata_conf_ssl();
 
         struct post_status_file_thread_data *d = calloc(1, sizeof(*d));
