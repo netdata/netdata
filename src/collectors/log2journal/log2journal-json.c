@@ -551,6 +551,12 @@ static inline bool json_parse_object(LOG_JSON_STATE *js) {
     json_consume_char(js);
 
     do {
+        const char *s = json_current_pos(js);
+        if(*s == '}') {
+            json_consume_char(js);
+            break;
+        }
+
         if (!json_expect_char_after_white_space(js, "\""))
             return false;
 
@@ -570,7 +576,7 @@ static inline bool json_parse_object(LOG_JSON_STATE *js) {
         if(!json_expect_char_after_white_space(js, ",}"))
             return false;
 
-        const char *s = json_current_pos(js);
+        s = json_current_pos(js);
         json_consume_char(js);
         if(*s == ',')
             continue;

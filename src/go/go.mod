@@ -1,6 +1,6 @@
 module github.com/netdata/netdata/go/plugins
 
-go 1.23.2
+go 1.23.4
 
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.50.1
 
@@ -20,7 +20,7 @@ require (
 	github.com/facebook/time v0.0.0-20241106150441-cd750f39df58
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-ldap/ldap/v3 v3.4.8
-	github.com/go-sql-driver/mysql v1.8.1
+	github.com/go-sql-driver/mysql v1.9.0
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gofrs/flock v0.12.1
 	github.com/gohugoio/hashstructure v0.5.0

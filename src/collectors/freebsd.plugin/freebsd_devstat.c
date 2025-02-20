@@ -195,30 +195,30 @@ int do_kern_devstat(int update_every, usec_t dt) {
     static SIMPLE_PATTERN *excluded_disks = NULL;
 
     if (unlikely(enable_new_disks == -1)) {
-        enable_new_disks = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT,
+        enable_new_disks = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT,
                                                        "enable new disks detected at runtime", CONFIG_BOOLEAN_AUTO);
 
-        enable_pass_devices = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT,
+        enable_pass_devices = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT,
                                                           "performance metrics for pass devices", CONFIG_BOOLEAN_AUTO);
 
-        do_system_io = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "total bandwidth for all disks",
+        do_system_io = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "total bandwidth for all disks",
                                                    CONFIG_BOOLEAN_YES);
 
-        do_io     = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "bandwidth for all disks",
+        do_io     = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "bandwidth for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_ops    = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "operations for all disks",
+        do_ops    = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "operations for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_qops   = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "queued operations for all disks",
+        do_qops   = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "queued operations for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_util   = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "utilization percentage for all disks",
+        do_util   = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "utilization percentage for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_iotime = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "i/o time for all disks",
+        do_iotime = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "i/o time for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_await  = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "average completed i/o time for all disks",
+        do_await  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "average completed i/o time for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_avagsz = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "average completed i/o bandwidth for all disks",
+        do_avagsz = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "average completed i/o bandwidth for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_svctm  = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "average service time for all disks",
+        do_svctm  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "average service time for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
 
         excluded_disks = simple_pattern_create(
@@ -302,18 +302,18 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->enabled = !simple_pattern_matches(excluded_disks, disk);
 
                             snprintfz(var_name, 4096, "%s:%s", CONFIG_SECTION_KERN_DEVSTAT, disk);
-                            dm->enabled = config_get_boolean_ondemand(var_name, "enabled", dm->enabled);
+                            dm->enabled = inicfg_get_boolean_ondemand(&netdata_config, var_name, "enabled", dm->enabled);
 
-                            dm->do_io     = config_get_boolean_ondemand(var_name, "bandwidth",               do_io);
-                            dm->do_ops    = config_get_boolean_ondemand(var_name, "operations",              do_ops);
-                            dm->do_qops   = config_get_boolean_ondemand(var_name, "queued operations",       do_qops);
-                            dm->do_util   = config_get_boolean_ondemand(var_name, "utilization percentage",  do_util);
-                            dm->do_iotime = config_get_boolean_ondemand(var_name, "i/o time",                do_iotime);
-                            dm->do_await  = config_get_boolean_ondemand(var_name, "average completed i/o time",
+                            dm->do_io     = inicfg_get_boolean_ondemand(&netdata_config, var_name, "bandwidth",               do_io);
+                            dm->do_ops    = inicfg_get_boolean_ondemand(&netdata_config, var_name, "operations",              do_ops);
+                            dm->do_qops   = inicfg_get_boolean_ondemand(&netdata_config, var_name, "queued operations",       do_qops);
+                            dm->do_util   = inicfg_get_boolean_ondemand(&netdata_config, var_name, "utilization percentage",  do_util);
+                            dm->do_iotime = inicfg_get_boolean_ondemand(&netdata_config, var_name, "i/o time",                do_iotime);
+                            dm->do_await  = inicfg_get_boolean_ondemand(&netdata_config, var_name, "average completed i/o time",
                                                                         do_await);
-                            dm->do_avagsz = config_get_boolean_ondemand(var_name, "average completed i/o bandwidth",
+                            dm->do_avagsz = inicfg_get_boolean_ondemand(&netdata_config, var_name, "average completed i/o bandwidth",
                                                                         do_avagsz);
-                            dm->do_svctm  = config_get_boolean_ondemand(var_name, "average service time",    do_svctm);
+                            dm->do_svctm  = inicfg_get_boolean_ondemand(&netdata_config, var_name, "average service time",    do_svctm);
 
                             // initialise data for differential charts
 
