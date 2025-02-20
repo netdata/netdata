@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- build: change go.mod version to 1.23.6 [\#19680](https://github.com/netdata/netdata/pull/19680) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/go-sql-driver/mysql from 1.8.1 to 1.9.0 in /src/go [\#19679](https://github.com/netdata/netdata/pull/19679) ([dependabot[bot]](https://github.com/apps/dependabot))
+- initial setup of custom OpenTelemetry Collector distribution [\#19678](https://github.com/netdata/netdata/pull/19678) ([ilyam8](https://github.com/ilyam8))
+- Fix freebsd compilation [\#19677](https://github.com/netdata/netdata/pull/19677) ([stelfrag](https://github.com/stelfrag))
+- test\(go.d dyncfg\): fix tests [\#19676](https://github.com/netdata/netdata/pull/19676) ([ilyam8](https://github.com/ilyam8))
+- Dyncfg users actions log [\#19674](https://github.com/netdata/netdata/pull/19674) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d dyncfg\): don't overwrite source [\#19673](https://github.com/netdata/netdata/pull/19673) ([ilyam8](https://github.com/ilyam8))
 - improvement\(go.d dyncfg\): log collector dyncfg actions [\#19672](https://github.com/netdata/netdata/pull/19672) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/k8sstate\): correct deployment conditions [\#19671](https://github.com/netdata/netdata/pull/19671) ([ilyam8](https://github.com/ilyam8))
@@ -24,6 +30,7 @@
 - build\(deps\): bump k8s.io/client-go from 0.32.1 to 0.32.2 in /src/go [\#19652](https://github.com/netdata/netdata/pull/19652) ([dependabot[bot]](https://github.com/apps/dependabot))
 - make onewayalloc fallback to malloc [\#19646](https://github.com/netdata/netdata/pull/19646) ([ktsaou](https://github.com/ktsaou))
 - docs: move /run/dbus mount to Docker recommended way [\#19645](https://github.com/netdata/netdata/pull/19645) ([ilyam8](https://github.com/ilyam8))
+- Fix native package installation on RHEL. [\#19643](https://github.com/netdata/netdata/pull/19643) ([Ferroin](https://github.com/Ferroin))
 - ci: fix win build [\#19642](https://github.com/netdata/netdata/pull/19642) ([ilyam8](https://github.com/ilyam8))
 - fix windows logs 2 - do not renumber - append fields [\#19640](https://github.com/netdata/netdata/pull/19640) ([ktsaou](https://github.com/ktsaou))
 - Revert "fix windows logs" [\#19639](https://github.com/netdata/netdata/pull/19639) ([ktsaou](https://github.com/ktsaou))
@@ -479,14 +486,6 @@
 - ci: fix build/create release [\#19138](https://github.com/netdata/netdata/pull/19138) ([ilyam8](https://github.com/ilyam8))
 - Streaming improvements No 1 [\#19137](https://github.com/netdata/netdata/pull/19137) ([ktsaou](https://github.com/ktsaou))
 - fixed bug in streaming sender read [\#19136](https://github.com/netdata/netdata/pull/19136) ([ktsaou](https://github.com/ktsaou))
-- minor beatification of log messages [\#19135](https://github.com/netdata/netdata/pull/19135) ([ktsaou](https://github.com/ktsaou))
-- docs: restructure readme intro for better readability [\#19134](https://github.com/netdata/netdata/pull/19134) ([ilyam8](https://github.com/ilyam8))
-- ci: fix build/Prepare Artifacts [\#19133](https://github.com/netdata/netdata/pull/19133) ([ilyam8](https://github.com/ilyam8))
-- Modify Claim Screen \(Windows Installer\) [\#19132](https://github.com/netdata/netdata/pull/19132) ([thiagoftsm](https://github.com/thiagoftsm))
-- Regenerate integrations docs [\#19131](https://github.com/netdata/netdata/pull/19131) ([netdatabot](https://github.com/netdatabot))
-- chore\(windows/hyperv\): small Hyper-V fixes [\#19130](https://github.com/netdata/netdata/pull/19130) ([ilyam8](https://github.com/ilyam8))
-- docs\(windows/hyperv\): add Hyper-V metadata [\#19129](https://github.com/netdata/netdata/pull/19129) ([ilyam8](https://github.com/ilyam8))
-- fix\(system-info\): change id\_like and name mac -\> macOS [\#19128](https://github.com/netdata/netdata/pull/19128) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
