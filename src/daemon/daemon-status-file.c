@@ -3,6 +3,11 @@
 #include "common.h"
 #include "daemon-status-file.h"
 
+#include <curl/curl.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/err.h>
+
 ENUM_STR_MAP_DEFINE(DAEMON_STATUS) = {
     { DAEMON_STATUS_NONE, "none"},
     { DAEMON_STATUS_INITIALIZING, "initializing"},
@@ -245,64 +250,140 @@ void daemon_status_file_save(DAEMON_STATUS status) {
     spinlock_unlock(&spinlock);
 }
 
+struct post_status_file_thread_data {
+    const char *cause;
+    const char *msg;
+    ND_LOG_FIELD_PRIORITY priority;
+    DAEMON_STATUS_FILE status;
+};
+
+void post_status_file(struct post_status_file_thread_data *d) {
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    buffer_json_member_add_string(wb, "cause", d->cause);
+    buffer_json_member_add_string(wb, "message", d->msg);
+    buffer_json_member_add_uint64(wb, "priority", d->priority);
+    daemon_status_file_to_json(wb, &d->status);
+    buffer_json_finalize(wb);
+
+    const char *json_data = buffer_tostring(wb);
+
+    CURL *curl = curl_easy_init();
+    if(!curl)
+        return;
+
+    curl_easy_setopt(curl, CURLOPT_URL, "https://agent-events.netdata.cloud/agent-events");
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    CURLcode rc = curl_easy_perform(curl);
+
+    curl_easy_cleanup(curl);
+    curl_slist_free_all(headers);
+}
+
+void *post_status_file_thread(void *ptr) {
+    struct post_status_file_thread_data *d = (struct post_status_file_thread_data *)ptr;
+    post_status_file(d);
+    freez((void *)d->cause);
+    freez((void *)d->msg);
+    freez(d);
+    return NULL;
+}
+
 void daemon_status_file_check_crash(void) {
     last_session_status = daemon_status_file_load();
     daemon_status_file_save(DAEMON_STATUS_INITIALIZING);
     ND_LOG_FIELD_PRIORITY pri = NDLP_NOTICE;
 
-    bool send_report = false;
+    bool new_version = strcmp(last_session_status.version, session_status.version) != 0;
+    bool post_crash_report = false;
     bool dump_json = true;
-    const char *msg;
+    const char *msg, *cause;
     switch(last_session_status.status) {
+        default:
         case DAEMON_STATUS_NONE:
             // probably a previous version of netdata was running
+            cause = "no last status";
             msg = "No status found for the previous Netdata session";
             break;
 
         case DAEMON_STATUS_EXITED:
             if(last_session_status.reason == EXIT_REASON_NONE) {
+                cause = "exit no reason";
                 msg = "Netdata was last stopped gracefully (no exit reason set)";
                 if(!last_session_status.timestamp_ut)
                     dump_json = false;
             }
             else if(!is_exit_reason_normal(last_session_status.reason)) {
+                cause = "exit on fatal";
                 msg = "Netdata was last stopped gracefully (encountered an error)";
                 pri = NDLP_ERR;
-                send_report = true;
+                post_crash_report = true;
             }
-            else if(last_session_status.reason & EXIT_REASON_SYSTEM_SHUTDOWN)
+            else if(last_session_status.reason & EXIT_REASON_SYSTEM_SHUTDOWN) {
+                cause = "exit on system shutdown";
                 msg = "Netdata has gracefully stopped due to system shutdown";
-            else if(last_session_status.reason & EXIT_REASON_UPDATE)
+            }
+            else if(last_session_status.reason & EXIT_REASON_UPDATE) {
+                cause = "exit to update";
                 msg = "Netdata has gracefully restarted to update to a new version";
-            else if(strcmp(last_session_status.version, session_status.version) != 0) {
+            }
+            else if(new_version) {
+                cause = "exit and updated";
                 msg = "Netdata has gracefully restarted and updated to a new version";
                 last_session_status.reason |= EXIT_REASON_UPDATE;
             }
-            else
+            else {
+                cause = "exit instructed";
                 msg = "Netdata was last stopped gracefully (instructed to do so)";
+            }
             break;
 
         case DAEMON_STATUS_INITIALIZING:
+            cause = "crashed on start";
             msg = "Netdata was last killed/crashed while starting";
             pri = NDLP_ERR;
-            send_report = true;
+            post_crash_report = true;
             break;
 
         case DAEMON_STATUS_EXITING:
-            msg = "Netdata was last killed/crashed while exiting";
+            if(!is_exit_reason_normal(last_session_status.reason)) {
+                cause = "crashed on fatal";
+                msg = "Netdata was last killed/crashed while exiting after encountering an error";
+            }
+            else if(last_session_status.reason & EXIT_REASON_SYSTEM_SHUTDOWN) {
+                cause = "crashed on system shutdown";
+                msg = "Netdata was last killed/crashed while exiting due to system shutdown";
+            }
+            else if(new_version || (last_session_status.reason & EXIT_REASON_UPDATE)) {
+                cause = "crashed on update";
+                msg = "Netdata was last killed/crashed while exiting to update to a new version";
+            }
+            else {
+                cause = "crashed on exit";
+                msg = "Netdata was last killed/crashed while exiting (instructed to do so)";
+            }
             pri = NDLP_ERR;
-            send_report = true;
+            post_crash_report = true;
             break;
 
         case DAEMON_STATUS_RUNNING: {
             usec_t this_boot_timestamp_ut = session_status.timestamp_ut - session_status.boottime * USEC_PER_SEC;
             usec_t last_boot_timestamp_ut = last_session_status.timestamp_ut - last_session_status.boottime * USEC_PER_SEC;
             if (last_boot_timestamp_ut + 3 * USEC_PER_SEC < this_boot_timestamp_ut) {
+                cause = "abnormal power off";
                 msg = "The system was abnormally powered off while Netdata was running";
                 pri = NDLP_CRIT;
-            } else {
+            }
+            else {
+                cause = "killed hard";
                 msg = "Netdata was last killed/crashed while operating normally";
                 pri = NDLP_CRIT;
+                post_crash_report = true;
             }
             break;
         }
@@ -322,12 +403,18 @@ void daemon_status_file_check_crash(void) {
 
     nd_log(NDLS_DAEMON, pri,
            "Netdata Agent version '%s' is starting...\n"
-           "Last exit status: %s:\n\n%s",
-           NETDATA_VERSION, msg, buffer_tostring(wb));
+           "Last exit status: %s (%s):\n\n%s",
+           NETDATA_VERSION, msg, cause, buffer_tostring(wb));
 
-    if(send_report) {
+    if(analytics_check_enabled() || post_crash_report) {
         netdata_conf_ssl();
-        // TODO: send crash report
+
+        struct post_status_file_thread_data *d = calloc(1, sizeof(*d));
+        d->cause = strdupz(cause);
+        d->msg = strdupz(msg);
+        d->status = last_session_status;
+        d->priority = pri;
+        nd_thread_create("post_status_file", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_DEFAULT, post_status_file_thread, d);
     }
 }
 

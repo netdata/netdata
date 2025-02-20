@@ -230,7 +230,7 @@ void analytics_set_data_str(char **name, const char *value)
  */
 void analytics_log_prometheus(void)
 {
-    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
+    if (netdata_anonymous_statistics_enabled && likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
         analytics_data.prometheus_hits++;
         char b[21];
         snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.prometheus_hits);
@@ -243,7 +243,7 @@ void analytics_log_prometheus(void)
  */
 void analytics_log_shell(void)
 {
-    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
+    if (netdata_anonymous_statistics_enabled && likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
         analytics_data.shell_hits++;
         char b[21];
         snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.shell_hits);
@@ -256,7 +256,7 @@ void analytics_log_shell(void)
  */
 void analytics_log_json(void)
 {
-    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
+    if (netdata_anonymous_statistics_enabled && likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
         analytics_data.json_hits++;
         char b[21];
         snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.json_hits);
@@ -269,7 +269,7 @@ void analytics_log_json(void)
  */
 void analytics_log_dashboard(void)
 {
-    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
+    if (netdata_anonymous_statistics_enabled && likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
         analytics_data.dashboard_hits++;
         char b[21];
         snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.dashboard_hits);
@@ -857,47 +857,24 @@ void get_system_timezone(void)
     }
 }
 
+static bool analytics_script_exists(void) {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename), "%s/anonymous-statistics.sh", netdata_configured_primary_plugins_dir);
+    return access(filename, R_OK) == 0;
+}
+
+bool analytics_check_enabled(void) {
+    if(!netdata_anonymous_statistics_enabled)
+        return false;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename), "%s/.opt-out-from-anonymous-statistics", netdata_configured_user_config_dir);
+    netdata_anonymous_statistics_enabled = access(filename, R_OK) != 0;
+    return netdata_anonymous_statistics_enabled;
+}
+
 void analytics_statistic_send(const analytics_statistic_t *statistic) {
-    if (!statistic)
-        return;
-
-    static char *as_script;
-
-    if (netdata_anonymous_statistics_enabled == -1) {
-        char *optout_file = mallocz(
-            sizeof(char) *
-            (strlen(netdata_configured_user_config_dir) + strlen(".opt-out-from-anonymous-statistics") + 2));
-
-        sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
-
-        if (likely(access(optout_file, R_OK) != 0)) {
-            as_script = mallocz(
-                sizeof(char) *
-                (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
-
-            sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
-
-            if (unlikely(access(as_script, R_OK) != 0)) {
-                netdata_anonymous_statistics_enabled = 0;
-
-                nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                       "Statistics script '%s' not found.",
-                       as_script);
-
-                freez(as_script);
-            }
-            else
-                netdata_anonymous_statistics_enabled = 1;
-        }
-        else {
-            netdata_anonymous_statistics_enabled = 0;
-            as_script = NULL;
-        }
-
-        freez(optout_file);
-    }
-
-    if (!netdata_anonymous_statistics_enabled || !statistic->action)
+    if (!statistic || !statistic->action || !analytics_check_enabled() || !analytics_script_exists())
         return;
 
     const char *action_result = statistic->result;
@@ -905,16 +882,17 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
 
     if (!statistic->result)
         action_result = "";
+
     if (!statistic->data)
         action_data = "";
 
     char *command_to_run = mallocz(
-        sizeof(char) * (strlen(statistic->action) + strlen(action_result) + strlen(action_data) + strlen(as_script) +
+        sizeof(char) * (strlen(statistic->action) + strlen(action_result) + strlen(action_data) + FILENAME_MAX +
                         analytics_data.data_length + (ANALYTICS_NO_OF_ITEMS * 3) + 15));
     sprintf(
         command_to_run,
-        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
-        as_script,
+        "%s/anonymous-statistics.sh '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
+        netdata_configured_primary_plugins_dir,
         statistic->action,
         action_result,
         action_data,
@@ -960,8 +938,8 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
         analytics_data.netdata_fail_reason);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "%s '%s' '%s' '%s'",
-           as_script, statistic->action, action_result, action_data);
+           "%s/anonymous-statistics.sh '%s' '%s' '%s'",
+           netdata_configured_primary_plugins_dir, statistic->action, action_result, action_data);
 
     POPEN_INSTANCE *instance = spawn_popen_run(command_to_run);
     if (instance) {
@@ -982,8 +960,8 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
     }
     else
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "Failed to run statistics script: %s.",
-               as_script);
+               "Failed to run statistics script: %s/anonymous-statistics.sh",
+               netdata_configured_primary_plugins_dir);
 
     freez(command_to_run);
 }

@@ -23,7 +23,7 @@
 #endif
 
 bool unittest_running = false;
-int netdata_anonymous_statistics_enabled;
+bool netdata_anonymous_statistics_enabled = true;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
@@ -940,7 +940,6 @@ int netdata_main(int argc, char **argv) {
 
     delta_startup_time("collecting system info");
 
-    netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = rrdhost_system_info_create();
     rrdhost_system_info_detect(system_info);
 
@@ -1031,7 +1030,7 @@ int netdata_main(int argc, char **argv) {
     }
 
     // check if ANALYTICS needs to start
-    if (netdata_anonymous_statistics_enabled == 1) {
+    if (netdata_anonymous_statistics_enabled) {
         for (i = 0; static_threads[i].name != NULL; i++) {
             if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
                 struct netdata_static_thread *st = &static_threads[i];
