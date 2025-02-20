@@ -1,6 +1,6 @@
 module github.com/netdata/netdata/otel-collector/exporter/journaldexporter
 
-go 1.23.6
+go 1.23.4
 
 require (
 	github.com/stretchr/testify v1.10.0
