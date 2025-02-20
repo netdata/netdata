@@ -652,6 +652,8 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
     worker_is_idle();
 }
 
+// UV health event loop
+
 __thread bool is_health_thread = false;
 
 enum health_opcode {
@@ -684,7 +686,6 @@ typedef enum health_job_type_t {
     HEALTH_JOB_MAX,
 } health_job_type_t;
 
-
 struct health_config_s {
     uv_thread_t thread;
     uv_loop_t loop;
@@ -694,10 +695,6 @@ struct health_config_s {
     SPINLOCK cmd_queue_lock;
     struct health_cmd *cmd_base;
     struct job_list_t *job_list[HEALTH_JOB_MAX];
-    bool initialized;
-    bool running_ae;
-    uint32_t pending_ae_count;
-    Pvoid_t ae_DelJudyL;
     ARAL *ar;
 } health_config_s = { 0 };
 
@@ -1080,8 +1077,6 @@ static void health_ev_loop(void *arg)
     int max_thread_count = netdata_conf_cloud_query_threads();
     netdata_log_info("Starting health with %d threads", max_thread_count);
 
-    config->initialized = true;
-
     unsigned cmd_batch_size;
     RRDHOST *host;
     config->job_list[HEALTH_JOB_HOST_RUN] = callocz(1, sizeof(config->job_list));
@@ -1102,7 +1097,6 @@ static void health_ev_loop(void *arg)
     health_register_host(localhost, localhost->health.delay_up_to);
     HEALTH *host_health;
     bool is_shutdown = false;
-    config->pending_ae_count = 0;
 
     while (likely(false == is_shutdown)) {
         enum health_opcode opcode;
@@ -1201,7 +1195,6 @@ static void health_ev_loop(void *arg)
             }
         } while (opcode != HEALTH_NOOP);
     }
-    config->initialized = false;
 
     if (!uv_timer_stop(&config->timer_req))
         uv_close((uv_handle_t *)&config->timer_req, NULL);
@@ -1234,29 +1227,16 @@ static inline void queue_health_cmd(enum health_opcode opcode, const void *param
 // Run health for a host
 void health_host_run(RRDHOST *host)
 {
-    if (unlikely(!health_config_s.initialized))
-        return;
-
     queue_health_cmd(HEALTH_HOST_RUN, host, NULL);
 }
 
 void health_host_run_later(RRDHOST *host, uint64_t delay)
 {
-    if (unlikely(!health_config_s.initialized || !host)) {
-        nd_log_daemon(NDLP_INFO, "FAILED TO QUEUE SCHEDULE FOR %s", rrdhost_hostname(host));
-        return;
-    }
-
     queue_health_cmd(HEALTH_HOST_RUN_LATER, host, (void *)(uintptr_t)delay);
 }
 
 void health_host_initialize(RRDHOST *host, uint64_t delay)
 {
-    if (unlikely(!health_config_s.initialized || !host)) {
-        nd_log_daemon(NDLP_INFO, "FAILED TO QUEUE SCHEDULE FOR %s", rrdhost_hostname(host));
-        return;
-    }
-
     queue_health_cmd(HEALTH_HOST_INIT, host, (void *)(uintptr_t)delay);
 }
 
