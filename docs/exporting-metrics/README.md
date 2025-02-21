@@ -1,17 +1,16 @@
 # Export metrics to external time-series databases
 
-Netdata allows you to export metrics to external time-series databases with the [exporting engine](/src/exporting/README.md). This system uses a number of **connectors** to initiate connections to [more than thirty](#supported-databases) supported databases, including InfluxDB, Prometheus, Graphite, ElasticSearch, and much more.
+Netdata natively supports long term retention of metrics. Its tiered database design typically provides significantly longer retention (months to years) and faster queries (typically 20+ times faster), compared to other common time-series databases.
 
-The exporting engine resamples Netdata's thousands of per-second metrics at a user-configurable interval, and can export
-metrics to multiple time-series databases simultaneously.
+For integration with other observability tools, Netdata provides a number of exporters allow you to copy metrics to third party time-series databases for additional analysis or integration with other tools.
+
+Exporters enable connections to [more than thirty](#supported-databases) supported databases, including InfluxDB, Prometheus, Graphite, ElasticSearch, and much more.
+
+The exporting engine is able to downsample Netdata's per-second metrics at a user-configurable interval (e.g per minute), and can export metrics to multiple time-series databases simultaneously.
 
 Based on your needs and resources you allocated to your external time-series database, you can configure the interval
 that metrics are exported or export only certain charts with filtering. You can also choose whether metrics are exported
 as-collected, a normalized average, or the sum/volume of metrics values over the configured interval.
-
-Exporting is an important part of Netdata's effort to be interoperable
-with other monitoring software. You can use an external time-series database for long-term metrics retention, further
-analysis, or correlation with other tools, such as application tracing.
 
 ## Supported databases
 
