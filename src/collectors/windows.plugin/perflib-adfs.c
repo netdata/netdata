@@ -247,6 +247,41 @@ void netdata_adfs_certificate_authentications(
     rrdset_done(adfs.st_adfs_certificate_authentications_total);
 }
 
+void netdata_adfs_db_artifacts_failure(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSDBConfigFailures)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_db_artifact_failure_total) {
+        adfs.st_adfs_db_artifact_failure_total = rrdset_create_localhost(
+            "adfs",
+            "db_artifact_failures",
+            NULL,
+            "ad",
+            "adfs.db_artifact_failures",
+            "Connection failures to the artifact database",
+            "failures/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_DB_ARTIFACT_FAILURE_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_db_artifact_failure_totall = rrddim_add(
+            adfs.st_adfs_db_artifact_failure_total, "connection", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_db_artifact_failure_total,
+        adfs.rd_adfs_db_artifact_failure_total,
+        (collected_number)adfs.ADFSDBConfigFailures.current.Data);
+    rrdset_done(adfs.st_adfs_db_artifact_failure_total);
+}
+
 static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
@@ -256,6 +291,7 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
     static void (*doADFS[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_adfs_login_connection_failures,
         netdata_adfs_certificate_authentications,
+        netdata_adfs_db_artifacts_failure,
 
         // This must be the end
         NULL};
