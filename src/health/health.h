@@ -103,4 +103,6 @@ uint64_t health_evloop_current_iteration(void);
 void rrdhost_set_health_evloop_iteration(RRDHOST *host);
 uint64_t rrdhost_health_evloop_last_iteration(RRDHOST *host);
 
+void health_load_config_defaults(void);
+
 #endif //NETDATA_HEALTH_H
