@@ -167,11 +167,32 @@ static inline bool json_parse_number(LOG_JSON_STATE *js) {
     }
 }
 
+static inline void copy_newline(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
+    if(*remaining > 3) {
+        *(*d)++ = '\\';
+        *(*d)++ = 'n';
+        (*remaining) -= 2;
+    }
+}
+
+static inline void copy_tab(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
+    if(*remaining > 3) {
+        *(*d)++ = '\\';
+        *(*d)++ = 't';
+        (*remaining) -= 2;
+    }
+}
+
 static inline bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) {
     if (codepoint <= 0x7F) {
         // 1-byte sequence
         if (*remaining < 2) return false; // +1 for the null
-        *(*d)++ = (char)codepoint;
+        if(codepoint == '\n')
+            copy_newline(NULL, d, remaining);
+        else if(codepoint == '\t')
+            copy_tab(NULL, d, remaining);
+        else
+            *(*d)++ = (char)codepoint;
         (*remaining)--;
     }
     else if (codepoint <= 0x7FF) {
@@ -252,22 +273,6 @@ size_t parse_surrogate(const char *s, char *d, size_t *remaining) {
         }
         codepoint = (unsigned)strtoul(hex, NULL, 16);
         return encode_utf8(codepoint, &d, remaining) ? 10 : 0; // \UXXXXXXXX
-    }
-}
-
-static inline void copy_newline(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
-    if(*remaining > 3) {
-        *(*d)++ = '\\';
-        *(*d)++ = 'n';
-        (*remaining) -= 2;
-    }
-}
-
-static inline void copy_tab(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
-    if(*remaining > 3) {
-        *(*d)++ = '\\';
-        *(*d)++ = 't';
-        (*remaining) -= 2;
     }
 }
 
