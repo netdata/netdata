@@ -188,7 +188,7 @@ void netdata_adfs_login_connection_failures(PERF_DATA_BLOCK *pDataBlock, PERF_OB
 
     if (!adfs.st_adfs_login_connection_failures) {
         adfs.st_adfs_login_connection_failures = rrdset_create_localhost(
-            "adffs",
+            "adfs",
             "ad_login_connection_failures",
             NULL,
             "ad",
@@ -212,6 +212,41 @@ void netdata_adfs_login_connection_failures(PERF_DATA_BLOCK *pDataBlock, PERF_OB
     rrdset_done(adfs.st_adfs_login_connection_failures);
 }
 
+void netdata_adfs_certificate_authentications(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSCertificateAuthentications)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_certificate_authentications_total) {
+        adfs.st_adfs_certificate_authentications_total = rrdset_create_localhost(
+            "adfs",
+            "certificate_authentications",
+            NULL,
+            "ad",
+            "adfs.certificate_authentications",
+            "User Certificate authentications",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_CERTIFICATE_AUTHENTICATION_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_certificate_authentications_total = rrddim_add(
+            adfs.st_adfs_certificate_authentications_total, "authentications", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_certificate_authentications_total,
+        adfs.rd_adfs_certificate_authentications_total,
+        (collected_number)adfs.ADFSCertificateAuthentications.current.Data);
+    rrdset_done(adfs.st_adfs_certificate_authentications_total);
+}
+
 static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
@@ -220,6 +255,7 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
     static void (*doADFS[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_adfs_login_connection_failures,
+        netdata_adfs_certificate_authentications,
 
         // This must be the end
         NULL};
