@@ -3,7 +3,7 @@
 #ifndef NETDATA_BOOTTIME_H
 #define NETDATA_BOOTTIME_H
 
-#include "libnetdata/libnetdata.h"
+#include "libnetdata/common.h"
 
 /**
  * Get system boot time

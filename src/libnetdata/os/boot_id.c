@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "boot_id.h"
 #include "libnetdata/libnetdata.h"
 
 static ND_UUID cached_boot_id = UUID_ZERO;

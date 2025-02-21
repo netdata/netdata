@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
-#include "boottime.h"
 
 static time_t cached_boottime = 0;
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;

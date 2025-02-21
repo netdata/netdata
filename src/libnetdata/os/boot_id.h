@@ -3,7 +3,8 @@
 #ifndef NETDATA_OS_BOOT_ID_H
 #define NETDATA_OS_BOOT_ID_H
 
-#include "libnetdata/libnetdata.h"
+#include "libnetdata/common.h"
+#include "libnetdata/uuid/uuid.h"
 
 /**
  * Get system boot ID
