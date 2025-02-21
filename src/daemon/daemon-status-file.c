@@ -34,6 +34,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_time_t(wb, "uptime", ds->uptime);
     buffer_json_member_add_datetime_rfc3339(wb, "wallclock", ds->timestamp_ut, true);
     buffer_json_member_add_uuid_compact(wb, "invocation", ds->invocation.uuid);
+    buffer_json_member_add_uuid(wb, "boot_id", ds->boot_id.uuid);
     buffer_json_member_add_uuid(wb, "host_id", ds->host_id.uuid);
     buffer_json_member_add_uuid(wb, "node_id", ds->node_id.uuid);
     buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
@@ -120,6 +121,7 @@ static bool daemon_status_file_from_json(json_object *jobj, const char *path, vo
         ds->timestamp_ut = rfc3339_parse_ut(datetime, NULL);
 
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "invocation", ds->invocation.uuid, error, false);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "boot_id", ds->boot_id.uuid, error, false);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", ds->host_id.uuid, error, false);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "node_id", ds->node_id.uuid, error, false);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "claim_id", ds->claim_id.uuid, error, false);
@@ -135,10 +137,6 @@ static bool daemon_status_file_from_json(json_object *jobj, const char *path, vo
 }
 
 static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
-    static time_t netdata_boottime_time = 0;
-    if (!netdata_boottime_time)
-        netdata_boottime_time = now_boottime_sec();
-
     usec_t now_ut = now_realtime_usec();
 
     if(session_status.status == DAEMON_STATUS_INITIALIZING && status == DAEMON_STATUS_RUNNING)
@@ -148,8 +146,16 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
         session_status.timings.exit = (time_t)((now_ut - session_status.timestamp_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
     strncpyz(session_status.version, NETDATA_VERSION, sizeof(session_status.version) - 1);
+
+    session_status.boot_id = os_boot_id();
+    if(!UUIDeq(session_status.boot_id, last_session_status.boot_id) && os_boot_ids_match(session_status.boot_id, last_session_status.boot_id)) {
+        // there is a slight difference in boot_id, but it is still the same boot
+        // copy the last boot_id
+        session_status.boot_id = last_session_status.boot_id;
+    }
+
     session_status.boottime = now_boottime_sec();
-    session_status.uptime = now_boottime_sec() - netdata_boottime_time;
+    session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
     session_status.invocation = nd_log_get_invocation_id();
 
@@ -374,9 +380,7 @@ void daemon_status_file_check_crash(void) {
             break;
 
         case DAEMON_STATUS_RUNNING: {
-            usec_t this_boot_timestamp_ut = session_status.timestamp_ut - session_status.boottime * USEC_PER_SEC;
-            usec_t last_boot_timestamp_ut = last_session_status.timestamp_ut - last_session_status.boottime * USEC_PER_SEC;
-            if (last_boot_timestamp_ut + 3 * USEC_PER_SEC < this_boot_timestamp_ut) {
+            if (!UUIDeq(session_status.boot_id, last_session_status.boot_id)) {
                 cause = "abnormal power off";
                 msg = "The system was abnormally powered off while Netdata was running";
                 pri = NDLP_CRIT;

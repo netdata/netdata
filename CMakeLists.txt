@@ -1048,6 +1048,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/file_metadata.h
         src/libnetdata/os/process_path.c
         src/libnetdata/os/process_path.h
+        src/libnetdata/os/boottime.c
+        src/libnetdata/os/boottime.h
+        src/libnetdata/os/boot_id.c
+        src/libnetdata/os/boot_id.h
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})

@@ -26,6 +26,7 @@ typedef struct daemon_status_file {
     time_t uptime;          // netdata uptime
     usec_t timestamp_ut;    // the timestamp of the status file
 
+    ND_UUID boot_id;        // the boot id of the system
     ND_UUID invocation;     // the netdata invocation id generated the file
     ND_UUID host_id;        // the machine guid of the agent
     ND_UUID node_id;        // the Netdata Cloud node id of the agent
