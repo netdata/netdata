@@ -305,7 +305,7 @@ RRDHOST *rrdhost_create(
         const char *prog_version,
         int update_every,
         long entries,
-    RRD_DB_MODE memory_mode,
+        RRD_DB_MODE memory_mode,
         bool health,
         bool stream,
         STRING *parents,
@@ -349,8 +349,8 @@ RRDHOST *rrdhost_create(
 
     rrdhost_init_hostname(host, hostname, false);
 
-    host->rrd_history_entries        = align_entries_to_pagesize(memory_mode, entries);
-    host->health.enabled = ((memory_mode == RRD_DB_MODE_NONE)) ? 0 : health;
+    host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
+    host->health.enabled = ((memory_mode == RRD_DB_MODE_NONE)) ? false : health;
 
     spinlock_init(&host->receiver_lock);
 
