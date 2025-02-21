@@ -136,7 +136,7 @@ struct adfs_certificate {
     COUNTER_DATA ADFSUserPasswordAuthenticationsFailure;
     COUNTER_DATA ADFSWindowsIntegratedAuthentications;
     COUNTER_DATA ADFSWSFedTokenRequestsSuccess;
-} adcfs = {
+} adfs = {
     .charts_created = false,
 
     .ADFSLoginConnectionFailure.key = "AD Login Connection Failures",
@@ -173,17 +173,56 @@ struct adfs_certificate {
     .ADFSUserPasswordAuthenticationsSuccess.key = "SSO Authentications",
     .ADFSUserPasswordAuthenticationsFailure.key = "SSO Authentication Failures",
     .ADFSWindowsIntegratedAuthentications.key = "Windows Integrated Authentications",
-    .ADFSWSFedTokenRequestsSuccess.key = "WS-Fed Token Requests"
-}
-;
+    .ADFSWSFedTokenRequestsSuccess.key = "WS-Fed Token Requests"};
 
 static void initialize(void)
 {
     ;
 }
 
+void netdata_adfs_login_connection_failures(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSLoginConnectionFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_login_connection_failures) {
+        adfs.st_adfs_login_connection_failures = rrdset_create_localhost(
+            "adffs",
+            "ad_login_connection_failures",
+            NULL,
+            "ad",
+            "adfs.ad_login_connection_failures",
+            "Connection failures",
+            "failures/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_LOGIN_CONNECTION_FAILURES_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_login_connection_failures =
+            rrddim_add(adfs.st_adfs_login_connection_failures, "connection", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_login_connection_failures,
+        adfs.rd_adfs_login_connection_failures,
+        (collected_number)adfs.ADFSLoginConnectionFailure.current.Data);
+    rrdset_done(adfs.st_adfs_login_connection_failures);
+}
+
 static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
+    if (!pObjectType)
+        return false;
+
+    static void (*doADFS[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
+        netdata_adfs_login_connection_failures,
+
+        // This must be the end
+        NULL};
     return true;
 }
 
