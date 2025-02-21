@@ -3,13 +3,13 @@
 #include "boot_id.h"
 #include "libnetdata/libnetdata.h"
 
-static ND_UUID cached_boot_id = UUID_ZERO;
+static ND_UUID cached_boot_id = { 0 };
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
 #if defined(OS_LINUX)
 
 static ND_UUID get_boot_id(void) {
-    ND_UUID boot_id = UUID_ZERO;
+    ND_UUID boot_id = { 0 };
     char buf[UUID_STR_LEN];
 
     // Try reading the official boot_id first
@@ -31,7 +31,7 @@ static ND_UUID get_boot_id(void) {
 #else // !OS_LINUX
 
 static ND_UUID get_boot_id(void) {
-    ND_UUID boot_id = UUID_ZERO;
+    ND_UUID boot_id = { 0 };
 
     time_t boottime = os_boottime();
     if(boottime > 0) {
