@@ -108,6 +108,29 @@ func TestV4Range_Contains(t *testing.T) {
 	}
 }
 
+func TestV4Range_Iterate(t *testing.T) {
+	tests := map[string]struct {
+		input string
+	}{
+		"Single IP": {input: "192.0.2.0"},
+		"IP range":  {input: "192.0.2.0-192.0.2.10"},
+		"IP CIDR":   {input: "192.0.2.0/24"},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			r, err := ParseRange(test.input)
+			require.NoError(t, err)
+
+			var n int64
+			for range r.Iterate() {
+				n++
+			}
+			assert.Equal(t, r.Size().Int64(), n)
+		})
+	}
+}
+
 func TestV6Range_String(t *testing.T) {
 	tests := map[string]struct {
 		input      string
@@ -195,6 +218,29 @@ func TestV6Range_Contains(t *testing.T) {
 			} else {
 				assert.True(t, r.Contains(ip))
 			}
+		})
+	}
+}
+
+func TestV6Range_Iterate(t *testing.T) {
+	tests := map[string]struct {
+		input string
+	}{
+		"Single IP": {input: "2001:db8::5"},
+		"IP range":  {input: "2001:db8::-2001:db8::10"},
+		"IP CIDR":   {input: "2001:db8::/124"},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			r, err := ParseRange(test.input)
+			require.NoError(t, err)
+
+			var n int64
+			for range r.Iterate() {
+				n++
+			}
+			assert.Equal(t, r.Size().Int64(), n)
 		})
 	}
 }
