@@ -5,6 +5,7 @@ package iprange
 import (
 	"bytes"
 	"fmt"
+	"iter"
 	"math/big"
 	"net"
 )
@@ -24,7 +25,11 @@ type Range interface {
 	Family() Family
 	Contains(ip net.IP) bool
 	Size() *big.Int
+	Iterate() iter.Seq[net.IP]
 	fmt.Stringer
+
+	getStart() net.IP
+	getEnd() net.IP
 }
 
 // New returns new IP Range.
@@ -43,6 +48,13 @@ func New(start, end net.IP) Range {
 type v4Range struct {
 	start net.IP
 	end   net.IP
+}
+
+func (r v4Range) getStart() net.IP { return r.start }
+func (r v4Range) getEnd() net.IP   { return r.end }
+
+func (r v4Range) Iterate() iter.Seq[net.IP] {
+	return iterate(r)
 }
 
 // String returns the string form of the range.
@@ -68,6 +80,13 @@ func (r v4Range) Size() *big.Int {
 type v6Range struct {
 	start net.IP
 	end   net.IP
+}
+
+func (r v6Range) getStart() net.IP { return r.start }
+func (r v6Range) getEnd() net.IP   { return r.end }
+
+func (r v6Range) Iterate() iter.Seq[net.IP] {
+	return iterate(r)
 }
 
 // String returns the string form of the range.

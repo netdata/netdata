@@ -113,24 +113,25 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         }
     }
 
-    if(!unittest)
+    if(!unittest) {
         metadata_sync_init();
+        health_load_config_defaults();
+    }
 
     localhost = rrdhost_create(
         hostname
         , registry_get_this_machine_hostname()
-            , registry_get_this_machine_guid()
-            , os_type
+        , registry_get_this_machine_guid()
+        , os_type
         , netdata_configured_timezone
         , netdata_configured_abbrev_timezone
         , netdata_configured_utc_offset
         , program_name
         , NETDATA_VERSION
-        ,
-        nd_profile.update_every, default_rrd_history_entries
+        , nd_profile.update_every, default_rrd_history_entries
         , default_rrd_memory_mode
         , health_plugin_enabled()
-            , stream_send.enabled
+        , stream_send.enabled
         , stream_send.parents.destination
         , stream_send.api_key
         , stream_send.send_charts_matching

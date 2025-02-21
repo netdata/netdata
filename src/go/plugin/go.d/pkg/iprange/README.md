@@ -11,6 +11,7 @@ type Range interface {
 	Family() Family
 	Contains(ip net.IP) bool
 	Size() *big.Int
+	Iterate() iter.Seq[net.IP]
 	fmt.Stringer
 }
 ```  

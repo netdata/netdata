@@ -40,7 +40,7 @@ arch_data:  # Mapping of per-architecture matrix behavior.
   aarch64: *arm64
   ppc64le:
     qemu: true
-    runner: *arm-runner
+    runner: *x86-runner
 static_arches:  # Static build architectures
   - x86_64
   - armv6l

@@ -36,7 +36,11 @@ void health_plugin_disable(void) {
 }
 
 
-static void health_load_config_defaults(void) {
+void health_load_config_defaults(void) {
+    static bool done = false;
+    if(done) return;
+    done = true;
+
     char filename[FILENAME_MAX + 1];
 
     health_globals.config.enabled =
