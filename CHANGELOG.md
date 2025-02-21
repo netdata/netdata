@@ -2,10 +2,15 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.5...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.6...HEAD)
 
 **Merged pull requests:**
 
+- Switch back to x86 hosts for POWER8+ builds. [\#19686](https://github.com/netdata/netdata/pull/19686) ([Ferroin](https://github.com/Ferroin))
+- allow parsing empty json arrays and objects [\#19685](https://github.com/netdata/netdata/pull/19685) ([ktsaou](https://github.com/ktsaou))
+- improve dyncfg src type anon message [\#19684](https://github.com/netdata/netdata/pull/19684) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/mysql\): handle Cpu\_time in microseconds in v10.11.11+ [\#19683](https://github.com/netdata/netdata/pull/19683) ([ilyam8](https://github.com/ilyam8))
+- build: change go.mod version to 1.23.4 to fix win ci builds [\#19681](https://github.com/netdata/netdata/pull/19681) ([ilyam8](https://github.com/ilyam8))
 - build: change go.mod version to 1.23.6 [\#19680](https://github.com/netdata/netdata/pull/19680) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/go-sql-driver/mysql from 1.8.1 to 1.9.0 in /src/go [\#19679](https://github.com/netdata/netdata/pull/19679) ([dependabot[bot]](https://github.com/apps/dependabot))
 - initial setup of custom OpenTelemetry Collector distribution [\#19678](https://github.com/netdata/netdata/pull/19678) ([ilyam8](https://github.com/ilyam8))
@@ -183,6 +188,10 @@
 - Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
 - Modify eBPF.plugin integration \(Part I\) [\#19219](https://github.com/netdata/netdata/pull/19219) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add CLR Remoting metadata [\#19203](https://github.com/netdata/netdata/pull/19203) ([thiagoftsm](https://github.com/thiagoftsm))
+
+## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.5...v2.2.6)
 
 ## [v2.2.5](https://github.com/netdata/netdata/tree/v2.2.5) (2025-02-12)
 
@@ -480,12 +489,6 @@
 - chore\(go.d.plugin\): simplify main [\#19146](https://github.com/netdata/netdata/pull/19146) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d.plugin\): simplify netdataapi pkg [\#19145](https://github.com/netdata/netdata/pull/19145) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d.plugin\): improve function parser [\#19143](https://github.com/netdata/netdata/pull/19143) ([ilyam8](https://github.com/ilyam8))
-- docs: fix a typo in aclk readme [\#19141](https://github.com/netdata/netdata/pull/19141) ([ilyam8](https://github.com/ilyam8))
-- docs: Plans and ACLK docs edits [\#19140](https://github.com/netdata/netdata/pull/19140) ([Ancairon](https://github.com/Ancairon))
-- docs: Edits in the main Netdata Cloud readme [\#19139](https://github.com/netdata/netdata/pull/19139) ([Ancairon](https://github.com/Ancairon))
-- ci: fix build/create release [\#19138](https://github.com/netdata/netdata/pull/19138) ([ilyam8](https://github.com/ilyam8))
-- Streaming improvements No 1 [\#19137](https://github.com/netdata/netdata/pull/19137) ([ktsaou](https://github.com/ktsaou))
-- fixed bug in streaming sender read [\#19136](https://github.com/netdata/netdata/pull/19136) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
