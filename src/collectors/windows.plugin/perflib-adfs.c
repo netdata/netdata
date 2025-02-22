@@ -380,6 +380,48 @@ void netdata_adfs_device_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
     rrdset_done(adfs.st_adfs_device_authentications_total);
 }
 
+void netdata_adfs_external_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSExternalAuthenticationsSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSExternalAuthenticationsFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_external_authentications) {
+        adfs.st_adfs_external_authentications = rrdset_create_localhost(
+            "adfs",
+            "external_authentications",
+            NULL,
+            "auth",
+            "adfs.external_authentications",
+            "Authentications from external MFA providers",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_EXTERNAL_AUTHENTICATION_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_external_authentications_success =
+            rrddim_add(adfs.st_adfs_external_authentications, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_external_authentications_failure =
+            rrddim_add(adfs.st_adfs_external_authentications, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_external_authentications,
+        adfs.rd_adfs_external_authentications_success,
+        (collected_number)adfs.ADFSExternalAuthenticationsSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_external_authentications,
+        adfs.rd_adfs_external_authentications_failure,
+        (collected_number)adfs.ADFSExternalAuthenticationsFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_external_authentications);
+}
+
 static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
@@ -393,6 +435,7 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
         netdata_adfs_db_artifacts_failure,
         netdata_adfs_db_artifact_query_time_seconds,
         netdata_adfs_device_authentications,
+        netdata_adfs_external_authentications,
 
         // This must be the end
         NULL};
