@@ -205,25 +205,37 @@ DAEMON_STATUS_FILE daemon_status_file_load(void) {
     };
 
     char filename[FILENAME_MAX];
-    snprintfz(filename, sizeof(filename), "%s/status-netdata.json", netdata_configured_varlib_dir);
-    FILE *fp = fopen(filename, "r");
-    if (fp) {
-        fseek(fp, 0, SEEK_END);
-        long file_size = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    CLEAN_BUFFER *error = buffer_create(0, NULL);
 
-        CLEAN_BUFFER *wb = buffer_create(file_size + 1, NULL);
-        buffer_need_bytes(wb, file_size + 1);
+    for(size_t x = 0; x < 2 ;x++) {
+        if(x == 0)
+            snprintfz(filename, sizeof(filename), "/run/netdata/status-netdata.json");
+        else
+            snprintfz(filename, sizeof(filename), "%s/status-netdata.json", netdata_configured_cache_dir);
 
-        size_t read_bytes = fread(wb->buffer, 1, file_size, fp);
-        fclose(fp);
+        FILE *fp = fopen(filename, "r");
+        if (fp) {
+            fseek(fp, 0, SEEK_END);
+            long file_size = ftell(fp);
+            fseek(fp, 0, SEEK_SET);
 
-        wb->buffer[read_bytes] = '\0';
-        wb->len = read_bytes;
+            buffer_need_bytes(wb, file_size + 1);
 
-        CLEAN_BUFFER *error = buffer_create(0, NULL);
-        json_parse_payload_or_error(wb, error, daemon_status_file_from_json, &status);
+            size_t read_bytes = fread(wb->buffer, 1, file_size, fp);
+            fclose(fp);
+
+            wb->buffer[read_bytes] = '\0';
+            wb->len = read_bytes;
+
+            buffer_flush(error);
+            memset(&status, 0, sizeof(status));
+
+            if(json_parse_payload_or_error(wb, error, daemon_status_file_from_json, &status) == HTTP_RESP_OK)
+                break;
+        }
     }
+
     return status;
 }
 
@@ -239,17 +251,26 @@ void daemon_status_file_save(DAEMON_STATUS status) {
     buffer_json_finalize(wb);
 
     char temp_filename[FILENAME_MAX];
-    snprintfz(temp_filename, sizeof(temp_filename), "%s/status-netdata.tmp", netdata_configured_varlib_dir);
+    for (size_t x = 0; x < 2 ; x++) {
+        if(x == 0)
+            snprintfz(temp_filename, sizeof(temp_filename), "/run/netdata/status-netdata.json.tmp");
+        else
+            snprintfz(temp_filename, sizeof(temp_filename), "%s/status-netdata.tmp", netdata_configured_cache_dir);
 
-    FILE *fp = fopen(temp_filename, "w");
-    if (fp) {
-        bool ok = fwrite(buffer_tostring(wb), 1, buffer_strlen(wb), fp) == buffer_strlen(wb);
-        fclose(fp);
+        FILE *fp = fopen(temp_filename, "w");
+        if (fp) {
+            bool ok = fwrite(buffer_tostring(wb), 1, buffer_strlen(wb), fp) == buffer_strlen(wb);
+            fclose(fp);
 
-        if(ok) {
-            char filename[FILENAME_MAX];
-            snprintfz(filename, sizeof(filename), "%s/status-netdata.json", netdata_configured_varlib_dir);
-            rename(temp_filename, filename);
+            if (ok) {
+                char filename[FILENAME_MAX];
+                if(x == 0)
+                    snprintfz(filename, sizeof(filename), "/run/netdata/status-netdata.json");
+                else
+                    snprintfz(filename, sizeof(filename), "%s/status-netdata", netdata_configured_cache_dir);
+
+                rename(temp_filename, filename);
+            }
         }
     }
 
