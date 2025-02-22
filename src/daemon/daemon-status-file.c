@@ -210,7 +210,7 @@ DAEMON_STATUS_FILE daemon_status_file_load(void) {
 
     for(size_t x = 0; x < 2 ;x++) {
         if(x == 0)
-            snprintfz(filename, sizeof(filename), "/run/netdata/status-netdata.json");
+            snprintfz(filename, sizeof(filename), "%s/status-netdata.json", os_run_dir(true));
         else
             snprintfz(filename, sizeof(filename), "%s/status-netdata.json", netdata_configured_cache_dir);
 
@@ -257,7 +257,7 @@ void daemon_status_file_save(DAEMON_STATUS status) {
     for (size_t x = 0; x < 2 ; x++) {
         if(x == 0) {
             snprintfz(filename, sizeof(filename), "%s/status-netdata.json", run_dir);
-            snprintfz(temp_filename, sizeof(temp_filename), "/%s/status-netdata.json.tmp", run_dir);
+            snprintfz(temp_filename, sizeof(temp_filename), "%s/status-netdata.json.tmp", run_dir);
         }
         else {
             snprintfz(filename, sizeof(filename), "%s/status-netdata", netdata_configured_cache_dir);
@@ -311,6 +311,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
     CURLcode rc = curl_easy_perform(curl);
+    (void)rc;
 
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
