@@ -18,17 +18,29 @@ ENUM_STR_MAP_DEFINE(DAEMON_STATUS) = {
     // terminator
     { 0, NULL },
 };
+ENUM_STR_DEFINE_FUNCTIONS(DAEMON_STATUS, DAEMON_STATUS_NONE, "none");
+
+ENUM_STR_MAP_DEFINE(DAEMON_OS_TYPE) = {
+    {DAEMON_OS_TYPE_UNKNOWN, "unknown"},
+    {DAEMON_OS_TYPE_LINUX, "linux"},
+    {DAEMON_OS_TYPE_FREEBSD, "freebsd"},
+    {DAEMON_OS_TYPE_MACOS, "macos"},
+    {DAEMON_OS_TYPE_WINDOWS, "windows"},
+
+    // terminator
+    { 0, NULL },
+};
+ENUM_STR_DEFINE_FUNCTIONS(DAEMON_OS_TYPE, DAEMON_OS_TYPE_UNKNOWN, "unknown");
 
 static DAEMON_STATUS_FILE last_session_status = { 0 };
 static DAEMON_STATUS_FILE session_status = { 0 };
-
-ENUM_STR_DEFINE_FUNCTIONS(DAEMON_STATUS, DAEMON_STATUS_NONE, "none");
 
 static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_string(wb, "version", ds->version);
     buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
     EXIT_REASON_2json(wb, "reason", ds->reason);
     ND_PROFILE_2json(wb, "profile", ds->profile);
+    buffer_json_member_add_string(wb, "os_type", DAEMON_OS_TYPE_2str(ds->os_type));
 
     buffer_json_member_add_time_t(wb, "boottime", ds->boottime);
     buffer_json_member_add_time_t(wb, "uptime", ds->uptime);
@@ -126,6 +138,7 @@ static bool daemon_status_file_from_json(json_object *jobj, const char *path, vo
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "node_id", ds->node_id.uuid, error, false);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "claim_id", ds->claim_id.uuid, error, false);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "status", DAEMON_STATUS_2id, ds->status, error, false);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "os_type", DAEMON_OS_TYPE_2id, ds->os_type, error, false);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "reason", EXIT_REASON_2id_one, ds->reason, error, false);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "profile", ND_PROFILE_2id_one, ds->profile, error, false);
 
@@ -138,6 +151,16 @@ static bool daemon_status_file_from_json(json_object *jobj, const char *path, vo
 
 static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     usec_t now_ut = now_realtime_usec();
+
+#if defined(OS_LINUX)
+    session_status.os_type = DAEMON_OS_TYPE_LINUX;
+#elif defined(OS_FREEBSD)
+    session_status.built_for = DAEMON_OS_TYPE_FREEBSD;
+#elif defined(OS_MACOS)
+    session_status.built_for = DAEMON_OS_TYPE_MACOS;
+#elif defined(OS_WINDOWS)
+    session_status.built_for = DAEMON_OS_TYPE_WINDOWS;
+#endif
 
     if(session_status.status == DAEMON_STATUS_INITIALIZING && status == DAEMON_STATUS_RUNNING)
         session_status.timings.init = (time_t)((now_ut - session_status.timestamp_ut + USEC_PER_SEC/2) / USEC_PER_SEC);

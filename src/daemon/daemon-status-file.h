@@ -13,14 +13,23 @@ typedef enum {
     DAEMON_STATUS_EXITING,
     DAEMON_STATUS_EXITED,
 } DAEMON_STATUS;
-
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(DAEMON_STATUS);
+
+typedef enum {
+    DAEMON_OS_TYPE_UNKNOWN,
+    DAEMON_OS_TYPE_LINUX,
+    DAEMON_OS_TYPE_FREEBSD,
+    DAEMON_OS_TYPE_MACOS,
+    DAEMON_OS_TYPE_WINDOWS,
+} DAEMON_OS_TYPE;
+ENUM_STR_DEFINE_FUNCTIONS_EXTERN(DAEMON_OS_TYPE);
 
 typedef struct daemon_status_file {
     char version[32];       // the netdata version
     DAEMON_STATUS status;   // the daemon status
     EXIT_REASON reason;     // the exit reason (maybe empty)
     ND_PROFILE profile;     // the profile of the agent
+    DAEMON_OS_TYPE os_type;
 
     time_t boottime;        // system boottime
     time_t uptime;          // netdata uptime
