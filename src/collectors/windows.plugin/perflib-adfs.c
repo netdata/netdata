@@ -46,9 +46,6 @@ struct adfs_certificate {
     RRDDIM *rd_adfs_oauth_password_grant_requests_success;
     RRDDIM *rd_adfs_oauth_password_grant_requests_failure;
 
-    RRDSET *st_adfs_passport_authentications;
-    RRDDIM *rd_adfs_passport_authentications_total;
-
     RRDSET *st_adfs_user_password_authentications;
     RRDDIM *rd_adfs_sso_authentications_success;
     RRDDIM *rd_adfs_sso_authentications_failure;
@@ -183,7 +180,6 @@ struct adfs_certificate {
     .st_adfs_password_change_requests = NULL,
     .st_adfs_samlp_token_requests_success_total = NULL,
     .st_adfs_wstrust_token_requests_success_total = NULL,
-    .st_adfs_sso_authentications = NULL,
     .st_adfs_token_requests_total = NULL,
     .st_adfs_sso_authentications_success = NULL,
     .st_adfs_windows_integrated_authentications_total = NULL,
@@ -221,7 +217,7 @@ struct adfs_certificate {
     .ADFSSAMLPTokenRequests.key = "SAML-P Token Requests",
     .ADFSWSTrustTokenRequestsSuccess.key = "WS-Trust Token Requests",
     .ADFSSSOAuthenticationsSuccess.key = "SSO Authentication Failures",
-    .ADFSPassportAuthentications.kye = "Microsoft Passport Authentications",
+    .ADFSPassportAuthentications.key = "Microsoft Passport Authentications",
     .ADFSSSOAuthenticationsFailure.key = "SSO Authentications",
     .ADFSTokenRequests.key = "Token Requests", .ADFSUserPasswordAuthenticationsSuccess.key = "SSO Authentications",
     .ADFSUserPasswordAuthenticationsFailure.key = "SSO Authentication Failures",
