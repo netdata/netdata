@@ -8,10 +8,14 @@ static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 #if defined(OS_LINUX)
 
 static time_t calculate_boottime(void) {
-    char buf[64];
+    char buf[8192];
+
+    char filename[FILENAME_MAX + 1];
 
     // Try to read from /proc/stat first - this provides the absolute timestamp
-    if (read_txt_file("/proc/stat", buf, sizeof(buf)) == 0) {
+    snprintfz(filename, sizeof(filename), "%s/proc/stat",
+              netdata_configured_host_prefix ? netdata_configured_host_prefix : "");
+    if (read_txt_file(filename, buf, sizeof(buf)) == 0) {
         char *btime_line = strstr(buf, "btime ");
         if (btime_line) {
             time_t btime = (time_t)str2ull(btime_line + 6, NULL);
@@ -21,7 +25,9 @@ static time_t calculate_boottime(void) {
     }
 
     // If btime is not available, calculate it from uptime
-    if (read_txt_file("/proc/uptime", buf, sizeof(buf)) == 0) {
+    snprintfz(filename, sizeof(filename), "%s/proc/uptime",
+              netdata_configured_host_prefix ? netdata_configured_host_prefix : "");
+    if (read_txt_file(filename, buf, sizeof(buf)) == 0) {
         double uptime;
         if (sscanf(buf, "%lf", &uptime) == 1) {
             time_t now = now_realtime_sec();

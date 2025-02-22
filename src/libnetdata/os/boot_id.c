@@ -12,8 +12,12 @@ static ND_UUID get_boot_id(void) {
     ND_UUID boot_id = { 0 };
     char buf[UUID_STR_LEN];
 
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename), "%s/proc/sys/kernel/random/boot_id",
+              netdata_configured_host_prefix ? netdata_configured_host_prefix : "");
+
     // Try reading the official boot_id first
-    if (read_txt_file("/proc/sys/kernel/random/boot_id", buf, sizeof(buf)) == 0) {
+    if (read_txt_file(filename, buf, sizeof(buf)) == 0) {
         if (uuid_parse(trim(buf), boot_id.uuid) == 0)
             return boot_id;
     }
