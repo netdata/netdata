@@ -2,16 +2,27 @@
 
 #include "pipename.h"
 
-#include <stdlib.h>
+#include "libnetdata/libnetdata.h"
+
+static const char *cached_pipename = NULL;
 
 const char *daemon_pipename(void) {
-    const char *pipename = getenv("NETDATA_PIPENAME");
-    if (pipename)
-        return pipename;
+    if(cached_pipename)
+        return cached_pipename;
 
-#ifdef _WIN32
-    return "\\\\?\\pipe\\netdata-cli";
+    const char *pipename = getenv("NETDATA_PIPENAME");
+    if (pipename) {
+        cached_pipename = strdupz(pipename);
+        return pipename;
+    }
+
+#if defined(OS_WINDOWS)
+    cached_pipename = strdupz("\\\\?\\pipe\\netdata-cli");
+    return cached_pipename;
 #else
-    return "/tmp/netdata-ipc";
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/netdata.pipe", os_get_run_dir(true));
+    cached_pipename = strdupz(filename);
+    return cached_pipename;
 #endif
 }

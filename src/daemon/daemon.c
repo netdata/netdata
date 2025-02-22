@@ -75,7 +75,7 @@ static void clean_directory(const char *dirname)
 }
 
 static void prepare_required_directories(uid_t uid, gid_t gid) {
-    change_dir_ownership("/run/netdata", uid, gid, false);
+    change_dir_ownership(os_get_run_dir(true), uid, gid, false);
     change_dir_ownership(netdata_configured_cache_dir, uid, gid, true);
     change_dir_ownership(netdata_configured_varlib_dir, uid, gid, false);
     change_dir_ownership(netdata_configured_log_dir, uid, gid, false);

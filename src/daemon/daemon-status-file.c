@@ -250,12 +250,14 @@ void daemon_status_file_save(DAEMON_STATUS status) {
     daemon_status_file_to_json(wb, &ds);
     buffer_json_finalize(wb);
 
+    const char *run_dir = os_get_run_dir(true);
+
     char filename[FILENAME_MAX];
     char temp_filename[FILENAME_MAX];
     for (size_t x = 0; x < 2 ; x++) {
         if(x == 0) {
-            snprintfz(filename, sizeof(filename), "/run/netdata/status-netdata.json");
-            snprintfz(temp_filename, sizeof(temp_filename), "/run/netdata/status-netdata.json.tmp");
+            snprintfz(filename, sizeof(filename), "%s/status-netdata.json", run_dir);
+            snprintfz(temp_filename, sizeof(temp_filename), "/%s/status-netdata.json.tmp", run_dir);
         }
         else {
             snprintfz(filename, sizeof(filename), "%s/status-netdata", netdata_configured_cache_dir);
