@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "daemon/daemon-status-file.h"
 
 typedef enum signal_action {
     NETDATA_SIGNAL_END_OF_LIST,
@@ -112,6 +113,7 @@ void nd_process_signals(void) {
         // is delivered that either terminates the process or causes the invocation
         // of a signal-catching function.
         if(pause() == -1 && errno == EINTR) {
+            daemon_status_file_save(DAEMON_STATUS_NONE);
             errno_clear();
 
             // loop once, but keep looping while signals are coming in

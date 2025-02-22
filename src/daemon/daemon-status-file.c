@@ -255,7 +255,9 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
 
     session_status.exit_reason = exit_initiated;
     session_status.profile = nd_profile_detect_and_configure(false);
-    session_status.status = status;
+
+    if(status != DAEMON_STATUS_NONE)
+        session_status.status = status;
 
     session_status.memory = os_system_memory(true);
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
@@ -547,4 +549,6 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     session_status.fatal.line = line;
 
     spinlock_unlock(&spinlock);
+
+    daemon_status_file_save(DAEMON_STATUS_NONE);
 }
