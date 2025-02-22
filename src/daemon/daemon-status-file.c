@@ -250,26 +250,28 @@ void daemon_status_file_save(DAEMON_STATUS status) {
     daemon_status_file_to_json(wb, &ds);
     buffer_json_finalize(wb);
 
+    char filename[FILENAME_MAX];
     char temp_filename[FILENAME_MAX];
     for (size_t x = 0; x < 2 ; x++) {
-        if(x == 0)
+        if(x == 0) {
+            snprintfz(filename, sizeof(filename), "/run/netdata/status-netdata.json");
             snprintfz(temp_filename, sizeof(temp_filename), "/run/netdata/status-netdata.json.tmp");
-        else
+        }
+        else {
+            snprintfz(filename, sizeof(filename), "%s/status-netdata", netdata_configured_cache_dir);
             snprintfz(temp_filename, sizeof(temp_filename), "%s/status-netdata.tmp", netdata_configured_cache_dir);
+        }
 
         FILE *fp = fopen(temp_filename, "w");
         if (fp) {
             bool ok = fwrite(buffer_tostring(wb), 1, buffer_strlen(wb), fp) == buffer_strlen(wb);
             fclose(fp);
 
-            if (ok) {
-                char filename[FILENAME_MAX];
-                if(x == 0)
-                    snprintfz(filename, sizeof(filename), "/run/netdata/status-netdata.json");
-                else
-                    snprintfz(filename, sizeof(filename), "%s/status-netdata", netdata_configured_cache_dir);
-
-                rename(temp_filename, filename);
+            if (ok)
+                (void)rename(temp_filename, filename);
+            else {
+                (void)unlink(filename);
+                (void)unlink(temp_filename);
             }
         }
     }
