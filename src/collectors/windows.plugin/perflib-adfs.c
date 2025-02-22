@@ -18,14 +18,14 @@ struct adfs_certificate {
     RRDSET *st_adfs_db_artifact_query_time_seconds_total;
     RRDDIM *rd_adfs_db_artifact_query_time_seconds_total;
 
+    RRDSET *st_adfs_device_authentications_total;
+    RRDDIM *rd_adfs_device_authentications_total;
+
     RRDSET *st_adfs_db_config_failures;
     RRDDIM *rd_adfs_db_config_failures;
 
     RRDSET *st_adfs_db_config_query_time_seconds_total;
     RRDDIM *rd_adfs_db_config_query_time_seconds_total;
-
-    RRDSET *st_adfs_device_authentications_total;
-    RRDDIM *rd_adfs_device_authentications_total;
 
     RRDSET *st_adfs_external_authentications;
     RRDDIM *rd_adfs_external_authentications_success;
@@ -348,6 +348,38 @@ void netdata_adfs_db_artifact_query_time_seconds(
     rrdset_done(adfs.st_adfs_db_artifact_query_time_seconds_total);
 }
 
+void netdata_adfs_device_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSDeviceAuthentications)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_device_authentications_total) {
+        adfs.st_adfs_device_authentications_total = rrdset_create_localhost(
+            "adfs",
+            "device_authentications",
+            NULL,
+            "auth",
+            "adfs.device_authentications",
+            "Device authentications",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_DEVICE_AUTHENTICATIONS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_device_authentications_total = rrddim_add(
+            adfs.st_adfs_device_authentications_total, "authentications", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_device_authentications_total,
+        adfs.rd_adfs_device_authentications_total,
+        (collected_number)adfs.ADFSDeviceAuthentications.current.Data);
+    rrdset_done(adfs.st_adfs_device_authentications_total);
+}
+
 static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
@@ -357,8 +389,10 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
     static void (*doADFS[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_adfs_login_connection_failures,
         netdata_adfs_certificate_authentications,
+
         netdata_adfs_db_artifacts_failure,
         netdata_adfs_db_artifact_query_time_seconds,
+        netdata_adfs_device_authentications,
 
         // This must be the end
         NULL};
