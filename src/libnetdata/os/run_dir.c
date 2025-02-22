@@ -62,35 +62,35 @@ static char *detect_run_dir(bool rw) {
         goto success;
 #endif
 
-#if defined(OS_WINDOWS)
-    // On MSYS2/Cygwin get TEMP and convert it properly
-    WCHAR temp_pathW[MAX_PATH];
-    DWORD len = GetEnvironmentVariableW(L"TEMP", temp_pathW, MAX_PATH);
-    if (len > 0 && len < MAX_PATH) {
-        // Convert Windows wide path to UTF-8
-        int utf8_len = WideCharToMultiByte(CP_UTF8, 0, temp_pathW, -1, NULL, 0, NULL, NULL);
-        if (utf8_len > 0 && utf8_len < FILENAME_MAX) {
-            char win_path[FILENAME_MAX + 1];
-            if (WideCharToMultiByte(CP_UTF8, 0, temp_pathW, -1, win_path, sizeof(win_path), NULL, NULL)) {
-                // Convert Windows path to Unix path using Cygwin API
-                ssize_t unix_size = cygwin_conv_path(CCP_WIN_A_TO_POSIX, win_path, NULL, 0);
-                if (unix_size > 0) {
-                    char unix_path[FILENAME_MAX + 1];
-                    if (cygwin_conv_path(CCP_WIN_A_TO_POSIX, win_path, unix_path, sizeof(unix_path)) == 0) {
-                        if (is_dir_accessible(unix_path, rw)) {
-                            snprintfz(path, sizeof(path), "%s/netdata", unix_path);
-                            if (!rw)
-                                goto success;
-
-                            if (mkdir(path, 0755) == 0 || errno == EEXIST)
-                                goto success;
-                        }
-                    }
-                }
-            }
-        }
-    }
-#endif
+//#if defined(OS_WINDOWS)
+//    // On MSYS2/Cygwin get TEMP and convert it properly
+//    WCHAR temp_pathW[MAX_PATH];
+//    DWORD len = GetEnvironmentVariableW(L"TEMP", temp_pathW, MAX_PATH);
+//    if (len > 0 && len < MAX_PATH) {
+//        // Convert Windows wide path to UTF-8
+//        int utf8_len = WideCharToMultiByte(CP_UTF8, 0, temp_pathW, -1, NULL, 0, NULL, NULL);
+//        if (utf8_len > 0 && utf8_len < FILENAME_MAX) {
+//            char win_path[FILENAME_MAX + 1];
+//            if (WideCharToMultiByte(CP_UTF8, 0, temp_pathW, -1, win_path, sizeof(win_path), NULL, NULL)) {
+//                // Convert Windows path to Unix path using Cygwin API
+//                ssize_t unix_size = cygwin_conv_path(CCP_WIN_A_TO_POSIX, win_path, NULL, 0);
+//                if (unix_size > 0) {
+//                    char unix_path[FILENAME_MAX + 1];
+//                    if (cygwin_conv_path(CCP_WIN_A_TO_POSIX, win_path, unix_path, sizeof(unix_path)) == 0) {
+//                        if (is_dir_accessible(unix_path, rw)) {
+//                            snprintfz(path, sizeof(path), "%s/netdata", unix_path);
+//                            if (!rw)
+//                                goto success;
+//
+//                            if (mkdir(path, 0755) == 0 || errno == EEXIST)
+//                                goto success;
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
+//#endif
 
     // Fallback to /tmp/netdata - force creation if needed
     if (!is_dir_accessible("/tmp", rw)) {
