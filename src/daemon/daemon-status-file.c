@@ -250,7 +250,7 @@ void daemon_status_file_save(DAEMON_STATUS status) {
     daemon_status_file_to_json(wb, &ds);
     buffer_json_finalize(wb);
 
-    const char *run_dir = os_get_run_dir(true);
+    const char *run_dir = os_run_dir(true);
 
     char filename[FILENAME_MAX];
     char temp_filename[FILENAME_MAX];

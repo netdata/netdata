@@ -21,7 +21,7 @@ const char *daemon_pipename(void) {
     return cached_pipename;
 #else
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/netdata.pipe", os_get_run_dir(true));
+    snprintfz(filename, FILENAME_MAX, "%s/netdata.pipe", os_run_dir(false));
     cached_pipename = strdupz(filename);
     return cached_pipename;
 #endif

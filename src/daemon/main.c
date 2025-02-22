@@ -757,7 +757,7 @@ int netdata_main(int argc, char **argv) {
 
     // make sure we are the only instance running
     {
-        const char *run_dir = os_get_run_dir(true);
+        const char *run_dir = os_run_dir(true);
         if(!run_dir) {
             netdata_log_error("Cannot get/create a run directory.");
             exit(1);

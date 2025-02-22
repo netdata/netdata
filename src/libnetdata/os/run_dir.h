@@ -9,9 +9,9 @@
  * Initialize and get the runtime directory for Netdata
  * This function gets or creates the runtime directory based on environment or system defaults
  *
- * @param create_if_missing When true, create the directory if it doesn't exist
+ * @param rw When true, create the directory if it doesn't exist
  * @return const char* The runtime directory path
  */
-const char *os_get_run_dir(bool create_if_missing);
+const char *os_run_dir(bool rw);
 
 #endif //NETDATA_RUN_DIR_H
