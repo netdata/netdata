@@ -115,7 +115,7 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
 #define THP_SIZE (2 * 1024 * 1024) // 2 MiB THP size
 #define THP_MASK (THP_SIZE - 1)    // Mask for alignment check
 
-inline int madvise_thp(void *mem, size_t len) {
+inline int madvise_thp(void *mem __maybe_unused, size_t len __maybe_unused) {
 #ifdef MADV_HUGEPAGE
     // Check if the size is at least THP size and aligned
     if (len >= THP_SIZE && ((uintptr_t)mem & THP_MASK) == 0) {

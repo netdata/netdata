@@ -58,7 +58,7 @@ static void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool rec
     fix_directory_file_permissions(dir, uid, gid, recursive);
 }
 
-static void clean_directory(const char *dirname)
+static inline void clean_directory(const char *dirname)
 {
     DIR *dir = opendir(dirname);
     if(!dir) return;

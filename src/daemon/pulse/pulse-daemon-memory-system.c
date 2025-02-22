@@ -113,7 +113,7 @@ void pulse_daemon_memory_system_do(bool extended) {
     if(!extended) return;
 
     size_t glibc_mmaps = 0;
-    bool have_mallinfo = false;
+    bool have_mallinfo = false; (void)have_mallinfo;
 
 #ifdef HAVE_C_MALLINFO2
     struct mallinfo2 mi = mallinfo2();
