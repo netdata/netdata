@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- load health config before creating localhost [\#19689](https://github.com/netdata/netdata/pull/19689) ([ktsaou](https://github.com/ktsaou))
+- chore\(go.d/pkg/iprange\): add iterator [\#19688](https://github.com/netdata/netdata/pull/19688) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/mysql\): InnodbOSLogIO in MariaDB \>= 10.8 [\#19687](https://github.com/netdata/netdata/pull/19687) ([arkamar](https://github.com/arkamar))
 - Switch back to x86 hosts for POWER8+ builds. [\#19686](https://github.com/netdata/netdata/pull/19686) ([Ferroin](https://github.com/Ferroin))
 - allow parsing empty json arrays and objects [\#19685](https://github.com/netdata/netdata/pull/19685) ([ktsaou](https://github.com/ktsaou))
 - improve dyncfg src type anon message [\#19684](https://github.com/netdata/netdata/pull/19684) ([ilyam8](https://github.com/ilyam8))
@@ -183,6 +186,7 @@
 - Child should be online before initializing health [\#19463](https://github.com/netdata/netdata/pull/19463) ([stelfrag](https://github.com/stelfrag))
 - Active Directory Metrics \(Windows.plugin\) [\#19461](https://github.com/netdata/netdata/pull/19461) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use aral in ACLK [\#19459](https://github.com/netdata/netdata/pull/19459) ([stelfrag](https://github.com/stelfrag))
+- Enable libunwind in native packages and Docker images. [\#19452](https://github.com/netdata/netdata/pull/19452) ([Ferroin](https://github.com/Ferroin))
 - Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
 - Start using new GitHub hosted ARM runners for CI when appropriate. [\#19427](https://github.com/netdata/netdata/pull/19427) ([Ferroin](https://github.com/Ferroin))
 - Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
@@ -487,8 +491,6 @@
 - build\(deps\): bump github.com/prometheus/common from 0.60.1 to 0.61.0 in /src/go [\#19148](https://github.com/netdata/netdata/pull/19148) ([dependabot[bot]](https://github.com/apps/dependabot))
 - MSSQL Metadatas \(windows.plugin\) [\#19147](https://github.com/netdata/netdata/pull/19147) ([thiagoftsm](https://github.com/thiagoftsm))
 - chore\(go.d.plugin\): simplify main [\#19146](https://github.com/netdata/netdata/pull/19146) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d.plugin\): simplify netdataapi pkg [\#19145](https://github.com/netdata/netdata/pull/19145) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d.plugin\): improve function parser [\#19143](https://github.com/netdata/netdata/pull/19143) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
