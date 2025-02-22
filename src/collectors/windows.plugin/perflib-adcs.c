@@ -662,11 +662,8 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every)
         netdata_adcs_failed_requets,
         netdata_adcs_issued_requets,
         netdata_adcs_pending_requets,
-
         netdata_adcs_challenge_response,
-
         netdata_adcs_retrieval_processing,
-
         netdata_adcs_crypto_singing_time,
         netdata_adcs_policy_mod_processing_time,
         netdata_adcs_challenge_response_processing_time,
@@ -691,8 +688,8 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         struct adcs_certificate *ptr = dictionary_set(adcs_certificates, windows_shared_buffer, NULL, sizeof(*ptr));
 
-        for (int i = 0; doADCS[i]; i++)
-            doADCS[i](ptr, pDataBlock, pObjectType, update_every);
+        for (int j = 0; doADCS[j] ;j++)
+            doADCS[j](ptr, pDataBlock, pObjectType, update_every);
     }
 
     return true;
