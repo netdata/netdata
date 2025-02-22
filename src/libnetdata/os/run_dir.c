@@ -52,7 +52,7 @@ static char *detect_run_dir(bool rw) {
 
 #if defined(OS_MACOS)
     // macOS typically uses /private/var/run
-    if (create_netdata_dir("/private/var/run", path, sizeof(path)))
+    if (netdata_dir_in_parent("/private/var/run", path, sizeof(path), rw))
         goto success;
 #endif
 
