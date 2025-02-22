@@ -6,43 +6,56 @@
 struct adfs_certificate {
     bool charts_created;
 
+    // AD/ADFS
     RRDSET *st_adfs_login_connection_failures;
     RRDDIM *rd_adfs_login_connection_failures;
 
-    RRDSET *st_adfs_certificate_authentications_total;
-    RRDDIM *rd_adfs_certificate_authentications_total;
-
+    // DB Artifacts
     RRDSET *st_adfs_db_artifact_failure_total;
     RRDDIM *rd_adfs_db_artifact_failure_total;
 
     RRDSET *st_adfs_db_artifact_query_time_seconds_total;
     RRDDIM *rd_adfs_db_artifact_query_time_seconds_total;
 
-    RRDSET *st_adfs_device_authentications_total;
-    RRDDIM *rd_adfs_device_authentications_total;
-
+    // DB Config
     RRDSET *st_adfs_db_config_failures;
     RRDDIM *rd_adfs_db_config_failures;
 
     RRDSET *st_adfs_db_config_query_time_seconds_total;
     RRDDIM *rd_adfs_db_config_query_time_seconds_total;
 
+    // Auth
+    RRDSET *st_adfs_device_authentications_total;
+    RRDDIM *rd_adfs_device_authentications_total;
+
     RRDSET *st_adfs_external_authentications;
     RRDDIM *rd_adfs_external_authentications_success;
     RRDDIM *rd_adfs_external_authentications_failure;
 
-    RRDSET *st_adfs_federated_authentications;
-    RRDDIM *rd_adfs_federated_authentications;
-
-    RRDSET *st_adfs_federation_metadata_requests_total;
-    RRDDIM *rd_adfs_federation_metadata_requests_total;
-
     RRDSET *st_adfs_oauth_authorization_requests_total;
     RRDDIM *rd_adfs_oauth_authorization_requests_total;
+
+    RRDSET *st_adfs_certificate_authentications_total;
+    RRDDIM *rd_adfs_certificate_authentications_total;
 
     RRDSET *st_adfs_oauth_client_authentications;
     RRDDIM *rd_adfs_oauth_client_authentications_success;
     RRDDIM *rd_adfs_oauth_client_authentications_failure;
+
+    RRDSET *st_adfs_oauth_password_grant_requests;
+    RRDDIM *rd_adfs_oauth_password_grant_requests_success;
+    RRDDIM *rd_adfs_oauth_password_grant_requests_failure;
+
+    RRDSET *st_adfs_passport_authentications;
+    RRDDIM *rd_adfs_passport_authentications_total;
+
+    RRDSET *st_adfs_user_password_authentications;
+    RRDDIM *rd_adfs_sso_authentications_success;
+    RRDDIM *rd_adfs_sso_authentications_failure;
+
+    // Oauth
+    RRDSET *st_adfs_federation_metadata_requests_total;
+    RRDDIM *rd_adfs_federation_metadata_requests_total;
 
     RRDSET *st_adfs_oauth_client_credentials_requests;
     RRDDIM *rd_adfs_oauth_client_credentials_requests_success;
@@ -60,10 +73,10 @@ struct adfs_certificate {
     RRDDIM *rd_adfs_oauth_client_secret_post_authentications_success;
     RRDDIM *rd_adfs_oauth_client_secret_post_authentications_failure;
 
-    RRDSET *st_adfs_oauth_password_grant_requests;
-    RRDDIM *rd_adfs_oauth_password_grant_requests_success;
-    RRDDIM *rd_adfs_oauth_password_grant_requests_failure;
+    RRDSET *st_adfs_federated_authentications;
+    RRDDIM *rd_adfs_federated_authentications;
 
+    // Requests
     RRDSET *st_adfs_passive_requests_total;
     RRDDIM *rd_adfs_passive_requests_total;
 
@@ -80,10 +93,6 @@ struct adfs_certificate {
     RRDSET *st_adfs_wstrust_token_requests_success_total;
     RRDDIM *rd_adfs_wstrust_token_requests_success_total;
 
-    RRDSET *st_adfs_sso_authentications;
-    RRDDIM *rd_adfs_sso_authentications_success;
-    RRDDIM *rd_adfs_sso_authentications_failure;
-
     RRDSET *st_adfs_token_requests_total;
     RRDDIM *rd_adfs_token_requests_total;
 
@@ -97,21 +106,30 @@ struct adfs_certificate {
     RRDSET *st_adfs_wsfed_token_requests_success_total;
     RRDDIM *rd_adfs_wsfed_token_requests_success_total;
 
+    // AD/ADFS
     COUNTER_DATA ADFSLoginConnectionFailure;
-    COUNTER_DATA ADFSCertificateAuthentications;
 
+    // DB Artifacts
     COUNTER_DATA ADFSDBArtifactFailures;
     COUNTER_DATA ADFSDBArtifactQueryTimeSeconds;
+
+    // DB Config
     COUNTER_DATA ADFSDBConfigFailures;
     COUNTER_DATA ADFSDBConfigQueryTimeSeconds;
+
+    // Auth
     COUNTER_DATA ADFSDeviceAuthentications;
     COUNTER_DATA ADFSExternalAuthenticationsSuccess;
     COUNTER_DATA ADFSExternalAuthenticationsFailure;
+    COUNTER_DATA ADFSOauthAuthorizationRequests;
+    COUNTER_DATA ADFSCertificateAuthentications;
+    COUNTER_DATA ADFSOauthClientAuthenticationsSuccess;
     COUNTER_DATA ADFSFederatedAuthentications;
     COUNTER_DATA ADFSFederationMetadataRequests;
+    COUNTER_DATA ADFSSSOAuthenticationsSuccess;
+    COUNTER_DATA ADFSPassportAuthentications;
 
-    COUNTER_DATA ADFSOauthAuthorizationRequests;
-    COUNTER_DATA ADFSOauthClientAuthenticationsSuccess;
+    // OAUTH
     COUNTER_DATA ADFSOauthClientAuthenticationsFailure;
     COUNTER_DATA ADFSOauthClientCredentialsSuccess;
     COUNTER_DATA ADFSOauthClientCredentialsFailure;
@@ -126,13 +144,14 @@ struct adfs_certificate {
     COUNTER_DATA ADFSOauthPasswordGrantRequestsSuccess;
     COUNTER_DATA ADFSOauthPasswordGrantRequestsFailure;
     COUNTER_DATA ADFSOauthTokenRequestsSuccess;
+
+    // Requests
     COUNTER_DATA ADFSPassiveRequests;
     COUNTER_DATA ADFSPassportAuthentications;
     COUNTER_DATA ADFSPasswordChangeRequestsSuccess;
     COUNTER_DATA ADFSPasswordChangeRequestsFailure;
     COUNTER_DATA ADFSSAMLPTokenRequests;
     COUNTER_DATA ADFSWSTrustTokenRequestsSuccess;
-    COUNTER_DATA ADFSSSOAuthenticationsSuccess;
     COUNTER_DATA ADFSSSOAuthenticationsFailure;
     COUNTER_DATA ADFSTokenRequests;
     COUNTER_DATA ADFSUserPasswordAuthenticationsSuccess;
@@ -202,12 +221,14 @@ struct adfs_certificate {
     .ADFSSAMLPTokenRequests.key = "SAML-P Token Requests",
     .ADFSWSTrustTokenRequestsSuccess.key = "WS-Trust Token Requests",
     .ADFSSSOAuthenticationsSuccess.key = "SSO Authentication Failures",
+    .ADFSPassportAuthentications.kye = "Microsoft Passport Authentications",
     .ADFSSSOAuthenticationsFailure.key = "SSO Authentications",
-    .ADFSTokenRequests.key = "Token Requests",
-    .ADFSUserPasswordAuthenticationsSuccess.key = "SSO Authentications",
+    .ADFSTokenRequests.key = "Token Requests", .ADFSUserPasswordAuthenticationsSuccess.key = "SSO Authentications",
     .ADFSUserPasswordAuthenticationsFailure.key = "SSO Authentication Failures",
     .ADFSWindowsIntegratedAuthentications.key = "Windows Integrated Authentications",
-    .ADFSWSFedTokenRequestsSuccess.key = "WS-Fed Token Requests"};
+    .ADFSWSFedTokenRequestsSuccess.key = "WS-Fed Token Requests"
+}
+;
 
 static void initialize(void)
 {
@@ -430,12 +451,14 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
     static void (*doADFS[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
         netdata_adfs_login_connection_failures,
-        netdata_adfs_certificate_authentications,
 
         netdata_adfs_db_artifacts_failure,
         netdata_adfs_db_artifact_query_time_seconds,
+
         netdata_adfs_device_authentications,
         netdata_adfs_external_authentications,
+
+        netdata_adfs_certificate_authentications,
 
         // This must be the end
         NULL};
