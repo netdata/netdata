@@ -755,6 +755,12 @@ int netdata_main(int argc, char **argv) {
     netdata_conf_section_global(); // get hostname, host prefix, profile, etc
     registry_init(); // for machine_guid, must be after netdata_conf_section_global()
 
+    // initialize thread - this is required before the first nd_thread_create()
+    default_stacksize = netdata_threads_init();
+    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
+    if (default_stacksize < 1 * 1024 * 1024)
+        default_stacksize = 1 * 1024 * 1024;
+
     // make sure we are the only instance running
     {
         const char *run_dir = os_run_dir(true);
@@ -844,12 +850,6 @@ int netdata_main(int argc, char **argv) {
         // check which threads are enabled and initialize them
 
         delta_startup_time("initialize static threads");
-
-        // setup threads configs
-        default_stacksize = netdata_threads_init();
-        // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
-        if (default_stacksize < 1 * 1024 * 1024)
-            default_stacksize = 1 * 1024 * 1024;
 
         for (i = 0; static_threads[i].name != NULL ; i++) {
             struct netdata_static_thread *st = &static_threads[i];
