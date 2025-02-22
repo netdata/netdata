@@ -1054,6 +1054,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/boot_id.h
         src/libnetdata/os/run_dir.c
         src/libnetdata/os/run_dir.h
+        src/libnetdata/os/file_lock.c
+        src/libnetdata/os/file_lock.h
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})

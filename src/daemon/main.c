@@ -755,6 +755,24 @@ int netdata_main(int argc, char **argv) {
     netdata_conf_section_global(); // get hostname, host prefix, profile, etc
     registry_init(); // for machine_guid, must be after netdata_conf_section_global()
 
+    // make sure we are the only instance running
+    {
+        const char *run_dir = os_get_run_dir(true);
+        if(!run_dir) {
+            netdata_log_error("Cannot get/create a run directory.");
+            exit(1);
+        }
+        netdata_log_info("Netdata run directory is '%s'", run_dir);
+
+        char lock_file[FILENAME_MAX];
+        snprintfz(lock_file, sizeof(lock_file), "%s/netdata.lock", run_dir);
+        FILE_LOCK lock = file_lock_get(lock_file);
+        if(!FILE_LOCK_OK(lock)) {
+            netdata_log_error("Cannot get exclusive lock on file '%s'. Is Netdata already running?", lock_file);
+            exit(1);
+        }
+    }
+
     // status and crash/update/exit detection
     exit_initiated_reset();
     daemon_status_file_check_crash();

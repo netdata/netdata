@@ -92,17 +92,13 @@ static char *detect_run_dir(bool create_if_missing) {
     // Fallback to /tmp/netdata - force creation if needed
     if (!is_dir_accessible("/tmp")) {
         // Try to create /tmp with standard permissions (including sticky bit)
-        if (mkdir("/tmp", 01777) == -1 && errno != EEXIST) {
-            // Failed to create /tmp - this is a serious system issue
-            fatal("Cannot create /tmp directory");
-        }
+        if (mkdir("/tmp", 01777) == -1 && errno != EEXIST)
+            return NULL;
     }
 
-    snprintfz(path, sizeof(path), "%s/netdata", "/tmp");
-    if (mkdir(path, 0755) == -1 && errno != EEXIST) {
-        // Failed to create /tmp/netdata - this is a serious issue
-        fatal("Cannot create /tmp/netdata directory");
-    }
+    snprintfz(path, sizeof(path), "/tmp/netdata");
+    if (mkdir(path, 0755) == -1 && errno != EEXIST)
+        return NULL;
 
 success:
     // Set the environment variable for child processes
