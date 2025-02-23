@@ -263,6 +263,7 @@
 } while(0)
 
 #define JSONC_PARSE_SUBOBJECT(jobj, path, member, error, required, block) do { \
+    BUILD_BUG_ON(sizeof(path) < 128); /* ensure path is an array of at least 128 bytes */                       \
     json_object *JSONC_TEMP_VAR(_j, __LINE__);                                                                  \
     if (!json_object_object_get_ex(jobj, member, &JSONC_TEMP_VAR(_j, __LINE__))) {                              \
         if(required) {                                                                                          \
