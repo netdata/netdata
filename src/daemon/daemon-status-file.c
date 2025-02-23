@@ -210,11 +210,11 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
 #if defined(OS_LINUX)
     session_status.os_type = DAEMON_OS_TYPE_LINUX;
 #elif defined(OS_FREEBSD)
-    session_status.built_for = DAEMON_OS_TYPE_FREEBSD;
+    session_status.os_type = DAEMON_OS_TYPE_FREEBSD;
 #elif defined(OS_MACOS)
-    session_status.built_for = DAEMON_OS_TYPE_MACOS;
+    session_status.os_type = DAEMON_OS_TYPE_MACOS;
 #elif defined(OS_WINDOWS)
-    session_status.built_for = DAEMON_OS_TYPE_WINDOWS;
+    session_status.os_type = DAEMON_OS_TYPE_WINDOWS;
 #endif
 
     if(session_status.status == DAEMON_STATUS_INITIALIZING && status == DAEMON_STATUS_RUNNING)
