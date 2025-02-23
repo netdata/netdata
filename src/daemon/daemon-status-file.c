@@ -8,6 +8,9 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
+#define STATUS_FILENAME "status-netdata.json"
+#define STATUS_FILENAME_TMP "status-netdata.json.tmp"
+
 ENUM_STR_MAP_DEFINE(DAEMON_STATUS) = {
     { DAEMON_STATUS_NONE, "none"},
     { DAEMON_STATUS_INITIALIZING, "initializing"},
@@ -279,11 +282,13 @@ DAEMON_STATUS_FILE daemon_status_file_load(void) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     CLEAN_BUFFER *error = buffer_create(0, NULL);
 
+    const char *run_dir = os_run_dir(true);
+
     for(size_t x = 0; x < 2 ;x++) {
         if(x == 0)
-            snprintfz(filename, sizeof(filename), "%s/status-netdata.json", os_run_dir(true));
+            snprintfz(filename, sizeof(filename), "%s/%s", run_dir, STATUS_FILENAME);
         else
-            snprintfz(filename, sizeof(filename), "%s/status-netdata.json", netdata_configured_cache_dir);
+            snprintfz(filename, sizeof(filename), "%s/%s", netdata_configured_cache_dir, STATUS_FILENAME);
 
         FILE *fp = fopen(filename, "r");
         if (fp) {
@@ -327,12 +332,12 @@ void daemon_status_file_save(DAEMON_STATUS status) {
     char temp_filename[FILENAME_MAX];
     for (size_t x = 0; x < 2 ; x++) {
         if(x == 0) {
-            snprintfz(filename, sizeof(filename), "%s/status-netdata.json", run_dir);
-            snprintfz(temp_filename, sizeof(temp_filename), "%s/status-netdata.json.tmp", run_dir);
+            snprintfz(filename, sizeof(filename), "%s/%s", run_dir, STATUS_FILENAME);
+            snprintfz(temp_filename, sizeof(temp_filename), "%s/%s", run_dir, STATUS_FILENAME_TMP);
         }
         else {
-            snprintfz(filename, sizeof(filename), "%s/status-netdata", netdata_configured_cache_dir);
-            snprintfz(temp_filename, sizeof(temp_filename), "%s/status-netdata.tmp", netdata_configured_cache_dir);
+            snprintfz(filename, sizeof(filename), "%s/%s", netdata_configured_cache_dir, STATUS_FILENAME);
+            snprintfz(temp_filename, sizeof(temp_filename), "%s/%s", netdata_configured_cache_dir, STATUS_FILENAME_TMP);
         }
 
         FILE *fp = fopen(temp_filename, "w");
