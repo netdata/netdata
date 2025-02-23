@@ -309,7 +309,11 @@ DAEMON_STATUS_FILE daemon_status_file_load(void) {
 
             if(json_parse_payload_or_error(wb, error, daemon_status_file_from_json, &status) == HTTP_RESP_OK)
                 break;
+            else
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot parse status file '%s': %s", filename, buffer_tostring(error));
         }
+        else
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open status file for reading '%s'", filename);
     }
 
     return status;
@@ -348,10 +352,13 @@ void daemon_status_file_save(DAEMON_STATUS status) {
             if (ok)
                 (void)rename(temp_filename, filename);
             else {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot write status file '%s'", temp_filename);
                 (void)unlink(filename);
                 (void)unlink(temp_filename);
             }
         }
+        else
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open status file for writing '%s'", temp_filename);
     }
 
     spinlock_unlock(&spinlock);
@@ -554,6 +561,4 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     session_status.fatal.line = line;
 
     spinlock_unlock(&spinlock);
-
-    daemon_status_file_save(DAEMON_STATUS_NONE);
 }
