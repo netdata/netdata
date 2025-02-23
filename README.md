@@ -187,13 +187,14 @@ NEW! On the same workload, Netdata uses **1/3rd less CPU**, consumes **1/8th of 
 
 ### 1. **Install Netdata everywhere** :v:
 
-Netdata can be installed on all Linux, macOS, FreeBSD (and soon on Windows) systems. We provide binary packages for the most popular operating systems and package managers.
+Netdata can be installed on all Linux, macOS, FreeBSD and Windows systems. We provide binary packages for the most popular operating systems and package managers.
 
 - Install on [Ubuntu, Debian CentOS, Fedora, Suse, Red Hat, Arch, Alpine, Gentoo, even BusyBox](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
 - Install with [Docker](/packaging/docker/README.md).<br/>
   Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
 - Install on [macOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
 - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
+- Install on [Windows](https://learn.netdata.cloud/docs/netdata-agent/installation/windows).
 - Install [from source](https://learn.netdata.cloud/docs/installing/build-the-netdata-agent-yourself/compile-from-source-code) ![github downloads](https://img.shields.io/github/downloads/netdata/netdata/total?color=success&logo=github)
 - For Kubernetes deployments [check here](https://learn.netdata.cloud/docs/installation/install-on-specific-environments/kubernetes/).
 
@@ -209,7 +210,6 @@ _Note: the binary packages we provide, install Netdata UI automatically. Netdata
 Netdata auto-detects and auto-discovers most operating system data sources and applications. However, many data sources require some manual configuration, usually to allow Netdata to get access to the metrics.
 
 - For a detailed list of the 800+ collectors available, check [this guide](https://learn.netdata.cloud/docs/data-collection/).
-- To monitor Windows servers and applications, use [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/system-metrics/windows-machines).<br/><small>Note that Netdata on Windows is at its final release stage, so at the next Netdata release Netdata will natively support Windows.</small>
 - To monitor SNMP devices, check [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/networking/snmp).
 
 ### 3. **Configure Alert Notifications** :bell:
