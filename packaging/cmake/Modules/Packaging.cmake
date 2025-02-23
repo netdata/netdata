@@ -46,11 +46,10 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Netdata Builder <bot@netdata.cloud>")
 #
 
 set(CPACK_COMPONENT_NETDATA_DESCRIPTION
-	  "real-time charts for system monitoring
- Netdata is a daemon that collects data in realtime (per second)
- and presents a web site to view and analyze them. The presentation
- is also real-time and full of interactive charts that precisely
- render all collected values.")
+	  "Netdata is a high-resolution, real-time, low-latency observability platform.
+	  Per-second data collection, high-performance long-term storage, low-latency
+	  visualization, machine-learning based anomaly detection, alerts and notifications,
+	  advanced correlations and fast root cause analysis, native horizontal scalability.")
 
 set(CPACK_DEBIAN_NETDATA_PACKAGE_NAME "netdata")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SECTION "net")
