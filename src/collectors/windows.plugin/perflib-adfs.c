@@ -38,15 +38,16 @@ struct adfs_certificate {
     RRDSET *st_adfs_federation_metadata_authentications;
     RRDDIM *rd_adfs_federation_metadata_authentications;
 
+    // OAuth
     RRDSET *st_adfs_oauth_authorization_requests_total;
     RRDDIM *rd_adfs_oauth_authorization_requests_total;
-
-    RRDSET *st_adfs_certificate_authentications_total;
-    RRDDIM *rd_adfs_certificate_authentications_total;
 
     RRDSET *st_adfs_oauth_client_authentications;
     RRDDIM *rd_adfs_oauth_client_authentications_success;
     RRDDIM *rd_adfs_oauth_client_authentications_failure;
+
+    RRDSET *st_adfs_certificate_authentications_total;
+    RRDDIM *rd_adfs_certificate_authentications_total;
 
     RRDSET *st_adfs_oauth_password_grant_requests;
     RRDDIM *rd_adfs_oauth_password_grant_requests_success;
@@ -56,7 +57,6 @@ struct adfs_certificate {
     RRDDIM *rd_adfs_sso_authentications_success;
     RRDDIM *rd_adfs_sso_authentications_failure;
 
-    // Oauth
     RRDSET *st_adfs_oauth_client_credentials_requests;
     RRDDIM *rd_adfs_oauth_client_credentials_requests_success;
     RRDDIM *rd_adfs_oauth_client_credentials_requests_failure;
@@ -126,7 +126,6 @@ struct adfs_certificate {
     COUNTER_DATA ADFSOauthAuthorizationRequests;
     COUNTER_DATA ADFSCertificateAuthentications;
     COUNTER_DATA ADFSOauthClientAuthenticationsSuccess;
-    COUNTER_DATA ADFSFederationMetadataRequests;
     COUNTER_DATA ADFSSSOAuthenticationsSuccess;
     COUNTER_DATA ADFSPassportAuthentications;
 
@@ -179,6 +178,7 @@ struct adfs_certificate {
     .st_adfs_federation_metadata_authentications = NULL,
     .st_adfs_certificate_authentications_total = NULL,
 
+    // OAuth
     .st_adfs_oauth_authorization_requests_total = NULL,
     .st_adfs_oauth_client_authentications = NULL,
     .st_adfs_oauth_client_credentials_requests = NULL,
@@ -186,6 +186,7 @@ struct adfs_certificate {
     .st_adfs_oauth_client_secret_basic_authentications = NULL,
     .st_adfs_oauth_client_secret_post_authentications = NULL,
     .st_adfs_oauth_password_grant_requests = NULL,
+
     .st_adfs_passive_requests_total = NULL,
     .st_adfs_passport_authentications_total = NULL,
     .st_adfs_password_change_requests = NULL,
@@ -208,9 +209,8 @@ struct adfs_certificate {
     .ADFSDeviceAuthentications.key = "Device Authentications",
     .ADFSExternalAuthenticationsSuccess.key = "External Authentications",
     .ADFSExternalAuthenticationsFailure.key = "External Authentication Failures",
-    .ADFSFederatedAuthentications.key = "Federated Authentications",
-    .ADFSFederatedMetadataAuthentications.key = "Federation Metadata Requests",
-    .ADFSFederationMetadataRequests.key = "Federation Metadata Requests",
+    .ADFSFederationAuthentications.key = "Federated Authentications",
+    .ADFSFederationMetadataAuthentications.key = "Federation Metadata Requests",
 
     .ADFSOauthAuthorizationRequests.key = "OAuth AuthZ Requests",
     .ADFSOauthClientAuthenticationsSuccess.key = "OAuth Client Authentications",
@@ -521,7 +521,7 @@ void netdata_adfs_external_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
 
 void netdata_adfs_federated_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
-    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSFederatedAuthentications)) {
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSFederationAuthentications)) {
         return;
     }
 
@@ -540,19 +540,22 @@ void netdata_adfs_federated_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OB
             update_every,
             RRDSET_TYPE_LINE);
 
-        adfs.rd_adfs_federation_authentications =
-            rrddim_add(adfs.st_adfs_federation_authentications, "authentications", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        adfs.rd_adfs_federation_authentications = rrddim_add(
+            adfs.st_adfs_federation_authentications, "authentications", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
         adfs.st_adfs_federation_authentications,
         adfs.rd_adfs_federation_authentications,
-        (collected_number)adfs.ADFSFederatedAuthentications.current.Data);
+        (collected_number)adfs.ADFSFederationAuthentications.current.Data);
 
     rrdset_done(adfs.st_adfs_external_authentications);
 }
 
-void netdata_adfs_federation_metadata_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+void netdata_adfs_federation_metadata_authentications(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSFederationMetadataAuthentications)) {
         return;
@@ -573,8 +576,8 @@ void netdata_adfs_federation_metadata_authentications(PERF_DATA_BLOCK *pDataBloc
             update_every,
             RRDSET_TYPE_LINE);
 
-        adfs.rd_adfs_federation_metadata_authentications =
-            rrddim_add(adfs.st_adfs_federation_metadata_authentications, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        adfs.rd_adfs_federation_metadata_authentications = rrddim_add(
+            adfs.st_adfs_federation_metadata_authentications, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -585,32 +588,118 @@ void netdata_adfs_federation_metadata_authentications(PERF_DATA_BLOCK *pDataBloc
     rrdset_done(adfs.st_adfs_federation_metadata_authentications);
 }
 
+void netdata_adfs_oauth_authorization_requests(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthAuthorizationRequests)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_oauth_authorization_requests_total) {
+        adfs.st_adfs_oauth_authorization_requests_total = rrdset_create_localhost(
+            "adfs",
+            "oauth_authorization_requests",
+            NULL,
+            "auth",
+            "adfs.oauth_authorization_requests",
+            "Incoming requests to the OAuth Authorization endpoint",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_OAUTH_AUTHORIZED_REQUEST,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_oauth_authorization_requests_total = rrddim_add(
+            adfs.st_adfs_oauth_authorization_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_authorization_requests_total,
+        adfs.rd_adfs_oauth_authorization_requests_total,
+        (collected_number)adfs.ADFSOauthAuthorizationRequests.current.Data);
+
+    rrdset_done(adfs.st_adfs_oauth_authorization_requests_total);
+}
+
+void netdata_adfs_oauth_client_authorizations(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientCredentialsSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientCredentialsFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_oauth_client_credentials_requests) {
+        adfs.st_adfs_oauth_client_credentials_requests = rrdset_create_localhost(
+            "adfs",
+            "oauth_client_authentications",
+            NULL,
+            "auth",
+            "adfs.oauth_client_authentications",
+            "OAuth client authentications",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_OAUTH_CLIENT_AUTHENTICATIONS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_oauth_client_credentials_requests_success = rrddim_add(
+            adfs.st_adfs_oauth_client_credentials_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_external_authentications_failure = rrddim_add(
+            adfs.st_adfs_oauth_client_credentials_requests, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_credentials_requests,
+        adfs.rd_adfs_oauth_client_credentials_requests_success,
+        (collected_number)adfs.ADFSOauthClientCredentialsSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_credentials_requests,
+        adfs.rd_adfs_oauth_client_credentials_requests_failure,
+        (collected_number)adfs.ADFSOauthClientCredentialsFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_external_authentications);
+}
+
 static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
     if (!pObjectType)
         return false;
 
-    static void (*doADFS[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {// ADFS/AD
-                                                                           netdata_adfs_login_connection_failures,
+    static void (*doADFS[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
+        // ADFS/AD
+        netdata_adfs_login_connection_failures,
 
-                                                                           // DB Artifacts
-                                                                           netdata_adfs_db_artifacts_failure,
-                                                                           netdata_adfs_db_artifacts_query_time_seconds,
+        // DB Artifacts
+        netdata_adfs_db_artifacts_failure,
+        netdata_adfs_db_artifacts_query_time_seconds,
 
-                                                                           // DB Config
-                                                                           netdata_adfs_db_config_failure,
-                                                                           netdata_adfs_db_config_query_time_seconds,
+        // DB Config
+        netdata_adfs_db_config_failure,
+        netdata_adfs_db_config_query_time_seconds,
 
-                                                                           // Auth
-                                                                           netdata_adfs_device_authentications,
-                                                                           netdata_adfs_external_authentications,
-                                                                           netdata_adfs_federated_authentications,
-                                                                           netdata_adfs_federation_metadata_authentications,
-                                                                           netdata_adfs_certificate_authentications,
+        // Auth
+        netdata_adfs_device_authentications,
+        netdata_adfs_external_authentications,
+        netdata_adfs_federated_authentications,
+        netdata_adfs_federation_metadata_authentications,
+        netdata_adfs_certificate_authentications,
 
-                                                                           // This must be the end
-                                                                           NULL};
+        // OAuth
+        netdata_adfs_oauth_authorization_requests,
+        netdata_adfs_oauth_client_authorizations,
+
+        // This must be the end
+        NULL};
     return true;
 }
 
