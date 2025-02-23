@@ -11,9 +11,8 @@
 # Should-Stop:       $local_fs $network $named $remote_fs $time $all
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Start and stop the netdata real-time monitoring server daemon
-# Description:       Controls the main netdata monitoring server daemon "netdata".
-#                    and all its plugins.
+# Short-Description: Start and stop netdata
+# Description:       Controls the main netdata process and all its plugins.
 ### END INIT INFO
 #
 set -e
@@ -41,23 +40,23 @@ service_start() {
 	
 	chown @netdata_user_POST@:@netdata_user_POST@ $PIDFILE_PATH
 	
-	log_success_msg "Starting real-time performance monitoring"
+	log_success_msg "Starting netdata"
 	start_daemon -p $PIDFILE $DAEMON_PATH/$DAEMON $DAEMONOPTS
 	RETVAL=$?
 	case "${RETVAL}" in
-		0) log_success_msg "Started real-time performance monitoring" ;;
-		*) log_error_msg "Failed to start real-time performance monitoring" ;;
+		0) log_success_msg "Started netdata" ;;
+		*) log_error_msg "Failed to start netdata" ;;
 	esac
 	return $RETVAL
 }
 
 service_stop() {
-	log_success_msg "Stopping real-time performance monitoring"
+	log_success_msg "Stopping netdata"
 	killproc -p ${PIDFILE} $DAEMON_PATH/$DAEMON
 	RETVAL=$?
 	case "${RETVAL}" in
-		0) log_success_msg "Stopped real-time performance monitoring" ;;
-		*) log_error_msg "Failed to stop real-time performance monitoring" ;;
+		0) log_success_msg "Stopped netdata" ;;
+		*) log_error_msg "Failed to stop netdata" ;;
 	esac
 
 	if [ $RETVAL -eq 0 ]; then
