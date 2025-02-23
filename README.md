@@ -40,13 +40,13 @@ Netdata is a high-performance observability platform designed to simplify modern
 **:sparkles: Key Features**:
 
 - **Real-Time**<br/>Per-second data collection provides immediate visibility into your infrastructure's behavior.
-- **Zero-Configuration**<br/>Start monitoring in minutes with automatic detection and discovery and fully automated dashboards.
-- **ML-Powered Insights**<br/>Automatic anomaly detection and pattern recognition, with instant root cause analysis.
-- **Long-Term Retention**<br/>High-performance tiered storage for years of retention and 20+ times faster query responses.
-- **Advanced Visualization**<br/>Rich, interactive dashboard for deep system insights and rapid troubleshooting.
+- **Zero-Configuration**<br/>Start monitoring in minutes with automatic detection and discovery and fully automated dashboards and alerts.
+- **ML-Powered Insights**<br/>Automatic anomaly detection and pattern recognition, with advanced correlations and instant root cause analysis.
+- **Long-Term Retention**<br/>High-performance and efficient tiered storage for years of retention and 20+ times faster query responses.
+- **Advanced Visualization**<br/>Rich, interactive low-latency dashboards for deep system and applications insights and rapid troubleshooting.
 - **Extreme Scalability**<br/>Native horizontal scalability, while maintaining performance and ease of use.
-- **Complete Visibility**<br/>From infrastructure to applications, logs to metrics, all in one solution.
-- **Edge-Based**<br/>All processing and storage of your data, at your premises.
+- **Complete Visibility**<br/>From infrastructure to applications, logs to metrics, hardware to databases, all in one solution.
+- **Edge-Based**<br/>All processing and storage of your data, at your premises, as close to the edge as possible.
 
 ---
 
