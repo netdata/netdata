@@ -94,8 +94,8 @@ void nd_log_initialize_for_external_plugins(const char *name) {
 
     switch(method) {
         case NDLM_JOURNAL:
-            if(!nd_log_journal_direct_init(getenv("NETDATA_SYSTEMD_JOURNAL_PATH")) ||
-                !nd_log_journal_direct_init(NULL) || !nd_log_journal_systemd_init()) {
+            if(!nd_log_journal_direct_init(getenv("NETDATA_SYSTEMD_JOURNAL_PATH")) &&
+                !nd_log_journal_direct_init(NULL) && !nd_log_journal_systemd_init()) {
                 nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to initialize journal. Using stderr.");
                 method = NDLM_STDERR;
             }
