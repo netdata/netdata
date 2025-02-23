@@ -77,29 +77,33 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         }
         buffer_json_object_close(wb);
         buffer_json_member_add_time_t(wb, "uptime", ds->boottime); // ECS
+
+        buffer_json_member_add_object(wb, "memory"); // custom
+        if(OS_SYSTEM_MEMORY_OK(ds->memory)) {
+            buffer_json_member_add_uint64(wb, "total", ds->memory.ram_total_bytes);
+            buffer_json_member_add_uint64(wb, "free", ds->memory.ram_available_bytes);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "disk"); // ECS
+        {
+            buffer_json_member_add_object(wb, "db");
+            if (OS_SYSTEM_DISK_SPACE_OK(ds->var_cache)) {
+                buffer_json_member_add_uint64(wb, "total", ds->var_cache.total_bytes);
+                buffer_json_member_add_uint64(wb, "free", ds->var_cache.free_bytes);
+                buffer_json_member_add_uint64(wb, "inodes_total", ds->var_cache.total_inodes);
+                buffer_json_member_add_uint64(wb, "inodes_free", ds->var_cache.free_inodes);
+                buffer_json_member_add_boolean(wb, "read_only", ds->var_cache.is_read_only);
+            }
+            buffer_json_object_close(wb);
+        }
+        buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
 
     buffer_json_member_add_object(wb, "os"); // ECS
     {
         buffer_json_member_add_string(wb, "type", DAEMON_OS_TYPE_2str(ds->os_type)); // ECS
-    }
-    buffer_json_object_close(wb);
-
-    buffer_json_member_add_object(wb, "ram");
-    if(OS_SYSTEM_MEMORY_OK(ds->memory)) {
-        buffer_json_member_add_uint64(wb, "total", ds->memory.ram_total_bytes);
-        buffer_json_member_add_uint64(wb, "free", ds->memory.ram_available_bytes);
-    }
-    buffer_json_object_close(wb);
-
-    buffer_json_member_add_object(wb, "db_disk");
-    if(OS_SYSTEM_DISK_SPACE_OK(ds->var_cache)) {
-        buffer_json_member_add_uint64(wb, "total", ds->var_cache.total_bytes);
-        buffer_json_member_add_uint64(wb, "free", ds->var_cache.free_bytes);
-        buffer_json_member_add_uint64(wb, "inodes_total", ds->var_cache.total_inodes);
-        buffer_json_member_add_uint64(wb, "inodes_free", ds->var_cache.free_inodes);
-        buffer_json_member_add_boolean(wb, "read_only", ds->var_cache.is_read_only);
     }
     buffer_json_object_close(wb);
 
@@ -117,20 +121,20 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 // --------------------------------------------------------------------------------------------------------------------
 // json parsing
 
-static bool daemon_status_file_from_json_cache_dir(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->var_cache.total_bytes, error, required);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->var_cache.free_bytes, error, required);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_total", ds->var_cache.total_inodes, error, required);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_free", ds->var_cache.free_inodes, error, required);
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "read_only", ds->var_cache.is_read_only, error, required);
+static bool daemon_status_file_from_json_host_disk_db(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required __maybe_unused) {
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->var_cache.total_bytes, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->var_cache.free_bytes, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_total", ds->var_cache.total_inodes, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_free", ds->var_cache.free_inodes, error, false);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "read_only", ds->var_cache.is_read_only, error, false);
     if(!OS_SYSTEM_DISK_SPACE_OK(ds->var_cache))
         ds->var_cache = OS_SYSTEM_DISK_SPACE_EMPTY;
     return true;
 }
 
-static bool daemon_status_file_from_json_ram(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->memory.ram_total_bytes, error, required);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, required);
+static bool daemon_status_file_from_json_memory(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required __maybe_unused) {
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->memory.ram_total_bytes, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, false);
     if(!OS_SYSTEM_MEMORY_OK(ds->memory))
         ds->memory = OS_SYSTEM_MEMORY_EMPTY;
     return true;
@@ -161,9 +165,16 @@ static bool daemon_status_file_from_json_host_boot(json_object *jobj, const char
     return true;
 }
 
+static bool daemon_status_file_from_json_host_disk(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
+    JSONC_PARSE_SUBOBJECT(jobj, path, "db", ds, daemon_status_file_from_json_host_disk_db, error, required);
+    return true;
+}
+
 static bool daemon_status_file_from_json_host(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->boottime, error, required);
     JSONC_PARSE_SUBOBJECT(jobj, path, "boot", ds, daemon_status_file_from_json_host_boot, error, required);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "memory", ds, daemon_status_file_from_json_memory, error, required);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "disk", ds, daemon_status_file_from_json_host_disk, error, required);
     return true;
 }
 
@@ -198,8 +209,6 @@ static bool daemon_status_file_from_json(json_object *jobj, const char *path, vo
     JSONC_PARSE_SUBOBJECT(jobj, path, "agent", ds, daemon_status_file_from_json_agent, error, required);
     JSONC_PARSE_SUBOBJECT(jobj, path, "host", ds, daemon_status_file_from_json_host, error, required);
     JSONC_PARSE_SUBOBJECT(jobj, path, "os", ds, daemon_status_file_from_json_os, error, required);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "db_disk", ds, daemon_status_file_from_json_cache_dir, error, required);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "ram", ds, daemon_status_file_from_json_ram, error, required);
     JSONC_PARSE_SUBOBJECT(jobj, path, "fatal", ds, daemon_status_file_from_json_fatal, error, required);
     return true;
 }

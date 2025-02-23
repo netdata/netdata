@@ -25,21 +25,21 @@ typedef enum {
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(DAEMON_OS_TYPE);
 
 typedef struct daemon_status_file {
-    char version[32];       // the netdata version
-    DAEMON_STATUS status;   // the daemon status
-    EXIT_REASON exit_reason;     // the exit reason (maybe empty)
-    ND_PROFILE profile;     // the profile of the agent
+    char version[32];           // the netdata version
+    DAEMON_STATUS status;       // the daemon status
+    EXIT_REASON exit_reason;    // the exit reason (maybe empty)
+    ND_PROFILE profile;         // the profile of the agent
     DAEMON_OS_TYPE os_type;
 
-    time_t boottime;        // system boottime
-    time_t uptime;          // netdata uptime
-    usec_t timestamp_ut;    // the timestamp of the status file
+    time_t boottime;            // system boottime
+    time_t uptime;              // netdata uptime
+    usec_t timestamp_ut;        // the timestamp of the status file
 
-    ND_UUID boot_id;        // the boot id of the system
-    ND_UUID invocation;     // the netdata invocation id generated the file
-    ND_UUID host_id;        // the machine guid of the agent
-    ND_UUID node_id;        // the Netdata Cloud node id of the agent
-    ND_UUID claim_id;       // the Netdata Cloud claim id of the agent
+    ND_UUID boot_id;            // the boot id of the system
+    ND_UUID invocation;         // the netdata invocation id generated the file
+    ND_UUID host_id;            // the machine guid of the agent
+    ND_UUID node_id;            // the Netdata Cloud node id of the agent
+    ND_UUID claim_id;           // the Netdata Cloud claim id of the agent
 
     struct {
         time_t init;
