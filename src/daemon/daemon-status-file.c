@@ -349,8 +349,13 @@ void daemon_status_file_save(DAEMON_STATUS status) {
             bool ok = fwrite(buffer_tostring(wb), 1, buffer_strlen(wb), fp) == buffer_strlen(wb);
             fclose(fp);
 
-            if (ok)
-                (void)rename(temp_filename, filename);
+            if (ok) {
+                if(chmod(temp_filename, 0664) != 0)
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot set permissions on status file '%s'", temp_filename);
+
+                if(rename(temp_filename, filename) != 0)
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot rename status file '%s' to '%s'", temp_filename, filename);
+            }
             else {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot write status file '%s'", temp_filename);
                 (void)unlink(filename);
