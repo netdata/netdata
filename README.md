@@ -6,7 +6,8 @@
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
-<h3 align="center">Monitor your servers, containers, and applications<br/>in high-resolution and in real-time.</h3>
+<h3 align="center">X-Ray Vision for your intfrastructure!</h3>
+<h4 align="center">Every metric, every second. No BS.</h4>
 
 <br />
 <p align="center">
@@ -42,11 +43,12 @@ Netdata is a high-performance observability platform designed to simplify modern
 
 - **Real-Time**: Per-second data collection provides immediate visibility into your infrastructure's behavior.
 - **Zero-Configuration**: Start monitoring in minutes with automatic detection and instant insights.
-- **ML-Powered Insights**: Automatic anomaly detection and pattern recognition, helping you identify issues before they become critical.
-- **Enterprise-Ready**: Scale from a single node to thousands while maintaining performance and ease of use.
+- **ML-Powered Insights**: Automatic anomaly detection and pattern recognition, with instant root cause analysis.
+- **Long-Term Retention**: High-performance tiered storage for years of retention and 20+ times faster query responses.
+- **Advanced Visualization**: Rich, interactive dashboard for deep system insights and rapid troubleshooting.
+- **Extreme Scalability**: Native horizontal scalability, while maintaining performance and ease of use.
 - **Complete Visibility**: From infrastructure to applications, logs to metrics, all in one solution.
 - **Edge-Based**: Process and store metrics at the edge for superior performance and cost efficiency.
-- **Advanced Visualization**: Rich, interactive dashboard for deep system insights and rapid troubleshooting.
 
 ---
 
@@ -59,7 +61,7 @@ This three-part architecture enables Netdata to scale seamlessly from single-nod
 | Component     | Description                                                                                                                                                                                                                                                                                                                            | License                                         |
 |---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
 | Netdata Agent | • The heart of Netdata's monitoring capabilities<br/>• Handles data collection, storage, querying, ML analysis, exports, and alerts<br/>• Runs on physical/virtual servers, cloud, Kubernetes, and IoT devices<br/>• Optimized for zero production impact<br/>• Core of all observability features                                     | [GPL v3+](https://www.gnu.org/licenses/gpl-3.0) |
-| Netdata Cloud | • Adds enterprise-grade features:<br/>  &emsp; - User management and RBAC<br/>  &emsp; - Horizontal scalability<br/>  &emsp; - Centralized alert management<br/> &emsp;  - Access your infrastructure from anywhere<br/>• Available as SaaS or on-premises<br/>• Includes free community tier<br/>• Does not centralize metric storage |                                                 |
+| Netdata Cloud | • Adds enterprise-grade features<br/>&nbsp;(user management and RBAC, horizontal scalability,<br/>&nbsp; centralized alert management, access from anywhere)<br/>• Available as SaaS or on-premises<br/>• Includes free community tier<br/>• Does not centralize metric storage |                                                 |
 | Netdata UI    | • Powers all dashboards and visualizations<br/>• Free to use with both Agent and Cloud<br/>• Included in standard Netdata packages<br/>• Latest version available via CDN                                                                                                                                                              | [NCUL1](https://app.netdata.cloud/LICENSE.txt)  |
 
 ### Key capabilities of the Netdata Agent
