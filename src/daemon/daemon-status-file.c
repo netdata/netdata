@@ -121,78 +121,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 // --------------------------------------------------------------------------------------------------------------------
 // json parsing
 
-static bool daemon_status_file_from_json_host_disk_db(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required __maybe_unused) {
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->var_cache.total_bytes, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->var_cache.free_bytes, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_total", ds->var_cache.total_inodes, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_free", ds->var_cache.free_inodes, error, false);
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "read_only", ds->var_cache.is_read_only, error, false);
-    if(!OS_SYSTEM_DISK_SPACE_OK(ds->var_cache))
-        ds->var_cache = OS_SYSTEM_DISK_SPACE_EMPTY;
-    return true;
-}
+static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *error) {
+    char path[1024]; path[0] = '\0';
 
-static bool daemon_status_file_from_json_memory(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required __maybe_unused) {
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->memory.ram_total_bytes, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, false);
-    if(!OS_SYSTEM_MEMORY_OK(ds->memory))
-        ds->memory = OS_SYSTEM_MEMORY_EMPTY;
-    return true;
-}
-
-static bool daemon_status_file_from_json_fatal(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
-    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "filename", ds->fatal.filename, error, required);
-    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "function", ds->fatal.function, error, required);
-    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "message", ds->fatal.message, error, required);
-    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "stack_trace", ds->fatal.stack_trace, error, required);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "line", ds->fatal.line, error, required);
-    return true;
-}
-
-static bool daemon_status_file_from_json_timings(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init", ds->timings.init, error, required);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit", ds->timings.exit, error, required);
-    return true;
-}
-
-static bool daemon_status_file_from_json_os(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "type", DAEMON_OS_TYPE_2id, ds->os_type, error, required);
-    return true;
-}
-
-static bool daemon_status_file_from_json_host_boot(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->boot_id.uuid, error, required);
-    return true;
-}
-
-static bool daemon_status_file_from_json_host_disk(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
-    JSONC_PARSE_SUBOBJECT(jobj, path, "db", ds, daemon_status_file_from_json_host_disk_db, error, required);
-    return true;
-}
-
-static bool daemon_status_file_from_json_host(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->boottime, error, required);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "boot", ds, daemon_status_file_from_json_host_boot, error, required);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "memory", ds, daemon_status_file_from_json_memory, error, required);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "disk", ds, daemon_status_file_from_json_host_disk, error, required);
-    return true;
-}
-
-static bool daemon_status_file_from_json_agent(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->host_id.uuid, error, required);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ephemeral_id", ds->invocation.uuid, error, required);
-    JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->version, error, required);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->uptime, error, required);
-    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "ND_profile", ND_PROFILE_2id_one, ds->profile, error, required);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ND_status", DAEMON_STATUS_2id, ds->status, error, required);
-    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "ND_exit_reason", EXIT_REASON_2id_one, ds->exit_reason, error, required);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ND_node_id", ds->node_id.uuid, error, required);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ND_claim_id", ds->claim_id.uuid, error, required);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "ND_timings", ds, daemon_status_file_from_json_timings, error, required);
-    return true;
-}
-
-static bool daemon_status_file_from_json(json_object *jobj, const char *path, void *data, BUFFER *error) {
     DAEMON_STATUS_FILE *ds = data;
     char datetime[RFC3339_MAX_LENGTH]; datetime[0] = '\0';
 
@@ -202,14 +133,71 @@ static bool daemon_status_file_from_json(json_object *jobj, const char *path, vo
 
     bool required = false; // allow missing fields and values
 
+    // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required);
     if(datetime[0])
         ds->timestamp_ut = rfc3339_parse_ut(datetime, NULL);
 
-    JSONC_PARSE_SUBOBJECT(jobj, path, "agent", ds, daemon_status_file_from_json_agent, error, required);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "host", ds, daemon_status_file_from_json_host, error, required);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "os", ds, daemon_status_file_from_json_os, error, required);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "fatal", ds, daemon_status_file_from_json_fatal, error, required);
+    // Parse agent object
+    JSONC_PARSE_SUBOBJECT(jobj, path, "agent", error, required, {
+        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->host_id.uuid, error, required);
+        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ephemeral_id", ds->invocation.uuid, error, required);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->version, error, required);
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->uptime, error, required);
+        JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "ND_profile", ND_PROFILE_2id_one, ds->profile, error, required);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ND_status", DAEMON_STATUS_2id, ds->status, error, required);
+        JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "ND_exit_reason", EXIT_REASON_2id_one, ds->exit_reason, error, required);
+        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ND_node_id", ds->node_id.uuid, error, required);
+        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ND_claim_id", ds->claim_id.uuid, error, required);
+
+        JSONC_PARSE_SUBOBJECT(jobj, path, "ND_timings", error, required, {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init", ds->timings.init, error, required);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit", ds->timings.exit, error, required);
+        });
+    });
+
+    // Parse host object
+    JSONC_PARSE_SUBOBJECT(jobj, path, "host", error, required, {
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->boottime, error, required);
+
+        JSONC_PARSE_SUBOBJECT(jobj, path, "boot", error, required, {
+            JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->boot_id.uuid, error, required);
+        });
+
+        JSONC_PARSE_SUBOBJECT(jobj, path, "memory", error, required, {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->memory.ram_total_bytes, error, required);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, required);
+            if(!OS_SYSTEM_MEMORY_OK(ds->memory))
+                ds->memory = OS_SYSTEM_MEMORY_EMPTY;
+        });
+
+        JSONC_PARSE_SUBOBJECT(jobj, path, "disk", error, required, {
+            JSONC_PARSE_SUBOBJECT(jobj, path, "db", error, required, {
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->var_cache.total_bytes, error, false);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->var_cache.free_bytes, error, false);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_total", ds->var_cache.total_inodes, error, false);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_free", ds->var_cache.free_inodes, error, false);
+                JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "read_only", ds->var_cache.is_read_only, error, false);
+                if(!OS_SYSTEM_DISK_SPACE_OK(ds->var_cache))
+                    ds->var_cache = OS_SYSTEM_DISK_SPACE_EMPTY;
+            });
+        });
+    });
+
+    // Parse os object
+    JSONC_PARSE_SUBOBJECT(jobj, path, "os", error, required, {
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "type", DAEMON_OS_TYPE_2id, ds->os_type, error, required);
+    });
+
+    // Parse fatal object
+    JSONC_PARSE_SUBOBJECT(jobj, path, "fatal", error, required, {
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "filename", ds->fatal.filename, error, required);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "function", ds->fatal.function, error, required);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "message", ds->fatal.message, error, required);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "stack_trace", ds->fatal.stack_trace, error, required);
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "line", ds->fatal.line, error, required);
+    });
+
     return true;
 }
 

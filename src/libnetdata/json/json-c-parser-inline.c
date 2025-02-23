@@ -38,7 +38,7 @@ struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER 
     json_tokener_free(tokener);
 
     CLEAN_BUFFER *error = buffer_create(0, NULL);
-    if(!cb(jobj, "", cb_data, error)) {
+    if(!cb(jobj, cb_data, error)) {
         char tmp[buffer_strlen(error) + 100];
         snprintfz(tmp, sizeof(tmp), "JSON parser failed: %s", buffer_tostring(error));
         *code = rrd_call_function_error(output, tmp, HTTP_RESP_BAD_REQUEST);
@@ -74,7 +74,7 @@ int json_parse_payload_or_error(BUFFER *payload, BUFFER *error, json_parse_funct
     }
     json_tokener_free(tokener);
 
-    if(!cb(jobj, "", cb_data, error)) {
+    if(!cb(jobj, cb_data, error)) {
         if(!buffer_strlen(error))
             buffer_strcat(error, "Unknown error during parsing");
         json_object_put(jobj);
