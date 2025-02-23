@@ -323,11 +323,20 @@ static void buffer_json_strcat(BUFFER *wb, const char *txt)
             if(unlikely(*t < ' ')) {
                 uint32_t v = *t++;
                 *d++ = '\\';
-                *d++ = 'u';
-                *d++ = hex_digits[(v >> 12) & 0xf];
-                *d++ = hex_digits[(v >> 8) & 0xf];
-                *d++ = hex_digits[(v >> 4) & 0xf];
-                *d++ = hex_digits[v & 0xf];
+                switch (v) {
+                    case '\n': *d++ = 'n'; break;
+                    case '\r': *d++ = 'r'; break;
+                    case '\t': *d++ = 't'; break;
+                    case '\b': *d++ = 'b'; break;
+                    case '\f': *d++ = 'f'; break;
+                    default:
+                        *d++ = 'u';
+                        *d++ = hex_digits[(v >> 12) & 0xf];
+                        *d++ = hex_digits[(v >> 8) & 0xf];
+                        *d++ = hex_digits[(v >> 4) & 0xf];
+                        *d++ = hex_digits[v & 0xf];
+                        break;
+                }
             }
             else {
                 if (unlikely(*t == '\\' || *t == '\"'))
