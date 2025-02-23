@@ -425,7 +425,7 @@ if [ "$(id -u)" -ne 0 ] && [ -z "${NETDATA_PREPARE_ONLY}" ]; then
 fi
 
 netdata_banner
-progress "monitoring and troubleshooting, transformed!"
+progress "netdata, X-Ray Vision for your infrastructure!"
 cat << BANNER1
 
   You are about to build and install netdata to your system.

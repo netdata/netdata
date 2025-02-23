@@ -1,12 +1,11 @@
 Begin3
 Title:          netdata
 Version:        NETDATA_VERSION
-Description:    Netdata - Monitoring and troubleshooting, transformed!
-                It provides unparalleled insights, in real-time, of everything happening on the
-                systems it runs (including applications such as web and database servers), using
-                modern interactive web dashboards. netdata is fast and efficient, designed to
-                permanently run on all systems (physical & virtual servers, containers, IoT
-                devices), without disrupting their core function.
+Description:    netdata - X-Ray Vision for your infrastructure!
+                netdata is a high-resolution, real-time, low-latency observability platform.
+                Per-second data collection, high-performance long-term storage, low-latency
+                visualization, machine-learning based anomaly detection, alerts and notifications,
+                advanced correlations and fast root cause analysis, native horizontal scalability.
 Keywords:       real-time performance and health monitoring
 Author:         Netdata Inc.
 Maintained-by:  Netdata Inc.

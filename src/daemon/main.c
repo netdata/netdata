@@ -101,7 +101,7 @@ int help(int exitcode) {
     fprintf(stream, "%s", "\n"
             " ^\n"
             " |.-.   .-.   .-.   .-.   .  netdata                                         \n"
-            " |   '-'   '-'   '-'   '-'   monitoring and troubleshooting, transformed!    \n"
+            " |   '-'   '-'   '-'   '-'   X-Ray Vision for your infrastructure!           \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
             " Copyright 2018-2025 Netdata Inc.\n"
