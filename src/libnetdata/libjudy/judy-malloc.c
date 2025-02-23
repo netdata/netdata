@@ -157,6 +157,9 @@ void JudyFreeVirtual(void * PWord, Word_t Words) {
 // initialization
 
 void libjudy_malloc_init(void) {
+    // IMPORTANT: this is not called on external plugins
+    // the allocator should run even if this is not called
+
 #ifdef HAVE_JEMALLOC_ARENA_API
     jemalloc_init();
     if(!jemalloc_initialized)
