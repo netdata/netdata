@@ -33,8 +33,6 @@ MENU: **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)*
 > **Important** :bulb:<br/>
 > People get addicted to Netdata. Once you use it on your systems, **there's no going back!**<br/>
 
-**Netdata: Real-time Observability, Simplified.**
-
 [![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20FreeBSD%20%7C%20Windows-blue)]()
 
 Netdata is a high-performance observability platform designed to simplify modern infrastructure monitoring. With its innovative distributed architecture, Netdata delivers real-time insights into your systems, containers, and applications at a granular level.
