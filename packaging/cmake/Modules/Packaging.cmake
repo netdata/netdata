@@ -46,7 +46,7 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Netdata Builder <bot@netdata.cloud>")
 #
 
 set(CPACK_COMPONENT_NETDATA_DESCRIPTION
-	  "netdata is a high-resolution, real-time, low-latency observability platform.
+	  "Netdata is a high-resolution, real-time, low-latency observability platform.
 	  Per-second data collection, high-performance long-term storage, low-latency
 	  visualization, machine-learning based anomaly detection, alerts and notifications,
 	  advanced correlations and fast root cause analysis, native horizontal scalability.")
