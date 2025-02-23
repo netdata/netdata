@@ -50,7 +50,7 @@ struct aral_statistics *judy_aral_statistics(void) {
 }
 
 static ARAL *judy_size_aral(Word_t Words) {
-    if(Words <= MAX_JUDY_SIZE_TO_ARAL && judy_sizes_aral[Words])
+    if(Words <= MAX_JUDY_SIZE_TO_ARAL)
         return judy_sizes_aral[Words];
 
     return NULL;
@@ -156,7 +156,7 @@ void JudyFreeVirtual(void * PWord, Word_t Words) {
 // --------------------------------------------------------------------------------------------------------------------
 // initialization
 
-__attribute__((constructor)) void libjudy_malloc_init(void) {
+void libjudy_malloc_init(void) {
 #ifdef HAVE_JEMALLOC_ARENA_API
     jemalloc_init();
     if(!jemalloc_initialized)
