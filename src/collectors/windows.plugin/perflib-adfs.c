@@ -144,7 +144,6 @@ struct adfs_certificate {
 
     // Requests
     COUNTER_DATA ADFSPassiveRequests;
-    COUNTER_DATA ADFSPassportAuthentications;
     COUNTER_DATA ADFSPasswordChangeRequestsSuccess;
     COUNTER_DATA ADFSPasswordChangeRequestsFailure;
     COUNTER_DATA ADFSSAMLPTokenRequests;
@@ -158,16 +157,22 @@ struct adfs_certificate {
 } adfs = {
     .charts_created = false,
 
+    // AD/ADFS
     .st_adfs_login_connection_failures = NULL,
-    .st_adfs_certificate_authentications_total = NULL,
+
+    // DB Artifacts
     .st_adfs_db_artifact_failure_total = NULL,
     .st_adfs_db_artifact_query_time_seconds_total = NULL,
+
+    // DB Config
     .st_adfs_db_config_failures = NULL,
     .st_adfs_db_config_query_time_seconds_total = NULL,
+
     .st_adfs_device_authentications_total = NULL,
     .st_adfs_external_authentications = NULL,
     .st_adfs_federated_authentications = NULL,
     .st_adfs_federation_metadata_requests_total = NULL,
+    .st_adfs_certificate_authentications_total = NULL,
     .st_adfs_oauth_authorization_requests_total = NULL,
     .st_adfs_oauth_client_authentications = NULL,
     .st_adfs_oauth_client_credentials_requests = NULL,
@@ -219,12 +224,11 @@ struct adfs_certificate {
     .ADFSSSOAuthenticationsSuccess.key = "SSO Authentication Failures",
     .ADFSPassportAuthentications.key = "Microsoft Passport Authentications",
     .ADFSSSOAuthenticationsFailure.key = "SSO Authentications",
-    .ADFSTokenRequests.key = "Token Requests", .ADFSUserPasswordAuthenticationsSuccess.key = "SSO Authentications",
+    .ADFSTokenRequests.key = "Token Requests",
+    .ADFSUserPasswordAuthenticationsSuccess.key = "SSO Authentications",
     .ADFSUserPasswordAuthenticationsFailure.key = "SSO Authentication Failures",
     .ADFSWindowsIntegratedAuthentications.key = "Windows Integrated Authentications",
-    .ADFSWSFedTokenRequestsSuccess.key = "WS-Fed Token Requests"
-}
-;
+    .ADFSWSFedTokenRequestsSuccess.key = "WS-Fed Token Requests"};
 
 static void initialize(void)
 {
@@ -330,7 +334,7 @@ void netdata_adfs_db_artifacts_failure(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
     rrdset_done(adfs.st_adfs_db_artifact_failure_total);
 }
 
-void netdata_adfs_db_artifact_query_time_seconds(
+void netdata_adfs_db_artifacts_query_time_seconds(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     int update_every)
@@ -363,6 +367,73 @@ void netdata_adfs_db_artifact_query_time_seconds(
         adfs.rd_adfs_db_artifact_query_time_seconds_total,
         (collected_number)adfs.ADFSDBArtifactQueryTimeSeconds.current.Data);
     rrdset_done(adfs.st_adfs_db_artifact_query_time_seconds_total);
+}
+
+void netdata_adfs_db_config_failure(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSDBConfigFailures)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_db_config_failures) {
+        adfs.st_adfs_db_config_failures = rrdset_create_localhost(
+            "adfs",
+            "db_config_failures",
+            NULL,
+            "db config",
+            "adfs.db_config_failures",
+            "Connection failures to the configuration database",
+            "failures/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_DB_CONFIG_FAILURE_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_db_config_failures =
+            rrddim_add(adfs.st_adfs_db_config_failures, "connection", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_db_config_failures,
+        adfs.rd_adfs_db_config_failures,
+        (collected_number)adfs.ADFSDBConfigFailures.current.Data);
+    rrdset_done(adfs.st_adfs_db_config_failures);
+}
+
+void netdata_adfs_db_config_query_time_seconds(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSDBConfigQueryTimeSeconds)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_db_config_query_time_seconds_total) {
+        adfs.st_adfs_db_config_query_time_seconds_total = rrdset_create_localhost(
+            "adfs",
+            "db_config_query_time_seconds",
+            NULL,
+            "db config",
+            "adfs.db_config_query_time_seconds",
+            "Time taken for a configuration database query",
+            "seconds/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_DB_CONFIG_QUERY_TYME_SECONDS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_db_config_query_time_seconds_total = rrddim_add(
+            adfs.st_adfs_db_config_query_time_seconds_total, "query_time", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_db_config_query_time_seconds_total,
+        adfs.rd_adfs_db_config_query_time_seconds_total,
+        (collected_number)adfs.ADFSDBConfigQueryTimeSeconds.current.Data);
+    rrdset_done(adfs.st_adfs_db_config_query_time_seconds_total);
 }
 
 void netdata_adfs_device_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
@@ -445,19 +516,24 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
     if (!pObjectType)
         return false;
 
-    static void (*doADFS[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
-        netdata_adfs_login_connection_failures,
+    static void (*doADFS[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {// ADFS/AD
+                                                                           netdata_adfs_login_connection_failures,
 
-        netdata_adfs_db_artifacts_failure,
-        netdata_adfs_db_artifact_query_time_seconds,
+                                                                           // DB Artifacts
+                                                                           netdata_adfs_db_artifacts_failure,
+                                                                           netdata_adfs_db_artifacts_query_time_seconds,
 
-        netdata_adfs_device_authentications,
-        netdata_adfs_external_authentications,
+                                                                           // DB Config
+                                                                           netdata_adfs_db_config_failure,
+                                                                           netdata_adfs_db_config_query_time_seconds,
 
-        netdata_adfs_certificate_authentications,
+                                                                           // Auth
+                                                                           netdata_adfs_device_authentications,
+                                                                           netdata_adfs_external_authentications,
+                                                                           netdata_adfs_certificate_authentications,
 
-        // This must be the end
-        NULL};
+                                                                           // This must be the end
+                                                                           NULL};
     return true;
 }
 
