@@ -100,7 +100,7 @@ int help(int exitcode) {
 
     fprintf(stream, "%s", "\n"
             " ^\n"
-            " |.-.   .-.   .-.   .-.   .  netdata                                         \n"
+            " |.-.   .-.   .-.   .-.   .  Netdata                                         \n"
             " |   '-'   '-'   '-'   '-'   X-Ray Vision for your infrastructure!           \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
