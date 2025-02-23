@@ -46,7 +46,7 @@ Netdata is a high-performance observability platform designed to simplify modern
 - **Advanced Visualization**: Rich, interactive dashboard for deep system insights and rapid troubleshooting.
 - **Extreme Scalability**: Native horizontal scalability, while maintaining performance and ease of use.
 - **Complete Visibility**: From infrastructure to applications, logs to metrics, all in one solution.
-- **Edge-Based**: Process and store metrics at the edge for superior performance and cost efficiency.
+- **Edge-Based**: All processing and storage of your data, at your premises.
 
 ---
 
