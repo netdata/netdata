@@ -120,7 +120,7 @@ AutoReqProv: yes
 # Filter known bogus deps that would be caught by AutoReqProv.
 %global __requires_exclude_from ^%{_libdir}/%{name}/system/.*$
 
-Summary:	netdata - X-Ray Vision for your infrastructure!
+Summary:	Netdata - X-Ray Vision for your infrastructure!
 Name:		netdata
 Version:	%{version}
 Release:	1%{?dist}
