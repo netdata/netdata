@@ -38,6 +38,9 @@ ENUM_STR_DEFINE_FUNCTIONS(DAEMON_OS_TYPE, DAEMON_OS_TYPE_UNKNOWN, "unknown");
 static DAEMON_STATUS_FILE last_session_status = { 0 };
 static DAEMON_STATUS_FILE session_status = { 0 };
 
+// --------------------------------------------------------------------------------------------------------------------
+// json generation
+
 static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->timestamp_ut, true); // ECS
     buffer_json_member_add_uint64(wb, "version", 1); // custom
@@ -110,6 +113,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// json parsing
 
 static bool daemon_status_file_from_json_cache_dir(json_object *jobj, const char *path, DAEMON_STATUS_FILE *ds, BUFFER *error, bool required) {
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->var_cache.total_bytes, error, required);
@@ -198,6 +204,9 @@ static bool daemon_status_file_from_json(json_object *jobj, const char *path, vo
     return true;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// get the current status
+
 static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     usec_t now_ut = now_realtime_usec();
 
@@ -268,106 +277,177 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     return session_status;
 }
 
-DAEMON_STATUS_FILE daemon_status_file_load(void) {
-    DAEMON_STATUS_FILE status = {
-        .boottime = 0,
-        .uptime = 0,
-        .timestamp_ut = 0,
-        .invocation = UUID_ZERO,
-        .exit_reason = EXIT_REASON_NONE,
-        .status = DAEMON_STATUS_NONE,
-    };
+// --------------------------------------------------------------------------------------------------------------------
+// file helpers
 
-    char filename[FILENAME_MAX];
+// List of fallback directories to try
+static const char *status_file_fallbacks[] = {
+    "/tmp",
+    "/run",
+    "/var/run",
+};
+
+static bool check_status_file(const char *directory, char *filename, size_t filename_size, time_t *mtime) {
+    if(!directory || !*directory)
+        return false;
+
+    snprintfz(filename, filename_size, "%s/%s", directory, STATUS_FILENAME);
+
+    // Get file metadata
+    OS_FILE_METADATA metadata = os_get_file_metadata(filename);
+    if (!OS_FILE_METADATA_OK(metadata))
+        return false;
+
+    *mtime = metadata.modified_time;
+    return true;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// load a saved status
+
+static bool load_status_file(const char *filename, DAEMON_STATUS_FILE *status) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp)
+        return false;
+
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     CLEAN_BUFFER *error = buffer_create(0, NULL);
 
-    const char *run_dir = os_run_dir(true);
+    // Get file size
+    fseek(fp, 0, SEEK_END);
+    long file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
 
-    for(size_t x = 0; x < 2 ;x++) {
-        if(x == 0)
-            snprintfz(filename, sizeof(filename), "%s/%s", run_dir, STATUS_FILENAME);
-        else
-            snprintfz(filename, sizeof(filename), "%s/%s", netdata_configured_cache_dir, STATUS_FILENAME);
+    // Read the file
+    buffer_need_bytes(wb, file_size + 1);
+    size_t read_bytes = fread(wb->buffer, 1, file_size, fp);
+    fclose(fp);
 
-        FILE *fp = fopen(filename, "r");
-        if (fp) {
-            fseek(fp, 0, SEEK_END);
-            long file_size = ftell(fp);
-            fseek(fp, 0, SEEK_SET);
+    if (read_bytes == 0)
+        return false;
 
-            buffer_need_bytes(wb, file_size + 1);
+    wb->buffer[read_bytes] = '\0';
+    wb->len = read_bytes;
 
-            size_t read_bytes = fread(wb->buffer, 1, file_size, fp);
-            fclose(fp);
+    // Parse the JSON
+    return json_parse_payload_or_error(wb, error, daemon_status_file_from_json, status) == HTTP_RESP_OK;
+}
 
-            wb->buffer[read_bytes] = '\0';
-            wb->len = read_bytes;
+DAEMON_STATUS_FILE daemon_status_file_load(void) {
+    DAEMON_STATUS_FILE status = {0};
+    char newest_filename[FILENAME_MAX] = "";
+    char current_filename[FILENAME_MAX];
+    time_t newest_mtime = 0, current_mtime;
 
-            buffer_flush(error);
-            memset(&status, 0, sizeof(status));
-
-            if(json_parse_payload_or_error(wb, error, daemon_status_file_from_json, &status) == HTTP_RESP_OK)
-                break;
-            else
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot parse status file '%s': %s", filename, buffer_tostring(error));
-        }
-        else
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open status file for reading '%s'", filename);
+    // Check primary directory first
+    if(check_status_file(netdata_configured_cache_dir, current_filename, sizeof(current_filename), &current_mtime)) {
+        strncpyz(newest_filename, current_filename, sizeof(newest_filename) - 1);
+        newest_mtime = current_mtime;
     }
 
+    // Check each fallback location
+    for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
+        if(check_status_file(status_file_fallbacks[i], current_filename, sizeof(current_filename), &current_mtime) &&
+            (!*newest_filename || current_mtime > newest_mtime)) {
+            strncpyz(newest_filename, current_filename, sizeof(newest_filename) - 1);
+            newest_mtime = current_mtime;
+        }
+    }
+
+    // Load the newest file found
+    if(*newest_filename) {
+        if(!load_status_file(newest_filename, &status))
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to load newest status file: %s", newest_filename);
+    }
+    else
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
+
     return status;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// save the current status
+
+static bool save_status_file(const char *directory, const char *content, size_t content_size) {
+    if(!directory || !*directory)
+        return false;
+
+    char filename[FILENAME_MAX];
+    char temp_filename[FILENAME_MAX];
+
+    snprintfz(filename, sizeof(filename), "%s/%s", directory, STATUS_FILENAME);
+    snprintfz(temp_filename, sizeof(temp_filename), "%s/%s", directory, STATUS_FILENAME_TMP);
+
+    FILE *fp = fopen(temp_filename, "w");
+    if (!fp)
+        return false;
+
+    bool ok = fwrite(content, 1, content_size, fp) == content_size;
+    fclose(fp);
+
+    if (!ok) {
+        unlink(filename);
+        unlink(temp_filename);
+        return false;
+    }
+
+    if (chmod(temp_filename, 0664) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot set permissions on status file '%s'", temp_filename);
+        unlink(temp_filename);
+        return false;
+    }
+
+    if (rename(temp_filename, filename) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot rename status file '%s' to '%s'", temp_filename, filename);
+        unlink(temp_filename);
+        return false;
+    }
+
+    return true;
 }
 
 void daemon_status_file_save(DAEMON_STATUS status) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
 
+    // Get current status
     DAEMON_STATUS_FILE ds = daemon_status_file_get(status);
 
+    // Prepare JSON content
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     daemon_status_file_to_json(wb, &ds);
     buffer_json_finalize(wb);
 
-    const char *run_dir = os_run_dir(true);
+    const char *content = buffer_tostring(wb);
+    size_t content_size = buffer_strlen(wb);
 
-    char filename[FILENAME_MAX];
-    char temp_filename[FILENAME_MAX];
-    for (size_t x = 0; x < 2 ; x++) {
-        if(x == 0) {
-            snprintfz(filename, sizeof(filename), "%s/%s", run_dir, STATUS_FILENAME);
-            snprintfz(temp_filename, sizeof(temp_filename), "%s/%s", run_dir, STATUS_FILENAME_TMP);
-        }
-        else {
-            snprintfz(filename, sizeof(filename), "%s/%s", netdata_configured_cache_dir, STATUS_FILENAME);
-            snprintfz(temp_filename, sizeof(temp_filename), "%s/%s", netdata_configured_cache_dir, STATUS_FILENAME_TMP);
-        }
+    // Try primary directory first
+    bool saved = false;
+    if (save_status_file(netdata_configured_cache_dir, content, content_size))
+        saved = true;
+    else {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "Failed to save status file in primary directory %s",
+               netdata_configured_cache_dir);
 
-        FILE *fp = fopen(temp_filename, "w");
-        if (fp) {
-            bool ok = fwrite(buffer_tostring(wb), 1, buffer_strlen(wb), fp) == buffer_strlen(wb);
-            fclose(fp);
-
-            if (ok) {
-                if(chmod(temp_filename, 0664) != 0)
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot set permissions on status file '%s'", temp_filename);
-
-                if(rename(temp_filename, filename) != 0)
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot rename status file '%s' to '%s'", temp_filename, filename);
-            }
-            else {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot write status file '%s'", temp_filename);
-                (void)unlink(filename);
-                (void)unlink(temp_filename);
+        // Try each fallback directory until successful
+        for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
+            if(save_status_file(status_file_fallbacks[i], content, content_size)) {
+                nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_fallbacks[i]);
+                saved = true;
+                break;
             }
         }
-        else
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open status file for writing '%s'", temp_filename);
     }
+
+    if (!saved)
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to save status file in any location");
 
     spinlock_unlock(&spinlock);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// POST the last status to agent-events
 
 struct post_status_file_thread_data {
     const char *cause;
@@ -413,6 +493,9 @@ void *post_status_file_thread(void *ptr) {
     freez(d);
     return NULL;
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// check last status on startup and post crash report
 
 void daemon_status_file_check_crash(void) {
     last_session_status = daemon_status_file_load();
@@ -545,6 +628,9 @@ bool daemon_status_file_has_last_crashed(void) {
 bool daemon_status_file_was_incomplete_shutdown(void) {
     return last_session_status.status == DAEMON_STATUS_EXITING;
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// ng_log() hook for receiving fatal message information
 
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *stack_trace, long line) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
