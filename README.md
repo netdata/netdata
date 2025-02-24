@@ -60,7 +60,7 @@ Netdata is a high-performance, open-source observability platform designed for r
   
 - **Long-Term Retention**
 
-  High-performance and efficient tiered storage for years of retention and faster query responses.
+  High-performance and efficient tiered storage for years of retention and fast query responses.
 
   > **Unique**: Netdata needs ~0.5 per sample on disk, offering superb compression for high-resolution data!<br/>
   > **Unique**: Netdata's tiered storage engine automatically downsamples old data for archiving, long term retention and capacity planning.
