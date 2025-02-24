@@ -1476,6 +1476,78 @@ void pulse_dbengine_do(bool extended) {
         rrdset_done(st_query_timings_average);
     }
 
+    {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_journal_index_lookups = NULL;
+        static RRDDIM *rd_journal_index_uuid_lookup_hits = NULL;
+        static RRDDIM *rd_journal_index_uuid_lookup_misses = NULL;
+        static RRDDIM *rd_journal_index_page_entries_scanned = NULL;
+        static RRDDIM *rd_journal_index_page_entries_matched = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost(
+                "netdata",
+                "dbengine_index_lookups",
+                NULL,
+                "dbengine index",
+                NULL,
+                "Netdata Database Index Lookups",
+                "count/s",
+                "netdata",
+                "pulse",
+                priority,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_LINE);
+
+            rd_journal_index_lookups = rrddim_add(st, "index lookups", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_journal_index_uuid_lookup_hits = rrddim_add(st, "uuid lookup hits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_journal_index_uuid_lookup_misses = rrddim_add(st, "uuid lookup misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_journal_index_page_entries_scanned = rrddim_add(st, "page entries scanned", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_journal_index_page_entries_matched = rrddim_add(st, "page entries matched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st, rd_journal_index_lookups, (collected_number)cache_efficiency_stats.journal_index_lookups);
+        rrddim_set_by_pointer(st, rd_journal_index_uuid_lookup_hits, (collected_number)cache_efficiency_stats.journal_index_uuid_lookup_hits);
+        rrddim_set_by_pointer(st, rd_journal_index_uuid_lookup_misses, (collected_number)cache_efficiency_stats.journal_index_uuid_lookup_misses);
+        rrddim_set_by_pointer(st, rd_journal_index_page_entries_scanned, (collected_number)cache_efficiency_stats.journal_index_page_entries_scanned);
+        rrddim_set_by_pointer(st, rd_journal_index_page_entries_matched, (collected_number)cache_efficiency_stats.journal_index_page_entries_matched);
+        rrdset_done(st);
+    }
+
+    {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd[MAX_CHAIN_HISTOGRAM] = { NULL };
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost(
+                "netdata",
+                "dbengine_index_chain_lengths",
+                NULL,
+                "dbengine index",
+                NULL,
+                "Netdata Database Index Metric Chain Lengths",
+                "count",
+                "netdata",
+                "pulse",
+                priority,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_HEATMAP);
+
+            for (size_t i = 0; i != MAX_CHAIN_HISTOGRAM; i++) {
+                char buf[64];
+                snprintfz(buf, 64 - 1, "n_%zu", i);
+                rd[i] = rrddim_add(st, buf, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+        }
+        priority++;
+
+        for (size_t i = 0; i != MAX_CHAIN_HISTOGRAM; i++) {
+            rrddim_set_by_pointer(st, rd[i], (collected_number)cache_efficiency_stats.journal_index_metric_hash_table_chain_length_histogram[i]);
+        }
+        rrdset_done(st);
+    }
+
     if(netdata_rwlock_tryrdlock(&rrd_rwlock) == 0) {
         priority = 135400;
 
