@@ -73,6 +73,8 @@ RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
 void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
 
+uint16_t rrddim_collection_modulo(RRDSET *st, uint32_t spread);
+
 #define rrdset_find_localhost(id) rrdset_find(localhost, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_localhost(const char *id) {

@@ -24,7 +24,7 @@ void sender_host_buffer_free(RRDHOST *host) {
 }
 
 // Collector thread starting a transmission
-BUFFER *sender_commit_start_with_trace(struct sender_state *s, struct sender_buffer *commit, const char *func) {
+static BUFFER *sender_commit_start_with_trace(struct sender_state *s, struct sender_buffer *commit, size_t default_size, const char *func) {
     if(unlikely(commit->used))
         fatal("STREAM SND '%s' [to %s]: thread buffer is used multiple times concurrently (%u). "
               "It is already being used by '%s()', and now is called by '%s()'",
@@ -39,14 +39,14 @@ BUFFER *sender_commit_start_with_trace(struct sender_state *s, struct sender_buf
               commit->receiver_tid, gettid_cached(), func ? func : "(null)");
 
     if(unlikely(commit->wb &&
-                 commit->wb->size > THREAD_BUFFER_INITIAL_SIZE &&
+                 commit->wb->size > default_size &&
                  commit->our_recreates != commit->sender_recreates)) {
         buffer_free(commit->wb);
         commit->wb = NULL;
     }
 
     if(unlikely(!commit->wb)) {
-        commit->wb = buffer_create(THREAD_BUFFER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_streaming);
+        commit->wb = buffer_create(default_size, &netdata_buffers_statistics.buffers_streaming);
         commit->our_recreates = commit->sender_recreates;
     }
 
@@ -58,12 +58,12 @@ BUFFER *sender_commit_start_with_trace(struct sender_state *s, struct sender_buf
     return commit->wb;
 }
 
-BUFFER *sender_thread_buffer_with_trace(struct sender_state *s, const char *func) {
-    return sender_commit_start_with_trace(s, &commit___thread, func);
+BUFFER *sender_thread_buffer_with_trace(struct sender_state *s, size_t default_size, const char *func) {
+    return sender_commit_start_with_trace(s, &commit___thread, default_size, func);
 }
 
 BUFFER *sender_host_buffer_with_trace(struct rrdhost *host, const char *func) {
-    return sender_commit_start_with_trace(host->sender, &host->stream.snd.commit, func);
+    return sender_commit_start_with_trace(host->sender, &host->stream.snd.commit, HOST_THREAD_BUFFER_INITIAL_SIZE, func);
 }
 
 // Collector thread finishing a transmission

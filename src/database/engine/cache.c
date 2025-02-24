@@ -401,7 +401,7 @@ static ssize_t cache_usage_per1000(PGC *cache, int64_t *size_to_evict) {
     if(cache->config.out_of_memory_protection_bytes) {
         // out of memory protection
         OS_SYSTEM_MEMORY sm = os_system_memory(false);
-        if(sm.ram_total_bytes) {
+        if(OS_SYSTEM_MEMORY_OK(sm)) {
             // when the total exists, ram_available_bytes is also right
 
             const int64_t ram_available_bytes = (int64_t)sm.ram_available_bytes;
@@ -1042,11 +1042,13 @@ static inline void remove_and_free_page_not_in_any_queue_and_acquired_for_deleti
 static inline bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page) {
     pointer_check(cache, page);
 
+    WAITQ_PRIORITY prio = is_page_clean(page) ? PGC_QUEUE_LOCK_PRIO_EVICTORS : PGC_QUEUE_LOCK_PRIO_COLLECTORS;
+
     page_transition_lock(cache, page);
-    pgc_queue_lock(cache, &cache->clean, PGC_QUEUE_LOCK_PRIO_EVICTORS);
+    pgc_queue_lock(cache, &cache->clean, prio);
 
     // make it clean - it does not have any accesses, so it will be prepended
-    page_set_clean(cache, page, true, true, PGC_QUEUE_LOCK_PRIO_EVICTORS);
+    page_set_clean(cache, page, true, true, prio);
 
     if(!acquired_page_get_for_deletion_or_release_it(cache, page)) {
         pgc_queue_unlock(cache, &cache->clean);
@@ -1055,7 +1057,7 @@ static inline bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache
     }
 
     // remove it from the linked list
-    pgc_queue_del(cache, &cache->clean, page, true, PGC_QUEUE_LOCK_PRIO_EVICTORS);
+    pgc_queue_del(cache, &cache->clean, page, true, prio);
     pgc_queue_unlock(cache, &cache->clean);
     page_transition_unlock(cache, page);
 
@@ -2006,7 +2008,7 @@ PGC *pgc_create(const char *name,
     cache->config.out_of_memory_protection_bytes    = (int64_t)dbengine_out_of_memory_protection;
 
     // partitions
-    if(partitions == 0) partitions  = netdata_conf_cpus();
+    if(partitions == 0) partitions  = netdata_conf_cpus() * 2;
     if(partitions <= 4) partitions  = 4;
     if(partitions > 256) partitions = 256;
     cache->config.partitions        = partitions;
@@ -2288,7 +2290,7 @@ bool pgc_flush_pages(PGC *cache) {
 }
 
 void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_s, size_t additional_bytes) {
-    internal_fatal(!is_page_hot(page) && !netdata_exit,
+    internal_fatal(!is_page_hot(page) && !exit_initiated,
                    "DBENGINE CACHE: end_time_s update on non-hot page");
 
     internal_fatal(end_time_s < __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),

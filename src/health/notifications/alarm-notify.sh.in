@@ -138,7 +138,7 @@ log() {
 
   [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
-  systemd-cat-native --log-as-netdata --newline="--NEWLINE--" <<EOFLOG
+  systemd-cat-native --log-as-netdata <<EOFLOG
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
@@ -166,7 +166,7 @@ ND_ALERT_INFO=${info}
 ND_ALERT_DURATION=${duration}
 ND_REQUEST=${cmd_line}
 MESSAGE_ID=6db0018e83e34320ae2a659d78019fb7
-MESSAGE=[ALERT NOTIFICATION]: ${*//\\n/--NEWLINE--}
+MESSAGE=[ALERT NOTIFICATION]: ${*//$'\n'/\\n}
 
 EOFLOG
   # AN EMPTY LINE IS NEEDED ABOVE

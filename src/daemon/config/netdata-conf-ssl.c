@@ -53,7 +53,7 @@ const char *detect_libcurl_default_ca() {
     return NULL;
 }
 
-static const char *detect_ca_path(void) {
+static inline const char *detect_ca_path(void) {
     static const char *paths[] = {
         "/etc/ssl/certs/ca-certificates.crt",               // Debian, Ubuntu, Arch
         "/etc/pki/tls/certs/ca-bundle.crt",                 // RHEL, CentOS, Fedora
@@ -74,6 +74,8 @@ static const char *detect_ca_path(void) {
 }
 
 void netdata_conf_ssl(void) {
+    FUNCTION_RUN_ONCE();
+
     netdata_ssl_initialize_openssl();
 
 #if 0

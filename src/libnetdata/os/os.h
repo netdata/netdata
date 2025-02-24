@@ -32,6 +32,13 @@
 #include "system-maps/cache-host-users-and-groups.h"
 #include "system-maps/cached-sid-username.h"
 #include "windows-perflib/perflib.h"
+#include "disk_space.h"
+#include "file_metadata.h"
+#include "process_path.h"
+#include "boottime.h"
+#include "boot_id.h"
+#include "run_dir.h"
+#include "file_lock.h"
 
 // this includes windows.h to the whole of netdata
 // so various conflicts arise

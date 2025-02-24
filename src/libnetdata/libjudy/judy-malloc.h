@@ -12,4 +12,6 @@ struct aral_statistics *judy_aral_statistics(void);
 void JudyAllocThreadPulseReset(void);
 int64_t JudyAllocThreadPulseGetAndReset(void);
 
+void libjudy_malloc_init(void);
+
 #endif //NETDATA_JUDY_MALLOC_H

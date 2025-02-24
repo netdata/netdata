@@ -4,9 +4,7 @@
 #include "daemon/common.h"
 
 bool netdata_conf_load(char *filename, char overwrite_used, const char **user) {
-    static bool run = false;
-    if(run) return false;
-    run = true;
+    FUNCTION_RUN_ONCE_RET(false);
 
     errno_clear();
 
@@ -35,6 +33,7 @@ bool netdata_conf_load(char *filename, char overwrite_used, const char **user) {
     }
 
     netdata_conf_backwards_compatibility();
+    netdata_conf_section_directories();
     netdata_conf_section_global_run_as_user(user);
     libuv_initialize();
     return ret;

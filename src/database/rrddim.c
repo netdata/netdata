@@ -2,6 +2,7 @@
 
 #include "rrd.h"
 #include "storage-engine.h"
+#include "rrddim-collection.h"
 
 void rrddim_metadata_updated(RRDDIM *rd) {
     rrdcontext_updated_rrddim(rd);
@@ -115,8 +116,13 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t initialized = 0;
         for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             if (rd->tiers[tier].smh) {
+                uint32_t tier_update_every = st->rrdhost->db[tier].tier_grouping * st->update_every;
+
+                rd->tiers[tier].last_completed_point_flush_modulo = rrddim_collection_modulo(st, tier_update_every);
+
                 rd->tiers[tier].sch =
-                        storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
+                        storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, tier_update_every, rd->rrdset->smg[tier]);
+
                 initialized++;
             }
         }
@@ -175,11 +181,14 @@ bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
 
     size_t tiers_available = 0, tiers_said_no_retention = 0;
 
-    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers ;tier++) {
         spinlock_lock(&rd->tiers[tier].spinlock);
 
         if(rd->tiers[tier].sch) {
             tiers_available++;
+
+            if(tier > 0)
+                store_metric_at_tier_flush_last_completed(rd, tier, &rd->tiers[tier]);
 
             if (storage_engine_store_finalize(rd->tiers[tier].sch))
                 tiers_said_no_retention++;

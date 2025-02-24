@@ -164,7 +164,7 @@ static cmd_status_t cmd_exit_execute(char *args, char **message)
 
     nd_log_limits_unlimited();
     netdata_log_info("COMMAND: Cleaning up to exit.");
-    netdata_cleanup_and_exit(0, NULL, NULL, NULL);
+    netdata_cleanup_and_exit(EXIT_REASON_CMD_EXIT, NULL, NULL, NULL);
     exit(0);
 
     return CMD_STATUS_SUCCESS;

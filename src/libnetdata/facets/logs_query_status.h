@@ -326,7 +326,8 @@ static inline void lqs_function_help(LOGS_QUERY_STATUS *lqs, BUFFER *wb) {
                    );
 }
 
-static inline bool lqs_request_parse_json_payload(json_object *jobj, const char *path, void *data, BUFFER *error) {
+static inline bool lqs_request_parse_json_payload(json_object *jobj, void *data, BUFFER *error) {
+    const char *path = "";
     struct logs_query_data *qd = data;
     LOGS_QUERY_REQUEST *rq = qd->rq;
     BUFFER *wb = qd->wb;

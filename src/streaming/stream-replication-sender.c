@@ -622,7 +622,7 @@ bool replication_response_execute_finalize_and_send(struct replication_query *q,
     // we might want to optimize this by filling a temporary buffer
     // and copying the result to the host's buffer in order to avoid
     // holding the host's buffer lock for too long
-    BUFFER *wb = sender_thread_buffer(host->sender);
+    BUFFER *wb = sender_thread_buffer(host->sender, REPLICATION_THREAD_BUFFER_INITIAL_SIZE);
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN, sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1);
 
@@ -1863,7 +1863,7 @@ void *replication_thread_main(void *ptr) {
 }
 
 int replication_threads_default(void) {
-    int threads = netdata_conf_is_parent() ? (int)MIN(netdata_conf_cpus(), 6) : 1;
+    int threads = netdata_conf_is_parent() ? (int)MAX(netdata_conf_cpus() / 3, 4) : 1;
     threads = FIT_IN_RANGE(threads, 1, MAX_REPLICATION_THREADS);
     return threads;
 }

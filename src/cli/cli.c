@@ -133,7 +133,7 @@ static void connect_cb(uv_connect_t* req, int status)
     (void)req;
     if (status) {
         fprintf(stderr, "uv_pipe_connect(): %s\n", uv_strerror(status));
-        fprintf(stderr, "Make sure the netdata service is running.\n");
+        fprintf(stderr, "Cannot connect to '%s'.\nMake sure the netdata service is running.\n", daemon_pipename());
         exit(-1);
     }
     if (0 == command_string_size) {

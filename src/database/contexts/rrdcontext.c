@@ -93,7 +93,7 @@ ALWAYS_INLINE void rrdcontext_collected_rrdset(RRDSET *st) {
 }
 
 ALWAYS_INLINE void rrdcontext_host_child_disconnected(RRDHOST *host) {
-    rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, false);
+    rrdhost_flag_set(host, RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION);
 }
 
 ALWAYS_INLINE void rrdcontext_host_child_connected(RRDHOST *host) {

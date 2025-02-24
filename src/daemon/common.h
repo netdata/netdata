@@ -90,7 +90,7 @@ extern const char *netdata_configured_host_prefix;
 extern const char *netdata_configured_timezone;
 extern const char *netdata_configured_abbrev_timezone;
 extern int32_t netdata_configured_utc_offset;
-extern int netdata_anonymous_statistics_enabled;
+extern bool netdata_anonymous_statistics_enabled;
 
 extern bool netdata_ready;
 extern time_t netdata_start_time;

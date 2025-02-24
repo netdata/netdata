@@ -79,6 +79,8 @@
 #cmakedefine HAVE_RAND_S
 #cmakedefine HAVE_GETRANDOM
 #cmakedefine HAVE_SYSINFO
+#cmakedefine HAVE_TIMEGM
+#cmakedefine HAVE_TM_GMTOFF
 
 #cmakedefine HAVE_LIBUNWIND
 #cmakedefine HAVE_BACKTRACE
@@ -116,6 +118,7 @@
 #cmakedefine HAVE_FUNC_ATTRIBUTE_NORETURN
 #cmakedefine HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL
 #cmakedefine HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT
+#cmakedefine HAVE_JEMALLOC_ARENA_API
 
 // enabled features
 

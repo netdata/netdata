@@ -268,6 +268,41 @@ if(ENABLE_MIMALLOC)
         netdata_add_mimalloc()
 endif()
 
+option(ENABLE_JEMALLOC "Disable jemalloc allocator" OFF)
+
+if(ENABLE_JEMALLOC)
+    pkg_check_modules(JEMALLOC QUIET jemalloc)
+    if(JEMALLOC_FOUND)
+        # Check if jemalloc has arena API
+        set(CMAKE_REQUIRED_INCLUDES ${JEMALLOC_INCLUDE_DIRS})
+        set(CMAKE_REQUIRED_LIBRARIES ${JEMALLOC_LIBRARIES})
+        check_c_source_compiles("
+            #include <jemalloc/jemalloc.h>
+            int main() {
+                unsigned narenas;
+                size_t sz = sizeof(narenas);
+                mallctl(\"arenas.narenas\", &narenas, &sz, NULL, 0);
+                return 0;
+            }
+        " HAVE_JEMALLOC_ARENA_API)
+
+        if(HAVE_JEMALLOC_ARENA_API)
+            set(ENABLE_JEMALLOC ON CACHE BOOL "Enable jemalloc allocator" FORCE)
+            message(STATUS "Jemalloc found with arena API support - enabling")
+        else()
+            if(ENABLE_JEMALLOC)
+                message(FATAL_ERROR "Jemalloc was found but does not have arena API support")
+            endif()
+            message(STATUS "Jemalloc found but does not have arena API support - disabling")
+        endif()
+    else()
+        if(ENABLE_JEMALLOC)
+            message(FATAL_ERROR "Jemalloc support was explicitly enabled but jemalloc was not found")
+        endif()
+        message(STATUS "Jemalloc not found - disabling")
+    endif()
+endif()
+
 if(ENABLE_PLUGIN_GO)
     include(NetdataGoTools)
 
@@ -449,12 +484,23 @@ check_function_exists(arc4random_uniform HAVE_ARC4RANDOM_UNIFORM)
 check_function_exists(getrandom HAVE_GETRANDOM)
 check_function_exists(sysinfo HAVE_SYSINFO)
 
+check_function_exists(timegm HAVE_TIMEGM)
+
 #
 # check source compilation
 #
 
 include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
+
+check_c_source_compiles("
+#include <time.h>
+int main(void) {
+    struct tm t;
+    (void)t.tm_gmtoff;
+    return 0;
+}
+" HAVE_TM_GMTOFF)
 
 set(CMAKE_REQUIRED_LIBRARIES pthread)
 check_c_source_compiles("
@@ -994,6 +1040,22 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/get_system_pagesize.h
         src/libnetdata/os/hostname.c
         src/libnetdata/os/hostname.h
+        src/libnetdata/exit/exit_initiated.c
+        src/libnetdata/exit/exit_initiated.h
+        src/libnetdata/os/disk_space.c
+        src/libnetdata/os/disk_space.h
+        src/libnetdata/os/file_metadata.c
+        src/libnetdata/os/file_metadata.h
+        src/libnetdata/os/process_path.c
+        src/libnetdata/os/process_path.h
+        src/libnetdata/os/boottime.c
+        src/libnetdata/os/boottime.h
+        src/libnetdata/os/boot_id.c
+        src/libnetdata/os/boot_id.h
+        src/libnetdata/os/run_dir.c
+        src/libnetdata/os/run_dir.h
+        src/libnetdata/os/file_lock.c
+        src/libnetdata/os/file_lock.h
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
@@ -1182,8 +1244,12 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-db-dbengine-retention.h
         src/daemon/pulse/pulse-parents.c
         src/daemon/pulse/pulse-parents.h
+        src/daemon/daemon-status-file.c
+        src/daemon/daemon-status-file.h
         src/daemon/config/netdata-conf-ssl.c
         src/daemon/config/netdata-conf-ssl.h
+        src/daemon/daemon-systemd-watcher.c
+        src/daemon/daemon-systemd-watcher.h
 )
 
 set(H2O_FILES
@@ -2169,6 +2235,13 @@ target_link_libraries(libnetdata PUBLIC judy)
 netdata_add_jsonc_to_target(libnetdata)
 
 netdata_add_libyaml_to_target(libnetdata)
+
+# jemalloc
+if(ENABLE_JEMALLOC)
+    target_link_libraries(libnetdata PUBLIC ${JEMALLOC_LIBRARIES})
+    target_include_directories(libnetdata PUBLIC ${JEMALLOC_INCLUDE_DIRS})
+    target_compile_options(libnetdata PUBLIC ${JEMALLOC_CFLAGS_OTHER})
+endif()
 
 # libunwind
 if(ENABLE_LIBUNWIND)

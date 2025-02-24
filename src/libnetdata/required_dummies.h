@@ -4,13 +4,13 @@
 #define NETDATA_LIB_DUMMIES_H 1
 
 // callback required by fatal()
-void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data)
+void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char *action_result, const char *action_data)
 {
     (void)action;
     (void)action_result;
     (void)action_data;
 
-    exit(ret);
+    exit(reason == EXIT_REASON_FATAL ? 1 : 0);
 }
 
 void rrdset_thread_rda_free(void){}

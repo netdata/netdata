@@ -2,7 +2,8 @@
 
 #include "common.h"
 #include "buildinfo.h"
-#include "daemon/daemon-shutdown-watcher.h"
+#include "daemon-shutdown-watcher.h"
+#include "daemon-status-file.h"
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 
@@ -22,7 +23,7 @@
 #endif
 
 bool unittest_running = false;
-int netdata_anonymous_statistics_enabled;
+bool netdata_anonymous_statistics_enabled = true;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
@@ -228,6 +229,7 @@ int unittest_prepare_rrd(const char **user) {
 }
 
 int netdata_main(int argc, char **argv) {
+    libjudy_malloc_init();
     string_init();
     analytics_init();
 
@@ -749,21 +751,40 @@ int netdata_main(int argc, char **argv) {
 
     // initialize the log files
     nd_log_initialize();
-    {
-        ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_startup_msgid),
-            ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
+    nd_log_register_event_cb(daemon_status_file_register_fatal);
 
-        netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
+    netdata_conf_section_global(); // get hostname, host prefix, profile, etc
+    registry_init(); // for machine_guid, must be after netdata_conf_section_global()
+
+    // initialize thread - this is required before the first nd_thread_create()
+    default_stacksize = netdata_threads_init();
+    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
+    if (default_stacksize < 1 * 1024 * 1024)
+        default_stacksize = 1 * 1024 * 1024;
+
+    // make sure we are the only instance running
+    {
+        const char *run_dir = os_run_dir(true);
+        if(!run_dir) {
+            netdata_log_error("Cannot get/create a run directory.");
+            exit(1);
+        }
+        netdata_log_info("Netdata run directory is '%s'", run_dir);
+
+        char lock_file[FILENAME_MAX];
+        snprintfz(lock_file, sizeof(lock_file), "%s/netdata.lock", run_dir);
+        FILE_LOCK lock = file_lock_get(lock_file);
+        if(!FILE_LOCK_OK(lock)) {
+            netdata_log_error("Cannot get exclusive lock on file '%s'. Is Netdata already running?", lock_file);
+            exit(1);
+        }
     }
 
-    // ----------------------------------------------------------------------------------------------------------------
-    // global configuration
+    // status and crash/update/exit detection
+    exit_initiated_reset();
+    daemon_status_file_check_crash();
 
     netdata_conf_ssl();
-    netdata_conf_section_global();
 
     // Get execution path before switching user to avoid permission issues
     get_netdata_execution_path();
@@ -830,12 +851,6 @@ int netdata_main(int argc, char **argv) {
         // check which threads are enabled and initialize them
 
         delta_startup_time("initialize static threads");
-
-        // setup threads configs
-        default_stacksize = netdata_threads_init();
-        // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
-        if (default_stacksize < 1 * 1024 * 1024)
-            default_stacksize = 1 * 1024 * 1024;
 
         for (i = 0; static_threads[i].name != NULL ; i++) {
             struct netdata_static_thread *st = &static_threads[i];
@@ -909,7 +924,6 @@ int netdata_main(int argc, char **argv) {
 #endif
 
     netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
-    watcher_thread_start();
 
     // init sentry
 #ifdef ENABLE_SENTRY
@@ -936,7 +950,7 @@ int netdata_main(int argc, char **argv) {
 
     // initialize internal registry
     delta_startup_time("initialize registry");
-    registry_init();
+    registry_load();
     cloud_conf_init_after_registry();
     netdata_random_session_id_generate();
 
@@ -945,7 +959,6 @@ int netdata_main(int argc, char **argv) {
 
     delta_startup_time("collecting system info");
 
-    netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = rrdhost_system_info_create();
     rrdhost_system_info_detect(system_info);
 
@@ -966,18 +979,6 @@ int netdata_main(int argc, char **argv) {
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
     }
     abort_on_fatal_enable();
-
-    delta_startup_time("check for incomplete shutdown");
-
-    char agent_crash_file[FILENAME_MAX + 1];
-    char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
-    snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
-    int incomplete_shutdown_detected = (unlink(agent_incomplete_shutdown_file) == 0);
-    snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
-    int crash_detected = (unlink(agent_crash_file) == 0);
-    int fd = open(agent_crash_file, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 444);
-    if (fd >= 0)
-        close(fd);
 
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
@@ -1038,17 +1039,17 @@ int netdata_main(int argc, char **argv) {
 
     analytics_statistic_t start_statistic = { "START", "-",  "-" };
     analytics_statistic_send(&start_statistic);
-    if (crash_detected) {
+    if (daemon_status_file_has_last_crashed()) {
         analytics_statistic_t crash_statistic = { "CRASH", "-",  "-" };
         analytics_statistic_send(&crash_statistic);
     }
-    if (incomplete_shutdown_detected) {
+    if (daemon_status_file_was_incomplete_shutdown()) {
         analytics_statistic_t incomplete_shutdown_statistic = { "INCOMPLETE_SHUTDOWN", "-", "-" };
         analytics_statistic_send(&incomplete_shutdown_statistic);
     }
 
-    //check if ANALYTICS needs to start
-    if (netdata_anonymous_statistics_enabled == 1) {
+    // check if ANALYTICS needs to start
+    if (netdata_anonymous_statistics_enabled) {
         for (i = 0; static_threads[i].name != NULL; i++) {
             if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
                 struct netdata_static_thread *st = &static_threads[i];
@@ -1060,6 +1061,8 @@ int netdata_main(int argc, char **argv) {
     }
 
     webrtc_initialize();
+
+    daemon_status_file_save(DAEMON_STATUS_RUNNING);
     return 10;
 }
 

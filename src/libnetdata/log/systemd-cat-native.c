@@ -545,8 +545,8 @@ static int help(void) {
             "    The parameter --newline=STRING allows setting the string to be replaced\n"
             "    with newlines.\n"
             "\n"
-            "    For example by setting --newline='--NEWLINE--', the program will replace\n"
-            "    all occurrences of --NEWLINE-- with the newline character, within each\n"
+            "    With the default setting of --newline='\\n', the program will replace\n"
+            "    all occurrences of \\n with the newline character, within each\n"
             "    VALUE of the KEY=VALUE lines. Once this this done, the program will\n"
             "    switch the field to the binary Journal Export Format before sending the\n"
             "    log event to systemd-journal.\n"
@@ -741,7 +741,7 @@ int main(int argc, char *argv[]) {
 
     int timeout_ms = 0; // wait forever
     bool log_as_netdata = false;
-    const char *newline = NULL;
+    const char *newline = "\\n";
     const char *namespace = NULL;
     const char *socket = getenv("NETDATA_SYSTEMD_JOURNAL_PATH");
 #ifdef HAVE_LIBCURL

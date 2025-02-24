@@ -11,37 +11,71 @@ static inline time_t tier_next_point_time_s(RRDDIM *rd, struct rrddim_tier *t, t
     return now_s + loop - ((now_s + loop) % loop);
 }
 
-ALWAYS_INLINE_HOT void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
+#define LAST_COMPLETED_POINT_EXISTS(t) (t->last_completed_point.end_time_s != 0)
+
+ALWAYS_INLINE_HOT
+void store_metric_at_tier_flush_last_completed(RRDDIM *rd __maybe_unused, size_t tier, struct rrddim_tier *t) {
+    // when there is no end_time_s we do not have a saved last_completed_point
+    if(!LAST_COMPLETED_POINT_EXISTS(t)) return;
+
+    STORAGE_POINT *sp = &t->last_completed_point;
+    if(likely(!storage_point_is_unset(t->last_completed_point))) {
+        storage_engine_store_metric(
+            t->sch,
+            sp->end_time_s * USEC_PER_SEC,
+            sp->sum,
+            sp->min,
+            sp->max,
+            sp->count,
+            sp->anomaly_count,
+            sp->flags);
+    }
+    else {
+        storage_engine_store_metric(
+            t->sch,
+            sp->end_time_s * USEC_PER_SEC,
+            NAN,
+            NAN,
+            NAN,
+            0,
+            0, SN_FLAG_NONE);
+    }
+
+    rrdset_done_statistics_points_stored_per_tier[tier]++;
+
+    // make the point unset
+    t->last_completed_point.count = 0;      // make it unset
+    t->last_completed_point.end_time_s = 0; // make it not saved
+}
+
+ALWAYS_INLINE_HOT
+void store_metric_at_tier_save_last_completed(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp) {
+    // make sure the last_completed_point is empty
+    store_metric_at_tier_flush_last_completed(rd, tier, t);
+
+    // copy the point
+    t->last_completed_point = sp;
+
+    // set the end_time_s, so that we will know we have saved a last_completed_point
+    t->last_completed_point.end_time_s = t->next_point_end_time_s;
+}
+
+ALWAYS_INLINE_HOT
+void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
+    if(LAST_COMPLETED_POINT_EXISTS(t) && sp.start_time_s % t->last_completed_point_flush_modulo == 0)
+        store_metric_at_tier_flush_last_completed(rd, tier, t);
+
     if (unlikely(!t->next_point_end_time_s))
         t->next_point_end_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
 
     if(unlikely(sp.start_time_s >= t->next_point_end_time_s)) {
         // flush the virtual point, it is done
 
-        if (likely(!storage_point_is_unset(t->virtual_point))) {
+        if (likely(!storage_point_is_unset(t->virtual_point)))
+            store_metric_at_tier_save_last_completed(rd, tier, t, t->virtual_point);
+        else
+            store_metric_at_tier_save_last_completed(rd, tier, t, STORAGE_POINT_UNSET);
 
-            storage_engine_store_metric(
-                t->sch,
-                t->next_point_end_time_s * USEC_PER_SEC,
-                t->virtual_point.sum,
-                t->virtual_point.min,
-                t->virtual_point.max,
-                t->virtual_point.count,
-                t->virtual_point.anomaly_count,
-                t->virtual_point.flags);
-        }
-        else {
-            storage_engine_store_metric(
-                t->sch,
-                t->next_point_end_time_s * USEC_PER_SEC,
-                NAN,
-                NAN,
-                NAN,
-                0,
-                0, SN_FLAG_NONE);
-        }
-
-        rrdset_done_statistics_points_stored_per_tier[tier]++;
         t->virtual_point.count = 0; // make the point unset
         t->next_point_end_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
     }
@@ -73,6 +107,7 @@ ALWAYS_INLINE_HOT void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrdd
     }
 }
 
+NOT_INLINE_HOT
 #ifdef NETDATA_LOG_COLLECTION_ERRORS
 void rrddim_store_metric_with_trace(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags, const char *function) {
 #else // !NETDATA_LOG_COLLECTION_ERRORS

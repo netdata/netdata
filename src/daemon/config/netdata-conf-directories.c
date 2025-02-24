@@ -10,9 +10,7 @@ static const char *get_varlib_subdir_from_config(const char *prefix, const char 
 }
 
 void netdata_conf_section_directories(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     // ------------------------------------------------------------------------
     // get system paths
