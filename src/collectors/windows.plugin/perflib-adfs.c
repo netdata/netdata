@@ -46,17 +46,6 @@ struct adfs_certificate {
     RRDDIM *rd_adfs_oauth_client_authentications_success;
     RRDDIM *rd_adfs_oauth_client_authentications_failure;
 
-    RRDSET *st_adfs_certificate_authentications_total;
-    RRDDIM *rd_adfs_certificate_authentications_total;
-
-    RRDSET *st_adfs_oauth_password_grant_requests;
-    RRDDIM *rd_adfs_oauth_password_grant_requests_success;
-    RRDDIM *rd_adfs_oauth_password_grant_requests_failure;
-
-    RRDSET *st_adfs_user_password_authentications;
-    RRDDIM *rd_adfs_sso_authentications_success;
-    RRDDIM *rd_adfs_sso_authentications_failure;
-
     RRDSET *st_adfs_oauth_client_credentials_requests;
     RRDDIM *rd_adfs_oauth_client_credentials_requests_success;
     RRDDIM *rd_adfs_oauth_client_credentials_requests_failure;
@@ -65,9 +54,20 @@ struct adfs_certificate {
     RRDDIM *rd_adfs_oauth_client_privkey_jwt_authentications_success;
     RRDDIM *rd_adfs_oauth_client_privkey_jwt_authentications_failure;
 
+    RRDSET *st_adfs_certificate_authentications_total;
+    RRDDIM *rd_adfs_certificate_authentications_total;
+
     RRDSET *st_adfs_oauth_client_secret_basic_authentications;
     RRDDIM *rd_adfs_oauth_client_secret_basic_authentications_success;
     RRDDIM *rd_adfs_oauth_client_secret_basic_authentications_failure;
+
+    RRDSET *st_adfs_oauth_password_grant_requests;
+    RRDDIM *rd_adfs_oauth_password_grant_requests_success;
+    RRDDIM *rd_adfs_oauth_password_grant_requests_failure;
+
+    RRDSET *st_adfs_user_password_authentications;
+    RRDDIM *rd_adfs_sso_authentications_success;
+    RRDDIM *rd_adfs_sso_authentications_failure;
 
     RRDSET *st_adfs_oauth_client_secret_post_authentications;
     RRDDIM *rd_adfs_oauth_client_secret_post_authentications_success;
@@ -602,7 +602,7 @@ void netdata_adfs_oauth_authorization_requests(
             "adfs",
             "oauth_authorization_requests",
             NULL,
-            "auth",
+            "oauth",
             "adfs.oauth_authorization_requests",
             "Incoming requests to the OAuth Authorization endpoint",
             "requests/s",
@@ -624,7 +624,52 @@ void netdata_adfs_oauth_authorization_requests(
     rrdset_done(adfs.st_adfs_oauth_authorization_requests_total);
 }
 
-void netdata_adfs_oauth_client_authorizations(
+void netdata_adfs_oauth_client_authentication(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientAuthenticationsSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientAuthenticationsFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_oauth_client_authentications) {
+        adfs.st_adfs_oauth_client_authentications = rrdset_create_localhost(
+            "adfs",
+            "oauth_client_authentications",
+            NULL,
+            "oauth",
+            "adfs.oauth_authorization_requests",
+            "OAuth client authentications",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_OAUTH_CLIENT_AUTHORIZATION_REQUEST,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_oauth_client_authentications_success =
+            rrddim_add(adfs.st_adfs_oauth_client_authentications, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_oauth_client_authentications_failure = rrddim_add(
+            adfs.st_adfs_oauth_client_credentials_requests, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_authentications,
+        adfs.rd_adfs_oauth_client_authentications_success,
+        (collected_number)adfs.ADFSOauthClientAuthenticationsSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_authentications,
+        adfs.rd_adfs_oauth_client_authentications_failure,
+        (collected_number)adfs.ADFSOauthClientAuthenticationsFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_oauth_client_authentications);
+}
+
+void netdata_adfs_oauth_client_credentials_requests(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     int update_every)
@@ -637,22 +682,22 @@ void netdata_adfs_oauth_client_authorizations(
     if (!adfs.st_adfs_oauth_client_credentials_requests) {
         adfs.st_adfs_oauth_client_credentials_requests = rrdset_create_localhost(
             "adfs",
-            "oauth_client_authentications",
+            "oauth_client_credentials_requests",
             NULL,
-            "auth",
-            "adfs.oauth_client_authentications",
-            "OAuth client authentications",
-            "authentications/s",
+            "oauth",
+            "adfs.oauth_client_credentials_requests",
+            "OAuth client credentials requests",
+            "requests/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
-            PRIO_ADFS_OAUTH_CLIENT_AUTHENTICATIONS,
+            PRIO_ADFS_OAUTH_CLIENT_CREDENTIAL_REQUEST,
             update_every,
             RRDSET_TYPE_LINE);
 
         adfs.rd_adfs_oauth_client_credentials_requests_success = rrddim_add(
             adfs.st_adfs_oauth_client_credentials_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-        adfs.rd_adfs_external_authentications_failure = rrddim_add(
+        adfs.rd_adfs_oauth_client_credentials_requests_failure = rrddim_add(
             adfs.st_adfs_oauth_client_credentials_requests, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
@@ -666,7 +711,97 @@ void netdata_adfs_oauth_client_authorizations(
         adfs.rd_adfs_oauth_client_credentials_requests_failure,
         (collected_number)adfs.ADFSOauthClientCredentialsFailure.current.Data);
 
-    rrdset_done(adfs.st_adfs_external_authentications);
+    rrdset_done(adfs.st_adfs_oauth_client_credentials_requests);
+}
+
+void netdata_adfs_oauth_client_privkey_jwt_authentications(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientPrivkeyJwtAuthenticationSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientPrivkeyJwtAuthenticationFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_oauth_client_privkey_jwt_authentications) {
+        adfs.st_adfs_oauth_client_privkey_jwt_authentications = rrdset_create_localhost(
+            "adfs",
+            "oauth_client_privkey_jwt_authentications",
+            NULL,
+            "oauth",
+            "adfs.oauth_client_privkey_jwt_authentications",
+            "OAuth client private key JWT authentications",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_OAUTH_CLIENT_PRV_KEY_JWT_AUTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_oauth_client_privkey_jwt_authentications_success = rrddim_add(
+            adfs.st_adfs_oauth_client_privkey_jwt_authentications, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_oauth_client_privkey_jwt_authentications_failure = rrddim_add(
+            adfs.st_adfs_oauth_client_privkey_jwt_authentications, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_privkey_jwt_authentications,
+        adfs.rd_adfs_oauth_client_privkey_jwt_authentications_success,
+        (collected_number)adfs.ADFSOauthClientPrivkeyJwtAuthenticationSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_privkey_jwt_authentications,
+        adfs.rd_adfs_oauth_client_privkey_jwt_authentications_failure,
+        (collected_number)adfs.ADFSOauthClientPrivkeyJwtAuthenticationFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_oauth_client_privkey_jwt_authentications);
+}
+
+void netdata_adfs_oauth_client_secret_basic_authentications(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientSecretBasicAuthenticationsSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientSecretBasicAuthenticationsFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_oauth_client_secret_basic_authentications) {
+        adfs.st_adfs_oauth_client_secret_basic_authentications = rrdset_create_localhost(
+            "adfs",
+            "oauth_client_secret_basic_authentications",
+            NULL,
+            "oauth",
+            "adfs.oauth_client_secret_basic_authentications",
+            "OAuth client secret basic authentications",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_OAUTH_CLIENT_SECRET_BASIC_AUTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_oauth_client_secret_basic_authentications_success = rrddim_add(
+            adfs.st_adfs_oauth_client_secret_basic_authentications, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_oauth_client_secret_basic_authentications_failure = rrddim_add(
+            adfs.st_adfs_oauth_client_secret_basic_authentications, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_secret_basic_authentications,
+        adfs.rd_adfs_oauth_client_secret_basic_authentications_success,
+        (collected_number)adfs.ADFSOauthClientSecretBasicAuthenticationsSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_secret_basic_authentications,
+        adfs.rd_adfs_oauth_client_secret_basic_authentications_failure,
+        (collected_number)adfs.ADFSOauthClientSecretBasicAuthenticationsFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_oauth_client_secret_basic_authentications);
 }
 
 static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
@@ -696,7 +831,10 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         // OAuth
         netdata_adfs_oauth_authorization_requests,
-        netdata_adfs_oauth_client_authorizations,
+        netdata_adfs_oauth_client_authentication,
+        netdata_adfs_oauth_client_credentials_requests,
+        netdata_adfs_oauth_client_privkey_jwt_authentications,
+        netdata_adfs_oauth_client_secret_basic_authentications,
 
         // This must be the end
         NULL};
