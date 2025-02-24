@@ -148,6 +148,7 @@ struct adfs_certificate {
     COUNTER_DATA ADFSOauthClientWindowsAuthenticationsSuccess;
     COUNTER_DATA ADFSOauthClientWindowsAuthenticationsFailure;
     COUNTER_DATA ADFSOauthLogonCertificateRequestsSuccess;
+    COUNTER_DATA ADFSOauthLogonCertificateRequestsFailure;
     COUNTER_DATA ADFSOauthPasswordGrantRequestsSuccess;
     COUNTER_DATA ADFSOauthPasswordGrantRequestsFailure;
     COUNTER_DATA ADFSOauthTokenRequestsSuccess;
