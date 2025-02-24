@@ -97,16 +97,16 @@ struct adfs_certificate {
     RRDSET *st_adfs_wstrust_token_requests_success_total;
     RRDDIM *rd_adfs_wstrust_token_requests_success_total;
 
-    RRDSET *st_adfs_sso_authentications_success;
-    RRDDIM *rd_adfs_sso_authentications_success_success;
-    RRDDIM *rd_adfs_sso_authentications_success_failure;
+    RRDSET *st_adfs_sso_authentications;
+    RRDDIM *rd_adfs_sso_authentications_success;
+    RRDDIM *rd_adfs_sso_authentications_failure;
 
     RRDSET *st_adfs_token_requests_total;
     RRDDIM *rd_adfs_token_requests_total;
 
     RRDSET *st_adfs_user_password_authentications;
-    RRDDIM *rd_adfs_sso_authentications_success;
-    RRDDIM *rd_adfs_sso_authentications_failure;
+    RRDDIM *rd_adfs_user_password_authentications_success;
+    RRDDIM *rd_adfs_user_password_authentications_failure;
 
     RRDSET *st_adfs_windows_integrated_authentications_total;
     RRDDIM *rd_adfs_windows_integrated_authentications_total;
@@ -134,7 +134,6 @@ struct adfs_certificate {
     COUNTER_DATA ADFSOauthAuthorizationRequests;
     COUNTER_DATA ADFSCertificateAuthentications;
     COUNTER_DATA ADFSOauthClientAuthenticationsSuccess;
-    COUNTER_DATA ADFSSSOAuthenticationsSuccess;
 
     // OAUTH
     COUNTER_DATA ADFSOauthClientAuthenticationsFailure;
@@ -161,6 +160,7 @@ struct adfs_certificate {
     COUNTER_DATA ADFSPasswordChangeRequestsFailure;
     COUNTER_DATA ADFSSAMLPTokenRequests;
     COUNTER_DATA ADFSWSTrustTokenRequestsSuccess;
+    COUNTER_DATA ADFSSSOAuthenticationsSuccess;
     COUNTER_DATA ADFSSSOAuthenticationsFailure;
     COUNTER_DATA ADFSTokenRequests;
     COUNTER_DATA ADFSUserPasswordAuthenticationsSuccess;
@@ -1100,10 +1100,7 @@ void netdata_adfs_passport_authentications_chart(
     rrdset_done(adfs.st_adfs_passport_authentications_total);
 }
 
-void netdata_adfs_password_change_request(
-    PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
-    int update_every)
+void netdata_adfs_password_change_request(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSPasswordChangeRequestsSuccess) ||
         !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSPasswordChangeRequestsFailure)) {
@@ -1145,10 +1142,7 @@ void netdata_adfs_password_change_request(
     rrdset_done(adfs.st_adfs_password_change_requests);
 }
 
-void netdata_adfs_samlp_token_requests(
-    PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
-    int update_every)
+void netdata_adfs_samlp_token_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSSAMLPTokenRequests)) {
         return;
@@ -1169,8 +1163,8 @@ void netdata_adfs_samlp_token_requests(
             update_every,
             RRDSET_TYPE_LINE);
 
-        adfs.rd_adfs_samlp_token_requests_success_total =
-            rrddim_add(adfs.st_adfs_samlp_token_requests_success_total, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        adfs.rd_adfs_samlp_token_requests_success_total = rrddim_add(
+            adfs.st_adfs_samlp_token_requests_success_total, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1181,10 +1175,7 @@ void netdata_adfs_samlp_token_requests(
     rrdset_done(adfs.st_adfs_samlp_token_requests_success_total);
 }
 
-void netdata_adfs_wstrust_token_requests(
-    PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
-    int update_every)
+void netdata_adfs_wstrust_token_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSWSTrustTokenRequestsSuccess)) {
         return;
@@ -1205,16 +1196,204 @@ void netdata_adfs_wstrust_token_requests(
             update_every,
             RRDSET_TYPE_LINE);
 
-        adfs.rd_adfs_samlp_token_requests_success_total =
-            rrddim_add(adfs.st_adfs_wstrust_token_requests_success_total, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        adfs.rd_adfs_wstrust_token_requests_success_total = rrddim_add(
+            adfs.st_adfs_wstrust_token_requests_success_total, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
         adfs.st_adfs_wstrust_token_requests_success_total,
-        adfs.rd_adfs_samlp_token_requests_success_total,
+        adfs.rd_adfs_wstrust_token_requests_success_total,
         (collected_number)adfs.ADFSWSTrustTokenRequestsSuccess.current.Data);
 
     rrdset_done(adfs.st_adfs_wstrust_token_requests_success_total);
+}
+
+void netdata_adfs_sso_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSSSOAuthenticationsSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSSSOAuthenticationsFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_sso_authentications) {
+        adfs.st_adfs_sso_authentications = rrdset_create_localhost(
+            "adfs",
+            "password_change_requests",
+            NULL,
+            "auth",
+            "adfs.password_change_requests",
+            "Password change requests",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_SSO_AUTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_sso_authentications_success =
+            rrddim_add(adfs.st_adfs_sso_authentications, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_sso_authentications_failure =
+            rrddim_add(adfs.st_adfs_sso_authentications, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_sso_authentications,
+        adfs.rd_adfs_sso_authentications_success,
+        (collected_number)adfs.ADFSSSOAuthenticationsSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_sso_authentications,
+        adfs.rd_adfs_sso_authentications_failure,
+        (collected_number)adfs.ADFSSSOAuthenticationsFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_sso_authentications_success);
+}
+
+void netdata_adfs_token_request(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSTokenRequests)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_token_requests_total) {
+        adfs.st_adfs_token_requests_total = rrdset_create_localhost(
+            "adfs",
+            "token_requests",
+            NULL,
+            "requests",
+            "adfs.token_requests",
+            "Token access requests",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_TRUST_TOKEN_SUCCESS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_token_requests_total =
+            rrddim_add(adfs.st_adfs_token_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_token_requests_total,
+        adfs.rd_adfs_token_requests_total,
+        (collected_number)adfs.ADFSTokenRequests.current.Data);
+
+    rrdset_done(adfs.st_adfs_token_requests_total);
+}
+
+void netdata_adfs_user_pass_auth(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSUserPasswordAuthenticationsSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSUserPasswordAuthenticationsFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_user_password_authentications) {
+        adfs.st_adfs_user_password_authentications = rrdset_create_localhost(
+            "adfs",
+            "userpassword_authentications",
+            NULL,
+            "auth",
+            "adfs.userpassword_authentications",
+            "AD U/P authentications",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_USER_PASS_AUTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_user_password_authentications_success =
+            rrddim_add(adfs.st_adfs_user_password_authentications, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_user_password_authentications_failure =
+            rrddim_add(adfs.st_adfs_user_password_authentications, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_user_password_authentications,
+        adfs.rd_adfs_user_password_authentications_success,
+        (collected_number)adfs.ADFSUserPasswordAuthenticationsSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_user_password_authentications,
+        adfs.rd_adfs_user_password_authentications_failure,
+        (collected_number)adfs.ADFSUserPasswordAuthenticationsFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_user_password_authentications);
+}
+
+void netdata_windows_integrated_auth(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSWindowsIntegratedAuthentications)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_windows_integrated_authentications_total) {
+        adfs.st_adfs_windows_integrated_authentications_total = rrdset_create_localhost(
+            "adfs",
+            "windows_integrated_authentications",
+            NULL,
+            "auth",
+            "adfs.windows_integrated_authentications",
+            "Windows integrated authentications using Kerberos or NTLM",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_TRUST_TOKEN_SUCCESS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_windows_integrated_authentications_total = rrddim_add(
+            adfs.st_adfs_windows_integrated_authentications_total,
+            "authentications",
+            NULL,
+            1,
+            1,
+            RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_windows_integrated_authentications_total,
+        adfs.rd_adfs_windows_integrated_authentications_total,
+        (collected_number)adfs.ADFSWindowsIntegratedAuthentications.current.Data);
+
+    rrdset_done(adfs.st_adfs_windows_integrated_authentications_total);
+}
+
+void netdata_wsfed_token_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSWSFedTokenRequestsSuccess)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_wsfed_token_requests_success_total) {
+        adfs.st_adfs_wsfed_token_requests_success_total = rrdset_create_localhost(
+            "adfs",
+            "wsfed_token_requests_success",
+            NULL,
+            "requests",
+            "adfs.wsfed_token_requests_success",
+            "Successful RP token requests over WS-Fed protocol",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_WSFED_TOKEN_REQUESTS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_wsfed_token_requests_success_total = rrddim_add(
+            adfs.st_adfs_wsfed_token_requests_success_total, "authentications", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_wsfed_token_requests_success_total,
+        adfs.rd_adfs_wsfed_token_requests_success_total,
+        (collected_number)adfs.ADFSWSFedTokenRequestsSuccess.current.Data);
+
+    rrdset_done(adfs.st_adfs_wsfed_token_requests_success_total);
 }
 
 static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
@@ -1260,6 +1439,11 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
         netdata_adfs_password_change_request,
         netdata_adfs_samlp_token_requests,
         netdata_adfs_wstrust_token_requests,
+        netdata_adfs_sso_authentications,
+        netdata_adfs_token_request,
+        netdata_adfs_user_pass_auth,
+        netdata_windows_integrated_auth,
+        netdata_wsfed_token_requests,
 
         // This must be the end
         NULL};
