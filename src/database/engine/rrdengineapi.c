@@ -1324,11 +1324,14 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
         extent_list++;
     }
 
-    struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
+    jf_metric_hash_table_t ht = jf_metric_hash_table(j2_header);
+    struct journal_metric_list *metric = jf_metric_hash_table_next(&ht, NULL);
+
     time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
 
     stats->metrics += j2_header->metric_count;
     for (entries = 0; entries < j2_header->metric_count; entries++) {
+        internal_fatal(metric == NULL, "expected a non-null journal file index metric");
 
         struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
         stats->metrics_pages += metric_list_header->entries;
@@ -1368,7 +1371,8 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
 
             descr++;
         }
-        metric++;
+
+        metric = jf_metric_hash_table_next(&ht, metric);
     }
 
     journalfile_v2_data_release(datafile->journalfile);

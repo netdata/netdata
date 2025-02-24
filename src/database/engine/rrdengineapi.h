@@ -218,6 +218,17 @@ struct rrdeng_cache_efficiency_stats {
     PAD64(size_t) datafile_deletion_spin;
     PAD64(size_t) journal_v2_indexing_started;
     PAD64(size_t) metrics_retention_started;
+
+    // journal index
+    PAD64(size_t) journal_index_lookups;
+    PAD64(size_t) journal_index_uuid_lookup_hits;
+    PAD64(size_t) journal_index_uuid_lookup_misses;
+    PAD64(size_t) journal_index_page_entries_scanned;
+    PAD64(size_t) journal_index_page_entries_matched;
+
+    // journal index hash table histogram
+    #define MAX_CHAIN_HISTOGRAM 16
+    PAD64(size_t) journal_index_metric_hash_table_chain_length_histogram[MAX_CHAIN_HISTOGRAM];
 };
 
 typedef enum rrdeng_mem {
