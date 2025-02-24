@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- change the moto and the description of netdata [\#19696](https://github.com/netdata/netdata/pull/19696) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.0 to 9.7.1 in /src/go [\#19693](https://github.com/netdata/netdata/pull/19693) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/docker/docker from 27.5.1+incompatible to 28.0.0+incompatible in /src/go [\#19692](https://github.com/netdata/netdata/pull/19692) ([dependabot[bot]](https://github.com/apps/dependabot))
 - load health config before creating localhost [\#19689](https://github.com/netdata/netdata/pull/19689) ([ktsaou](https://github.com/ktsaou))
@@ -489,7 +490,6 @@
 - fix\(go.d\): unlock job files on quit/restart [\#19153](https://github.com/netdata/netdata/pull/19153) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19152](https://github.com/netdata/netdata/pull/19152) ([netdatabot](https://github.com/netdatabot))
 - build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.0 to 0.2.1 in /src/go [\#19151](https://github.com/netdata/netdata/pull/19151) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump golang.org/x/net from 0.31.0 to 0.32.0 in /src/go [\#19149](https://github.com/netdata/netdata/pull/19149) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
