@@ -558,3 +558,37 @@ void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_
         buffer_json_add_array_item_string(wb, "");
     }
 }
+
+void get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
+    if(ds->read_system_info) return;
+
+    struct rrdhost_system_info tmp = { 0 };
+    struct rrdhost_system_info *ri = (localhost && localhost->system_info) ? localhost->system_info : NULL;
+
+    if(!ri && rrdhost_system_info_detect(&tmp) == 0)
+        ri = &tmp;
+
+    if(!ri) {
+        // nothing we can do, let it be
+        return;
+    }
+
+    freez((char *)ds->architecture);
+    freez((char *)ds->virtualization);
+    freez((char *)ds->container);
+    freez((char *)ds->kernel_version);
+    freez((char *)ds->os_name);
+    freez((char *)ds->os_version);
+    freez((char *)ds->os_id);
+    freez((char *)ds->os_id_like);
+
+    ds->architecture = strdupz(ri->architecture ? ri->architecture : "");
+    ds->virtualization = strdupz(ri->virtualization ? ri->virtualization : "");
+    ds->container = strdupz(ri->container ? ri->container : "");
+    ds->kernel_version = strdupz(ri->kernel_version ? ri->kernel_version : "");
+    ds->os_name = strdupz(ri->host_os_name ? ri->host_os_name : "");
+    ds->os_version = strdupz(ri->host_os_version ? ri->host_os_version : "");
+    ds->os_id = strdupz(ri->host_os_id ? ri->host_os_id : "");
+    ds->os_id_like = strdupz(ri->host_os_id_like ? ri->host_os_id_like : "");
+    ds->read_system_info = true;
+}

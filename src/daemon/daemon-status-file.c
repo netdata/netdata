@@ -71,12 +71,16 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
     buffer_json_member_add_object(wb, "host"); // ECS
     {
+        buffer_json_member_add_string_or_empty(wb, "architecture", ds->architecture); // ECS
+        buffer_json_member_add_string_or_empty(wb, "virtualization", ds->virtualization); // custom
+        buffer_json_member_add_string_or_empty(wb, "container", ds->container); // custom
+        buffer_json_member_add_time_t(wb, "uptime", ds->boottime); // ECS
+
         buffer_json_member_add_object(wb, "boot"); // ECS
         {
             buffer_json_member_add_uuid(wb, "id", ds->boot_id.uuid); // ECS
         }
         buffer_json_object_close(wb);
-        buffer_json_member_add_time_t(wb, "uptime", ds->boottime); // ECS
 
         buffer_json_member_add_object(wb, "memory"); // custom
         if(OS_SYSTEM_MEMORY_OK(ds->memory)) {
@@ -104,6 +108,11 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "os"); // ECS
     {
         buffer_json_member_add_string(wb, "type", DAEMON_OS_TYPE_2str(ds->os_type)); // ECS
+        buffer_json_member_add_string_or_empty(wb, "kernel", ds->kernel_version); // ECS
+        buffer_json_member_add_string_or_empty(wb, "name", ds->os_name); // ECS
+        buffer_json_member_add_string_or_empty(wb, "version", ds->os_version); // ECS
+        buffer_json_member_add_string_or_empty(wb, "family", ds->os_id); // ECS
+        buffer_json_member_add_string_or_empty(wb, "platform", ds->os_id_like); // ECS
     }
     buffer_json_object_close(wb);
 
@@ -158,6 +167,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
     // Parse host object
     JSONC_PARSE_SUBOBJECT(jobj, path, "host", error, required, {
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "architecture", ds->architecture, error, required);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "virtualization", ds->virtualization, error, required);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "container", ds->container, error, required);
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->boottime, error, required);
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "boot", error, required, {
@@ -187,6 +199,11 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     // Parse os object
     JSONC_PARSE_SUBOBJECT(jobj, path, "os", error, required, {
         JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "type", DAEMON_OS_TYPE_2id, ds->os_type, error, required);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "kernel", ds->kernel_version, error, required);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "name", ds->os_name, error, required);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "version", ds->os_version, error, required);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "family", ds->os_id, error, required);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "platform", ds->os_id_like, error, required);
     });
 
     // Parse fatal object
@@ -255,12 +272,32 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
             session_status.host_id = UUID_ZERO;
     }
 
+    // copy items from the old status if they are not set
     if(UUIDiszero(session_status.claim_id))
         session_status.claim_id = last_session_status.claim_id;
     if(UUIDiszero(session_status.node_id))
         session_status.node_id = last_session_status.node_id;
     if(UUIDiszero(session_status.host_id))
         session_status.host_id = last_session_status.host_id;
+    if(!session_status.architecture && last_session_status.architecture)
+        session_status.architecture = strdupz(last_session_status.architecture);
+    if(!session_status.virtualization && last_session_status.virtualization)
+        session_status.virtualization = strdupz(last_session_status.virtualization);
+    if(!session_status.container && last_session_status.container)
+        session_status.container = strdupz(last_session_status.container);
+    if(!session_status.kernel_version && last_session_status.kernel_version)
+        session_status.kernel_version = strdupz(last_session_status.kernel_version);
+    if(!session_status.os_name && last_session_status.os_name)
+        session_status.os_name = strdupz(last_session_status.os_name);
+    if(!session_status.os_version && last_session_status.os_version)
+        session_status.os_version = strdupz(last_session_status.os_version);
+    if(!session_status.os_id && last_session_status.os_id)
+        session_status.os_id = strdupz(last_session_status.os_id);
+    if(!session_status.os_id_like && last_session_status.os_id_like)
+        session_status.os_id_like = strdupz(last_session_status.os_id_like);
+
+    if((session_status.status == DAEMON_STATUS_NONE && !session_status.architecture) || status == DAEMON_STATUS_RUNNING)
+        get_daemon_status_fields_from_system_info(&session_status);
 
     session_status.exit_reason = exit_initiated;
     session_status.profile = nd_profile_detect_and_configure(false);

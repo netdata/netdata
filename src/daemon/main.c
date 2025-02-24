@@ -771,13 +771,13 @@ int netdata_main(int argc, char **argv) {
         }
         netdata_log_info("Netdata run directory is '%s'", run_dir);
 
-        char lock_file[FILENAME_MAX];
-        snprintfz(lock_file, sizeof(lock_file), "%s/netdata.lock", run_dir);
-        FILE_LOCK lock = file_lock_get(lock_file);
-        if(!FILE_LOCK_OK(lock)) {
-            netdata_log_error("Cannot get exclusive lock on file '%s'. Is Netdata already running?", lock_file);
-            exit(1);
-        }
+//        char lock_file[FILENAME_MAX];
+//        snprintfz(lock_file, sizeof(lock_file), "%s/netdata.lock", run_dir);
+//        FILE_LOCK lock = file_lock_get(lock_file);
+//        if(!FILE_LOCK_OK(lock)) {
+//            netdata_log_error("Cannot get exclusive lock on file '%s'. Is Netdata already running?", lock_file);
+//            exit(1);
+//        }
     }
 
     // status and crash/update/exit detection

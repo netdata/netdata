@@ -49,6 +49,16 @@ typedef struct daemon_status_file {
     OS_SYSTEM_MEMORY memory;
     OS_SYSTEM_DISK_SPACE var_cache;
 
+    const char *architecture;   // ECS: host.architecture
+    const char *virtualization;
+    const char *container;
+    const char *kernel_version; // ECS: os.kernel
+    const char *os_name;        // ECS: os.name
+    const char *os_version;     // ECS: os.version
+    const char *os_id;          // ECS: os.family
+    const char *os_id_like;     // ECS: os.platform
+    bool read_system_info;
+
     struct {
         long line;
         const char *filename;
