@@ -33,7 +33,7 @@ find_package(Go "${MIN_GO_VERSION}" REQUIRED)
 
 message(STATUS "Generating OpenTelemetry Collector Builder configuration")
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/release-config.yaml.in"
-               "${CMAKE_BINARY_DIR}/otel-config.yaml"
+               "${CMAKE_BINARY_DIR}/otel-build-config.yaml"
                @ONLY)
 message(STATUS "Generating OpenTelemetry Collector Builder configuration -- Done")
 
@@ -66,7 +66,7 @@ endforeach()
 
 add_custom_command(
   OUTPUT otelcol-plugin/otelcol.plugin
-  COMMAND ${CMAKE_BINARY_DIR}/bin/builder --config=${CMAKE_BINARY_DIR}/otel-config.yaml
+  COMMAND ${CMAKE_BINARY_DIR}/bin/builder --config=${CMAKE_BINARY_DIR}/otel-build-config.yaml
   DEPENDS ${otelcol_deps}
   COMMENT "Building otelcol.plugin"
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"

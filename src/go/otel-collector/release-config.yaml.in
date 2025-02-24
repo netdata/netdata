@@ -2,9 +2,9 @@ dist:
   name: otelcol.plugin
   module: github.com/netdata/netdata/otel-collector
   description: OpenTelemetry Collector Distribution built for Netdata
-  output_path: "@CMAKE_BINARY_DIR@/otel-collector"
-  version: "@NETDATA_VERSION_STRING@"
-  go: "@GO_EXECUTABLE@"
+  output_path: @CMAKE_BINARY_DIR@/otel-collector
+  version: @NETDATA_VERSION_STRING@
+  go: @GO_EXECUTABLE@
   debug_compilation: @DEBUG_BUILD@
 
 receivers:
