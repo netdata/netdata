@@ -61,22 +61,33 @@ struct adfs_certificate {
     RRDDIM *rd_adfs_oauth_client_secret_basic_authentications_success;
     RRDDIM *rd_adfs_oauth_client_secret_basic_authentications_failure;
 
-    RRDSET *st_adfs_oauth_password_grant_requests;
-    RRDDIM *rd_adfs_oauth_password_grant_requests_success;
-    RRDDIM *rd_adfs_oauth_password_grant_requests_failure;
-
-    RRDSET *st_adfs_user_password_authentications;
-    RRDDIM *rd_adfs_sso_authentications_success;
-    RRDDIM *rd_adfs_sso_authentications_failure;
-
     RRDSET *st_adfs_oauth_client_secret_post_authentications;
     RRDDIM *rd_adfs_oauth_client_secret_post_authentications_success;
     RRDDIM *rd_adfs_oauth_client_secret_post_authentications_failure;
 
+    RRDSET *st_adfs_oauth_client_windows_authentications;
+    RRDDIM *rd_adfs_oauth_client_windows_authentications_success_total;
+    RRDDIM *rd_adfs_oauth_client_windows_authentications_failure_total;
+
+    RRDSET *st_adfs_oauth_logon_certificate_requests;
+    RRDDIM *rd_adfs_oauth_logon_certificate_token_requests_success_total;
+    RRDDIM *rd_adfs_oauth_logon_certificate_requests_failure_total;
+
+    RRDSET *st_adfs_oauth_password_grant_requests;
+    RRDDIM *rd_adfs_oauth_password_grant_requests_success;
+    RRDDIM *rd_adfs_oauth_password_grant_requests_failure;
+
+    RRDSET *st_adfs_oauth_token_requests_success;
+    RRDDIM *rd_adfs_token_requests_success_success;
+
+    // Requests
+    RRDSET *st_adfs_user_password_authentications;
+    RRDDIM *rd_adfs_sso_authentications_success;
+    RRDDIM *rd_adfs_sso_authentications_failure;
+
     RRDSET *st_adfs_federated_authentications;
     RRDDIM *rd_adfs_federated_authentications;
 
-    // Requests
     RRDSET *st_adfs_passive_requests_total;
     RRDDIM *rd_adfs_passive_requests_total;
 
@@ -141,6 +152,8 @@ struct adfs_certificate {
     COUNTER_DATA ADFSOauthClientSecretPostAuthenticationsFailure;
     COUNTER_DATA ADFSOauthClientWindowsAuthenticationsSuccess;
     COUNTER_DATA ADFSOauthClientWindowsAuthenticationsFailure;
+    COUNTER_DATA ADFSOauthLogonCertificateRequestsSuccess;
+    COUNTER_DATA ADFSOauthLogonCertificateRequestsFailure;
     COUNTER_DATA ADFSOauthPasswordGrantRequestsSuccess;
     COUNTER_DATA ADFSOauthPasswordGrantRequestsFailure;
     COUNTER_DATA ADFSOauthTokenRequestsSuccess;
@@ -221,6 +234,8 @@ struct adfs_certificate {
     .ADFSOauthClientSecretBasicAuthenticationsFailure.key = "OAuth Client Secret Post Authentication Failures",
     .ADFSOauthClientSecretPostAuthenticationsSuccess.key = "OAuth Client Secret Post Authentication",
     .ADFSOauthClientSecretPostAuthenticationsFailure.key = "OAuth Client Secret Post Authentication Failures",
+    .ADFSOauthLogonCertificateRequestsSuccess.key = "OAuth Logon Certificate Token Requests",
+    .ADFSOauthLogonCertificateRequestsFailure.key = "OAuth Logon Certificate Request Failures",
     .ADFSOauthPasswordGrantRequestsSuccess.key = "OAuth Password Grant Request Failures",
     .ADFSOauthPasswordGrantRequestsFailure.key = "OAuth Password Grant Request",
     .ADFSOauthTokenRequestsSuccess.key = "OAuth Token Requests",
@@ -804,6 +819,222 @@ void netdata_adfs_oauth_client_secret_basic_authentications(
     rrdset_done(adfs.st_adfs_oauth_client_secret_basic_authentications);
 }
 
+void netdata_adfs_oauth_client_secret_post_authentications(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientSecretPostAuthenticationsSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientSecretPostAuthenticationsFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_oauth_client_secret_post_authentications) {
+        adfs.st_adfs_oauth_client_secret_post_authentications = rrdset_create_localhost(
+            "adfs",
+            "oauth_client_secret_post_authentications",
+            NULL,
+            "oauth",
+            "adfs.oauth_client_secret_post_authentications",
+            "OAuth client secret post authentications",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_OAUTH_CLIENT_SECRET_POST_AUTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_oauth_client_secret_post_authentications_success = rrddim_add(
+            adfs.st_adfs_oauth_client_secret_post_authentications, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_oauth_client_secret_post_authentications_failure = rrddim_add(
+            adfs.st_adfs_oauth_client_secret_post_authentications, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_secret_post_authentications,
+        adfs.rd_adfs_oauth_client_secret_post_authentications_success,
+        (collected_number)adfs.ADFSOauthClientSecretPostAuthenticationsSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_secret_post_authentications,
+        adfs.rd_adfs_oauth_client_secret_post_authentications_failure,
+        (collected_number)adfs.ADFSOauthClientSecretPostAuthenticationsFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_oauth_client_secret_post_authentications);
+}
+
+void netdata_adfs_oauth_client_windows_authentications(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientWindowsAuthenticationsSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthClientWindowsAuthenticationsFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_oauth_client_windows_authentications) {
+        adfs.st_adfs_oauth_client_windows_authentications = rrdset_create_localhost(
+            "adfs",
+            "oauth_client_windows_authentications",
+            NULL,
+            "oauth",
+            "adfs.oauth_client_windows_authentications",
+            "OAuth client windows integrated authentications",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_OAUTH_CLIENT_WINDOWS_AUTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_oauth_client_windows_authentications_success_total = rrddim_add(
+            adfs.st_adfs_oauth_client_windows_authentications, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_oauth_client_windows_authentications_failure_total = rrddim_add(
+            adfs.st_adfs_oauth_client_windows_authentications, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_windows_authentications,
+        adfs.rd_adfs_oauth_client_windows_authentications_success_total,
+        (collected_number)adfs.ADFSOauthClientWindowsAuthenticationsSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_client_windows_authentications,
+        adfs.rd_adfs_oauth_client_windows_authentications_failure_total,
+        (collected_number)adfs.ADFSOauthClientWindowsAuthenticationsFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_oauth_client_windows_authentications);
+}
+
+void netdata_adfs_oauth_logon_certificate_request(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthLogonCertificateRequestsSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthLogonCertificateRequestsFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_oauth_logon_certificate_requests) {
+        adfs.st_adfs_oauth_logon_certificate_requests = rrdset_create_localhost(
+            "adfs",
+            "oauth_client_windows_authentications",
+            NULL,
+            "oauth",
+            "adfs.oauth_client_windows_authentications",
+            "OAuth client windows integrated authentications",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_OAUTH_CLIENT_WINDOWS_AUTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_oauth_logon_certificate_token_requests_success_total =
+            rrddim_add(adfs.st_adfs_oauth_logon_certificate_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_oauth_logon_certificate_requests_failure_total =
+            rrddim_add(adfs.st_adfs_oauth_logon_certificate_requests, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_logon_certificate_requests,
+        adfs.rd_adfs_oauth_logon_certificate_token_requests_success_total,
+        (collected_number)adfs.ADFSOauthLogonCertificateRequestsSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_logon_certificate_requests,
+        adfs.rd_adfs_oauth_logon_certificate_requests_failure_total,
+        (collected_number)adfs.ADFSOauthLogonCertificateRequestsFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_oauth_logon_certificate_requests);
+}
+
+void netdata_adfs_oauth_password_grant_requests(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthPasswordGrantRequestsSuccess) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthPasswordGrantRequestsFailure)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_oauth_password_grant_requests) {
+        adfs.st_adfs_oauth_password_grant_requests = rrdset_create_localhost(
+            "adfs",
+            "oauth_client_windows_authentications",
+            NULL,
+            "oauth",
+            "adfs.oauth_client_windows_authentications",
+            "OAuth client windows integrated authentications",
+            "authentications/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_OAUTH_CLIENT_WINDOWS_AUTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_oauth_password_grant_requests_success =
+            rrddim_add(adfs.st_adfs_oauth_password_grant_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        adfs.rd_adfs_oauth_password_grant_requests_failure =
+            rrddim_add(adfs.st_adfs_oauth_password_grant_requests, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_password_grant_requests,
+        adfs.rd_adfs_oauth_password_grant_requests_success,
+        (collected_number)adfs.ADFSOauthPasswordGrantRequestsSuccess.current.Data);
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_password_grant_requests,
+        adfs.rd_adfs_oauth_password_grant_requests_failure,
+        (collected_number)adfs.ADFSOauthPasswordGrantRequestsFailure.current.Data);
+
+    rrdset_done(adfs.st_adfs_oauth_password_grant_requests);
+}
+
+void netdata_adfs_oauth_token_requests_success(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSOauthTokenRequestsSuccess)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_oauth_token_requests_success) {
+        adfs.st_adfs_oauth_token_requests_success = rrdset_create_localhost(
+            "adfs",
+            "oauth_token_requests_success",
+            NULL,
+            "oauth",
+            "adfs.oauth_token_requests_success",
+            "Successful RP token requests over OAuth protocol",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_OAUTH_TOKEN_REQUESTS_SUCCESS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_token_requests_success_success = rrddim_add(
+            adfs.st_adfs_oauth_token_requests_success, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_oauth_token_requests_success,
+        adfs.rd_adfs_token_requests_success_success,
+        (collected_number)adfs.ADFSOauthTokenRequestsSuccess.current.Data);
+
+    rrdset_done(adfs.st_adfs_oauth_token_requests_success);
+}
+
 static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
@@ -835,6 +1066,11 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
         netdata_adfs_oauth_client_credentials_requests,
         netdata_adfs_oauth_client_privkey_jwt_authentications,
         netdata_adfs_oauth_client_secret_basic_authentications,
+        netdata_adfs_oauth_client_secret_post_authentications,
+        netdata_adfs_oauth_client_windows_authentications,
+        netdata_adfs_oauth_logon_certificate_request,
+        netdata_adfs_oauth_password_grant_requests,
+        netdata_adfs_oauth_token_requests_success,
 
         // This must be the end
         NULL};
