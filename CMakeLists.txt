@@ -2924,15 +2924,35 @@ endif()
 # build netdatacli
 #
 
+include(FetchContent)
+include(NetdataFetchContentExtra)
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+        FetchContent_Declare(
+                CLI11
+                GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+                GIT_TAG 6c7b07a878ad834957b98d0f9ce1dbe0cb204fc9 # v2.4.2
+                EXCLUDE_FROM_ALL
+        )
+else()
+        FetchContent_Declare(CLI11
+                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+                GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+                GIT_TAG 6c7b07a878ad834957b98d0f9ce1dbe0cb204fc9 # v2.4.2
+        )
+endif()
+
+FetchContent_MakeAvailable_NoInstall(CLI11)
+
 set(NETDATACLI_FILES
         src/daemon/commands.h
         src/daemon/pipename.c
         src/daemon/pipename.h
-        src/cli/cli.c
+        src/cli/cli.cc
 )
 
 add_executable(netdatacli ${NETDATACLI_FILES} "$<$<BOOL:${OS_WINDOWS}>:${NETDATACLI_RES_FILES}>")
-target_link_libraries(netdatacli libnetdata)
+target_link_libraries(netdatacli libnetdata CLI11)
 
 install(TARGETS netdatacli
         COMPONENT netdata
