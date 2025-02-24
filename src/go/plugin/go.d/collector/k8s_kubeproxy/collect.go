@@ -4,6 +4,7 @@ package k8s_kubeproxy
 
 import (
 	"math"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
@@ -38,8 +39,8 @@ func (c *Collector) collectSyncProxyRulesLatency(raw prometheus.Series, mx *metr
 	latency := &mx.SyncProxyRules.Latency
 
 	for _, metric := range raw.FindByName(metricName) {
-		bucket := metric.Labels.Get("le")
 		value := metric.Value
+		bucket := strings.TrimSuffix(metric.Labels.Get("le"), ".0")
 		switch bucket {
 		case "1000":
 			latency.LE1000.Set(value)
