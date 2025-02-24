@@ -76,8 +76,8 @@ Netdata is a high-performance, open-source observability platform designed for r
 
   Native horizontal scalability, while maintaining performance and ease of use.
 
-  > **Unique**: Simple Parent-Child centralization and native horizontal scalability.
-  > **Unique**: Each Netdata can scale to multi-million samples/s with superb resource utilization.
+  > **Unique**: Simple Parent-Child centralization and native horizontal scalability.<br/>
+  > **Unique**: Each Netdata can scale to multi-million samples/s with reasonable resources utilization.
   
 - **Complete End-to-End Visibility**
 
