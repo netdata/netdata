@@ -10,6 +10,9 @@ struct adfs_certificate {
     RRDSET *st_adfs_login_connection_failures;
     RRDDIM *rd_adfs_login_connection_failures;
 
+    RRDSET *st_adfs_certificate_authentications_total;
+    RRDDIM *rd_adfs_certificate_authentications_total;
+
     // DB Artifacts
     RRDSET *st_adfs_db_artifact_failure_total;
     RRDDIM *rd_adfs_db_artifact_failure_total;
@@ -53,9 +56,6 @@ struct adfs_certificate {
     RRDSET *st_adfs_oauth_client_privkey_jwt_authentications;
     RRDDIM *rd_adfs_oauth_client_privkey_jwt_authentications_success;
     RRDDIM *rd_adfs_oauth_client_privkey_jwt_authentications_failure;
-
-    RRDSET *st_adfs_certificate_authentications_total;
-    RRDDIM *rd_adfs_certificate_authentications_total;
 
     RRDSET *st_adfs_oauth_client_secret_basic_authentications;
     RRDDIM *rd_adfs_oauth_client_secret_basic_authentications_success;
@@ -116,6 +116,7 @@ struct adfs_certificate {
 
     // AD/ADFS
     COUNTER_DATA ADFSLoginConnectionFailure;
+    COUNTER_DATA ADFSCertificateAuthentications;
 
     // DB Artifacts
     COUNTER_DATA ADFSDBArtifactFailures;
@@ -132,10 +133,9 @@ struct adfs_certificate {
     COUNTER_DATA ADFSFederationAuthentications;
     COUNTER_DATA ADFSFederationMetadataAuthentications;
     COUNTER_DATA ADFSOauthAuthorizationRequests;
-    COUNTER_DATA ADFSCertificateAuthentications;
-    COUNTER_DATA ADFSOauthClientAuthenticationsSuccess;
 
     // OAUTH
+    COUNTER_DATA ADFSOauthClientAuthenticationsSuccess;
     COUNTER_DATA ADFSOauthClientAuthenticationsFailure;
     COUNTER_DATA ADFSOauthClientCredentialsSuccess;
     COUNTER_DATA ADFSOauthClientCredentialsFailure;
@@ -148,7 +148,6 @@ struct adfs_certificate {
     COUNTER_DATA ADFSOauthClientWindowsAuthenticationsSuccess;
     COUNTER_DATA ADFSOauthClientWindowsAuthenticationsFailure;
     COUNTER_DATA ADFSOauthLogonCertificateRequestsSuccess;
-    COUNTER_DATA ADFSOauthLogonCertificateRequestsFailure;
     COUNTER_DATA ADFSOauthPasswordGrantRequestsSuccess;
     COUNTER_DATA ADFSOauthPasswordGrantRequestsFailure;
     COUNTER_DATA ADFSOauthTokenRequestsSuccess;
@@ -172,6 +171,7 @@ struct adfs_certificate {
 
     // AD/ADFS
     .st_adfs_login_connection_failures = NULL,
+    .st_adfs_certificate_authentications_total = NULL,
 
     // DB Artifacts
     .st_adfs_db_artifact_failure_total = NULL,
@@ -181,11 +181,11 @@ struct adfs_certificate {
     .st_adfs_db_config_failures = NULL,
     .st_adfs_db_config_query_time_seconds_total = NULL,
 
+    // Auth
     .st_adfs_device_authentications_total = NULL,
     .st_adfs_external_authentications = NULL,
     .st_adfs_federation_authentications = NULL,
     .st_adfs_federation_metadata_authentications = NULL,
-    .st_adfs_certificate_authentications_total = NULL,
 
     // OAuth
     .st_adfs_oauth_authorization_requests_total = NULL,
@@ -194,61 +194,77 @@ struct adfs_certificate {
     .st_adfs_oauth_client_privkey_jwt_authentications = NULL,
     .st_adfs_oauth_client_secret_basic_authentications = NULL,
     .st_adfs_oauth_client_secret_post_authentications = NULL,
+    .st_adfs_oauth_client_windows_authentications = NULL,
+    .st_adfs_oauth_logon_certificate_requests = NULL,
     .st_adfs_oauth_password_grant_requests = NULL,
+    .st_adfs_oauth_token_requests_success = NULL,
 
+    // Requests
     .st_adfs_passive_requests_total = NULL,
     .st_adfs_passport_authentications_total = NULL,
     .st_adfs_password_change_requests = NULL,
     .st_adfs_samlp_token_requests_success_total = NULL,
     .st_adfs_wstrust_token_requests_success_total = NULL,
+    .st_adfs_sso_authentications = NULL,
     .st_adfs_token_requests_total = NULL,
-    .st_adfs_sso_authentications_success = NULL,
+    .st_adfs_user_password_authentications = NULL,
     .st_adfs_windows_integrated_authentications_total = NULL,
     .st_adfs_wsfed_token_requests_success_total = NULL,
 
+    // AD/ADFS
     .ADFSLoginConnectionFailure.key = "AD Login Connection Failures",
     .ADFSCertificateAuthentications.key = "Certificate Authentications",
 
+    // DB Artifacts
     .ADFSDBArtifactFailures.key = "Artifact Database Connection Failures",
     .ADFSDBArtifactQueryTimeSeconds.key = "Average Artifact Database Query Time",
 
+    // DB Config
     .ADFSDBConfigFailures.key = "Configuration Database Connection Failures",
     .ADFSDBConfigQueryTimeSeconds.key = "Average Config Database Query Time",
 
+    // Auth
     .ADFSDeviceAuthentications.key = "Device Authentications",
     .ADFSExternalAuthenticationsSuccess.key = "External Authentications",
     .ADFSExternalAuthenticationsFailure.key = "External Authentication Failures",
     .ADFSFederationAuthentications.key = "Federated Authentications",
     .ADFSFederationMetadataAuthentications.key = "Federation Metadata Requests",
-
     .ADFSOauthAuthorizationRequests.key = "OAuth AuthZ Requests",
+
+    // OAuth
     .ADFSOauthClientAuthenticationsSuccess.key = "OAuth Client Authentications",
     .ADFSOauthClientAuthenticationsFailure.key = "OAuth Client Authentications Failures",
+    .ADFSOauthClientCredentialsSuccess.key = "OAuth Client Credentials Requests",
+    .ADFSOauthClientCredentialsFailure.key = "OAuth Client Credentials Request Failures",
     .ADFSOauthClientPrivkeyJwtAuthenticationSuccess.key = "OAuth Client Private Key Jwt Authentications",
     .ADFSOauthClientPrivkeyJwtAuthenticationFailure.key = "OAuth Client Private Key Jwt Authentication Failures",
     .ADFSOauthClientSecretBasicAuthenticationsSuccess.key = "OAuth Client Secret Post Authentication",
     .ADFSOauthClientSecretBasicAuthenticationsFailure.key = "OAuth Client Secret Post Authentication Failures",
     .ADFSOauthClientSecretPostAuthenticationsSuccess.key = "OAuth Client Secret Post Authentication",
     .ADFSOauthClientSecretPostAuthenticationsFailure.key = "OAuth Client Secret Post Authentication Failures",
+    .ADFSOauthClientWindowsAuthenticationsSuccess.key = "OAuth Client Windows Integrated Authentication",
+    .ADFSOauthClientWindowsAuthenticationsFailure.key = "OAuth Client Windows Integrated Authentication Failures",
     .ADFSOauthLogonCertificateRequestsSuccess.key = "OAuth Logon Certificate Token Requests",
     .ADFSOauthLogonCertificateRequestsFailure.key = "OAuth Logon Certificate Request Failures",
     .ADFSOauthPasswordGrantRequestsSuccess.key = "OAuth Password Grant Request Failures",
     .ADFSOauthPasswordGrantRequestsFailure.key = "OAuth Password Grant Request",
     .ADFSOauthTokenRequestsSuccess.key = "OAuth Token Requests",
+
+    // Requests
     .ADFSPassiveRequests.key = "Passive Requests",
     .ADFSPassportAuthentications.key = "Microsoft Passport Authentications",
     .ADFSPasswordChangeRequestsSuccess.key = "Password Change Successful Requests",
     .ADFSPasswordChangeRequestsFailure.key = "Password Change Failed Requests",
     .ADFSSAMLPTokenRequests.key = "SAML-P Token Requests",
     .ADFSWSTrustTokenRequestsSuccess.key = "WS-Trust Token Requests",
-    .ADFSSSOAuthenticationsSuccess.key = "SSO Authentication Failures",
-    .ADFSPassportAuthentications.key = "Microsoft Passport Authentications",
-    .ADFSSSOAuthenticationsFailure.key = "SSO Authentications",
+    .ADFSSSOAuthenticationsSuccess.key = "SSO Authentications",
+    .ADFSSSOAuthenticationsFailure.key = "SSO Authentication Failures",
     .ADFSTokenRequests.key = "Token Requests",
     .ADFSUserPasswordAuthenticationsSuccess.key = "SSO Authentications",
     .ADFSUserPasswordAuthenticationsFailure.key = "SSO Authentication Failures",
     .ADFSWindowsIntegratedAuthentications.key = "Windows Integrated Authentications",
-    .ADFSWSFedTokenRequestsSuccess.key = "WS-Fed Token Requests"};
+    .ADFSWSFedTokenRequestsSuccess.key = "WS-Fed Token Requests",
+};
 
 static void initialize(void)
 {
@@ -1247,7 +1263,7 @@ void netdata_adfs_sso_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
         adfs.rd_adfs_sso_authentications_failure,
         (collected_number)adfs.ADFSSSOAuthenticationsFailure.current.Data);
 
-    rrdset_done(adfs.st_adfs_sso_authentications_success);
+    rrdset_done(adfs.st_adfs_sso_authentications);
 }
 
 void netdata_adfs_token_request(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
