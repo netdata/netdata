@@ -2397,3 +2397,143 @@ modules:
               chart_type: line
               dimensions:
                 - name: processing_time
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibADFS
+      monitored_instance:
+        name: Active Directory Federation Service
+        link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-fs/ad-fs-overview"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - active directory
+        - adfs
+        - ad
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Active Directory Federation Services statistics.
+        method_description: |
+          It queries 'AD FS' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibADFS
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Federation Service
+          description: "These metrics refer to the Federated Identity and Access Management on host."
+          labels: []
+          metrics:
+            - name: adfs.ad_login_connection_failures
+              description: Connection failures
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: connection
+            - name: adfs.certificate_authentications
+              description: User Certificate authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: authentications
+            - name: adfs.db_artifact_failures
+              description: Connection failures to the artifact database
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: adfs.db_artifact_query_time_seconds
+              description: Time taken for an artifact database query
+              unit: seconds/s
+              chart_type: line
+              dimensions:
+                - name: query_time
+            - name: adfs.db_config_failures
+              description: Connection failures to the configuration database
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: connection
+            - name: adfs.db_config_query_time_seconds
+              description: Time taken for a configuration database query
+              unit: seconds/s
+              chart_type: line
+              dimensions:
+                - name: query_time
+            - name: adfs.device_authentications
+              description: Device authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: authentications
+            - name: adfs.external_authentications
+              description: Authentications from external MFA providers
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failures
+            - name: adfs.federated_authentications
+              description: Authentications from Federated Sources
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: authentications
+            - name: adfs.federation_metadata_requests
+              description: Federation Metadata requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
