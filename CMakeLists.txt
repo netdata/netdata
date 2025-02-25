@@ -3031,7 +3031,7 @@ endif()
 if(ENABLE_PLUGIN_OTEL)
   add_subdirectory(${CMAKE_SOURCE_DIR}/src/go/otel-collector)
 
-  install(PROGRAMS ${CMAKE_BINARY_DIR}/otelcol-plugin/otelcol.plugin
+  install(PROGRAMS ${CMAKE_BINARY_DIR}/otel-collector/otelcol.plugin
           COMPONENT plugin-otelcol
           DESTINATION usr/libexec/netdata/plugins.d)
 endif()

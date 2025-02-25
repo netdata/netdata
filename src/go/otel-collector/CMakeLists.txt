@@ -65,7 +65,7 @@ foreach(dir IN LISTS DIRS)
 endforeach()
 
 add_custom_command(
-  OUTPUT otelcol-plugin/otelcol.plugin
+  OUTPUT otel-collector/otelcol.plugin
   COMMAND ${CMAKE_BINARY_DIR}/bin/builder --config=${CMAKE_BINARY_DIR}/otel-build-config.yaml
   DEPENDS ${otelcol_deps}
   COMMENT "Building otelcol.plugin"
@@ -74,5 +74,5 @@ add_custom_command(
 )
 add_custom_target(
   plugin-otelcol ALL
-  DEPENDS otelcol-plugin/otelcol.plugin
+  DEPENDS otel-collector/otelcol.plugin
 )
