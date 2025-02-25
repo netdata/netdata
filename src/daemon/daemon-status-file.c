@@ -675,7 +675,8 @@ bool daemon_status_file_was_incomplete_shutdown(void) {
 }
 
 void daemon_status_file_startup_step(const char *step) {
-    session_status.fatal.function = step;
+    freez((char *)session_status.fatal.function);
+    session_status.fatal.function = strdupz(step);
     if(step != NULL)
         daemon_status_file_save(DAEMON_STATUS_NONE);
 }
@@ -687,7 +688,8 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
 
-    if(session_status.fatal.filename || session_status.fatal.function || session_status.fatal.message || session_status.fatal.stack_trace) {
+    // do not check the function, because it may have a startup step in it
+    if(session_status.fatal.filename || session_status.fatal.message || session_status.fatal.stack_trace) {
         spinlock_unlock(&spinlock);
         freez((void *)filename);
         freez((void *)function);
@@ -697,6 +699,7 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     }
 
     session_status.fatal.filename = filename;
+    freez((char *)session_status.fatal.function); // it may have a startup step
     session_status.fatal.function = function;
     session_status.fatal.message = message;
     session_status.fatal.stack_trace = stack_trace;
