@@ -296,7 +296,7 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     if(!session_status.os_id_like && last_session_status.os_id_like)
         session_status.os_id_like = strdupz(last_session_status.os_id_like);
 
-    if(status == DAEMON_STATUS_RUNNING)
+    if((session_status.status == DAEMON_STATUS_NONE && !session_status.architecture) || status == DAEMON_STATUS_RUNNING)
         get_daemon_status_fields_from_system_info(&session_status);
 
     session_status.exit_reason = exit_initiated;
@@ -373,7 +373,7 @@ DAEMON_STATUS_FILE daemon_status_file_load(void) {
     char current_filename[FILENAME_MAX];
     time_t newest_mtime = 0, current_mtime;
 
-    // Check primary directory first
+    // Check the primary directory first
     if(check_status_file(netdata_configured_cache_dir, current_filename, sizeof(current_filename), &current_mtime)) {
         strncpyz(newest_filename, current_filename, sizeof(newest_filename) - 1);
         newest_mtime = current_mtime;

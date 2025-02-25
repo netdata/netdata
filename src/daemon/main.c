@@ -784,6 +784,7 @@ int netdata_main(int argc, char **argv) {
 
     // status and crash/update/exit detection
     exit_initiated_reset();
+    netdata_main_spawn_server_init("init", argc, (const char **)argv);
     daemon_status_file_check_crash();
 
     netdata_conf_ssl();
@@ -918,6 +919,8 @@ int netdata_main(int argc, char **argv) {
     (void)dont_fork;
 #endif
 
+    // stop the old server and start a new one under the new permissions
+    netdata_main_spawn_server_cleanup();
     netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
 
     // init sentry
