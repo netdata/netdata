@@ -263,7 +263,7 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     else if(!UUIDiszero(last_session_status.host_id))
         session_status.host_id = last_session_status.host_id;
     else {
-        const char *machine_guid = registry_get_this_machine_guid();
+        const char *machine_guid = registry_get_this_machine_guid(false);
         if(machine_guid && *machine_guid) {
             if (uuid_parse_flexi(machine_guid, session_status.host_id.uuid) != 0)
                 session_status.host_id = UUID_ZERO;
@@ -296,8 +296,7 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     if(!session_status.os_id_like && last_session_status.os_id_like)
         session_status.os_id_like = strdupz(last_session_status.os_id_like);
 
-    if((session_status.status == DAEMON_STATUS_NONE && !session_status.architecture) || status == DAEMON_STATUS_RUNNING)
-        get_daemon_status_fields_from_system_info(&session_status);
+    get_daemon_status_fields_from_system_info(&session_status);
 
     session_status.exit_reason = exit_initiated;
     session_status.profile = nd_profile_detect_and_configure(false);
@@ -673,6 +672,12 @@ bool daemon_status_file_has_last_crashed(void) {
 
 bool daemon_status_file_was_incomplete_shutdown(void) {
     return last_session_status.status == DAEMON_STATUS_EXITING;
+}
+
+void daemon_status_file_startup_step(const char *step) {
+    session_status.fatal.function = step;
+    if(step != NULL)
+        daemon_status_file_save(DAEMON_STATUS_NONE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

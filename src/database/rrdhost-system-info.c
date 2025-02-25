@@ -562,12 +562,7 @@ void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_
 void get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
     if(ds->read_system_info) return;
 
-    struct rrdhost_system_info tmp = { 0 };
     struct rrdhost_system_info *ri = (localhost && localhost->system_info) ? localhost->system_info : NULL;
-
-    if(!ri && rrdhost_system_info_detect(&tmp) == 0)
-        ri = &tmp;
-
     if(!ri) {
         // nothing we can do, let it be
         return;
