@@ -911,6 +911,9 @@ int netdata_main(int argc, char **argv) {
 
     delta_startup_time("become daemon");
 
+    // stop the old server and later start a new one under the new permissions
+    netdata_main_spawn_server_cleanup();
+
 #if defined(OS_LINUX) || defined(OS_MACOS) || defined(OS_FREEBSD)
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
@@ -919,8 +922,6 @@ int netdata_main(int argc, char **argv) {
     (void)dont_fork;
 #endif
 
-    // stop the old server and start a new one under the new permissions
-    netdata_main_spawn_server_cleanup();
     netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
 
     // init sentry
