@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- add host/os fields to status file [\#19704](https://github.com/netdata/netdata/pull/19704) ([ktsaou](https://github.com/ktsaou))
+- under MSYS2 use stat [\#19703](https://github.com/netdata/netdata/pull/19703) ([ktsaou](https://github.com/ktsaou))
+- Document journal v2 index file format. [\#19701](https://github.com/netdata/netdata/pull/19701) ([vkalintiris](https://github.com/vkalintiris))
+- build\(deps\): update go.d packages [\#19700](https://github.com/netdata/netdata/pull/19700) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/sijms/go-ora/v2 from 2.8.23 to 2.8.24 in /src/go [\#19698](https://github.com/netdata/netdata/pull/19698) ([dependabot[bot]](https://github.com/apps/dependabot))
 - change the moto and the description of netdata [\#19696](https://github.com/netdata/netdata/pull/19696) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.0 to 9.7.1 in /src/go [\#19693](https://github.com/netdata/netdata/pull/19693) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/docker/docker from 27.5.1+incompatible to 28.0.0+incompatible in /src/go [\#19692](https://github.com/netdata/netdata/pull/19692) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -62,6 +67,7 @@
 - detect the system ca bundle at runtime [\#19622](https://github.com/netdata/netdata/pull/19622) ([ktsaou](https://github.com/ktsaou))
 - Switch to Ubuntu 22.04 runner images for CI build jobs. [\#19619](https://github.com/netdata/netdata/pull/19619) ([Ferroin](https://github.com/Ferroin))
 - fix\(go.d/mysql\): handle Cpu\_time in microseconds in v11.4.5+ [\#19618](https://github.com/netdata/netdata/pull/19618) ([ilyam8](https://github.com/ilyam8))
+- detect netdata exit reasons [\#19617](https://github.com/netdata/netdata/pull/19617) ([ktsaou](https://github.com/ktsaou))
 - improvement\(health\): clarify clickhouse\_replicated\_readonly\_tables info [\#19616](https://github.com/netdata/netdata/pull/19616) ([ilyam8](https://github.com/ilyam8))
 - fix: correct typo in NetdataCompilerFlags [\#19614](https://github.com/netdata/netdata/pull/19614) ([ilyam8](https://github.com/ilyam8))
 - chore: remove fluentbit.log from Dockerfile [\#19613](https://github.com/netdata/netdata/pull/19613) ([ilyam8](https://github.com/ilyam8))
@@ -484,12 +490,6 @@
 - docs: edit Authentication and Authorization section [\#19160](https://github.com/netdata/netdata/pull/19160) ([Ancairon](https://github.com/Ancairon))
 - Remove Option from Installer \(Windows\) [\#19159](https://github.com/netdata/netdata/pull/19159) ([thiagoftsm](https://github.com/thiagoftsm))
 - NET Framework metadata \(Windows.plugin Part 1\) [\#19158](https://github.com/netdata/netdata/pull/19158) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix\(build\): fix building go.d on 32bit [\#19156](https://github.com/netdata/netdata/pull/19156) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d\): correct sd dir [\#19155](https://github.com/netdata/netdata/pull/19155) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d\): correct unlockall impl [\#19154](https://github.com/netdata/netdata/pull/19154) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d\): unlock job files on quit/restart [\#19153](https://github.com/netdata/netdata/pull/19153) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19152](https://github.com/netdata/netdata/pull/19152) ([netdatabot](https://github.com/netdatabot))
-- build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.0 to 0.2.1 in /src/go [\#19151](https://github.com/netdata/netdata/pull/19151) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
