@@ -116,7 +116,7 @@ void nd_process_signals(void) {
             daemon_status_file_save(DAEMON_STATUS_NONE);
             errno_clear();
 
-            // loop once, but keep looping while signals are coming in
+            // loop once, but keep looping while signals are coming in,
             // this is needed because a few operations may take some time
             // so we need to check for new signals before pausing again
             int found = 1;
@@ -155,7 +155,9 @@ void nd_process_signals(void) {
                                 break;
 
                             case NETDATA_SIGNAL_FATAL:
+                                nd_log_limits_unlimited();
                                 exit_initiated_set(signals_waiting[i].reason);
+                                daemon_status_file_save(DAEMON_STATUS_NONE);
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
                                 break;
 

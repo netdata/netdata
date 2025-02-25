@@ -10,4 +10,6 @@ void get_netdata_execution_path(void);
 extern char *pidfile;
 extern char *netdata_exe_path;
 
+void verify_required_directory(const char *env, const char *dir, bool create_it, int perms);
+
 #endif /* NETDATA_DAEMON_H */

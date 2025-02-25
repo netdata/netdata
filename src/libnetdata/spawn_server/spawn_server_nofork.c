@@ -986,6 +986,9 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
         return false;
     }
 
+    if(chmod(server->path, 0770) != 0)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to chmod '%s' to 0770", server->path);
+
     return true;
 }
 
@@ -1028,8 +1031,10 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     server->id = __atomic_add_fetch(&spawn_server_id, 1, __ATOMIC_RELAXED);
     os_uuid_generate_random(server->magic.uuid);
 
-    char *runtime_directory = getenv("NETDATA_CACHE_DIR");
-    if(runtime_directory && !*runtime_directory) runtime_directory = NULL;
+    const char *runtime_directory = getenv("NETDATA_RUN_DIR");
+    if(!runtime_directory || !*runtime_directory)
+        runtime_directory = os_run_dir(true);
+
     if (runtime_directory) {
         struct stat statbuf;
 

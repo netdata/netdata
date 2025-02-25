@@ -780,6 +780,8 @@ int netdata_main(int argc, char **argv) {
 //        }
     }
 
+    nd_profile_setup();
+
     // status and crash/update/exit detection
     exit_initiated_reset();
     daemon_status_file_check_crash();
@@ -790,12 +792,6 @@ int netdata_main(int argc, char **argv) {
     get_netdata_execution_path();
 
     // ----------------------------------------------------------------------------------------------------------------
-    // analytics
-
-    analytics_reset();
-    get_system_timezone();
-
-    // ----------------------------------------------------------------------------------------------------------------
     // data collection plugins
 
     // prepare configuration environment variables for the plugins
@@ -804,6 +800,12 @@ int netdata_main(int argc, char **argv) {
     // cd into config_dir to allow the plugins refer to their config files using relative filenames
     if(chdir(netdata_configured_user_config_dir) == -1)
         fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // analytics
+
+    analytics_reset();
+    get_system_timezone();
 
     // ----------------------------------------------------------------------------------------------------------------
     // pulse (internal netdata instrumentation)
@@ -821,82 +823,75 @@ int netdata_main(int argc, char **argv) {
         workers_utilization_enable();
 
     // ----------------------------------------------------------------------------------------------------------------
-    // profiles
-
-    nd_profile_setup();
-
-    // ----------------------------------------------------------------------------------------------------------------
     // streaming, replication, functions initialization
 
     replication_initialize();
     rrd_functions_inflight_init();
 
-    {
-        // --------------------------------------------------------------------
-        // alerts SILENCERS
+    // --------------------------------------------------------------------
+    // alerts SILENCERS
 
-        health_set_silencers_filename();
-        health_initialize_global_silencers();
+    health_set_silencers_filename();
+    health_initialize_global_silencers();
 
-        // --------------------------------------------------------------------
-        // setup process signals
+    // --------------------------------------------------------------------
+    // setup process signals
 
-        // block signals while initializing threads.
-        // this causes the threads to block signals.
+    // block signals while initializing threads.
+    // this causes the threads to block signals.
 
-        delta_startup_time("initialize signals");
-        nd_initialize_signals(); // setup the signals we want to use
+    delta_startup_time("initialize signals");
+    nd_initialize_signals(); // setup the signals we want to use
 
-        // --------------------------------------------------------------------
-        // check which threads are enabled and initialize them
+    // --------------------------------------------------------------------
+    // check which threads are enabled and initialize them
 
-        delta_startup_time("initialize static threads");
+    delta_startup_time("initialize static threads");
 
-        for (i = 0; static_threads[i].name != NULL ; i++) {
-            struct netdata_static_thread *st = &static_threads[i];
+    for (i = 0; static_threads[i].name != NULL ; i++) {
+        struct netdata_static_thread *st = &static_threads[i];
 
-            if(st->enable_routine)
-                st->enabled = st->enable_routine();
+        if(st->enable_routine)
+            st->enabled = st->enable_routine();
 
-            if(st->config_name)
-                st->enabled = inicfg_get_boolean(&netdata_config, st->config_section, st->config_name, st->enabled);
+        if(st->config_name)
+            st->enabled = inicfg_get_boolean(&netdata_config, st->config_section, st->config_name, st->enabled);
 
-            if(st->enabled && st->init_routine)
-                st->init_routine();
+        if(st->enabled && st->init_routine)
+            st->init_routine();
 
-            if(st->env_name)
-                nd_setenv(st->env_name, st->enabled?"YES":"NO", 1);
+        if(st->env_name)
+            nd_setenv(st->env_name, st->enabled?"YES":"NO", 1);
 
-            if(st->global_variable)
-                *st->global_variable = (st->enabled) ? true : false;
-        }
-
-        // --------------------------------------------------------------------
-        // create the listening sockets
-
-        delta_startup_time("initialize web server");
-
-        // get the certificate and start security
-        netdata_conf_web_security_init();
-
-        nd_web_api_init();
-        web_server_threading_selection();
-
-        if(web_server_mode != WEB_SERVER_MODE_NONE) {
-            if (!api_listen_sockets_setup()) {
-                netdata_log_error("Cannot setup listen port(s). Is Netdata already running?");
-                exit(1);
-            }
-        }
-        if (sqlite_library_init())
-            fatal("Failed to initialize sqlite library");
-
-        // --------------------------------------------------------------------
-        // Initialize ML configuration
-
-        delta_startup_time("initialize ML");
-        ml_init();
+        if(st->global_variable)
+            *st->global_variable = (st->enabled) ? true : false;
     }
+
+    // --------------------------------------------------------------------
+    // create the listening sockets
+
+    delta_startup_time("initialize web server");
+
+    // get the certificate and start security
+    netdata_conf_web_security_init();
+
+    nd_web_api_init();
+    web_server_threading_selection();
+
+    if(web_server_mode != WEB_SERVER_MODE_NONE) {
+        if (!api_listen_sockets_setup()) {
+            netdata_log_error("Cannot setup listen port(s). Is Netdata already running?");
+            exit(1);
+        }
+    }
+    if (sqlite_library_init())
+        fatal("Failed to initialize sqlite library");
+
+    // --------------------------------------------------------------------
+    // Initialize ML configuration
+
+    delta_startup_time("initialize ML");
+    ml_init();
 
     delta_startup_time("set resource limits");
 

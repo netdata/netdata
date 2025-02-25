@@ -2,35 +2,57 @@
 
 #include "common.h"
 
-static const char *verify_required_directory(const char *dir)
-{
-    if (chdir(dir) == -1)
-        fatal("Cannot change directory to '%s'", dir);
-
-    DIR *d = opendir(dir);
-    if (!d)
-        fatal("Cannot examine the contents of directory '%s'", dir);
-    closedir(d);
-
-    return dir;
-}
-
-static const char *verify_or_create_required_directory(const char *dir) {
+void verify_required_directory(const char *env, const char *dir, bool create_it, int perms) {
     errno_clear();
 
-    if (mkdir(dir, 0755) != 0 && errno != EEXIST)
-        fatal("Cannot create required directory '%s'", dir);
+    if (!dir || *dir != '/')
+        fatal("Invalid directory path (must be an absolute path): '%s'\n", dir);
 
-    return verify_required_directory(dir);
-}
+    if (chdir(dir) == 0) {
+        if(env)
+            nd_setenv(env, dir, 1);
+        return;
+    }
 
-static const char *verify_or_create_required_private_directory(const char *dir) {
-    errno_clear();
+    if(create_it) {
+        if(mkdir(dir, perms) == 0) {
+            if(env)
+                nd_setenv(env, dir, 1);
+            return;
+        }
+    }
 
-    if (mkdir(dir, 0770) != 0 && errno != EEXIST)
-        fatal("Cannot create required directory '%s'", dir);
+    char path[PATH_MAX];
+    strncpyz(path, dir, sizeof(path) - 1);
+    struct stat st;
 
-    return verify_required_directory(dir);
+    char *p = path;
+    while (*p) {
+        if (p != path && *p == '/') {
+            *p = '\0';
+
+            errno_clear();
+            if (stat(path, &st) == -1)
+                fatal("Required directory: '%s' - Missing or inaccessible component: '%s' (error: %s)\n", dir, path, strerror(errno));
+
+            if (!S_ISDIR(st.st_mode))
+                fatal("Required directory: '%s' - Component '%s' exists but is not a directory.\n", dir, path);
+
+            *p = '/';
+        }
+        p++;
+    }
+
+    if (stat(dir, &st) == -1)
+        fatal("Required directory: '%s' - Missing or inaccessible: '%s' (error: %s)\n", dir, dir, strerror(errno));
+
+    if (!S_ISDIR(st.st_mode))
+        fatal("Required directory: '%s' - '%s' exists but is not a directory.\n", dir, dir);
+
+    if (access(dir, R_OK | X_OK) == -1)
+        fatal("Required directory: '%s' - Insufficient permissions for: '%s' (error: %s)\n", dir, dir, strerror(errno));
+
+    fatal("Required directory: '%s' - Failed (error: %s)\n", dir, strerror(errno));
 }
 
 void set_environment_for_plugins_and_scripts(void) {
@@ -42,17 +64,17 @@ void set_environment_for_plugins_and_scripts(void) {
 
     nd_setenv("NETDATA_VERSION", NETDATA_VERSION, 1);
     nd_setenv("NETDATA_HOSTNAME", netdata_configured_hostname, 1);
-    nd_setenv("NETDATA_CONFIG_DIR", verify_required_directory(netdata_configured_user_config_dir), 1);
-    nd_setenv("NETDATA_USER_CONFIG_DIR", verify_required_directory(netdata_configured_user_config_dir), 1);
-    nd_setenv("NETDATA_STOCK_CONFIG_DIR", verify_required_directory(netdata_configured_stock_config_dir), 1);
-    nd_setenv("NETDATA_PLUGINS_DIR", verify_required_directory(netdata_configured_primary_plugins_dir), 1);
-    nd_setenv("NETDATA_WEB_DIR", verify_required_directory(netdata_configured_web_dir), 1);
-    nd_setenv("NETDATA_CACHE_DIR", verify_or_create_required_directory(netdata_configured_cache_dir), 1);
-    nd_setenv("NETDATA_LIB_DIR", verify_or_create_required_directory(netdata_configured_varlib_dir), 1);
-    nd_setenv("NETDATA_LOG_DIR", verify_or_create_required_directory(netdata_configured_log_dir), 1);
     nd_setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
-    nd_setenv("CLAIMING_DIR", verify_or_create_required_private_directory(netdata_configured_cloud_dir), 1);
+    verify_required_directory("NETDATA_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
+    verify_required_directory("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
+    verify_required_directory("NETDATA_STOCK_CONFIG_DIR", netdata_configured_stock_config_dir, false, 0);
+    verify_required_directory("NETDATA_PLUGINS_DIR", netdata_configured_primary_plugins_dir, false, 0);
+    verify_required_directory("NETDATA_WEB_DIR", netdata_configured_web_dir, false, 0);
+    verify_required_directory("NETDATA_CACHE_DIR", netdata_configured_cache_dir, true, 0775);
+    verify_required_directory("NETDATA_LIB_DIR", netdata_configured_varlib_dir, true, 0775);
+    verify_required_directory("NETDATA_LOG_DIR", netdata_configured_log_dir, true, 0775);
+    verify_required_directory("CLAIMING_DIR", netdata_configured_cloud_dir, true, 0770);
 
     {
         BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX, NULL);

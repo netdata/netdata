@@ -296,7 +296,7 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     if(!session_status.os_id_like && last_session_status.os_id_like)
         session_status.os_id_like = strdupz(last_session_status.os_id_like);
 
-    if((session_status.status == DAEMON_STATUS_NONE && !session_status.architecture) || status == DAEMON_STATUS_RUNNING)
+    if(status == DAEMON_STATUS_RUNNING)
         get_daemon_status_fields_from_system_info(&session_status);
 
     session_status.exit_reason = exit_initiated;
@@ -529,7 +529,7 @@ void *post_status_file_thread(void *ptr) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// check last status on startup and post crash report
+// check last status on startup and post-crash report
 
 void daemon_status_file_check_crash(void) {
     last_session_status = daemon_status_file_load();
@@ -583,8 +583,20 @@ void daemon_status_file_check_crash(void) {
             break;
 
         case DAEMON_STATUS_INITIALIZING:
-            cause = "crashed on start";
-            msg = "Netdata was last killed/crashed while starting";
+            if (OS_SYSTEM_DISK_SPACE_OK(last_session_status.var_cache) &&
+                last_session_status.var_cache.is_read_only) {
+                cause = "disk read-only";
+                msg = "Netdata couldn't start because the disk is readonly";
+            }
+            else if (OS_SYSTEM_DISK_SPACE_OK(last_session_status.var_cache) &&
+                last_session_status.var_cache.free_bytes == 0) {
+                cause = "disk full";
+                msg = "Netdata couldn't start because the disk is full";
+            }
+            else {
+                cause = "crashed on start";
+                msg = "Netdata was last killed/crashed while starting";
+            }
             pri = NDLP_ERR;
             post_crash_report = true;
             break;
