@@ -82,8 +82,7 @@ void registry_init(void) {
     // path names
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
     registry.pathname = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "registry", filename);
-    if(mkdir(registry.pathname, 0770) == -1 && errno != EEXIST)
-        fatal("Cannot create directory '%s'.", registry.pathname);
+    verify_required_directory(NULL, registry.pathname, true, 0770);
 
     // filenames
     snprintfz(filename, FILENAME_MAX, "%s/netdata.public.unique.id", registry.pathname);

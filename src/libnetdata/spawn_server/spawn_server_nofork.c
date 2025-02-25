@@ -1028,8 +1028,10 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     server->id = __atomic_add_fetch(&spawn_server_id, 1, __ATOMIC_RELAXED);
     os_uuid_generate_random(server->magic.uuid);
 
-    char *runtime_directory = getenv("NETDATA_CACHE_DIR");
-    if(runtime_directory && !*runtime_directory) runtime_directory = NULL;
+    const char *runtime_directory = getenv("NETDATA_RUN_DIR");
+    if(!runtime_directory || !*runtime_directory)
+        runtime_directory = os_run_dir(true);
+
     if (runtime_directory) {
         struct stat statbuf;
 

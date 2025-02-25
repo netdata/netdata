@@ -106,7 +106,7 @@ static char *detect_run_dir(bool rw) {
 success:
     // Set the environment variable for child processes
     if(rw)
-        setenv("NETDATA_RUN_DIR", path, 1);
+        nd_setenv("NETDATA_RUN_DIR", path, 1);
 
     return strdupz(path);
 }
