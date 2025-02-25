@@ -296,7 +296,7 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     if(!session_status.os_id_like && last_session_status.os_id_like)
         session_status.os_id_like = strdupz(last_session_status.os_id_like);
 
-    if((session_status.status == DAEMON_STATUS_NONE && !session_status.architecture) || status == DAEMON_STATUS_RUNNING)
+    if(status == DAEMON_STATUS_RUNNING)
         get_daemon_status_fields_from_system_info(&session_status);
 
     session_status.exit_reason = exit_initiated;
