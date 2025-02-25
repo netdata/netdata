@@ -37,13 +37,14 @@ ENUM_STR_DEFINE_FUNCTIONS(DAEMON_OS_TYPE, DAEMON_OS_TYPE_UNKNOWN, "unknown");
 
 static DAEMON_STATUS_FILE last_session_status = { 0 };
 static DAEMON_STATUS_FILE session_status = { 0 };
+static SPINLOCK dsf_spinlock = SPINLOCK_INITIALIZER;
 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
 
 static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->timestamp_ut, true); // ECS
-    buffer_json_member_add_uint64(wb, "version", 1); // custom
+    buffer_json_member_add_uint64(wb, "version", 2); // custom
 
     buffer_json_member_add_object(wb, "agent"); // ECS
     {
@@ -116,13 +117,21 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_object(wb, "fatal");
+    buffer_json_member_add_object(wb, "fatal"); // custom
     {
         buffer_json_member_add_uint64(wb, "line", ds->fatal.line);
         buffer_json_member_add_string_or_empty(wb, "filename", ds->fatal.filename);
         buffer_json_member_add_string_or_empty(wb, "function", ds->fatal.function);
         buffer_json_member_add_string_or_empty(wb, "message", ds->fatal.message);
         buffer_json_member_add_string_or_empty(wb, "stack_trace", ds->fatal.stack_trace);
+    }
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_object(wb, "dedup"); // custom
+    {
+        buffer_json_member_add_time_t(wb, "timestamp", ds->dedup.timestamp); // custom
+        buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->dedup.status)); // custom
+        EXIT_REASON_2json(wb, "exit_reason", ds->dedup.exit_reason); // custom
     }
     buffer_json_object_close(wb);
 }
@@ -141,6 +150,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, true);
 
     bool required = false; // allow missing fields and values
+    bool required_v2 = false; // allow missing fields and values for version 2
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required);
@@ -215,13 +225,22 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "line", ds->fatal.line, error, required);
     });
 
+    // Parse the last posted object
+    JSONC_PARSE_SUBOBJECT(jobj, path, "dedup", error, required_v2, {
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "timestamp", ds->dedup.timestamp, error, required_v2);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "status", DAEMON_STATUS_2id, ds->dedup.status, error, required_v2);
+        JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "exit_reason", EXIT_REASON_2id_one, ds->dedup.exit_reason, error, required_v2);
+    });
+
     return true;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 // get the current status
 
-static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
+static void daemon_status_file_refresh(DAEMON_STATUS status) {
+    spinlock_lock(&dsf_spinlock);
+
     usec_t now_ut = now_realtime_usec();
 
 #if defined(OS_LINUX)
@@ -295,6 +314,11 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
         session_status.os_id = strdupz(last_session_status.os_id);
     if(!session_status.os_id_like && last_session_status.os_id_like)
         session_status.os_id_like = strdupz(last_session_status.os_id_like);
+    if(!session_status.dedup.timestamp) {
+        session_status.dedup.timestamp = last_session_status.dedup.timestamp;
+        session_status.dedup.status = last_session_status.dedup.status;
+        session_status.dedup.exit_reason = last_session_status.dedup.exit_reason;
+    }
 
     get_daemon_status_fields_from_system_info(&session_status);
 
@@ -307,7 +331,7 @@ static DAEMON_STATUS_FILE daemon_status_file_get(DAEMON_STATUS status) {
     session_status.memory = os_system_memory(true);
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
 
-    return session_status;
+    spinlock_unlock(&dsf_spinlock);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -439,17 +463,13 @@ static bool save_status_file(const char *directory, const char *content, size_t 
     return true;
 }
 
-void daemon_status_file_save(DAEMON_STATUS status) {
-    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-    spinlock_lock(&spinlock);
-
-    // Get current status
-    DAEMON_STATUS_FILE ds = daemon_status_file_get(status);
+static void daemon_status_file_save(DAEMON_STATUS_FILE *ds) {
+    spinlock_lock(&dsf_spinlock);
 
     // Prepare JSON content
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-    daemon_status_file_to_json(wb, &ds);
+    daemon_status_file_to_json(wb, ds);
     buffer_json_finalize(wb);
 
     const char *content = buffer_tostring(wb);
@@ -476,7 +496,12 @@ void daemon_status_file_save(DAEMON_STATUS status) {
     if (!saved)
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to save status file in any location");
 
-    spinlock_unlock(&spinlock);
+    spinlock_unlock(&dsf_spinlock);
+}
+
+void daemon_status_file_update_status(DAEMON_STATUS status) {
+    daemon_status_file_refresh(status);
+    daemon_status_file_save(&session_status);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -512,7 +537,14 @@ void post_status_file(struct post_status_file_thread_data *d) {
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
     CURLcode rc = curl_easy_perform(curl);
-    (void)rc;
+    if(rc == CURLE_OK) {
+        spinlock_lock(&dsf_spinlock);
+        session_status.dedup.timestamp = now_realtime_sec();
+        session_status.dedup.status = d->status.status;
+        session_status.dedup.exit_reason = d->status.exit_reason;
+        spinlock_unlock(&dsf_spinlock);
+        daemon_status_file_save(&session_status);
+    }
 
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
@@ -532,7 +564,7 @@ void *post_status_file_thread(void *ptr) {
 
 void daemon_status_file_check_crash(void) {
     last_session_status = daemon_status_file_load();
-    daemon_status_file_save(DAEMON_STATUS_INITIALIZING);
+    daemon_status_file_update_status(DAEMON_STATUS_INITIALIZING);
     ND_LOG_FIELD_PRIORITY pri = NDLP_NOTICE;
 
     bool new_version = strcmp(last_session_status.version, session_status.version) != 0;
@@ -592,12 +624,24 @@ void daemon_status_file_check_crash(void) {
                 cause = "disk full";
                 msg = "Netdata couldn't start because the disk is full";
             }
+            else if (OS_SYSTEM_DISK_SPACE_OK(last_session_status.var_cache) &&
+                     last_session_status.var_cache.free_bytes < 1 * 1024 * 1024) {
+                cause = "disk almost full";
+                msg = "Netdata couldn't start while the disk is almost full";
+            }
             else {
                 cause = "crashed on start";
                 msg = "Netdata was last killed/crashed while starting";
             }
             pri = NDLP_ERR;
             post_crash_report = true;
+
+            if(session_status.dedup.status == DAEMON_STATUS_INITIALIZING &&
+                now_realtime_sec() - last_session_status.dedup.timestamp < 86400) {
+                // we have already posted this crash
+                disable_crash_report = true;
+            }
+
             break;
 
         case DAEMON_STATUS_EXITING:
@@ -678,19 +722,18 @@ void daemon_status_file_startup_step(const char *step) {
     freez((char *)session_status.fatal.function);
     session_status.fatal.function = step ? strdupz(step) : NULL;
     if(step != NULL)
-        daemon_status_file_save(DAEMON_STATUS_NONE);
+        daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 // ng_log() hook for receiving fatal message information
 
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *stack_trace, long line) {
-    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-    spinlock_lock(&spinlock);
+    spinlock_lock(&dsf_spinlock);
 
     // do not check the function, because it may have a startup step in it
     if(session_status.fatal.filename || session_status.fatal.message || session_status.fatal.stack_trace) {
-        spinlock_unlock(&spinlock);
+        spinlock_unlock(&dsf_spinlock);
         freez((void *)filename);
         freez((void *)function);
         freez((void *)message);
@@ -705,5 +748,8 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     session_status.fatal.stack_trace = stack_trace;
     session_status.fatal.line = line;
 
-    spinlock_unlock(&spinlock);
+    spinlock_unlock(&dsf_spinlock);
+
+    exit_initiated |= EXIT_REASON_FATAL;
+    daemon_status_file_save(&session_status);
 }

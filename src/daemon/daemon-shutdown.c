@@ -173,7 +173,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
         exit(ret);
     }
     run = true;
-    daemon_status_file_save(DAEMON_STATUS_EXITING);
+    daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 
     nd_log_limits_unlimited();
     netdata_log_exit_reason();
@@ -322,7 +322,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     watcher_thread_stop();
     curl_global_cleanup();
 
-    daemon_status_file_save(DAEMON_STATUS_EXITED);
+    daemon_status_file_update_status(DAEMON_STATUS_EXITED);
 
 #ifdef OS_WINDOWS
     return;
