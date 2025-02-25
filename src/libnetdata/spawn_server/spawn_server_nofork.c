@@ -986,6 +986,9 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
         return false;
     }
 
+    if(chmod(server->path, 0770) != 0)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to chmod '%s' to 0770", server->path);
+
     return true;
 }
 
