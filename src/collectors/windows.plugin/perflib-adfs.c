@@ -70,7 +70,7 @@ struct adfs_certificate {
     RRDDIM *rd_adfs_oauth_client_windows_authentications_failure_total;
 
     RRDSET *st_adfs_oauth_logon_certificate_requests;
-    RRDDIM *rd_adfs_oauth_logon_certificate_token_requests_success_total;
+    RRDDIM *rd_adfs_oauth_logon_certificate_requests_success_total;
     RRDDIM *rd_adfs_oauth_logon_certificate_requests_failure_total;
 
     RRDSET *st_adfs_oauth_password_grant_requests;
@@ -78,7 +78,7 @@ struct adfs_certificate {
     RRDDIM *rd_adfs_oauth_password_grant_requests_failure;
 
     RRDSET *st_adfs_oauth_token_requests_success;
-    RRDDIM *rd_adfs_token_requests_success_success;
+    RRDDIM *rd_adfs_oauth_token_requests_success;
 
     // Requests
     RRDSET *st_adfs_passive_requests_total;
@@ -668,9 +668,9 @@ void netdata_adfs_oauth_client_authentication(
             "oauth_client_authentications",
             NULL,
             "oauth",
-            "adfs.oauth_authorization_requests",
+            "adfs.oauth_client_authentications",
             "OAuth client authentications",
-            "requests/s",
+            "authentications/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
             PRIO_ADFS_OAUTH_CLIENT_AUTHORIZATION_REQUEST,
@@ -681,7 +681,7 @@ void netdata_adfs_oauth_client_authentication(
             rrddim_add(adfs.st_adfs_oauth_client_authentications, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         adfs.rd_adfs_oauth_client_authentications_failure = rrddim_add(
-            adfs.st_adfs_oauth_client_credentials_requests, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            adfs.st_adfs_oauth_client_authentications, "failure", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -940,14 +940,14 @@ void netdata_adfs_oauth_logon_certificate_request(
             "oauth",
             "adfs.oauth_client_windows_authentications",
             "OAuth client windows integrated authentications",
-            "authentications/s",
+            "requests/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
             PRIO_ADFS_OAUTH_CLIENT_WINDOWS_AUTH,
             update_every,
             RRDSET_TYPE_LINE);
 
-        adfs.rd_adfs_oauth_logon_certificate_token_requests_success_total =
+        adfs.rd_adfs_oauth_logon_certificate_requests_success_total =
             rrddim_add(adfs.st_adfs_oauth_logon_certificate_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         adfs.rd_adfs_oauth_logon_certificate_requests_failure_total =
@@ -956,7 +956,7 @@ void netdata_adfs_oauth_logon_certificate_request(
 
     rrddim_set_by_pointer(
         adfs.st_adfs_oauth_logon_certificate_requests,
-        adfs.rd_adfs_oauth_logon_certificate_token_requests_success_total,
+        adfs.rd_adfs_oauth_logon_certificate_requests_success_total,
         (collected_number)adfs.ADFSOauthLogonCertificateRequestsSuccess.current.Data);
 
     rrddim_set_by_pointer(
@@ -1027,7 +1027,7 @@ void netdata_adfs_oauth_token_requests_success(
             "oauth_token_requests_success",
             NULL,
             "oauth",
-            "adfs.oauth_token_requests_success",
+            "adfs.oauth_token_requests",
             "Successful RP token requests over OAuth protocol",
             "requests/s",
             PLUGIN_WINDOWS_NAME,
@@ -1036,13 +1036,13 @@ void netdata_adfs_oauth_token_requests_success(
             update_every,
             RRDSET_TYPE_LINE);
 
-        adfs.rd_adfs_token_requests_success_success =
+        adfs.rd_adfs_oauth_token_requests_success =
             rrddim_add(adfs.st_adfs_oauth_token_requests_success, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
         adfs.st_adfs_oauth_token_requests_success,
-        adfs.rd_adfs_token_requests_success_success,
+        adfs.rd_adfs_oauth_token_requests_success,
         (collected_number)adfs.ADFSOauthTokenRequestsSuccess.current.Data);
 
     rrdset_done(adfs.st_adfs_oauth_token_requests_success);
@@ -1235,12 +1235,12 @@ void netdata_adfs_sso_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
     if (!adfs.st_adfs_sso_authentications) {
         adfs.st_adfs_sso_authentications = rrdset_create_localhost(
             "adfs",
-            "password_change_requests",
+            "sso_authentications",
             NULL,
             "auth",
-            "adfs.password_change_requests",
-            "Password change requests",
-            "requests/s",
+            "adfs.sso_authentications",
+            "SSO authentications",
+            "authentications/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
             PRIO_ADFS_SSO_AUTH,
@@ -1402,7 +1402,7 @@ void netdata_wsfed_token_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
             RRDSET_TYPE_LINE);
 
         adfs.rd_adfs_wsfed_token_requests_success_total = rrddim_add(
-            adfs.st_adfs_wsfed_token_requests_success_total, "authentications", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            adfs.st_adfs_wsfed_token_requests_success_total, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
