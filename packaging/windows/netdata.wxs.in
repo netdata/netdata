@@ -41,6 +41,7 @@
                 <ComponentRef Id="NetdataHome" />
                 <ComponentRef Id="NetdataRoot" />
                 <ComponentRef Id="NetdataVarLib" />
+                <ComponentRef Id="NetdataVarLibNetdata" />
                 <ComponentGroupRef Id="WevtComponents" />
                 <ComponentRef Id="NetdataService" />
             </Feature>
@@ -52,7 +53,9 @@
                     </Directory>
                     <Directory Id="VARDIR" Name="var">
                         <Directory Id="VARCACHEDIR" Name="cache" />
-                        <Directory Id="VARLIBDIR" Name="lib" />
+                        <Directory Id="VARLIBDIR" Name="lib">
+                            <Directory Id="VARLIBDIRNETDATA" Name="netdata" />
+                        </Directory>
                     </Directory>
                     <Directory Id="ETCDIR" Name="etc">
                         <Directory Id="ETCDIRNETDATA" Name="netdata" />
@@ -98,6 +101,10 @@
             </Component>
 
             <Component Id="NetdataVarLib" Directory="VARLIBDIR" Guid="c72d7ea8-c848-46c4-a983-589044f2eec9">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataVarLibNetdata" Directory="VARLIBDIRNETDATA" Guid="e3a7ad51-4387-466b-b611-cf1ae8d72986">
                 <CreateFolder />
             </Component>
 
