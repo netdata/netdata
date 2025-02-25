@@ -270,7 +270,7 @@ const char *registry_get_this_machine_hostname(void) {
     return registry.hostname;
 }
 
-const char *registry_get_this_machine_guid(void) {
+const char *registry_get_this_machine_guid(bool create_it) {
     static char guid[GUID_LEN + 1] = "";
 
     if(likely(guid[0]))
@@ -297,7 +297,7 @@ const char *registry_get_this_machine_guid(void) {
     }
 
     // generate a new one?
-    if(!guid[0]) {
+    if(!guid[0] && create_it) {
         nd_uuid_t uuid;
 
         uuid_generate_time(uuid);
@@ -315,7 +315,8 @@ const char *registry_get_this_machine_guid(void) {
         close(fd);
     }
 
-    nd_setenv("NETDATA_REGISTRY_UNIQUE_ID", guid, 1);
+    if(guid[0])
+        nd_setenv("NETDATA_REGISTRY_UNIQUE_ID", guid, 1);
 
     return guid;
 }

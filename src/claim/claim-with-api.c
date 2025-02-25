@@ -372,7 +372,7 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
     bool done = false, can_retry = true;
     size_t retries = 0;
     do {
-        done = send_curl_request(registry_get_this_machine_guid(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, &can_retry);
+        done = send_curl_request(registry_get_this_machine_guid(true), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, &can_retry);
         if (done) break;
         sleep_usec(300 * USEC_PER_MS + 100 * retries * USEC_PER_MS);
         retries++;

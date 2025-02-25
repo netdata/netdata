@@ -1063,11 +1063,11 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     char path[1024];
     if(name && *name) {
         server->name = strdupz(name);
-        snprintf(path, sizeof(path), "%s/.netdata-spawn-%s.sock", runtime_directory, name);
+        snprintf(path, sizeof(path), "%s/netdata-spawn-%s.sock", runtime_directory, name);
     }
     else {
         server->name = strdupz("unnamed");
-        snprintf(path, sizeof(path), "%s/.netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
+        snprintf(path, sizeof(path), "%s/netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
     }
 
     server->path = strdupz(path);
