@@ -113,7 +113,7 @@ void nd_process_signals(void) {
         // is delivered that either terminates the process or causes the invocation
         // of a signal-catching function.
         if(pause() == -1 && errno == EINTR) {
-            daemon_status_file_save(DAEMON_STATUS_NONE);
+            daemon_status_file_update_status(DAEMON_STATUS_NONE);
             errno_clear();
 
             // loop once, but keep looping while signals are coming in,
@@ -157,7 +157,7 @@ void nd_process_signals(void) {
                             case NETDATA_SIGNAL_FATAL:
                                 nd_log_limits_unlimited();
                                 exit_initiated_set(signals_waiting[i].reason);
-                                daemon_status_file_save(DAEMON_STATUS_NONE);
+                                daemon_status_file_update_status(DAEMON_STATUS_NONE);
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
                                 break;
 

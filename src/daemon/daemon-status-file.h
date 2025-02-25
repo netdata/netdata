@@ -66,13 +66,19 @@ typedef struct daemon_status_file {
         const char *stack_trace;
         const char *message;
     } fatal;
+
+    struct {
+        time_t timestamp;
+        DAEMON_STATUS status;
+        EXIT_REASON exit_reason;
+    } dedup;
 } DAEMON_STATUS_FILE;
 
 // loads the last status saved
 DAEMON_STATUS_FILE daemon_status_file_load(void);
 
 // saves the current status
-void daemon_status_file_save(DAEMON_STATUS status);
+void daemon_status_file_update_status(DAEMON_STATUS status);
 
 // check for a crash
 void daemon_status_file_check_crash(void);

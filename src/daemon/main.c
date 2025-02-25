@@ -1058,7 +1058,7 @@ int netdata_main(int argc, char **argv) {
     webrtc_initialize();
 
     daemon_status_file_startup_step(NULL);
-    daemon_status_file_save(DAEMON_STATUS_RUNNING);
+    daemon_status_file_update_status(DAEMON_STATUS_RUNNING);
     return 10;
 }
 
