@@ -676,7 +676,7 @@ bool daemon_status_file_was_incomplete_shutdown(void) {
 
 void daemon_status_file_startup_step(const char *step) {
     freez((char *)session_status.fatal.function);
-    session_status.fatal.function = strdupz(step);
+    session_status.fatal.function = step ? strdupz(step) : NULL;
     if(step != NULL)
         daemon_status_file_save(DAEMON_STATUS_NONE);
 }
