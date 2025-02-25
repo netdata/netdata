@@ -782,7 +782,6 @@ int netdata_main(int argc, char **argv) {
     }
 
     nd_profile_setup();
-    netdata_conf_ssl();
 
     // start a temporary spawn server
     netdata_main_spawn_server_init("init", argc, (const char **)argv);
@@ -794,7 +793,9 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("initialize environment");
 
-    // Get execution path before switching user to avoid permission issues
+    netdata_conf_ssl();
+
+    // Get the execution path before switching user to avoid permission issues
     get_netdata_execution_path();
 
     // prepare configuration environment variables for the plugins
