@@ -39,6 +39,7 @@
 #include "boot_id.h"
 #include "run_dir.h"
 #include "file_lock.h"
+#include "mmap_limit.h"
 
 // this includes windows.h to the whole of netdata
 // so various conflicts arise

@@ -143,6 +143,15 @@ struct aral {
 #define aral_pages_head_free(ar, marked) (marked ? &ar->aral_lock.pages_marked_free : &ar->aral_lock.pages_free)
 #define aral_pages_head_full(ar, marked) (marked ? &ar->aral_lock.pages_marked_full : &ar->aral_lock.pages_full)
 
+static inline bool aral_malloc_use_mmap(ARAL *ar __maybe_unused, size_t size) {
+    unsigned long long mmap_limit = os_mmap_limit();
+
+    if(mmap_limit > 256 * 1000 && size >= ARAL_MALLOC_USE_MMAP_ABOVE)
+        return true;
+
+    return false;
+}
+
 const char *aral_name(ARAL *ar) {
     return ar->config.name;
 }
@@ -503,7 +512,7 @@ static ALWAYS_INLINE size_t aral_next_allocation_size___adders_lock_needed(ARAL 
         ar->ops[idx].adders.allocation_size = size;
     }
 
-    if(!ar->config.mmap.enabled && size < ARAL_MALLOC_USE_MMAP_ABOVE) {
+    if(!ar->config.mmap.enabled && aral_malloc_use_mmap(ar, size)) {
         // when doing malloc, don't allocate entire pages, but only what needed
         size =
             aral_elements_in_page_size(ar, size) * ar->config.element_size +
@@ -553,7 +562,7 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
     else {
         size_t ARAL_PAGE_size = memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT);
 
-        if (size >= ARAL_MALLOC_USE_MMAP_ABOVE) {
+        if (aral_malloc_use_mmap(ar, size)) {
             bool mapped;
             uint8_t *ptr =
                 nd_mmap_advanced(NULL, size, MAP_ANONYMOUS | MAP_PRIVATE, 1, false, ar->config.options & ARAL_DONT_DUMP, NULL);
