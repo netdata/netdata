@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+    // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "health.h"
 #include "health_internals.h"
@@ -766,6 +766,7 @@ struct worker_data {
     uv_work_t request;
     void *payload;
     time_t next_run;
+    health_job_type_t job_type;
     struct health_config_s *config;
 };
 
@@ -775,7 +776,7 @@ static void after_host_rrdcalc_cleanup_job(uv_work_t *req, int status __maybe_un
     RRDHOST *host = data->payload;
     host->health.rrdcalc_cleanup_running = false;
     struct health_config_s *config = data->config;
-    config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP]->running--;
+    config->job_list[data->job_type]->running--;
     freez(data);
 }
 
@@ -795,7 +796,7 @@ static void after_host_health_maintenance_job(uv_work_t *req, int status __maybe
 {
     struct worker_data *data = req->data;
     struct health_config_s *config = data->config;
-    config->job_list[HEALTH_JOB_HOST_MAINT]->running--;
+    config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
     health_host_run(host);
     freez(data);
@@ -821,7 +822,7 @@ static void after_host_initialize_alerts_job(uv_work_t *req, int status __maybe_
 {
     struct worker_data *data = req->data;
     struct health_config_s *config = data->config;
-    config->job_list[HEALTH_JOB_HOST_INIT]->running--;
+    config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
     health_host_run(host);
     freez(data);
@@ -848,7 +849,7 @@ static void after_host_evaluate_alerts_job(uv_work_t *req, int status __maybe_un
 {
     struct worker_data *data = req->data;
     struct health_config_s *config = data->config;
-    config->job_list[HEALTH_JOB_HOST_RUN]->running--;
+    config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
 
     time_t next_run = data->next_run;
@@ -937,6 +938,7 @@ int send_job_to_worker(struct health_config_s *config, struct job_list_t *job, R
     data->request.data = data;
     data->config = config;
     data->payload = host;
+    data->job_type = job->job_type;
     job->running++;
 
     int rc = 0;
