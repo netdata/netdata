@@ -76,9 +76,12 @@ void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_thre
 }
 
 void libuv_initialize(void) {
+    libuv_worker_threads = (int)netdata_conf_cpus() * 6;
+    libuv_worker_threads = MIN(MAX_LIBUV_WORKER_THREADS, MAX(MIN_LIBUV_WORKER_THREADS, libuv_worker_threads));
+
     libuv_worker_threads = (int)inicfg_get_number_range(
         &netdata_config, CONFIG_SECTION_GLOBAL, "libuv worker threads",
-        (int)netdata_conf_cpus() * 6, MIN_LIBUV_WORKER_THREADS, MAX_LIBUV_WORKER_THREADS);
+        libuv_worker_threads, MIN_LIBUV_WORKER_THREADS, MAX_LIBUV_WORKER_THREADS);
 
     char buf[20 + 1];
     snprintfz(buf, sizeof(buf) - 1, "%d", libuv_worker_threads);
