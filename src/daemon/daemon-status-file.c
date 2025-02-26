@@ -498,8 +498,10 @@ static bool save_status_file(const char *directory, const char *content, size_t 
 static void daemon_status_file_save(DAEMON_STATUS_FILE *ds) {
     spinlock_lock(&dsf_spinlock);
 
-    // Prepare JSON content
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    static BUFFER *wb = NULL;
+    if (!wb)
+        wb = buffer_create(16384, NULL);
+
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     daemon_status_file_to_json(wb, ds);
     buffer_json_finalize(wb);
@@ -541,6 +543,10 @@ void daemon_status_file_exit_reason_save(EXIT_REASON reason) {
     session_status.exit_reason |= reason;
     spinlock_unlock(&dsf_spinlock);
     daemon_status_file_save(&session_status);
+}
+
+static void daemon_status_file_out_of_memory(void) {
+    daemon_status_file_exit_reason_save(EXIT_REASON_OUT_OF_MEMORY);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -602,6 +608,10 @@ void *post_status_file_thread(void *ptr) {
 // check last status on startup and post-crash report
 
 void daemon_status_file_check_crash(void) {
+    FUNCTION_RUN_ONCE();
+
+    mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
+
     last_session_status = daemon_status_file_load();
     daemon_status_file_update_status(DAEMON_STATUS_INITIALIZING);
     ND_LOG_FIELD_PRIORITY pri = NDLP_NOTICE;

@@ -64,4 +64,7 @@ void mallocz_release_as_much_memory_to_the_system(void);
 int posix_memalignz(void **memptr, size_t alignment, size_t size);
 void posix_memalign_freez(void *ptr);
 
+typedef void (*out_of_memory_cb)(void);
+void mallocz_register_out_of_memory_cb(out_of_memory_cb cb);
+
 #endif //NETDATA_ND_MALLOCZ_H

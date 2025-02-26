@@ -2,6 +2,29 @@
 
 #include "../libnetdata.h"
 
+out_of_memory_cb out_of_memory_callback = NULL;
+void mallocz_register_out_of_memory_cb(out_of_memory_cb cb) {
+    out_of_memory_callback = cb;
+}
+
+ALWAYS_INLINE NORETURN
+static void out_of_memory(const char *call, size_t size) {
+    if(out_of_memory_callback)
+        out_of_memory_callback();
+
+    struct rusage usage = { 0 };
+    if(getrusage(RUSAGE_SELF, &usage) != 0)
+        usage.ru_maxrss = 0;
+
+    OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
+    fatal("Out of memory on %s(%zu bytes)!\n"
+          "System memory available: %lu, while our max RSS usage is: %ld\n"
+          "O/S mmap limit: %llu, while our mmap count is: %zu",
+          call, size,
+          sm.ram_available_bytes, usage.ru_maxrss,
+          os_mmap_limit(), __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED));
+}
+
 // ----------------------------------------------------------------------------
 // memory allocation functions that handle failures
 
@@ -385,21 +408,6 @@ void freez_int(void *ptr, const char *file, const char *function, size_t line) {
     libc_free(t);
 }
 #else
-
-ALWAYS_INLINE NORETURN
-static void out_of_memory(const char *call, size_t size) {
-    struct rusage usage = { 0 };
-    if(getrusage(RUSAGE_SELF, &usage) != 0)
-        usage.ru_maxrss = 0;
-
-    OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
-    fatal("Out of memory on %s(%zu bytes)!\n"
-          "System memory available: %lu, while our max RSS usage is: %ld\n"
-          "O/S mmap limit: %llu, while our mmap count is: %zu",
-          call, size,
-          sm.ram_available_bytes, usage.ru_maxrss,
-          os_mmap_limit(), __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED));
-}
 
 ALWAYS_INLINE MALLOCLIKE NEVERNULL WARNUNUSED
 char *strdupz(const char *s) {
