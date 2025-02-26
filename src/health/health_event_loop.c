@@ -815,6 +815,8 @@ static void after_host_initialize_alerts_job(uv_work_t *req, int status __maybe_
     config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
     health_host_run(host);
+    if (config->job_list[data->job_type]->pending)
+        health_host_initialize(NULL, 0);
     freez(data);
 }
 
@@ -1163,7 +1165,10 @@ static void health_ev_loop(void *arg)
 
                 case HEALTH_HOST_INIT:
                     host = cmd.param[0];
-                    schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, host);
+                    if (host)
+                        schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, host);
+                    else
+                        schedule_job_to_run(config, HEALTH_JOB_HOST_INIT, NULL);
                     break;
 
                 case HEALTH_HOST_RUN:
