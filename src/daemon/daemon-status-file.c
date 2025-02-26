@@ -607,6 +607,16 @@ void *post_status_file_thread(void *ptr) {
 // --------------------------------------------------------------------------------------------------------------------
 // check last status on startup and post-crash report
 
+struct log_priority {
+    ND_LOG_FIELD_PRIORITY user;
+    ND_LOG_FIELD_PRIORITY post;
+};
+
+struct log_priority PRI_ALL_NORMAL          = { NDLP_NOTICE, NDLP_DEBUG };
+struct log_priority PRI_USER_SHOULD_FIX     = { NDLP_WARNING, NDLP_INFO };
+struct log_priority PRI_NETDATA_BUG         = { NDLP_CRIT, NDLP_ERR };
+struct log_priority PRI_BAD_BUT_NO_REASON   = { NDLP_ERR, NDLP_WARNING };
+
 void daemon_status_file_check_crash(void) {
     FUNCTION_RUN_ONCE();
 
@@ -614,7 +624,7 @@ void daemon_status_file_check_crash(void) {
 
     last_session_status = daemon_status_file_load();
     daemon_status_file_update_status(DAEMON_STATUS_INITIALIZING);
-    ND_LOG_FIELD_PRIORITY pri = NDLP_NOTICE;
+    struct log_priority pri = PRI_ALL_NORMAL;
 
     bool new_version = strcmp(last_session_status.version, session_status.version) != 0;
     bool post_crash_report = false;
@@ -640,7 +650,7 @@ void daemon_status_file_check_crash(void) {
             else if(!is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "exit on fatal";
                 msg = "Netdata was last stopped gracefully (encountered an error)";
-                pri = NDLP_ERR;
+                pri = PRI_NETDATA_BUG;
                 post_crash_report = true;
             }
             else if(last_session_status.exit_reason & EXIT_REASON_SYSTEM_SHUTDOWN) {
@@ -667,22 +677,43 @@ void daemon_status_file_check_crash(void) {
                 last_session_status.var_cache.is_read_only) {
                 cause = "disk read-only";
                 msg = "Netdata couldn't start because the disk is readonly";
+                pri = PRI_USER_SHOULD_FIX;
             }
             else if (OS_SYSTEM_DISK_SPACE_OK(last_session_status.var_cache) &&
                 last_session_status.var_cache.free_bytes == 0) {
                 cause = "disk full";
                 msg = "Netdata couldn't start because the disk is full";
+                pri = PRI_USER_SHOULD_FIX;
             }
             else if (OS_SYSTEM_DISK_SPACE_OK(last_session_status.var_cache) &&
                      last_session_status.var_cache.free_bytes < 1 * 1024 * 1024) {
                 cause = "disk almost full";
                 msg = "Netdata couldn't start while the disk is almost full";
+                pri = PRI_USER_SHOULD_FIX;
+            }
+            else if (last_session_status.exit_reason == EXIT_REASON_NONE &&
+                !UUIDiszero(session_status.boot_id) &&
+                !UUIDiszero(last_session_status.boot_id) &&
+                !UUIDeq(session_status.boot_id, last_session_status.boot_id)) {
+                cause = "abnormal power off";
+                msg = "The system was abnormally powered off while Netdata was starting";
+                pri = PRI_USER_SHOULD_FIX;
+            }
+            else if (last_session_status.exit_reason &= (EXIT_REASON_SIGBUS|EXIT_REASON_SIGFPE|EXIT_REASON_SIGILL|EXIT_REASON_SIGSEGV)) {
+                cause = "killed signal";
+                msg = "Netdata was last crashed while starting, with a signal indicating a bug";
+                pri = PRI_NETDATA_BUG;
+            }
+            else if (last_session_status.exit_reason &= EXIT_REASON_OUT_OF_MEMORY) {
+                cause = "out of memory";
+                msg = "Netdata was last crashed while starting, because it couldn't allocate memory";
+                pri = PRI_USER_SHOULD_FIX;
             }
             else {
                 cause = "crashed on start";
                 msg = "Netdata was last killed/crashed while starting";
+                pri = PRI_BAD_BUT_NO_REASON;
             }
-            pri = NDLP_ERR;
             post_crash_report = true;
 
             break;
@@ -704,20 +735,33 @@ void daemon_status_file_check_crash(void) {
                 cause = "crashed on exit";
                 msg = "Netdata was last killed/crashed while exiting (instructed to do so)";
             }
-            pri = NDLP_ERR;
+            pri = PRI_NETDATA_BUG;
             post_crash_report = true;
             break;
 
         case DAEMON_STATUS_RUNNING: {
-            if (!UUIDeq(session_status.boot_id, last_session_status.boot_id)) {
+            if (last_session_status.exit_reason == EXIT_REASON_NONE &&
+                !UUIDiszero(session_status.boot_id) &&
+                !UUIDiszero(last_session_status.boot_id) &&
+                !UUIDeq(session_status.boot_id, last_session_status.boot_id)) {
                 cause = "abnormal power off";
                 msg = "The system was abnormally powered off while Netdata was running";
-                pri = NDLP_CRIT;
+                pri = PRI_USER_SHOULD_FIX;
+            }
+            else if (last_session_status.exit_reason &= (EXIT_REASON_SIGBUS|EXIT_REASON_SIGFPE|EXIT_REASON_SIGILL|EXIT_REASON_SIGSEGV)) {
+                cause = "killed signal";
+                msg = "Netdata was last crashed with a signal indicating a bug";
+                pri = PRI_NETDATA_BUG;
+            }
+            else if (last_session_status.exit_reason &= EXIT_REASON_OUT_OF_MEMORY) {
+                cause = "out of memory";
+                msg = "Netdata was last crashed because it couldn't allocate memory";
+                pri = PRI_USER_SHOULD_FIX;
             }
             else {
                 cause = "killed hard";
                 msg = "Netdata was last killed/crashed while operating normally";
-                pri = NDLP_CRIT;
+                pri = PRI_BAD_BUT_NO_REASON;
                 post_crash_report = true;
             }
             break;
@@ -736,7 +780,7 @@ void daemon_status_file_check_crash(void) {
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    nd_log(NDLS_DAEMON, pri,
+    nd_log(NDLS_DAEMON, pri.user,
            "Netdata Agent version '%s' is starting...\n"
            "Last exit status: %s (%s):\n\n%s",
            NETDATA_VERSION, msg, cause, buffer_tostring(wb));
@@ -757,7 +801,7 @@ void daemon_status_file_check_crash(void) {
         d->cause = strdupz(cause);
         d->msg = strdupz(msg);
         d->status = last_session_status;
-        d->priority = pri;
+        d->priority = pri.post;
         nd_thread_create("post_status_file", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_DEFAULT, post_status_file_thread, d);
     }
 }
