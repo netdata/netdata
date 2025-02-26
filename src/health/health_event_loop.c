@@ -431,6 +431,7 @@ static void do_eval_expression(
                           rrdhost_hostname(rc->rrdset->rrdhost), rrdcalc_chart_name(rc), rrdcalc_name(rc), expression_type,
                           expression_error_msg(expression)
         );
+        worker_is_idle();
         return;
     }
     rc->run_flags &= ~error_type;
@@ -448,6 +449,8 @@ static void do_eval_expression(
         *calc_status = rrdcalc_value2status(expression_result(expression));
     else
         *result = expression_result(expression);
+
+    worker_is_idle();
 }
 
 static void process_repeating_alarms(RRDHOST *host, time_t now, struct health_raised_summary *hrm)
@@ -605,6 +608,7 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
     if (hrm) {
         worker_is_busy(UV_EVENT_HEALTH_JOB_ALARM_LOG_PROCESS);
         health_alarm_log_process_to_send_notifications(host, hrm);
+        worker_is_idle();
         alerts_raised_summary_free(hrm);
     }
 
@@ -848,6 +852,7 @@ static void after_host_evaluate_alerts_job(uv_work_t *req, int status __maybe_un
     time_t now = now_realtime_sec();
     // Lets see if we need to do maintenace
     if (now - host->health.last_maintenance > HEALTH_HOST_MAINTENANCE_INTERVAL) {
+        host->health.last_maintenance = now;
         health_host_maintenance(host);
         return;
     }
@@ -862,8 +867,6 @@ static void after_host_evaluate_alerts_job(uv_work_t *req, int status __maybe_un
 static void host_evaluate_alerts_job(uv_work_t *req)
 {
     register_libuv_worker_jobs();
-
-    worker_is_busy(UV_EVENT_HOST_HEALTH_RUN);
 
     struct worker_data *data = req->data;
     RRDHOST *host = data->payload;
@@ -894,22 +897,17 @@ static void host_evaluate_alerts_job(uv_work_t *req)
 
     data->next_run = (start_ut / USEC_PER_SEC) + health_globals.config.run_at_least_every_seconds;
 
-    if (host_health->rrdcalc_cleanup_running) {
+    if (host_health->rrdcalc_cleanup_running)
         worker_is_idle();
-        return;
-    }
 
     // Just reschedule
-    if (!stream_control_health_should_be_running()) {
-        worker_is_idle();
+    if (!stream_control_health_should_be_running())
         return;
-    }
 
-    if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
-        worker_is_idle();
+    if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS))
         return;
-    }
 
+    worker_is_busy(UV_EVENT_HOST_HEALTH_RUN);
     health_event_loop_for_host(host, now_realtime_sec(), &data->next_run);
 
     host_health->last_runtime  = now_realtime_usec() - start_ut;
