@@ -476,7 +476,6 @@ static bool save_status_file(const char *directory, const char *content, size_t 
     fclose(fp);
 
     if (!ok) {
-        unlink(filename);
         unlink(temp_filename);
         return false;
     }
@@ -534,6 +533,13 @@ static void daemon_status_file_save(DAEMON_STATUS_FILE *ds) {
 
 void daemon_status_file_update_status(DAEMON_STATUS status) {
     daemon_status_file_refresh(status);
+    daemon_status_file_save(&session_status);
+}
+
+void daemon_status_file_exit_reason_save(EXIT_REASON reason) {
+    spinlock_lock(&dsf_spinlock);
+    session_status.exit_reason |= reason;
+    spinlock_unlock(&dsf_spinlock);
     daemon_status_file_save(&session_status);
 }
 
