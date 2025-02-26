@@ -4,19 +4,9 @@ package jobmgr
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
-
-type FileStatus interface {
-	Save(cfg confgroup.Config, state string)
-	Remove(cfg confgroup.Config)
-}
-
-type FileStatusStore interface {
-	Contains(cfg confgroup.Config, states ...string) bool
-}
 
 type Vnodes interface {
 	Lookup(key string) (*vnodes.VirtualNode, bool)

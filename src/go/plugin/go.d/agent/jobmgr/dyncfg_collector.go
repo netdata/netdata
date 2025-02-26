@@ -347,7 +347,7 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
 		return
 	case dyncfgRunning:
-		m.FileStatus.Remove(ecfg.cfg)
+		m.fileStatus.remove(ecfg.cfg)
 		m.stopRunningJob(ecfg.cfg.FullName())
 	default:
 	}
@@ -365,7 +365,7 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 	ecfg.status = dyncfgRunning
 
 	if isDyncfg(ecfg.cfg) {
-		m.FileStatus.Save(ecfg.cfg, ecfg.status.String())
+		m.fileStatus.add(ecfg.cfg, ecfg.status.String())
 	}
 	m.startRunningJob(job)
 	m.dyncfgRespf(fn, 200, "")
@@ -445,7 +445,7 @@ func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
 	ecfg.status = dyncfgRunning
 
 	if isDyncfg(ecfg.cfg) {
-		m.FileStatus.Save(ecfg.cfg, ecfg.status.String())
+		m.fileStatus.add(ecfg.cfg, ecfg.status.String())
 	}
 
 	m.startRunningJob(job)
@@ -482,7 +482,7 @@ func (m *Manager) dyncfgConfigDisable(fn functions.Function) {
 	case dyncfgRunning:
 		m.stopRunningJob(ecfg.cfg.FullName())
 		if isDyncfg(ecfg.cfg) {
-			m.FileStatus.Remove(ecfg.cfg)
+			m.fileStatus.remove(ecfg.cfg)
 		}
 	default:
 	}
@@ -583,7 +583,7 @@ func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
 	m.seenConfigs.remove(ecfg.cfg)
 	m.exposedConfigs.remove(ecfg.cfg)
 	m.stopRunningJob(ecfg.cfg.FullName())
-	m.FileStatus.Remove(ecfg.cfg)
+	m.fileStatus.remove(ecfg.cfg)
 
 	m.dyncfgRespf(fn, 200, "")
 	m.dyncfgJobRemove(ecfg.cfg)
