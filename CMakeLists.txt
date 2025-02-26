@@ -1056,6 +1056,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/run_dir.h
         src/libnetdata/os/file_lock.c
         src/libnetdata/os/file_lock.h
+        src/libnetdata/os/mmap_limit.c
+        src/libnetdata/os/mmap_limit.h
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
