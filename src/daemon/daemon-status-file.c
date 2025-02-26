@@ -54,6 +54,7 @@ static XXH64_hash_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *
     buffer_json_member_add_string(wb, "agent_version", ds->version);
     buffer_json_member_add_uint64(wb, "fatal_line", ds->fatal.line);
     buffer_json_member_add_string_or_empty(wb, "fatal_filename", ds->fatal.filename);
+    buffer_json_member_add_string_or_empty(wb, "fatal_errno", ds->fatal.errno_str);
     buffer_json_member_add_string_or_empty(wb, "fatal_function", ds->fatal.function);
     buffer_json_member_add_string_or_empty(wb, "fatal_message", ds->fatal.message);
     buffer_json_member_add_string_or_empty(wb, "fatal_stack_trace", ds->fatal.stack_trace);
@@ -148,6 +149,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "filename", ds->fatal.filename);
         buffer_json_member_add_string_or_empty(wb, "function", ds->fatal.function);
         buffer_json_member_add_string_or_empty(wb, "message", ds->fatal.message);
+        buffer_json_member_add_string_or_empty(wb, "errno", ds->fatal.errno_str);
         buffer_json_member_add_string_or_empty(wb, "stack_trace", ds->fatal.stack_trace);
     }
     buffer_json_object_close(wb);
@@ -247,6 +249,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "filename", ds->fatal.filename, error, required_v1);
         JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "function", ds->fatal.function, error, required_v1);
         JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "message", ds->fatal.message, error, required_v1);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "errno", ds->fatal.errno_str, error, required_v3);
         JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "stack_trace", ds->fatal.stack_trace, error, required_v1);
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "line", ds->fatal.line, error, required_v1);
     });
@@ -762,15 +765,16 @@ void daemon_status_file_startup_step(const char *step) {
 // --------------------------------------------------------------------------------------------------------------------
 // ng_log() hook for receiving fatal message information
 
-void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *stack_trace, long line) {
+void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line) {
     spinlock_lock(&dsf_spinlock);
 
     // do not check the function, because it may have a startup step in it
-    if(session_status.fatal.filename || session_status.fatal.message || session_status.fatal.stack_trace) {
+    if(session_status.fatal.filename || session_status.fatal.message || session_status.fatal.errno_str || session_status.fatal.stack_trace) {
         spinlock_unlock(&dsf_spinlock);
         freez((void *)filename);
         freez((void *)function);
         freez((void *)message);
+        freez((void *)errno_str);
         freez((void *)stack_trace);
         return;
     }
@@ -779,6 +783,7 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     freez((char *)session_status.fatal.function); // it may have a startup step
     session_status.fatal.function = function;
     session_status.fatal.message = message;
+    session_status.fatal.errno_str = errno_str;
     session_status.fatal.stack_trace = stack_trace;
     session_status.fatal.line = line;
 

@@ -33,7 +33,7 @@ const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 const char *nd_log_method_for_external_plugins(const char *s);
 ND_UUID nd_log_get_invocation_id(void);
 
-typedef void (*log_event_t)(const char *filename, const char *function, const char *message, const char *stack_trace, long line);
+typedef void (*log_event_t)(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
 void nd_log_register_event_cb(log_event_t cb);
 
 int nd_log_health_fd(void);

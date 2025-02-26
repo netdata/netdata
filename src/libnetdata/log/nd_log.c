@@ -125,9 +125,10 @@ static void nd_log_event(struct log_field *fields, size_t fields_max __maybe_unu
     const char *message = log_field_strdupz(&fields[NDF_MESSAGE]);
     const char *function = log_field_strdupz(&fields[NDF_FUNC]);
     const char *stack_trace = log_field_strdupz(&fields[NDF_STACK_TRACE]);
+    const char *errno_str = log_field_strdupz(&fields[NDF_ERRNO]);
     long line = log_field_to_int64(&fields[NDF_LINE]);
 
-    nd_log.log_event_cb(filename, function, message, stack_trace, line);
+    nd_log.log_event_cb(filename, function, message, errno_str, stack_trace, line);
 }
 
 void nd_log_register_event_cb(log_event_t cb) {
