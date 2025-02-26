@@ -126,7 +126,7 @@ uint64_t log_field_to_uint64(struct log_field *lf) {
     return 0;
 }
 
-char *log_field_strdupz(struct log_field *lf) {
+const char *log_field_strdupz(struct log_field *lf) {
 
     //  --- FIELD_PARSER_VERSIONS ---
     //
@@ -146,50 +146,54 @@ char *log_field_strdupz(struct log_field *lf) {
     const char *s = NULL;
     char buf[DOUBLE_MAX_LENGTH];
 
-    switch(lf->entry.type) {
-        default:
-        case NDFT_UNSET:
-            return NULL;
+    if(lf->logfmt_annotator)
+         s = lf->logfmt_annotator(lf);
+    else {
+        switch (lf->entry.type) {
+            default:
+            case NDFT_UNSET:
+                return NULL;
 
-        case NDFT_UUID:
-            uuid_unparse_lower_compact(*lf->entry.uuid, buf);
-            s = buf;
-            break;
+            case NDFT_UUID:
+                uuid_unparse_lower_compact(*lf->entry.uuid, buf);
+                s = buf;
+                break;
 
-        case NDFT_TXT:
-            s = lf->entry.txt;
-            break;
+            case NDFT_TXT:
+                s = lf->entry.txt;
+                break;
 
-        case NDFT_STR:
-            s = string2str(lf->entry.str);
-            break;
+            case NDFT_STR:
+                s = string2str(lf->entry.str);
+                break;
 
-        case NDFT_BFR:
-            s = buffer_tostring(lf->entry.bfr);
-            break;
+            case NDFT_BFR:
+                s = buffer_tostring(lf->entry.bfr);
+                break;
 
-        case NDFT_CALLBACK:
-            tmp = buffer_create(0, NULL);
+            case NDFT_CALLBACK:
+                tmp = buffer_create(0, NULL);
 
-            if(lf->entry.cb.formatter(tmp, lf->entry.cb.formatter_data))
-                s = buffer_tostring(tmp);
-            else
-                s = NULL;
-            break;
+                if (lf->entry.cb.formatter(tmp, lf->entry.cb.formatter_data))
+                    s = buffer_tostring(tmp);
+                else
+                    s = NULL;
+                break;
 
-        case NDFT_U64:
-            print_uint64(buf, lf->entry.u64);
-            s = buf;
-            break;
+            case NDFT_U64:
+                print_uint64(buf, lf->entry.u64);
+                s = buf;
+                break;
 
-        case NDFT_I64:
-            print_int64(buf, lf->entry.i64);
-            s = buf;
-            break;
+            case NDFT_I64:
+                print_int64(buf, lf->entry.i64);
+                s = buf;
+                break;
 
-        case NDFT_DBL:
-            print_netdata_double(buf, lf->entry.dbl);
-            break;
+            case NDFT_DBL:
+                print_netdata_double(buf, lf->entry.dbl);
+                break;
+        }
     }
 
     if(s && *s)

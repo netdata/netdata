@@ -6,7 +6,7 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
     errno_clear();
 
     if (!dir || *dir != '/')
-        fatal("Invalid directory path (must be an absolute path): '%s'\n", dir);
+        fatal("Invalid directory path (must be an absolute path): '%s' (%s)", dir, env?env:"");
 
     if (chdir(dir) == 0) {
         if(env)
@@ -33,10 +33,12 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
 
             errno_clear();
             if (stat(path, &st) == -1)
-                fatal("Required directory: '%s' - Missing or inaccessible component: '%s' (error: %s)\n", dir, path, strerror(errno));
+                fatal("Required directory: '%s' (%s) - Missing or inaccessible component: '%s'",
+                      dir, env?env:"", path);
 
             if (!S_ISDIR(st.st_mode))
-                fatal("Required directory: '%s' - Component '%s' exists but is not a directory.\n", dir, path);
+                fatal("Required directory: '%s' (%s) - Component '%s' exists but is not a directory.",
+                      dir, env?env:"", path);
 
             *p = '/';
         }
@@ -44,15 +46,19 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
     }
 
     if (stat(dir, &st) == -1)
-        fatal("Required directory: '%s' - Missing or inaccessible: '%s' (error: %s)\n", dir, dir, strerror(errno));
+        fatal("Required directory: '%s' (%s) - Missing or inaccessible: '%s'",
+              dir, env?env:"", dir);
 
     if (!S_ISDIR(st.st_mode))
-        fatal("Required directory: '%s' - '%s' exists but is not a directory.\n", dir, dir);
+        fatal("Required directory: '%s' (%s) - '%s' exists but is not a directory.",
+              dir, env?env:"", dir);
 
     if (access(dir, R_OK | X_OK) == -1)
-        fatal("Required directory: '%s' - Insufficient permissions for: '%s' (error: %s)\n", dir, dir, strerror(errno));
+        fatal("Required directory: '%s' (%s) - Insufficient permissions for: '%s'",
+              dir, env?env:"", dir);
 
-    fatal("Required directory: '%s' - Failed (error: %s)\n", dir, strerror(errno));
+    fatal("Required directory: '%s' (%s) - Failed",
+          dir, env?env:"");
 }
 
 void set_environment_for_plugins_and_scripts(void) {
