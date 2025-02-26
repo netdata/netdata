@@ -68,9 +68,9 @@ typedef struct daemon_status_file {
     } fatal;
 
     struct {
-        time_t timestamp;
-        DAEMON_STATUS status;
-        EXIT_REASON exit_reason;
+        XXH64_hash_t hash;
+        usec_t timestamp_ut;
+        size_t restarts;
     } dedup;
 } DAEMON_STATUS_FILE;
 
