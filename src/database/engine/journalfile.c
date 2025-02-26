@@ -580,10 +580,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     journalfile->file = file;
     __atomic_add_fetch(&ctx->stats.journalfile_creations, 1, __ATOMIC_RELAXED);
 
-    ret = posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
-    if (unlikely(ret)) {
-        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
-    }
+    (void)posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     memset(superblock, 0, sizeof(*superblock));
     (void) strncpy(superblock->magic_number, RRDENG_JF_MAGIC, RRDENG_MAGIC_SZ);
     (void) strncpy(superblock->version, RRDENG_JF_VER, RRDENG_VER_SZ);
@@ -617,10 +614,7 @@ static int journalfile_check_superblock(uv_file file)
     uv_buf_t iov;
     uv_fs_t req;
 
-    ret = posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
-    if (unlikely(ret)) {
-        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
-    }
+    (void)posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
     ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
@@ -813,9 +807,7 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
     file_size = journalfile->unsafe.pos;
 
     max_id = 1;
-    ret = posix_memalignz((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
-    if (unlikely(ret))
-        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
+    (void)posix_memalignz((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
 
     for (pos = sizeof(struct rrdeng_jf_sb); pos < file_size; pos += READAHEAD_BYTES) {
         size_bytes = MIN(READAHEAD_BYTES, file_size - pos);

@@ -386,72 +386,94 @@ void freez_int(void *ptr, const char *file, const char *function, size_t line) {
 }
 #else
 
-ALWAYS_INLINE char *strdupz(const char *s) {
+ALWAYS_INLINE NORETURN
+static void out_of_memory(const char *call, size_t size) {
+    struct rusage usage = { 0 };
+    if(getrusage(RUSAGE_SELF, &usage) != 0)
+        usage.ru_maxrss = 0;
+
+    OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
+    fatal("Out of memory on %s(%zu bytes)!\n"
+          "System memory available: %lu, while our max RSS usage is: %ld\n"
+          "O/S mmap limit: %llu, while our mmap count is: %zu",
+          call, size,
+          sm.ram_available_bytes, usage.ru_maxrss,
+          os_mmap_limit(), __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED));
+}
+
+ALWAYS_INLINE MALLOCLIKE NEVERNULL WARNUNUSED
+char *strdupz(const char *s) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_STRDUP);
 
     char *t = strdup(s);
-    if (unlikely(!t)) {
-        OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
-        fatal("Cannot strdup() string '%s' (system memory available bytes: %lu)", s, sm.ram_available_bytes);
-    }
+    if (unlikely(!t))
+        out_of_memory(__FUNCTION__ , strlen(s) + 1);
+
     return t;
 }
 
-ALWAYS_INLINE char *strndupz(const char *s, size_t len) {
+ALWAYS_INLINE MALLOCLIKE NEVERNULL WARNUNUSED
+char *strndupz(const char *s, size_t len) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_STRNDUP);
 
     char *t = strndup(s, len);
-    if (unlikely(!t)) {
-        OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
-        fatal("Cannot strndup() string '%s' of len %zu (system memory available bytes: %lu)", s, len, sm.ram_available_bytes);
-    }
+    if (unlikely(!t))
+        out_of_memory(__FUNCTION__ , len + 1);
+
     return t;
 }
 
 // If ptr is NULL, no operation is performed.
-ALWAYS_INLINE void freez(void *ptr) {
+ALWAYS_INLINE
+void freez(void *ptr) {
     if(likely(ptr)) {
         workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
         free(ptr);
     }
 }
 
-ALWAYS_INLINE void *mallocz(size_t size) {
+ALWAYS_INLINE MALLOCLIKE NEVERNULL WARNUNUSED
+void *mallocz(size_t size) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_MALLOC);
     void *p = malloc(size);
-    if (unlikely(!p)) {
-        OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
-        fatal("Cannot allocate %zu bytes of memory (system memory available bytes: %lu)", size, sm.ram_available_bytes);
-    }
+    if (unlikely(!p))
+        out_of_memory(__FUNCTION__, size);
+
     return p;
 }
 
-ALWAYS_INLINE void *callocz(size_t nmemb, size_t size) {
+ALWAYS_INLINE MALLOCLIKE NEVERNULL WARNUNUSED
+void *callocz(size_t nmemb, size_t size) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_CALLOC);
     void *p = calloc(nmemb, size);
-    if (unlikely(!p)) {
-        OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
-        fatal("Cannot allocate %zu bytes of memory (system memory available bytes: %lu)", nmemb * size, sm.ram_available_bytes);
-    }
+    if (unlikely(!p))
+        out_of_memory(__FUNCTION__, nmemb * size);
+
     return p;
 }
 
-ALWAYS_INLINE void *reallocz(void *ptr, size_t size) {
+ALWAYS_INLINE MALLOCLIKE NEVERNULL WARNUNUSED
+void *reallocz(void *ptr, size_t size) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_REALLOC);
     void *p = realloc(ptr, size);
-    if (unlikely(!p)) {
-        OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
-        fatal("Cannot re-allocate memory to %zu bytes. (system memory available bytes: %lu)", size, sm.ram_available_bytes);
-    }
+    if (unlikely(!p))
+        out_of_memory(__FUNCTION__, size);
+
     return p;
 }
 
-ALWAYS_INLINE int posix_memalignz(void **memptr, size_t alignment, size_t size) {
+ALWAYS_INLINE
+int posix_memalignz(void **memptr, size_t alignment, size_t size) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN);
-    return posix_memalign(memptr, alignment, size);
+    int rc = posix_memalign(memptr, alignment, size);
+    if(unlikely(rc))
+        out_of_memory(__FUNCTION__, size);
+
+    return rc;
 }
 
-ALWAYS_INLINE void posix_memalign_freez(void *ptr) {
+ALWAYS_INLINE
+void posix_memalign_freez(void *ptr) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN_FREE);
     free(ptr);
 }

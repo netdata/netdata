@@ -2,6 +2,7 @@ extern "C" {
 
 #include "daemon.h"
 #include "libnetdata/libnetdata.h"
+#include "daemon/daemon-shutdown.h"
 
 int netdata_main(int argc, char *argv[]);
 void nd_process_signals(void);
