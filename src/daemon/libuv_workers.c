@@ -52,9 +52,7 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_METADATA_ML_LOAD, "metadata load ml models");
     worker_register_job_name(UV_EVENT_CTX_CLEANUP_SCHEDULE, "metadata ctx cleanup schedule");
     worker_register_job_name(UV_EVENT_CTX_CLEANUP, "metadata ctx cleanup");
-//    worker_register_job_name(UV_EVENT_STORE_ALERT_TRANSITIONS, "metadata store alert transitions");
     worker_register_job_name(UV_EVENT_CHART_LABEL_CLEANUP, "metadata chart label cleanup");
-    worker_register_job_name(UV_EVENT_HEALTH_LOG_CLEANUP, "alert transitions cleanup");
     worker_register_job_name(UV_EVENT_UUID_DELETION, "metadata dimension deletion");
     worker_register_job_name(UV_EVENT_DIMENSION_CLEANUP, "metadata dimension cleanup");
     worker_register_job_name(UV_EVENT_CHART_CLEANUP, "metadata chart cleanup");
@@ -85,6 +83,7 @@ static void register_libuv_worker_jobs_internal(void) {
     // health
     worker_register_job_name(UV_EVENT_HOST_HEALTH_INIT, "host health initialization");
     worker_register_job_name(UV_EVENT_HOST_HEALTH_RUN, "host health run");
+    worker_register_job_name(UV_EVENT_HEALTH_LOG_CLEANUP, "alert transitions cleanup");
     worker_register_job_name(UV_EVENT_HOST_CALC_CLEANUP, "host calc cleanup");
 
 
