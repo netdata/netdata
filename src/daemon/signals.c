@@ -35,7 +35,12 @@ static struct {
 };
 
 static void signal_handler(int signo) {
-    // find the entry in the list
+    static size_t recurse = 0;
+    if(__atomic_add_fetch(&recurse, 1, __ATOMIC_RELAXED) > 1) {
+        __atomic_sub_fetch(&recurse, 1, __ATOMIC_RELAXED);
+        return;
+    }
+
     int i;
     for(i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST ; i++) {
         if(unlikely(signals_waiting[i].signo == signo)) {
@@ -48,11 +53,14 @@ static void signal_handler(int signo) {
                     // nothing to do - we cannot write but there is no way to complain about it
                     ;
                 }
+                daemon_status_file_exit_reason_save(signals_waiting[i].reason);
             }
 
-            return;
+            break;
         }
     }
+
+    __atomic_sub_fetch(&recurse, 1, __ATOMIC_RELAXED);
 }
 
 // Mask all signals, to ensure they will only be unmasked at the threads that can handle them.
@@ -156,8 +164,7 @@ void nd_process_signals(void) {
 
                             case NETDATA_SIGNAL_FATAL:
                                 nd_log_limits_unlimited();
-                                exit_initiated_set(signals_waiting[i].reason);
-                                daemon_status_file_update_status(DAEMON_STATUS_NONE);
+                                daemon_status_file_exit_reason_save(signals_waiting[i].reason);
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
                                 break;
 
