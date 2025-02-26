@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "daemon-status-file.h"
+#include "buildinfo.h"
 
 #include <curl/curl.h>
 #include <openssl/evp.h>
@@ -11,7 +12,6 @@
 #define STATUS_FILE_VERSION 3
 
 #define STATUS_FILENAME "status-netdata.json"
-#define STATUS_FILENAME_TMP "status-netdata.json.tmp"
 
 ENUM_STR_MAP_DEFINE(DAEMON_STATUS) = {
     { DAEMON_STATUS_NONE, "none"},
@@ -85,6 +85,8 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         ND_PROFILE_2json(wb, "ND_profile", ds->profile); // custom
         buffer_json_member_add_string(wb, "ND_status", DAEMON_STATUS_2str(ds->status)); // custom
         EXIT_REASON_2json(wb, "ND_exit_reason", ds->exit_reason); // custom
+
+        buffer_json_member_add_string_or_empty(wb, "ND_install_type", ds->install_type); // custom
 
         buffer_json_member_add_object(wb, "ND_timings"); // custom
         {
@@ -195,6 +197,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "ND_exit_reason", EXIT_REASON_2id_one, ds->exit_reason, error, required_v1);
         JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ND_node_id", ds->node_id.uuid, error, required_v1);
         JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ND_claim_id", ds->claim_id.uuid, error, required_v1);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "ND_install_type", ds->install_type, error, required_v3);
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "ND_timings", error, required_v1, {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init", ds->timings.init, error, required_v1);
@@ -353,6 +356,14 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         session_status.dedup.hash = last_session_status.dedup.hash;
     }
 
+    if(!session_status.install_type) {
+        char *install_type = NULL, *prebuilt_arch = NULL, *prebuilt_dist = NULL;
+        get_install_type_internal(&install_type, &prebuilt_arch, &prebuilt_dist);
+        freez(prebuilt_arch);
+        freez(prebuilt_dist);
+        session_status.install_type = install_type;
+    }
+
     get_daemon_status_fields_from_system_info(&session_status);
 
     session_status.exit_reason = exit_initiated;
@@ -466,7 +477,7 @@ static bool save_status_file(const char *directory, const char *content, size_t 
     char temp_filename[FILENAME_MAX];
 
     snprintfz(filename, sizeof(filename), "%s/%s", directory, STATUS_FILENAME);
-    snprintfz(temp_filename, sizeof(temp_filename), "%s/%s", directory, STATUS_FILENAME_TMP);
+    snprintfz(temp_filename, sizeof(temp_filename), "%s/%s-%08x", directory, STATUS_FILENAME, (unsigned)gettid_cached());
 
     FILE *fp = fopen(temp_filename, "w");
     if (!fp)
@@ -502,6 +513,7 @@ static void daemon_status_file_save(DAEMON_STATUS_FILE *ds) {
     if (!wb)
         wb = buffer_create(16384, NULL);
 
+    buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     daemon_status_file_to_json(wb, ds);
     buffer_json_finalize(wb);
@@ -519,7 +531,7 @@ static void daemon_status_file_save(DAEMON_STATUS_FILE *ds) {
 
         // Try each fallback directory until successful
         for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
-            if(save_status_file(status_file_fallbacks[i], content, content_size)) {
+            if (save_status_file(status_file_fallbacks[i], content, content_size)) {
                 nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_fallbacks[i]);
                 saved = true;
                 break;

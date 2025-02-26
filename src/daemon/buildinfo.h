@@ -15,4 +15,6 @@ void get_install_type(struct rrdhost_system_info *system_info);
 
 void build_info_to_json_object(BUFFER *b);
 
+void get_install_type_internal(char **install_type, char **prebuilt_arch, char **prebuilt_dist);
+
 #endif // NETDATA_BUILDINFO_H
