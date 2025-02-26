@@ -51,11 +51,11 @@ void freez_int(void *ptr, const char *file, const char *function, size_t line);
 size_t mallocz_usable_size_int(void *ptr, const char *file, const char *function, size_t line);
 
 #else // NETDATA_TRACE_ALLOCATIONS
-char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
-char *strndupz(const char *s, size_t len) MALLOCLIKE NEVERNULL;
-void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
-void *mallocz(size_t size) MALLOCLIKE NEVERNULL;
-void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
+char *strdupz(const char *s) MALLOCLIKE NEVERNULL WARNUNUSED;
+char *strndupz(const char *s, size_t len) MALLOCLIKE NEVERNULL WARNUNUSED;
+void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL WARNUNUSED;
+void *mallocz(size_t size) MALLOCLIKE NEVERNULL WARNUNUSED;
+void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL WARNUNUSED;
 void freez(void *ptr);
 #endif // NETDATA_TRACE_ALLOCATIONS
 

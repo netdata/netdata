@@ -1216,12 +1216,10 @@ static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file
     uv_fs_t request;
 
     unsigned real_io_size = ALIGN_BYTES_CEILING(size_bytes);
-    int ret = posix_memalignz(&buffer, RRDFILE_ALIGNMENT, real_io_size);
-    if (unlikely(ret))
-        fatal("DBENGINE: posix_memalign(): %s", strerror(ret));
+    (void)posix_memalignz(&buffer, RRDFILE_ALIGNMENT, real_io_size);
 
     uv_buf_t iov = uv_buf_init(buffer, real_io_size);
-    ret = uv_fs_read(NULL, &request, file, &iov, 1, (int64_t)pos, NULL);
+    int ret = uv_fs_read(NULL, &request, file, &iov, 1, (int64_t)pos, NULL);
     if (unlikely(-1 == ret)) {
         ctx_io_error(ctx);
         posix_memalign_freez(buffer);

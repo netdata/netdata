@@ -56,7 +56,6 @@ static XXH64_hash_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *
     buffer_json_member_add_string_or_empty(wb, "fatal_filename", ds->fatal.filename);
     buffer_json_member_add_string_or_empty(wb, "fatal_errno", ds->fatal.errno_str);
     buffer_json_member_add_string_or_empty(wb, "fatal_function", ds->fatal.function);
-    buffer_json_member_add_string_or_empty(wb, "fatal_message", ds->fatal.message);
     buffer_json_member_add_string_or_empty(wb, "fatal_stack_trace", ds->fatal.stack_trace);
     buffer_json_member_add_string(wb, "message", msg);
     buffer_json_member_add_string(wb, "cause", cause);

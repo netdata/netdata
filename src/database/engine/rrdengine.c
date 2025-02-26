@@ -393,9 +393,7 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
     if(unlikely(!wal)) {
         wal = mallocz(sizeof(WAL));
         wal->buf_size = RRDENG_BLOCK_SIZE;
-        int ret = posix_memalignz((void *)&wal->buf, RRDFILE_ALIGNMENT, wal->buf_size);
-        if (unlikely(ret))
-            fatal("DBENGINE: posix_memalign:%s", strerror(ret));
+        (void)posix_memalignz((void *)&wal->buf, RRDFILE_ALIGNMENT, wal->buf_size);
         __atomic_add_fetch(&wal_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
@@ -732,7 +730,6 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
 static struct extent_io_descriptor *
 datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_data *base, uv_buf_t *iov)
 {
-    int ret;
     unsigned i, count, size_bytes, pos, real_io_size;
     uint32_t uncompressed_payload_length, max_compressed_size, payload_offset;
     struct page_descr_with_data *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
@@ -763,11 +760,7 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     payload_offset = sizeof(*header) + count * sizeof(header->descr[0]);
     max_compressed_size = dbengine_max_compressed_size(uncompressed_payload_length, compression_algorithm);
     size_bytes = payload_offset + MAX(uncompressed_payload_length, max_compressed_size) + sizeof(*trailer);
-    ret = posix_memalignz((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
-    if (unlikely(ret)) {
-        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
-        /* freez(xt_io_descr);*/
-    }
+    (void)posix_memalignz((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
     memset(xt_io_descr->buf, 0, ALIGN_BYTES_CEILING(size_bytes));
     (void) memcpy(xt_io_descr->descr_array, eligible_pages, sizeof(struct page_descr_with_data *) * count);
     xt_io_descr->descr_count = count;
