@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Avoid post initialization errors repeateadly [\#19709](https://github.com/netdata/netdata/pull/19709) ([ktsaou](https://github.com/ktsaou))
+- Check for final step [\#19708](https://github.com/netdata/netdata/pull/19708) ([stelfrag](https://github.com/stelfrag))
+- daemon status improvements 3 [\#19707](https://github.com/netdata/netdata/pull/19707) ([ktsaou](https://github.com/ktsaou))
 - fix runtime directory; annotate daemon status file [\#19706](https://github.com/netdata/netdata/pull/19706) ([ktsaou](https://github.com/ktsaou))
 - add host/os fields to status file [\#19704](https://github.com/netdata/netdata/pull/19704) ([ktsaou](https://github.com/ktsaou))
 - under MSYS2 use stat [\#19703](https://github.com/netdata/netdata/pull/19703) ([ktsaou](https://github.com/ktsaou))
@@ -488,9 +491,6 @@
 - Update cloud virtual host name [\#19163](https://github.com/netdata/netdata/pull/19163) ([stelfrag](https://github.com/stelfrag))
 - docs: leftover links + changes on api-tokens.md [\#19162](https://github.com/netdata/netdata/pull/19162) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations docs [\#19161](https://github.com/netdata/netdata/pull/19161) ([netdatabot](https://github.com/netdatabot))
-- docs: edit Authentication and Authorization section [\#19160](https://github.com/netdata/netdata/pull/19160) ([Ancairon](https://github.com/Ancairon))
-- Remove Option from Installer \(Windows\) [\#19159](https://github.com/netdata/netdata/pull/19159) ([thiagoftsm](https://github.com/thiagoftsm))
-- NET Framework metadata \(Windows.plugin Part 1\) [\#19158](https://github.com/netdata/netdata/pull/19158) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
