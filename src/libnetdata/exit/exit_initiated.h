@@ -23,23 +23,24 @@ typedef enum {
     EXIT_REASON_SIGSEGV             = (1 << 5),
     EXIT_REASON_SIGFPE              = (1 << 6),
     EXIT_REASON_SIGILL              = (1 << 7),
+    EXIT_REASON_OUT_OF_MEMORY       = (1 << 8),
 
     // normal termination via APIs
-    EXIT_REASON_API_QUIT            = (1 << 7),
-    EXIT_REASON_CMD_EXIT            = (1 << 8),
+    EXIT_REASON_API_QUIT            = (1 << 9),
+    EXIT_REASON_CMD_EXIT            = (1 << 10),
 
     // abnormal termination via a fatal message
-    EXIT_REASON_FATAL               = (1 << 9),
+    EXIT_REASON_FATAL               = (1 << 11),
 
     // windows specific, service stop
-    EXIT_REASON_SERVICE_STOP        = (1 << 10),
+    EXIT_REASON_SERVICE_STOP        = (1 << 12),
 
     // netdata update
-    EXIT_REASON_UPDATE              = (1 << 11),
+    EXIT_REASON_UPDATE              = (1 << 13),
 } EXIT_REASON;
 
 #define EXIT_REASON_NORMAL (EXIT_REASON_SIGINT|EXIT_REASON_SIGTERM|EXIT_REASON_SIGQUIT|EXIT_REASON_API_QUIT|EXIT_REASON_CMD_EXIT|EXIT_REASON_SERVICE_STOP|EXIT_REASON_SYSTEM_SHUTDOWN|EXIT_REASON_UPDATE)
-#define EXIT_REASON_ABNORMAL (EXIT_REASON_SIGBUS|EXIT_REASON_SIGSEGV|EXIT_REASON_SIGFPE|EXIT_REASON_SIGILL|EXIT_REASON_FATAL)
+#define EXIT_REASON_ABNORMAL (EXIT_REASON_SIGBUS|EXIT_REASON_SIGSEGV|EXIT_REASON_SIGFPE|EXIT_REASON_SIGILL|EXIT_REASON_FATAL|EXIT_REASON_OUT_OF_MEMORY)
 
 #define is_exit_reason_normal(reason) (((reason) & EXIT_REASON_NORMAL) && !((reason) & EXIT_REASON_ABNORMAL))
 
