@@ -1073,7 +1073,11 @@ static void health_ev_loop(void *arg)
     fatal_assert(0 == uv_timer_start(&config->timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
     int max_thread_count = netdata_conf_health_threads();
-    netdata_log_info("Starting health with %d threads", max_thread_count);
+    int maint_max_thread_count = (max_thread_count * 5 / 100);
+    if (maint_max_thread_count < 1)
+        maint_max_thread_count = 1;
+    netdata_log_info("Starting health with %d threads for alert evaluations and 3x%d threads for other tasks",
+                     max_thread_count, maint_max_thread_count);
 
     unsigned cmd_batch_size;
     RRDHOST *host;
@@ -1088,9 +1092,9 @@ static void health_ev_loop(void *arg)
     config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP]->job_type = HEALTH_JOB_HOST_CALC_CLEANUP;
 
     config->job_list[HEALTH_JOB_HOST_RUN]->max_threads = max_thread_count;
-    config->job_list[HEALTH_JOB_HOST_INIT]->max_threads = 2;
-    config->job_list[HEALTH_JOB_HOST_MAINT]->max_threads = 2;
-    config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP]->max_threads = 2;
+    config->job_list[HEALTH_JOB_HOST_INIT]->max_threads = maint_max_thread_count;
+    config->job_list[HEALTH_JOB_HOST_MAINT]->max_threads = maint_max_thread_count;
+    config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP]->max_threads = maint_max_thread_count;
 
     health_register_host(localhost, localhost->health.delay_up_to);
     HEALTH *host_health;
