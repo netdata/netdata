@@ -85,7 +85,18 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_HOST_HEALTH_RUN, "host health run");
     worker_register_job_name(UV_EVENT_HEALTH_LOG_CLEANUP, "alert transitions cleanup");
     worker_register_job_name(UV_EVENT_HOST_CALC_CLEANUP, "host calc cleanup");
-
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_RRD_LOCK, "health rrd lock");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_HOST_LOCK, "health host lock");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_DB_QUERY, "health db lookup");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_CALC_EVAL, "health calc eval");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_WARNING_EVAL, "health warning eval");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_CRITICAL_EVAL, "health critical eval");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_ALARM_LOG_ENTRY, "health alert log entry");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_ALARM_LOG_PROCESS, "health alert log process");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_ALARM_LOG_QUEUE, "health alert log queue");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_WAIT_EXEC, "health alert wait exec");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_DELAYED_INIT_RRDSET, "health rrdset init");
+    worker_register_job_name(UV_EVENT_HEALTH_JOB_DELAYED_INIT_RRDDIM, "health rrddim init");
 
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
