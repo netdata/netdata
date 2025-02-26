@@ -56,12 +56,6 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
 
-#ifdef OS_WINDOWS
-void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char *action_result, const char *action_data);
-#else
-void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char *action_result, const char *action_data) NORETURN;
-#endif
-
 extern const char *netdata_configured_host_prefix;
 
 // safe includes before O/S specific functions

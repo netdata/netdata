@@ -136,6 +136,12 @@ void nd_log_register_event_cb(log_event_t cb) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+
+void nd_log_register_fatal_cb(fatal_event_t cb) {
+    nd_log.fatal_event_cb = cb;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // high level logger
 
 static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
@@ -525,8 +531,11 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    abort();
+    // abort();
 #endif
 
-    netdata_cleanup_and_exit(EXIT_REASON_FATAL, "FATAL", action_result, action_data);
+    if(nd_log.fatal_event_cb)
+        nd_log.fatal_event_cb();
+
+    exit(1);
 }
