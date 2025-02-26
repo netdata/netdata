@@ -26,6 +26,7 @@ typedef struct health {
     bool timer_initialized;
     bool apply_hibernation_delay;
     bool rrdcalc_cleanup_running;
+    time_t last_maintenance;
     uint32_t last_runtime;
     Word_t count;
     Word_t delete_count;
