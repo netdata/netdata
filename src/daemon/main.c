@@ -229,6 +229,16 @@ int unittest_prepare_rrd(const char **user) {
     return 0;
 }
 
+static void fatal_cleanup_and_exit_cb(void) {
+    netdata_cleanup_and_exit(EXIT_REASON_FATAL, "fatal error", "exiting", NULL);
+    exit(1);
+}
+
+static void fatal_status_file_save(void) {
+    daemon_status_file_update_status(DAEMON_STATUS_NONE);
+    exit(1);
+}
+
 int netdata_main(int argc, char **argv) {
     libjudy_malloc_init();
     string_init();
@@ -753,6 +763,7 @@ int netdata_main(int argc, char **argv) {
     // initialize the log files
     nd_log_initialize();
     nd_log_register_event_cb(daemon_status_file_register_fatal);
+    nd_log_register_fatal_cb(fatal_status_file_save);
 
     netdata_conf_section_global(); // get hostname, host prefix, profile, etc
     registry_init(); // for machine_guid, must be after netdata_conf_section_global()
@@ -1057,6 +1068,7 @@ int netdata_main(int argc, char **argv) {
 
     webrtc_initialize();
 
+    nd_log_register_fatal_cb(fatal_cleanup_and_exit_cb);
     daemon_status_file_startup_step(NULL);
     daemon_status_file_update_status(DAEMON_STATUS_RUNNING);
     return 10;

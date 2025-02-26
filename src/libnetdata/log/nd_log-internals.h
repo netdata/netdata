@@ -126,6 +126,7 @@ struct nd_log {
 
     ND_LOG_SOURCES overwrite_process_source;
     log_event_t log_event_cb;
+    fatal_event_t fatal_event_cb;
 
     struct nd_log_source sources[_NDLS_MAX];
 

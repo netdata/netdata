@@ -3,6 +3,7 @@
 #include "libnetdata/libnetdata.h"
 #include "daemon-systemd-watcher.h"
 #include "daemon-service.h"
+#include "daemon-shutdown.h"
 
 #ifdef ENABLE_SYSTEMD_DBUS
 
