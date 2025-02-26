@@ -98,12 +98,7 @@ struct lqs_extension {
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       \
     "!MESSAGE_ID"                               \
     "|*MESSAGE*"                                \
-    "|*_RAW"                                    \
-    "|*_USEC"                                   \
-    "|*_NSEC"                                   \
     "|*TIMESTAMP*"                              \
-    "|*_ID"                                     \
-    "|*_ID_*"                                   \
     "|__*"                                      \
     ""
 
