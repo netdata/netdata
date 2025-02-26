@@ -101,7 +101,7 @@ void nd_profile_setup(void) {
     if(netdata_conf_is_iot()) {
         nd_profile.storage_tiers = 3;       // MUST BE 1
         nd_profile.update_every = 1;        // MUST BE 2
-        nd_profile.malloc_arenas = 4;
+        nd_profile.malloc_arenas = 1;
         nd_profile.malloc_trim = 32 * 1024;
         nd_profile.stream_sender_compression = ND_COMPRESSION_FASTEST;
         // web server threads = 6
@@ -117,7 +117,7 @@ void nd_profile_setup(void) {
     else if(netdata_conf_is_parent()) {
         nd_profile.storage_tiers = 3;
         nd_profile.update_every = 1;
-        nd_profile.malloc_arenas = 1;
+        nd_profile.malloc_arenas = 4;
         nd_profile.malloc_trim = 128 * 1024;
         nd_profile.stream_sender_compression = ND_COMPRESSION_FASTEST;
         // web server threads = dynamic
