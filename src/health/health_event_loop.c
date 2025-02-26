@@ -1035,6 +1035,7 @@ void schedule_job_to_run(struct health_config_s *config, health_job_type_t job_t
     if (!host)
         return;
 
+    too_busy = (job->running >= max_threads);
     // We have a host, if not busy lets run it
     if (!too_busy)
         too_busy = send_job_to_worker(config, job, host);
