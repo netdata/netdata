@@ -717,7 +717,7 @@ void daemon_status_file_check_crash(void) {
                 pri = PRI_USER_SHOULD_FIX;
             }
             else if (!is_exit_reason_normal(last_session_status.exit_reason)) {
-                cause = "killed fatal";
+                cause = "fatal on start";
                 msg = "Netdata was last crashed while starting, because of a fatal error";
                 pri = PRI_NETDATA_BUG;
             }
