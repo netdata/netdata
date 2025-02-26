@@ -18,7 +18,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/filestatus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -193,23 +192,13 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr := jobmgr.New()
 	jobMgr.PluginName = a.Name
 	jobMgr.Out = a.Out
+	jobMgr.StateFile = a.StateFile
 	jobMgr.Modules = enabledModules
 	jobMgr.ConfigDefaults = discCfg.Registry
 	jobMgr.FnReg = fnMgr
 
 	if reg := a.setupVnodeRegistry(); len(reg) > 0 {
 		jobMgr.Vnodes = reg
-	}
-
-	var fsMgr *filestatus.Manager
-	if !isTerminal && a.StateFile != "" {
-		fsMgr = filestatus.NewManager(a.StateFile)
-		jobMgr.FileStatus = fsMgr
-		if store, err := filestatus.LoadStore(a.StateFile); err != nil {
-			a.Warningf("couldn't load state file: %v", err)
-		} else {
-			jobMgr.FileStatusStore = store
-		}
 	}
 
 	in := make(chan []*confgroup.Group)
@@ -223,11 +212,6 @@ func (a *Agent) run(ctx context.Context) {
 
 	wg.Add(1)
 	go func() { defer wg.Done(); discMgr.Run(ctx, in) }()
-
-	if fsMgr != nil {
-		wg.Add(1)
-		go func() { defer wg.Done(); fsMgr.Run(ctx) }()
-	}
 
 	wg.Wait()
 	<-ctx.Done()
