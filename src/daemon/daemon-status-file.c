@@ -711,15 +711,15 @@ void daemon_status_file_check_crash(void) {
                 msg = "The system was abnormally powered off while Netdata was starting";
                 pri = PRI_USER_SHOULD_FIX;
             }
-            else if (last_session_status.exit_reason &= (EXIT_REASON_SIGBUS|EXIT_REASON_SIGFPE|EXIT_REASON_SIGILL|EXIT_REASON_SIGSEGV)) {
-                cause = "killed signal";
-                msg = "Netdata was last crashed while starting, with a signal indicating a bug";
-                pri = PRI_NETDATA_BUG;
-            }
-            else if (last_session_status.exit_reason &= EXIT_REASON_OUT_OF_MEMORY) {
+            else if (last_session_status.exit_reason & EXIT_REASON_OUT_OF_MEMORY) {
                 cause = "out of memory";
                 msg = "Netdata was last crashed while starting, because it couldn't allocate memory";
                 pri = PRI_USER_SHOULD_FIX;
+            }
+            else if (!is_exit_reason_normal(last_session_status.exit_reason)) {
+                cause = "killed fatal";
+                msg = "Netdata was last crashed while starting, because of a fatal error";
+                pri = PRI_NETDATA_BUG;
             }
             else {
                 cause = "crashed on start";
@@ -760,15 +760,15 @@ void daemon_status_file_check_crash(void) {
                 msg = "The system was abnormally powered off while Netdata was running";
                 pri = PRI_USER_SHOULD_FIX;
             }
-            else if (last_session_status.exit_reason &= (EXIT_REASON_SIGBUS|EXIT_REASON_SIGFPE|EXIT_REASON_SIGILL|EXIT_REASON_SIGSEGV)) {
-                cause = "killed signal";
-                msg = "Netdata was last crashed with a signal indicating a bug";
-                pri = PRI_NETDATA_BUG;
-            }
-            else if (last_session_status.exit_reason &= EXIT_REASON_OUT_OF_MEMORY) {
+            else if (last_session_status.exit_reason & EXIT_REASON_OUT_OF_MEMORY) {
                 cause = "out of memory";
                 msg = "Netdata was last crashed because it couldn't allocate memory";
                 pri = PRI_USER_SHOULD_FIX;
+            }
+            else if (!is_exit_reason_normal(last_session_status.exit_reason)) {
+                cause = "killed fatal";
+                msg = "Netdata was last crashed due to a fatal error";
+                pri = PRI_NETDATA_BUG;
             }
             else {
                 cause = "killed hard";
