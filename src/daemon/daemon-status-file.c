@@ -908,10 +908,32 @@ bool daemon_status_file_was_incomplete_shutdown(void) {
 }
 
 void daemon_status_file_startup_step(const char *step) {
+    if(session_status.fatal.filename)
+        // we have a fatal logged
+        return;
+
     freez((char *)session_status.fatal.function);
     session_status.fatal.function = step ? strdupz(step) : NULL;
     if(step != NULL)
         daemon_status_file_update_status(DAEMON_STATUS_NONE);
+}
+
+void daemon_status_file_shutdown_step(const char *step) {
+    if(session_status.fatal.filename)
+        // we have a fatal logged
+        return;
+
+    freez((char *)session_status.fatal.function);
+    if(!step)
+        session_status.fatal.function = NULL;
+
+    else {
+        char buf[1024];
+        snprintfz(buf, sizeof(buf), "shutdown(%s)", step);
+        session_status.fatal.function = strdupz(buf);
+    }
+
+    daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

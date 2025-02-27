@@ -88,7 +88,9 @@ void daemon_status_file_check_crash(void);
 
 bool daemon_status_file_has_last_crashed(void);
 bool daemon_status_file_was_incomplete_shutdown(void);
+
 void daemon_status_file_startup_step(const char *step);
+void daemon_status_file_shutdown_step(const char *step);
 
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
 

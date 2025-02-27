@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon-shutdown-watcher.h"
+#include "daemon-status-file.h"
 
 watcher_step_t *watcher_steps;
 
@@ -32,6 +33,8 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
     netdata_log_info("shutdown step: [%d/%d] - {at %s} started '%s'...",
                      (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
                      watcher_steps[step_id].msg);
+
+    daemon_status_file_shutdown_step(watcher_steps[step_id].msg);
 
 #ifdef ENABLE_SENTRY
     // Wait with a timeout
@@ -65,6 +68,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
                           (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
                           watcher_steps[step_id].msg, step_duration_txt);
 
+        daemon_status_file_shutdown_step("sentry timeout");
         abort();
     }
 }
