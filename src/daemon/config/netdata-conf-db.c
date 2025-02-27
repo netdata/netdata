@@ -15,6 +15,8 @@ time_t rrdset_free_obsolete_time_s = 3600;
 time_t rrdhost_cleanup_orphan_to_archive_time_s = 3600;
 time_t rrdhost_free_ephemeral_time_s = 0;
 
+extern time_t dbengine_journal_v2_unmount_time;
+
 size_t get_tier_grouping(size_t tier) {
     if(unlikely(tier >= nd_profile.storage_tiers)) tier = nd_profile.storage_tiers - 1;
 
@@ -177,6 +179,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
     // ----------------------------------------------------------------------------------------------------------------
 
     dbengine_use_direct_io = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine use direct io", dbengine_use_direct_io);
+    dbengine_journal_v2_unmount_time = inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "dbengine journal v2 unmount time", nd_profile.dbengine_journal_v2_unmount_time);
 
     unsigned read_num = (unsigned)inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", DEFAULT_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= DEFAULT_PAGES_PER_EXTENT)
