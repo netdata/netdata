@@ -1415,7 +1415,7 @@ void netdata_wsfed_token_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
 
 static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "AD FS");
     if (!pObjectType)
         return false;
 
@@ -1464,6 +1464,12 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         // This must be the end
         NULL};
+
+    DWORD i;
+    for (i = 0; doADFS[i]; i++) {
+        doADFS[i](pDataBlock, pObjectType, update_every);
+    }
+
     return true;
 }
 
