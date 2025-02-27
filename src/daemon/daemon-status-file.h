@@ -73,7 +73,7 @@ typedef struct daemon_status_file {
     struct {
         XXH64_hash_t hash;
         usec_t timestamp_ut;
-    } dedup;
+    } dedup[10];
 } DAEMON_STATUS_FILE;
 
 // loads the last status saved
