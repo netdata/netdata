@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 3
+#define STATUS_FILE_VERSION 4
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -81,6 +81,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         buffer_json_member_add_uuid(wb, "ND_node_id", ds->node_id.uuid); // custom
         buffer_json_member_add_uuid(wb, "ND_claim_id", ds->claim_id.uuid); // custom
+        buffer_json_member_add_uint64(wb, "ND_restarts", ds->restarts); // custom
 
         ND_PROFILE_2json(wb, "ND_profile", ds->profile); // custom
         buffer_json_member_add_string(wb, "ND_status", DAEMON_STATUS_2str(ds->status)); // custom
@@ -159,7 +160,6 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     {
         buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup.timestamp_ut, true); // custom
         buffer_json_member_add_uint64(wb, "hash", ds->dedup.hash); // custom
-        buffer_json_member_add_uint64(wb, "restarts", ds->dedup.restarts); // custom
     }
     buffer_json_object_close(wb);
 }
@@ -180,6 +180,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool strict = false; // allow missing fields and values
     bool required_v1 = version >= 1 ? strict : false;
     bool required_v3 = version >= 3 ? strict : false;
+    bool required_v4 = version >= 4 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -203,6 +204,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init", ds->timings.init, error, required_v1);
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit", ds->timings.exit, error, required_v1);
         });
+
+        if(version == 4)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ND_restarts", ds->restarts, error, required_v4);
     });
 
     // Parse host object
@@ -264,7 +268,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             ds->dedup.timestamp_ut = rfc3339_parse_ut(datetime, NULL);
 
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.hash, error, required_v3);
-        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "restarts", ds->dedup.restarts, error, required_v3);
+
+        if(version == 3)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "restarts", ds->restarts, error, required_v3);
     });
 
     return true;
@@ -349,8 +355,8 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         session_status.os_id = strdupz(last_session_status.os_id);
     if(!session_status.os_id_like && last_session_status.os_id_like)
         session_status.os_id_like = strdupz(last_session_status.os_id_like);
-    if(!session_status.dedup.restarts)
-        session_status.dedup.restarts = last_session_status.dedup.restarts + 1;
+    if(!session_status.restarts)
+        session_status.restarts = last_session_status.restarts + 1;
     if(!session_status.dedup.timestamp_ut || !session_status.dedup.hash) {
         session_status.dedup.timestamp_ut = last_session_status.dedup.timestamp_ut;
         session_status.dedup.hash = last_session_status.dedup.hash;

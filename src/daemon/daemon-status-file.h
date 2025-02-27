@@ -34,6 +34,7 @@ typedef struct daemon_status_file {
     time_t boottime;            // system boottime
     time_t uptime;              // netdata uptime
     usec_t timestamp_ut;        // the timestamp of the status file
+    size_t restarts;            // the number of times this agent has restarted
 
     ND_UUID boot_id;            // the boot id of the system
     ND_UUID invocation;         // the netdata invocation id generated the file
@@ -72,7 +73,6 @@ typedef struct daemon_status_file {
     struct {
         XXH64_hash_t hash;
         usec_t timestamp_ut;
-        size_t restarts;
     } dedup;
 } DAEMON_STATUS_FILE;
 
