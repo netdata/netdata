@@ -316,12 +316,11 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     netdata_ssl_cleanup();
     watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
 
-    watcher_step_complete(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE);
-
     watcher_shutdown_end();
     watcher_thread_stop();
     curl_global_cleanup();
 
+    daemon_status_file_shutdown_step(NULL);
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
 
 #ifdef OS_WINDOWS

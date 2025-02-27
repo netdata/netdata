@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 3
+#define STATUS_FILE_VERSION 4
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -81,6 +81,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         buffer_json_member_add_uuid(wb, "ND_node_id", ds->node_id.uuid); // custom
         buffer_json_member_add_uuid(wb, "ND_claim_id", ds->claim_id.uuid); // custom
+        buffer_json_member_add_uint64(wb, "ND_restarts", ds->restarts); // custom
 
         ND_PROFILE_2json(wb, "ND_profile", ds->profile); // custom
         buffer_json_member_add_string(wb, "ND_status", DAEMON_STATUS_2str(ds->status)); // custom
@@ -155,13 +156,21 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_object(wb, "dedup"); // custom
+    buffer_json_member_add_array(wb, "dedup"); // custom
     {
-        buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup.timestamp_ut, true); // custom
-        buffer_json_member_add_uint64(wb, "hash", ds->dedup.hash); // custom
-        buffer_json_member_add_uint64(wb, "restarts", ds->dedup.restarts); // custom
+        for(size_t i = 0; i < _countof(ds->dedup); i++) {
+            if (ds->dedup[i].timestamp_ut == 0)
+                continue;
+
+            buffer_json_add_array_item_object(wb); // custom
+            {
+                buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup[i].timestamp_ut, true); // custom
+                buffer_json_member_add_uint64(wb, "hash", ds->dedup[i].hash); // custom
+            }
+            buffer_json_object_close(wb);
+        }
     }
-    buffer_json_object_close(wb);
+    buffer_json_array_close(wb);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -180,6 +189,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool strict = false; // allow missing fields and values
     bool required_v1 = version >= 1 ? strict : false;
     bool required_v3 = version >= 3 ? strict : false;
+    bool required_v4 = version >= 4 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -203,6 +213,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init", ds->timings.init, error, required_v1);
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit", ds->timings.exit, error, required_v1);
         });
+
+        if(version >= 4)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ND_restarts", ds->restarts, error, required_v4);
     });
 
     // Parse host object
@@ -257,15 +270,32 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     });
 
     // Parse the last posted object
-    JSONC_PARSE_SUBOBJECT(jobj, path, "dedup", error, required_v3, {
-        datetime[0] = '\0';
-        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
-        if(datetime[0])
-            ds->dedup.timestamp_ut = rfc3339_parse_ut(datetime, NULL);
+    if(version == 3) {
+        JSONC_PARSE_SUBOBJECT(jobj, path, "dedup", error, required_v3, {
+            datetime[0] = '\0';
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v3);
+            if (datetime[0])
+                ds->dedup[0].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
 
-        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.hash, error, required_v3);
-        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "restarts", ds->dedup.restarts, error, required_v3);
-    });
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup[0].hash, error, required_v3);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "restarts", ds->restarts, error, required_v3);
+        });
+    }
+    else if(version >= 4) {
+        JSONC_PARSE_ARRAY(jobj, path, "dedup", error, required_v4, {
+            size_t i = 0;
+            JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, required_v4, {
+                if(i >= _countof(ds->dedup))
+                    break;
+
+                JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v4);
+                if (datetime[0])
+                    ds->dedup[i].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
+
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup[i].hash, error, required_v4);
+            });
+        });
+    }
 
     return true;
 }
@@ -349,11 +379,11 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         session_status.os_id = strdupz(last_session_status.os_id);
     if(!session_status.os_id_like && last_session_status.os_id_like)
         session_status.os_id_like = strdupz(last_session_status.os_id_like);
-    if(!session_status.dedup.restarts)
-        session_status.dedup.restarts = last_session_status.dedup.restarts + 1;
-    if(!session_status.dedup.timestamp_ut || !session_status.dedup.hash) {
-        session_status.dedup.timestamp_ut = last_session_status.dedup.timestamp_ut;
-        session_status.dedup.hash = last_session_status.dedup.hash;
+    if(!session_status.restarts)
+        session_status.restarts = last_session_status.restarts + 1;
+    if(!session_status.dedup[0].timestamp_ut || !session_status.dedup[0].hash) {
+        for (size_t i = 0; i < _countof(session_status.dedup); i++)
+            session_status.dedup[i] = last_session_status.dedup[i];
     }
 
     if(!session_status.install_type) {
@@ -562,6 +592,65 @@ static void daemon_status_file_out_of_memory(void) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// deduplication hashes management
+
+static bool dedup_already_posted(XXH64_hash_t hash) {
+    spinlock_lock(&dsf_spinlock);
+
+    usec_t now_ut = now_realtime_usec();
+
+    for(size_t i = 0; i < _countof(session_status.dedup); i++) {
+        if(session_status.dedup[i].timestamp_ut == 0)
+            continue;
+
+        if(hash == session_status.dedup[i].hash &&
+            now_ut - session_status.dedup[i].timestamp_ut < 86400 * USEC_PER_SEC) {
+            // we have already posted this crash
+            spinlock_unlock(&dsf_spinlock);
+            return true;
+        }
+    }
+
+    spinlock_unlock(&dsf_spinlock);
+    return false;
+}
+
+static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, XXH64_hash_t hash) {
+    spinlock_lock(&dsf_spinlock);
+
+    // find the same hash
+    for(size_t i = 0; i < _countof(ds->dedup); i++) {
+        if(ds->dedup[i].hash == hash) {
+            ds->dedup[i].timestamp_ut = now_realtime_usec();
+            spinlock_unlock(&dsf_spinlock);
+            return;
+        }
+    }
+
+    // find an empty slot
+    for(size_t i = 0; i < _countof(ds->dedup); i++) {
+        if(!ds->dedup[i].hash) {
+            ds->dedup[i].hash = hash;
+            ds->dedup[i].timestamp_ut = now_realtime_usec();
+            spinlock_unlock(&dsf_spinlock);
+            return;
+        }
+    }
+
+    // find the oldest slot
+    size_t store_at_slot = 0;
+    for(size_t i = 1; i < _countof(ds->dedup); i++) {
+        if(ds->dedup[i].timestamp_ut < ds->dedup[store_at_slot].timestamp_ut)
+            store_at_slot = i;
+    }
+
+    ds->dedup[store_at_slot].timestamp_ut = now_realtime_usec();
+    ds->dedup[store_at_slot].hash = hash;
+
+    spinlock_unlock(&dsf_spinlock);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // POST the last status to agent-events
 
 struct post_status_file_thread_data {
@@ -596,10 +685,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
         XXH64_hash_t hash = daemon_status_file_hash(&d->status, d->msg, d->cause);
-        spinlock_lock(&dsf_spinlock);
-        session_status.dedup.timestamp_ut = now_realtime_usec();
-        session_status.dedup.hash = hash;
-        spinlock_unlock(&dsf_spinlock);
+        dedup_keep_hash(&session_status, hash);
         daemon_status_file_save(&session_status);
     }
 
@@ -797,14 +883,9 @@ void daemon_status_file_check_crash(void) {
            "Last exit status: %s (%s):\n\n%s",
            NETDATA_VERSION, msg, cause, buffer_tostring(wb));
 
-    if(last_session_status.dedup.timestamp_ut && last_session_status.dedup.hash) {
-        XXH64_hash_t hash = daemon_status_file_hash(&last_session_status, msg, cause);
-        if(hash == last_session_status.dedup.hash &&
-            now_realtime_usec() - last_session_status.dedup.timestamp_ut < 86400 * USEC_PER_SEC) {
-            // we have already posted this crash
-            disable_crash_report = true;
-        }
-    }
+    // check if we have already posted this crash in the last 24 hours
+    XXH64_hash_t hash = daemon_status_file_hash(&last_session_status, msg, cause);
+    disable_crash_report = dedup_already_posted(hash);
 
     if(!disable_crash_report && (analytics_check_enabled() || post_crash_report)) {
         netdata_conf_ssl();
@@ -827,10 +908,32 @@ bool daemon_status_file_was_incomplete_shutdown(void) {
 }
 
 void daemon_status_file_startup_step(const char *step) {
+    if(session_status.fatal.filename)
+        // we have a fatal logged
+        return;
+
     freez((char *)session_status.fatal.function);
     session_status.fatal.function = step ? strdupz(step) : NULL;
     if(step != NULL)
         daemon_status_file_update_status(DAEMON_STATUS_NONE);
+}
+
+void daemon_status_file_shutdown_step(const char *step) {
+    if(session_status.fatal.filename)
+        // we have a fatal logged
+        return;
+
+    freez((char *)session_status.fatal.function);
+    if(!step)
+        session_status.fatal.function = NULL;
+
+    else {
+        char buf[1024];
+        snprintfz(buf, sizeof(buf), "shutdown(%s)", step);
+        session_status.fatal.function = strdupz(buf);
+    }
+
+    daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

@@ -34,6 +34,7 @@ typedef struct daemon_status_file {
     time_t boottime;            // system boottime
     time_t uptime;              // netdata uptime
     usec_t timestamp_ut;        // the timestamp of the status file
+    size_t restarts;            // the number of times this agent has restarted
 
     ND_UUID boot_id;            // the boot id of the system
     ND_UUID invocation;         // the netdata invocation id generated the file
@@ -72,8 +73,7 @@ typedef struct daemon_status_file {
     struct {
         XXH64_hash_t hash;
         usec_t timestamp_ut;
-        size_t restarts;
-    } dedup;
+    } dedup[10];
 } DAEMON_STATUS_FILE;
 
 // loads the last status saved
@@ -88,7 +88,9 @@ void daemon_status_file_check_crash(void);
 
 bool daemon_status_file_has_last_crashed(void);
 bool daemon_status_file_was_incomplete_shutdown(void);
+
 void daemon_status_file_startup_step(const char *step);
+void daemon_status_file_shutdown_step(const char *step);
 
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
 

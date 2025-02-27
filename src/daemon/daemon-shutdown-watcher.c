@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon-shutdown-watcher.h"
+#include "daemon-status-file.h"
 
 watcher_step_t *watcher_steps;
 
@@ -32,6 +33,8 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
     netdata_log_info("shutdown step: [%d/%d] - {at %s} started '%s'...",
                      (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
                      watcher_steps[step_id].msg);
+
+    daemon_status_file_shutdown_step(watcher_steps[step_id].msg);
 
 #ifdef ENABLE_SENTRY
     // Wait with a timeout
@@ -65,6 +68,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
                           (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
                           watcher_steps[step_id].msg, step_duration_txt);
 
+        daemon_status_file_shutdown_step("sentry timeout");
         abort();
     }
 }
@@ -104,7 +108,6 @@ void *watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE, shutdown_start_time);
 
     completion_wait_for(&shutdown_end_completion);
     usec_t shutdown_end_time = now_monotonic_usec();
@@ -165,8 +168,6 @@ void watcher_thread_start() {
         "remove pid file";
     watcher_steps[WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES].msg =
         "free openssl structures";
-    watcher_steps[WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE].msg =
-        "remove incomplete shutdown file";
 
     for (size_t i = 0; i != WATCHER_STEP_ID_MAX; i++) {
         completion_init(&watcher_steps[i].p);
