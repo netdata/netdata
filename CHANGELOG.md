@@ -6,6 +6,19 @@
 
 **Merged pull requests:**
 
+- minor status file annotation fixes [\#19723](https://github.com/netdata/netdata/pull/19723) ([ktsaou](https://github.com/ktsaou))
+- status has install type [\#19722](https://github.com/netdata/netdata/pull/19722) ([ktsaou](https://github.com/ktsaou))
+- more status file annotations [\#19721](https://github.com/netdata/netdata/pull/19721) ([ktsaou](https://github.com/ktsaou))
+- save status on out of memory event [\#19719](https://github.com/netdata/netdata/pull/19719) ([ktsaou](https://github.com/ktsaou))
+- attempt to save status file from the signal handler [\#19718](https://github.com/netdata/netdata/pull/19718) ([ktsaou](https://github.com/ktsaou))
+- unified out of memory handling [\#19717](https://github.com/netdata/netdata/pull/19717) ([ktsaou](https://github.com/ktsaou))
+- chore\(go.d\): add file persister [\#19716](https://github.com/netdata/netdata/pull/19716) ([ilyam8](https://github.com/ilyam8))
+- do not call cleanup and exit on fatal conditions during startup [\#19715](https://github.com/netdata/netdata/pull/19715) ([ktsaou](https://github.com/ktsaou))
+- do not use mmap when the mmap limit is too low [\#19714](https://github.com/netdata/netdata/pull/19714) ([ktsaou](https://github.com/ktsaou))
+- systemd-journal: allow almost all fields to be facets [\#19713](https://github.com/netdata/netdata/pull/19713) ([ktsaou](https://github.com/ktsaou))
+- deduplicate all crash reports [\#19712](https://github.com/netdata/netdata/pull/19712) ([ktsaou](https://github.com/ktsaou))
+- 4 malloc arenas for parents, not IoT [\#19711](https://github.com/netdata/netdata/pull/19711) ([ktsaou](https://github.com/ktsaou))
+- Fix Fresh Installation on Microsoft [\#19710](https://github.com/netdata/netdata/pull/19710) ([thiagoftsm](https://github.com/thiagoftsm))
 - Avoid post initialization errors repeateadly [\#19709](https://github.com/netdata/netdata/pull/19709) ([ktsaou](https://github.com/ktsaou))
 - Check for final step [\#19708](https://github.com/netdata/netdata/pull/19708) ([stelfrag](https://github.com/stelfrag))
 - daemon status improvements 3 [\#19707](https://github.com/netdata/netdata/pull/19707) ([ktsaou](https://github.com/ktsaou))
@@ -479,18 +492,6 @@
 - Regenerate integrations docs [\#19177](https://github.com/netdata/netdata/pull/19177) ([netdatabot](https://github.com/netdatabot))
 - docs: reorder silent mode and add full pipeline command example [\#19176](https://github.com/netdata/netdata/pull/19176) ([Ancairon](https://github.com/Ancairon))
 - Add Objects metadata \(Windows Plugin\) [\#19175](https://github.com/netdata/netdata/pull/19175) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fixup URLs in package repo documentation to use index files. [\#19174](https://github.com/netdata/netdata/pull/19174) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations docs [\#19173](https://github.com/netdata/netdata/pull/19173) ([netdatabot](https://github.com/netdatabot))
-- build\(deps\): bump github.com/docker/docker from 27.3.1+incompatible to 27.4.0+incompatible in /src/go [\#19172](https://github.com/netdata/netdata/pull/19172) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Processor Metadata \(Windows Plugin\) [\#19171](https://github.com/netdata/netdata/pull/19171) ([thiagoftsm](https://github.com/thiagoftsm))
-- Streaming improvements No 3 [\#19168](https://github.com/netdata/netdata/pull/19168) ([ktsaou](https://github.com/ktsaou))
-- Streaming improvements No 2 [\#19167](https://github.com/netdata/netdata/pull/19167) ([ktsaou](https://github.com/ktsaou))
-- send quit to plugins [\#19166](https://github.com/netdata/netdata/pull/19166) ([ktsaou](https://github.com/ktsaou))
-- add units per context to /api/v3/contexts [\#19165](https://github.com/netdata/netdata/pull/19165) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#19164](https://github.com/netdata/netdata/pull/19164) ([netdatabot](https://github.com/netdatabot))
-- Update cloud virtual host name [\#19163](https://github.com/netdata/netdata/pull/19163) ([stelfrag](https://github.com/stelfrag))
-- docs: leftover links + changes on api-tokens.md [\#19162](https://github.com/netdata/netdata/pull/19162) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations docs [\#19161](https://github.com/netdata/netdata/pull/19161) ([netdatabot](https://github.com/netdatabot))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
