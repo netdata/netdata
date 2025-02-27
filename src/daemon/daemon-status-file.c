@@ -885,7 +885,8 @@ void daemon_status_file_check_crash(void) {
 
     // check if we have already posted this crash in the last 24 hours
     XXH64_hash_t hash = daemon_status_file_hash(&last_session_status, msg, cause);
-    disable_crash_report = dedup_already_posted(hash);
+    if(dedup_already_posted(hash))
+        disable_crash_report = true;
 
     if(!disable_crash_report && (analytics_check_enabled() || post_crash_report)) {
         netdata_conf_ssl();
