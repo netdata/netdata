@@ -22,12 +22,18 @@ static void out_of_memory(const char *call, size_t size) {
     if(getrusage(RUSAGE_SELF, &usage) != 0)
         usage.ru_maxrss = 0;
 
+    char mem_available[64];
+    char rss_used[64];
+
     OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
+    size_snprintf(mem_available, sizeof(mem_available), sm.ram_available_bytes, "B", false);
+    size_snprintf(rss_used, sizeof(rss_used), usage.ru_maxrss * rss_multiplier, "B", false);
+
     fatal("Out of memory on %s(%zu bytes)!\n"
-          "System memory available: %lu, while our max RSS usage is: %ld\n"
+          "System memory available: %s, while our max RSS usage is: %s\n"
           "O/S mmap limit: %llu, while our mmap count is: %zu",
           call, size,
-          sm.ram_available_bytes, usage.ru_maxrss * rss_multiplier,
+          mem_available, rss_used,
           os_mmap_limit(), __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED));
 }
 
