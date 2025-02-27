@@ -12,6 +12,12 @@ static void out_of_memory(const char *call, size_t size) {
     if(out_of_memory_callback)
         out_of_memory_callback();
 
+#if defined(OS_LINUX) || defined(OS_WINDOWS)
+    int rss_multiplier = 1024;
+#else
+    int rss_multiplier = 1;
+#endif
+
     struct rusage usage = { 0 };
     if(getrusage(RUSAGE_SELF, &usage) != 0)
         usage.ru_maxrss = 0;
@@ -21,7 +27,7 @@ static void out_of_memory(const char *call, size_t size) {
           "System memory available: %lu, while our max RSS usage is: %ld\n"
           "O/S mmap limit: %llu, while our mmap count is: %zu",
           call, size,
-          sm.ram_available_bytes, usage.ru_maxrss,
+          sm.ram_available_bytes, usage.ru_maxrss * rss_multiplier,
           os_mmap_limit(), __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED));
 }
 
