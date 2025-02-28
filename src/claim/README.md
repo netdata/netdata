@@ -60,11 +60,11 @@ The `proxy` option at the `[global]` section in `claim.conf` can be set to:
 - `none` to disable proxy configuration.
 - `env` to use the environment variable `http_proxy` (this is the default).
 - `http://[user:pass@]host:port`, to connect via a web proxy.
-- `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 or SOCKS5h proxy.
+- `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 proxy.
 
 The `http_proxy` environment variable is used only when the `proxy` option is set to `env` (which is the default). The `http_proxy` environment can be:
 
-- `http://[user:pass@]host:port`, to connect via an HTTP or HTTPS proxy.
+- `http://[user:pass@]host:port`, to connect via an HTTP proxy.
 - `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 or SOCKS5h proxy.
 
 **NOTE**: Netdata does not currently support secure connections to proxies. So, while the connection from the proxy to Netdata Cloud is always encrypted and secure, the connection from the Netdata Agent to the proxy is always unencrypted. Keep in mind that there are 2 distinct connection libraries involved. Claiming uses libcurl which may be more flexible, but later at the establishment of the actual Netdata Cloud connection a different library implements MQTT over WebSockets over HTTPS (MQTToWSoHTTPS) and unfortunately this library does not currently support secure connections to proxies. So, while claiming may work via a secure connection to a proxy (libcurl), the actual Netdata Cloud connection will later fail if the proxy connection is secure (MQTToWSoHTTPS). The proxy configuration patterns described above, work for both libraries.
