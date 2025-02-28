@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- do not post empty reports [\#19729](https://github.com/netdata/netdata/pull/19729) ([ktsaou](https://github.com/ktsaou))
+- docs: clarify Windows Agent limits on free plans [\#19727](https://github.com/netdata/netdata/pull/19727) ([ilyam8](https://github.com/ilyam8))
+- improve status file deduplication [\#19726](https://github.com/netdata/netdata/pull/19726) ([ktsaou](https://github.com/ktsaou))
+- handle flushing state during exit [\#19725](https://github.com/netdata/netdata/pull/19725) ([ktsaou](https://github.com/ktsaou))
+- allow configuring journal v2 unmount time; turn it off for parents [\#19724](https://github.com/netdata/netdata/pull/19724) ([ktsaou](https://github.com/ktsaou))
 - minor status file annotation fixes [\#19723](https://github.com/netdata/netdata/pull/19723) ([ktsaou](https://github.com/ktsaou))
 - status has install type [\#19722](https://github.com/netdata/netdata/pull/19722) ([ktsaou](https://github.com/ktsaou))
 - more status file annotations [\#19721](https://github.com/netdata/netdata/pull/19721) ([ktsaou](https://github.com/ktsaou))
@@ -488,10 +493,6 @@
 - fix\(kickstart\): netdata\_avail\_check on Ubuntu [\#19183](https://github.com/netdata/netdata/pull/19183) ([ilyam8](https://github.com/ilyam8))
 - Disks Metadata \(Windows plugin\) [\#19182](https://github.com/netdata/netdata/pull/19182) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump repository config fetched by kickstart to latest version [\#19181](https://github.com/netdata/netdata/pull/19181) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d\): pass context to init/check/collect/cleanup [\#19180](https://github.com/netdata/netdata/pull/19180) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19177](https://github.com/netdata/netdata/pull/19177) ([netdatabot](https://github.com/netdatabot))
-- docs: reorder silent mode and add full pipeline command example [\#19176](https://github.com/netdata/netdata/pull/19176) ([Ancairon](https://github.com/Ancairon))
-- Add Objects metadata \(Windows Plugin\) [\#19175](https://github.com/netdata/netdata/pull/19175) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
