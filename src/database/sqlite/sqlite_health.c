@@ -72,7 +72,7 @@ int sql_init_health_database(bool in_memory)
     if (likely(!in_memory))
         snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-health.db", netdata_configured_cache_dir);
     else
-        strcpy(sqlite_database, ":memory:");
+        strncpyz(sqlite_database, ":memory:", sizeof(sqlite_database) - 1);
 
     rc = sqlite3_open(sqlite_database, &db_health);
     if (rc != SQLITE_OK) {
