@@ -97,8 +97,11 @@ static inline int check_http_enviroment(const char **proxy)
 {
     char *tmp = getenv("http_proxy");
 
-    if (!tmp || !*tmp)
-        return 1;
+    if (!tmp || !*tmp) {
+        tmp = getenv("https_proxy");
+        if (!tmp || !*tmp)
+            return 1;
+    }
 
     if (aclk_verify_proxy(tmp) == PROXY_TYPE_HTTP) {
         *proxy = tmp;
