@@ -602,12 +602,16 @@ static void daemon_status_file_out_of_memory(void) {
 void daemon_status_file_bad_signal_received(EXIT_REASON reason) {
     spinlock_lock(&dsf_spinlock);
     session_status.exit_reason |= reason;
-    strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
+
+    if(!session_status.fatal.thread[0])
+        strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
+
     if(!session_status.fatal.stack_trace[0]) {
         static_save_buffer_init();
         capture_stack_trace(static_save_buffer);
         strncpyz(session_status.fatal.stack_trace, buffer_tostring(static_save_buffer), sizeof(session_status.fatal.stack_trace) - 1);
     }
+
     spinlock_unlock(&dsf_spinlock);
     daemon_status_file_save(&session_status);
 }
