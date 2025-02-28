@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 4
+#define STATUS_FILE_VERSION 5
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -741,13 +741,14 @@ void daemon_status_file_check_crash(void) {
         case DAEMON_STATUS_EXITED:
             if(last_session_status.exit_reason == EXIT_REASON_NONE) {
                 cause = "exit no reason";
-                msg = "Netdata was last stopped gracefully (no exit reason set)";
+                msg = "Netdata was last stopped gracefully, without setting a reason";
                 if(!last_session_status.timestamp_ut)
                     dump_json = false;
             }
-            else if(!is_exit_reason_normal(last_session_status.exit_reason)) {
-                cause = "exit on fatal";
-                msg = "Netdata was last stopped gracefully (encountered an error)";
+            else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
+                     !is_exit_reason_normal(last_session_status.exit_reason)) {
+                cause = "fatal and exit";
+                msg = "Netdata was last stopped gracefully after it encountered a fatal error";
                 pri = PRI_NETDATA_BUG;
                 post_crash_report = true;
             }
@@ -766,12 +767,25 @@ void daemon_status_file_check_crash(void) {
             }
             else {
                 cause = "exit instructed";
-                msg = "Netdata was last stopped gracefully (instructed to do so)";
+                msg = "Netdata was last stopped gracefully";
             }
             break;
 
         case DAEMON_STATUS_INITIALIZING:
-            if (OS_SYSTEM_DISK_SPACE_OK(last_session_status.var_cache) &&
+            if (last_session_status.exit_reason == EXIT_REASON_NONE &&
+                     !UUIDiszero(session_status.boot_id) &&
+                     !UUIDiszero(last_session_status.boot_id) &&
+                     !os_boot_ids_match(session_status.boot_id, last_session_status.boot_id)) {
+                cause = "abnormal power off";
+                msg = "The system was abnormally powered off while Netdata was starting";
+                pri = PRI_USER_SHOULD_FIX;
+            }
+            else if (last_session_status.exit_reason & EXIT_REASON_OUT_OF_MEMORY) {
+                cause = "out of memory";
+                msg = "Netdata was last crashed while starting, because it couldn't allocate memory";
+                pri = PRI_USER_SHOULD_FIX;
+            }
+            else if (OS_SYSTEM_DISK_SPACE_OK(last_session_status.var_cache) &&
                 last_session_status.var_cache.is_read_only) {
                 cause = "disk read-only";
                 msg = "Netdata couldn't start because the disk is readonly";
@@ -784,31 +798,19 @@ void daemon_status_file_check_crash(void) {
                 pri = PRI_USER_SHOULD_FIX;
             }
             else if (OS_SYSTEM_DISK_SPACE_OK(last_session_status.var_cache) &&
-                     last_session_status.var_cache.free_bytes < 1 * 1024 * 1024) {
+                     last_session_status.var_cache.free_bytes < 10 * 1024 * 1024) {
                 cause = "disk almost full";
                 msg = "Netdata couldn't start while the disk is almost full";
                 pri = PRI_USER_SHOULD_FIX;
             }
-            else if (last_session_status.exit_reason == EXIT_REASON_NONE &&
-                !UUIDiszero(session_status.boot_id) &&
-                !UUIDiszero(last_session_status.boot_id) &&
-                !UUIDeq(session_status.boot_id, last_session_status.boot_id)) {
-                cause = "abnormal power off";
-                msg = "The system was abnormally powered off while Netdata was starting";
-                pri = PRI_USER_SHOULD_FIX;
-            }
-            else if (last_session_status.exit_reason & EXIT_REASON_OUT_OF_MEMORY) {
-                cause = "out of memory";
-                msg = "Netdata was last crashed while starting, because it couldn't allocate memory";
-                pri = PRI_USER_SHOULD_FIX;
-            }
-            else if (!is_exit_reason_normal(last_session_status.exit_reason)) {
+            else if (last_session_status.exit_reason != EXIT_REASON_NONE &&
+                     !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal on start";
                 msg = "Netdata was last crashed while starting, because of a fatal error";
                 pri = PRI_NETDATA_BUG;
             }
             else {
-                cause = "crashed on start";
+                cause = "killed hard on start";
                 msg = "Netdata was last killed/crashed while starting";
                 pri = PRI_BAD_BUT_NO_REASON;
             }
@@ -817,21 +819,22 @@ void daemon_status_file_check_crash(void) {
             break;
 
         case DAEMON_STATUS_EXITING:
-            if(!is_exit_reason_normal(last_session_status.exit_reason)) {
-                cause = "crashed on fatal";
+            if(last_session_status.exit_reason != EXIT_REASON_NONE &&
+                !is_exit_reason_normal(last_session_status.exit_reason)) {
+                cause = "fatal on exit";
                 msg = "Netdata was last killed/crashed while exiting after encountering an error";
             }
             else if(last_session_status.exit_reason & EXIT_REASON_SYSTEM_SHUTDOWN) {
-                cause = "crashed on system shutdown";
+                cause = "killed hard on shutdown";
                 msg = "Netdata was last killed/crashed while exiting due to system shutdown";
             }
             else if(new_version || (last_session_status.exit_reason & EXIT_REASON_UPDATE)) {
-                cause = "crashed on update";
+                cause = "killed hard on update";
                 msg = "Netdata was last killed/crashed while exiting to update to a new version";
             }
             else {
-                cause = "crashed on exit";
-                msg = "Netdata was last killed/crashed while exiting (instructed to do so)";
+                cause = "killed hard on exit";
+                msg = "Netdata was last killed/crashed while it was instructed to exit";
             }
             pri = PRI_NETDATA_BUG;
             post_crash_report = true;
@@ -841,7 +844,7 @@ void daemon_status_file_check_crash(void) {
             if (last_session_status.exit_reason == EXIT_REASON_NONE &&
                 !UUIDiszero(session_status.boot_id) &&
                 !UUIDiszero(last_session_status.boot_id) &&
-                !UUIDeq(session_status.boot_id, last_session_status.boot_id)) {
+                !os_boot_ids_match(session_status.boot_id, last_session_status.boot_id)) {
                 cause = "abnormal power off";
                 msg = "The system was abnormally powered off while Netdata was running";
                 pri = PRI_USER_SHOULD_FIX;
@@ -851,7 +854,8 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last crashed because it couldn't allocate memory";
                 pri = PRI_USER_SHOULD_FIX;
             }
-            else if (!is_exit_reason_normal(last_session_status.exit_reason)) {
+            else if (last_session_status.exit_reason != EXIT_REASON_NONE &&
+                     !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "killed fatal";
                 msg = "Netdata was last crashed due to a fatal error";
                 pri = PRI_NETDATA_BUG;
