@@ -29,7 +29,7 @@ The UI method is the easiest and recommended way to connect your Agent. Here's h
 
 #### Automatically, via a provisioning system or the command line
 
-Netdata Agents can be connected to Netdata Cloud by creating `/INSTALL_PREFIX/netdata/claim.conf`:
+Netdata Agents can be connected to Netdata Cloud by creating `/INSTALL_PREFIX/etc/netdata/claim.conf`:
 
 ```bash
 [global]
@@ -40,38 +40,34 @@ Netdata Agents can be connected to Netdata Cloud by creating `/INSTALL_PREFIX/ne
    insecure = no
 ```
 
-|  option  | description                                                                                                                                                                                                         | required |
-|:--------:|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------:|
-|   url    | The Netdata Cloud base URL (defaults to `https://app.netdata.cloud`)                                                                                                                                                |    no    |
-|  token   | The claiming token for your Netdata Cloud Space                                                                                                                                                                     |   yes    |
-|  rooms   | A comma-separated list of Rooms that the Agent will be added to                                                                                                                                                     |    no    |
-|  proxy   | The format is similar to libcurl, or `none`, or `env`. `none` (or just an empty value) disables proxy configuration, while `env` makes Netdata check the environment variable `http_proxy` for proxy configuration. |    no    |
-| insecure | A boolean (either `yes`, or `no`) and when set to `yes` it instructs libcurl to disable host verification.                                                                                                          |    no    |
+|  option  | description                                                                            | required |
+|:--------:|:---------------------------------------------------------------------------------------|:--------:|
+|   url    | The Netdata Cloud base URL (defaults to `https://app.netdata.cloud`)                   |    no    |
+|  token   | The claiming token for your Netdata Cloud Space                                        |   yes    |
+|  rooms   | A comma-separated list of Rooms that the Agent will be added to                        |    no    |
+|  proxy   | Check below for possible values                                                        |    no    |
+| insecure | A boolean (either `yes`, or `no`) and when set to `yes` it disables host verification. |    no    |
 
 If the Agent is already running, you can either run `netdatacli reload-claiming-state` or [restart the Agent](/docs/netdata-agent/start-stop-restart.md). Otherwise, the Agent will be connected when it starts.
 
 If the connection process fails, the reason will be logged in daemon.log (search for "CLAIM") and the `cloud` section of `http://ip:19999/api/v3/info`.
 
-##### Proxy configuration
+##### Proxy configuration for claiming via claim.conf
 
-If you need to use a proxy to connect to Netdata Cloud, you can set the `proxy` option in `claim.conf`, like this:
+The `proxy` option at the `[global]` section in `claim.conf` can be set to:
 
 - empty, to disable proxy configuration.
 - `none` to disable proxy configuration.
 - `env` to use the environment variable `http_proxy` (this is the default).
+- `http://[user:pass@]host:port`, to connect via a web proxy.
+- `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 or SOCKS5h proxy.
+
+The `http_proxy` environment variable is used only when the `proxy` option is set to `env` (which is the default). The `http_proxy` environment can be:
+
 - `http://[user:pass@]host:port`, to connect via an HTTP or HTTPS proxy.
 - `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 or SOCKS5h proxy.
 
-The `http_proxy` environment variable is used only when the `proxy` option in `claim.conf` is set to `env` (which is the default). The `http_proxy` environment can be:
-
-- empty, to disable proxy configuration.
-- `http://[user:pass@]host:port`, to connect via an HTTP or HTTPS proxy.
-- `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 or SOCKS5h proxy.
-
-In Netdata version v2.2.7 and later, Netdata also checks for the `https_proxy` environment variable if the `http_proxy` variable is not set (so, Netdata first checks for `http_proxy` and only this is unset it checks for `https_proxy`).
-
-Netdata does not currently support secure connections to proxies. So, while the connection from the proxy to Netdata Cloud is encrypted and secure, the connection from the Netdata Agent to the proxy is unencrypted.
-
+**NOTE**: Netdata does not currently support secure connections to proxies. So, while the connection from the proxy to Netdata Cloud is always encrypted and secure, the connection from the Netdata Agent to the proxy is always unencrypted. Keep in mind that there are 2 distinct connection libraries involved. Claiming uses libcurl which may be more flexible, but later at the establishment of the actual Netdata Cloud connection a different library implements MQTT over WebSockets over HTTPS (MQTToWSoHTTPS) and unfortunately this library does not currently support secure connections to proxies. So, while claiming may work via a secure connection to a proxy (libcurl), the actual Netdata Cloud connection will later fail if the proxy connection is secure (MQTToWSoHTTPS). The proxy configuration patterns described above, work for both libraries.
 
 #### Automatically, via environment variables
 
