@@ -145,11 +145,11 @@ void netdata_conf_web_security_init(void) {
     FUNCTION_RUN_ONCE();
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
-    netdata_ssl_security_key = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "ssl key",  filename);
+    snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem", netdata_configured_user_config_dir);
+    netdata_ssl_security_key = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "ssl key", filename);
 
-    snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
-    netdata_ssl_security_cert = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "ssl certificate",  filename);
+    snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem", netdata_configured_user_config_dir);
+    netdata_ssl_security_cert = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "ssl certificate", filename);
 
     tls_version    = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "tls ciphers",  "none");

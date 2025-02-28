@@ -877,14 +877,14 @@ int netdata_main(int argc, char **argv) {
     }
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("initialize web server");
+    delta_startup_time("initialize web server api");
 
     // get the certificate and start security
     netdata_conf_web_security_init();
-
     nd_web_api_init();
     web_server_threading_selection();
 
+    delta_startup_time("initialize web server sockets");
     if(web_server_mode != WEB_SERVER_MODE_NONE) {
         if (!api_listen_sockets_setup()) {
             netdata_log_error("Cannot setup listen port(s). Is Netdata already running?");
