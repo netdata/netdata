@@ -55,7 +55,6 @@ const char *database_health_config[] = {
 };
 
 const char *database_health_cleanup[] = {
-    "VACUUM",
     NULL
 };
 
