@@ -6,9 +6,10 @@
 
 void health_host_run(RRDHOST *host);
 void health_host_run_later(RRDHOST *host, uint64_t delay);
-void health_host_initialize(RRDHOST *host, uint64_t delay);
+void health_host_initialize(RRDHOST *host);
 void health_host_maintenance(RRDHOST *host);
 void health_run_jobs();
+static void host_health_timer_cb(uv_timer_t *handle);
 
 #define HEALTH_HOST_MAINTENANCE_INTERVAL (3600)     // Cleanup host alert transitions (in seconds)
 
@@ -498,7 +499,7 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
             rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION))) {
         // Dont run again, initialization will reschedule us
         *next_run = -1;
-        health_host_initialize(host, 1000);
+        health_host_initialize(host);
         return;
     }
 
@@ -814,7 +815,7 @@ static void after_host_initialize_alerts_job(uv_work_t *req, int status __maybe_
     health_host_run(host);
 
     if (config->job_list[data->job_type]->pending)
-        health_host_initialize(NULL, 0);
+        health_host_initialize(NULL);
     freez(data);
 }
 
@@ -841,6 +842,7 @@ static void after_host_evaluate_alerts_job(uv_work_t *req, int status __maybe_un
     struct health_config_s *config = data->config;
     config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
+    HEALTH *host_health = &host->health;
 
     time_t next_run = data->next_run;
     freez(data);
@@ -858,10 +860,14 @@ static void after_host_evaluate_alerts_job(uv_work_t *req, int status __maybe_un
     }
 
     int64_t delay = next_run - now_realtime_sec();
-    if (delay <= 0)
-        health_host_run(host);
-    else
-        health_host_run_later(host, delay * MSEC_PER_SEC);
+
+    int rc = uv_timer_start(&host_health->timer, host_health_timer_cb, delay > 0 ? delay * MSEC_PER_SEC : 0, 0);
+    if (rc) {
+        if (delay <= 0)
+            health_host_run(host);
+        else
+            health_host_run_later(host, delay * MSEC_PER_SEC);
+    }
 }
 
 static void host_evaluate_alerts_job(uv_work_t *req)
@@ -1244,9 +1250,9 @@ void health_host_run_later(RRDHOST *host, uint64_t delay)
     queue_health_cmd(HEALTH_HOST_RUN_LATER, host, (void *)(uintptr_t)delay);
 }
 
-void health_host_initialize(RRDHOST *host, uint64_t delay)
+void health_host_initialize(RRDHOST *host)
 {
-    queue_health_cmd(HEALTH_HOST_INIT, host, (void *)(uintptr_t)delay);
+    queue_health_cmd(HEALTH_HOST_INIT, host, NULL);
 }
 
 void health_event_loop_init(void)
