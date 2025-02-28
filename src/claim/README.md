@@ -69,7 +69,7 @@ The `http_proxy` environment variable is used only when the `proxy` option is se
 
 > **IMPORTANT**: Netdata does not currently support secure connections to proxies. So, while the connection from the proxy to Netdata Cloud is always encrypted and secure, the connection from the Netdata Agent to the proxy is always unencrypted.
 >
-> Keep in mind that there are 2 distinct connection libraries involved. Claiming uses libcurl which may be more flexible, but later at the establishment of the actual Netdata Cloud connection a different library implements MQTT over WebSockets over HTTPS (MQTToWSoHTTPS) and unfortunately this library does not currently support secure connections to proxies. So, while claiming may work via a secure connection to a proxy (libcurl), the actual Netdata Cloud connection will later fail if the proxy connection is secure (MQTToWSoHTTPS). The proxy configuration patterns described above, work for both libraries.
+> Keep in mind that there are 2 distinct connection libraries involved. Claiming uses libcurl which may be more flexible, but later at the establishment of the actual Netdata Cloud connection a different library implements MQTT over WebSockets over HTTPS (MQTToWSoHTTPS) and unfortunately this library does not currently support encrypted connections to proxies. So, while claiming (libcurl) may work via an encrypted connection to a proxy, the actual Netdata Cloud connection (MQTToWSoHTTPS) will later fail if the proxy connection is encrypted. The proxy configuration patterns described above, work for both libraries.
 
 #### Automatically, via environment variables
 
