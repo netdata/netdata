@@ -67,18 +67,20 @@ The `http_proxy` environment variable is used only when the `proxy` option is se
 - `http://[user:pass@]host:port`, to connect via an HTTP proxy.
 - `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 or SOCKS5h proxy.
 
-**IMPORTANT**: Netdata does not currently support secure connections to proxies. So, while the connection from the proxy to Netdata Cloud is always encrypted and secure, the connection from the Netdata Agent to the proxy is always unencrypted. Data exchanged between Netdata Agents and Netdata Cloud are still end-to-end encrypted, since the Netdata Agent requests a TCP tunnel (HTTP `CONNECT`) from the proxy, and the Netdata Agent directly handles all encryption required for Netdata Cloud communication, however the initial communication from the Netdata Agent to the proxy cannot be encrypted.
+**IMPORTANT**: Netdata does not currently support secure connections to proxies. Data exchanged between Netdata Agents and Netdata Cloud are still end-to-end encrypted, since the Netdata Agent requests a TCP tunnel (HTTP `CONNECT`) from the proxy, and the Netdata Agent directly handles all encryption required for Netdata Cloud communication, however the initial communication from the Netdata Agent to the proxy is not encrypted.
 
 The current implementation uses HTTP proxies in a way that maintains end-to-end encryption between the Netdata agent and Netdata Cloud. Here's how it works:
 
-1. **HTTP CONNECT Method**: The agent connects to the HTTP proxy using a plain HTTP connection.
-2. **Tunneling Request**: The agent sends an HTTP CONNECT request to the proxy, asking it to establish a TCP tunnel to the Netdata Cloud server.
+1. **Proxy Connection**: The agent connects to the HTTP proxy using a plain HTTP connection.
+2. **TCP Tunneling Request**: The agent sends an HTTP CONNECT request to the proxy, asking it to establish a TCP tunnel to the Netdata Cloud server.
 3. **Proxy Tunneling**: Once the proxy accepts the CONNECT request (responds with HTTP 200), it creates a TCP tunnel between the agent and the Netdata Cloud server. At this point, the proxy simply forwards raw TCP data in both directions without interpreting it.
 4. **Encrypted Communication**: The agent then establishes a TLS/SSL connection through this tunnel directly with the Netdata Cloud server. All subsequent data (including the WebSocket handshake and MQTT protocol data) is encrypted end-to-end.
 
 The proxy never sees the decrypted content of the communication - it only sees encrypted TLS traffic flowing through the tunnel it established. This is a standard way of using HTTP proxies for secure connections and is often called "TCP tunneling" or "HTTP CONNECT tunneling."
 
-Keep in mind that there are 2 distinct connection libraries involved. Claiming uses libcurl which may be more flexible, but later at the establishment of the actual Netdata Cloud connection a different library implements MQTT over WebSockets over HTTPS (MQTToWSoHTTPS) and this library does not support encrypted connections to proxies. So, while claiming (libcurl) may work via an encrypted connection to a proxy, the actual Netdata Cloud connection (MQTToWSoHTTPS) will later fail if the proxy connection is encrypted. The proxy configuration patterns described above, work for both libraries and provide end-to-end encryption for Netdata Cloud communication.
+Keep in mind that there are 2 distinct connection libraries involved. Claiming uses libcurl which may be more flexible, but later at the establishment of the actual Netdata Cloud connection a different library implements MQTT over WebSockets over HTTPS (MQTToWSoHTTPS) and this library does not support encrypted connections to proxies. So, while claiming (libcurl) may work via an encrypted connection to a proxy, the actual Netdata Cloud connection (MQTToWSoHTTPS) will later fail if the proxy connection is encrypted.
+
+The proxy configuration patterns described above, work for both libraries and provide end-to-end encryption for Netdata Cloud communication.
 
 #### Automatically, via environment variables
 
