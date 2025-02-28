@@ -898,7 +898,7 @@ static void host_evaluate_alerts_job(uv_work_t *req)
     data->next_run = (start_ut / USEC_PER_SEC) + health_globals.config.run_at_least_every_seconds;
 
     if (host_health->rrdcalc_cleanup_running)
-        worker_is_idle();
+        return;
 
     // Just reschedule
     if (!stream_control_health_should_be_running())
