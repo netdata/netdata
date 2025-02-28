@@ -152,6 +152,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "function", ds->fatal.function);
         buffer_json_member_add_string_or_empty(wb, "message", ds->fatal.message);
         buffer_json_member_add_string_or_empty(wb, "errno", ds->fatal.errno_str);
+        buffer_json_member_add_string_or_empty(wb, "thread", ds->fatal.thread);
         buffer_json_member_add_string_or_empty(wb, "stack_trace", ds->fatal.stack_trace);
     }
     buffer_json_object_close(wb);
@@ -190,6 +191,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v1 = version >= 1 ? strict : false;
     bool required_v3 = version >= 3 ? strict : false;
     bool required_v4 = version >= 4 ? strict : false;
+    bool required_v5 = version >= 5 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -264,9 +266,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "filename", ds->fatal.filename, error, required_v1);
         JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "function", ds->fatal.function, error, required_v1);
         JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "message", ds->fatal.message, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "errno", ds->fatal.errno_str, error, required_v3);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "stack_trace", ds->fatal.stack_trace, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "stack_trace", ds->fatal.stack_trace, error, required_v1);
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "line", ds->fatal.line, error, required_v1);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "errno", ds->fatal.errno_str, error, required_v3);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "thread", ds->fatal.thread, error, required_v5);
     });
 
     // Parse the last posted object
@@ -536,20 +539,25 @@ static bool save_status_file(const char *directory, const char *content, size_t 
     return true;
 }
 
+static BUFFER *static_save_buffer = NULL;
+static void static_save_buffer_init(void) {
+    if (!static_save_buffer)
+        static_save_buffer = buffer_create(16384, NULL);
+
+    buffer_flush(static_save_buffer);
+}
+
 static void daemon_status_file_save(DAEMON_STATUS_FILE *ds) {
     spinlock_lock(&dsf_spinlock);
 
-    static BUFFER *wb = NULL;
-    if (!wb)
-        wb = buffer_create(16384, NULL);
+    static_save_buffer_init();
 
-    buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-    daemon_status_file_to_json(wb, ds);
-    buffer_json_finalize(wb);
+    buffer_json_initialize(static_save_buffer, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    daemon_status_file_to_json(static_save_buffer, ds);
+    buffer_json_finalize(static_save_buffer);
 
-    const char *content = buffer_tostring(wb);
-    size_t content_size = buffer_strlen(wb);
+    const char *content = buffer_tostring(static_save_buffer);
+    size_t content_size = buffer_strlen(static_save_buffer);
 
     // Try primary directory first
     bool saved = false;
@@ -589,6 +597,19 @@ void daemon_status_file_exit_reason_save(EXIT_REASON reason) {
 
 static void daemon_status_file_out_of_memory(void) {
     daemon_status_file_exit_reason_save(EXIT_REASON_OUT_OF_MEMORY);
+}
+
+void daemon_status_file_bad_signal_received(EXIT_REASON reason) {
+    spinlock_lock(&dsf_spinlock);
+    session_status.exit_reason |= reason;
+    strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
+    if(!session_status.fatal.stack_trace[0]) {
+        static_save_buffer_init();
+        capture_stack_trace(static_save_buffer);
+        strncpyz(session_status.fatal.stack_trace, buffer_tostring(static_save_buffer), sizeof(session_status.fatal.stack_trace) - 1);
+    }
+    spinlock_unlock(&dsf_spinlock);
+    daemon_status_file_save(&session_status);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -948,7 +969,7 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     spinlock_lock(&dsf_spinlock);
 
     // do not check the function, because it may have a startup step in it
-    if(session_status.fatal.filename || session_status.fatal.message || session_status.fatal.errno_str || session_status.fatal.stack_trace) {
+    if(session_status.fatal.filename || session_status.fatal.message || session_status.fatal.errno_str || session_status.fatal.thread[0]) {
         spinlock_unlock(&dsf_spinlock);
         freez((void *)filename);
         freez((void *)function);
@@ -958,16 +979,19 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
         return;
     }
 
+    exit_initiated |= EXIT_REASON_FATAL;
+    strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
+
     session_status.fatal.filename = filename;
     freez((char *)session_status.fatal.function); // it may have a startup step
     session_status.fatal.function = function;
     session_status.fatal.message = message;
     session_status.fatal.errno_str = errno_str;
-    session_status.fatal.stack_trace = stack_trace;
+    strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
+    freez((char *)stack_trace);
     session_status.fatal.line = line;
 
     spinlock_unlock(&dsf_spinlock);
 
-    exit_initiated |= EXIT_REASON_FATAL;
     daemon_status_file_save(&session_status);
 }

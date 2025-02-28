@@ -66,8 +66,9 @@ typedef struct daemon_status_file {
         const char *filename;
         const char *function;
         const char *errno_str;
-        const char *stack_trace;
         const char *message;
+        char stack_trace[4096];
+        char thread[ND_THREAD_TAG_MAX + 1];
     } fatal;
 
     struct {
@@ -82,6 +83,7 @@ DAEMON_STATUS_FILE daemon_status_file_load(void);
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);
 void daemon_status_file_exit_reason_save(EXIT_REASON reason);
+void daemon_status_file_bad_signal_received(EXIT_REASON reason);
 
 // check for a crash
 void daemon_status_file_check_crash(void);

@@ -42,18 +42,22 @@ static void signal_handler(int signo) {
     }
 
     int i;
-    for(i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST ; i++) {
+    for(i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST; i++) {
         if(unlikely(signals_waiting[i].signo == signo)) {
             signals_waiting[i].count++;
 
             if(signals_waiting[i].action == NETDATA_SIGNAL_FATAL) {
                 char buffer[200 + 1];
-                snprintfz(buffer, sizeof(buffer) - 1, "\nSIGNAL HANDLER: received: %s. Oops! This is bad!\n", signals_waiting[i].name);
+                snprintfz(buffer, sizeof(buffer) - 1, "\nSIGNAL HANDLER: received: %s in thread %d. Oops! This is bad!\n",
+                          signals_waiting[i].name, gettid_cached());
+
                 if(write(STDERR_FILENO, buffer, strlen(buffer)) == -1) {
                     // nothing to do - we cannot write but there is no way to complain about it
                     ;
                 }
-                daemon_status_file_exit_reason_save(signals_waiting[i].reason);
+
+                // Always update the status file for fatal signals
+                daemon_status_file_bad_signal_received(signals_waiting[i].reason);
             }
 
             break;
@@ -63,15 +67,22 @@ static void signal_handler(int signo) {
     __atomic_sub_fetch(&recurse, 1, __ATOMIC_RELAXED);
 }
 
+
 // Mask all signals, to ensure they will only be unmasked at the threads that can handle them.
 // This means that all third party libraries (including libuv) cannot use signals anymore.
 // The signals they are interested must be unblocked at their corresponding event loops.
-static void posix_mask_all_signals(void) {
+static void posix_signals_default_mask(void) {
     sigset_t sigset;
     sigfillset(&sigset);
 
+    // Don't mask fatal signals - we want these to be handled in any thread
+    sigdelset(&sigset, SIGBUS);
+    sigdelset(&sigset, SIGSEGV);
+    sigdelset(&sigset, SIGFPE);
+    sigdelset(&sigset, SIGILL);
+
     if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
-        netdata_log_error("SIGNAL: cannot mask all signals");
+        netdata_log_error("SIGNAL: cannot apply the default mask for signals");
 }
 
 // Unmask all signals the netdata main signal handler uses.
@@ -88,7 +99,7 @@ static void posix_unmask_my_signals(void) {
 }
 
 void nd_initialize_signals(void) {
-    posix_mask_all_signals(); // block all signals for all threads
+    posix_signals_default_mask();
 
     // Catch signals which we want to use
     struct sigaction sa;
@@ -164,7 +175,7 @@ void nd_process_signals(void) {
 
                             case NETDATA_SIGNAL_FATAL:
                                 nd_log_limits_unlimited();
-                                daemon_status_file_exit_reason_save(signals_waiting[i].reason);
+                                daemon_status_file_bad_signal_received(signals_waiting[i].reason);
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
                                 break;
 
