@@ -148,7 +148,7 @@ static int debug_callback(CURL *handle, curl_infotype type, char *data, size_t s
     return 0;
 }
 
-static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure, bool *can_retry) {
+static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, bool insecure, bool *can_retry) {
     CURL *curl;
     CURLcode res;
     char target_url[2048];
@@ -270,8 +270,16 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     // execute the request
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        claim_agent_failure_reason_set("Request failed with error: %s (proxy is set to '%s')",
-                                       curl_easy_strerror(res), proxy);
+        claim_agent_failure_reason_set("Request failed with error: %s\n"
+                                       "proxy: '%s',\n"
+                                       "insecure: %s,\n"
+                                       "public key file: '%s',\n"
+                                       "trusted key file: '%s'",
+                                       curl_easy_strerror(res),
+                                       proxy,
+                                       insecure ? "true" : "false",
+                                       public_key_file ? public_key_file : "none",
+                                       trusted_key_file ? trusted_key_file : "none");
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
         *can_retry = true;
