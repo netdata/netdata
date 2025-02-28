@@ -91,10 +91,7 @@ void do_rc_status_change(RRDHOST *host, RRDCALC *rc, RRDCALC_STATUS status, time
             rc->delay_down_current = rc->config.delay_max_duration;
     }
 
-    if (status > rc->status)
-        delay = rc->delay_up_current;
-    else
-        delay = rc->delay_down_current;
+    delay = (status > rc->status) ? rc->delay_up_current : rc->delay_down_current;
 
     // COMMENTED: because we do need to send raising alarms
     // if (now + delay < rc->delay_up_to_timestamp)
@@ -230,13 +227,13 @@ static void health_database_lookup_for_rc(RRDHOST *host __maybe_unused, RRDCALC 
         case RRDR_GROUPING_PERCENTILE:
         case RRDR_GROUPING_TRIMMED_MEAN:
         case RRDR_GROUPING_TRIMMED_MEDIAN:
-            snprintfz(group_options_buf, sizeof(group_options_buf),
+            snprintfz(group_options_buf, sizeof(group_options_buf) - 1,
                       NETDATA_DOUBLE_FORMAT_AUTO,
                       rc->config.time_group_value);
             break;
 
         case RRDR_GROUPING_COUNTIF:
-            snprintfz(group_options_buf, sizeof(group_options_buf),
+            snprintfz(group_options_buf, sizeof(group_options_buf) - 1,
                       "%s" NETDATA_DOUBLE_FORMAT_AUTO,
                       alerts_group_conditions_id2txt(rc->config.time_group_condition),
                       rc->config.time_group_value);
@@ -251,7 +248,7 @@ static void health_database_lookup_for_rc(RRDHOST *host __maybe_unused, RRDCALC 
                                   &value_is_null, NULL, 0, 0,
                                   QUERY_SOURCE_HEALTH, STORAGE_PRIORITY_SYNCHRONOUS);
 
-    if (unlikely(ret != 200)) {
+    if (unlikely(ret != HTTP_RESP_OK)) {
         // database lookup failed
         rc->value = NAN;
         rc->run_flags |= RRDCALC_FLAG_DB_ERROR;
@@ -815,6 +812,7 @@ static void after_host_initialize_alerts_job(uv_work_t *req, int status __maybe_
     config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
     health_host_run(host);
+
     if (config->job_list[data->job_type]->pending)
         health_host_initialize(NULL, 0);
     freez(data);
@@ -918,7 +916,7 @@ static void host_evaluate_alerts_job(uv_work_t *req)
     worker_is_idle();
 }
 
-int send_job_to_worker(struct health_config_s *config, struct job_list_t *job, RRDHOST *host)
+static bool send_job_to_worker(struct health_config_s *config, struct job_list_t *job, RRDHOST *host)
 {
     struct worker_data *data = mallocz(sizeof(*data));
     data->request.data = data;
@@ -950,27 +948,10 @@ int send_job_to_worker(struct health_config_s *config, struct job_list_t *job, R
         job->running--;
         freez(data);
     }
-    return rc;
+    return rc != 0;
 }
 
-// HEALTH CLEANUP
-
-static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
-{
-    if (handle->type == UV_TIMER) {
-        uv_timer_stop((uv_timer_t *)handle);
-    }
-    uv_close(handle, NULL);  // Automatically close and free the handle
-}
-
-static void host_health_timer_cb(uv_timer_t *handle)
-{
-    RRDHOST *host = handle->data;
-    // Queue command to run health
-    health_host_run(host);
-}
-
-void add_job(struct job_list_t *job, RRDHOST *host)
+static void add_job(struct job_list_t *job, RRDHOST *host)
 {
     Pvoid_t *Pvalue = JudyLIns(&job->JudyL, ++job->count, PJE0);
     if (Pvalue != PJERR) {
@@ -980,19 +961,19 @@ void add_job(struct job_list_t *job, RRDHOST *host)
         nd_log_daemon(NDLP_ERR, "Failed to add job");
 }
 
-Pvoid_t *get_job(struct job_list_t *job, Word_t *Index)
+static Pvoid_t *get_job(struct job_list_t *job, Word_t *Index)
 {
     Pvoid_t *Pvalue = JudyLFirst(job->JudyL, Index, PJE0);
     return Pvalue;
 }
 
-void del_job(struct job_list_t *job, Word_t Index)
+static void del_job(struct job_list_t *job, Word_t Index)
 {
     job->pending--;
     (void)JudyLDel(&job->JudyL, Index, PJE0);
 }
 
-void schedule_job_to_run(struct health_config_s *config, health_job_type_t job_type, RRDHOST *host)
+static void schedule_job_to_run(struct health_config_s *config, health_job_type_t job_type, RRDHOST *host)
 {
     Pvoid_t *Pvalue;
     RRDHOST *host_in_queue;
@@ -1025,17 +1006,16 @@ void schedule_job_to_run(struct health_config_s *config, health_job_type_t job_t
 
         // Send it to worker, increase running
         too_busy = send_job_to_worker(config, job, host_in_queue);
-        // It was scheduled in worker, remove it from pending
-        if (!too_busy) {
+        // if it was scheduled in worker, remove it from pending
+        if (!too_busy)
             del_job(job, Index);
-        }
     }
 
     // Was it just a ping to run? leave
     if (!host)
         return;
 
-    too_busy = (job->running >= max_threads);
+    too_busy = (job->pending > 0 || job->running >= max_threads);
     // We have a host, if not busy lets run it
     if (!too_busy)
         too_busy = send_job_to_worker(config, job, host);
@@ -1043,6 +1023,24 @@ void schedule_job_to_run(struct health_config_s *config, health_job_type_t job_t
     // We were either busy, or failed to start worker, schedule for later
     if (too_busy)
         add_job(job, host);
+}
+
+// HEALTH CLEANUP
+
+static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
+{
+    if (handle->type == UV_TIMER) {
+        uv_timer_stop((uv_timer_t *)handle);
+    }
+    uv_close(handle, NULL);  // Automatically close and free the handle
+}
+
+static void host_health_timer_cb(uv_timer_t *handle)
+{
+    RRDHOST *host = handle->data;
+    struct health_config_s *config = handle->loop->data;
+    // Queue command to run health
+    schedule_job_to_run(config, HEALTH_JOB_HOST_RUN, host);
 }
 
 #define MAX_HEALTH_BATCH_COMMANDS (16)
@@ -1066,12 +1064,15 @@ static void health_ev_loop(void *arg)
     worker_register_job_name(HEALTH_RUN_JOBS, "host health run jobs");
 
     uv_loop_t *loop = &config->loop;
+    loop->data = config;
     fatal_assert(0 == uv_loop_init(loop));
     fatal_assert(0 == uv_async_init(loop, &config->async, async_cb));
 
     fatal_assert(0 == uv_timer_init(loop, &config->timer_req));
     config->timer_req.data = config;
-    fatal_assert(0 == uv_timer_start(&config->timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
+
+    uint64_t health_run_every_ms = health_globals.config.run_at_least_every_seconds * 1000;
+    fatal_assert(0 == uv_timer_start(&config->timer_req, timer_cb, health_run_every_ms, health_run_every_ms));
 
     int max_thread_count = netdata_conf_health_threads();
     int maint_max_thread_count = (max_thread_count * 5 / 100);
@@ -1135,6 +1136,7 @@ static void health_ev_loop(void *arg)
                         if (!rc) {
                             host_health->timer_initialized = true;
                             host_health->timer.data = host;
+                            host_health->timer.loop = loop;
                         }
                     }
 
@@ -1143,6 +1145,7 @@ static void health_ev_loop(void *arg)
                             uv_timer_stop(&host_health->timer);
 
                         host_health->timer.data = host;
+                        host_health->timer.loop = loop;
                         int rc = uv_timer_start(&host_health->timer, host_health_timer_cb, schedule_time, 0);
                         if (!rc)
                             break;
