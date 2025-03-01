@@ -429,8 +429,10 @@ static bool check_status_file(const char *directory, char *filename, size_t file
 
     // Get file metadata
     OS_FILE_METADATA metadata = os_get_file_metadata(filename);
-    if (!OS_FILE_METADATA_OK(metadata))
+    if (!OS_FILE_METADATA_OK(metadata)) {
+        *mtime = 0;
         return false;
+    }
 
     *mtime = metadata.modified_time;
     return true;
@@ -646,6 +648,7 @@ static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, XXH64_hash_t hash) {
     // find the same hash
     for(size_t i = 0; i < _countof(ds->dedup); i++) {
         if(ds->dedup[i].hash == hash) {
+            ds->dedup[i].hash = hash;
             ds->dedup[i].timestamp_ut = now_realtime_usec();
             spinlock_unlock(&dsf_spinlock);
             return;
@@ -669,8 +672,8 @@ static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, XXH64_hash_t hash) {
             store_at_slot = i;
     }
 
-    ds->dedup[store_at_slot].timestamp_ut = now_realtime_usec();
     ds->dedup[store_at_slot].hash = hash;
+    ds->dedup[store_at_slot].timestamp_ut = now_realtime_usec();
 
     spinlock_unlock(&dsf_spinlock);
 }
@@ -682,7 +685,7 @@ struct post_status_file_thread_data {
     const char *cause;
     const char *msg;
     ND_LOG_FIELD_PRIORITY priority;
-    DAEMON_STATUS_FILE status;
+    DAEMON_STATUS_FILE *status;
 };
 
 void post_status_file(struct post_status_file_thread_data *d) {
@@ -691,7 +694,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_string(wb, "exit_cause", d->cause); // custom
     buffer_json_member_add_string(wb, "message", d->msg); // ECS
     buffer_json_member_add_uint64(wb, "priority", d->priority); // custom
-    daemon_status_file_to_json(wb, &d->status);
+    daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
     const char *json_data = buffer_tostring(wb);
@@ -709,7 +712,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
-        XXH64_hash_t hash = daemon_status_file_hash(&d->status, d->msg, d->cause);
+        XXH64_hash_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash);
         daemon_status_file_save(&session_status);
     }
@@ -923,7 +926,7 @@ void daemon_status_file_check_crash(void) {
         struct post_status_file_thread_data *d = calloc(1, sizeof(*d));
         d->cause = strdupz(cause);
         d->msg = strdupz(msg);
-        d->status = last_session_status;
+        d->status = &last_session_status;
         d->priority = pri.post;
         nd_thread_create("post_status_file", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_DEFAULT, post_status_file_thread, d);
     }
