@@ -723,33 +723,6 @@ static void health_enq_cmd(struct health_cmd *cmd)
     (void) uv_async_send(&health_config_s.async);
 }
 
-struct job_list_t {
-    health_job_type_t job_type;
-    int pending;
-    int running;
-    int max_threads;
-    Pvoid_t JudyL;
-    Word_t count;
-};
-
-static void async_cb(uv_async_t *handle)
-{
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
-}
-
-#define TIMER_PERIOD_MS (5000)
-
-static void timer_cb(uv_timer_t *handle)
-{
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
-//    struct health_config_s *config = handle->data;
-
-//    struct health_cmd cmd = { 0 };
-    health_run_jobs();
-}
-
 struct worker_data {
     uv_work_t request;
     void *payload;
@@ -758,6 +731,29 @@ struct worker_data {
     struct health_config_s *config;
 };
 
+struct job_list_t {
+    health_job_type_t job_type;
+    int pending;
+    int running;
+    int max_threads;
+    Pvoid_t JudyL;
+    Word_t count;
+    struct worker_data **data;
+};
+
+static void async_cb(uv_async_t *handle)
+{
+    uv_stop(handle->loop);
+    uv_update_time(handle->loop);
+}
+
+static void timer_cb(uv_timer_t *handle)
+{
+    uv_stop(handle->loop);
+    uv_update_time(handle->loop);
+    health_run_jobs();
+}
+
 static void after_host_rrdcalc_cleanup_job(uv_work_t *req, int status __maybe_unused)
 {
     struct worker_data *data = req->data;
@@ -765,7 +761,6 @@ static void after_host_rrdcalc_cleanup_job(uv_work_t *req, int status __maybe_un
     host->health.rrdcalc_cleanup_running = false;
     struct health_config_s *config = data->config;
     config->job_list[data->job_type]->running--;
-    freez(data);
 }
 
 static void host_rrdcalc_cleanup_job(uv_work_t *req)
@@ -787,7 +782,6 @@ static void after_host_health_maintenance_job(uv_work_t *req, int status __maybe
     config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
     health_host_run(host);
-    freez(data);
 }
 
 static void host_health_maintenance_job(uv_work_t *req)
@@ -816,7 +810,6 @@ static void after_host_initialize_alerts_job(uv_work_t *req, int status __maybe_
 
     if (config->job_list[data->job_type]->pending)
         health_host_initialize(NULL);
-    freez(data);
 }
 
 static void host_initialize_alerts_job(uv_work_t *req)
@@ -845,7 +838,6 @@ static void after_host_evaluate_alerts_job(uv_work_t *req, int status __maybe_un
     HEALTH *host_health = &host->health;
 
     time_t next_run = data->next_run;
-    freez(data);
 
     // initialization needed?
     if (next_run == -1)
@@ -924,11 +916,16 @@ static void host_evaluate_alerts_job(uv_work_t *req)
 
 static bool send_job_to_worker(struct health_config_s *config, struct job_list_t *job, RRDHOST *host)
 {
-    struct worker_data *data = mallocz(sizeof(*data));
+    struct worker_data *data = job->data[job->running];
+    if (!data) {
+        data = mallocz(sizeof(*data));
+        job->data[job->running] = data;
+        data->config = config;
+        data->job_type = job->job_type;
+    }
+
     data->request.data = data;
-    data->config = config;
     data->payload = host;
-    data->job_type = job->job_type;
     job->running++;
 
     int rc = 0;
@@ -950,10 +947,8 @@ static bool send_job_to_worker(struct health_config_s *config, struct job_list_t
         default:
             break;
     }
-    if (rc) {
+    if (rc)
         job->running--;
-        freez(data);
-    }
     return rc != 0;
 }
 
@@ -992,7 +987,7 @@ static void schedule_job_to_run(struct health_config_s *config, health_job_type_
     if (too_busy && !host)
         return;
 
-    // if we are busy (we have a query) store it and leave
+    // if we are busy (we have a job) store it and leave
     if (too_busy) {
         add_job(job, host);
         return;
@@ -1002,7 +997,7 @@ static void schedule_job_to_run(struct health_config_s *config, health_job_type_
     // If we have health job to run for a host
     // if we dont, it was a ping from the callback
 
-    // Lets try to queue as many of the pending commands
+    // Lets try to queue as many of the pending jobs
     while (!too_busy && job->pending && job->running < max_threads) {
         Word_t Index = 0;
         Pvalue = get_job(job, &Index);
@@ -1089,20 +1084,13 @@ static void health_ev_loop(void *arg)
 
     unsigned cmd_batch_size;
     RRDHOST *host;
-    config->job_list[HEALTH_JOB_HOST_RUN] = callocz(1, sizeof(config->job_list));
-    config->job_list[HEALTH_JOB_HOST_INIT] = callocz(1, sizeof(config->job_list));
-    config->job_list[HEALTH_JOB_HOST_MAINT] = callocz(1, sizeof(config->job_list));
-    config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP] = callocz(1, sizeof(config->job_list));
 
-    config->job_list[HEALTH_JOB_HOST_RUN]->job_type = HEALTH_JOB_HOST_RUN;
-    config->job_list[HEALTH_JOB_HOST_INIT]->job_type = HEALTH_JOB_HOST_INIT;
-    config->job_list[HEALTH_JOB_HOST_MAINT]->job_type = HEALTH_JOB_HOST_MAINT;
-    config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP]->job_type = HEALTH_JOB_HOST_CALC_CLEANUP;
-
-    config->job_list[HEALTH_JOB_HOST_RUN]->max_threads = max_thread_count;
-    config->job_list[HEALTH_JOB_HOST_INIT]->max_threads = maint_max_thread_count;
-    config->job_list[HEALTH_JOB_HOST_MAINT]->max_threads = maint_max_thread_count;
-    config->job_list[HEALTH_JOB_HOST_CALC_CLEANUP]->max_threads = maint_max_thread_count;
+    for (int i = 0; i < HEALTH_JOB_MAX; i++) {
+        config->job_list[i] = callocz(1, sizeof(struct job_list_t));
+        config->job_list[i]->job_type = i;
+        config->job_list[i]->max_threads = (i == HEALTH_JOB_HOST_RUN) ? max_thread_count : maint_max_thread_count;
+        config->job_list[i]->data = callocz(config->job_list[i]->max_threads, sizeof(struct worker_data *));
+    }
 
     health_register_host(localhost, localhost->health.delay_up_to);
     HEALTH *host_health;
@@ -1222,6 +1210,14 @@ static void health_ev_loop(void *arg)
 
     (void) uv_loop_close(loop);
 
+    for (int i = 0; i < HEALTH_JOB_MAX; i++) {
+        for (int j = 0; j < config->job_list[i]->max_threads; j++) {
+            freez(config->job_list[i]->data[j]);
+        }
+        freez(config->job_list[i]->data);
+        freez(config->job_list[i]);
+    }
+
     aral_by_size_release(config->ar);
 
     worker_unregister();
@@ -1283,7 +1279,6 @@ void health_host_maintenance(RRDHOST *host)
 {
     queue_health_cmd(HEALTH_HOST_MAINTENANCE, host, NULL);
 }
-
 
 void health_run_jobs()
 {
