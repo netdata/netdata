@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- allow insecure cloud connections [\#19736](https://github.com/netdata/netdata/pull/19736) ([ktsaou](https://github.com/ktsaou))
+- add more information about claiming failures [\#19735](https://github.com/netdata/netdata/pull/19735) ([ktsaou](https://github.com/ktsaou))
+- support https\_proxy too [\#19733](https://github.com/netdata/netdata/pull/19733) ([ktsaou](https://github.com/ktsaou))
+- fix json generation of apps.plugin processes function info [\#19732](https://github.com/netdata/netdata/pull/19732) ([ktsaou](https://github.com/ktsaou))
+- add another step when initializing web [\#19731](https://github.com/netdata/netdata/pull/19731) ([ktsaou](https://github.com/ktsaou))
+- improved descriptions of exit reasons [\#19730](https://github.com/netdata/netdata/pull/19730) ([ktsaou](https://github.com/ktsaou))
 - do not post empty reports [\#19729](https://github.com/netdata/netdata/pull/19729) ([ktsaou](https://github.com/ktsaou))
 - docs: clarify Windows Agent limits on free plans [\#19727](https://github.com/netdata/netdata/pull/19727) ([ilyam8](https://github.com/ilyam8))
 - improve status file deduplication [\#19726](https://github.com/netdata/netdata/pull/19726) ([ktsaou](https://github.com/ktsaou))
@@ -487,12 +493,6 @@
 - build\(deps\): bump golang.org/x/crypto from 0.30.0 to 0.31.0 in /src/go [\#19189](https://github.com/netdata/netdata/pull/19189) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Network Metadata \(Windows plugin\) [\#19188](https://github.com/netdata/netdata/pull/19188) ([thiagoftsm](https://github.com/thiagoftsm))
 - ci: fix update-website workflow [\#19187](https://github.com/netdata/netdata/pull/19187) ([ilyam8](https://github.com/ilyam8))
-- Streaming improvements No 4 [\#19186](https://github.com/netdata/netdata/pull/19186) ([ktsaou](https://github.com/ktsaou))
-- Move dependency handling for integrations to script. [\#19185](https://github.com/netdata/netdata/pull/19185) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations docs [\#19184](https://github.com/netdata/netdata/pull/19184) ([netdatabot](https://github.com/netdatabot))
-- fix\(kickstart\): netdata\_avail\_check on Ubuntu [\#19183](https://github.com/netdata/netdata/pull/19183) ([ilyam8](https://github.com/ilyam8))
-- Disks Metadata \(Windows plugin\) [\#19182](https://github.com/netdata/netdata/pull/19182) ([thiagoftsm](https://github.com/thiagoftsm))
-- Bump repository config fetched by kickstart to latest version [\#19181](https://github.com/netdata/netdata/pull/19181) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
