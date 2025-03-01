@@ -268,7 +268,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
     // set the common fields that are automatically set by the logging subsystem
 
-    if(likely(!thread_log_fields[NDF_STACK_TRACE].entry.set))
+    if(likely(!thread_log_fields[NDF_STACK_TRACE].entry.set) && priority <= NDLP_WARNING)
         thread_log_fields[NDF_STACK_TRACE].entry = ND_LOG_FIELD_CB(NDF_STACK_TRACE, stack_trace_formatter, NULL);
 
     if(likely(!thread_log_fields[NDF_INVOCATION_ID].entry.set))
@@ -516,19 +516,6 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
 
     char action_result[200+1];
     snprintfz(action_result, 60, "%s:%s:%s", program_name, tag_to_send, function);
-
-#if !defined(ENABLE_SENTRY) && defined(HAVE_BACKTRACE)
-    int fd = nd_log.sources[NDLS_DAEMON].fd;
-    if(fd == -1)
-        fd = STDERR_FILENO;
-
-    int nptrs;
-    void *buffer[10000];
-
-    nptrs = backtrace(buffer, sizeof(buffer));
-    if(nptrs)
-        backtrace_symbols_fd(buffer, nptrs, fd);
-#endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // abort();
