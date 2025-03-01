@@ -429,8 +429,10 @@ static bool check_status_file(const char *directory, char *filename, size_t file
 
     // Get file metadata
     OS_FILE_METADATA metadata = os_get_file_metadata(filename);
-    if (!OS_FILE_METADATA_OK(metadata))
+    if (!OS_FILE_METADATA_OK(metadata)) {
+        *mtime = 0;
         return false;
+    }
 
     *mtime = metadata.modified_time;
     return true;
