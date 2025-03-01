@@ -486,6 +486,14 @@ check_function_exists(sysinfo HAVE_SYSINFO)
 
 check_function_exists(timegm HAVE_TIMEGM)
 
+# Add -rdynamic when backtrace is available but libunwind is not
+if(HAVE_BACKTRACE AND NOT ENABLE_LIBUNWIND AND NOT STATIC_BUILD)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        add_link_options(-rdynamic)
+        message(STATUS "Adding -rdynamic to link options for better backtrace support")
+    endif()
+endif()
+
 #
 # check source compilation
 #
