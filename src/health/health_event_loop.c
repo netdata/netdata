@@ -1259,7 +1259,7 @@ void health_register_host(RRDHOST *host, time_t run_at)
     if (delay <= 0)
         delay = 0;
     else
-        delay /= USEC_PER_MS;
+        delay *= USEC_PER_MS;
     queue_health_cmd(HEALTH_HOST_REGISTER, host, (void *)(uintptr_t)delay);
 }
 
