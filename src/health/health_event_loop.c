@@ -738,7 +738,6 @@ struct job_list_t {
     int max_threads;
     Pvoid_t JudyL;
     Word_t count;
-    struct worker_data **data;
 };
 
 static void async_cb(uv_async_t *handle)
@@ -761,6 +760,7 @@ static void after_host_rrdcalc_cleanup_job(uv_work_t *req, int status __maybe_un
     host->health.rrdcalc_cleanup_running = false;
     struct health_config_s *config = data->config;
     config->job_list[data->job_type]->running--;
+    freez(data);
 }
 
 static void host_rrdcalc_cleanup_job(uv_work_t *req)
@@ -782,6 +782,7 @@ static void after_host_health_maintenance_job(uv_work_t *req, int status __maybe
     config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
     health_host_run(host);
+    freez(data);
 }
 
 static void host_health_maintenance_job(uv_work_t *req)
@@ -810,6 +811,7 @@ static void after_host_initialize_alerts_job(uv_work_t *req, int status __maybe_
 
     if (config->job_list[data->job_type]->pending)
         health_host_initialize(NULL);
+    freez(data);
 }
 
 static void host_initialize_alerts_job(uv_work_t *req)
@@ -838,6 +840,7 @@ static void after_host_evaluate_alerts_job(uv_work_t *req, int status __maybe_un
     HEALTH *host_health = &host->health;
 
     time_t next_run = data->next_run;
+    freez(data);
 
     // initialization needed?
     if (next_run == -1)
@@ -916,16 +919,11 @@ static void host_evaluate_alerts_job(uv_work_t *req)
 
 static bool send_job_to_worker(struct health_config_s *config, struct job_list_t *job, RRDHOST *host)
 {
-    struct worker_data *data = job->data[job->running];
-    if (!data) {
-        data = mallocz(sizeof(*data));
-        job->data[job->running] = data;
-        data->config = config;
-        data->job_type = job->job_type;
-    }
-
+    struct worker_data *data = mallocz(sizeof(*data));
     data->request.data = data;
+    data->config = config;
     data->payload = host;
+    data->job_type = job->job_type;
     job->running++;
 
     int rc = 0;
@@ -947,8 +945,10 @@ static bool send_job_to_worker(struct health_config_s *config, struct job_list_t
         default:
             break;
     }
-    if (rc)
+    if (rc) {
         job->running--;
+        freez(data);
+    }
     return rc != 0;
 }
 
@@ -1089,7 +1089,6 @@ static void health_ev_loop(void *arg)
         config->job_list[i] = callocz(1, sizeof(struct job_list_t));
         config->job_list[i]->job_type = i;
         config->job_list[i]->max_threads = (i == HEALTH_JOB_HOST_RUN) ? max_thread_count : maint_max_thread_count;
-        config->job_list[i]->data = callocz(config->job_list[i]->max_threads, sizeof(struct worker_data *));
     }
 
     health_register_host(localhost, localhost->health.delay_up_to);
@@ -1210,13 +1209,8 @@ static void health_ev_loop(void *arg)
 
     (void) uv_loop_close(loop);
 
-    for (int i = 0; i < HEALTH_JOB_MAX; i++) {
-        for (int j = 0; j < config->job_list[i]->max_threads; j++) {
-            freez(config->job_list[i]->data[j]);
-        }
-        freez(config->job_list[i]->data);
+    for (int i = 0; i < HEALTH_JOB_MAX; i++)
         freez(config->job_list[i]);
-    }
 
     aral_by_size_release(config->ar);
 
