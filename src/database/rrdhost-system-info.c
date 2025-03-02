@@ -301,7 +301,7 @@ int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
 
         // Validate name and value
         if (unlikely(!*line || !*value)) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "SYSTEM INFO: Skipping empty name or value from system-info.sh: '%s=%s'",
                    line, value);
             continue;
