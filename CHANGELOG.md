@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- zero mtime when a fallback check fails [\#19740](https://github.com/netdata/netdata/pull/19740) ([ktsaou](https://github.com/ktsaou))
+- Capture deadly signals [\#19737](https://github.com/netdata/netdata/pull/19737) ([ktsaou](https://github.com/ktsaou))
 - allow insecure cloud connections [\#19736](https://github.com/netdata/netdata/pull/19736) ([ktsaou](https://github.com/ktsaou))
 - add more information about claiming failures [\#19735](https://github.com/netdata/netdata/pull/19735) ([ktsaou](https://github.com/ktsaou))
 - support https\_proxy too [\#19733](https://github.com/netdata/netdata/pull/19733) ([ktsaou](https://github.com/ktsaou))
@@ -491,8 +493,6 @@
 - rw\_spinlocks: allow recursive readers, even when writers are waiting [\#19191](https://github.com/netdata/netdata/pull/19191) ([ktsaou](https://github.com/ktsaou))
 - docs: remove a duplicated row [\#19190](https://github.com/netdata/netdata/pull/19190) ([orisano](https://github.com/orisano))
 - build\(deps\): bump golang.org/x/crypto from 0.30.0 to 0.31.0 in /src/go [\#19189](https://github.com/netdata/netdata/pull/19189) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Network Metadata \(Windows plugin\) [\#19188](https://github.com/netdata/netdata/pull/19188) ([thiagoftsm](https://github.com/thiagoftsm))
-- ci: fix update-website workflow [\#19187](https://github.com/netdata/netdata/pull/19187) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
