@@ -118,7 +118,7 @@ static void nd_log_event(struct log_field *fields, size_t fields_max __maybe_unu
 
     nd_log_event_this = false;
 
-    if(!nd_log.log_event_cb)
+    if(!nd_log.fatal_data_cb)
         return;
 
     const char *filename = log_field_strdupz(&fields[NDF_FILE]);
@@ -128,17 +128,17 @@ static void nd_log_event(struct log_field *fields, size_t fields_max __maybe_unu
     const char *errno_str = log_field_strdupz(&fields[NDF_ERRNO]);
     long line = log_field_to_int64(&fields[NDF_LINE]);
 
-    nd_log.log_event_cb(filename, function, message, errno_str, stack_trace, line);
+    nd_log.fatal_data_cb(filename, function, message, errno_str, stack_trace, line);
 }
 
-void nd_log_register_event_cb(log_event_t cb) {
-    nd_log.log_event_cb = cb;
+void nd_log_register_fatal_data_cb(log_event_t cb) {
+    nd_log.fatal_data_cb = cb;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
-void nd_log_register_fatal_cb(fatal_event_t cb) {
-    nd_log.fatal_event_cb = cb;
+void nd_log_register_fatal_final_cb(fatal_event_t cb) {
+    nd_log.fatal_final_cb = cb;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -521,8 +521,8 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     // abort();
 #endif
 
-    if(nd_log.fatal_event_cb)
-        nd_log.fatal_event_cb();
+    if(nd_log.fatal_final_cb)
+        nd_log.fatal_final_cb();
 
     exit(1);
 }
