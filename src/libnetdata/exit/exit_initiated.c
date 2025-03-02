@@ -96,6 +96,10 @@ void exit_initiated_reset(void) {
         self = os_get_file_metadata(self_path);
 }
 
+void exit_initiated_add(EXIT_REASON reason) {
+    exit_initiated |= reason;
+}
+
 void exit_initiated_set(EXIT_REASON reason) {
     if(exit_initiated == EXIT_REASON_NONE && !(reason & EXIT_REASON_SYSTEM_SHUTDOWN) && is_system_shutdown())
         reason |= EXIT_REASON_SYSTEM_SHUTDOWN;
@@ -109,5 +113,6 @@ void exit_initiated_set(EXIT_REASON reason) {
     // we combine all of them together
     // so that if this is called multiple times,
     // we will have all of them
-    exit_initiated |= reason;
+    exit_initiated_add(reason);
 }
+

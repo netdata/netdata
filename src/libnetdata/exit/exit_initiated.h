@@ -51,5 +51,6 @@ extern volatile EXIT_REASON exit_initiated;
 
 void exit_initiated_reset(void);
 void exit_initiated_set(EXIT_REASON reason);
+void exit_initiated_add(EXIT_REASON reason);
 
 #endif //NETDATA_EXIT_INITIATED_H
