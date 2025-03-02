@@ -5,20 +5,26 @@
 volatile EXIT_REASON exit_initiated = EXIT_REASON_NONE;
 
 ENUM_STR_MAP_DEFINE(EXIT_REASON) = {
-    { EXIT_REASON_SIGINT, "signal-interrupt"},
-    { EXIT_REASON_SIGQUIT, "signal-quit"},
-    { EXIT_REASON_SIGTERM, "signal-terminate"},
     { EXIT_REASON_SIGBUS, "signal-bus-error"},
     { EXIT_REASON_SIGSEGV, "signal-segmentation-fault"},
     { EXIT_REASON_SIGFPE, "signal-floating-point-exception"},
     { EXIT_REASON_SIGILL, "signal-illegal-instruction"},
+    { EXIT_REASON_OUT_OF_MEMORY, "out-of-memory"},
+
+    { EXIT_REASON_FATAL, "fatal"},
+
     { EXIT_REASON_API_QUIT, "api-quit"},
     { EXIT_REASON_CMD_EXIT, "cmd-exit"},
-    { EXIT_REASON_FATAL, "fatal"},
-    { EXIT_REASON_SYSTEM_SHUTDOWN, "system-shutdown"},
+
+    { EXIT_REASON_SIGQUIT, "signal-quit"},
+    { EXIT_REASON_SIGTERM, "signal-terminate"},
+    { EXIT_REASON_SIGINT, "signal-interrupt"},
+
     { EXIT_REASON_SERVICE_STOP, "service-stop"},
+
+    { EXIT_REASON_SYSTEM_SHUTDOWN, "system-shutdown"},
+
     { EXIT_REASON_UPDATE, "update"},
-    { EXIT_REASON_OUT_OF_MEMORY, "out-of-memory"},
 
     // terminator
     {0, NULL},

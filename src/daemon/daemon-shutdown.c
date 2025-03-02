@@ -196,21 +196,17 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     statistic = (analytics_statistic_t) {"EXIT", ret?"ERROR":"OK","-"};
     analytics_statistic_send(&statistic);
 
-    watcher_step_complete(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
-
     netdata_main_spawn_server_cleanup();
     watcher_step_complete(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
-
-    watcher_step_complete(WATCHER_STEP_ID_DBENGINE_EXIT_MODE);
 
     webrtc_close_all_connections();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
     service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS |
-                        ABILITY_STREAMING_CONNECTIONS | SERVICE_ACLK);
+                        ABILITY_STREAMING_CONNECTIONS | SERVICE_ACLK | SERVICE_SYSTEMD);
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
 
-    service_wait_exit(SERVICE_MAINTENANCE, 3 * USEC_PER_SEC);
+    service_wait_exit(SERVICE_MAINTENANCE | SERVICE_SYSTEMD, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
 
     service_wait_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
