@@ -125,8 +125,8 @@ struct nd_log {
     nd_uuid_t invocation_id;
 
     ND_LOG_SOURCES overwrite_process_source;
-    log_event_t log_event_cb;
-    fatal_event_t fatal_event_cb;
+    log_event_t fatal_data_cb;
+    fatal_event_t fatal_final_cb;
 
     struct nd_log_source sources[_NDLS_MAX];
 

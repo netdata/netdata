@@ -5,20 +5,26 @@
 volatile EXIT_REASON exit_initiated = EXIT_REASON_NONE;
 
 ENUM_STR_MAP_DEFINE(EXIT_REASON) = {
-    { EXIT_REASON_SIGINT, "signal-interrupt"},
-    { EXIT_REASON_SIGQUIT, "signal-quit"},
-    { EXIT_REASON_SIGTERM, "signal-terminate"},
     { EXIT_REASON_SIGBUS, "signal-bus-error"},
     { EXIT_REASON_SIGSEGV, "signal-segmentation-fault"},
     { EXIT_REASON_SIGFPE, "signal-floating-point-exception"},
     { EXIT_REASON_SIGILL, "signal-illegal-instruction"},
+    { EXIT_REASON_OUT_OF_MEMORY, "out-of-memory"},
+
+    { EXIT_REASON_FATAL, "fatal"},
+
     { EXIT_REASON_API_QUIT, "api-quit"},
     { EXIT_REASON_CMD_EXIT, "cmd-exit"},
-    { EXIT_REASON_FATAL, "fatal"},
-    { EXIT_REASON_SYSTEM_SHUTDOWN, "system-shutdown"},
+
+    { EXIT_REASON_SIGQUIT, "signal-quit"},
+    { EXIT_REASON_SIGTERM, "signal-terminate"},
+    { EXIT_REASON_SIGINT, "signal-interrupt"},
+
     { EXIT_REASON_SERVICE_STOP, "service-stop"},
+
+    { EXIT_REASON_SYSTEM_SHUTDOWN, "system-shutdown"},
+
     { EXIT_REASON_UPDATE, "update"},
-    { EXIT_REASON_OUT_OF_MEMORY, "out-of-memory"},
 
     // terminator
     {0, NULL},
@@ -96,6 +102,10 @@ void exit_initiated_reset(void) {
         self = os_get_file_metadata(self_path);
 }
 
+void exit_initiated_add(EXIT_REASON reason) {
+    exit_initiated |= reason;
+}
+
 void exit_initiated_set(EXIT_REASON reason) {
     if(exit_initiated == EXIT_REASON_NONE && !(reason & EXIT_REASON_SYSTEM_SHUTDOWN) && is_system_shutdown())
         reason |= EXIT_REASON_SYSTEM_SHUTDOWN;
@@ -109,5 +119,6 @@ void exit_initiated_set(EXIT_REASON reason) {
     // we combine all of them together
     // so that if this is called multiple times,
     // we will have all of them
-    exit_initiated |= reason;
+    exit_initiated_add(reason);
 }
+

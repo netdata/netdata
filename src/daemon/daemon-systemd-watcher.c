@@ -108,7 +108,7 @@ static void listen_for_systemd_dbus_events(void) {
     }
 
     // Process incoming D-Bus messages.
-    while (service_running(SERVICE_SYSTEMD)) {
+    while (service_running(SERVICE_SYSTEMD) && bus != NULL) {
         // Process any pending messages.
         r = sd_bus_process(bus, NULL);
         if (r < 0) {
@@ -121,9 +121,9 @@ static void listen_for_systemd_dbus_events(void) {
             continue;
 
         // Wait for the next signal.
-        r = 0;
-        while(r == 0 && service_running(SERVICE_SYSTEMD))
+        do {
             r = sd_bus_wait(bus, USEC_PER_SEC);
+        } while((r == 0 || r == -EINTR) && service_running(SERVICE_SYSTEMD));
 
         if (r < 0) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEMD DBUS: Failed to wait on bus: %s", strerror(-r));

@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 6
+#define STATUS_FILE_VERSION 7
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -591,8 +591,9 @@ void daemon_status_file_update_status(DAEMON_STATUS status) {
 }
 
 void daemon_status_file_exit_reason_save(EXIT_REASON reason) {
+    exit_initiated_add(reason);
     spinlock_lock(&dsf_spinlock);
-    session_status.exit_reason |= reason;
+    session_status.exit_reason = exit_initiated;
     spinlock_unlock(&dsf_spinlock);
     daemon_status_file_save(&session_status);
 }
@@ -986,7 +987,7 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
         return;
     }
 
-    exit_initiated |= EXIT_REASON_FATAL;
+    exit_initiated_add(EXIT_REASON_FATAL);
     strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
 
     session_status.fatal.filename = filename;

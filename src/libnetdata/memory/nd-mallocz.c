@@ -9,6 +9,8 @@ void mallocz_register_out_of_memory_cb(out_of_memory_cb cb) {
 
 ALWAYS_INLINE NORETURN
 static void out_of_memory(const char *call, size_t size) {
+    exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
+
     if(out_of_memory_callback)
         out_of_memory_callback();
 
