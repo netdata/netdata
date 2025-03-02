@@ -886,11 +886,9 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
     if (!statistic->data)
         action_data = "";
 
-    char *command_to_run = mallocz(
-        sizeof(char) * (strlen(statistic->action) + strlen(action_result) + strlen(action_data) + FILENAME_MAX +
-                        analytics_data.data_length + (ANALYTICS_NO_OF_ITEMS * 3) + 15));
-    sprintf(
-        command_to_run,
+    CLEAN_BUFFER *cmd = buffer_create(0, NULL);
+    buffer_sprintf(
+        cmd,
         "%s/anonymous-statistics.sh '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
         netdata_configured_primary_plugins_dir,
         statistic->action,
@@ -941,7 +939,7 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
            "%s/anonymous-statistics.sh '%s' '%s' '%s'",
            netdata_configured_primary_plugins_dir, statistic->action, action_result, action_data);
 
-    POPEN_INSTANCE *instance = spawn_popen_run(command_to_run);
+    POPEN_INSTANCE *instance = spawn_popen_run(buffer_tostring(cmd));
     if (instance) {
         char buffer[4 + 1];
         char *s = fgets(buffer, 4, spawn_popen_stdout(instance));
@@ -962,8 +960,6 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "Failed to run statistics script: %s/anonymous-statistics.sh",
                netdata_configured_primary_plugins_dir);
-
-    freez(command_to_run);
 }
 
 void analytics_reset(void) {
