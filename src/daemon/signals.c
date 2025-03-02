@@ -47,8 +47,12 @@ static void signal_handler(int signo) {
             signals_waiting[i].count++;
 
             if(signals_waiting[i].action == NETDATA_SIGNAL_FATAL) {
+                // Update the status file
+                daemon_status_file_deadly_signal_received(signals_waiting[i].reason);
+
+                // log it
                 char buffer[200 + 1];
-                snprintfz(buffer, sizeof(buffer) - 1, "\nSIGNAL HANDLER: received: %s in thread %d. Oops! This is bad!\n",
+                snprintfz(buffer, sizeof(buffer) - 1, "\nSIGNAL HANDLER: received: %s in thread %d!\n",
                           signals_waiting[i].name, gettid_cached());
 
                 if(write(STDERR_FILENO, buffer, strlen(buffer)) == -1) {
@@ -56,8 +60,15 @@ static void signal_handler(int signo) {
                     ;
                 }
 
-                // Always update the status file for fatal signals
-                daemon_status_file_bad_signal_received(signals_waiting[i].reason);
+                // Reset the signal's disposition to the default handler.
+                struct sigaction sa;
+                sa.sa_handler = SIG_DFL;
+                sigemptyset(&sa.sa_mask);
+                sa.sa_flags = 0;
+                sigaction(signo, &sa, NULL);
+
+                // Re-raise the signal, which now uses the default action.
+                raise(signo);
             }
 
             break;
@@ -175,7 +186,7 @@ void nd_process_signals(void) {
 
                             case NETDATA_SIGNAL_FATAL:
                                 nd_log_limits_unlimited();
-                                daemon_status_file_bad_signal_received(signals_waiting[i].reason);
+                                daemon_status_file_deadly_signal_received(signals_waiting[i].reason);
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
                                 break;
 

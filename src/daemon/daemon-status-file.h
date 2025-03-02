@@ -83,7 +83,7 @@ DAEMON_STATUS_FILE daemon_status_file_load(void);
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);
 void daemon_status_file_exit_reason_save(EXIT_REASON reason);
-void daemon_status_file_bad_signal_received(EXIT_REASON reason);
+void daemon_status_file_deadly_signal_received(EXIT_REASON reason);
 
 // check for a crash
 void daemon_status_file_check_crash(void);
