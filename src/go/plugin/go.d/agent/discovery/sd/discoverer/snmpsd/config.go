@@ -17,7 +17,7 @@ type (
 		RescanInterval time.Duration `yaml:"rescan_interval"`
 		// Timeout defines the maximum time to wait for SNMP device responses (default: 1 s)
 		Timeout time.Duration `yaml:"timeout"`
-		// DeviceCacheTTL defines how long to remember discovered devices (default: 6 h)
+		// DeviceCacheTTL defines how long to trust cached discovery results before requiring a new probe (default: 6h)
 		DeviceCacheTTL time.Duration `yaml:"device_cache_ttl"`
 		// ParallelScansPerNetwork defines how many IPs to scan concurrently within each subnet (default: 32)
 		ParallelScansPerNetwork int `yaml:"parallel_scans_per_network"`
