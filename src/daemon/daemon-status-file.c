@@ -505,35 +505,94 @@ DAEMON_STATUS_FILE daemon_status_file_load(void) {
 // save the current status
 
 static bool save_status_file(const char *directory, const char *content, size_t content_size) {
+    // THIS FUNCTION MUST USE ONLY ASYNC-SAFE OPERATIONS
+
     if(!directory || !*directory)
         return false;
 
     char filename[FILENAME_MAX];
     char temp_filename[FILENAME_MAX];
 
-    snprintfz(filename, sizeof(filename), "%s/%s", directory, STATUS_FILENAME);
-    snprintfz(temp_filename, sizeof(temp_filename), "%s/%s-%08x", directory, STATUS_FILENAME, (unsigned)gettid_cached());
+    /* Construct filenames using async-safe string operations */
+    /* Using simple string concatenation instead of snprintf */
+    size_t dir_len = strlen(directory);
+    if (dir_len + 1 + strlen(STATUS_FILENAME) >= FILENAME_MAX)
+        return false;  /* Path too long */
 
-    FILE *fp = fopen(temp_filename, "w");
-    if (!fp)
+    memcpy(filename, directory, dir_len);
+    filename[dir_len] = '/';
+    memcpy(filename + dir_len + 1, STATUS_FILENAME, strlen(STATUS_FILENAME) + 1);
+
+    /* Create a unique temp filename using thread id */
+    unsigned int tid = (unsigned int)gettid_cached();
+    char tid_str[16];
+    char *tid_ptr = tid_str + sizeof(tid_str) - 1;
+    *tid_ptr = '\0';
+
+    unsigned int tid_copy = tid;
+    do {
+        tid_ptr--;
+        *tid_ptr = "0123456789abcdef"[tid_copy & 0xf];
+        tid_copy >>= 4;
+    } while (tid_copy && tid_ptr > tid_str);
+
+    size_t temp_name_len = dir_len + 1 + strlen(STATUS_FILENAME) + 1 + (sizeof(tid_str) - (tid_ptr - tid_str));
+    if (temp_name_len >= FILENAME_MAX)
+        return false;  /* Path too long */
+
+    memcpy(temp_filename, directory, dir_len);
+    temp_filename[dir_len] = '/';
+    char *ptr = temp_filename + dir_len + 1;
+    memcpy(ptr, STATUS_FILENAME, strlen(STATUS_FILENAME));
+    ptr += strlen(STATUS_FILENAME);
+    *ptr++ = '-';
+    memcpy(ptr, tid_ptr, strlen(tid_ptr) + 1);
+
+    /* Open file with O_WRONLY, O_CREAT, and O_TRUNC flags */
+    int fd = open(temp_filename, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+    if (fd == -1)
         return false;
 
-    bool ok = fwrite(content, 1, content_size, fp) == content_size;
-    fclose(fp);
+    /* Write content to file using write() */
+    ssize_t bytes_written = 0;
+    size_t total_written = 0;
 
-    if (!ok) {
+    while (total_written < content_size) {
+        bytes_written = write(fd, content + total_written, content_size - total_written);
+
+        if (bytes_written == -1) {
+            if (errno == EINTR)
+                continue;  /* Retry if interrupted by signal */
+
+            close(fd);
+            unlink(temp_filename);  /* Remove the temp file */
+            return false;
+        }
+
+        total_written += bytes_written;
+    }
+
+    /* Fsync to ensure data is written to disk */
+    if (fsync(fd) == -1) {
+        close(fd);
         unlink(temp_filename);
         return false;
     }
 
+    /* Close file */
+    if (close(fd) == -1) {
+        unlink(temp_filename);
+        return false;
+    }
+
+    /* Set permissions using chmod() */
     if (chmod(temp_filename, 0664) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot set permissions on status file '%s'", temp_filename);
         unlink(temp_filename);
         return false;
     }
 
+    /* Rename temp file to target file */
     if (rename(temp_filename, filename) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot rename status file '%s' to '%s'", temp_filename, filename);
         unlink(temp_filename);
         return false;
     }
@@ -549,8 +608,9 @@ static void static_save_buffer_init(void) {
     buffer_flush(static_save_buffer);
 }
 
-static void daemon_status_file_save(DAEMON_STATUS_FILE *ds) {
-    spinlock_lock(&dsf_spinlock);
+static void daemon_status_file_save(DAEMON_STATUS_FILE *ds, bool have_lock) {
+    if(!have_lock)
+        spinlock_lock(&dsf_spinlock);
 
     static_save_buffer_init();
 
@@ -582,12 +642,13 @@ static void daemon_status_file_save(DAEMON_STATUS_FILE *ds) {
     if (!saved)
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to save status file in any location");
 
-    spinlock_unlock(&dsf_spinlock);
+    if(!have_lock)
+        spinlock_unlock(&dsf_spinlock);
 }
 
 void daemon_status_file_update_status(DAEMON_STATUS status) {
     daemon_status_file_refresh(status);
-    daemon_status_file_save(&session_status);
+    daemon_status_file_save(&session_status, false);
 }
 
 void daemon_status_file_exit_reason_save(EXIT_REASON reason) {
@@ -595,15 +656,16 @@ void daemon_status_file_exit_reason_save(EXIT_REASON reason) {
     spinlock_lock(&dsf_spinlock);
     session_status.exit_reason = exit_initiated;
     spinlock_unlock(&dsf_spinlock);
-    daemon_status_file_save(&session_status);
+    daemon_status_file_save(&session_status, false);
 }
 
 static void daemon_status_file_out_of_memory(void) {
     daemon_status_file_exit_reason_save(EXIT_REASON_OUT_OF_MEMORY);
 }
 
-void daemon_status_file_bad_signal_received(EXIT_REASON reason) {
-    spinlock_lock(&dsf_spinlock);
+void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
+    // DO NOT LOCK IN THIS FUNCTION - WE CRASHED ALREADY AND WE ARE INSIDE THE SIGNAL HANDLER!
+
     session_status.exit_reason |= reason;
 
     if(!session_status.fatal.thread[0])
@@ -615,8 +677,7 @@ void daemon_status_file_bad_signal_received(EXIT_REASON reason) {
         strncpyz(session_status.fatal.stack_trace, buffer_tostring(static_save_buffer), sizeof(session_status.fatal.stack_trace) - 1);
     }
 
-    spinlock_unlock(&dsf_spinlock);
-    daemon_status_file_save(&session_status);
+    daemon_status_file_save(&session_status, true);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -715,7 +776,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     if(rc == CURLE_OK) {
         XXH64_hash_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash);
-        daemon_status_file_save(&session_status);
+        daemon_status_file_save(&session_status, false);
     }
 
     curl_easy_cleanup(curl);
@@ -1001,5 +1062,5 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
 
     spinlock_unlock(&dsf_spinlock);
 
-    daemon_status_file_save(&session_status);
+    daemon_status_file_save(&session_status, false);
 }
