@@ -94,6 +94,8 @@ func (a *Agent) Run() {
 func serve(a *Agent) {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
+	signal.Ignore(syscall.SIGPIPE)
+
 	var wg sync.WaitGroup
 
 	var exit bool
@@ -228,12 +230,11 @@ func (a *Agent) keepAlive() {
 	var n int
 	for range tk.C {
 		if err := a.api.EMPTYLINE(); err != nil {
-			a.Infof("keepAlive: %v", err)
 			n++
 		} else {
 			n = 0
 		}
-		if n == 3 {
+		if n >= 30 {
 			a.Info("too many keepAlive errors. Terminating...")
 			os.Exit(0)
 		}
