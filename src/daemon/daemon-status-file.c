@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 6
+#define STATUS_FILE_VERSION 7
 
 #define STATUS_FILENAME "status-netdata.json"
 
