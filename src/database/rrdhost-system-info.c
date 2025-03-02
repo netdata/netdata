@@ -239,46 +239,101 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
 
 int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
 #if !defined(OS_WINDOWS)
-    char *script;
-    script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
-    sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
-    if (unlikely(access(script, R_OK) != 0)) {
-        netdata_log_error("System info script %s not found.",script);
-        freez(script);
+    if (unlikely(!system_info)) {
+        netdata_log_error("SYSTEM INFO: System info structure is NULL.");
         return 1;
     }
 
-    POPEN_INSTANCE *instance = spawn_popen_run(script);
-    if(instance) {
-        char line[200 + 1];
-        // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
-        // One time init code, but I'm curious about the warning...
-        while (fgets(line, 200, spawn_popen_stdout(instance)) != NULL) {
-            char *value=line;
-            while (*value && *value != '=') value++;
-            if (*value=='=') {
-                *value='\0';
-                value++;
-                char *end = value;
-                while (*end && *end != '\n') end++;
-                *end = '\0';    // Overwrite newline if present
-                coverity_remove_taint(line);    // I/O is controlled result of system_info.sh - not tainted
-                coverity_remove_taint(value);
+    CLEAN_BUFFER *script = buffer_create(0, NULL);
+    buffer_sprintf(script, "%s/system-info.sh", netdata_configured_primary_plugins_dir);
 
-                if(unlikely(rrdhost_system_info_set_by_name(system_info, line, value))) {
-                    netdata_log_error("Unexpected environment variable %s=%s", line, value);
-                } else {
-                    nd_setenv(line, value, 1);
-                }
-            }
-        }
-        spawn_popen_wait(instance);
+    POPEN_INSTANCE *instance = NULL;
+    int ret = 1;
+
+    // Check if script exists and is readable
+    if (unlikely(access(buffer_tostring(script), R_OK) != 0)) {
+        netdata_log_error("SYSTEM INFO: System info script %s not found or not readable.",
+                          buffer_tostring(script));
+        goto cleanup;
     }
-    freez(script);
+
+    // Run the script
+    instance = spawn_popen_run(buffer_tostring(script));
+    if (unlikely(!instance)) {
+        netdata_log_error("SYSTEM INFO: Failed to execute system info script %s.",
+                          buffer_tostring(script));
+        goto cleanup;
+    }
+
+    char line[1024];
+    FILE *fp = spawn_popen_stdout(instance);
+    if (unlikely(!fp)) {
+        netdata_log_error("SYSTEM INFO: Failed to get stdout from system info script.");
+        goto cleanup;
+    }
+
+    // Process each line from the script output
+    while (fgets(line, sizeof(line) - 1, fp) != NULL) {
+        // Ensure null-termination
+        line[sizeof(line) - 1] = '\0';
+
+        // Find the equals sign separator
+        char *value = strchr(line, '=');
+        if (unlikely(!value)) {
+            // Skip lines without an equal sign
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "SYSTEM INFO: Skipping malformed line from system-info.sh (no '=' found): '%s'",
+                   line);
+            continue;
+        }
+
+        // Split the name and value
+        *value = '\0';
+        value++;
+
+        // Trim any trailing newline from the value
+        char *end = strchr(value, '\n');
+        if (end) *end = '\0';
+
+        // Remove any carriage return that might be present (especially for macOS)
+        end = strchr(value, '\r');
+        if (end) *end = '\0';
+
+        // Validate name and value
+        if (unlikely(!*line || !*value)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "SYSTEM INFO: Skipping empty name or value from system-info.sh: '%s=%s'",
+                   line, value);
+            continue;
+        }
+
+        // Process the name-value pair
+        coverity_remove_taint(line);
+        coverity_remove_taint(value);
+
+        if (unlikely(rrdhost_system_info_set_by_name(system_info, line, value))) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "SYSTEM INFO: Unexpected variable '%s=%s'",
+                   line, value);
+        } else {
+            // Only set as environment variable if it was successfully processed
+            nd_setenv(line, value, 1);
+        }
+    }
+
+    // Everything succeeded
+    ret = 0;
+
+cleanup:
+    // Clean up resources
+    if (instance)
+        spawn_popen_wait(instance);
+
+    return ret;
 #else
     netdata_windows_get_system_info(system_info);
-#endif
     return 0;
+#endif
 }
 
 void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
