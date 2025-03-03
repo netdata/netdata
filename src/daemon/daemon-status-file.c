@@ -874,6 +874,11 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last crashed while starting, because it couldn't allocate memory";
                 pri = PRI_USER_SHOULD_FIX;
             }
+            else if (last_session_status.exit_reason & EXIT_REASON_ALREADY_RUNNING) {
+                cause = "out of memory";
+                msg = "Netdata couldn't start, because it was already running";
+                pri = PRI_USER_SHOULD_FIX;
+            }
             else if (OS_SYSTEM_DISK_SPACE_OK(last_session_status.var_cache) &&
                 last_session_status.var_cache.is_read_only) {
                 cause = "disk read-only";

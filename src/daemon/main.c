@@ -902,6 +902,8 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("web server sockets");
     if(web_server_mode != WEB_SERVER_MODE_NONE) {
         if (!api_listen_sockets_setup()) {
+            exit_initiated_add(EXIT_REASON_ALREADY_RUNNING);
+            daemon_status_file_update_status(DAEMON_STATUS_NONE);
             fatal("Cannot setup listen port(s). Is Netdata already running?");
             exit(1);
         }
