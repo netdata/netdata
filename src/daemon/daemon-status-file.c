@@ -37,14 +37,37 @@ ENUM_STR_MAP_DEFINE(DAEMON_OS_TYPE) = {
 };
 ENUM_STR_DEFINE_FUNCTIONS(DAEMON_OS_TYPE, DAEMON_OS_TYPE_UNKNOWN, "unknown");
 
-static DAEMON_STATUS_FILE last_session_status = { 0 };
-static DAEMON_STATUS_FILE session_status = { 0 };
-static SPINLOCK dsf_spinlock = SPINLOCK_INITIALIZER;
+static DAEMON_STATUS_FILE last_session_status = {
+    .spinlock = SPINLOCK_INITIALIZER,
+    .fatal = {
+        .spinlock = SPINLOCK_INITIALIZER,
+    },
+    .dedup = {
+        .spinlock = SPINLOCK_INITIALIZER,
+    },
+};
+
+static DAEMON_STATUS_FILE session_status = {
+    .spinlock = SPINLOCK_INITIALIZER,
+    .fatal = {
+        .spinlock = SPINLOCK_INITIALIZER,
+    },
+    .dedup = {
+        .spinlock = SPINLOCK_INITIALIZER,
+    },
+};
+
+static void daemon_status_file_out_of_memory(void);
+
+// these are used instead of locks when locks cannot be used (signal handler, out of memory, etc)
+#define dsf_acquire(ds) __atomic_load_n(&(ds).v, __ATOMIC_ACQUIRE)
+#define dsf_release(ds) __atomic_store_n(&(ds).v, STATUS_FILE_VERSION, __ATOMIC_RELEASE)
 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
 
 static XXH64_hash_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const char *cause) {
+    dsf_acquire(*ds);
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
@@ -62,12 +85,15 @@ static XXH64_hash_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *
     buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
     EXIT_REASON_2json(wb, "exit_reason", ds->exit_reason);
     ND_PROFILE_2json(wb, "profile", ds->profile);
+    dsf_release(*ds);
     buffer_json_finalize(wb);
     XXH64_hash_t hash = XXH3_64bits((const void *)buffer_tostring(wb), buffer_strlen(wb));
     return hash;
 }
 
 static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
+    dsf_acquire(*ds);
+
     buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->timestamp_ut, true); // ECS
     buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION); // custom
 
@@ -159,19 +185,21 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
     buffer_json_member_add_array(wb, "dedup"); // custom
     {
-        for(size_t i = 0; i < _countof(ds->dedup); i++) {
-            if (ds->dedup[i].timestamp_ut == 0)
+        for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
+            if (ds->dedup.slot[i].timestamp_ut == 0)
                 continue;
 
             buffer_json_add_array_item_object(wb); // custom
             {
-                buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup[i].timestamp_ut, true); // custom
-                buffer_json_member_add_uint64(wb, "hash", ds->dedup[i].hash); // custom
+                buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup.slot[i].timestamp_ut, true); // custom
+                buffer_json_member_add_uint64(wb, "hash", ds->dedup.slot[i].hash); // custom
             }
             buffer_json_object_close(wb);
         }
     }
     buffer_json_array_close(wb);
+
+    dsf_release(*ds);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -278,9 +306,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             datetime[0] = '\0';
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v3);
             if (datetime[0])
-                ds->dedup[0].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
+                ds->dedup.slot[0].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
 
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup[0].hash, error, required_v3);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[0].hash, error, required_v3);
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "restarts", ds->restarts, error, required_v3);
         });
     }
@@ -288,14 +316,14 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_ARRAY(jobj, path, "dedup", error, required_v4, {
             size_t i = 0;
             JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, required_v4, {
-                if(i >= _countof(ds->dedup))
+                if(i >= _countof(ds->dedup.slot))
                     break;
 
                 JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v4);
                 if (datetime[0])
-                    ds->dedup[i].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
+                    ds->dedup.slot[i].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
 
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup[i].hash, error, required_v4);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[i].hash, error, required_v4);
             });
         });
     }
@@ -307,9 +335,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 // get the current status
 
 static void daemon_status_file_refresh(DAEMON_STATUS status) {
-    spinlock_lock(&dsf_spinlock);
-
     usec_t now_ut = now_realtime_usec();
+
+    dsf_acquire(session_status);
+    spinlock_lock(&session_status.spinlock);
 
 #if defined(OS_LINUX)
     session_status.os_type = DAEMON_OS_TYPE_LINUX;
@@ -321,11 +350,17 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.os_type = DAEMON_OS_TYPE_WINDOWS;
 #endif
 
+    if(session_status.status != DAEMON_STATUS_INITIALIZING && status == DAEMON_STATUS_INITIALIZING)
+        session_status.timings.init_started_ut = now_ut;
+
+    if(session_status.status != DAEMON_STATUS_EXITING && status == DAEMON_STATUS_EXITING)
+        session_status.timings.exit_started_ut = now_ut;
+
     if(session_status.status == DAEMON_STATUS_INITIALIZING && status == DAEMON_STATUS_RUNNING)
-        session_status.timings.init = (time_t)((now_ut - session_status.timestamp_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
+        session_status.timings.init = (time_t)((now_ut - session_status.timings.init_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
     if(session_status.status == DAEMON_STATUS_EXITING && status == DAEMON_STATUS_EXITED)
-        session_status.timings.exit = (time_t)((now_ut - session_status.timestamp_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
+        session_status.timings.exit = (time_t)((now_ut - session_status.timings.exit_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
     strncpyz(session_status.version, NETDATA_VERSION, sizeof(session_status.version) - 1);
 
@@ -384,9 +419,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         session_status.os_id_like = strdupz(last_session_status.os_id_like);
     if(!session_status.restarts)
         session_status.restarts = last_session_status.restarts + 1;
-    if(!session_status.dedup[0].timestamp_ut || !session_status.dedup[0].hash) {
-        for (size_t i = 0; i < _countof(session_status.dedup); i++)
-            session_status.dedup[i] = last_session_status.dedup[i];
+    if(!session_status.dedup.slot[0].timestamp_ut || !session_status.dedup.slot[0].hash) {
+        for (size_t i = 0; i < _countof(session_status.dedup.slot); i++)
+            session_status.dedup.slot[i] = last_session_status.dedup.slot[i];
     }
 
     if(!session_status.install_type) {
@@ -408,7 +443,8 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.memory = os_system_memory(true);
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
 
-    spinlock_unlock(&dsf_spinlock);
+    spinlock_unlock(&session_status.spinlock);
+    dsf_release(session_status);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -608,136 +644,97 @@ static void static_save_buffer_init(void) {
     buffer_flush(static_save_buffer);
 }
 
-static void daemon_status_file_save(DAEMON_STATUS_FILE *ds, bool have_lock) {
-    if(!have_lock)
-        spinlock_lock(&dsf_spinlock);
+static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log) {
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    daemon_status_file_to_json(wb, ds);
+    buffer_json_finalize(wb);
 
-    static_save_buffer_init();
-
-    buffer_json_initialize(static_save_buffer, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-    daemon_status_file_to_json(static_save_buffer, ds);
-    buffer_json_finalize(static_save_buffer);
-
-    const char *content = buffer_tostring(static_save_buffer);
-    size_t content_size = buffer_strlen(static_save_buffer);
+    const char *content = buffer_tostring(wb);
+    size_t content_size = buffer_strlen(wb);
 
     // Try primary directory first
     bool saved = false;
     if (save_status_file(netdata_configured_cache_dir, content, content_size))
         saved = true;
     else {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "Failed to save status file in primary directory %s",
-               netdata_configured_cache_dir);
+        if(log)
+            nd_log(NDLS_DAEMON, NDLP_DEBUG, "Failed to save status file in primary directory %s",
+                   netdata_configured_cache_dir);
 
         // Try each fallback directory until successful
         for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
             if (save_status_file(status_file_fallbacks[i], content, content_size)) {
-                nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_fallbacks[i]);
+                if(log)
+                    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_fallbacks[i]);
                 saved = true;
                 break;
             }
         }
     }
 
-    if (!saved)
+    if (!saved && log)
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to save status file in any location");
-
-    if(!have_lock)
-        spinlock_unlock(&dsf_spinlock);
-}
-
-void daemon_status_file_update_status(DAEMON_STATUS status) {
-    daemon_status_file_refresh(status);
-    daemon_status_file_save(&session_status, false);
-}
-
-void daemon_status_file_exit_reason_save(EXIT_REASON reason) {
-    exit_initiated_add(reason);
-    spinlock_lock(&dsf_spinlock);
-    session_status.exit_reason = exit_initiated;
-    spinlock_unlock(&dsf_spinlock);
-    daemon_status_file_save(&session_status, false);
-}
-
-static void daemon_status_file_out_of_memory(void) {
-    daemon_status_file_exit_reason_save(EXIT_REASON_OUT_OF_MEMORY);
-}
-
-void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
-    // DO NOT LOCK IN THIS FUNCTION - WE CRASHED ALREADY AND WE ARE INSIDE THE SIGNAL HANDLER!
-
-    session_status.exit_reason |= reason;
-
-    if(!session_status.fatal.thread[0])
-        strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
-
-    if(!session_status.fatal.stack_trace[0]) {
-        static_save_buffer_init();
-        capture_stack_trace(static_save_buffer);
-        strncpyz(session_status.fatal.stack_trace, buffer_tostring(static_save_buffer), sizeof(session_status.fatal.stack_trace) - 1);
-    }
-
-    daemon_status_file_save(&session_status, true);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 // deduplication hashes management
 
-static bool dedup_already_posted(XXH64_hash_t hash) {
-    spinlock_lock(&dsf_spinlock);
+static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, XXH64_hash_t hash) {
+    spinlock_lock(&ds->dedup.spinlock);
 
     usec_t now_ut = now_realtime_usec();
 
-    for(size_t i = 0; i < _countof(session_status.dedup); i++) {
-        if(session_status.dedup[i].timestamp_ut == 0)
+    for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
+        if(ds->dedup.slot[i].timestamp_ut == 0)
             continue;
 
-        if(hash == session_status.dedup[i].hash &&
-            now_ut - session_status.dedup[i].timestamp_ut < 86400 * USEC_PER_SEC) {
+        if(hash == ds->dedup.slot[i].hash &&
+            now_ut - ds->dedup.slot[i].timestamp_ut < 86400 * USEC_PER_SEC) {
             // we have already posted this crash
-            spinlock_unlock(&dsf_spinlock);
+            spinlock_unlock(&ds->dedup.spinlock);
             return true;
         }
     }
 
-    spinlock_unlock(&dsf_spinlock);
+    spinlock_unlock(&ds->dedup.spinlock);
     return false;
 }
 
 static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, XXH64_hash_t hash) {
-    spinlock_lock(&dsf_spinlock);
+    spinlock_lock(&ds->dedup.spinlock);
 
     // find the same hash
-    for(size_t i = 0; i < _countof(ds->dedup); i++) {
-        if(ds->dedup[i].hash == hash) {
-            ds->dedup[i].hash = hash;
-            ds->dedup[i].timestamp_ut = now_realtime_usec();
-            spinlock_unlock(&dsf_spinlock);
+    for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
+        if(ds->dedup.slot[i].hash == hash) {
+            ds->dedup.slot[i].hash = hash;
+            ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
+            spinlock_unlock(&ds->dedup.spinlock);
             return;
         }
     }
 
     // find an empty slot
-    for(size_t i = 0; i < _countof(ds->dedup); i++) {
-        if(!ds->dedup[i].hash) {
-            ds->dedup[i].hash = hash;
-            ds->dedup[i].timestamp_ut = now_realtime_usec();
-            spinlock_unlock(&dsf_spinlock);
+    for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
+        if(!ds->dedup.slot[i].hash) {
+            ds->dedup.slot[i].hash = hash;
+            ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
+            spinlock_unlock(&ds->dedup.spinlock);
             return;
         }
     }
 
     // find the oldest slot
     size_t store_at_slot = 0;
-    for(size_t i = 1; i < _countof(ds->dedup); i++) {
-        if(ds->dedup[i].timestamp_ut < ds->dedup[store_at_slot].timestamp_ut)
+    for(size_t i = 1; i < _countof(ds->dedup.slot); i++) {
+        if(ds->dedup.slot[i].timestamp_ut < ds->dedup.slot[store_at_slot].timestamp_ut)
             store_at_slot = i;
     }
 
-    ds->dedup[store_at_slot].hash = hash;
-    ds->dedup[store_at_slot].timestamp_ut = now_realtime_usec();
+    ds->dedup.slot[store_at_slot].hash = hash;
+    ds->dedup.slot[store_at_slot].timestamp_ut = now_realtime_usec();
 
-    spinlock_unlock(&dsf_spinlock);
+    spinlock_unlock(&ds->dedup.spinlock);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -776,7 +773,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     if(rc == CURLE_OK) {
         XXH64_hash_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash);
-        daemon_status_file_save(&session_status, false);
+        daemon_status_file_save(wb, &session_status, true);
     }
 
     curl_easy_cleanup(curl);
@@ -807,6 +804,8 @@ struct log_priority PRI_BAD_BUT_NO_REASON   = { NDLP_ERR, NDLP_WARNING };
 
 void daemon_status_file_check_crash(void) {
     FUNCTION_RUN_ONCE();
+
+    static_save_buffer_init();
 
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
@@ -979,7 +978,7 @@ void daemon_status_file_check_crash(void) {
 
     // check if we have already posted this crash in the last 24 hours
     XXH64_hash_t hash = daemon_status_file_hash(&last_session_status, msg, cause);
-    if(dedup_already_posted(hash))
+    if(dedup_already_posted(&session_status, hash))
         disable_crash_report = true;
 
     if(!disable_crash_report && (analytics_check_enabled() || post_crash_report)) {
@@ -994,6 +993,97 @@ void daemon_status_file_check_crash(void) {
     }
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// ng_log() hook for receiving fatal message information
+
+void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line) {
+    FUNCTION_RUN_ONCE();
+
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+
+    dsf_acquire(session_status);
+    spinlock_lock(&session_status.fatal.spinlock);
+
+    // do not check the function, because it may have a startup step in it
+    if(session_status.fatal.filename || session_status.fatal.message || session_status.fatal.errno_str || session_status.fatal.thread[0]) {
+        spinlock_unlock(&session_status.fatal.spinlock);
+        freez((void *)filename);
+        freez((void *)function);
+        freez((void *)message);
+        freez((void *)errno_str);
+        freez((void *)stack_trace);
+        return;
+    }
+
+    exit_initiated_add(EXIT_REASON_FATAL);
+    strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
+
+    session_status.fatal.filename = filename;
+    freez((char *)session_status.fatal.function); // it may have a startup step
+    session_status.fatal.function = function;
+    session_status.fatal.message = message;
+    session_status.fatal.errno_str = errno_str;
+    strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
+    freez((char *)stack_trace);
+    session_status.fatal.line = line;
+
+    spinlock_unlock(&session_status.fatal.spinlock);
+    dsf_release(session_status);
+
+    daemon_status_file_save(wb, &session_status, false);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+void daemon_status_file_update_status(DAEMON_STATUS status) {
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    daemon_status_file_refresh(status);
+    daemon_status_file_save(wb, &session_status, true);
+}
+
+static void daemon_status_file_out_of_memory(void) {
+    FUNCTION_RUN_ONCE();
+
+    // DO NOT LOCK OR ALLOCATE IN THIS FUNCTION - WE DON'T HAVE ANY MEMORY AVAILABLE - IT HAPPENED ALREADY!
+
+    exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
+
+    // the buffer should already be allocated, so this should normally do nothing
+    static_save_buffer_init();
+
+    dsf_acquire(session_status);
+    session_status.exit_reason = exit_initiated;
+    dsf_release(session_status);
+
+    daemon_status_file_save(static_save_buffer, &session_status, false);
+}
+
+void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
+    FUNCTION_RUN_ONCE();
+
+    // DO NOT LOCK OR ALLOCATE IN THIS FUNCTION - WE CRASHED ALREADY AND WE ARE INSIDE THE SIGNAL HANDLER!
+
+    dsf_acquire(session_status);
+
+    session_status.exit_reason |= reason;
+    if(!session_status.fatal.thread[0])
+        strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
+
+    dsf_release(session_status);
+
+    // the buffer should already be allocated, so this should normally do nothing
+    static_save_buffer_init();
+
+    // save what we know already
+    daemon_status_file_save(static_save_buffer, &session_status, false);
+
+    if(!session_status.fatal.stack_trace[0]) {
+        capture_stack_trace(static_save_buffer);
+        strncpyz(session_status.fatal.stack_trace, buffer_tostring(static_save_buffer), sizeof(session_status.fatal.stack_trace) - 1);
+        daemon_status_file_save(static_save_buffer, &session_status, false);
+    }
+}
+
 bool daemon_status_file_has_last_crashed(void) {
     return last_session_status.status != DAEMON_STATUS_EXITED || !is_exit_reason_normal(last_session_status.exit_reason);
 }
@@ -1001,6 +1091,9 @@ bool daemon_status_file_has_last_crashed(void) {
 bool daemon_status_file_was_incomplete_shutdown(void) {
     return last_session_status.status == DAEMON_STATUS_EXITING;
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// startup and shutdown steps
 
 void daemon_status_file_startup_step(const char *step) {
     if(session_status.fatal.filename)
@@ -1029,38 +1122,4 @@ void daemon_status_file_shutdown_step(const char *step) {
     }
 
     daemon_status_file_update_status(DAEMON_STATUS_NONE);
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-// ng_log() hook for receiving fatal message information
-
-void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line) {
-    spinlock_lock(&dsf_spinlock);
-
-    // do not check the function, because it may have a startup step in it
-    if(session_status.fatal.filename || session_status.fatal.message || session_status.fatal.errno_str || session_status.fatal.thread[0]) {
-        spinlock_unlock(&dsf_spinlock);
-        freez((void *)filename);
-        freez((void *)function);
-        freez((void *)message);
-        freez((void *)errno_str);
-        freez((void *)stack_trace);
-        return;
-    }
-
-    exit_initiated_add(EXIT_REASON_FATAL);
-    strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
-
-    session_status.fatal.filename = filename;
-    freez((char *)session_status.fatal.function); // it may have a startup step
-    session_status.fatal.function = function;
-    session_status.fatal.message = message;
-    session_status.fatal.errno_str = errno_str;
-    strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
-    freez((char *)stack_trace);
-    session_status.fatal.line = line;
-
-    spinlock_unlock(&dsf_spinlock);
-
-    daemon_status_file_save(&session_status, false);
 }

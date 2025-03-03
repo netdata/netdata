@@ -426,8 +426,19 @@ typedef uint32_t uid_t;
 
 // --------------------------------------------------------------------------------------------------------------------
 
-#define FUNCTION_RUN_ONCE() { static bool __run_once = false; if(__run_once) return; __run_once = true; }
-#define FUNCTION_RUN_ONCE_RET(ret) { static bool __run_once = false; if(__run_once) return (ret); __run_once = true; }
+#define FUNCTION_RUN_ONCE() {                                           \
+    static bool __run_once = false;                                     \
+    if (!__sync_bool_compare_and_swap(&__run_once, false, true)) {      \
+        return;                                                         \
+    }                                                                   \
+}
+
+#define FUNCTION_RUN_ONCE_RET(ret) {                                    \
+    static bool __run_once = false;                                     \
+    if (!__sync_bool_compare_and_swap(&__run_once, false, true)) {      \
+        return (ret);                                                   \
+    }                                                                   \
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 
