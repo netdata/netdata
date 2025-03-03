@@ -23,7 +23,7 @@ const (
 	defaultRescanInterval          = time.Minute * 30
 	defaultTimeout                 = time.Second * 1
 	defaultParallelScansPerNetwork = 32
-	defaultDeviceCacheTTL          = time.Hour * 6
+	defaultDeviceCacheTTL          = time.Hour * 12
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
