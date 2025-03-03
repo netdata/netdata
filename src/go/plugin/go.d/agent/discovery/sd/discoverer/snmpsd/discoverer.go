@@ -54,7 +54,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		status:         newDiscoveryStatus(),
 	}
 
-	if cfg.RescanInterval >= 0 {
+	if cfg.RescanInterval != nil && *cfg.RescanInterval >= 0 {
 		d.rescanInterval = cfg.RescanInterval.Duration()
 	}
 	if cfg.Timeout > 0 {
@@ -63,7 +63,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 	if cfg.ParallelScansPerNetwork > 0 {
 		d.parallelScansPerNetwork = cfg.ParallelScansPerNetwork
 	}
-	if cfg.DeviceCacheTTL >= 0 {
+	if cfg.DeviceCacheTTL != nil && *cfg.DeviceCacheTTL >= 0 {
 		d.deviceCacheTTL = cfg.DeviceCacheTTL.Duration()
 	}
 
