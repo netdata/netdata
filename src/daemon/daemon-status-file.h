@@ -73,7 +73,7 @@ typedef struct daemon_status_file {
         const char *function;
         const char *errno_str;
         const char *message;
-        char stack_trace[4096];
+        char stack_trace[2048];
         char thread[ND_THREAD_TAG_MAX + 1];
     } fatal;
 
@@ -82,7 +82,7 @@ typedef struct daemon_status_file {
         struct {
             XXH64_hash_t hash;
             usec_t timestamp_ut;
-        } slot[20];
+        } slot[10];
     } dedup;
 } DAEMON_STATUS_FILE;
 
