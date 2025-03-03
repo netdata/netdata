@@ -35,7 +35,7 @@ func (g *targetGroup) addTarget(tg model.Target) {
 	g.targets = append(g.targets, tg)
 }
 
-func newTarget(ip string, cred SnmpCredentialConfig, si SysInfo) *target {
+func newTarget(ip string, cred CredentialConfig, si SysInfo) *target {
 	tg := &target{
 		IPAddress:  ip,
 		Credential: cred,
@@ -53,8 +53,8 @@ type (
 		hash       uint64
 
 		IPAddress  string
-		Credential SnmpCredentialConfig `hash:"ignore"`
-		SysInfo    SysInfo              `hash:"ignore"`
+		Credential CredentialConfig `hash:"ignore"`
+		SysInfo    SysInfo          `hash:"ignore"`
 	}
 )
 

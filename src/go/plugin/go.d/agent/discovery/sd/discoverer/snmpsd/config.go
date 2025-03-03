@@ -4,25 +4,25 @@ package snmpsd
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/gosnmp/gosnmp"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
 )
 
 type (
 	Config struct {
 		// RescanInterval defines how often to scan the networks for devices (default: 30 m)
-		RescanInterval time.Duration `yaml:"rescan_interval"`
+		RescanInterval confopt.Duration `yaml:"rescan_interval"`
 		// Timeout defines the maximum time to wait for SNMP device responses (default: 1 s)
-		Timeout time.Duration `yaml:"timeout"`
+		Timeout confopt.Duration `yaml:"timeout"`
 		// DeviceCacheTTL defines how long to trust cached discovery results before requiring a new probe (default: 6h)
-		DeviceCacheTTL time.Duration `yaml:"device_cache_ttl"`
+		DeviceCacheTTL confopt.Duration `yaml:"device_cache_ttl"`
 		// ParallelScansPerNetwork defines how many IPs to scan concurrently within each subnet (default: 32)
 		ParallelScansPerNetwork int `yaml:"parallel_scans_per_network"`
 		// Credentials define the SNMP credentials used for authentication
-		Credentials []SnmpCredentialConfig `yaml:"credentials"`
+		Credentials []CredentialConfig `yaml:"credentials"`
 		// Networks defines the subnets to scan and which credentials to use
 		Networks []NetworkConfig `yaml:"networks"`
 	}
@@ -34,7 +34,7 @@ type (
 		// Credential is the name of a credential from the Credentials list
 		Credential string `yaml:"credential"`
 	}
-	SnmpCredentialConfig struct {
+	CredentialConfig struct {
 		// Name is the identifier for this credential set, used in Network.Credential
 		Name string `yaml:"name"`
 		// Version must be one of: "1", "2c", or "3"
@@ -64,7 +64,8 @@ func (c *Config) validateAndParse() ([]subnet, error) {
 		return nil, fmt.Errorf("no networks provided")
 	}
 
-	credentials := make(map[string]SnmpCredentialConfig)
+	credentials := make(map[string]CredentialConfig)
+
 	for i, cr := range c.Credentials {
 		if cr.Name == "" {
 			return nil, fmt.Errorf("no name provided for credential %d", i)
@@ -75,9 +76,10 @@ func (c *Config) validateAndParse() ([]subnet, error) {
 		credentials[cr.Name] = c.Credentials[i]
 	}
 
+	networks := make(map[string]bool)
+
 	var subnets []subnet
 
-	networks := make(map[string]bool)
 	for i, n := range c.Networks {
 		if n.Subnet == "" {
 			return nil, fmt.Errorf("no subnet provided for network %d", i)
@@ -117,7 +119,7 @@ func (c *Config) validateAndParse() ([]subnet, error) {
 	return subnets, nil
 }
 
-func setCredential(client gosnmp.Handler, cred SnmpCredentialConfig) {
+func setCredential(client gosnmp.Handler, cred CredentialConfig) {
 	switch parseSNMPVersion(cred) {
 	case gosnmp.Version1:
 		client.SetVersion(gosnmp.Version1)
@@ -139,7 +141,7 @@ func setCredential(client gosnmp.Handler, cred SnmpCredentialConfig) {
 	}
 }
 
-func parseSNMPVersion(cred SnmpCredentialConfig) gosnmp.SnmpVersion {
+func parseSNMPVersion(cred CredentialConfig) gosnmp.SnmpVersion {
 	switch cred.Version {
 	case "0", "1":
 		return gosnmp.Version1
@@ -152,7 +154,7 @@ func parseSNMPVersion(cred SnmpCredentialConfig) gosnmp.SnmpVersion {
 	}
 }
 
-func parseSNMPv3SecurityLevel(cred SnmpCredentialConfig) gosnmp.SnmpV3MsgFlags {
+func parseSNMPv3SecurityLevel(cred CredentialConfig) gosnmp.SnmpV3MsgFlags {
 	switch cred.SecurityLevel {
 	case "1", "none", "noAuthNoPriv", "":
 		return gosnmp.NoAuthNoPriv
@@ -165,7 +167,7 @@ func parseSNMPv3SecurityLevel(cred SnmpCredentialConfig) gosnmp.SnmpV3MsgFlags {
 	}
 }
 
-func parseSNMPv3AuthProtocol(cred SnmpCredentialConfig) gosnmp.SnmpV3AuthProtocol {
+func parseSNMPv3AuthProtocol(cred CredentialConfig) gosnmp.SnmpV3AuthProtocol {
 	switch cred.AuthProtocol {
 	case "1", "none", "noAuth", "":
 		return gosnmp.NoAuth
@@ -186,7 +188,7 @@ func parseSNMPv3AuthProtocol(cred SnmpCredentialConfig) gosnmp.SnmpV3AuthProtoco
 	}
 }
 
-func parseSNMPv3PrivProtocol(cred SnmpCredentialConfig) gosnmp.SnmpV3PrivProtocol {
+func parseSNMPv3PrivProtocol(cred CredentialConfig) gosnmp.SnmpV3PrivProtocol {
 	switch cred.PrivacyProtocol {
 	case "1", "none", "noPriv", "":
 		return gosnmp.NoPriv

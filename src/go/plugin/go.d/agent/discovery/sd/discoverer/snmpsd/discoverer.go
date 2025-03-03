@@ -53,16 +53,16 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 	}
 
 	if cfg.RescanInterval > 0 {
-		d.rescanInterval = cfg.RescanInterval
+		d.rescanInterval = cfg.RescanInterval.Duration()
 	}
 	if cfg.Timeout > 0 {
-		d.timeout = cfg.Timeout
+		d.timeout = cfg.Timeout.Duration()
 	}
 	if cfg.ParallelScansPerNetwork > 0 {
 		d.parallelScansPerNetwork = cfg.ParallelScansPerNetwork
 	}
 	if cfg.DeviceCacheTTL > 0 {
-		d.deviceCacheTTL = cfg.DeviceCacheTTL
+		d.deviceCacheTTL = cfg.DeviceCacheTTL.Duration()
 	}
 
 	return d, nil
@@ -91,7 +91,7 @@ type (
 	subnet struct {
 		str        string
 		ips        iprange.Range
-		credential SnmpCredentialConfig
+		credential CredentialConfig
 	}
 )
 
