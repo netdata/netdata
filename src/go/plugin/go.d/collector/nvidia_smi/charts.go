@@ -284,8 +284,11 @@ func (c *Collector) addGpuCharts(gpu gpuInfo, index int) {
 	if !isValidValue(gpu.FanSpeed) {
 		_ = charts.Remove(gpuFanSpeedPercChartTmpl.ID)
 	}
-	if (gpu.PowerReadings == nil || !isValidValue(gpu.PowerReadings.PowerDraw)) &&
-		(gpu.GPUPowerReadings == nil || !isValidValue(gpu.GPUPowerReadings.PowerDraw)) {
+
+	mx := make(map[string]int64)
+	addGPUPowerMetricsSwitch(mx, "", gpu)
+
+	if len(mx) == 0 {
 		_ = charts.Remove(gpuPowerDrawChartTmpl.ID)
 	}
 	if !isValidValue(gpu.Voltage.GraphicsVolt) {
