@@ -81,7 +81,7 @@ type (
 	gpuPowerReadings struct {
 		//PowerState         string `xml:"power_state"`
 		//PowerManagement    string `xml:"power_management"`
-		PowerDraw string `xml:"power_draw"`
+		PowerDraw string `xml:"average_power_draw"`
 		//PowerLimit         string `xml:"power_limit"`
 		//DefaultPowerLimit  string `xml:"default_power_limit"`
 		//EnforcedPowerLimit string `xml:"enforced_power_limit"`
