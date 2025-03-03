@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- more strict parsing of the output of system-info.sh [\#19745](https://github.com/netdata/netdata/pull/19745) ([ktsaou](https://github.com/ktsaou))
+- pass NULL to sensors\_init\(\) when the standard files exist in /etc/ [\#19744](https://github.com/netdata/netdata/pull/19744) ([ktsaou](https://github.com/ktsaou))
+- allow coredumps to be generated [\#19743](https://github.com/netdata/netdata/pull/19743) ([ktsaou](https://github.com/ktsaou))
+- work on agent-events crashes [\#19741](https://github.com/netdata/netdata/pull/19741) ([ktsaou](https://github.com/ktsaou))
 - zero mtime when a fallback check fails [\#19740](https://github.com/netdata/netdata/pull/19740) ([ktsaou](https://github.com/ktsaou))
+- fix\(go.d\): ignore sigpipe to exit gracefully [\#19739](https://github.com/netdata/netdata/pull/19739) ([ilyam8](https://github.com/ilyam8))
 - Capture deadly signals [\#19737](https://github.com/netdata/netdata/pull/19737) ([ktsaou](https://github.com/ktsaou))
 - allow insecure cloud connections [\#19736](https://github.com/netdata/netdata/pull/19736) ([ktsaou](https://github.com/ktsaou))
 - add more information about claiming failures [\#19735](https://github.com/netdata/netdata/pull/19735) ([ktsaou](https://github.com/ktsaou))
@@ -487,12 +492,6 @@
 - Add dynamic rooms docs [\#19199](https://github.com/netdata/netdata/pull/19199) ([kapantzak](https://github.com/kapantzak))
 - Streaming improvements No 6 [\#19196](https://github.com/netdata/netdata/pull/19196) ([ktsaou](https://github.com/ktsaou))
 - Add cross-architecture build tests for Go code. [\#19195](https://github.com/netdata/netdata/pull/19195) ([Ferroin](https://github.com/Ferroin))
-- Remove July arrays [\#19194](https://github.com/netdata/netdata/pull/19194) ([stelfrag](https://github.com/stelfrag))
-- Streaming Improvements No 5 [\#19193](https://github.com/netdata/netdata/pull/19193) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#19192](https://github.com/netdata/netdata/pull/19192) ([netdatabot](https://github.com/netdatabot))
-- rw\_spinlocks: allow recursive readers, even when writers are waiting [\#19191](https://github.com/netdata/netdata/pull/19191) ([ktsaou](https://github.com/ktsaou))
-- docs: remove a duplicated row [\#19190](https://github.com/netdata/netdata/pull/19190) ([orisano](https://github.com/orisano))
-- build\(deps\): bump golang.org/x/crypto from 0.30.0 to 0.31.0 in /src/go [\#19189](https://github.com/netdata/netdata/pull/19189) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
