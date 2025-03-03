@@ -38,6 +38,7 @@ ENUM_STR_MAP_DEFINE(DAEMON_OS_TYPE) = {
 ENUM_STR_DEFINE_FUNCTIONS(DAEMON_OS_TYPE, DAEMON_OS_TYPE_UNKNOWN, "unknown");
 
 static DAEMON_STATUS_FILE last_session_status = {
+    .v = STATUS_FILE_VERSION,
     .spinlock = SPINLOCK_INITIALIZER,
     .fatal = {
         .spinlock = SPINLOCK_INITIALIZER,
@@ -48,6 +49,7 @@ static DAEMON_STATUS_FILE last_session_status = {
 };
 
 static DAEMON_STATUS_FILE session_status = {
+    .v = STATUS_FILE_VERSION,
     .spinlock = SPINLOCK_INITIALIZER,
     .fatal = {
         .spinlock = SPINLOCK_INITIALIZER,
@@ -71,6 +73,7 @@ static XXH64_hash_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
+    buffer_json_member_add_uint64(wb, "version_saved", ds->v);
     buffer_json_member_add_uuid(wb, "host_id", ds->host_id.uuid);
     buffer_json_member_add_uuid(wb, "node_id", ds->node_id.uuid);
     buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
@@ -214,6 +217,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     // change management, version to know which fields to expect
     uint64_t version = 0;
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, true);
+    ds->v = version;
 
     bool strict = false; // allow missing fields and values
     bool required_v1 = version >= 1 ? strict : false;
@@ -316,14 +320,15 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_ARRAY(jobj, path, "dedup", error, required_v4, {
             size_t i = 0;
             JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, required_v4, {
-                if(i >= _countof(ds->dedup.slot))
-                    break;
+                if(i < _countof(ds->dedup.slot)) {
+                    datetime[0] = '\0';
+                    JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v4);
+                    if (datetime[0])
+                        ds->dedup.slot[i].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
 
-                JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v4);
-                if (datetime[0])
-                    ds->dedup.slot[i].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
-
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[i].hash, error, required_v4);
+                    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(
+                        jobj, path, "hash", ds->dedup.slot[i].hash, error, required_v4);
+                }
             });
         });
     }
@@ -350,16 +355,16 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.os_type = DAEMON_OS_TYPE_WINDOWS;
 #endif
 
-    if(session_status.status != DAEMON_STATUS_INITIALIZING && status == DAEMON_STATUS_INITIALIZING)
+    if(!session_status.timings.init_started_ut)
         session_status.timings.init_started_ut = now_ut;
 
-    if(session_status.status != DAEMON_STATUS_EXITING && status == DAEMON_STATUS_EXITING)
+    if(status == DAEMON_STATUS_EXITING && !session_status.timings.exit_started_ut)
         session_status.timings.exit_started_ut = now_ut;
 
-    if(session_status.status == DAEMON_STATUS_INITIALIZING && status == DAEMON_STATUS_RUNNING)
+    if(session_status.status == DAEMON_STATUS_INITIALIZING)
         session_status.timings.init = (time_t)((now_ut - session_status.timings.init_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
-    if(session_status.status == DAEMON_STATUS_EXITING && status == DAEMON_STATUS_EXITED)
+    if(session_status.status == DAEMON_STATUS_EXITING)
         session_status.timings.exit = (time_t)((now_ut - session_status.timings.exit_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
     strncpyz(session_status.version, NETDATA_VERSION, sizeof(session_status.version) - 1);
@@ -419,9 +424,12 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         session_status.os_id_like = strdupz(last_session_status.os_id_like);
     if(!session_status.restarts)
         session_status.restarts = last_session_status.restarts + 1;
-    if(!session_status.dedup.slot[0].timestamp_ut || !session_status.dedup.slot[0].hash) {
-        for (size_t i = 0; i < _countof(session_status.dedup.slot); i++)
-            session_status.dedup.slot[i] = last_session_status.dedup.slot[i];
+
+    if(last_session_status.v == STATUS_FILE_VERSION) {
+        if (!session_status.dedup.slot[0].timestamp_ut || !session_status.dedup.slot[0].hash) {
+            for (size_t i = 0; i < _countof(session_status.dedup.slot); i++)
+                session_status.dedup.slot[i] = last_session_status.dedup.slot[i];
+        }
     }
 
     if(!session_status.install_type) {
@@ -753,6 +761,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_string(wb, "exit_cause", d->cause); // custom
     buffer_json_member_add_string(wb, "message", d->msg); // ECS
     buffer_json_member_add_uint64(wb, "priority", d->priority); // custom
+    buffer_json_member_add_uint64(wb, "version_saved", d->status->v); // custom
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
