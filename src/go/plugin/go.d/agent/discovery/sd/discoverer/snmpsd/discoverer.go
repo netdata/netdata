@@ -39,9 +39,12 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 			slog.String("component", "service discovery"),
 			slog.String("discoverer", "snmp"),
 		),
-		cfgHash:       cfgHash,
-		subnets:       subnets,
-		newSnmpClient: gosnmp.NewHandler,
+		started: make(chan struct{}),
+		cfgHash: cfgHash,
+		subnets: subnets,
+		newSnmpClient: func() (gosnmp.Handler, func()) {
+			return gosnmp.NewHandler(), func() {}
+		},
 
 		rescanInterval:          defaultRescanInterval,
 		timeout:                 defaultTimeout,
@@ -73,11 +76,12 @@ type (
 		*logger.Logger
 		model.Base
 
+		started chan struct{}
 		cfgHash uint64
 
 		subnets []subnet
 
-		newSnmpClient func() gosnmp.Handler
+		newSnmpClient func() (gosnmp.Handler, func())
 
 		parallelScansPerNetwork int
 		rescanInterval          time.Duration
@@ -102,6 +106,8 @@ func (d *Discoverer) String() string {
 func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup) {
 	d.Info("instance is started")
 	defer func() { d.Info("instance is stopped") }()
+
+	close(d.started)
 
 	d.loadFileStatus()
 
@@ -227,7 +233,8 @@ func (d *Discoverer) probeIPAddress(ctx context.Context, sub subnet, ip string, 
 }
 
 func (d *Discoverer) getSnmpSysInfo(sub subnet, ip string) (*SysInfo, error) {
-	client := d.newSnmpClient()
+	client, cleanup := d.newSnmpClient()
+	defer cleanup()
 
 	client.SetTarget(ip)
 	client.SetTimeout(d.timeout)

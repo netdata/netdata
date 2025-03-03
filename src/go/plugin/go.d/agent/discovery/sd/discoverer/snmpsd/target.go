@@ -11,10 +11,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 )
 
+func targetSource(sub subnet) string { return fmt.Sprintf("discoverer=snmp,network=%s", subKey(sub)) }
+
 func newTargetGroup(sub subnet) *targetGroup {
 	return &targetGroup{
 		provider: "sd:snmpdiscoverer",
-		source:   fmt.Sprintf("discoverer=snmp,network=%s", subKey(sub)),
+		source:   targetSource(sub),
 	}
 }
 

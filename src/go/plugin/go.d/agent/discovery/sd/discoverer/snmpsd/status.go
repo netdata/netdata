@@ -19,13 +19,16 @@ func (d *Discoverer) loadFileStatus() {
 		return
 	}
 
-	if f, err := os.Open(filename); err != nil {
+	f, err := os.Open(filename)
+	if err != nil {
 		d.Warningf("failed to open status file %s: %v", filename, err)
-	} else {
-		defer func() { _ = f.Close() }()
-		if err := json.NewDecoder(f).Decode(d.status); err != nil {
-			d.Warningf("failed to parse status file %s: %v", filename, err)
-		}
+		return
+	}
+	defer func() { _ = f.Close() }()
+
+	if err := json.NewDecoder(f).Decode(d.status); err != nil {
+		d.Warningf("failed to parse status file %s: %v", filename, err)
+		return
 	}
 
 	d.Infof("loaded status file: last discovery=%s", d.status.LastDiscoveryTime)
