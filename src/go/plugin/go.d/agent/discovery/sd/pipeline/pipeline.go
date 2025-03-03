@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/dockerd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/kubernetes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/netlisteners"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/hostinfo"
 )
@@ -102,6 +103,12 @@ func (p *Pipeline) registerDiscoverers(conf Config) error {
 				}
 				p.discoverers = append(p.discoverers, td)
 			}
+		case "snmp":
+			td, err := snmpsd.NewDiscoverer(cfg.SNMP)
+			if err != nil {
+				return fmt.Errorf("failed to create '%s' discoverer: %v", cfg.Discoverer, err)
+			}
+			p.discoverers = append(p.discoverers, td)
 		default:
 			return fmt.Errorf("unknown discoverer: '%s'", cfg.Discoverer)
 		}
@@ -130,7 +137,7 @@ func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 		case <-ctx.Done():
 			select {
 			case <-done:
-			case <-time.After(time.Second * 4):
+			case <-time.After(time.Second * 10):
 			}
 			return
 		case <-done:
@@ -149,7 +156,7 @@ func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 
 func (p *Pipeline) processGroups(tggs []model.TargetGroup) []*confgroup.Group {
 	var groups []*confgroup.Group
-	// updates come from the accumulator, this ensures that all groups have different sources
+	// updates come from the accumulator; this ensures that all groups have different sources
 	for _, tgg := range tggs {
 		p.Debugf("processing group '%s' with %d target(s)", tgg.Source(), len(tgg.Targets()))
 		if v := p.processGroup(tgg); v != nil {

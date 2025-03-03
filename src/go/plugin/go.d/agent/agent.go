@@ -34,7 +34,7 @@ type Config struct {
 	CollectorsConfigDir       []string
 	CollectorsConfigWatchPath []string
 	ServiceDiscoveryConfigDir []string
-	StateFile                 string
+	VarLibDir                 string
 	ModuleRegistry            module.Registry
 	RunModule                 string
 	MinUpdateEvery            int
@@ -51,7 +51,7 @@ type Agent struct {
 	CollectorsConfigWatchPath []string
 	ServiceDiscoveryConfigDir multipath.MultiPath
 
-	StateFile string
+	VarLibDir string
 
 	RunModule      string
 	MinUpdateEvery int
@@ -75,13 +75,13 @@ func New(cfg Config) *Agent {
 		CollectorsConfDir:         cfg.CollectorsConfigDir,
 		ServiceDiscoveryConfigDir: cfg.ServiceDiscoveryConfigDir,
 		CollectorsConfigWatchPath: cfg.CollectorsConfigWatchPath,
-		StateFile:                 cfg.StateFile,
+		VarLibDir:                 cfg.VarLibDir,
 		RunModule:                 cfg.RunModule,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
 		ModuleRegistry:            module.DefaultRegistry,
 		Out:                       safewriter.Stdout,
 		api:                       netdataapi.New(safewriter.Stdout),
-		quitCh:                    make(chan struct{}),
+		quitCh:                    make(chan struct{}, 1),
 	}
 }
 
@@ -194,7 +194,7 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr := jobmgr.New()
 	jobMgr.PluginName = a.Name
 	jobMgr.Out = a.Out
-	jobMgr.StateFile = a.StateFile
+	jobMgr.VarLibDir = a.VarLibDir
 	jobMgr.Modules = enabledModules
 	jobMgr.ConfigDefaults = discCfg.Registry
 	jobMgr.FnReg = fnMgr

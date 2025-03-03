@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/dockerd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/kubernetes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/netlisteners"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 )
 
 type Config struct {
@@ -28,6 +29,7 @@ type DiscoveryConfig struct {
 	NetListeners netlisteners.Config `yaml:"net_listeners"`
 	Docker       dockerd.Config      `yaml:"docker"`
 	K8s          []kubernetes.Config `yaml:"k8s"`
+	SNMP         snmpsd.Config       `yaml:"snmp"`
 }
 
 type ClassifyRuleConfig struct {
@@ -71,7 +73,7 @@ func validateDiscoveryConfig(config []DiscoveryConfig) error {
 	}
 	for _, cfg := range config {
 		switch cfg.Discoverer {
-		case "net_listeners", "docker", "k8s":
+		case "net_listeners", "docker", "k8s", "snmp":
 		default:
 			return fmt.Errorf("unknown discoverer: '%s'", cfg.Discoverer)
 		}

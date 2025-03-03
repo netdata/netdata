@@ -119,12 +119,18 @@ func (m *Manager) registerDiscoverers(cfg Config) error {
 }
 
 func (m *Manager) runDiscoverer(ctx context.Context, d discoverer) {
+	done := make(chan struct{})
 	updates := make(chan []*confgroup.Group)
-	go d.Run(ctx, updates)
+
+	go func() { defer close(done); d.Run(ctx, updates) }()
 
 	for {
 		select {
 		case <-ctx.Done():
+			select {
+			case <-done:
+			case <-time.After(time.Second * 10):
+			}
 			return
 		case groups, ok := <-updates:
 			if !ok {
