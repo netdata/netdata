@@ -13,6 +13,8 @@ static void host_health_timer_cb(uv_timer_t *handle);
 
 #define HEALTH_HOST_MAINTENANCE_INTERVAL (3600)     // Cleanup host alert transitions (in seconds)
 
+#define MAX_WORKER_DATA (256)
+
 #define COMPUTE_DURATION(var_name, unit, start, end)      \
     char var_name[64];                                    \
     duration_snprintf(var_name, sizeof(var_name),         \
@@ -499,7 +501,6 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
             rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION))) {
         // Dont run again, initialization will reschedule us
         *next_run = -1;
-        health_host_initialize(host);
         return;
     }
 
@@ -723,14 +724,6 @@ static void health_enq_cmd(struct health_cmd *cmd)
     (void) uv_async_send(&health_config_s.async);
 }
 
-struct worker_data {
-    uv_work_t request;
-    void *payload;
-    time_t next_run;
-    health_job_type_t job_type;
-    struct health_config_s *config;
-};
-
 struct job_list_t {
     health_job_type_t job_type;
     int pending;
@@ -739,6 +732,49 @@ struct job_list_t {
     Pvoid_t JudyL;
     Word_t count;
 };
+
+typedef struct worker_data {
+    uv_work_t request;
+    void *payload;
+    time_t next_run;
+    health_job_type_t job_type;
+    struct health_config_s *config;
+} worker_data_t;
+
+typedef struct {
+    worker_data_t workers[MAX_WORKER_DATA];  // Preallocated worker data pool
+    int free_stack[MAX_WORKER_DATA];  // Stack of available worker data indices
+    int top;  // Stack pointer
+} WorkerPool;
+
+WorkerPool worker_pool;
+
+// Initialize the worker pool
+void init_worker_pool(WorkerPool *pool) {
+    for (int i = 0; i < MAX_WORKER_DATA; i++) {
+        pool->free_stack[i] = i;  // Fill the stack with indices
+    }
+    pool->top = MAX_WORKER_DATA;  // All workers are initially free
+}
+
+// Get a worker (reuse if available, NULL if pool exhausted)
+worker_data_t *get_worker(WorkerPool *pool) {
+    if (pool->top == 0) {
+        return NULL;  // Pool exhausted
+    }
+    int index = pool->free_stack[--pool->top];  // Pop from stack
+    return &pool->workers[index];
+}
+
+// Return a worker for reuse
+void return_worker(WorkerPool *pool, worker_data_t *worker) {
+    int index = worker - pool->workers;  // Calculate index
+    if (index < 0 || index >= MAX_WORKER_DATA) {
+        return;  // Invalid worker (should not happen)
+    }
+    pool->free_stack[pool->top++] = index;  // Push index back to stack
+}
+
 
 static void async_cb(uv_async_t *handle)
 {
@@ -755,18 +791,18 @@ static void timer_cb(uv_timer_t *handle)
 
 static void after_host_rrdcalc_cleanup_job(uv_work_t *req, int status __maybe_unused)
 {
-    struct worker_data *data = req->data;
+    worker_data_t *data = req->data;
     RRDHOST *host = data->payload;
     host->health.rrdcalc_cleanup_running = false;
     struct health_config_s *config = data->config;
     config->job_list[data->job_type]->running--;
-    freez(data);
+    return_worker(&worker_pool, data);
 }
 
 static void host_rrdcalc_cleanup_job(uv_work_t *req)
 {
     register_libuv_worker_jobs();
-    struct worker_data *data = req->data;
+    worker_data_t *data = req->data;
     RRDHOST *host = data->payload;
     worker_is_busy(UV_EVENT_HOST_CALC_CLEANUP);
 
@@ -777,18 +813,28 @@ static void host_rrdcalc_cleanup_job(uv_work_t *req)
 
 static void after_host_health_maintenance_job(uv_work_t *req, int status __maybe_unused)
 {
-    struct worker_data *data = req->data;
+    worker_data_t *data = req->data;
     struct health_config_s *config = data->config;
     config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
-    health_host_run(host);
-    freez(data);
+    HEALTH *host_health = &host->health;
+    time_t next_run = data->next_run;
+    return_worker(&worker_pool, data);
+
+    int64_t delay = next_run > 0 ? next_run - now_realtime_sec() : 0;
+    int rc = uv_timer_start(&host_health->timer, host_health_timer_cb, delay > 0 ? delay * MSEC_PER_SEC : 0, 0);
+    if (rc) {
+        if (delay <= 0)
+            health_host_run(host);
+        else
+            health_host_run_later(host, delay * MSEC_PER_SEC);
+    }
 }
 
 static void host_health_maintenance_job(uv_work_t *req)
 {
     register_libuv_worker_jobs();
-    struct worker_data *data = req->data;
+    worker_data_t *data = req->data;
     RRDHOST *host = data->payload;
     worker_is_busy(UV_EVENT_HEALTH_LOG_CLEANUP);
 
@@ -803,7 +849,7 @@ static void host_health_maintenance_job(uv_work_t *req)
 
 static void after_host_initialize_alerts_job(uv_work_t *req, int status __maybe_unused)
 {
-    struct worker_data *data = req->data;
+    worker_data_t *data = req->data;
     struct health_config_s *config = data->config;
     config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
@@ -811,7 +857,8 @@ static void after_host_initialize_alerts_job(uv_work_t *req, int status __maybe_
 
     if (config->job_list[data->job_type]->pending)
         health_host_initialize(NULL);
-    freez(data);
+
+    return_worker(&worker_pool, data);
 }
 
 static void host_initialize_alerts_job(uv_work_t *req)
@@ -819,7 +866,7 @@ static void host_initialize_alerts_job(uv_work_t *req)
     register_libuv_worker_jobs();
 
     worker_is_busy(UV_EVENT_HOST_HEALTH_INIT);
-    struct worker_data *data =  req->data;
+    worker_data_t *data =  req->data;
     RRDHOST *host = data->payload;
 
     usec_t start_ut = now_realtime_usec();
@@ -833,18 +880,20 @@ static void host_initialize_alerts_job(uv_work_t *req)
 
 static void after_host_evaluate_alerts_job(uv_work_t *req, int status __maybe_unused)
 {
-    struct worker_data *data = req->data;
+    worker_data_t *data = req->data;
     struct health_config_s *config = data->config;
     config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
     HEALTH *host_health = &host->health;
 
     time_t next_run = data->next_run;
-    freez(data);
+    return_worker(&worker_pool, data);
 
     // initialization needed?
-    if (next_run == -1)
+    if (next_run == -1) {
+        health_host_initialize(host);
         return;
+    }
 
     time_t now = now_realtime_sec();
     // Lets see if we need to do maintenace
@@ -869,7 +918,7 @@ static void host_evaluate_alerts_job(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
-    struct worker_data *data = req->data;
+    worker_data_t *data = req->data;
     RRDHOST *host = data->payload;
     HEALTH *host_health = &host->health;
 
@@ -917,37 +966,35 @@ static void host_evaluate_alerts_job(uv_work_t *req)
     worker_is_idle();
 }
 
+struct {
+    uv_work_cb work_cb;
+    uv_after_work_cb after_work_cb;
+} job_functions[HEALTH_JOB_MAX] = {
+    [HEALTH_JOB_HOST_INIT] = {host_initialize_alerts_job, after_host_initialize_alerts_job},
+    [HEALTH_JOB_HOST_RUN] = {host_evaluate_alerts_job, after_host_evaluate_alerts_job},
+    [HEALTH_JOB_HOST_MAINT] = {host_health_maintenance_job, after_host_health_maintenance_job},
+    [HEALTH_JOB_HOST_CALC_CLEANUP] = {host_rrdcalc_cleanup_job, after_host_rrdcalc_cleanup_job},
+};
+
 static bool send_job_to_worker(struct health_config_s *config, struct job_list_t *job, RRDHOST *host)
 {
-    struct worker_data *data = mallocz(sizeof(*data));
+    worker_data_t *data = get_worker(&worker_pool);
+    if (!data)
+        return true;
+
     data->request.data = data;
     data->config = config;
     data->payload = host;
     data->job_type = job->job_type;
     job->running++;
 
-    int rc = 0;
-    switch (job->job_type) {
-        case HEALTH_JOB_HOST_INIT:
-            rc = uv_queue_work(
-                &config->loop, &data->request, host_initialize_alerts_job, after_host_initialize_alerts_job);
-            break;
-        case HEALTH_JOB_HOST_RUN:
-            rc = uv_queue_work(&config->loop, &data->request, host_evaluate_alerts_job, after_host_evaluate_alerts_job);
-            break;
-        case HEALTH_JOB_HOST_MAINT:
-            rc = uv_queue_work(
-                &config->loop, &data->request, host_health_maintenance_job, after_host_health_maintenance_job);
-            break;
-        case HEALTH_JOB_HOST_CALC_CLEANUP:
-            rc = uv_queue_work(&config->loop, &data->request, host_rrdcalc_cleanup_job, after_host_rrdcalc_cleanup_job);
-            break;
-        default:
-            break;
-    }
+    int rc = 1;
+    if (likely(job->job_type < HEALTH_JOB_MAX))
+        rc = uv_queue_work(&config->loop, &data->request, job_functions[job->job_type].work_cb, job_functions[job->job_type].after_work_cb);
+
     if (rc) {
         job->running--;
-        freez(data);
+        return_worker(&worker_pool, data);
     }
     return rc != 0;
 }
@@ -1076,7 +1123,7 @@ static void health_ev_loop(void *arg)
     fatal_assert(0 == uv_timer_start(&config->timer_req, timer_cb, health_run_every_ms, health_run_every_ms));
 
     int max_thread_count = netdata_conf_health_threads();
-    int maint_max_thread_count = (max_thread_count * 5 / 100);
+    int maint_max_thread_count = (max_thread_count * 25 / 100);
     if (maint_max_thread_count < 1)
         maint_max_thread_count = 1;
     netdata_log_info("Starting health with %d threads for alert evaluations and 3x%d threads for other tasks",
@@ -1091,6 +1138,7 @@ static void health_ev_loop(void *arg)
         config->job_list[i]->max_threads = (i == HEALTH_JOB_HOST_RUN) ? max_thread_count : maint_max_thread_count;
     }
 
+    init_worker_pool(&worker_pool);
     health_register_host(localhost, localhost->health.delay_up_to);
     HEALTH *host_health;
     bool is_shutdown = false;
