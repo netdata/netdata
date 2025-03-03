@@ -14,11 +14,11 @@ import (
 type (
 	Config struct {
 		// RescanInterval defines how often to scan the networks for devices (default: 30m)
-		RescanInterval confopt.Duration `yaml:"rescan_interval"`
+		RescanInterval *confopt.Duration `yaml:"rescan_interval"`
 		// Timeout defines the maximum time to wait for SNMP device responses (default: 1s)
 		Timeout confopt.Duration `yaml:"timeout"`
 		// DeviceCacheTTL defines how long to trust cached discovery results before requiring a new probe (default: 12h)
-		DeviceCacheTTL confopt.Duration `yaml:"device_cache_ttl"`
+		DeviceCacheTTL *confopt.Duration `yaml:"device_cache_ttl"`
 		// ParallelScansPerNetwork defines how many IPs to scan concurrently within each subnet (default: 32)
 		ParallelScansPerNetwork int `yaml:"parallel_scans_per_network"`
 		// Credentials define the SNMP credentials used for authentication
