@@ -54,7 +54,7 @@ void capture_stack_trace(BUFFER *wb) {
     messages = backtrace_symbols(array, size);
 
     if (messages == NULL) {
-        // Failed to get backtrace symbols
+        buffer_strcat(wb, "backtrace failed to get symbols");
         return;
     }
 
