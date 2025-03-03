@@ -54,13 +54,16 @@ void capture_stack_trace(BUFFER *wb) {
     messages = backtrace_symbols(array, size);
 
     if (messages == NULL) {
-        // Failed to get backtrace symbols
+        buffer_strcat(wb, "backtrace failed to get symbols");
         return;
     }
 
-    // Format the stack trace
-    for (i = 0; i < size ; i++)
-        buffer_sprintf(wb, "#%d %s\n", i, messages[i]);
+    // Format the stack trace (removing the address part)
+    for (i = 0; i < size; i++) {
+        char *p = strstr(messages[i], " [");
+        size_t len = p ? (size_t)(p - messages[i]) : strlen(messages[i]);
+        buffer_sprintf(wb, "#%d %.*s\n", i, (int)len, messages[i]);
+    }
 
     free(messages);
 }

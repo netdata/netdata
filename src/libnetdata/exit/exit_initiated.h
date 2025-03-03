@@ -15,28 +15,29 @@ typedef enum {
     EXIT_REASON_SIGFPE              = (1 << 2),
     EXIT_REASON_SIGILL              = (1 << 3),
     EXIT_REASON_OUT_OF_MEMORY       = (1 << 4),
+    EXIT_REASON_ALREADY_RUNNING     = (1 << 5),
 
     // abnormal termination via a fatal message
-    EXIT_REASON_FATAL               = (1 << 5),     // a fatal message
+    EXIT_REASON_FATAL               = (1 << 6),     // a fatal message
 
     // normal termination via APIs
-    EXIT_REASON_API_QUIT            = (1 << 6),     // developer only
-    EXIT_REASON_CMD_EXIT            = (1 << 7),     // netdatacli
+    EXIT_REASON_API_QUIT            = (1 << 7),     // developer only
+    EXIT_REASON_CMD_EXIT            = (1 << 8),     // netdatacli
 
     // signals - normal termination
-    EXIT_REASON_SIGQUIT             = (1 << 8),     // rare, but graceful
-    EXIT_REASON_SIGTERM             = (1 << 9),     // received on Linux, FreeBSD, MacOS
-    EXIT_REASON_SIGINT              = (1 << 10),    // received on Windows on normal termination
+    EXIT_REASON_SIGQUIT             = (1 << 9),     // rare, but graceful
+    EXIT_REASON_SIGTERM             = (1 << 10),     // received on Linux, FreeBSD, MacOS
+    EXIT_REASON_SIGINT              = (1 << 11),    // received on Windows on normal termination
 
     // windows specific, service stop
-    EXIT_REASON_SERVICE_STOP        = (1 << 11),
+    EXIT_REASON_SERVICE_STOP        = (1 << 12),
 
     // automatically detect when exit_initiated_set() is called
     // supports Linux, FreeBSD, MacOS, Windows
-    EXIT_REASON_SYSTEM_SHUTDOWN     = (1 << 12),
+    EXIT_REASON_SYSTEM_SHUTDOWN     = (1 << 13),
 
     // netdata update
-    EXIT_REASON_UPDATE              = (1 << 13),
+    EXIT_REASON_UPDATE              = (1 << 14),
 } EXIT_REASON;
 
 #define EXIT_REASON_NORMAL (EXIT_REASON_SIGINT|EXIT_REASON_SIGTERM|EXIT_REASON_SIGQUIT|EXIT_REASON_API_QUIT|EXIT_REASON_CMD_EXIT|EXIT_REASON_SERVICE_STOP|EXIT_REASON_SYSTEM_SHUTDOWN|EXIT_REASON_UPDATE)

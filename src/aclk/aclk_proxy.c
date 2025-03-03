@@ -112,7 +112,8 @@ static inline int check_http_environment(const char **proxy)
 
     char buf[1024];
     snprintfz(buf, sizeof(buf),
-              "Environment var '%s' defined but of unknown format. Supported syntax: 'http://[user:pass@]host:port'.",
+              "Environment var '%s' defined but of unknown format '%s'. "
+              "Supported syntax: 'http://[user:pass@]host:port'.",
               var, tmp);
     safe_log_proxy_error(buf, tmp);
 

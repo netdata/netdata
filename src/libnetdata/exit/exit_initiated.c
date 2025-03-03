@@ -10,6 +10,7 @@ ENUM_STR_MAP_DEFINE(EXIT_REASON) = {
     { EXIT_REASON_SIGFPE, "signal-floating-point-exception"},
     { EXIT_REASON_SIGILL, "signal-illegal-instruction"},
     { EXIT_REASON_OUT_OF_MEMORY, "out-of-memory"},
+    { EXIT_REASON_ALREADY_RUNNING, "already-running"},
 
     { EXIT_REASON_FATAL, "fatal"},
 

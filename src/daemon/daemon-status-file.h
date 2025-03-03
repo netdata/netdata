@@ -25,6 +25,9 @@ typedef enum {
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(DAEMON_OS_TYPE);
 
 typedef struct daemon_status_file {
+    SPINLOCK spinlock;
+    uint32_t v;                 // the version of the status file
+
     char version[32];           // the netdata version
     DAEMON_STATUS status;       // the daemon status
     EXIT_REASON exit_reason;    // the exit reason (maybe empty)
@@ -43,7 +46,9 @@ typedef struct daemon_status_file {
     ND_UUID claim_id;           // the Netdata Cloud claim id of the agent
 
     struct {
+        usec_t init_started_ut;
         time_t init;
+        usec_t exit_started_ut;
         time_t exit;
     } timings;
 
@@ -62,6 +67,7 @@ typedef struct daemon_status_file {
     bool read_system_info;
 
     struct {
+        SPINLOCK spinlock;
         long line;
         const char *filename;
         const char *function;
@@ -72,9 +78,12 @@ typedef struct daemon_status_file {
     } fatal;
 
     struct {
-        XXH64_hash_t hash;
-        usec_t timestamp_ut;
-    } dedup[20];
+        SPINLOCK spinlock;
+        struct {
+            XXH64_hash_t hash;
+            usec_t timestamp_ut;
+        } slot[20];
+    } dedup;
 } DAEMON_STATUS_FILE;
 
 // loads the last status saved
@@ -82,7 +91,6 @@ DAEMON_STATUS_FILE daemon_status_file_load(void);
 
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);
-void daemon_status_file_exit_reason_save(EXIT_REASON reason);
 void daemon_status_file_deadly_signal_received(EXIT_REASON reason);
 
 // check for a crash
