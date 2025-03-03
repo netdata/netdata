@@ -32,7 +32,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/kanocz/fcgi_client v0.0.0-20210113082628-fff85c8adfb7
-	github.com/likexian/whois v1.15.5
+	github.com/likexian/whois v1.15.6
 	github.com/likexian/whois-parser v1.24.20
 	github.com/lmittmann/tint v1.0.7
 	github.com/mattn/go-isatty v0.0.20
