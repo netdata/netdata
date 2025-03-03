@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -50,6 +51,7 @@ func newDiscoveryStatus() *discoveryStatus {
 
 type (
 	discoveryStatus struct {
+		updated           atomic.Bool
 		mux               sync.RWMutex
 		Networks          map[string]map[string]*discoveredDevice `json:"networks"`
 		LastDiscoveryTime time.Time                               `json:"last_discovery_time"`

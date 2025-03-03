@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync/atomic"
 	"time"
 
 	"github.com/gohugoio/hashstructure"
@@ -55,7 +54,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		status:         newDiscoveryStatus(),
 	}
 
-	if cfg.RescanInterval > 0 {
+	if cfg.RescanInterval >= 0 {
 		d.rescanInterval = cfg.RescanInterval.Duration()
 	}
 	if cfg.Timeout > 0 {
@@ -64,7 +63,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 	if cfg.ParallelScansPerNetwork > 0 {
 		d.parallelScansPerNetwork = cfg.ParallelScansPerNetwork
 	}
-	if cfg.DeviceCacheTTL > 0 {
+	if cfg.DeviceCacheTTL >= 0 {
 		d.deviceCacheTTL = cfg.DeviceCacheTTL.Duration()
 	}
 
@@ -90,7 +89,6 @@ type (
 
 		firstDiscovery bool
 		status         *discoveryStatus
-		statusUpdated  atomic.Bool
 	}
 	subnet struct {
 		str        string
@@ -148,7 +146,7 @@ func (d *Discoverer) discoverNetworks(ctx context.Context, in chan<- []model.Tar
 			d.status.LastDiscoveryTime = now
 		}
 
-		if d.statusUpdated.Swap(false) || d.status.ConfigHash != d.cfgHash {
+		if d.status.updated.Swap(false) || d.status.ConfigHash != d.cfgHash {
 			d.status.ConfigHash = d.cfgHash
 			filepersister.Save(statusFileName(), d.status)
 		}
@@ -199,11 +197,16 @@ func (d *Discoverer) probeIPAddress(ctx context.Context, sub subnet, ip string, 
 	dev := d.status.get(sub, ip)
 
 	// Use the cached device if available and not expired
-	if dev != nil && now.Before(dev.DiscoverTime.Add(d.deviceCacheTTL)) {
+	if dev != nil && (d.deviceCacheTTL == 0 || now.Before(dev.DiscoverTime.Add(d.deviceCacheTTL))) {
 		if d.firstDiscovery {
-			untilProbe := dev.DiscoverTime.Add(d.deviceCacheTTL).Sub(now).Round(time.Second)
-			d.Infof("device '%s': found in cache (sysName: '%s', network: '%s', next probe in %s)",
-				ip, dev.SysInfo.Name, subKey(sub), untilProbe)
+			if d.deviceCacheTTL == 0 {
+				d.Infof("device '%s': found in cache (sysName: '%s', network: '%s', cache never expires)",
+					ip, dev.SysInfo.Name, subKey(sub))
+			} else {
+				untilProbe := dev.DiscoverTime.Add(d.deviceCacheTTL).Sub(now).Round(time.Second)
+				d.Infof("device '%s': found in cache (sysName: '%s', network: '%s', next probe in %s)",
+					ip, dev.SysInfo.Name, subKey(sub), untilProbe)
+			}
 		}
 		tg := newTarget(ip, sub.credential, dev.SysInfo)
 		tgg.addTarget(tg)
@@ -221,13 +224,13 @@ func (d *Discoverer) probeIPAddress(ctx context.Context, sub subnet, ip string, 
 				ip, dev.SysInfo.Name, subKey(sub), err)
 		}
 		d.status.del(sub, ip)
-		d.statusUpdated.Store(dev != nil)
+		d.status.updated.Store(dev != nil)
 		return
 	}
 
 	d.Infof("device '%s': successfully discovered (sysName: '%s', network: '%s')", ip, si.Name, subKey(sub))
 	d.status.put(sub, ip, &discoveredDevice{DiscoverTime: now, SysInfo: *si})
-	d.statusUpdated.Store(true)
+	d.status.updated.Store(true)
 	tg := newTarget(ip, sub.credential, *si)
 	tgg.addTarget(tg)
 }
