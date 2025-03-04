@@ -55,24 +55,24 @@ typedef struct daemon_status_file {
     OS_SYSTEM_MEMORY memory;
     OS_SYSTEM_DISK_SPACE var_cache;
 
-    const char *install_type;
-    const char *architecture;   // ECS: host.architecture
-    const char *virtualization;
-    const char *container;
-    const char *kernel_version; // ECS: os.kernel
-    const char *os_name;        // ECS: os.name
-    const char *os_version;     // ECS: os.version
-    const char *os_id;          // ECS: os.family
-    const char *os_id_like;     // ECS: os.platform
+    char install_type[32];
+    char architecture[32];   // ECS: host.architecture
+    char virtualization[32];
+    char container[32];
+    char kernel_version[32]; // ECS: os.kernel
+    char os_name[32];        // ECS: os.name
+    char os_version[32];     // ECS: os.version
+    char os_id[64];          // ECS: os.family
+    char os_id_like[64];     // ECS: os.platform
     bool read_system_info;
 
     struct {
         SPINLOCK spinlock;
         long line;
-        const char *filename;
-        const char *function;
-        const char *errno_str;
-        const char *message;
+        char filename[256];
+        char function[128];
+        char errno_str[64];
+        char message[512];
         char stack_trace[2048];
         char thread[ND_THREAD_TAG_MAX + 1];
     } fatal;
@@ -85,9 +85,6 @@ typedef struct daemon_status_file {
         } slot[10];
     } dedup;
 } DAEMON_STATUS_FILE;
-
-// loads the last status saved
-DAEMON_STATUS_FILE daemon_status_file_load(void);
 
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);

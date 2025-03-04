@@ -632,13 +632,29 @@ void get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
     freez((char *)ds->os_id);
     freez((char *)ds->os_id_like);
 
-    ds->architecture = strdupz(ri->architecture ? ri->architecture : "");
-    ds->virtualization = strdupz(ri->virtualization ? ri->virtualization : "");
-    ds->container = strdupz(ri->container ? ri->container : "");
-    ds->kernel_version = strdupz(ri->kernel_version ? ri->kernel_version : "");
-    ds->os_name = strdupz(ri->host_os_name ? ri->host_os_name : "");
-    ds->os_version = strdupz(ri->host_os_version ? ri->host_os_version : "");
-    ds->os_id = strdupz(ri->host_os_id ? ri->host_os_id : "");
-    ds->os_id_like = strdupz(ri->host_os_id_like ? ri->host_os_id_like : "");
+    if(ri->architecture)
+        strncpyz(ds->architecture, ri->architecture, sizeof(ds->architecture) - 1);
+
+    if(ri->virtualization)
+        strncpyz(ds->virtualization, ri->virtualization, sizeof(ds->virtualization) - 1);
+
+    if(ri->container)
+        strncpyz(ds->container, ri->container, sizeof(ds->container) - 1);
+
+    if(ri->kernel_version)
+        strncpyz(ds->kernel_version, ri->kernel_version, sizeof(ds->kernel_version) - 1);
+
+    if(ri->host_os_name)
+        strncpyz(ds->os_name, ri->host_os_name, sizeof(ds->os_name) - 1);
+
+    if(ri->host_os_version)
+        strncpyz(ds->os_version, ri->host_os_version, sizeof(ds->os_version) - 1);
+
+    if(ri->host_os_id)
+        strncpyz(ds->os_id, ri->host_os_id, sizeof(ds->os_id) - 1);
+
+    if(ri->host_os_id_like)
+        strncpyz(ds->os_id_like, ri->host_os_id_like, sizeof(ds->os_id_like) - 1);
+
     ds->read_system_info = true;
 }
