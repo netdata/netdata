@@ -32,6 +32,7 @@ apk add --no-cache -U \
   lz4-static \
   make \
   ncurses \
+  ncurses-dev \
   netcat-openbsd \
   openssh \
   pkgconfig \
@@ -44,5 +45,6 @@ apk add --no-cache -U \
   zlib-dev \
   zlib-static \
   libunwind \
+  libunwind-dev \
   libunwind-static \
   || exit 1
