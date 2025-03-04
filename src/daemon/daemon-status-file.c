@@ -805,16 +805,18 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
-
-    fprintf(stderr, "DSF: finished\n");
 }
 
 void *post_status_file_thread(void *ptr) {
     struct post_status_file_thread_data *d = (struct post_status_file_thread_data *)ptr;
     post_status_file(d);
+    fprintf(stderr, "DSF: finished\n");
+
     freez((void *)d->cause);
     freez((void *)d->msg);
     freez(d);
+
+    fprintf(stderr, "DSF: exiting\n");
     return NULL;
 }
 
