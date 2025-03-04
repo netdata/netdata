@@ -880,7 +880,7 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
     const char *action_result = statistic->result;
     const char *action_data = statistic->data;
 
-    CLEAN_BUFFER *cmd = buffer_create(0, NULL);
+    CLEAN_BUFFER *cmd = buffer_create(16384, NULL);
     buffer_sprintf(
         cmd,
         "%s/anonymous-statistics.sh '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
