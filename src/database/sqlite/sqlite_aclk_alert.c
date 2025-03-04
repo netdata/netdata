@@ -5,8 +5,6 @@
 
 #include "../../aclk/aclk_alarm_api.h"
 
-extern __thread bool is_health_thread;
-
 #define SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param)                                                                     \
     ({                                                                                                                 \
         int _param = (param);                                                                                          \
@@ -20,19 +18,10 @@ extern __thread bool is_health_thread;
 
 static inline bool is_event_from_alert_variable_config(int64_t unique_id, nd_uuid_t *host_id)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_health, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &compiled_res))
-                return false;
-        }
-        res = compiled_res;
-    } else {
-        if (!PREPARE_STATEMENT(db_health, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &res))
+    if (!PREPARE_STATEMENT(db_health, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &res))
             return false;
-    }
 
     bool ret = false;
 
@@ -45,10 +34,7 @@ static inline bool is_event_from_alert_variable_config(int64_t unique_id, nd_uui
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
-        SQLITE_RESET(res);
-    else
-        SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res);
     return ret;
 }
 
@@ -57,19 +43,10 @@ done:
 
 static void update_alert_version_transition(int64_t health_log_id, int64_t unique_id)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_UPDATE_ALERT_VERSION_TRANSITION, &compiled_res))
-                return;
-        }
-        res = compiled_res;
-    } else {
-        if (!PREPARE_STATEMENT(db_aclk, SQL_UPDATE_ALERT_VERSION_TRANSITION, &res))
-            return;
-    }
+    if (!PREPARE_STATEMENT(db_aclk, SQL_UPDATE_ALERT_VERSION_TRANSITION, &res))
+        return;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
@@ -82,10 +59,7 @@ static void update_alert_version_transition(int64_t health_log_id, int64_t uniqu
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
-        SQLITE_RESET(res);
-    else
-        SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res);
 }
 
 //decide if some events should be sent or not
@@ -94,19 +68,10 @@ done:
 
 static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_SELECT_LAST_ALERT_STATUS, &compiled_res))
-                return true;
-        }
-        res = compiled_res;
-    } else {
-        if (!PREPARE_STATEMENT(db_aclk, SQL_SELECT_LAST_ALERT_STATUS, &res))
-            return true;
-    }
+    if (!PREPARE_STATEMENT(db_aclk, SQL_SELECT_LAST_ALERT_STATUS, &res))
+        return true;
 
     bool send = false;
 
@@ -122,10 +87,7 @@ static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
-        SQLITE_RESET(res);
-    else
-        SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res);
     return send;
 }
 
@@ -144,7 +106,6 @@ done:
 //
 static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, uint32_t unique_id, RRDCALC_STATUS status)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
     if (cloud_status_matches(health_log_id, status)) {
@@ -155,16 +116,8 @@ static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, ui
     if (is_event_from_alert_variable_config(unique_id, &host->host_id.uuid))
         return 2;
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_QUEUE_ALERT_TO_CLOUD, &compiled_res))
-                return -1;
-        }
-        res = compiled_res;
-    } else {
-        if (!PREPARE_STATEMENT(db_aclk, SQL_QUEUE_ALERT_TO_CLOUD, &res))
-            return -1;
-    }
+    if (!PREPARE_STATEMENT(db_aclk, SQL_QUEUE_ALERT_TO_CLOUD, &res))
+        return -1;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
@@ -178,10 +131,7 @@ static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, ui
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
-        SQLITE_RESET(res);
-    else
-        SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res);
     return 0;
 }
 
@@ -545,19 +495,10 @@ done:
 
 static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_DELETE_PROCESSED_ROWS, &compiled_res))
-                return;
-        }
-        res = compiled_res;
-    } else {
-        if (!PREPARE_STATEMENT(db_aclk, SQL_DELETE_PROCESSED_ROWS, &res))
-            return;
-    }
+    if (!PREPARE_STATEMENT(db_aclk, SQL_DELETE_PROCESSED_ROWS, &res))
+        return;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
@@ -570,10 +511,7 @@ static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
-        SQLITE_RESET(res);
-    else
-        SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_REBUILD_HOST_ALERT_VERSION_TABLE                                                                           \
@@ -625,19 +563,10 @@ done:
 
 bool process_alert_pending_queue(RRDHOST *host)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_aclk, SQL_PROCESS_ALERT_PENDING_QUEUE, &compiled_res))
-                return false;
-        }
-        res = compiled_res;
-    } else {
-        if (!PREPARE_STATEMENT(db_aclk, SQL_PROCESS_ALERT_PENDING_QUEUE, &res))
-            return false;
-    }
+    if (!PREPARE_STATEMENT(db_aclk, SQL_PROCESS_ALERT_PENDING_QUEUE, &res))
+        return false;
 
     int param = 0;
     int added =0, count = 0;
@@ -666,10 +595,7 @@ bool process_alert_pending_queue(RRDHOST *host)
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Processed %d entries, queued %d", rrdhost_hostname(host), count, added);
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
-        SQLITE_RESET(res);
-    else
-        SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res);
     return added > 0;
 }
 

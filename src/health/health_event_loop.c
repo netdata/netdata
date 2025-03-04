@@ -646,8 +646,6 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
 
 // UV health event loop
 
-__thread bool is_health_thread = false;
-
 enum health_opcode {
     HEALTH_NOOP = 0,
     HEALTH_HOST_INIT,
