@@ -63,19 +63,19 @@ if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
     ${docker} run --rm --privileged tonistiigi/binfmt:master --install "${QEMU_ARCH}" || exit 1
 fi
 
-DOCKER_IMAGE_NAME="netdata/static-builder:v1"
+DOCKER_IMAGE_NAME="localhost/netdata/static-builder:v1"
 
-if ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
-    if ${docker} image inspect "${DOCKER_IMAGE_NAME}" | grep -q 'Variant'; then
-        img_platform="$(${docker} image inspect "${DOCKER_IMAGE_NAME}" --format '{{.Os}}/{{.Architecture}}/{{.Variant}}')"
-    else
-        img_platform="$(${docker} image inspect "${DOCKER_IMAGE_NAME}" --format '{{.Os}}/{{.Architecture}}')"
-    fi
-
-    if [ "${img_platform}" != "${platform}" ]; then
-        ${docker} image rm "${DOCKER_IMAGE_NAME}" || exit 1
-    fi
-fi
+#if ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
+#    if ${docker} image inspect "${DOCKER_IMAGE_NAME}" | grep -q 'Variant'; then
+#        img_platform="$(${docker} image inspect "${DOCKER_IMAGE_NAME}" --format '{{.Os}}/{{.Architecture}}/{{.Variant}}')"
+#    else
+#        img_platform="$(${docker} image inspect "${DOCKER_IMAGE_NAME}" --format '{{.Os}}/{{.Architecture}}')"
+#    fi
+#
+#    if [ "${img_platform}" != "${platform}" ]; then
+#        ${docker} image rm "${DOCKER_IMAGE_NAME}" || exit 1
+#    fi
+#fi
 
 if ! ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
     ${docker} pull --platform "${platform}" "${DOCKER_IMAGE_NAME}"

@@ -44,6 +44,4 @@ apk add --no-cache -U \
   xz \
   zlib-dev \
   zlib-static \
-  libunwind-dev \
-  libunwind-static \
   || exit 1
