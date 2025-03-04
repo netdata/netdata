@@ -812,7 +812,7 @@ void daemon_status_file_check_crash(void) {
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
     daemon_status_file_load(&last_session_status);
-    daemon_status_file_update_status(DAEMON_STATUS_INITIALIZING);
+    daemon_status_file_startup_step("startup(read status file)");
     struct log_priority pri = PRI_ALL_NORMAL;
 
     bool new_version = strcmp(last_session_status.version, session_status.version) != 0;
@@ -1015,6 +1015,8 @@ void daemon_status_file_check_crash(void) {
     if(!disable_crash_report && (analytics_check_enabled() || post_crash_report)) {
         netdata_conf_ssl();
 
+        daemon_status_file_startup_step("startup(post status file)");
+
         struct post_status_file_thread_data *d = calloc(1, sizeof(*d));
         d->cause = cause;
         d->msg = msg;
@@ -1143,7 +1145,7 @@ void daemon_status_file_startup_step(const char *step) {
     else
         session_status.fatal.function[0] = '\0';
 
-    daemon_status_file_update_status(DAEMON_STATUS_NONE);
+    daemon_status_file_update_status(DAEMON_STATUS_INITIALIZING);
 }
 
 void daemon_status_file_shutdown_step(const char *step) {
@@ -1156,5 +1158,5 @@ void daemon_status_file_shutdown_step(const char *step) {
     else
         session_status.fatal.function[0] = '\0';
 
-    daemon_status_file_update_status(DAEMON_STATUS_NONE);
+    daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 }
