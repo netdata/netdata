@@ -1082,25 +1082,29 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
 
     if(analytics_check_enabled()) {
-        delta_startup_time("anonymous analytics");
+        delta_startup_time("anonymous analytics1");
 
         analytics_statistic_t start_statistic = {"START", "-", "-"};
         analytics_statistic_send(&start_statistic);
         if (daemon_status_file_has_last_crashed()) {
+            delta_startup_time("anonymous analytics2");
             analytics_statistic_t crash_statistic = {"CRASH", "-", "-"};
             analytics_statistic_send(&crash_statistic);
         }
         if (daemon_status_file_was_incomplete_shutdown()) {
+            delta_startup_time("anonymous analytics3");
             analytics_statistic_t incomplete_shutdown_statistic = {"INCOMPLETE_SHUTDOWN", "-", "-"};
             analytics_statistic_send(&incomplete_shutdown_statistic);
         }
 
+        delta_startup_time("anonymous analytics4");
         // check if ANALYTICS needs to start
         for (i = 0; static_threads[i].name != NULL; i++) {
             if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
                 struct netdata_static_thread *st = &static_threads[i];
                 st->enabled = 1;
                 netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
+                delta_startup_time("anonymous analytics5");
                 st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
             }
         }
