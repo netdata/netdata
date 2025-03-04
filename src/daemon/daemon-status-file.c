@@ -63,7 +63,7 @@ static void daemon_status_file_out_of_memory(void);
 
 // these are used instead of locks when locks cannot be used (signal handler, out of memory, etc)
 #define dsf_acquire(ds) __atomic_load_n(&(ds).v, __ATOMIC_ACQUIRE)
-#define dsf_release(ds) __atomic_store_n(&(ds).v, STATUS_FILE_VERSION, __ATOMIC_RELEASE)
+#define dsf_release(ds) __atomic_store_n(&(ds).v, (ds).v, __ATOMIC_RELEASE)
 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
