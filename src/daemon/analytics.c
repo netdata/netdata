@@ -940,14 +940,19 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
     CMD_APPEND_QUOTED(cmd, analytics_data.netdata_prebuilt_distro);
     CMD_APPEND_QUOTED(cmd, analytics_data.netdata_fail_reason);
 
+    daemon_status_file_startup_step("startup(analytics-line-" STR(__LINE__) ")");
+
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "%s/anonymous-statistics.sh '%s' '%s' '%s'",
            netdata_configured_primary_plugins_dir, statistic->action,
            action_result ? action_result : "", action_data ? action_data : "");
 
+    daemon_status_file_startup_step("startup(analytics-line-" STR(__LINE__) ")");
+
     POPEN_INSTANCE *instance = spawn_popen_run(buffer_tostring(cmd));
     if (instance) {
         char buffer[4 + 1];
+        daemon_status_file_startup_step("startup(analytics-line-" STR(__LINE__) ")");
         char *s = fgets(buffer, 4, spawn_popen_stdout(instance));
         int exit_code = spawn_popen_wait(instance);
         if (exit_code)
@@ -956,16 +961,21 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
                    "Statistics script returned error: %d",
                    exit_code);
 
+        daemon_status_file_startup_step("startup(analytics-line-" STR(__LINE__) ")");
+
         if (s && strncmp(buffer, "200", 3) != 0)
             nd_log(NDLS_DAEMON, NDLP_NOTICE,
                    "Statistics script returned http code: %s",
                    buffer);
 
+        daemon_status_file_startup_step("startup(analytics-line-" STR(__LINE__) ")");
     }
     else
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "Failed to run statistics script: %s/anonymous-statistics.sh",
                netdata_configured_primary_plugins_dir);
+
+    daemon_status_file_startup_step("startup(analytics-line-" STR(__LINE__) ")");
 }
 
 void analytics_reset(void) {
