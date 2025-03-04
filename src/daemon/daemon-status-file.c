@@ -778,6 +778,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
 
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
@@ -788,15 +789,6 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
-}
-
-void *post_status_file_thread(void *ptr) {
-    struct post_status_file_thread_data *d = (struct post_status_file_thread_data *)ptr;
-    post_status_file(d);
-    freez((void *)d->cause);
-    freez((void *)d->msg);
-    freez(d);
-    return NULL;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1024,11 +1016,14 @@ void daemon_status_file_check_crash(void) {
         netdata_conf_ssl();
 
         struct post_status_file_thread_data *d = calloc(1, sizeof(*d));
-        d->cause = strdupz(cause);
-        d->msg = strdupz(msg);
+        d->cause = cause;
+        d->msg = msg;
         d->status = &last_session_status;
         d->priority = pri.post;
-        nd_thread_create("post_status_file", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_DEFAULT, post_status_file_thread, d);
+        post_status_file(d);
+
+        // MacOS crashes when starting under launchctl, when we create a thread to post the status file,
+        // so we post the status file synchronously, with a timeout of 10 seconds.
     }
 }
 
