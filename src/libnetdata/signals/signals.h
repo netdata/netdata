@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_SIGNAL_HANDLER_H
-#define NETDATA_SIGNALS_H
+#define NETDATA_SIGNAL_HANDLER_H
 
 #include "../common.h"
 
