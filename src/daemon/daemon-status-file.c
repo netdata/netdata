@@ -1116,7 +1116,8 @@ void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
     // save what we know already
     daemon_status_file_save(static_save_buffer, &session_status, false);
 
-    if(!session_status.fatal.stack_trace[0]) {
+    // we cannot get a stack trace on SIGABRT - it may deadlock forever
+    if(reason != EXIT_REASON_SIGABRT && !session_status.fatal.stack_trace[0]) {
         buffer_flush(static_save_buffer);
         capture_stack_trace(static_save_buffer);
         strncpyz(session_status.fatal.stack_trace, buffer_tostring(static_save_buffer), sizeof(session_status.fatal.stack_trace) - 1);
