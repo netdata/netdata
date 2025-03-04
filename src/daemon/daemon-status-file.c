@@ -1028,7 +1028,8 @@ void daemon_status_file_check_crash(void) {
         d->msg = strdupz(msg);
         d->status = &last_session_status;
         d->priority = pri.post;
-        nd_thread_create("post_status_file", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_DEFAULT, post_status_file_thread, d);
+        post_status_file_thread(d);
+        // nd_thread_create("post_status_file", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_DEFAULT, post_status_file_thread, d);
     }
 }
 
