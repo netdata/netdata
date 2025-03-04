@@ -623,15 +623,6 @@ void get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
         return;
     }
 
-    freez((char *)ds->architecture);
-    freez((char *)ds->virtualization);
-    freez((char *)ds->container);
-    freez((char *)ds->kernel_version);
-    freez((char *)ds->os_name);
-    freez((char *)ds->os_version);
-    freez((char *)ds->os_id);
-    freez((char *)ds->os_id_like);
-
     if(ri->architecture)
         strncpyz(ds->architecture, ri->architecture, sizeof(ds->architecture) - 1);
 
