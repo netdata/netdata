@@ -1066,6 +1066,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/file_lock.h
         src/libnetdata/os/mmap_limit.c
         src/libnetdata/os/mmap_limit.h
+        src/libnetdata/signals/signals.c
+        src/libnetdata/signals/signals.h
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
@@ -1171,8 +1173,8 @@ set(DAEMON_FILES
         src/daemon/environment.c
         src/daemon/win_system-info.c
         src/daemon/win_system-info.h
-        src/daemon/signals.c
-        src/daemon/signals.h
+        src/daemon/signal-handler.c
+        src/daemon/signal-handler.h
         src/daemon/service.c
         src/daemon/daemon-shutdown-watcher.c
         src/daemon/daemon-shutdown-watcher.h
