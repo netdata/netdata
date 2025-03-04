@@ -328,7 +328,7 @@ static void nd_thread_exit(ND_THREAD *nti) {
 }
 
 static void *nd_thread_starting_point(void *ptr) {
-    fprintf(stderr, "DSF: started thread\n");
+    fprintf(stderr, "DSF: started thread '%s'\n", nd_thread_tag());
     ND_THREAD *nti = _nd_thread_info = (ND_THREAD *)ptr;
     nd_thread_status_set(nti, NETDATA_THREAD_STATUS_STARTED);
 
@@ -344,16 +344,16 @@ static void *nd_thread_starting_point(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel state to ENABLE.");
 
-    fprintf(stderr, "DSF: starting work\n");
+    fprintf(stderr, "DSF: starting work '%s'\n", nd_thread_tag());
 
     // run the thread code
     nti->ret = nti->start_routine(nti->arg);
 
-    fprintf(stderr, "DSF: finished work\n");
+    fprintf(stderr, "DSF: finished work '%s'\n", nd_thread_tag());
 
     nd_thread_exit(nti);
 
-    fprintf(stderr, "DSF: finished thread\n");
+    fprintf(stderr, "DSF: finished thread '%s'\n", nd_thread_tag());
     return nti;
 }
 
