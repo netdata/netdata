@@ -1041,19 +1041,19 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     exit_initiated_add(EXIT_REASON_FATAL);
     strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
 
-    if(!session_status.fatal.filename[0])
+    if(!session_status.fatal.filename[0] && filename)
         strncpyz(session_status.fatal.filename, filename, sizeof(session_status.fatal.filename) - 1);
 
-    if(!session_status.fatal.function[0])
+    if(!session_status.fatal.function[0] && function)
         strncpyz(session_status.fatal.function, function, sizeof(session_status.fatal.function) - 1);
 
-    if(!session_status.fatal.message[0])
+    if(!session_status.fatal.message[0] && message)
         strncpyz(session_status.fatal.message, message, sizeof(session_status.fatal.message) - 1);
 
-    if(!session_status.fatal.errno_str[0])
+    if(!session_status.fatal.errno_str[0] && errno_str)
         strncpyz(session_status.fatal.errno_str, errno_str, sizeof(session_status.fatal.errno_str) - 1);
 
-    if(!session_status.fatal.stack_trace[0])
+    if(!session_status.fatal.stack_trace[0] && stack_trace)
         strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
 
     if(!session_status.fatal.line)
