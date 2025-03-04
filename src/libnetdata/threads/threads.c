@@ -328,12 +328,13 @@ static void nd_thread_exit(ND_THREAD *nti) {
 }
 
 static void *nd_thread_starting_point(void *ptr) {
-    fprintf(stderr, "DSF: started thread '%s'\n", nd_thread_tag());
     ND_THREAD *nti = _nd_thread_info = (ND_THREAD *)ptr;
     nd_thread_status_set(nti, NETDATA_THREAD_STATUS_STARTED);
 
     nti->tid = gettid_uncached();
     nd_thread_tag_set(nti->tag);
+
+    fprintf(stderr, "DSF: started thread '%s'\n", nd_thread_tag());
 
     if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_STARTUP) != NETDATA_THREAD_OPTION_DONT_LOG_STARTUP)
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread created with task id %d", gettid_cached());
