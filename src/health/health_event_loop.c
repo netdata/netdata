@@ -1082,6 +1082,9 @@ static void host_health_timer_cb(uv_timer_t *handle)
 
 #define MAX_HEALTH_BATCH_COMMANDS (16)
 
+#define TIMER_INITIAL_PERIOD_MS (2000)
+#define TIMER_REPEAT_PERIOD_MS (2000)
+
 static void health_ev_loop(void *arg)
 {
     struct health_config_s *config = arg;
@@ -1108,8 +1111,7 @@ static void health_ev_loop(void *arg)
     fatal_assert(0 == uv_timer_init(loop, &config->timer_req));
     config->timer_req.data = config;
 
-    uint64_t health_run_every_ms = health_globals.config.run_at_least_every_seconds * 1000;
-    fatal_assert(0 == uv_timer_start(&config->timer_req, timer_cb, health_run_every_ms, health_run_every_ms));
+    fatal_assert(0 == uv_timer_start(&config->timer_req, timer_cb, TIMER_INITIAL_PERIOD_MS, TIMER_REPEAT_PERIOD_MS));
 
     int max_thread_count = netdata_conf_health_threads();
     int maint_max_thread_count = (max_thread_count * 25 / 100);
