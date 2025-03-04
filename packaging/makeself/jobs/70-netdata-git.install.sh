@@ -26,6 +26,7 @@ export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig:/libnetfilter-acct-stati
 # Set correct CMake flags for building against non-System OpenSSL
 # See: https://github.com/warmcat/libwebsockets/blob/master/READMEs/README.build.md
 export CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=/openssl-static -DOPENSSL_LIBRARIES=/openssl-static/lib64 -DCMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE=/openssl-static -DLWS_OPENSSL_INCLUDE_DIRS=/openssl-static/include -DLWS_OPENSSL_LIBRARIES=/openssl-static/lib64/libssl.a;/openssl-static/lib64/libcrypto.a"
+export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBUNWIND=ON"
 
 run ./netdata-installer.sh \
   --install-prefix "${NETDATA_INSTALL_PARENT}" \
