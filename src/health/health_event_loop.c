@@ -815,18 +815,8 @@ static void after_host_health_maintenance_job(uv_work_t *req, int status __maybe
     struct health_config_s *config = data->config;
     config->job_list[data->job_type]->running--;
     RRDHOST *host = data->payload;
-    HEALTH *host_health = &host->health;
-    time_t next_run = data->next_run;
     return_worker(&worker_pool, data);
-
-    int64_t delay = next_run > 0 ? next_run - now_realtime_sec() : 0;
-    int rc = uv_timer_start(&host_health->timer, host_health_timer_cb, delay > 0 ? delay * MSEC_PER_SEC : 0, 0);
-    if (rc) {
-        if (delay <= 0)
-            health_host_run(host);
-        else
-            health_host_run_later(host, delay * MSEC_PER_SEC);
-    }
+    health_host_run(host);
 }
 
 static void host_health_maintenance_job(uv_work_t *req)
