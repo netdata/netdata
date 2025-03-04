@@ -8,14 +8,10 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building libunwind" || true
 
-export CFLAGS="${TUNING_FLAGS} -pipe"
+export CFLAGS="${TUNING_FLAGS} -fno-lto -pipe"
 export CXXFLAGS="${CFLAGS}"
 export LDFLAGS="-static"
 export PKG_CONFIG="pkg-config --static"
-
-if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libunwind" ]; then
-  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
-fi
 
 if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libunwind" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
@@ -29,7 +25,8 @@ if [ -d "${cache}" ]; then
   CACHE_HIT=1
 else
   echo "No cached copy of build directory for libunwind found, fetching sources instead."
-  run git clone --branch "${LIBUNWIND_VERSION}" --single-branch --depth 1 "${LIBUNWIND_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
+  run git clone "${LIBUNWIND_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
+  cd "${NETDATA_MAKESELF_PATH}/tmp/libunwind" && run git checkout "${LIBUNWIND_VERSION}"
   CACHE_HIT=0
 fi
 
@@ -40,8 +37,10 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
 
   run ./configure \
     --prefix=/libunwind-static \
+    --build="$(gcc -dumpmachine)" \
     --disable-cxx-exceptions \
     --disable-documentation \
+    --disable-tests \
     --disable-shared \
     --enable-static \
     --disable-dependency-tracking
