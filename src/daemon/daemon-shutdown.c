@@ -106,7 +106,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
     if(!pgc_hot_and_dirty_entries(main_cache))
         return;
 
-    nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE dirty pages...");
+    nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE hot & dirty pages...");
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
         rrdeng_quiesce(multidb_ctx[tier]);
 
