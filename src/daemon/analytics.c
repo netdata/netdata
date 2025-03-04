@@ -951,9 +951,11 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
 
     POPEN_INSTANCE *instance = spawn_popen_run(buffer_tostring(cmd));
     if (instance) {
-        char buffer[4 + 1];
+        char buffer[1024];
         daemon_status_file_startup_step("startup(analytics-line-" STR(__LINE__) ")");
-        char *s = fgets(buffer, 4, spawn_popen_stdout(instance));
+        char *s = fgets(buffer, sizeof(buffer) - 1, spawn_popen_stdout(instance));
+        daemon_status_file_startup_step("startup(analytics-line-" STR(__LINE__) ")");
+        buffer[sizeof(buffer) - 1] = '\0';
         int exit_code = spawn_popen_wait(instance);
         if (exit_code)
 
