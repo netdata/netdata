@@ -77,11 +77,7 @@ func (c *Collector) collectGPUInfo(mx map[string]int64) error {
 		addMetric(mx, px+"video_clock", gpu.Clocks.VideoClock, 0)
 		addMetric(mx, px+"sm_clock", gpu.Clocks.SmClock, 0)
 		addMetric(mx, px+"mem_clock", gpu.Clocks.MemClock, 0)
-		if gpu.PowerReadings != nil {
-			addMetric(mx, px+"power_draw", gpu.PowerReadings.PowerDraw, 0)
-		} else if gpu.GPUPowerReadings != nil {
-			addMetric(mx, px+"power_draw", gpu.GPUPowerReadings.PowerDraw, 0)
-		}
+		addGPUPowerMetricsSwitch(mx, px, gpu)
 		addMetric(mx, px+"voltage", gpu.Voltage.GraphicsVolt, 0)
 		for i := 0; i < 16; i++ {
 			s := "P" + strconv.Itoa(i)
@@ -132,6 +128,19 @@ func (c *Collector) collectGPUInfo(mx map[string]int64) error {
 	}
 
 	return nil
+}
+
+func addGPUPowerMetricsSwitch(mx map[string]int64, px string, gpu gpuInfo) {
+	switch true {
+	case gpu.PowerReadings != nil && gpu.PowerReadings.PowerDraw != nil:
+		addMetric(mx, px+"power_draw", *gpu.PowerReadings.PowerDraw, 0)
+	case gpu.GPUPowerReadings != nil && gpu.GPUPowerReadings.PowerDraw != nil:
+		addMetric(mx, px+"power_draw", *gpu.GPUPowerReadings.PowerDraw, 0)
+	case gpu.GPUPowerReadings != nil && gpu.GPUPowerReadings.InstantPowerDraw != nil:
+		addMetric(mx, px+"power_draw", *gpu.GPUPowerReadings.InstantPowerDraw, 0)
+	case gpu.GPUPowerReadings != nil && gpu.GPUPowerReadings.AveragePowerDraw != nil:
+		addMetric(mx, px+"power_draw", *gpu.GPUPowerReadings.AveragePowerDraw, 0)
+	}
 }
 
 func calcMaxPCIEBandwidth(gpu gpuInfo) float64 {
