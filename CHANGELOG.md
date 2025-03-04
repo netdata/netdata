@@ -6,6 +6,18 @@
 
 **Merged pull requests:**
 
+- fix\(go.d/sd/snmp\): use rescan and cache ttl only when set [\#19760](https://github.com/netdata/netdata/pull/19760) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/nvidia\_smi\): handle xml gpu\_power\_readings change [\#19759](https://github.com/netdata/netdata/pull/19759) ([ilyam8](https://github.com/ilyam8))
+- status file timings per step [\#19758](https://github.com/netdata/netdata/pull/19758) ([ktsaou](https://github.com/ktsaou))
+- improvement\(go.d/sd/snmp\): support device cache ttl 0 [\#19756](https://github.com/netdata/netdata/pull/19756) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/sd/snmp\): comment out  defaults in snmp.conf [\#19755](https://github.com/netdata/netdata/pull/19755) ([ilyam8](https://github.com/ilyam8))
+- status file version 8 [\#19753](https://github.com/netdata/netdata/pull/19753) ([ktsaou](https://github.com/ktsaou))
+- status file improvements \(dedup and signal handler use\) [\#19751](https://github.com/netdata/netdata/pull/19751) ([ktsaou](https://github.com/ktsaou))
+- build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.3 to 0.2.5 in /src/go [\#19750](https://github.com/netdata/netdata/pull/19750) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/likexian/whois from 1.15.5 to 1.15.6 in /src/go [\#19749](https://github.com/netdata/netdata/pull/19749) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump go.mongodb.org/mongo-driver from 1.17.2 to 1.17.3 in /src/go [\#19748](https://github.com/netdata/netdata/pull/19748) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/gosnmp/gosnmp from 1.38.0 to 1.39.0 in /src/go [\#19747](https://github.com/netdata/netdata/pull/19747) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/docker/docker from 28.0.0+incompatible to 28.0.1+incompatible in /src/go [\#19746](https://github.com/netdata/netdata/pull/19746) ([dependabot[bot]](https://github.com/apps/dependabot))
 - more strict parsing of the output of system-info.sh [\#19745](https://github.com/netdata/netdata/pull/19745) ([ktsaou](https://github.com/ktsaou))
 - pass NULL to sensors\_init\(\) when the standard files exist in /etc/ [\#19744](https://github.com/netdata/netdata/pull/19744) ([ktsaou](https://github.com/ktsaou))
 - allow coredumps to be generated [\#19743](https://github.com/netdata/netdata/pull/19743) ([ktsaou](https://github.com/ktsaou))
@@ -27,6 +39,7 @@
 - minor status file annotation fixes [\#19723](https://github.com/netdata/netdata/pull/19723) ([ktsaou](https://github.com/ktsaou))
 - status has install type [\#19722](https://github.com/netdata/netdata/pull/19722) ([ktsaou](https://github.com/ktsaou))
 - more status file annotations [\#19721](https://github.com/netdata/netdata/pull/19721) ([ktsaou](https://github.com/ktsaou))
+- feat\(go.d\): add snmp devices discovery [\#19720](https://github.com/netdata/netdata/pull/19720) ([ilyam8](https://github.com/ilyam8))
 - save status on out of memory event [\#19719](https://github.com/netdata/netdata/pull/19719) ([ktsaou](https://github.com/ktsaou))
 - attempt to save status file from the signal handler [\#19718](https://github.com/netdata/netdata/pull/19718) ([ktsaou](https://github.com/ktsaou))
 - unified out of memory handling [\#19717](https://github.com/netdata/netdata/pull/19717) ([ktsaou](https://github.com/ktsaou))
@@ -235,7 +248,6 @@
 - Start using new GitHub hosted ARM runners for CI when appropriate. [\#19427](https://github.com/netdata/netdata/pull/19427) ([Ferroin](https://github.com/Ferroin))
 - Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
 - Modify eBPF.plugin integration \(Part I\) [\#19219](https://github.com/netdata/netdata/pull/19219) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add CLR Remoting metadata [\#19203](https://github.com/netdata/netdata/pull/19203) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
@@ -484,14 +496,6 @@
 - fix: use setuid as a fallback for static builds when setcap fails for plugins [\#19215](https://github.com/netdata/netdata/pull/19215) ([ilyam8](https://github.com/ilyam8))
 - add dyncfg vnode option to collectors [\#19214](https://github.com/netdata/netdata/pull/19214) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/vmware/govmomi from 0.46.2 to 0.46.3 [\#19213](https://github.com/netdata/netdata/pull/19213) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump k8s.io/client-go from 0.31.3 to 0.32.0 in /src/go [\#19210](https://github.com/netdata/netdata/pull/19210) ([dependabot[bot]](https://github.com/apps/dependabot))
-- dyncfg vnodes improvements [\#19207](https://github.com/netdata/netdata/pull/19207) ([ilyam8](https://github.com/ilyam8))
-- Streaming improvements No 8 [\#19206](https://github.com/netdata/netdata/pull/19206) ([ktsaou](https://github.com/ktsaou))
-- feat\(go.d.plugin\): add dyncfg vnodes [\#19205](https://github.com/netdata/netdata/pull/19205) ([ilyam8](https://github.com/ilyam8))
-- Streaming improvements No 7 [\#19204](https://github.com/netdata/netdata/pull/19204) ([ktsaou](https://github.com/ktsaou))
-- Add dynamic rooms docs [\#19199](https://github.com/netdata/netdata/pull/19199) ([kapantzak](https://github.com/kapantzak))
-- Streaming improvements No 6 [\#19196](https://github.com/netdata/netdata/pull/19196) ([ktsaou](https://github.com/ktsaou))
-- Add cross-architecture build tests for Go code. [\#19195](https://github.com/netdata/netdata/pull/19195) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
