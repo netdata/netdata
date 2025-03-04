@@ -792,7 +792,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
-        fprintf(stderr, "DSF: curl_easy_perform() failed\n");
+        fprintf(stderr, "DSF: curl_easy_perform() failed with code %u\n", rc);
 
         XXH64_hash_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash);
