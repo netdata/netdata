@@ -930,6 +930,8 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
         analytics_data.netdata_fail_reason ? analytics_data.netdata_fail_reason : ""
         );
 
+    return;
+
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "%s/anonymous-statistics.sh '%s' '%s' '%s'",
            netdata_configured_primary_plugins_dir, statistic->action,
