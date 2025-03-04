@@ -78,6 +78,8 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_LIBCRYPTO,
     BIB_LIB_LIBYAML,
     BIB_LIB_LIBMNL,
+    BIB_LIB_LIBUNWIND,
+    BIB_LIB_BACKTRACE,
     BIB_PLUGIN_APPS,
     BIB_PLUGIN_LINUX_CGROUPS,
     BIB_PLUGIN_LINUX_CGROUP_NETWORK,
@@ -726,6 +728,22 @@ static struct {
             .json = "libmnl",
             .value = NULL,
         },
+        [BIB_LIB_LIBUNWIND] = {
+            .category = BIC_LIBS,
+            .type = BIT_BOOLEAN,
+            .analytics = "libunwind",
+            .print = "libunwind (library for getting stack traces)",
+            .json = "libunwind",
+            .value = NULL,
+        },
+        [BIB_LIB_BACKTRACE] = {
+            .category = BIC_LIBS,
+            .type = BIT_BOOLEAN,
+            .analytics = "backtrace",
+            .print = "backtrace (library for getting stack traces)",
+            .json = "backtrace",
+            .value = NULL,
+        },
         [BIB_PLUGIN_APPS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
@@ -1268,6 +1286,11 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef HAVE_LIBMNL
     build_info_set_status(BIB_LIB_LIBMNL, true);
+#endif
+#ifdef HAVE_LIBUNWIND
+    build_info_set_status(BIB_LIB_LIBUNWIND, true);
+#elif defined(HAVE_BACKTRACE)
+    build_info_set_status(BIB_LIB_BACKTRACE, true);
 #endif
 
 #ifdef ENABLE_PLUGIN_APPS
