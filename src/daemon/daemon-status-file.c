@@ -792,12 +792,14 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
-        fprintf(stderr, "DSF: curl_easy_perform() failed with code %u\n", rc);
+        fprintf(stderr, "DSF: curl_easy_perform() OK\n");
 
         XXH64_hash_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash);
         daemon_status_file_save(wb, &session_status, true);
     }
+    else
+        fprintf(stderr, "DSF: curl_easy_perform() failed with code %u\n", rc);
 
     fprintf(stderr, "DSF: curl_easy_cleanup()\n");
 
@@ -1045,8 +1047,7 @@ void daemon_status_file_check_crash(void) {
         d->msg = strdupz(msg);
         d->status = &last_session_status;
         d->priority = pri.post;
-        post_status_file_thread(d);
-        // nd_thread_create("post_status_file", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_DEFAULT, post_status_file_thread, d);
+        nd_thread_create("post_status_file", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_DEFAULT, post_status_file_thread, d);
     }
 }
 
