@@ -888,7 +888,7 @@ void daemon_status_file_check_crash(void) {
                 pri = PRI_USER_SHOULD_FIX;
             }
             else if (last_session_status.exit_reason & EXIT_REASON_ALREADY_RUNNING) {
-                cause = "out of memory";
+                cause = "already running";
                 msg = "Netdata couldn't start, because it was already running";
                 pri = PRI_USER_SHOULD_FIX;
             }
