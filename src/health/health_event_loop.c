@@ -976,11 +976,12 @@ struct {
     [HEALTH_JOB_HOST_CALC_CLEANUP] = {host_rrdcalc_cleanup_job, after_host_rrdcalc_cleanup_job},
 };
 
+// Return true if submitted to worker
 static bool send_job_to_worker(struct health_config_s *config, struct job_list_t *job, RRDHOST *host)
 {
     worker_data_t *data = get_worker(&worker_pool);
     if (!data)
-        return true;
+        return false;
 
     data->request.data = data;
     data->config = config;
@@ -988,15 +989,13 @@ static bool send_job_to_worker(struct health_config_s *config, struct job_list_t
     data->job_type = job->job_type;
     job->running++;
 
-    int rc = 1;
-    if (likely(job->job_type < HEALTH_JOB_MAX))
-        rc = uv_queue_work(&config->loop, &data->request, job_functions[job->job_type].work_cb, job_functions[job->job_type].after_work_cb);
-
+    internal_fatal(job->job_type >= HEALTH_JOB_MAX, "Invalid job type %d", job->job_type);
+    int rc = uv_queue_work(&config->loop, &data->request, job_functions[job->job_type].work_cb, job_functions[job->job_type].after_work_cb);
     if (rc) {
         job->running--;
         return_worker(&worker_pool, data);
     }
-    return rc != 0;
+    return (rc == 0);
 }
 
 static void add_job(struct job_list_t *job, RRDHOST *host)
@@ -1045,7 +1044,9 @@ static void schedule_job_to_run(struct health_config_s *config, health_job_type_
     // if we dont, it was a ping from the callback
 
     // Lets try to queue as many of the pending jobs
-    while (!too_busy && job->pending && job->running < max_threads) {
+    bool submitted = true;
+    int loop = max_threads - job->running;
+    while (submitted && loop-- > 0 && job->pending && job->running < max_threads) {
         Word_t Index = 0;
         Pvalue = get_job(job, &Index);
         if (Pvalue == NULL)
@@ -1053,9 +1054,9 @@ static void schedule_job_to_run(struct health_config_s *config, health_job_type_
         host_in_queue = *Pvalue;
 
         // Send it to worker, increase running
-        too_busy = send_job_to_worker(config, job, host_in_queue);
+        submitted = send_job_to_worker(config, job, host_in_queue);
         // if it was scheduled in worker, remove it from pending
-        if (!too_busy)
+        if (submitted)
             del_job(job, Index);
     }
 
@@ -1066,10 +1067,10 @@ static void schedule_job_to_run(struct health_config_s *config, health_job_type_
     too_busy = (job->pending > 0 || job->running >= max_threads);
     // We have a host, if not busy lets run it
     if (!too_busy)
-        too_busy = send_job_to_worker(config, job, host);
+        submitted = send_job_to_worker(config, job, host);
 
     // We were either busy, or failed to start worker, schedule for later
-    if (too_busy)
+    if (too_busy || !submitted)
         add_job(job, host);
 }
 
