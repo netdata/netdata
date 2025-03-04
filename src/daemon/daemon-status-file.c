@@ -757,6 +757,8 @@ struct post_status_file_thread_data {
 };
 
 void post_status_file(struct post_status_file_thread_data *d) {
+    fprintf(stderr, "DSF: CREATING JSON BUFFER\n");
+
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_string(wb, "exit_cause", d->cause); // custom
@@ -768,26 +770,41 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     const char *json_data = buffer_tostring(wb);
 
+    fprintf(stderr, "DSF: curl_easy_init()\n");
+
     CURL *curl = curl_easy_init();
     if(!curl)
         return;
 
+    fprintf(stderr, "DSF: curl_easy_setopt(1)\n");
     curl_easy_setopt(curl, CURLOPT_URL, "https://agent-events.netdata.cloud/agent-events");
+    fprintf(stderr, "DSF: curl_easy_setopt(2)\n");
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    fprintf(stderr, "DSF: curl_easy_setopt(3)\n");
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
+    fprintf(stderr, "DSF: curl_slist_append()\n");
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
+    fprintf(stderr, "DSF: curl_easy_setopt(4)\n");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    fprintf(stderr, "DSF: curl_easy_perform()\n");
 
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
+        fprintf(stderr, "DSF: curl_easy_perform() failed\n");
+
         XXH64_hash_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash);
         daemon_status_file_save(wb, &session_status, true);
     }
 
+    fprintf(stderr, "DSF: curl_easy_cleanup()\n");
+
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
+
+    fprintf(stderr, "DSF: finished\n");
 }
 
 void *post_status_file_thread(void *ptr) {
