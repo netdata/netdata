@@ -178,6 +178,7 @@ mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable OTEL metrics plugin" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocator monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "Enable systemd journal log collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -259,6 +260,44 @@ if(ENABLE_MIMALLOC)
         endfunction()
 
         netdata_add_mimalloc()
+endif()
+
+if(ENABLE_PLUGIN_OTEL)
+        find_program(CARGO_PROGRAM "cargo")
+        if(NOT CARGO_PROGRAM)
+                message(WARNING "Can not build otel.plugin because cargo can not be found.")
+                set(ENABLE_PLUGIN_OTEL Off CACHE BOOL "Enable OTEL metrics plugin" FORCE)
+        endif()
+endif()
+
+if(ENABLE_PLUGIN_OTEL)
+        include(FetchContent)
+        FetchContent_Declare(
+                Corrosion
+                GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+                GIT_TAG v0.5
+        )
+        FetchContent_MakeAvailable(Corrosion)
+
+        corrosion_import_crate(MANIFEST_PATH src/collectors/otel.plugin/Cargo.toml)
+        corrosion_install(TARGETS otel_plugin DESTINATION usr/libexec/netdata/plugins.d)
+
+        install(CODE "
+                file(RENAME
+                     \${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/otel_plugin
+                     \${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/otel.plugin)
+        ")
+
+        install(FILES src/collectors/otel.plugin/config/otel-receivers-config.yaml
+                COMPONENT plugin-otel
+                DESTINATION etc/netdata)
+
+        if(BUILD_FOR_PACKAGING)
+                install(FILES
+                        ${PKG_FILES_PATH}/copyright
+                        COMPONENT plugin-otel
+                        DESTINATION usr/share/doc/netdata-plugin-otel)
+        endif()
 endif()
 
 if(ENABLE_PLUGIN_GO)
@@ -2928,15 +2967,6 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
-
-#
-# otel.plugin
-#
-
-install(FILES
-        src/collectors/otel.plugin/config/otel-receivers-config.yaml
-        COMPONENT netdata
-        DESTINATION etc/netdata)
 
 #
 # Generate config file

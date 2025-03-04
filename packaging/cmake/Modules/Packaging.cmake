@@ -79,6 +79,10 @@ if(ENABLE_PLUGIN_APPS)
         list(APPEND _main_deps "netdata-plugin-apps")
 endif()
 
+if(ENABLE_PLUGIN_OTEL)
+        list(APPEND _main_deps "netdata-plugin-otel")
+endif()
+
 if(ENABLE_PLUGIN_GO)
         list(APPEND _main_deps "netdata-plugin-go")
 endif()
@@ -460,6 +464,20 @@ set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_DEBUGINFO_PACKAGE On)
 
 #
+# otel.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-OTEL_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-OTEL_DESCRIPTION
+		"The otel plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect OTEL metrics.")
+
+set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_NAME "netdata-plugin-otel")
+set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_CONFLICTS "netdata (<< 1.40)")
+set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_PREDEPENDS "adduser")
+
+#
 # CPack components
 #
 
@@ -511,6 +529,9 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
 endif()
 if(ENABLE_PLUGIN_XENSTAT)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-xenstat")
+endif()
+if(ENABLE_PLUGIN_XENSTAT)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-otel")
 endif()
 
 include(CPack)

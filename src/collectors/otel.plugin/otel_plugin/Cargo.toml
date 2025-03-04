@@ -1,5 +1,5 @@
 [package]
-name = "main"
+name = "otel_plugin"
 version.workspace = true
 edition.workspace = true
 

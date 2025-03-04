@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "main",
+    "otel_plugin",
     "otel_utils",
 ]
 
