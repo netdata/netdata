@@ -241,7 +241,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "ND_exit_reason", EXIT_REASON_2id_one, ds->exit_reason, error, required_v1);
         JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ND_node_id", ds->node_id.uuid, error, required_v1);
         JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ND_claim_id", ds->claim_id.uuid, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "ND_install_type", ds->install_type, error, required_v3);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "ND_install_type", ds->install_type, error, required_v3);
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "ND_timings", error, required_v1, {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init", ds->timings.init, error, required_v1);
@@ -254,9 +254,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
     // Parse host object
     JSONC_PARSE_SUBOBJECT(jobj, path, "host", error, required_v1, {
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "architecture", ds->architecture, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "virtualization", ds->virtualization, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "container", ds->container, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "architecture", ds->architecture, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "virtualization", ds->virtualization, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "container", ds->container, error, required_v1);
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->boottime, error, required_v1);
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "boot", error, required_v1, {
@@ -286,21 +286,21 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     // Parse os object
     JSONC_PARSE_SUBOBJECT(jobj, path, "os", error, required_v1, {
         JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "type", DAEMON_OS_TYPE_2id, ds->os_type, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "kernel", ds->kernel_version, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "name", ds->os_name, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "version", ds->os_version, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "family", ds->os_id, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "platform", ds->os_id_like, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "kernel", ds->kernel_version, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "name", ds->os_name, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->os_version, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "family", ds->os_id, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "platform", ds->os_id_like, error, required_v1);
     });
 
     // Parse fatal object
     JSONC_PARSE_SUBOBJECT(jobj, path, "fatal", error, required_v1, {
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "filename", ds->fatal.filename, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "function", ds->fatal.function, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "message", ds->fatal.message, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "filename", ds->fatal.filename, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "function", ds->fatal.function, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "message", ds->fatal.message, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "stack_trace", ds->fatal.stack_trace, error, required_v1);
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "line", ds->fatal.line, error, required_v1);
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "errno", ds->fatal.errno_str, error, required_v3);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "errno", ds->fatal.errno_str, error, required_v3);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "thread", ds->fatal.thread, error, required_v5);
     });
 
@@ -406,22 +406,22 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         session_status.node_id = last_session_status.node_id;
     if(UUIDiszero(session_status.host_id))
         session_status.host_id = last_session_status.host_id;
-    if(!session_status.architecture && last_session_status.architecture)
-        session_status.architecture = strdupz(last_session_status.architecture);
-    if(!session_status.virtualization && last_session_status.virtualization)
-        session_status.virtualization = strdupz(last_session_status.virtualization);
-    if(!session_status.container && last_session_status.container)
-        session_status.container = strdupz(last_session_status.container);
-    if(!session_status.kernel_version && last_session_status.kernel_version)
-        session_status.kernel_version = strdupz(last_session_status.kernel_version);
-    if(!session_status.os_name && last_session_status.os_name)
-        session_status.os_name = strdupz(last_session_status.os_name);
-    if(!session_status.os_version && last_session_status.os_version)
-        session_status.os_version = strdupz(last_session_status.os_version);
-    if(!session_status.os_id && last_session_status.os_id)
-        session_status.os_id = strdupz(last_session_status.os_id);
-    if(!session_status.os_id_like && last_session_status.os_id_like)
-        session_status.os_id_like = strdupz(last_session_status.os_id_like);
+    if(!session_status.architecture[0] && last_session_status.architecture[0])
+        strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
+    if(!session_status.virtualization[0] && last_session_status.virtualization[0])
+        strncpyz(session_status.virtualization, last_session_status.virtualization, sizeof(session_status.virtualization) - 1);
+    if(!session_status.container[0] && last_session_status.container[0])
+        strncpyz(session_status.container, last_session_status.container, sizeof(session_status.container) - 1);
+    if(!session_status.kernel_version[0] && last_session_status.kernel_version[0])
+        strncpyz(session_status.kernel_version, last_session_status.kernel_version, sizeof(session_status.kernel_version) - 1);
+    if(!session_status.os_name[0] && last_session_status.os_name[0])
+        strncpyz(session_status.os_name, last_session_status.os_name, sizeof(session_status.os_name) - 1);
+    if(!session_status.os_version[0] && last_session_status.os_version[0])
+        strncpyz(session_status.os_version, last_session_status.os_version, sizeof(session_status.os_version) - 1);
+    if(!session_status.os_id[0] && last_session_status.os_id[0])
+        strncpyz(session_status.os_id, last_session_status.os_id, sizeof(session_status.os_id) - 1);
+    if(!session_status.os_id_like[0] && last_session_status.os_id_like[0])
+        strncpyz(session_status.os_id_like, last_session_status.os_id_like, sizeof(session_status.os_id_like) - 1);
     if(!session_status.restarts)
         session_status.restarts = last_session_status.restarts + 1;
 
@@ -432,12 +432,16 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         }
     }
 
-    if(!session_status.install_type) {
+    if(!session_status.install_type[0]) {
         char *install_type = NULL, *prebuilt_arch = NULL, *prebuilt_dist = NULL;
         get_install_type_internal(&install_type, &prebuilt_arch, &prebuilt_dist);
+
+        if(install_type)
+            strncpyz(session_status.install_type, install_type, sizeof(session_status.install_type) - 1);
+
         freez(prebuilt_arch);
         freez(prebuilt_dist);
-        session_status.install_type = install_type;
+        freez(install_type);
     }
 
     get_daemon_status_fields_from_system_info(&session_status);
@@ -1013,38 +1017,41 @@ void daemon_status_file_check_crash(void) {
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line) {
     FUNCTION_RUN_ONCE();
 
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
-
     dsf_acquire(session_status);
     spinlock_lock(&session_status.fatal.spinlock);
-
-    // do not check the function, because it may have a startup step in it
-    if(session_status.fatal.filename || session_status.fatal.message || session_status.fatal.errno_str || session_status.fatal.thread[0]) {
-        spinlock_unlock(&session_status.fatal.spinlock);
-        freez((void *)filename);
-        freez((void *)function);
-        freez((void *)message);
-        freez((void *)errno_str);
-        freez((void *)stack_trace);
-        return;
-    }
 
     exit_initiated_add(EXIT_REASON_FATAL);
     strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
 
-    session_status.fatal.filename = filename;
-    freez((char *)session_status.fatal.function); // it may have a startup step
-    session_status.fatal.function = function;
-    session_status.fatal.message = message;
-    session_status.fatal.errno_str = errno_str;
-    strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
-    freez((char *)stack_trace);
-    session_status.fatal.line = line;
+    if(!session_status.fatal.filename[0])
+        strncpyz(session_status.fatal.filename, filename, sizeof(session_status.fatal.filename) - 1);
+
+    if(!session_status.fatal.function[0])
+        strncpyz(session_status.fatal.function, function, sizeof(session_status.fatal.function) - 1);
+
+    if(!session_status.fatal.message[0])
+        strncpyz(session_status.fatal.message, message, sizeof(session_status.fatal.message) - 1);
+
+    if(!session_status.fatal.errno_str[0])
+        strncpyz(session_status.fatal.errno_str, errno_str, sizeof(session_status.fatal.errno_str) - 1);
+
+    if(!session_status.fatal.stack_trace[0])
+        strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
+
+    if(!session_status.fatal.line)
+        session_status.fatal.line = line;
 
     spinlock_unlock(&session_status.fatal.spinlock);
     dsf_release(session_status);
 
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
     daemon_status_file_save(wb, &session_status, false);
+
+    freez((void *)filename);
+    freez((void *)function);
+    freez((void *)message);
+    freez((void *)errno_str);
+    freez((void *)stack_trace);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1110,30 +1117,27 @@ bool daemon_status_file_was_incomplete_shutdown(void) {
 // startup and shutdown steps
 
 void daemon_status_file_startup_step(const char *step) {
-    if(session_status.fatal.filename)
+    if(session_status.fatal.filename[0])
         // we have a fatal logged
         return;
 
-    freez((char *)session_status.fatal.function);
-    session_status.fatal.function = step ? strdupz(step) : NULL;
     if(step != NULL)
-        daemon_status_file_update_status(DAEMON_STATUS_NONE);
+        strncpyz(session_status.fatal.function, step, sizeof(session_status.fatal.function) - 1);
+    else
+        session_status.fatal.function[0] = '\0';
+
+    daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
 
 void daemon_status_file_shutdown_step(const char *step) {
-    if(session_status.fatal.filename)
+    if(session_status.fatal.filename[0])
         // we have a fatal logged
         return;
 
-    freez((char *)session_status.fatal.function);
-    if(!step)
-        session_status.fatal.function = NULL;
-
-    else {
-        char buf[1024];
-        snprintfz(buf, sizeof(buf), "shutdown(%s)", step);
-        session_status.fatal.function = strdupz(buf);
-    }
+    if(step != NULL)
+        snprintfz(session_status.fatal.function, sizeof(session_status.fatal.function), "shutdown(%s)", step);
+    else
+        session_status.fatal.function[0] = '\0';
 
     daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
