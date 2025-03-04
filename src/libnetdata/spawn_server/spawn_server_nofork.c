@@ -835,8 +835,8 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
     close(server->pipe[0]); server->pipe[0] = -1;
 
     signals_block_all();
-    signals_unblock_one(SIGTERM);
-    signals_unblock_one(SIGCHLD);
+    int wanted_signals[] = {SIGTERM, SIGCHLD};
+    signals_unblock(wanted_signals, _countof(wanted_signals));
 
     // Set up the signal handler for SIGCHLD and SIGTERM
     struct sigaction sa;

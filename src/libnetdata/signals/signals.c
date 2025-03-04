@@ -2,25 +2,6 @@
 
 #include "../libnetdata.h"
 
-// Mask all signals, to ensure they will only be unmasked at the threads that can handle them.
-// This means that all third party libraries (including libuv) cannot use signals anymore.
-// The signals they are interested must be unblocked at their corresponding event loops.
-void signals_block_all_except_deadly(void) {
-    sigset_t sigset;
-    sigfillset(&sigset);
-
-    // Don't mask fatal signals - we want these to be handled in any thread
-    sigdelset(&sigset, SIGBUS);
-    sigdelset(&sigset, SIGSEGV);
-    sigdelset(&sigset, SIGFPE);
-    sigdelset(&sigset, SIGILL);
-    sigdelset(&sigset, SIGABRT);
-
-    if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "SIGNALS: cannot apply the default mask for signals");
-}
-
 void signals_block_all(void) {
     sigset_t sigset;
     sigfillset(&sigset);
@@ -38,4 +19,24 @@ void signals_unblock_one(int signo) {
     if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SIGNALS: cannot unmask signal %d", signo);
+}
+
+void signals_unblock(int signals[], size_t count) {
+    sigset_t sigset;
+    sigemptyset(&sigset);  // Initialize the signal set to empty
+
+    // Add each signal from the array to the signal set
+    for (size_t i = 0; i < count; i++)
+        sigaddset(&sigset, signals[i]);
+
+    // Unblock all signals in the set
+    if (pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SIGNALS: cannot unmask signals");
+}
+
+void signals_block_all_except_deadly(void) {
+    signals_block_all();
+
+    int deadly_signals[] = {SIGBUS, SIGSEGV, SIGFPE, SIGILL, SIGABRT};
+    signals_unblock(deadly_signals, _countof(deadly_signals));
 }

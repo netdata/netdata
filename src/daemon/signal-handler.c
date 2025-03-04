@@ -94,6 +94,8 @@ static void posix_unmask_my_signals(void) {
 }
 
 void nd_initialize_signals(void) {
+    signals_block_all_except_deadly();
+
     // Catch signals which we want to use
     struct sigaction sa;
     sa.sa_flags = 0;
