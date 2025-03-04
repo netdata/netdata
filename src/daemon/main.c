@@ -794,6 +794,10 @@ int netdata_main(int argc, char **argv) {
 
     nd_profile_setup();
 
+    // block all signals except the deadly ones
+    // we need the deadly ones for the status file
+    signals_block_all_except_deadly();
+
     // status and crash/update/exit detection
     exit_initiated_reset();
     daemon_status_file_check_crash();

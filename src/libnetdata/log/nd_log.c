@@ -518,7 +518,7 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     snprintfz(action_result, 60, "%s:%s:%s", program_name, tag_to_send, function);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    // abort();
+    abort();
 #endif
 
     if(nd_log.fatal_final_cb)

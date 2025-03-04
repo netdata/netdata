@@ -8,6 +8,7 @@ extern "C" {
 # endif
 
 #include "common.h"
+#include "signals/signals.h"
 #include "memory/alignment.h"
 #include "memory/nd-mallocz.h"
 #include "memory/nd-mmap.h"

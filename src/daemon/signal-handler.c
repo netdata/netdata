@@ -80,25 +80,6 @@ static void signal_handler(int signo) {
     __atomic_sub_fetch(&recurse, 1, __ATOMIC_RELAXED);
 }
 
-
-// Mask all signals, to ensure they will only be unmasked at the threads that can handle them.
-// This means that all third party libraries (including libuv) cannot use signals anymore.
-// The signals they are interested must be unblocked at their corresponding event loops.
-static void posix_signals_default_mask(void) {
-    sigset_t sigset;
-    sigfillset(&sigset);
-
-    // Don't mask fatal signals - we want these to be handled in any thread
-    sigdelset(&sigset, SIGBUS);
-    sigdelset(&sigset, SIGSEGV);
-    sigdelset(&sigset, SIGFPE);
-    sigdelset(&sigset, SIGILL);
-    sigdelset(&sigset, SIGABRT);
-
-    if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
-        netdata_log_error("SIGNAL: cannot apply the default mask for signals");
-}
-
 // Unmask all signals the netdata main signal handler uses.
 // All other signals remain masked.
 static void posix_unmask_my_signals(void) {
@@ -113,8 +94,6 @@ static void posix_unmask_my_signals(void) {
 }
 
 void nd_initialize_signals(void) {
-    posix_signals_default_mask();
-
     // Catch signals which we want to use
     struct sigaction sa;
     sa.sa_flags = 0;
