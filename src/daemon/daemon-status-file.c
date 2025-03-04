@@ -1099,6 +1099,7 @@ void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
     daemon_status_file_save(static_save_buffer, &session_status, false);
 
     if(!session_status.fatal.stack_trace[0]) {
+        buffer_flush(static_save_buffer);
         capture_stack_trace(static_save_buffer);
         strncpyz(session_status.fatal.stack_trace, buffer_tostring(static_save_buffer), sizeof(session_status.fatal.stack_trace) - 1);
         daemon_status_file_save(static_save_buffer, &session_status, false);
