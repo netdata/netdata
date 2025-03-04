@@ -776,6 +776,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     if(!curl)
         return;
 
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
     fprintf(stderr, "DSF: curl_easy_setopt(1)\n");
     curl_easy_setopt(curl, CURLOPT_URL, "https://agent-events.netdata.cloud/agent-events");
     fprintf(stderr, "DSF: curl_easy_setopt(2)\n");
@@ -1050,7 +1051,8 @@ void daemon_status_file_check_crash(void) {
         d->msg = strdupz(msg);
         d->status = &last_session_status;
         d->priority = pri.post;
-        nd_thread_create("post_status_file", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_DEFAULT, post_status_file_thread, d);
+        post_status_file_thread(d);
+        // nd_thread_create("post_status_file", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_DEFAULT, post_status_file_thread, d);
     }
 }
 
