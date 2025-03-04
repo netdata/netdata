@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 8
+#define STATUS_FILE_VERSION 9
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -38,7 +38,7 @@ ENUM_STR_MAP_DEFINE(DAEMON_OS_TYPE) = {
 ENUM_STR_DEFINE_FUNCTIONS(DAEMON_OS_TYPE, DAEMON_OS_TYPE_UNKNOWN, "unknown");
 
 static DAEMON_STATUS_FILE last_session_status = {
-    .v = STATUS_FILE_VERSION,
+    .v = 0,
     .spinlock = SPINLOCK_INITIALIZER,
     .fatal = {
         .spinlock = SPINLOCK_INITIALIZER,
@@ -517,8 +517,7 @@ static bool load_status_file(const char *filename, DAEMON_STATUS_FILE *status) {
     return json_parse_payload_or_error(wb, error, daemon_status_file_from_json, status) == HTTP_RESP_OK;
 }
 
-DAEMON_STATUS_FILE daemon_status_file_load(void) {
-    DAEMON_STATUS_FILE status = {0};
+void daemon_status_file_load(DAEMON_STATUS_FILE *ds) {
     char newest_filename[FILENAME_MAX] = "";
     char current_filename[FILENAME_MAX];
     time_t newest_mtime = 0, current_mtime;
@@ -540,13 +539,11 @@ DAEMON_STATUS_FILE daemon_status_file_load(void) {
 
     // Load the newest file found
     if(*newest_filename) {
-        if(!load_status_file(newest_filename, &status))
+        if(!load_status_file(newest_filename, ds))
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to load newest status file: %s", newest_filename);
     }
     else
         nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
-
-    return status;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -822,7 +819,7 @@ void daemon_status_file_check_crash(void) {
 
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
-    last_session_status = daemon_status_file_load();
+    daemon_status_file_load(&last_session_status);
     daemon_status_file_update_status(DAEMON_STATUS_INITIALIZING);
     struct log_priority pri = PRI_ALL_NORMAL;
 
@@ -846,6 +843,12 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last stopped gracefully, without setting a reason";
                 if(!last_session_status.timestamp_ut)
                     dump_json = false;
+            }
+            else if(is_deadly_signal(last_session_status.exit_reason)) {
+                cause = "deadly signal and exit";
+                msg = "Netdata was last stopped gracefully after receiving a deadly signal";
+                pri = PRI_NETDATA_BUG;
+                post_crash_report = true;
             }
             else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
                      !is_exit_reason_normal(last_session_status.exit_reason)) {
@@ -881,6 +884,12 @@ void daemon_status_file_check_crash(void) {
                 cause = "abnormal power off";
                 msg = "The system was abnormally powered off while Netdata was starting";
                 pri = PRI_USER_SHOULD_FIX;
+            }
+            else if(is_deadly_signal(last_session_status.exit_reason)) {
+                cause = "deadly signal on start";
+                msg = "Netdata was last crashed while starting after receiving a deadly signal";
+                pri = PRI_NETDATA_BUG;
+                post_crash_report = true;
             }
             else if (last_session_status.exit_reason & EXIT_REASON_OUT_OF_MEMORY) {
                 cause = "out of memory";
@@ -926,7 +935,13 @@ void daemon_status_file_check_crash(void) {
             break;
 
         case DAEMON_STATUS_EXITING:
-            if(last_session_status.exit_reason != EXIT_REASON_NONE &&
+            if(is_deadly_signal(last_session_status.exit_reason)) {
+                cause = "deadly signal on exit";
+                msg = "Netdata was last crashed while exiting after receiving a deadly signal";
+                pri = PRI_NETDATA_BUG;
+                post_crash_report = true;
+            }
+            else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
                 !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal on exit";
                 msg = "Netdata was last killed/crashed while exiting after encountering an error";
@@ -960,6 +975,12 @@ void daemon_status_file_check_crash(void) {
                 cause = "out of memory";
                 msg = "Netdata was last crashed because it couldn't allocate memory";
                 pri = PRI_USER_SHOULD_FIX;
+            }
+            else if(is_deadly_signal(last_session_status.exit_reason)) {
+                cause = "deadly signal";
+                msg = "Netdata was last crashed after receiving a deadly signal";
+                pri = PRI_NETDATA_BUG;
+                post_crash_report = true;
             }
             else if (last_session_status.exit_reason != EXIT_REASON_NONE &&
                      !is_exit_reason_normal(last_session_status.exit_reason)) {

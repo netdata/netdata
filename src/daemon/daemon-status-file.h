@@ -86,9 +86,6 @@ typedef struct daemon_status_file {
     } dedup;
 } DAEMON_STATUS_FILE;
 
-// loads the last status saved
-DAEMON_STATUS_FILE daemon_status_file_load(void);
-
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);
 void daemon_status_file_deadly_signal_received(EXIT_REASON reason);
