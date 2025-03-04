@@ -932,7 +932,8 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "%s/anonymous-statistics.sh '%s' '%s' '%s'",
-           netdata_configured_primary_plugins_dir, statistic->action, action_result, action_data);
+           netdata_configured_primary_plugins_dir, statistic->action,
+           action_result ? action_result : "", action_data ? action_data : "");
 
     POPEN_INSTANCE *instance = spawn_popen_run(buffer_tostring(cmd));
     if (instance) {
