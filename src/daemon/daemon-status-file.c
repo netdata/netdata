@@ -818,7 +818,6 @@ void *post_status_file_thread(void *ptr) {
     freez(d);
 
     fprintf(stderr, "DSF: exiting\n");
-    while(true) pause();
     return NULL;
 }
 
