@@ -185,7 +185,7 @@ int help(int exitcode) {
 */
 
 #define delta_startup_time(msg)                                     \
-    {                                                               \
+    do {                                                            \
         usec_t now_ut = now_monotonic_usec();                       \
         if(prev_msg)                                                \
             netdata_log_info("NETDATA STARTUP: in %7llu ms, %s - next: %s", (now_ut - last_ut) / USEC_PER_MS, prev_msg, msg); \
@@ -194,7 +194,7 @@ int help(int exitcode) {
         last_ut = now_ut;                                           \
         prev_msg = msg;                                             \
         daemon_status_file_startup_step("startup(" msg ")");        \
-    }
+    } while(0)
 
 int buffer_unittest(void);
 int pgc_unittest(void);
