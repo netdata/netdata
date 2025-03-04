@@ -795,6 +795,7 @@ int netdata_main(int argc, char **argv) {
     nd_profile_setup();
 
     // status and crash/update/exit detection
+    signals_block_all_except_deadly();
     exit_initiated_reset();
     daemon_status_file_check_crash();
 
