@@ -300,13 +300,16 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     sqlite_close_databases();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
-
-
+    
     // unlink the pid
-    if(pidfile && *pidfile) {
-        if(unlink(pidfile) != 0)
-            netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
-    }
+    if(pidfile && *pidfile && unlink(pidfile) != 0)
+        netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
+
+    // unlink the pipe
+    const char *pipe = daemon_pipename();
+    if(pipe && *pipe && unlink(pipe) != 0)
+        netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
+
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
 
     netdata_ssl_cleanup();
