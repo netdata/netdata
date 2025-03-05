@@ -44,6 +44,7 @@ typedef struct daemon_status_file {
     ND_UUID host_id;            // the machine guid of the agent
     ND_UUID node_id;            // the Netdata Cloud node id of the agent
     ND_UUID claim_id;           // the Netdata Cloud claim id of the agent
+    ND_UUID machine_id;         // the unique machine id of the system
 
     struct {
         usec_t init_started_ut;

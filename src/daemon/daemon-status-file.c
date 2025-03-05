@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 9
+#define STATUS_FILE_VERSION 10
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -129,6 +129,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
     buffer_json_member_add_object(wb, "host"); // ECS
     {
+        buffer_json_member_add_uuid_compact(wb, "id", ds->machine_id.uuid);
         buffer_json_member_add_string_or_empty(wb, "architecture", ds->architecture); // ECS
         buffer_json_member_add_string_or_empty(wb, "virtualization", ds->virtualization); // custom
         buffer_json_member_add_string_or_empty(wb, "container", ds->container); // custom
@@ -136,7 +137,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         buffer_json_member_add_object(wb, "boot"); // ECS
         {
-            buffer_json_member_add_uuid(wb, "id", ds->boot_id.uuid); // ECS
+            buffer_json_member_add_uuid_compact(wb, "id", ds->boot_id.uuid); // ECS
         }
         buffer_json_object_close(wb);
 
@@ -224,6 +225,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v3 = version >= 3 ? strict : false;
     bool required_v4 = version >= 4 ? strict : false;
     bool required_v5 = version >= 5 ? strict : false;
+    bool required_v10 = version >= 10 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -254,6 +256,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
     // Parse host object
     JSONC_PARSE_SUBOBJECT(jobj, path, "host", error, required_v1, {
+        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->machine_id.uuid, error, required_v10);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "architecture", ds->architecture, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "virtualization", ds->virtualization, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "container", ds->container, error, required_v1);
@@ -398,6 +401,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         else
             session_status.host_id = UUID_ZERO;
     }
+
+    if(UUIDiszero(session_status.machine_id))
+        session_status.machine_id = os_machine_id();
 
     // copy items from the old status if they are not set
     if(UUIDiszero(session_status.claim_id))

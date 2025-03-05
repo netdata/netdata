@@ -1068,6 +1068,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/mmap_limit.h
         src/libnetdata/signals/signals.c
         src/libnetdata/signals/signals.h
+        src/libnetdata/os/machine_id.c
+        src/libnetdata/os/machine_id.h
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
