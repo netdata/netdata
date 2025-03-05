@@ -902,6 +902,7 @@ int netdata_main(int argc, char **argv) {
 
     delta_startup_time("web server sockets");
     if(web_server_mode != WEB_SERVER_MODE_NONE) {
+        errno_clear();
         if (!api_listen_sockets_setup()) {
             exit_initiated_add(EXIT_REASON_ALREADY_RUNNING);
             daemon_status_file_update_status(DAEMON_STATUS_NONE);
