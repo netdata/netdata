@@ -731,30 +731,51 @@ static void validate_page_log(nd_uuid_t *uuid,
         );
     }
     else {
-        const char *err_valid = "";
-        const char *err_start = (vd.start_time_s == start_time_s) ? "" : "start time updated, ";
-        const char *err_end = (vd.end_time_s == end_time_s) ? "" : "end time updated, ";
-        const char *err_update = (vd.update_every_s == update_every_s) ? "" : "update every updated, ";
-        const char *err_length = (vd.page_length == page_length) ? "" : "page length updated, ";
-        const char *err_entries = (vd.entries == entries) ? "" : "entries updated, ";
-        const char *err_future = (now_s && vd.end_time_s <= now_s) ? "" : "future end time, ";
+        CLEAN_BUFFER *log = buffer_create(0, NULL);
+
+        buffer_strcat(log, "DBENGINE: metric '");
+        buffer_strcat(log, uuid_str);
+        buffer_strcat(log, "' ");
+        buffer_strcat(log, msg ? msg : "");
+        buffer_strcat(log, " page of type ");
+        buffer_print_uint64(log, vd.type);
+        buffer_strcat(log, " from ");
+        buffer_print_int64(log, vd.start_time_s);
+        buffer_strcat(log, " to ");
+        buffer_print_int64(log, vd.end_time_s);
+        buffer_strcat(log, " (now ");
+        buffer_print_int64(log, now_s);
+        buffer_strcat(log, "), update every ");
+        buffer_print_uint64(log, vd.update_every_s);
+        buffer_strcat(log, ", page length ");
+        buffer_print_uint64(log, vd.page_length);
+        buffer_strcat(log, ", entries ");
+        buffer_print_uint64(log, vd.entries);
+        buffer_strcat(log, " (flags: ");
+        buffer_strcat(log, wb ? buffer_tostring(wb) : "");
+        buffer_strcat(log, ")");
+        buffer_strcat(log, "found inconsistent - the right is ");
+        buffer_print_int64(log, vd.start_time_s);
+        buffer_strcat(log, " to ");
+        buffer_print_int64(log, vd.end_time_s);
+        buffer_strcat(log, ", update every ");
+        buffer_print_uint64(log, vd.update_every_s);
+        buffer_strcat(log, ", page length ");
+        buffer_print_uint64(log, vd.page_length);
+        buffer_strcat(log, ", entries ");
+        buffer_print_uint64(log, vd.entries);
+        buffer_strcat(log, (vd.start_time_s == start_time_s) ? "" : "start time updated, ");
+        buffer_strcat(log, (vd.end_time_s == end_time_s) ? "" : "end time updated, ");
+        buffer_strcat(log, (vd.update_every_s == update_every_s) ? "" : "update every updated, ");
+        buffer_strcat(log, (vd.page_length == page_length) ? "" : "page length updated, ");
+        buffer_strcat(log, (vd.entries == entries) ? "" : "entries updated, ");
+        buffer_strcat(log, (now_s && vd.end_time_s <= now_s) ? "" : "future end time, ");
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        internal_error(true,
+        internal_error(true, "%s", buffer_tostring(log));
 #else
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "%s", buffer_tostring(log));
 #endif
-                       "DBENGINE: metric '%s' %s page of type %u "
-                       "from %ld to %ld (now %ld), update every %u, page length %zu, entries %zu (flags: %s), "
-                       "found inconsistent - the right is "
-                       "from %ld to %ld, update every %u, page length %zu, entries %zu: "
-                       "%s%s%s%s%s%s%s",
-                       uuid_str, msg ? msg : "", (unsigned)vd.type,
-                       (long)start_time_s, (long)end_time_s, (long)now_s, (unsigned)update_every_s,
-                       (unsigned)page_length, (size_t)entries, wb?buffer_tostring(wb):"",
-                       (long)vd.start_time_s, (long)vd.end_time_s, (unsigned)vd.update_every_s, (size_t)vd.page_length, (size_t)vd.entries,
-                       err_valid, err_start, err_end, err_update, err_length, err_entries, err_future
-        );
     }
 }
 
