@@ -182,11 +182,13 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     usec_t shutdown_start_time = now_monotonic_usec();
     watcher_shutdown_begin();
 
-#ifdef ENABLE_DBENGINE
-    if(!ret && dbengine_enabled)
-        // flush all dirty pages asap
-        rrdeng_flush_everything_and_wait(false, false);
-#endif
+    // we cannot call this here, because we get a fatal
+    // that points are appended to pages not created by a collector
+//#ifdef ENABLE_DBENGINE
+//    if(!ret && dbengine_enabled)
+//        // flush all dirty pages asap
+//        rrdeng_flush_everything_and_wait(false, false);
+//#endif
 
     // send the stat from our caller
     analytics_statistic_t statistic = { action, action_result, action_data };
