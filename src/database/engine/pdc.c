@@ -695,7 +695,92 @@ ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct 
             "loaded", 0);
 }
 
-ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_page(
+static void validate_page_log(nd_uuid_t *uuid,
+                              time_t start_time_s,
+                              time_t end_time_s,
+                              uint32_t update_every_s,
+                              size_t page_length,
+                              size_t entries,
+                              time_t now_s,
+                              const char *msg,
+                              RRDENG_COLLECT_PAGE_FLAGS flags,
+                              VALIDATED_PAGE_DESCRIPTOR vd) {
+#ifndef NETDATA_INTERNAL_CHECKS
+    nd_log_limit_static_global_var(erl, 1, 0);
+#endif
+    char uuid_str[UUID_STR_LEN + 1];
+    uuid_unparse(*uuid, uuid_str);
+
+    CLEAN_BUFFER *wb = NULL; // will be automatically freed on function exit
+
+    if(flags) {
+        wb = buffer_create(0, NULL);
+        collect_page_flags_to_buffer(wb, flags);
+    }
+
+    if(!vd.is_valid) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        internal_error(true,
+#else
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+#endif
+                       "DBENGINE: metric '%s' %s invalid page of type %u "
+                       "from %ld to %ld (now %ld), update every %u, page length %zu, entries %zu (flags: %s)",
+                       uuid_str, msg, (unsigned)vd.type,
+                       (long)vd.start_time_s, (long)vd.end_time_s, (long)now_s, (unsigned)vd.update_every_s, (size_t)vd.page_length, (size_t)vd.entries, wb?buffer_tostring(wb):""
+        );
+    }
+    else {
+        CLEAN_BUFFER *log = buffer_create(0, NULL);
+
+        buffer_strcat(log, "DBENGINE: metric '");
+        buffer_strcat(log, uuid_str);
+        buffer_strcat(log, "' ");
+        buffer_strcat(log, msg ? msg : "");
+        buffer_strcat(log, " page of type ");
+        buffer_print_uint64(log, vd.type);
+        buffer_strcat(log, " from ");
+        buffer_print_int64(log, vd.start_time_s);
+        buffer_strcat(log, " to ");
+        buffer_print_int64(log, vd.end_time_s);
+        buffer_strcat(log, " (now ");
+        buffer_print_int64(log, now_s);
+        buffer_strcat(log, "), update every ");
+        buffer_print_uint64(log, vd.update_every_s);
+        buffer_strcat(log, ", page length ");
+        buffer_print_uint64(log, vd.page_length);
+        buffer_strcat(log, ", entries ");
+        buffer_print_uint64(log, vd.entries);
+        buffer_strcat(log, " (flags: ");
+        buffer_strcat(log, wb ? buffer_tostring(wb) : "");
+        buffer_strcat(log, ")");
+        buffer_strcat(log, "found inconsistent - the right is ");
+        buffer_print_int64(log, vd.start_time_s);
+        buffer_strcat(log, " to ");
+        buffer_print_int64(log, vd.end_time_s);
+        buffer_strcat(log, ", update every ");
+        buffer_print_uint64(log, vd.update_every_s);
+        buffer_strcat(log, ", page length ");
+        buffer_print_uint64(log, vd.page_length);
+        buffer_strcat(log, ", entries ");
+        buffer_print_uint64(log, vd.entries);
+        buffer_strcat(log, (vd.start_time_s == start_time_s) ? "" : "start time updated, ");
+        buffer_strcat(log, (vd.end_time_s == end_time_s) ? "" : "end time updated, ");
+        buffer_strcat(log, (vd.update_every_s == update_every_s) ? "" : "update every updated, ");
+        buffer_strcat(log, (vd.page_length == page_length) ? "" : "page length updated, ");
+        buffer_strcat(log, (vd.entries == entries) ? "" : "entries updated, ");
+        buffer_strcat(log, (now_s && vd.end_time_s <= now_s) ? "" : "future end time, ");
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        internal_error(true, "%s", buffer_tostring(log));
+#else
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "%s", buffer_tostring(log));
+#endif
+    }
+}
+
+ALWAYS_INLINE
+VALIDATED_PAGE_DESCRIPTOR validate_page(
         nd_uuid_t *uuid,
         time_t start_time_s,
         time_t end_time_s,
@@ -804,60 +889,8 @@ ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_page(
         }
     }
 
-    if(unlikely(!vd.is_valid || updated)) {
-#ifndef NETDATA_INTERNAL_CHECKS
-        nd_log_limit_static_global_var(erl, 1, 0);
-#endif
-        char uuid_str[UUID_STR_LEN + 1];
-        uuid_unparse(*uuid, uuid_str);
-
-        BUFFER *wb = NULL;
-
-        if(flags) {
-            wb = buffer_create(0, NULL);
-            collect_page_flags_to_buffer(wb, flags);
-        }
-
-        if(!vd.is_valid) {
-#ifdef NETDATA_INTERNAL_CHECKS
-            internal_error(true,
-#else
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-#endif
-                        "DBENGINE: metric '%s' %s invalid page of type %u "
-                        "from %ld to %ld (now %ld), update every %u, page length %zu, entries %zu (flags: %s)",
-                        uuid_str, msg, vd.type,
-                        vd.start_time_s, vd.end_time_s, now_s, vd.update_every_s, vd.page_length, vd.entries, wb?buffer_tostring(wb):""
-            );
-        }
-        else {
-            const char *err_valid = "";
-            const char *err_start = (vd.start_time_s == start_time_s) ? "" : "start time updated, ";
-            const char *err_end = (vd.end_time_s == end_time_s) ? "" : "end time updated, ";
-            const char *err_update = (vd.update_every_s == update_every_s) ? "" : "update every updated, ";
-            const char *err_length = (vd.page_length == page_length) ? "" : "page length updated, ";
-            const char *err_entries = (vd.entries == entries) ? "" : "entries updated, ";
-            const char *err_future = (now_s && vd.end_time_s <= now_s) ? "" : "future end time, ";
-
-#ifdef NETDATA_INTERNAL_CHECKS
-            internal_error(true,
-#else
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-#endif
-                        "DBENGINE: metric '%s' %s page of type %u "
-                        "from %ld to %ld (now %ld), update every %u, page length %zu, entries %zu (flags: %s), "
-                        "found inconsistent - the right is "
-                        "from %ld to %ld, update every %u, page length %zu, entries %zu: "
-                        "%s%s%s%s%s%s%s",
-                        uuid_str, msg, vd.type,
-                        start_time_s, end_time_s, now_s, update_every_s, page_length, entries, wb?buffer_tostring(wb):"",
-                        vd.start_time_s, vd.end_time_s, vd.update_every_s, vd.page_length, vd.entries,
-                        err_valid, err_start, err_end, err_update, err_length, err_entries, err_future
-            );
-        }
-
-        buffer_free(wb);
-    }
+    if(unlikely(!vd.is_valid || updated))
+        validate_page_log(uuid, start_time_s, end_time_s, update_every_s, page_length, entries, now_s, msg, flags, vd);
 
     return vd;
 }
