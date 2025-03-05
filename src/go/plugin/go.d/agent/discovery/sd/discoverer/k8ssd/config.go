@@ -8,6 +8,8 @@ import (
 )
 
 type Config struct {
+	Source string `yaml:"-"`
+
 	APIServer  string   `yaml:"api_server"` // TODO: not used
 	Role       string   `yaml:"role"`
 	Tags       string   `yaml:"tags"`

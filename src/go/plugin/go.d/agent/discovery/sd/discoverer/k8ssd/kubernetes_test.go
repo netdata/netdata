@@ -137,6 +137,7 @@ func prepareDiscoverer(role role, namespaces []string, objects ...runtime.Object
 	client := fake.NewClientset(objects...)
 	tags, _ := model.ParseTags("k8s")
 	disc := &KubeDiscoverer{
+		cfgSource:   "test=test",
 		tags:        tags,
 		role:        role,
 		namespaces:  namespaces,
