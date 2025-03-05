@@ -819,35 +819,43 @@ stop_all_netdata() {
     if [ -n "${NETDATA_STOP_CMD}" ]; then
       if ${NETDATA_STOP_CMD}; then
         stop_success=1
-        sleep 5
       fi
     elif issystemd; then
       if systemctl stop netdata; then
         stop_success=1
-        sleep 5
       fi
     elif [ "${uname}" = "Darwin" ]; then
       if launchctl stop netdata; then
         stop_success=1
-        sleep 5
       fi
     elif [ "${uname}" = "FreeBSD" ]; then
       if /etc/rc.d/netdata stop; then
         stop_success=1
-        sleep 5
       fi
     else
       if service netdata stop; then
         stop_success=1
-        sleep 5
       fi
+    fi
+  fi
+
+  if [ "${stop_success}" = "1" ]; then
+    sleep 30
+
+    if [ -n "$(netdata_pids)" ]; then
+      stop_success=0
     fi
   fi
 
   if [ "$stop_success" = "0" ]; then
     if [ -n "$(netdata_pids)" ] && [ -n "$(command -v netdatacli)" ]; then
-      netdatacli shutdown-agent
-      sleep 20
+      for p in /tmp/netdata-ipc /run/netdata/netdata.pipe /var/run/netdata/netdata.pipe /tmp/netdata/netdata.pipe; do
+        if [ -f "${p}" ]; then
+          NETDATA_PIPENAME="${p}" netdatacli shutdown-agent && break
+        fi
+      done
+
+      sleep 30
     fi
 
     for p in $(netdata_pids); do
