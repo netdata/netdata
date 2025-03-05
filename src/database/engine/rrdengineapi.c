@@ -1294,14 +1294,18 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     return 0;
 }
 
-void rrdeng_quiesce(struct rrdengine_instance *ctx) {
+void rrdeng_quiesce(struct rrdengine_instance *ctx, bool dirty_only)
+{
     if (NULL == ctx)
         return;
 
     // FIXME - ktsaou - properly cleanup ctx
     // 1. make sure all collectors are stopped
 
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    if (dirty_only)
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_FLUSH_DIRTY, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    else
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)

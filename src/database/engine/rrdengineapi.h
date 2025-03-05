@@ -74,7 +74,7 @@ int rrdeng_init(
 void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
 
 int rrdeng_exit(struct rrdengine_instance *ctx);
-void rrdeng_quiesce(struct rrdengine_instance *ctx);
+void rrdeng_quiesce(struct rrdengine_instance *ctx, bool dirty_only);
 
 bool rrdeng_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s);
 bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);

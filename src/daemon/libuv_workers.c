@@ -47,6 +47,7 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_DBENGINE_EVICT_OPEN_CACHE, "evict open");
     worker_register_job_name(UV_EVENT_DBENGINE_EVICT_EXTENT_CACHE, "evict extent");
     worker_register_job_name(UV_EVENT_DBENGINE_BUFFERS_CLEANUP, "dbengine buffers cleanup");
+    worker_register_job_name(UV_EVENT_DBENGINE_FLUSH_DIRTY, "dbengine flush dirty");
     worker_register_job_name(UV_EVENT_DBENGINE_QUIESCE, "dbengine quiesce");
     worker_register_job_name(UV_EVENT_DBENGINE_SHUTDOWN, "dbengine shutdown");
 

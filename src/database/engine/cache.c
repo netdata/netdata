@@ -2075,6 +2075,10 @@ struct aral_statistics *pgc_aral_stats(void) {
     return &pgc_aral_statistics;
 }
 
+void pgc_flush_dirty_pages(PGC *cache, Word_t section) {
+    flush_pages(cache, 0, section, true, true);
+}
+
 void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {
     all_hot_pages_to_dirty(cache, section);
 
