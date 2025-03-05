@@ -13,6 +13,8 @@ import (
 
 type (
 	Config struct {
+		Source string `yaml:"-"`
+
 		// RescanInterval defines how often to scan the networks for devices (default: 30m)
 		RescanInterval *confopt.Duration `yaml:"rescan_interval"`
 		// Timeout defines the maximum time to wait for SNMP device responses (default: 1s)

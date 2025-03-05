@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package kubernetes
+package k8ssd
 
 import (
 	"fmt"
@@ -137,6 +137,7 @@ func prepareDiscoverer(role role, namespaces []string, objects ...runtime.Object
 	client := fake.NewClientset(objects...)
 	tags, _ := model.ParseTags("k8s")
 	disc := &KubeDiscoverer{
+		cfgSource:   "test=test",
 		tags:        tags,
 		role:        role,
 		namespaces:  namespaces,

@@ -185,7 +185,7 @@ int help(int exitcode) {
 */
 
 #define delta_startup_time(msg)                                     \
-    {                                                               \
+    do {                                                            \
         usec_t now_ut = now_monotonic_usec();                       \
         if(prev_msg)                                                \
             netdata_log_info("NETDATA STARTUP: in %7llu ms, %s - next: %s", (now_ut - last_ut) / USEC_PER_MS, prev_msg, msg); \
@@ -194,7 +194,7 @@ int help(int exitcode) {
         last_ut = now_ut;                                           \
         prev_msg = msg;                                             \
         daemon_status_file_startup_step("startup(" msg ")");        \
-    }
+    } while(0)
 
 int buffer_unittest(void);
 int pgc_unittest(void);
@@ -795,6 +795,7 @@ int netdata_main(int argc, char **argv) {
     nd_profile_setup();
 
     // status and crash/update/exit detection
+    signals_block_all_except_deadly();
     exit_initiated_reset();
     daemon_status_file_check_crash();
 
@@ -901,6 +902,7 @@ int netdata_main(int argc, char **argv) {
 
     delta_startup_time("web server sockets");
     if(web_server_mode != WEB_SERVER_MODE_NONE) {
+        errno_clear();
         if (!api_listen_sockets_setup()) {
             exit_initiated_add(EXIT_REASON_ALREADY_RUNNING);
             daemon_status_file_update_status(DAEMON_STATUS_NONE);

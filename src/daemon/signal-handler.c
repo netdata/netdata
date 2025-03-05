@@ -9,7 +9,7 @@ typedef enum signal_action {
     NETDATA_SIGNAL_EXIT_CLEANLY,
     NETDATA_SIGNAL_REOPEN_LOGS,
     NETDATA_SIGNAL_RELOAD_HEALTH,
-    NETDATA_SIGNAL_FATAL,
+    NETDATA_SIGNAL_DEADLY,
 } SIGNAL_ACTION;
 
 static struct {
@@ -25,10 +25,11 @@ static struct {
     { SIGTERM, "SIGTERM", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGTERM },
     { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS, EXIT_REASON_NONE },
     { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH, EXIT_REASON_NONE },
-    { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_FATAL, EXIT_REASON_SIGBUS },
-    { SIGSEGV, "SIGSEGV", 0, NETDATA_SIGNAL_FATAL, EXIT_REASON_SIGSEGV },
-    { SIGFPE,  "SIGFPE",  0, NETDATA_SIGNAL_FATAL, EXIT_REASON_SIGFPE },
-    { SIGILL,  "SIGILL",  0, NETDATA_SIGNAL_FATAL, EXIT_REASON_SIGILL },
+    { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGBUS },
+    { SIGSEGV, "SIGSEGV", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSEGV },
+    { SIGFPE,  "SIGFPE",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGFPE },
+    { SIGILL,  "SIGILL",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGILL },
+    { SIGABRT, "SIGABRT", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGABRT },
 
     // terminator
     { 0,       "NONE",    0, NETDATA_SIGNAL_END_OF_LIST, 0   }
@@ -46,7 +47,7 @@ static void signal_handler(int signo) {
         if(unlikely(signals_waiting[i].signo == signo)) {
             signals_waiting[i].count++;
 
-            if(signals_waiting[i].action == NETDATA_SIGNAL_FATAL) {
+            if(signals_waiting[i].action == NETDATA_SIGNAL_DEADLY) {
                 // Update the status file
                 daemon_status_file_deadly_signal_received(signals_waiting[i].reason);
 
@@ -61,6 +62,7 @@ static void signal_handler(int signo) {
                 }
 
                 // Reset the signal's disposition to the default handler.
+
                 struct sigaction sa;
                 sa.sa_handler = SIG_DFL;
                 sigemptyset(&sa.sa_mask);
@@ -78,24 +80,6 @@ static void signal_handler(int signo) {
     __atomic_sub_fetch(&recurse, 1, __ATOMIC_RELAXED);
 }
 
-
-// Mask all signals, to ensure they will only be unmasked at the threads that can handle them.
-// This means that all third party libraries (including libuv) cannot use signals anymore.
-// The signals they are interested must be unblocked at their corresponding event loops.
-static void posix_signals_default_mask(void) {
-    sigset_t sigset;
-    sigfillset(&sigset);
-
-    // Don't mask fatal signals - we want these to be handled in any thread
-    sigdelset(&sigset, SIGBUS);
-    sigdelset(&sigset, SIGSEGV);
-    sigdelset(&sigset, SIGFPE);
-    sigdelset(&sigset, SIGILL);
-
-    if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
-        netdata_log_error("SIGNAL: cannot apply the default mask for signals");
-}
-
 // Unmask all signals the netdata main signal handler uses.
 // All other signals remain masked.
 static void posix_unmask_my_signals(void) {
@@ -110,7 +94,7 @@ static void posix_unmask_my_signals(void) {
 }
 
 void nd_initialize_signals(void) {
-    posix_signals_default_mask();
+    signals_block_all_except_deadly();
 
     // Catch signals which we want to use
     struct sigaction sa;
@@ -184,10 +168,10 @@ void nd_process_signals(void) {
                                 exit(0);
                                 break;
 
-                            case NETDATA_SIGNAL_FATAL:
+                            case NETDATA_SIGNAL_DEADLY:
                                 nd_log_limits_unlimited();
                                 daemon_status_file_deadly_signal_received(signals_waiting[i].reason);
-                                fatal("SIGNAL: Received %s. netdata now exits.", name);
+                                _exit(1);
                                 break;
 
                             default:

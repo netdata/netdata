@@ -106,7 +106,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
     if(!pgc_hot_and_dirty_entries(main_cache))
         return;
 
-    nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE dirty pages...");
+    nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE hot & dirty pages...");
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
         rrdeng_quiesce(multidb_ctx[tier]);
 
@@ -300,13 +300,16 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     sqlite_close_databases();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
-
-
+    
     // unlink the pid
-    if(pidfile && *pidfile) {
-        if(unlink(pidfile) != 0)
-            netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
-    }
+    if(pidfile && *pidfile && unlink(pidfile) != 0)
+        netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
+
+    // unlink the pipe
+    const char *pipe = daemon_pipename();
+    if(pipe && *pipe && unlink(pipe) != 0)
+        netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
+
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
 
     netdata_ssl_cleanup();

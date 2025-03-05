@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package kubernetes
+package k8ssd
 
 import (
 	"errors"
@@ -8,6 +8,8 @@ import (
 )
 
 type Config struct {
+	Source string `yaml:"-"`
+
 	APIServer  string   `yaml:"api_server"` // TODO: not used
 	Role       string   `yaml:"role"`
 	Tags       string   `yaml:"tags"`

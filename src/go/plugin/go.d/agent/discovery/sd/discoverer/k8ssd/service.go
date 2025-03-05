@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package kubernetes
+package k8ssd
 
 import (
 	"context"
@@ -22,9 +22,10 @@ type serviceTargetGroup struct {
 	source  string
 }
 
-func (s serviceTargetGroup) Provider() string        { return "sd:k8s:service" }
-func (s serviceTargetGroup) Source() string          { return s.source }
-func (s serviceTargetGroup) Targets() []model.Target { return s.targets }
+func (s *serviceTargetGroup) Provider() string        { return "sd:k8s:service" }
+func (s *serviceTargetGroup) Source() string          { return s.source }
+func (s *serviceTargetGroup) Targets() []model.Target { return s.targets }
+func (s *serviceTargetGroup) setSource(src string)    { s.source = src }
 
 type ServiceTarget struct {
 	model.Base `hash:"ignore"`

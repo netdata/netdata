@@ -901,7 +901,7 @@ ALWAYS_INLINE_HOT STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_qu
     pgdc_get_next_point(&handle->pgdc, handle->position, &sp);
 
 prepare_for_next_iteration:
-    internal_fatal(sp.end_time_s < seqh->start_time_s, "DBENGINE: this point is too old for this query");
+    // internal_fatal(sp.end_time_s < seqh->start_time_s, "DBENGINE: this point is too old for this query");
     internal_fatal(sp.end_time_s < handle->now_s, "DBENGINE: this point is too old for this point in time");
 
     handle->now_s += handle->dt_s;

@@ -6,11 +6,20 @@
 
 **Merged pull requests:**
 
+- block signals before curl [\#19771](https://github.com/netdata/netdata/pull/19771) ([ktsaou](https://github.com/ktsaou))
+- block all signals before spawning any threads [\#19770](https://github.com/netdata/netdata/pull/19770) ([ktsaou](https://github.com/ktsaou))
+- add handling for sigabrt in the status file [\#19769](https://github.com/netdata/netdata/pull/19769) ([ktsaou](https://github.com/ktsaou))
+- copy fields only when the source is valid [\#19768](https://github.com/netdata/netdata/pull/19768) ([ktsaou](https://github.com/ktsaou))
+- detect crashes during status file processing [\#19767](https://github.com/netdata/netdata/pull/19767) ([ktsaou](https://github.com/ktsaou))
+- post status syncrhonously [\#19766](https://github.com/netdata/netdata/pull/19766) ([ktsaou](https://github.com/ktsaou))
+- fix invalid free [\#19763](https://github.com/netdata/netdata/pull/19763) ([ktsaou](https://github.com/ktsaou))
+- make status file use fixed size character arrays [\#19761](https://github.com/netdata/netdata/pull/19761) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/sd/snmp\): use rescan and cache ttl only when set [\#19760](https://github.com/netdata/netdata/pull/19760) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/nvidia\_smi\): handle xml gpu\_power\_readings change [\#19759](https://github.com/netdata/netdata/pull/19759) ([ilyam8](https://github.com/ilyam8))
 - status file timings per step [\#19758](https://github.com/netdata/netdata/pull/19758) ([ktsaou](https://github.com/ktsaou))
 - improvement\(go.d/sd/snmp\): support device cache ttl 0 [\#19756](https://github.com/netdata/netdata/pull/19756) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/sd/snmp\): comment out  defaults in snmp.conf [\#19755](https://github.com/netdata/netdata/pull/19755) ([ilyam8](https://github.com/ilyam8))
+- Add documentation outlining how to use custom CA certificates with Netdata. [\#19754](https://github.com/netdata/netdata/pull/19754) ([Ferroin](https://github.com/Ferroin))
 - status file version 8 [\#19753](https://github.com/netdata/netdata/pull/19753) ([ktsaou](https://github.com/ktsaou))
 - status file improvements \(dedup and signal handler use\) [\#19751](https://github.com/netdata/netdata/pull/19751) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.3 to 0.2.5 in /src/go [\#19750](https://github.com/netdata/netdata/pull/19750) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -247,7 +256,6 @@
 - Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
 - Start using new GitHub hosted ARM runners for CI when appropriate. [\#19427](https://github.com/netdata/netdata/pull/19427) ([Ferroin](https://github.com/Ferroin))
 - Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
-- Modify eBPF.plugin integration \(Part I\) [\#19219](https://github.com/netdata/netdata/pull/19219) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
@@ -487,15 +495,6 @@
 - ci: replace exit 1 with conditional skip in website update workflow [\#19227](https://github.com/netdata/netdata/pull/19227) ([ilyam8](https://github.com/ilyam8))
 - fix\(ml\): remove logging for earch not acquired dimension [\#19226](https://github.com/netdata/netdata/pull/19226) ([ilyam8](https://github.com/ilyam8))
 - Fix static builds to ensure usability on intended baseline hardware. [\#19224](https://github.com/netdata/netdata/pull/19224) ([Ferroin](https://github.com/Ferroin))
-- add MegaCli64 to ndsudo [\#19223](https://github.com/netdata/netdata/pull/19223) ([ilyam8](https://github.com/ilyam8))
-- removing IP address information. Bumping traefik version [\#19222](https://github.com/netdata/netdata/pull/19222) ([M4itee](https://github.com/M4itee))
-- fix compiler warnings [\#19221](https://github.com/netdata/netdata/pull/19221) ([ktsaou](https://github.com/ktsaou))
-- disable h20 [\#19218](https://github.com/netdata/netdata/pull/19218) ([ilyam8](https://github.com/ilyam8))
-- add pcre2 dev to install-requires-packages.sh [\#19217](https://github.com/netdata/netdata/pull/19217) ([ilyam8](https://github.com/ilyam8))
-- remove ENABLE\_H2O=1 from installer [\#19216](https://github.com/netdata/netdata/pull/19216) ([ilyam8](https://github.com/ilyam8))
-- fix: use setuid as a fallback for static builds when setcap fails for plugins [\#19215](https://github.com/netdata/netdata/pull/19215) ([ilyam8](https://github.com/ilyam8))
-- add dyncfg vnode option to collectors [\#19214](https://github.com/netdata/netdata/pull/19214) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/vmware/govmomi from 0.46.2 to 0.46.3 [\#19213](https://github.com/netdata/netdata/pull/19213) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 

@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 9
+#define STATUS_FILE_VERSION 10
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -129,6 +129,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
     buffer_json_member_add_object(wb, "host"); // ECS
     {
+        buffer_json_member_add_uuid_compact(wb, "id", ds->machine_id.uuid);
         buffer_json_member_add_string_or_empty(wb, "architecture", ds->architecture); // ECS
         buffer_json_member_add_string_or_empty(wb, "virtualization", ds->virtualization); // custom
         buffer_json_member_add_string_or_empty(wb, "container", ds->container); // custom
@@ -136,7 +137,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         buffer_json_member_add_object(wb, "boot"); // ECS
         {
-            buffer_json_member_add_uuid(wb, "id", ds->boot_id.uuid); // ECS
+            buffer_json_member_add_uuid_compact(wb, "id", ds->boot_id.uuid); // ECS
         }
         buffer_json_object_close(wb);
 
@@ -224,6 +225,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v3 = version >= 3 ? strict : false;
     bool required_v4 = version >= 4 ? strict : false;
     bool required_v5 = version >= 5 ? strict : false;
+    bool required_v10 = version >= 10 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -254,6 +256,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
     // Parse host object
     JSONC_PARSE_SUBOBJECT(jobj, path, "host", error, required_v1, {
+        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->machine_id.uuid, error, required_v10);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "architecture", ds->architecture, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "virtualization", ds->virtualization, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "container", ds->container, error, required_v1);
@@ -398,6 +401,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         else
             session_status.host_id = UUID_ZERO;
     }
+
+    if(UUIDiszero(session_status.machine_id))
+        session_status.machine_id = os_machine_id();
 
     // copy items from the old status if they are not set
     if(UUIDiszero(session_status.claim_id))
@@ -819,7 +825,7 @@ void daemon_status_file_check_crash(void) {
     bool post_crash_report = false;
     bool disable_crash_report = false;
     bool dump_json = true;
-    const char *msg, *cause;
+    const char *msg = "", *cause = "";
     switch(last_session_status.status) {
         default:
         case DAEMON_STATUS_NONE:
@@ -1017,12 +1023,13 @@ void daemon_status_file_check_crash(void) {
 
         daemon_status_file_startup_step("startup(post status file)");
 
-        struct post_status_file_thread_data *d = calloc(1, sizeof(*d));
-        d->cause = cause;
-        d->msg = msg;
-        d->status = &last_session_status;
-        d->priority = pri.post;
-        post_status_file(d);
+        struct post_status_file_thread_data d = {
+            .cause = cause,
+            .msg = msg,
+            .status = &last_session_status,
+            .priority = pri.post,
+        };
+        post_status_file(&d);
 
         // MacOS crashes when starting under launchctl, when we create a thread to post the status file,
         // so we post the status file synchronously, with a timeout of 10 seconds.
@@ -1116,7 +1123,8 @@ void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
     // save what we know already
     daemon_status_file_save(static_save_buffer, &session_status, false);
 
-    if(!session_status.fatal.stack_trace[0]) {
+    // we cannot get a stack trace on SIGABRT - it may deadlock forever
+    if(reason != EXIT_REASON_SIGABRT && !session_status.fatal.stack_trace[0]) {
         buffer_flush(static_save_buffer);
         capture_stack_trace(static_save_buffer);
         strncpyz(session_status.fatal.stack_trace, buffer_tostring(static_save_buffer), sizeof(session_status.fatal.stack_trace) - 1);

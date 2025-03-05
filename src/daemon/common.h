@@ -70,7 +70,7 @@ extern "C" {
 #include "daemon.h"
 #include "main.h"
 #include "static_threads.h"
-#include "signals.h"
+#include "signal-handler.h"
 #include "commands.h"
 #include "pipename.h"
 #include "analytics.h"

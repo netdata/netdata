@@ -38,9 +38,10 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 			slog.String("component", "service discovery"),
 			slog.String("discoverer", "snmp"),
 		),
-		started: make(chan struct{}),
-		cfgHash: cfgHash,
-		subnets: subnets,
+		cfgSource: cfg.Source,
+		started:   make(chan struct{}),
+		cfgHash:   cfgHash,
+		subnets:   subnets,
 		newSnmpClient: func() (gosnmp.Handler, func()) {
 			return gosnmp.NewHandler(), func() {}
 		},
@@ -75,8 +76,9 @@ type (
 		*logger.Logger
 		model.Base
 
-		started chan struct{}
-		cfgHash uint64
+		cfgSource string // pipeline configuration source
+		started   chan struct{}
+		cfgHash   uint64
 
 		subnets []subnet
 
@@ -164,6 +166,9 @@ func (d *Discoverer) discoverNetworks(ctx context.Context, in chan<- []model.Tar
 
 func (d *Discoverer) discoverNetwork(ctx context.Context, in chan<- []model.TargetGroup, sub subnet, doProbing bool) {
 	tgg := newTargetGroup(sub)
+	if d.cfgSource != "" {
+		tgg.source += fmt.Sprintf(",%s", d.cfgSource)
+	}
 	p := pool.New().WithMaxGoroutines(d.parallelScansPerNetwork)
 
 	for ip := range sub.ips.Iterate() {
