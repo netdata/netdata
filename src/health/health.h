@@ -109,6 +109,8 @@ void health_shutdown();
 void health_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae);
 void health_queue_ae_deletion(RRDHOST *host, ALARM_ENTRY *ae);
 void health_schedule_ae_save(RRDHOST *host, ALARM_ENTRY *ae);
+void health_pause();
+void health_resume();
 
 void health_load_config_defaults(void);
 

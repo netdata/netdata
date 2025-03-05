@@ -486,6 +486,9 @@ static void process_repeating_alarms(RRDHOST *host, time_t now, struct health_ra
     foreach_rrdcalc_in_rrdhost_done(rc);
 }
 
+SPINLOCK health_log_spinlock;
+SPINLOCK alert_queue_spinlock;
+
 // returns the number of runnable alerts
 static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_run)
 {
@@ -611,15 +614,18 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
         alerts_raised_summary_free(hrm);
     }
 
-
     // Store all transitions
+    spinlock_lock(&health_log_spinlock);
     Word_t Index = 0;
     bool first = true;
     Pvoid_t *Pvalue;
+    db_execute(db_health, "BEGIN TRANSACTION");
     while ((Pvalue = JudyLFirstThenNext(host->health.JudyL_ae, &Index, &first))) {
         ALARM_ENTRY *ae = *Pvalue;
         sql_health_alarm_log_save(host, ae);
     }
+    db_execute(db_health, "COMMIT TRANSACTION");
+    spinlock_unlock(&health_log_spinlock);
     (void) JudyLFreeArray(&host->health.JudyL_ae, PJE0);
 
     // Delete AE as needed
@@ -637,8 +643,14 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
         rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
     } else {
         worker_is_busy(UV_EVENT_HEALTH_JOB_ALARM_LOG_QUEUE);
+        spinlock_lock(&alert_queue_spinlock);
+
+        db_execute(db_aclk, "BEGIN TRANSACTION");
         if (process_alert_pending_queue(host))
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+        db_execute(db_aclk, "COMMIT TRANSACTION");
+
+        spinlock_unlock(&alert_queue_spinlock);
     }
 
     worker_is_idle();
@@ -655,6 +667,8 @@ enum health_opcode {
     HEALTH_HOST_UNREGISTER,
     HEALTH_RUN_JOBS,
     HEALTH_HOST_MAINTENANCE,
+    HEALTH_PAUSE,
+    HEALTH_RESUME,
     HEALTH_SHUTDOWN,
 
     // leave this last
@@ -682,6 +696,7 @@ struct health_config_s {
     uv_timer_t timer_req;
     uv_timer_t timer_ae;
     uv_async_t async;
+    bool paused;
     SPINLOCK cmd_queue_lock;
     struct health_cmd *cmd_base;
     struct job_list_t *job_list[HEALTH_JOB_MAX];
@@ -909,6 +924,7 @@ static void host_evaluate_alerts_job(uv_work_t *req)
     worker_data_t *data = req->data;
     RRDHOST *host = data->payload;
     HEALTH *host_health = &host->health;
+    struct health_config_s *config = data->config;
 
     usec_t start_ut = now_realtime_usec();
     time_t now = start_ut / USEC_PER_SEC;
@@ -937,6 +953,11 @@ static void host_evaluate_alerts_job(uv_work_t *req)
 
     if (host_health->rrdcalc_cleanup_running)
         return;
+
+    if (config->paused) {
+        nd_log_daemon(NDLP_INFO, "HEALTH: Health checks are paused for %s", rrdhost_hostname(host));
+        return;
+        }
 
     // Just reschedule
     if (!stream_control_health_should_be_running())
@@ -1093,6 +1114,9 @@ static void health_ev_loop(void *arg)
     config->ar = aral_by_size_acquire(sizeof(struct health_cmd));
 
     worker_register("HEALTH");
+
+    spinlock_init(&health_log_spinlock);
+    spinlock_init(&alert_queue_spinlock);
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
     worker_register_job_name(HEALTH_NOOP,  "noop");
@@ -1102,6 +1126,8 @@ static void health_ev_loop(void *arg)
     worker_register_job_name(HEALTH_HOST_RUN_LATER,  "host health evaluate");
     worker_register_job_name(HEALTH_HOST_INIT, "host health init");
     worker_register_job_name(HEALTH_RUN_JOBS, "host health run jobs");
+    worker_register_job_name(HEALTH_PAUSE, "health paused");
+    worker_register_job_name(HEALTH_RESUME, "health resumed");
 
     uv_loop_t *loop = &config->loop;
     loop->data = config;
@@ -1228,6 +1254,14 @@ static void health_ev_loop(void *arg)
                     schedule_job_to_run(config, HEALTH_JOB_HOST_MAINT, host);
                     break;
 
+                case HEALTH_PAUSE:
+                    config->paused = true;
+                    break;
+
+                case HEALTH_RESUME:
+                    config->paused = false;
+                    break;
+
                 case HEALTH_SHUTDOWN:
                     is_shutdown = true;
                     break;
@@ -1316,6 +1350,16 @@ void health_host_maintenance(RRDHOST *host)
 void health_run_jobs()
 {
     queue_health_cmd(HEALTH_RUN_JOBS, NULL, NULL);
+}
+
+void health_pause()
+{
+    queue_health_cmd(HEALTH_PAUSE, NULL, NULL);
+}
+
+void health_resume()
+{
+    queue_health_cmd(HEALTH_RESUME, NULL, NULL);
 }
 
 void health_shutdown()
