@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package netlisteners
+package netlistensd
 
 import (
 	"fmt"
