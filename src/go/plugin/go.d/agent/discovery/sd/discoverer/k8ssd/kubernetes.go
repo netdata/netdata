@@ -72,6 +72,7 @@ func NewKubeDiscoverer(cfg Config) (*KubeDiscoverer, error) {
 
 	d := &KubeDiscoverer{
 		Logger:        log,
+		cfgSource:     cfg.Source,
 		client:        client,
 		tags:          tags,
 		role:          role(cfg.Role),
@@ -87,6 +88,8 @@ func NewKubeDiscoverer(cfg Config) (*KubeDiscoverer, error) {
 
 type KubeDiscoverer struct {
 	*logger.Logger
+
+	cfgSource string
 
 	client kubernetes.Interface
 
@@ -157,6 +160,14 @@ func (d *KubeDiscoverer) Discover(ctx context.Context, in chan<- []model.TargetG
 			d.Info("all discoverers exited")
 			return
 		case tggs := <-updates:
+			if d.cfgSource != "" {
+				for _, tgg := range tggs {
+					if v, ok := tgg.(interface{ setSource(string) }); ok {
+						src := fmt.Sprintf("%s,%s", tgg.Source(), d.cfgSource)
+						v.setSource(src)
+					}
+				}
+			}
 			select {
 			case <-ctx.Done():
 			case in <- tggs:

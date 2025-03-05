@@ -43,8 +43,8 @@ func TestServiceTargetGroup_Source(t *testing.T) {
 				}
 			},
 			wantSources: []string{
-				"discoverer=k8s,kind=service,namespace=default,service_name=httpd-cluster-ip-service",
-				"discoverer=k8s,kind=service,namespace=default,service_name=nginx-cluster-ip-service",
+				"discoverer=k8s,kind=service,namespace=default,service_name=httpd-cluster-ip-service,test=test",
+				"discoverer=k8s,kind=service,namespace=default,service_name=nginx-cluster-ip-service,test=test",
 			},
 		},
 	}
@@ -425,7 +425,9 @@ func newNGINXHeadlessService() *corev1.Service {
 }
 
 func prepareEmptySvcTargetGroup(svc *corev1.Service) *serviceTargetGroup {
-	return &serviceTargetGroup{source: serviceSource(svc)}
+	tgg := &serviceTargetGroup{source: serviceSource(svc)}
+	tgg.source += ",test=test"
+	return tgg
 }
 
 func prepareSvcTargetGroup(svc *corev1.Service) *serviceTargetGroup {

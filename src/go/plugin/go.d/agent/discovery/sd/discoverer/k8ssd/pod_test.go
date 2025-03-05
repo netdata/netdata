@@ -44,8 +44,8 @@ func TestPodTargetGroup_Source(t *testing.T) {
 				}
 			},
 			wantSources: []string{
-				"discoverer=k8s,kind=pod,namespace=default,pod_name=httpd-dd95c4d68-5bkwl",
-				"discoverer=k8s,kind=pod,namespace=default,pod_name=nginx-7cfd77469b-q6kxj",
+				"discoverer=k8s,kind=pod,namespace=default,pod_name=httpd-dd95c4d68-5bkwl,test=test",
+				"discoverer=k8s,kind=pod,namespace=default,pod_name=nginx-7cfd77469b-q6kxj,test=test",
 			},
 		},
 	}
@@ -599,7 +599,9 @@ func prepareSecret(name string, data map[string]string) *corev1.Secret {
 }
 
 func prepareEmptyPodTargetGroup(pod *corev1.Pod) *podTargetGroup {
-	return &podTargetGroup{source: podSource(pod)}
+	tgg := &podTargetGroup{source: podSource(pod)}
+	tgg.source += ",test=test"
+	return tgg
 }
 
 func preparePodTargetGroup(pod *corev1.Pod) *podTargetGroup {
