@@ -3029,7 +3029,7 @@ endif()
 #
 
 if(ENABLE_PLUGIN_OTEL)
-  add_subdirectory(${CMAKE_SOURCE_DIR}/src/go/otel-collector)
+  include(${CMAKE_SOURCE_DIR}/src/go/otel-collector/CMakeLists.txt)
 
   install(PROGRAMS ${CMAKE_BINARY_DIR}/otel-collector/otelcol.plugin
           COMPONENT plugin-otelcol
