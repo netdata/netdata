@@ -615,12 +615,10 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
     Word_t Index = 0;
     bool first = true;
     Pvoid_t *Pvalue;
-    db_execute(db_health, "BEGIN TRANSACTION");
     while ((Pvalue = JudyLFirstThenNext(host->health.JudyL_ae, &Index, &first))) {
         ALARM_ENTRY *ae = *Pvalue;
         sql_health_alarm_log_save(host, ae);
     }
-    db_execute(db_health, "COMMIT TRANSACTION");
     (void) JudyLFreeArray(&host->health.JudyL_ae, PJE0);
 
     // Delete AE as needed
@@ -639,10 +637,8 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
     } else {
         worker_is_busy(UV_EVENT_HEALTH_JOB_ALARM_LOG_QUEUE);
 
-        db_execute(db_aclk, "BEGIN TRANSACTION");
         if (process_alert_pending_queue(host))
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-        db_execute(db_aclk, "COMMIT TRANSACTION");
     }
 
     worker_is_idle();
