@@ -11,12 +11,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
-func newDeploymentDiscoverer(si cache.SharedInformer, l *logger.Logger) *deploymentDiscoverer {
+func newCronJobDiscoverer(si cache.SharedInformer, l *logger.Logger) *cronJobDiscoverer {
 	if si == nil {
-		panic("nil deployment& shared informer")
+		panic("nil cronjob shared informer")
 	}
 
-	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "replicaset"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "cronjob"})
 
 	_, _ = si.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { enqueue(queue, obj) },
@@ -24,7 +24,7 @@ func newDeploymentDiscoverer(si cache.SharedInformer, l *logger.Logger) *deploym
 		DeleteFunc: func(obj any) { enqueue(queue, obj) },
 	})
 
-	return &deploymentDiscoverer{
+	return &cronJobDiscoverer{
 		Logger:   l,
 		informer: si,
 		queue:    queue,
@@ -33,16 +33,16 @@ func newDeploymentDiscoverer(si cache.SharedInformer, l *logger.Logger) *deploym
 	}
 }
 
-type deployResource struct {
+type cronjobResource struct {
 	src string
 	val any
 }
 
-func (r deployResource) source() string         { return r.src }
-func (r deployResource) kind() kubeResourceKind { return kubeResourceDeployment }
-func (r deployResource) value() any             { return r.val }
+func (r cronjobResource) source() string         { return r.src }
+func (r cronjobResource) kind() kubeResourceKind { return kubeResourceCronJob }
+func (r cronjobResource) value() any             { return r.val }
 
-type deploymentDiscoverer struct {
+type cronJobDiscoverer struct {
 	*logger.Logger
 	informer cache.SharedInformer
 	queue    *workqueue.Typed[string]
@@ -50,9 +50,9 @@ type deploymentDiscoverer struct {
 	stopCh   chan struct{}
 }
 
-func (d *deploymentDiscoverer) run(ctx context.Context, in chan<- resource) {
-	d.Info("deployment_discoverer is started")
-	defer func() { close(d.stopCh); d.Info("deployment_discoverer is stopped") }()
+func (d *cronJobDiscoverer) run(ctx context.Context, in chan<- resource) {
+	d.Info("cronjob_discoverer is started")
+	defer func() { close(d.stopCh); d.Info("cronjob_discoverer is stopped") }()
 
 	defer d.queue.ShutDown()
 
@@ -69,10 +69,7 @@ func (d *deploymentDiscoverer) run(ctx context.Context, in chan<- resource) {
 	<-ctx.Done()
 }
 
-func (d *deploymentDiscoverer) ready() bool   { return isChanClosed(d.readyCh) }
-func (d *deploymentDiscoverer) stopped() bool { return isChanClosed(d.stopCh) }
-
-func (d *deploymentDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
+func (d *cronJobDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
 	for {
 		key, shutdown := d.queue.Get()
 		if shutdown {
@@ -92,7 +89,7 @@ func (d *deploymentDiscoverer) runDiscover(ctx context.Context, in chan<- resour
 				return
 			}
 
-			r := &deployResource{src: deploymentSource(ns, name)}
+			r := &cronjobResource{src: cronjobSource(ns, name)}
 			if exists {
 				r.val = item
 			}
@@ -101,6 +98,9 @@ func (d *deploymentDiscoverer) runDiscover(ctx context.Context, in chan<- resour
 	}
 }
 
-func deploymentSource(namespace, name string) string {
-	return "k8s/rs/" + namespace + "/" + name
+func cronjobSource(namespace, name string) string {
+	return "k8s/cj/" + namespace + "/" + name
 }
+
+func (d *cronJobDiscoverer) ready() bool   { return isChanClosed(d.readyCh) }
+func (d *cronJobDiscoverer) stopped() bool { return isChanClosed(d.stopCh) }

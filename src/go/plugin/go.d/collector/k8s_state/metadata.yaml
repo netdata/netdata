@@ -247,6 +247,33 @@ modules:
               chart_type: line
               dimensions:
                 - name: age
+        - name: cronjob
+          description: These metrics refer to CronJobs.
+          labels:
+            - name: k8s_cluster_id
+              description: Cluster ID. This is equal to the kube-system namespace UID.
+            - name: k8s_cluster_name
+              description: Cluster name. Cluster name discovery only works in GKE.
+            - name: k8s_cronjob_name
+              description: CronJob name.
+            - name: k8s_namespace
+              description: Namespace.
+          metrics:
+            - name: k8s_state.cronjob_jobs_count_by_status
+              description: CronJob Jobs Count by Status
+              unit: 'jobs'
+              chart_type: stacked
+              dimensions:
+                - name: complete
+                - name: failed
+                - name: running
+                - name: suspended
+            - name: k8s_state.cronjob_age
+              description: CronJob Age
+              unit: 'seconds'
+              chart_type: line
+              dimensions:
+                - name: age
         - name: pod
           description: These metrics refer to the Pod.
           labels:

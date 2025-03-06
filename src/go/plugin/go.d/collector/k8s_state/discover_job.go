@@ -11,12 +11,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
-func newDeploymentDiscoverer(si cache.SharedInformer, l *logger.Logger) *deploymentDiscoverer {
+func newJobDiscoverer(si cache.SharedInformer, l *logger.Logger) *jobDiscoverer {
 	if si == nil {
-		panic("nil deployment& shared informer")
+		panic("nil job shared informer")
 	}
 
-	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "replicaset"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "job"})
 
 	_, _ = si.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { enqueue(queue, obj) },
@@ -24,7 +24,7 @@ func newDeploymentDiscoverer(si cache.SharedInformer, l *logger.Logger) *deploym
 		DeleteFunc: func(obj any) { enqueue(queue, obj) },
 	})
 
-	return &deploymentDiscoverer{
+	return &jobDiscoverer{
 		Logger:   l,
 		informer: si,
 		queue:    queue,
@@ -33,16 +33,16 @@ func newDeploymentDiscoverer(si cache.SharedInformer, l *logger.Logger) *deploym
 	}
 }
 
-type deployResource struct {
+type jobResource struct {
 	src string
 	val any
 }
 
-func (r deployResource) source() string         { return r.src }
-func (r deployResource) kind() kubeResourceKind { return kubeResourceDeployment }
-func (r deployResource) value() any             { return r.val }
+func (r jobResource) source() string         { return r.src }
+func (r jobResource) kind() kubeResourceKind { return kubeResourceJob }
+func (r jobResource) value() any             { return r.val }
 
-type deploymentDiscoverer struct {
+type jobDiscoverer struct {
 	*logger.Logger
 	informer cache.SharedInformer
 	queue    *workqueue.Typed[string]
@@ -50,9 +50,9 @@ type deploymentDiscoverer struct {
 	stopCh   chan struct{}
 }
 
-func (d *deploymentDiscoverer) run(ctx context.Context, in chan<- resource) {
-	d.Info("deployment_discoverer is started")
-	defer func() { close(d.stopCh); d.Info("deployment_discoverer is stopped") }()
+func (d *jobDiscoverer) run(ctx context.Context, in chan<- resource) {
+	d.Info("job_discoverer is started")
+	defer func() { close(d.stopCh); d.Info("job_discoverer is stopped") }()
 
 	defer d.queue.ShutDown()
 
@@ -69,10 +69,7 @@ func (d *deploymentDiscoverer) run(ctx context.Context, in chan<- resource) {
 	<-ctx.Done()
 }
 
-func (d *deploymentDiscoverer) ready() bool   { return isChanClosed(d.readyCh) }
-func (d *deploymentDiscoverer) stopped() bool { return isChanClosed(d.stopCh) }
-
-func (d *deploymentDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
+func (d *jobDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
 	for {
 		key, shutdown := d.queue.Get()
 		if shutdown {
@@ -92,7 +89,7 @@ func (d *deploymentDiscoverer) runDiscover(ctx context.Context, in chan<- resour
 				return
 			}
 
-			r := &deployResource{src: deploymentSource(ns, name)}
+			r := &jobResource{src: jobSource(ns, name)}
 			if exists {
 				r.val = item
 			}
@@ -101,6 +98,9 @@ func (d *deploymentDiscoverer) runDiscover(ctx context.Context, in chan<- resour
 	}
 }
 
-func deploymentSource(namespace, name string) string {
-	return "k8s/rs/" + namespace + "/" + name
+func jobSource(namespace, name string) string {
+	return "k8s/job/" + namespace + "/" + name
 }
+
+func (d *jobDiscoverer) ready() bool   { return isChanClosed(d.readyCh) }
+func (d *jobDiscoverer) stopped() bool { return isChanClosed(d.stopCh) }

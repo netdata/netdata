@@ -62,6 +62,11 @@ const (
 )
 
 const (
+	prioCronJobJobsCountByStatus = 50700 + iota
+	prioCronJobAge
+)
+
+const (
 	labelKeyPrefix = "k8s_"
 	//labelKeyLabelPrefix      = labelKeyPrefix + "label_"
 	//labelKeyAnnotationPrefix = labelKeyPrefix + "annotation_"
@@ -78,6 +83,7 @@ const (
 	labelKeyContainerID    = labelKeyPrefix + "container_id"
 	labelKeyQoSClass       = labelKeyPrefix + "qos_class"
 	labelKeyDeploymentName = labelKeyPrefix + "deployment_name"
+	labelKeyCronJobName    = labelKeyPrefix + "cronjob_name"
 )
 
 var baseCharts = module.Charts{
@@ -133,6 +139,11 @@ var deploymentChartsTmpl = module.Charts{
 	deploymentConditionStatusChartTmpl.Copy(),
 	deploymentReplicasChartTmpl.Copy(),
 	deploymentAgeChartTmpl.Copy(),
+}
+
+var cronJobChartsTmpl = module.Charts{
+	cronJobJobsCountByStatusChartTmpl.Copy(),
+	cronJobAgeChartTmpl.Copy(),
 }
 
 var (
@@ -824,8 +835,65 @@ func (c *Collector) addDeploymentCharts(rs *deploymentState) {
 	}
 }
 
-func (c *Collector) removeDeploymentCharts(rs *deploymentState) {
-	prefix := fmt.Sprintf("deployment_%s", replaceDots(rs.id()))
+func (c *Collector) removeDeploymentCharts(st *deploymentState) {
+	prefix := fmt.Sprintf("deployment_%s", replaceDots(st.id()))
+	c.removeCharts(prefix)
+}
+
+var (
+	cronJobJobsCountByStatusChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "cronjob_%s.jobs_count_by_status",
+		Title:    "CronJob Jobs Count by Status",
+		Units:    "jobs",
+		Fam:      "cronjob jobs",
+		Ctx:      "k8s_state.cronjob_jobs_count_by_status",
+		Priority: prioCronJobJobsCountByStatus,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "cronjob_%s_complete_jobs", Name: "complete"},
+			{ID: "cronjob_%s_failed_jobs", Name: "failed"},
+			{ID: "cronjob_%s_running_jobs", Name: "running"},
+			{ID: "cronjob_%s_suspended_jobs", Name: "suspended"},
+		},
+	}
+	cronJobAgeChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "cronjob_%s.age",
+		Title:    "CronJob Age",
+		Units:    "seconds",
+		Fam:      "cronjob age",
+		Ctx:      "k8s_state.cronjob_age",
+		Priority: prioCronJobAge,
+		Dims: module.Dims{
+			{ID: "cronjob_%s_age", Name: "age"},
+		},
+	}
+)
+
+func (c *Collector) addCronJobCharts(st *cronJobState) {
+	charts := cronJobChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, replaceDots(st.id()))
+		chart.Labels = []module.Label{
+			{Key: labelKeyClusterID, Value: c.kubeClusterID, Source: module.LabelSourceK8s},
+			{Key: labelKeyClusterName, Value: c.kubeClusterName, Source: module.LabelSourceK8s},
+			{Key: labelKeyCronJobName, Value: st.name, Source: module.LabelSourceK8s},
+			{Key: labelKeyNamespace, Value: st.namespace, Source: module.LabelSourceK8s},
+		}
+		for _, d := range chart.Dims {
+			d.ID = fmt.Sprintf(d.ID, st.id())
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) removeCronJobCharts(st *cronJobState) {
+	prefix := fmt.Sprintf("cronjob_%s", replaceDots(st.id()))
 	c.removeCharts(prefix)
 }
 
