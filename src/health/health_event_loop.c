@@ -486,7 +486,7 @@ static void process_repeating_alarms(RRDHOST *host, time_t now, struct health_ra
     foreach_rrdcalc_in_rrdhost_done(rc);
 }
 
-Drop // returns the number of runnable alerts
+// returns the number of runnable alerts
 static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_run)
 {
     size_t runnable = 0;
