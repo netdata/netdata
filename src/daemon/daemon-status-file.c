@@ -568,45 +568,34 @@ static bool save_status_file(const char *directory, const char *content, size_t 
     if(!directory || !*directory)
         return false;
 
+    static uint64_t tmp_attempt_counter = 0;
+
     char filename[FILENAME_MAX];
     char temp_filename[FILENAME_MAX];
+    char tid_str[UINT64_MAX_LENGTH];
 
-    /* Construct filenames using async-safe string operations */
-    /* Using simple string concatenation instead of snprintf */
+    print_uint64(tid_str, __atomic_add_fetch(&tmp_attempt_counter, 1, __ATOMIC_RELAXED));
     size_t dir_len = strlen(directory);
-    if (dir_len + 1 + strlen(STATUS_FILENAME) >= FILENAME_MAX)
-        return false;  /* Path too long */
+    size_t fil_len = strlen(STATUS_FILENAME);
+    size_t tid_len = strlen(tid_str);
 
-    memcpy(filename, directory, dir_len);
-    filename[dir_len] = '/';
-    memcpy(filename + dir_len + 1, STATUS_FILENAME, strlen(STATUS_FILENAME) + 1);
+    if (dir_len + 1 + fil_len + 1 + tid_len + 1 >= sizeof(filename))
+        return false; // cannot fit the filename
 
-    /* Create a unique temp filename using thread id */
-    unsigned int tid = (unsigned int)gettid_cached();
-    char tid_str[16];
-    char *tid_ptr = tid_str + sizeof(tid_str) - 1;
-    *tid_ptr = '\0';
+    // create the filename
+    size_t pos = 0;
+    memcpy(&filename[pos], directory, dir_len); pos += dir_len;
+    filename[pos] = '/'; pos++;
+    memcpy(&filename[pos], STATUS_FILENAME, fil_len); pos += fil_len;
+    filename[pos] = '\0';
 
-    unsigned int tid_copy = tid;
-    do {
-        tid_ptr--;
-        *tid_ptr = "0123456789abcdef"[tid_copy & 0xf];
-        tid_copy >>= 4;
-    } while (tid_copy && tid_ptr > tid_str);
+    // create the temp filename
+    memcpy(temp_filename, filename, pos);
+    temp_filename[pos] = '-'; pos++;
+    memcpy(&temp_filename[pos], tid_str, tid_len); pos += tid_len;
+    temp_filename[pos] = '\0';
 
-    size_t temp_name_len = dir_len + 1 + strlen(STATUS_FILENAME) + 1 + (sizeof(tid_str) - (tid_ptr - tid_str));
-    if (temp_name_len >= FILENAME_MAX)
-        return false;  /* Path too long */
-
-    memcpy(temp_filename, directory, dir_len);
-    temp_filename[dir_len] = '/';
-    char *ptr = temp_filename + dir_len + 1;
-    memcpy(ptr, STATUS_FILENAME, strlen(STATUS_FILENAME));
-    ptr += strlen(STATUS_FILENAME);
-    *ptr++ = '-';
-    memcpy(ptr, tid_ptr, strlen(tid_ptr) + 1);
-
-    /* Open file with O_WRONLY, O_CREAT, and O_TRUNC flags */
+    // Open file with O_WRONLY, O_CREAT, and O_TRUNC flags
     int fd = open(temp_filename, O_WRONLY | O_CREAT | O_TRUNC, 0664);
     if (fd == -1)
         return false;
