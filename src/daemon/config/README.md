@@ -46,7 +46,7 @@ After `netdata.conf` has been modified, Netdata needs to be [restarted](/docs/ne
 |              timezone              | auto-detected  | The timezone retrieved from the environment variable                                                                                                                                                                                                   |
 |            run as user             |   `netdata`    | The user Netdata will run as.                                                                                                                                                                                                                          |
 |         pthread stack size         | auto-detected  |                                                                                                                                                                                                                                                        |
-|           crash reports            | `all` or `off` | By default `off` when anonymous telemetry is disabled, otherwise `all`. When it is `all` it reports agent restarts and crashes. It can also be `crashes` to report only crashes. Each kind of event is deduplicated and reported at most once per day. |  
+|           crash reports            | `all` or `off` | It is `off` when anonymous telemetry is disabled, otherwise `all`. When it is `all` Netdata reports agent restarts and crashes. It can also be `crashes` to report only crashes. Each kind of event is deduplicated and reported at most once per day. |  
 
 ### `db` section options
 
