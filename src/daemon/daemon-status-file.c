@@ -609,7 +609,7 @@ static bool save_status_file(const char *directory, const char *content, size_t 
 
         if (bytes_written == -1) {
             if (errno == EINTR)
-                continue;  /* Retry if interrupted by signal */
+                continue; /* Retry if interrupted by signal */
 
             close(fd);
             unlink(temp_filename);  /* Remove the temp file */
@@ -811,6 +811,30 @@ static bool is_ci(void) {
     return ci && *ci && strcasecmp(ci, "true") == 0;
 }
 
+enum crash_report_t {
+    DSF_REPORT_DISABLED = 0,
+    DSF_REPORT_ALL,
+    DSF_REPORT_CRASHES,
+};
+
+static enum crash_report_t check_crash_reports_config(void) {
+    bool analytics = analytics_check_enabled();
+
+    const char *t = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "crash reports", analytics ? "off" : "all");
+
+    enum crash_report_t rc;
+    if(!t || !*t)
+        rc = analytics ? DSF_REPORT_ALL : DSF_REPORT_DISABLED;
+    else if(strcmp(t, "all") == 0)
+        rc = DSF_REPORT_ALL;
+    else if(strcmp(t, "crashes") == 0)
+        rc = DSF_REPORT_CRASHES;
+    else
+        rc = DSF_REPORT_DISABLED;
+
+    return rc;
+}
+
 void daemon_status_file_check_crash(void) {
     FUNCTION_RUN_ONCE();
 
@@ -823,8 +847,8 @@ void daemon_status_file_check_crash(void) {
     struct log_priority pri = PRI_ALL_NORMAL;
 
     bool new_version = strcmp(last_session_status.version, session_status.version) != 0;
-    bool post_crash_report = false;
-    bool disable_crash_report = false;
+    bool this_is_a_crash = false;
+    bool crash_report_ignore = false;
     bool dump_json = true;
     const char *msg = "", *cause = "";
     switch(last_session_status.status) {
@@ -833,7 +857,7 @@ void daemon_status_file_check_crash(void) {
             // probably a previous version of netdata was running
             cause = "no last status";
             msg = "No status found for the previous Netdata session";
-            disable_crash_report = true;
+            crash_report_ignore = true;
             break;
 
         case DAEMON_STATUS_EXITED:
@@ -847,14 +871,14 @@ void daemon_status_file_check_crash(void) {
                 cause = "deadly signal and exit";
                 msg = "Netdata was last stopped gracefully after receiving a deadly signal";
                 pri = PRI_NETDATA_BUG;
-                post_crash_report = true;
+                this_is_a_crash = true;
             }
             else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
                      !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal and exit";
                 msg = "Netdata was last stopped gracefully after it encountered a fatal error";
                 pri = PRI_NETDATA_BUG;
-                post_crash_report = true;
+                this_is_a_crash = true;
             }
             else if(last_session_status.exit_reason & EXIT_REASON_SYSTEM_SHUTDOWN) {
                 cause = "exit on system shutdown";
@@ -888,7 +912,7 @@ void daemon_status_file_check_crash(void) {
                 cause = "deadly signal on start";
                 msg = "Netdata was last crashed while starting after receiving a deadly signal";
                 pri = PRI_NETDATA_BUG;
-                post_crash_report = true;
+                this_is_a_crash = true;
             }
             else if (last_session_status.exit_reason & EXIT_REASON_OUT_OF_MEMORY) {
                 cause = "out of memory";
@@ -929,8 +953,7 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last killed/crashed while starting";
                 pri = PRI_BAD_BUT_NO_REASON;
             }
-            post_crash_report = true;
-
+            this_is_a_crash = true;
             break;
 
         case DAEMON_STATUS_EXITING:
@@ -938,7 +961,7 @@ void daemon_status_file_check_crash(void) {
                 cause = "deadly signal on exit";
                 msg = "Netdata was last crashed while exiting after receiving a deadly signal";
                 pri = PRI_NETDATA_BUG;
-                post_crash_report = true;
+                this_is_a_crash = true;
             }
             else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
                 !is_exit_reason_normal(last_session_status.exit_reason)) {
@@ -958,7 +981,7 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last killed/crashed while it was instructed to exit";
             }
             pri = PRI_NETDATA_BUG;
-            post_crash_report = true;
+            this_is_a_crash = true;
             break;
 
         case DAEMON_STATUS_RUNNING: {
@@ -979,7 +1002,7 @@ void daemon_status_file_check_crash(void) {
                 cause = "deadly signal";
                 msg = "Netdata was last crashed after receiving a deadly signal";
                 pri = PRI_NETDATA_BUG;
-                post_crash_report = true;
+                this_is_a_crash = true;
             }
             else if (last_session_status.exit_reason != EXIT_REASON_NONE &&
                      !is_exit_reason_normal(last_session_status.exit_reason)) {
@@ -991,7 +1014,7 @@ void daemon_status_file_check_crash(void) {
                 cause = "killed hard";
                 msg = "Netdata was last killed/crashed while operating normally";
                 pri = PRI_BAD_BUT_NO_REASON;
-                post_crash_report = true;
+                this_is_a_crash = true;
             }
             break;
         }
@@ -1014,15 +1037,23 @@ void daemon_status_file_check_crash(void) {
            "Last exit status: %s (%s):\n\n%s",
            NETDATA_VERSION, msg, cause, buffer_tostring(wb));
 
-    // check if we have already posted this crash in the last 24 hours
-    XXH64_hash_t hash = daemon_status_file_hash(&last_session_status, msg, cause);
-    if(dedup_already_posted(&session_status, hash) || (last_session_status.restarts < 10 && is_ci()))
-        disable_crash_report = true;
+    enum crash_report_t r = check_crash_reports_config();
+    if( // must be first for netdata.conf option to be used
+        (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
 
-    if(!disable_crash_report && (analytics_check_enabled() || post_crash_report)) {
-        netdata_conf_ssl();
+        // not a useful report (no previous status file)
+        !crash_report_ignore &&
 
+        // we are not running in CI
+        (last_session_status.restarts >= 10 || !is_ci()) &&
+
+        // we have not already reported this
+        !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause))
+
+        ) {
         daemon_status_file_startup_step("startup(post status file)");
+
+        netdata_conf_ssl();
 
         struct post_status_file_thread_data d = {
             .cause = cause,
@@ -1030,6 +1061,7 @@ void daemon_status_file_check_crash(void) {
             .status = &last_session_status,
             .priority = pri.post,
         };
+
         post_status_file(&d);
 
         // MacOS crashes when starting under launchctl, when we create a thread to post the status file,
