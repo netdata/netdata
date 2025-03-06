@@ -1,0 +1,57 @@
+# Metadata mixin for Cisco devices.
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "cisco"
+      version:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          extract_value: '\sVersion\s+([a-zA-Z0-9.()]+)'
+          # Example:
+          #   - Cisco IOS Software, IOS-XE Software, Catalyst L3 Switch Software (CAT3K_CAA-UNIVERSALK9-M), Version 03.06.06E RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2016 by Cisco Systems, Inc. Compiled Sat 17-Dec-
+          #   - Cisco Internetwork Operating System Software ..IOS (tm) C2600 Software (C2600-I-M), Version 12.0(3)T3,  RELEASE SOFTWARE (fc1)..Copyright (c) 1986-1999 by cisco Systems, Inc...
+          #   - Cisco NX-OS(tm) m9100, Software (m9100-s2ek9-mz), Version 4.1(1c), RELEASE SOFTWARE Copyright (c) 2002-2008 by Cisco Systems, Inc. Compiled 11/24/2008 18:00:00
+          #   - Cisco IOS XR Software (Cisco ASR9K Series), Version 4.2.3[Default] Copyright (c) 2013 by Cisco Systems, Inc.
+          # Credit: Some examples are from: https://github.com/mtoshi/sysdescrparser/blob/master/samples/sample_data.json
+      model:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          extract_value: '\sSoftware\s+\(([-a-zA-Z0-9_ ]+)\)'
+          # Example:
+          #   - Cisco IOS Software, IOS-XE Software, Catalyst L3 Switch Software (CAT3K_CAA-UNIVERSALK9-M), Version 03.06.06E RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2016 by Cisco Systems, Inc. Compiled Sat 17-Dec-
+          #   - Cisco Internetwork Operating System Software ..IOS (tm) C2600 Software (C2600-I-M), Version 12.0(3)T3,  RELEASE SOFTWARE (fc1)..Copyright (c) 1986-1999 by cisco Systems, Inc...
+          #   - Cisco NX-OS(tm) m9100, Software (m9100-s2ek9-mz), Version 4.1(1c), RELEASE SOFTWARE Copyright (c) 2002-2008 by Cisco Systems, Inc. Compiled 11/24/2008 18:00:00
+          #   - Cisco IOS XR Software (Cisco ASR9K Series), Version 4.2.3[Default] Copyright (c) 2013 by Cisco Systems, Inc.
+          #   - Cisco NX-OS(tm) Nexus9000 C9364C, Software (NXOS 32-bit), Version 9.3(9), RELEASE SOFTWARE Copyright (c) 2002-2022 by Cisco Systems, Inc. Compiled 2/4/2022 7:00:00
+          # Credit: Some examples are from: https://github.com/mtoshi/sysdescrparser/blob/master/samples/sample_data.json
+
+      os_name:
+        # TODO: Add tests (possibly unit tests) for profile regex patterns
+        #       Right now, we can only e2e test profiles but for match (match_pattern/match_value) and extract_value,
+        #       we need a way to unit test profiles. Using e2e is much heavier and is not suitable to testing regex patterns.
+        #       Some changes to test tooling might be needed to make easy to test those cases.
+        symbols:
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'Cisco Internetwork Operating System Software'
+            match_value: 'IOS'
+            # Cisco Internetwork Operating System Software ..IOS (tm) C2600 Software (C2600-I-M), Version 12.0(3)T3,  RELEASE SOFTWARE (fc1)..Copyright (c) 1986-1999 by cisco Systems, Inc...
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'Cisco IOS Software'
+            match_value: 'IOS'
+            # Example: Cisco IOS Software, IOS-XE Software, Catalyst L3 Switch Software (CAT3K_CAA-UNIVERSALK9-M), Version 03.06.06E RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2016 by Cisco Systems, Inc.
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'Cisco NX-OS'
+            match_value: 'NXOS'
+            # Example: Cisco NX-OS(tm) m9100, Software (m9100-s2ek9-mz), Version 4.1(1c), RELEASE SOFTWARE Copyright (c) 2002-2008 by Cisco Systems, Inc. Compiled 11/24/2008 18:00:00
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match_pattern: 'Cisco IOS XR'
+            match_value: 'IOSXR'
+            # Example: Cisco IOS XR Software (Cisco ASR9K Series), Version 4.2.3[Default] Copyright (c) 2013 by Cisco Systems, Inc.

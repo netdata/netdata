@@ -1,0 +1,349 @@
+extends:
+  - _aruba-base.yaml
+  - _base.yaml
+  - _generic-if.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.14823.1.1.1
+  - 1.3.6.1.4.1.14823.1.1.2
+  - 1.3.6.1.4.1.14823.1.1.3
+  - 1.3.6.1.4.1.14823.1.1.4
+  - 1.3.6.1.4.1.14823.1.1.7
+  - 1.3.6.1.4.1.14823.1.1.8
+  - 1.3.6.1.4.1.14823.1.1.9
+  - 1.3.6.1.4.1.14823.1.1.10
+  - 1.3.6.1.4.1.14823.1.1.11
+  - 1.3.6.1.4.1.14823.1.1.12
+  - 1.3.6.1.4.1.14823.1.1.13
+  - 1.3.6.1.4.1.14823.1.1.14
+  - 1.3.6.1.4.1.14823.1.1.15
+  - 1.3.6.1.4.1.14823.1.1.16
+  - 1.3.6.1.4.1.14823.1.1.17
+  - 1.3.6.1.4.1.14823.1.1.18
+  - 1.3.6.1.4.1.14823.1.1.19
+  - 1.3.6.1.4.1.14823.1.1.20
+  - 1.3.6.1.4.1.14823.1.1.23
+  - 1.3.6.1.4.1.14823.1.1.24
+  - 1.3.6.1.4.1.14823.1.1.25
+  - 1.3.6.1.4.1.14823.1.1.26
+  - 1.3.6.1.4.1.14823.1.1.27
+  - 1.3.6.1.4.1.14823.1.1.28
+  - 1.3.6.1.4.1.14823.1.1.29
+  - 1.3.6.1.4.1.14823.1.1.30
+  - 1.3.6.1.4.1.14823.1.1.31
+  - 1.3.6.1.4.1.14823.1.1.32
+  - 1.3.6.1.4.1.14823.1.1.33
+  - 1.3.6.1.4.1.14823.1.1.34
+  - 1.3.6.1.4.1.14823.1.1.35
+  - 1.3.6.1.4.1.14823.1.1.39
+  - 1.3.6.1.4.1.14823.1.1.40
+  - 1.3.6.1.4.1.14823.1.1.41
+  - 1.3.6.1.4.1.14823.1.1.42
+  - 1.3.6.1.4.1.14823.1.1.47
+  - 1.3.6.1.4.1.14823.1.1.48
+  - 1.3.6.1.4.1.14823.1.1.56
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "WLC"
+
+metrics:
+  - MIB: WLSX-SYSTEMEXT-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.14823.2.2.1.2.1.30.0
+  - MIB: WLSX-SYSTEMEXT-MIB
+    symbol:
+      name: memory.usage
+      OID: 1.3.6.1.4.1.14823.2.2.1.2.1.31.0
+  - MIB: WLSX-SYSTEMEXT-MIB
+    symbol:
+      name: wlsxSysExtPacketLossPercent
+      OID: 1.3.6.1.4.1.14823.2.2.1.2.1.32.0
+  - MIB: WLSX-SWITCH-MIB
+    table:
+      name: wlsxSysXStorageTable
+      OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10
+    symbols:
+      - name: sysXStorageSize
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.3
+      - name: sysXStorageUsed
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
+    metric_tags:
+      - symbol:
+          name: sysXStorageType
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.2
+        tag: sys_x_storage_type
+        mapping:
+          1: ram
+          2: flash_memory
+      - symbol:
+          name: sysXStorageName
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.5
+        tag: sys_x_storage_name
+  - MIB: WLSX-SWITCH-MIB
+    table:
+      name: wlsxSwitchAccessPointTable
+      OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3
+    symbols:
+      - name: apChannelNoise
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.13
+      - name: apSignalToNoiseRatio
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.14
+    metric_tags:
+      - symbol:
+          name: apESSID
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.2
+        tag: ap_essid
+      - symbol:
+          name: apPhyType
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.6
+        tag: ap_phy_type
+        mapping:
+          1: dot11a
+          2: dot11b
+          3: dot11g
+      - symbol:
+          name: apType
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.7
+        tag: ap_type
+        mapping:
+          1: ap
+          2: am
+      - symbol:
+          name: apCurrentChannel
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.8
+        tag: ap_current_channel
+      - symbol:
+          name: apLoadBalancing
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.12
+        tag: ap_load_balancing
+        mapping:
+          1: 'true'
+          2: 'false'
+  - MIB: WLSX-SWITCH-MIB
+    table:
+      name: wlsxSwitchAccessPointStatsTable
+      OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5
+    symbols:
+      - name: apChannelBwRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.2
+      - name: apChannelFrameRetryRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.3
+      - name: apChannelFrameLowSpeedRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.4
+      - name: apChannelFrameNonUnicastRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.5
+      - name: apChannelFrameFragmentationRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.6
+      - name: apChannelFrameReceiveErrorRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.7
+      - name: apBSSTxPackets
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.8
+        metric_type: monotonic_count
+      - name: apBSSTxBytes
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.9
+        metric_type: monotonic_count
+      - name: apBSSRxPackets
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.10
+        metric_type: monotonic_count
+      - name: apBSSRxBytes
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.11
+        metric_type: monotonic_count
+      - name: apBSSBwRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.12
+      - name: apBSSFrameRetryRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.13
+      - name: apBSSFrameLowSpeedRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.14
+      - name: apBSSFrameNonUnicastRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.15
+      - name: apBSSFrameFragmentationRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.16
+      - name: apBSSFrameReceiveErrorRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.17
+    metric_tags:
+      - symbol:
+          name: apStatsChannel
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.1
+        tag: ap_stats_channel
+  - MIB: WLSX-USER-MIB
+    symbol:
+      name: wlsxNumOfUsers8021x
+      OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.1.0
+  - MIB: WLSX-USER-MIB
+    symbol:
+      name: wlsxNumOfUsersVPN
+      OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.2.0
+  - MIB: WLSX-USER-MIB
+    symbol:
+      name: wlsxNumOfUsersCP
+      OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.3.0
+  - MIB: WLSX-USER-MIB
+    symbol:
+      name: wlsxNumOfUsersMAC
+      OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.4.0
+  - MIB: WLSX-USER-MIB
+    symbol:
+      name: wlsxNumOfUsersStateful8021x
+      OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.5.0
+  - MIB: WLSX-HA-MIB
+    symbol:
+      name: haActiveAPs
+      OID: 1.3.6.1.4.1.14823.2.2.1.20.1.2.1.1.0
+  - MIB: WLSX-HA-MIB
+    symbol:
+      name: haStandbyAPs
+      OID: 1.3.6.1.4.1.14823.2.2.1.20.1.2.1.2.0
+  - MIB: WLSX-HA-MIB
+    symbol:
+      name: haTotalAPs
+      OID: 1.3.6.1.4.1.14823.2.2.1.20.1.2.1.3.0
+  - MIB: WLSX-HA-MIB
+    table:
+      name: wlsxHighAvalabilityTunnelTable
+      OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5
+    symbols:
+      - name: haActiveVapTunnels
+        OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.1
+      - name: haStandbyVapTunnels
+        OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.2
+      - name: haTotalVapTunnels
+        OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.3
+      - name: haAPHbtTunnels
+        OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.4
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.20.1.1.1.2
+          name: haMembership
+        table: wlsxHighAvalabilityConfigTable
+        tag: ha_membership
+        # The actual index of the table is haProfileName that is not accessible
+
+  - MIB: WLSX-WLAN-MIB
+    table:
+      name: wlsxWlanStationTable
+      OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1
+    symbols:
+      - name: wlanStaTransmitRate
+        OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.10
+      - name: wlanStaRSSI
+        OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.14
+      - name: wlanStaUpTime
+        OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.15
+      - name: wlanStaTransmitRateCode
+        OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.17
+    metric_tags:
+      - symbol:
+          name: wlanStaPhyType
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.3
+        tag: wlan_sta_phy_type
+        mapping:
+          1: dot11a
+          2: dot11b
+          3: dot11g
+          4: dot11ag
+          5: wired
+      - symbol:
+          name: wlanStaAccessPointESSID
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.12
+        tag: wlan_sta_access_point_essid
+      - symbol:
+          name: wlanStaChannel
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.6
+        tag: wlan_sta_channel
+      - symbol:
+          name: wlanStaVlanId
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.7
+        tag: wlan_sta_vlan_id
+      - symbol:
+          name: wlanStaIsAuthenticated
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.4
+        tag: wlan_sta_is_authenticated
+        mapping:
+          1: 'true'
+          2: 'false'
+      - symbol:
+          name: wlanStaIsAssociated
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.5
+        tag: wlan_sta_is_associated
+        mapping:
+          1: 'true'
+          2: 'false'
+      - symbol:
+          name: wlanStaHTMode
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.16
+        tag: wlan_sta_ht_mode
+        mapping:
+          1: none
+          2: ht20
+          3: ht40
+          4: vht20
+          5: vht40
+          6: vht80
+          7: vht160
+          8: vht80plus80
+          9: he20
+          10: he40
+          11: he80
+          12: he160
+          13: he80plus80
+  - MIB: WLSX-WLAN-MIB
+    table:
+      name: wlsxWlanStationStatsTable
+      OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1
+    symbols:
+      - name: wlanStaTxBytes64
+        OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1.1.25
+      - name: wlanStaRxBytes64
+        OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1.1.26
+    metric_tags:
+      - symbol:
+          name: wlanStaChannelNum
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1.1.1
+        tag: wlan_sta_channel_num
+  # - MIB: WLSX-WLAN-MIB
+  #   table:
+  #     name: wlsxWlanESSIDStatsTable
+  #     OID: 1.3.6.1.4.1.14823.2.2.1.5.3.3.1
+  #   symbols:
+  #     - name: wlanESSIDRxRate
+  #       OID: 1.3.6.1.4.1.14823.2.2.1.5.3.3.1.1.8
+  #     - name: wlanESSIDTxRate
+  #       OID: 1.3.6.1.4.1.14823.2.2.1.5.3.3.1.1.9
+  #     - name: wlanESSIDWiredRxBytes
+  #       OID: 1.3.6.1.4.1.14823.2.2.1.5.3.3.1.1.11
+  #     - name: wlanESSIDWiredTxBytes
+  #       OID: 1.3.6.1.4.1.14823.2.2.1.5.3.3.1.1.12
+  #   metric_tags:
+  #     - symbol:
+  #         OID:
+  #         name:
+  #       table:
+  #       tag:
+  # The index wlanESSID is not accessible
+  # TODO: Requires feature to convert full index into a metric tag
+metric_tags:
+  - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.27.0
+    symbol: wlsxSysExtHwVersion
+    tag: wlsx_sys_ext_hw_version
+  - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.28.0
+    symbol: wlsxSysExtSwVersion
+    tag: wlsx_sys_ext_sw_version
+  - OID: 1.3.6.1.4.1.14823.2.2.1.1.1.2.0
+    symbol: wlsxModelName
+    tag: wlsx_model_name
+  - OID: 1.3.6.1.4.1.14823.2.2.1.1.1.4.0
+    symbol: wlsxSwitchRole
+    tag: wlsx_switch_role
+    mapping:
+      1: master
+      2: local
+      3: standbymaster
+      4: branch
+      5: md
+  - OID: 1.3.6.1.4.1.14823.2.2.1.1.1.12.0
+    symbol: wlsxSwitchLicenseSerialNumber
+    tag: wlsx_switch_license_serial_number

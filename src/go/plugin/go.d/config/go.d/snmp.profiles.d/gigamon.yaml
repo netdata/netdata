@@ -1,0 +1,30 @@
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "gigamon"
+
+sysobjectid:
+  - 1.3.6.1.4.1.26866.3.6
+
+# metrics:
+#   - MIB: GIGAMON-SNMP-MIB
+#     symbol:
+#       name: cpu.usage
+#       OID: 1.3.6.1.4.1.26866.2.18.4.0
+#       extract_value: '(\d+)'.
+#   - MIB: GIGAMON-SNMP-MIB
+#     symbol:
+#       name: memory.total
+#       OID: 1.3.6.1.4.1.26866.2.19.1.0
+#   - MIB: GIGAMON-SNMP-MIB
+#     symbol:
+#       name: memory.free
+#       OID: 1.3.6.1.4.1.26866.2.19.2.0
+# The latest version we could find (from 2018) doesn't contain these metrics
+# https://github.com/librenms/librenms/blob/master/mibs/gigamon/GIGAMON-SNMP-MIB
+# keeping this until we can confirm furthermore these metrics

@@ -1,0 +1,32 @@
+# CPU and memory metrics for Checkpoint Firewall devices
+
+metrics:
+    # CPU
+  - MIB: CHECKPOINT-MIB
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.5.1.1
+          name: multiProcIndex
+        tag: cpu_core
+      - tag: cpu
+        index: 1
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.5
+        # core check only
+        name: cpu.usage
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.5
+      name: multiProcTable
+    # Memory
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.6.7.4.3.0
+        # core check only
+      name: memory.total
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.6.7.4.4.0
+        # core check only
+      name: memory.used

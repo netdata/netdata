@@ -1,0 +1,40 @@
+extends:
+  - fortinet.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.12356.106.1.*       # FortiSwitch
+  - 1.3.6.1.4.1.12356.106.1.1486    # FortiSwitch-148F-FPOE
+  - 1.3.6.1.4.1.12356.106.1.1248    # FortiSwitch-148E-FPOE
+  - 1.3.6.1.4.1.12356.106.1.2485    # FortiSwitch-248E-POE
+metadata:
+  device:
+    fields:
+      type:
+        value: "switch"
+metrics:
+  - MIB: FORTINET-FORTISWITCH-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.12356.106.4.1.2.0
+  - MIB: FORTINET-FORTISWITCH-MIB
+    symbol:
+      name: memory.used
+      OID: 1.3.6.1.4.1.12356.106.4.1.3.0
+  - MIB: FORTINET-FORTISWITCH-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.4.1.12356.106.4.1.4.0
+  - MIB: FORTINET-FORTISWITCH-MIB
+    symbol:
+      name: fsSysDiskUsage
+      OID: 1.3.6.1.4.1.12356.106.4.1.5.0
+  - MIB: FORTINET-FORTISWITCH-MIB
+    symbol:
+      name: fsSysDiskCapacity
+      OID: 1.3.6.1.4.1.12356.106.4.1.6.0
+metric_tags:
+  - OID: 1.3.6.1.4.1.12356.106.1.1.1.0
+    symbol: fsSysSerial
+    tag: fs_sys_serial
+  - OID: 1.3.6.1.4.1.12356.106.4.1.1.0
+    symbol: fsSysVersion
+    tag: fs_sys_version

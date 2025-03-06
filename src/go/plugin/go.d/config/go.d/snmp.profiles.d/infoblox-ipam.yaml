@@ -1,0 +1,238 @@
+extends:
+  - _base.yaml
+  - _generic-host-resources-base.yaml
+  - _generic-if.yaml
+  - _generic-ucd.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.7779.1.1004    # Virtual Device
+  - 1.3.6.1.4.1.7779.1.1204    # IB-1552
+  - 1.3.6.1.4.1.7779.1.1301    # IB-550-A
+  - 1.3.6.1.4.1.7779.1.1302    # IB-1050-A
+  - 1.3.6.1.4.1.7779.1.1303    # IB-1550-A
+  - 1.3.6.1.4.1.7779.1.1401    # IB-810
+  - 1.3.6.1.4.1.7779.1.1402    # IB-820
+  - 1.3.6.1.4.1.7779.1.1403    # IB-1410
+  - 1.3.6.1.4.1.7779.1.1404    # IB-1420
+  - 1.3.6.1.4.1.7779.1.1405    # IB-1400
+  - 1.3.6.1.4.1.7779.1.1406    # IB-800
+  - 1.3.6.1.4.1.7779.1.1407    # PT-1400
+  - 1.3.6.1.4.1.7779.1.1411    # IB-2200
+  - 1.3.6.1.4.1.7779.1.1412    # IB-2210
+  - 1.3.6.1.4.1.7779.1.1413    # IB-2220
+  - 1.3.6.1.4.1.7779.1.1414    # PT-2200
+  - 1.3.6.1.4.1.7779.1.1421    # IB-4010
+  - 1.3.6.1.4.1.7779.1.1422    # IB-4030
+  - 1.3.6.1.4.1.7779.1.1423    # IB-4000
+  - 1.3.6.1.4.1.7779.1.1424    # PT-4000
+  - 1.3.6.1.4.1.7779.1.1425    # Infoblox, Model Unknown
+  - 1.3.6.1.4.1.7779.1.1431    # IB-100
+  - 1.3.6.1.4.1.7779.1.1441    # ND-800
+  - 1.3.6.1.4.1.7779.1.1442    # ND-1400
+  - 1.3.6.1.4.1.7779.1.1443    # ND-2200
+  - 1.3.6.1.4.1.7779.1.1444    # ND-4000
+  - 1.3.6.1.4.1.7779.1.1501    # IB-815
+  - 1.3.6.1.4.1.7779.1.1502    # IB-825
+  - 1.3.6.1.4.1.7779.1.1503    # IB-1415
+  - 1.3.6.1.4.1.7779.1.1504    # IB-1425
+  - 1.3.6.1.4.1.7779.1.1505    # IB-1405
+  - 1.3.6.1.4.1.7779.1.1506    # IB-805
+  - 1.3.6.1.4.1.7779.1.1507    # PT-1405
+  - 1.3.6.1.4.1.7779.1.1511    # IB-2205
+  - 1.3.6.1.4.1.7779.1.1512    # IB-2215
+  - 1.3.6.1.4.1.7779.1.1513    # IB-2225
+  - 1.3.6.1.4.1.7779.1.1514    # PT-2205
+  - 1.3.6.1.4.1.7779.1.1521    # IB-4015
+  - 1.3.6.1.4.1.7779.1.1522    # IB-4035
+  - 1.3.6.1.4.1.7779.1.1523    # IB-4005
+  - 1.3.6.1.4.1.7779.1.1524    # PT-4005
+  - 1.3.6.1.4.1.7779.1.1525    # IB-4025
+  - 1.3.6.1.4.1.7779.1.1541    # ND-805
+  - 1.3.6.1.4.1.7779.1.1542    # ND-1405
+  - 1.3.6.1.4.1.7779.1.1543    # ND-2205
+  - 1.3.6.1.4.1.7779.1.1544    # ND-4005
+  - 1.3.6.1.4.1.7779.2.2       # IB-1050
+  - 1.3.6.1.4.1.7779.2.4       # IB-1552
+  - 1.3.6.1.4.1.7779.3.4       # IB-1552-A
+  - 1.3.6.1.4.1.7779.3.7       # IB-2000-A
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "infoblox"
+metrics:
+  - MIB: IB-PLATFORMONE-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.7779.3.1.1.2.1.8.1.1.0
+  - MIB: IB-PLATFORMONE-MIB
+    symbol:
+      name: memory.usage
+      OID: 1.3.6.1.4.1.7779.3.1.1.2.1.8.2.1.0
+  - MIB: IB-DHCPONE-MIB
+    symbol:
+      name: ibDhcpDeferredQueueSize
+      OID: 1.3.6.1.4.1.7779.3.1.1.4.1.4.0
+  - MIB: IB-DNSONE-MIB
+    table:
+      name: ibZoneStatisticsTable
+      OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1
+    symbols:
+      - name: ibBindZoneSuccess
+        OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.2
+        metric_type: monotonic_count
+      - name: ibBindZoneReferral
+        OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.3
+        metric_type: monotonic_count
+      - name: ibBindZoneNxRRset
+        OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.4
+        metric_type: monotonic_count
+      - name: ibBindZoneNxDomain
+        OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.5
+        metric_type: monotonic_count
+      - name: ibBindZoneRecursion
+        OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.6
+        metric_type: monotonic_count
+      - name: ibBindZoneFailure
+        OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.7
+        metric_type: monotonic_count
+    metric_tags:
+      - symbol:
+          name: ibBindZoneName
+          OID: 1.3.6.1.4.1.7779.3.1.1.3.1.1.1.1
+        tag: ib_bind_zone_name
+  - MIB: IB-DNSONE-MIB
+    symbol:
+      name: ibDDNSUpdateSuccess
+      OID: 1.3.6.1.4.1.7779.3.1.1.3.1.3.1.0
+    metric_type: monotonic_count
+  - MIB: IB-DNSONE-MIB
+    symbol:
+      name: ibDDNSUpdateFailure
+      OID: 1.3.6.1.4.1.7779.3.1.1.3.1.3.2.0
+    metric_type: monotonic_count
+  - MIB: IB-DNSONE-MIB
+    symbol:
+      name: ibDDNSUpdateReject
+      OID: 1.3.6.1.4.1.7779.3.1.1.3.1.3.3.0
+    metric_type: monotonic_count
+  - MIB: IB-DNSONE-MIB
+    symbol:
+      name: ibDDNSUpdatePrerequisiteReject
+      OID: 1.3.6.1.4.1.7779.3.1.1.3.1.3.4.0
+    metric_type: monotonic_count
+  - MIB: IB-DNSONE-MIB
+    symbol:
+      name: ibDnsQueryRate
+      OID: 1.3.6.1.4.1.7779.3.1.1.3.1.6.0
+  - MIB: IB-PLATFORMONE-MIB
+    table:
+      name: ibClusterReplicationStatusTable
+      OID: 1.3.6.1.4.1.7779.3.1.1.2.1.2
+    symbols:
+      - name: ibNodeQueueFromMaster
+        OID: 1.3.6.1.4.1.7779.3.1.1.2.1.2.1.3
+      - name: ibNodeQueueToMaster
+        OID: 1.3.6.1.4.1.7779.3.1.1.2.1.2.1.5
+    metric_tags:
+      - symbol:
+          name: ibNodeIPAddress
+          OID: 1.3.6.1.4.1.7779.3.1.1.2.1.2.1.1
+        tag: ib_node_ip_address
+      - symbol:
+          name: ibNodeReplicationStatus
+          OID: 1.3.6.1.4.1.7779.3.1.1.2.1.2.1.2
+        tag: ib_node_replication_status
+  - MIB: IB-PLATFORMONE-MIB
+    table:
+      name: ibMemberServiceStatusTable
+      OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9
+    symbols:
+      - name: ibMemberServiceStatus
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          name: ibServiceName
+          OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.1
+        tag: ib_service_name
+        mapping:
+          1: dhcp
+          2: dns
+          3: ntp
+          4: tftp
+          5: http-file-dist
+          6: ftp
+          7: bloxtools-move
+          8: bloxtools
+          9: node-status
+          10: disk-usage
+          11: enet-lan
+          12: enet-lan2
+          13: enet-ha
+          14: enet-mgmt
+          15: lcd
+          16: memory
+          17: replication
+          18: db-object
+          19: raid-summary
+          20: raid-disk1
+          21: raid-disk2
+          22: raid-disk3
+          23: raid-disk4
+          24: raid-disk5
+          25: raid-disk6
+          26: raid-disk7
+          27: raid-disk8
+          28: fan1
+          29: fan2
+          30: fan3
+          31: fan4
+          32: fan5
+          33: fan6
+          34: fan7
+          35: fan8
+          36: power-supply1
+          37: power-supply2
+          38: ntp-sync
+          39: cpu1-temp
+          40: cpu2-temp
+          41: sys-temp
+          42: raid-battery
+          43: cpu-usage
+          44: ospf
+          45: bgp
+          46: mgm-service
+          47: subgrid-conn
+          48: network-capacity
+          49: reporting
+          50: dns-cache-acceleration
+          51: ospf6
+          52: swap-usage
+          53: discovery-consolidator
+          54: discovery-collector
+          55: discovery-capacity
+          56: threat-protection
+          58: recursive-clients
+      - symbol:
+          name: ibServiceDesc
+          OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.3
+        tag: ib_service_desc
+      - symbol:
+          OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.2
+          name: ibServiceStatus
+        tag: ib_service_status
+        mapping:
+          1: working
+          2: warning
+          3: failed
+          4: inactive
+          5: unknown
+metric_tags:
+  - OID: 1.3.6.1.4.1.7779.3.1.1.2.1.4.0
+    symbol: ibHardwareType
+    tag: ib_hardware_type
+  - tag: ib_serial_number
+    OID: 1.3.6.1.4.1.7779.3.1.1.2.1.6.0
+    symbol: ibSerialNumber
+  - OID: 1.3.6.1.4.1.7779.3.1.1.2.1.7.0
+    symbol: ibNiosVersion
+    tag: ib_nios_version

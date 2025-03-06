@@ -1,0 +1,543 @@
+# Profile for Dell Poweredge devices
+
+# MIBs can be downloaded after searching for a server and looking for keyboard "MIB":
+# Example: https://www.dell.com/support/home/us/en/04/product-support/product/poweredge-r730/drivers
+
+# Status metrics (e.g: powerSupplyStatus, temperatureProbeStatus, etc.) output one of the following: other(1), unknown(2), ok(3), nonCritical(4), critical(5), nonRecoverable(6)
+
+# PowerEdge servers should be monitored via their iDRAC interface (and with the idrac profile) when possible.
+
+extends:
+  - _dell.yaml
+  - _intel-lan-adapters.yaml
+  - _generic-tcp.yaml
+  - _generic-udp.yaml
+  - _generic-ip.yaml
+
+device:
+  vendor: "dell"
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "server"
+
+sysobjectid:
+  - 1.3.6.1.4.1.674.10892.1 # Poweredge R640
+  - 1.3.6.1.4.1.674.10892.1.*
+  - 1.3.6.1.4.1.674.10892.6 # Poweredge MX7000
+
+metrics:
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.200.10
+      name: systemStateTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.4
+        name: systemStateChassisStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.6
+        name: systemStatePowerUnitStatusRedundancy
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.9
+        name: systemStatePowerSupplyStatusCombined
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.15
+        name: systemStateAmperageStatusCombined
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.18
+        name: systemStateCoolingUnitStatusRedundancy
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.21
+        name: systemStateCoolingDeviceStatusCombined
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.24
+        name: systemStateTemperatureStatusCombined
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.27
+        name: systemStateMemoryDeviceStatusCombined
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.30
+        name: systemStateChassisIntrusionStatusCombined
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.42
+        name: systemStatePowerUnitStatusCombined
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.44
+        name: systemStateCoolingUnitStatusCombined
+      - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.50
+        name: systemStateProcessorDeviceStatusCombined
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.200.10.1.1
+          name: systemStatechassisIndex
+        tag: chassis_index
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.200.10
+      name: systemStateTable
+    symbols:
+      - name: systemState
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.200.10.1.9
+          name: systemStatePowerSupplyStatusCombined
+        tag: system_state_power_supply_status_combined
+        mapping:
+          1: other
+          2: unknown
+          3: ok
+          4: non_critical
+          5: critical
+          6: non_recoverable
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.200.10.1.1
+          name: systemStatechassisIndex
+        tag: chassis_index
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.400.20
+      name: operatingSystemMemoryTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.400.20.1.6
+        name: operatingSystemMemoryAvailablePhysicalSize
+      - OID: 1.3.6.1.4.1.674.10892.1.400.20.1.7
+        name: operatingSystemMemoryTotalPageFileSize
+      - OID: 1.3.6.1.4.1.674.10892.1.400.20.1.8
+        name: operatingSystemMemoryAvailablePageFileSize
+      - OID: 1.3.6.1.4.1.674.10892.1.400.20.1.9
+        name: operatingSystemMemoryTotalVirtualSize
+      - OID: 1.3.6.1.4.1.674.10892.1.400.20.1.10
+        name: operatingSystemMemoryAvailableVirtualSize
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.400.20.1.1
+          name: operatingSystemMemorychassisIndex
+        tag: chassis_index
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.600.50
+      name: batteryTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.600.50.1.5
+        name: batteryStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.600.50.1.6
+        name: batteryReading
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.50.1.1
+          name: batteryChassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.50.1.2
+          name: batteryIndex
+        tag: battery_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.50.1.7
+          name: batteryLocationName
+        tag: battery_location_name
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.1100.80
+      name: pCIDeviceTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.80.1.5
+        name: pCIDeviceStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.80.1.9
+          name: pCIDeviceDescriptionName
+        tag: device_descr_name
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.80.1.1
+          name: pCIDevicechassisIndex
+        tag: chassis_index
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.300.50
+      name: systemBIOSTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.300.50.1.5
+        name: systemBIOSStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.300.50.1.1
+          name: systemBIOSchassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.300.50.1.2
+          name: systemBIOSIndex
+        tag: system_bios_index
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.300.70
+      name: intrusionTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.300.70.1.5
+        name: intrusionStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.300.70.1.6
+        name: intrusionReading
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.300.70.1.1
+          name: intrusionchassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.300.70.1.2
+          name: intrusionIndex
+        tag: intrusion_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.300.70.1.8
+          name: intrusionLocationName
+        tag: intrusion_location_name
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.600.20
+      name: voltageProbeTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.600.20.1.5
+        name: voltageProbeStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.600.20.1.6
+        name: voltageProbeReading
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.20.1.1
+          name: voltageProbechassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.20.1.2
+          name: voltageProbeIndex
+        tag: voltage_probe_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.20.1.7
+          name: voltageProbeType
+        tag: probe_type
+        mapping:
+            1: voltage_probe_type_is_other
+            2: voltage_probe_type_is_unknown
+            3: voltage_probe_type_is_1point5_volt   # 1.5 volt
+            4: voltage_probe_type_is_3point3_volt   # 3.3 volt
+            5: voltage_probe_type_is_5_volt         # 5 volt
+            6: voltage_probe_type_is_minus5_volt    # -5 volt
+            7: voltage_probe_type_is_12_volt        # 12 volt
+            8: voltage_probe_type_is_minus12_volt   # -12 volt
+            9: voltage_probe_type_is_io
+            10: voltage_probe_type_is_core
+            11: voltage_probe_type_is_flea
+            12: voltage_probe_type_is_battery
+            13: voltage_probe_type_is_terminator
+            14: voltage_probe_type_is_2point5_volt  # 2.5 volt
+            15: voltage_probe_type_is_gtl
+            16: voltage_probe_type_is_discrete
+            17: voltage_probe_type_is_generic_discrete
+            18: voltage_probe_type_is_ps_voltage
+            19: voltage_probe_type_is_memory_status
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.600.30
+      name: amperageProbeTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.600.30.1.5
+        name: amperageProbeStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.600.30.1.6
+        name: amperageProbeReading
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.30.1.7
+          name: amperageProbeType
+        tag: probe_type
+        mapping:
+            1: amperage_probe_type_is_other
+            2: amperage_probe_type_is_unknown
+            3: amperage_probe_type_is_1point5_volt    # 1.5 volt
+            4: amperage_probe_type_is_3point3_volt    # 3.3 volt
+            5: amperage_probe_type_is_5_volt          # 5 volt
+            6: amperage_probe_type_is_minus5_volt     # -5 volt
+            7: amperage_probe_type_is_12_volt         # 12 volt
+            8: amperage_probe_type_is_minus12_volt    # -12 volt
+            9: amperage_probe_type_is_io
+            10: amperage_probe_type_is_core
+            11: amperage_probe_type_is_flea
+            12: amperage_probe_type_is_battery
+            13: amperage_probe_type_is_terminator
+            14: amperage_probe_type_is_2point5_volt   # 2.5 volt
+            15: amperage_probe_type_is_gtl
+            16: amperage_probe_type_is_discrete
+            23: amperage_probe_type_is_power_supply_amps
+            24: amperage_probe_type_is_power_supply_watts
+            25: amperage_probe_type_is_system_amps
+            26: amperage_probe_type_is_system_watts
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.30.1.1
+          name: amperageProbechassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.30.1.2
+          name: amperageProbeIndex
+        tag: amperage_probe_index
+  - MIB: MIB-Dell-10892
+    metric_type: gauge # Sent as integers
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.600.12
+      name: powerSupplyTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.5
+        name: powerSupplyStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.6
+        name: powerSupplyOutputWatts
+      - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.9
+        name: powerSupplyMaximumInputVoltage
+      - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.16
+        name: powerSupplyCurrentInputVoltage
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.12.1.1
+          name: powerSupplychassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.12.1.2
+          name: powerSupplyIndex
+        tag: index
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.600.60
+      name: powerUsageTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.600.60.1.5
+        name: powerUsageStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.60.1.1
+          name: powerUsageChassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.60.1.2
+          name: powerUsageIndex
+        tag: power_usage_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.600.60.1.6
+          name: powerUsageEntityName
+        tag: power_usage_entity_name
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.700.10
+      name: coolingUnitTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.700.10.1.5
+        name: coolingUnitRedundancyStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.700.10.1.8
+        name: coolingUnitStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.10.1.1
+          name: coolingUnitchassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.10.1.2
+          name: coolingUnitIndex
+        tag: cooling_unit_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.10.1.7
+          name: coolingUnitName
+        tag: cooling_unit_name
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.700.12
+      name: coolingDeviceTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.700.12.1.5
+        name: coolingDeviceStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.700.12.1.6
+        name: coolingDeviceReading
+      - OID: 1.3.6.1.4.1.674.10892.1.700.12.1.18
+        name: coolingDeviceDiscreteReading
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.12.1.1
+          name: coolingDevicechassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.12.1.2
+          name: coolingDeviceIndex
+        tag: cooling_device_name
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.12.1.7
+          name: coolingDeviceType
+        tag: cooling_device_type
+        mapping:
+          1: cooling_device_type_is_other
+          2: cooling_device_type_is_unknown
+          3: cooling_device_type_is_a_fan
+          4: cooling_device_type_is_a_blower
+          5: cooling_device_type_is_a_chip_fan
+          6: cooling_device_type_is_a_cabinet_fan
+          7: cooling_device_type_is_a_power_supply_fan
+          8: cooling_device_type_is_a_heat_pipe
+          9: cooling_device_type_is_refrigeration
+          10: cooling_device_type_is_active_cooling
+          11: cooling_device_type_is_passive_cooling
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.12.1.8
+          name: coolingDeviceLocationName
+        tag: cooling_device_location_name
+  - MIB: MIB-Dell-10892
+    metric_type: gauge # Sent as integers
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.700.20
+      name: temperatureProbeTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.700.20.1.5
+        name: temperatureProbeStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.700.20.1.6
+        name: temperatureProbeReading
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.20.1.1
+          name: temperatureProbechassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.20.1.2
+          name: temperatureProbeIndex
+        tag: index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.20.1.7
+          name: temperatureProbeType
+        tag: temperature_probe_type
+        mapping:
+          1: temperature_probe_type_is_other
+          2: temperature_probe_type_is_unknown
+          3: temperature_probe_type_is_ambient_esm
+          16: temperature_probe_type_is_discrete
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.700.20.1.8
+          name: temperatureProbeLocationName
+        tag: temperature_probe_location_name
+  - MIB: MIB-Dell-10892
+    metric_type: gauge # Sent as integers
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.1100.30
+      name: processorDeviceTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.30.1.5
+        name: processorDeviceStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.30.1.19
+        name: processorDeviceThreadCount
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.30.1.1
+          name: processorDevicechassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.30.1.2
+          name: processorDeviceIndex
+        tag: index
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.1100.32
+      name: processorDeviceStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.5
+        name: processorDeviceStatusStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.6
+        name: processorDeviceStatusReading
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.1
+          name: processorDeviceStatusChassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.2
+          name: processorDeviceStatusIndex
+        tag: processor_device_status_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.7
+          name: processorDeviceStatusLocationName
+        tag: processor_device_status_location_name
+  - MIB: MIB-Dell-10892
+    metric_type: gauge # Sent as integers
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.1100.40
+      name: cacheDeviceTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.5
+        name: cacheDeviceStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.12
+        name: cacheDeviceMaximumSize
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.13
+        name: cacheDeviceCurrentSize
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.1
+          name: cacheDevicechassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.2
+          name: cacheDeviceIndex
+        tag: index
+  - MIB: MIB-Dell-10892
+    metric_type: gauge # Sent as integers
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.1100.50
+      name: memoryDeviceTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.5
+        name: memoryDeviceStatus
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.20
+        name: memoryDeviceFailureModes
+        # Sent as bit masks:
+        # (0) -- memory device has no faults.
+        # (1) -- ECC single bit correction warning rate exceeded
+        # (2) -- ECC single bit correction failure rate exceeded
+        # (4),-- ECC multibit fault encountered
+        # (8) -- ECC single bit correction logging disabled
+        # (16) -- device disabled because of spare activation
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.1
+          name: memoryDevicechassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.2
+          name: memoryDeviceIndex
+        tag: device_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.23
+          name: memoryDeviceSerialNumberName
+        tag: serial_number_name
+  - MIB: MIB-Dell-10892
+    metric_type: gauge # Sent as integers
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.1100.90
+      name: networkDeviceTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.90.1.3
+        name: networkDeviceStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1100.90.1.11
+          name: networkDeviceIPAddress
+        tag: ip_address
+  - MIB: MIB-Dell-10892
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.1200.10
+      name: systemSlotTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.1200.10.1.5
+        name: systemSlotStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1200.10.1.8
+          name: systemSlotSlotExternalSlotName
+        tag: slot_name
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.1200.10.1.1
+          name: systemSlotchassisIndex
+        tag: chassis_index
+  - MIB: DCS3FRU-MIB
+    table:
+      OID: 1.3.6.1.4.1.674.10892.1.2000.10
+      name: fruTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.2000.10.1.3
+        name: fruInformationStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.2000.10.1.1
+          name: fruChassisIndex
+        tag: chassis_index
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.1.2000.10.1.2
+          name: fruIndex
+        tag: fru_index

@@ -1,0 +1,381 @@
+extends:
+  - _base.yaml
+
+sysobjectid: 1.3.6.1.4.1.3808.1.1.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "cyberpower"
+      type:
+        value: "PDU"
+
+metrics:
+  - MIB: CPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1
+      name: ePDULoadStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.2
+        name: cyberpower.ePDULoadStatusLoad
+      - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.6
+        name: cyberpower.ePDULoadStatusVoltage
+      - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.7
+        name: cyberpower.ePDULoadStatusActivePower
+      - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.8
+        name: cyberpower.ePDULoadStatusApparentPower
+      - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.9
+        name: cyberpower.ePDULoadStatusPowerFactor
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.1
+          name: ePDULoadStatusIndex
+        tag: e_pdu_load_status_index
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.3
+          name: ePDULoadStatusLoadState
+        tag: e_pdu_load_status_load_state
+        mapping:
+          1: load_normal
+          2: load_low
+          3: load_near_overload
+          4: load_overload
+  - MIB: CPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.3808.1.1.3.2.4.1
+      name: ePDULoadBankConfigTable
+    symbols:
+      - name: cyberpower.ePDULoadBankConfig
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.2.4.1.1.1
+          name: ePDULoadBankConfigIndex
+        tag: e_pdu_load_bank_config_index
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.2.4.1.1.5
+          name: ePDULoadBankConfigAlarm
+        tag: e_pdu_load_bank_config_alarm
+        mapping:
+          1: no_load_alarm
+          2: under_current_alarm
+          3: near_over_current_alarm
+          4: over_current_alarm
+  - MIB: CPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1
+      name: ePDUOutletStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.7
+        name: cyberpower.ePDUOutletStatusLoad
+      - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.8
+        name: cyberpower.ePDUOutletStatusActivePower
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.1
+          name: ePDUOutletStatusIndex
+        tag: e_pdu_outlet_status_index
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.2
+          name: ePDUOutletStatusOutletName
+        tag: e_pdu_outlet_status_outlet_name
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.4
+          name: ePDUOutletStatusOutletState
+        tag: e_pdu_outlet_status_outlet_state
+        mapping:
+          1: outlet_status_on
+          2: outlet_status_off
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.9
+          name: ePDUOutletStatusAlarm
+        tag: e_pdu_outlet_status_alarm
+        mapping:
+          1: no_load_alarm
+          2: under_current_alarm
+          3: near_over_current_alarm
+          4: over_current_alarm
+  # - MIB: CPS-MIB  # All three metric tags are scalar metrics with enums. Not supported yet.
+  #   table:
+  #     OID: 1.3.6.1.4.1.3808.1.1.3.3.6.1
+  #     name: ePDUOutletBankTable
+  #   symbols:
+  #     - name: ePDUOutletBank
+  #       constant_value_one: true
+  #   metric_tags:
+  #     - symbol:
+  #         OID:
+  #         name: ePDUOutletBankIndex
+  #     - symbol:
+  #         OID: 1.3.6.1.4.1.3808.1.1.3.4.1.1
+  #         name: ePDUPowerSupply1Status
+  #       tag: e_pdu_power_supply1_status
+  #       mapping:
+  #         1: power_supply_one_ok
+  #         2: power_supply_one_failed
+  #     - symbol:
+  #         OID: 1.3.6.1.4.1.3808.1.1.3.4.1.2
+  #         name: ePDUPowerSupply2Status
+  #       tag: e_pdu_power_supply2_status
+  #       mapping:
+  #         1: power_supply_two_ok
+  #         2: power_supply_two_failed
+  #         3: power_supply_two_not_present
+  #     - symbol:
+  #         OID: 1.3.6.1.4.1.3808.1.1.3.4.1.3
+  #         name: ePDUPowerSupplyAlarm
+  #       tag: e_pdu_power_supply_alarm
+  #       mapping:
+  #         1: all_available_power_supplies_ok
+  #         2: power_supply_one_failed
+  #         3: power_supply_two_failed
+  #         4: power_supply_oneand_two_failed
+  - MIB: CPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.3808.1.1.3.5.2
+      name: ePDUStatusBankTable
+    symbols:
+      - name: cyberpower.ePDUStatusBank
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.5.2.1.1
+          name: ePDUStatusBankIndex
+        tag: e_pdu_status_bank_index
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.5.2.1.2
+          name: ePDUStatusBankNumber
+        tag: e_pdu_status_bank_number
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.5.2.1.3
+          name: ePDUStatusBankState
+        tag: e_pdu_status_bank_state
+        mapping:
+          1: bank_load_normal
+          2: bank_load_low
+          3: bank_load_near_overload
+          4: bank_load_overload
+  - MIB: CPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.3808.1.1.3.5.4
+      name: ePDUStatusPhaseTable
+    symbols:
+      - name: cyberpower.ePDUStatusPhase
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.5.4.1.1
+          name: ePDUStatusPhaseIndex
+        tag: e_pdu_status_phase_index
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.5.4.1.2
+          name: ePDUStatusPhaseNumber
+        tag: e_pdu_status_phase_number
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.5.4.1.3
+          name: ePDUStatusPhaseState
+        tag: e_pdu_status_phase_state
+        mapping:
+          1: phase_load_normal
+          2: phase_load_low
+          3: phase_load_near_overload
+          4: phase_load_overload
+  - MIB: CPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.3808.1.1.3.5.6
+      name: ePDUStatusOutletTable
+    symbols:
+      - name: cyberpower.ePDUStatusOutlet
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.5.6.1.1
+          name: ePDUStatusOutletIndex
+        tag: e_pdu_status_outlet_index
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.5.6.1.2
+          name: ePDUStatusOutletNumber
+        tag: e_pdu_status_outlet_number
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.3.5.6.1.3
+          name: ePDUStatusOutletState
+        tag: e_pdu_status_outlet_state
+        mapping:
+          1: outlet_load_normal
+          2: outlet_load_low
+          3: outlet_load_near_overload
+          4: outlet_load_overload
+  - MIB: CPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3808.1.1.3.5.7
+      name: cyberpower.ePDUStatusInputVoltage
+  - MIB: CPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3808.1.1.3.5.8
+      name: cyberpower.ePDUStatusInputFrequency
+  - MIB: CPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.3808.1.1.6.3.4
+      name: ePDU2DeviceStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.5
+        name: cyberpower.ePDU2DeviceStatusCurrentLoad
+      - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.6
+        name: cyberpower.ePDU2DeviceStatusCurrentPeakLoad
+      - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.15
+        name: cyberpower.ePDU2DeviceStatusApparentPower
+      - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.16
+        name: cyberpower.ePDU2DeviceStatusPowerFactor
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.1
+          name: ePDU2DeviceStatusIndex
+        tag: e_pdu2_device_status_index
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.3
+          name: ePDU2DeviceStatusName
+        tag: e_pdu2_device_status_name
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.17
+          name: ePDU2DeviceStatusRoleType
+        tag: e_pdu2_device_status_role_type
+        mapping:
+          1: standalone
+          2: host
+          3: slave
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.4
+          name: ePDU2DeviceStatusLoadState
+        tag: e_pdu2_device_status_load_state
+        mapping:
+          1: no_load_alarm
+          2: under_current_alarm
+          3: near_over_current_alarm
+          4: over_current_alarm
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.12
+          name: ePDU2DeviceStatusPowerSupplyAlarm
+        tag: e_pdu2_device_status_power_supply_alarm
+        mapping:
+          1: normal
+          2: alarm
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.13
+          name: ePDU2DeviceStatusPowerSupply1Status
+        tag: e_pdu2_device_status_power_supply1_status
+        mapping:
+          1: normal
+          2: alarm
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.14
+          name: ePDU2DeviceStatusPowerSupply2Status
+        tag: e_pdu2_device_status_power_supply2_status
+        mapping:
+          1: normal
+          2: alarm
+  - MIB: CPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.3808.1.1.6.4.4
+      name: ePDU2PhaseStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.5
+        name: cyberpower.ePDU2PhaseStatusLoad
+      - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.6
+        name: cyberpower.ePDU2PhaseStatusVoltage
+      - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.7
+        name: cyberpower.ePDU2PhaseStatusPower
+      - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.8
+        name: cyberpower.ePDU2PhaseStatusApparentPower
+      - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.9
+        name: cyberpower.ePDU2PhaseStatusPowerFactor
+      - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.10
+        name: cyberpower.ePDU2PhaseStatusPeakLoad
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.1
+          name: ePDU2PhaseStatusIndex
+        tag: e_pdu2_phase_status_index
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.4
+          name: ePDU2PhaseStatusLoadState
+        tag: e_pdu2_phase_status_load_state
+        mapping:
+          1: normal
+          2: low_load
+          3: near_overload
+          4: overload
+  - MIB: CPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.3808.1.1.6.5.4
+      name: ePDU2BankStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.5
+        name: cyberpower.ePDU2BankStatusLoad
+      - OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.6
+        name: cyberpower.ePDU2BankStatusPeakLoad
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.1
+          name: ePDU2BankStatusIndex
+        tag: e_pdu2_bank_status_index
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.4
+          name: ePDU2BankStatusLoadState
+        tag: e_pdu2_bank_status_load_state
+        mapping:
+          1: normal
+          2: low_load
+          3: near_overload
+          4: overload
+  - MIB: CPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.3808.1.1.6.6.1.4
+      name: ePDU2OutletSwitchedStatusTable
+    symbols:
+      - name: cyberpower.ePDU2OutletSwitchedStatus
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.6.1.4.1.1
+          name: ePDU2OutletSwitchedStatusIndex
+        tag: e_pdu2_outlet_switched_status_index
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.6.1.4.1.4
+          name: ePDU2OutletSwitchedStatusName
+        tag: e_pdu2_outlet_switched_status_name
+      - symbol:
+          OID: 1.3.6.1.4.1.3808.1.1.6.6.1.4.1.5
+          name: ePDU2OutletSwitchedStatusState
+        tag: e_pdu2_outlet_switched_status_state
+        mapping:
+          1: outlet_status_on
+          2: outlet_status_off
+  - MIB: CPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3808.1.1.4.2.1.0
+      name: cyberpower.envirTemperature
+  - MIB: CPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3808.1.1.4.2.6.0
+      name: cyberpower.envirTemperatureCelsius
+  - MIB: CPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3808.1.1.4.3.1.0
+      name: cyberpower.envirHumidity
+metric_tags:
+  - OID: 1.3.6.1.4.1.3808.1.1.3.1.1.0
+    symbol: ePDUIdentName
+    tag: e_pdu_ident_name
+  - tag: e_pdu_ident_model_number
+    OID: 1.3.6.1.4.1.3808.1.1.3.1.5.0
+    symbol: ePDUIdentModelNumber
+  - tag: e_pdu_ident_serial_number
+    OID: 1.3.6.1.4.1.3808.1.1.3.1.6.0
+    symbol: ePDUIdentSerialNumber
+  - OID: 1.3.6.1.4.1.3808.1.1.4.1.1.0
+    symbol: envirIdentName
+    tag: envir_ident_name
+  - OID: 1.3.6.1.4.1.3808.1.1.4.1.2.0
+    symbol: envirIdentLocation
+    tag: envir_ident_location

@@ -1,0 +1,27 @@
+extends:
+  - _generic-host-resources-base.yaml
+  - _generic-if.yaml
+  - avaya.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.6889.1.58
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "server"
+
+metrics:
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.2.1.25.2.3.1.5.1
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: memory.used
+      OID: 1.3.6.1.2.1.25.2.3.1.6.1
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.2.1.25.3.3.1.2.196608

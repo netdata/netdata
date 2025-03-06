@@ -1,0 +1,211 @@
+extends:
+  - apc.yaml
+
+sysobjectid: 1.3.6.1.4.1.318.1.*
+
+device:
+  vendor: "apc"
+
+metadata:
+  device:
+    fields:
+      version:
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.1.1.2.1.0
+          name: upsAdvIdentFirmwareRevision
+      product_name:
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.1.1.1.1.0
+          name: upsBasicIdentModel
+      type:
+        value: "UPS"
+
+metrics:
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.2.2.5.0
+      name: upsAdvBatteryNumOfBattPacks
+  - MIB: POWERNET-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.2.2.6.0
+      name: upsAdvBatteryNumOfBadBattPacks
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.2.2.4.0
+      name: upsAdvBatteryReplaceIndicator
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.2.2.3.0
+      name: upsAdvBatteryRunTimeRemaining
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.2.2.2.0
+      name: upsAdvBatteryTemperature
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.2.2.1.0
+      name: upsAdvBatteryCapacity
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.2.3.2.0
+      name: upsHighPrecExtdBatteryTemperature
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.3.2.1.0
+      name: upsAdvInputLineVoltage
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.3.2.4.0
+      name: upsAdvInputFrequency
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.3.3.4.0
+      name: upsHighPrecInputFrequency
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.3.3.1.0
+      name: upsHighPrecInputLineVoltage
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.4.3.4.0
+      name: upsHighPrecOutputCurrent
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.3.2.5.0
+      name: upsAdvInputLineFailCause
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.4.2.1.0
+      name: upsAdvOutputVoltage
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.4.2.2.0
+      name: upsAdvOutputFrequency
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.4.2.3.0
+      name: upsAdvOutputLoad
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.4.2.4.0
+      name: upsAdvOutputCurrent
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.4.2.8.0
+      name: upsAdvOutputActivePower
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.4.2.9.0
+      name: upsAdvOutputApparentPower
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.4.2.12.0
+      name: upsAdvOutputEnergyUsage
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.2.1.2.0
+      name: upsBasicBatteryTimeOnBattery
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.7.2.3.0
+      name: upsAdvTestDiagnosticsResults
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
+      name: upsBasicStateOutputState
+    metric_type: flag_stream
+    options:
+      placement: 4
+      metric_suffix: OnLine
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
+      name: upsBasicStateOutputState
+    metric_type: flag_stream
+    options:
+      placement: 5
+      metric_suffix: ReplaceBattery
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
+      name: upsBasicStateOutputState
+    metric_type: flag_stream
+    options:
+      placement: 8
+      metric_suffix: AVRTrimActive
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
+      name: upsBasicStateOutputState
+    metric_type: flag_stream
+    options:
+      placement: 11
+      metric_suffix: BatteriesDischarged
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
+      name: upsBasicStateOutputState
+    metric_type: flag_stream
+    options:
+      placement: 19
+      metric_suffix: "On"
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
+      name: upsBasicStateOutputState
+    metric_type: flag_stream
+    options:
+      placement: 30
+      metric_suffix: LowBatteryOnBattery
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
+      name: upsBasicStateOutputState
+    metric_type: flag_stream
+    options:
+      placement: 33
+      metric_suffix: NoBatteriesAttached
+  - MIB: PowerNet-MIB
+    table:
+      OID: 1.3.6.1.4.1.318.1.1.1.12.1.2
+      name: upsOutletGroupStatusTable
+    symbols:
+      - name: upsOutletGroupStatus
+        constant_value_one: true
+      - OID: 1.3.6.1.4.1.318.1.1.1.12.1.2.1.3
+        name: upsOutletGroupStatusGroupState
+    metric_tags:
+      - tag: outlet_group_name
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.1.12.1.2.1.2
+          name: upsOutletGroupStatusName
+      - tag: ups_outlet_group_status_group_state
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.1.12.1.2.1.3
+          name: upsOutletGroupStatusGroupState
+        mapping:
+          1: ups_outlet_group_status_on
+          2: ups_outlet_group_status_off
+          3: ups_outlet_group_status_unknown
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.25.1.2.1.6.0
+      name: uioSensorStatusTemperatureDegC
+metric_tags:
+  - tag: model
+    OID: 1.3.6.1.4.1.318.1.1.1.1.1.1.0  # The UPS model name (e.g. 'APC Smart-UPS 600', 'Smart-UPS RT 6000 RM XL').
+    symbol: upsBasicIdentModel
+  - tag: serial_num
+    OID: 1.3.6.1.4.1.318.1.1.1.1.2.3.0
+    symbol: upsAdvIdentSerialNumber     # An 8-character string identifying the serial number of
+                                        # the UPS internal microprocessor.  This number is set at
+                                        # the factory.  NOTE: This number does NOT correspond to
+                                        # the serial number on the rear of the UPS.
+  - tag: firmware_version
+    OID: 1.3.6.1.4.1.318.1.1.1.1.2.1.0
+    symbol: upsAdvIdentFirmwareRevision # The firmware revision of the UPS system's microprocessor.
+                                        # e.g. 452.17.W
+  - OID: 1.3.6.1.4.1.318.1.1.1.1.1.2.0  # An 8 byte ID string identifying the UPS.  This object can be set by the administrator.
+                                        # e.g. UP001
+    symbol: upsBasicIdentName
+    tag: ups_name

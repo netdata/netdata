@@ -1,0 +1,46 @@
+extends:
+  - riverbed.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.17163.1.1  # Steelhead MODULE-IDENTITY
+metrics:
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.2.1.25.2.3.1.5.1  # hrStorageSize.1 (hrStorageSize at index 1)
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: memory.used
+      OID: 1.3.6.1.2.1.25.2.3.1.6.1  # hrStorageUsed.1 (hrStorageUsed at index 1)
+  - MIB: STEELHEAD-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.17163.1.1.5.1.1.0
+  - MIB: STEELHEAD-MIB
+    symbol:
+      name: riverbed.steelhead.optimizedConnections
+      OID: 1.3.6.1.4.1.17163.1.1.5.2.1.0
+  - MIB: STEELHEAD-MIB
+    symbol:
+      name: riverbed.steelhead.passthroughConnections
+      OID: 1.3.6.1.4.1.17163.1.1.5.2.2.0
+  - MIB: STEELHEAD-MIB
+    symbol:
+      name: riverbed.steelhead.halfOpenedConnections
+      OID: 1.3.6.1.4.1.17163.1.1.5.2.3.0
+  - MIB: STEELHEAD-MIB
+    symbol:
+      name: riverbed.steelhead.halfClosedConnections
+      OID: 1.3.6.1.4.1.17163.1.1.5.2.4.0
+  - MIB: STEELHEAD-MIB
+    symbol:
+      name: riverbed.steelhead.establishedConnections
+      OID: 1.3.6.1.4.1.17163.1.1.5.2.5.0
+  - MIB: STEELHEAD-MIB
+    symbol:
+      name: riverbed.steelhead.activeConnections
+      OID: 1.3.6.1.4.1.17163.1.1.5.2.6.0
+  - MIB: STEELHEAD-MIB
+    symbol:
+      name: riverbed.steelhead.totalConnections
+      OID: 1.3.6.1.4.1.17163.1.1.5.2.7.0

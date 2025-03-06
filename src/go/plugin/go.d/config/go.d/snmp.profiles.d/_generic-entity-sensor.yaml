@@ -1,0 +1,100 @@
+metrics:
+  - MIB: ENTITY-SENSOR-MIB
+    table:
+      OID: 1.3.6.1.2.1.99.1.1
+      name: entPhySensorTable
+    symbols:
+      - OID: 1.3.6.1.2.1.99.1.1.1.4
+        name: entPhySensorValue
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.99.1.1.1.1
+          name: entPhySensorType
+        tag: ent_phy_sensor_type
+        mapping:
+          1: other
+          2: unknown
+          3: volts_ac
+          4: volts_dc
+          5: amperes
+          6: watts
+          7: hertz
+          8: celsius
+          9: percent_rh
+          10: rpm
+          11: cmm
+          12: truthvalue
+      - symbol:
+          OID: 1.3.6.1.2.1.99.1.1.1.2
+          name: entPhySensorScale
+        tag: ent_phy_sensor_scale
+        mapping:
+          1: yocto
+          2: zepto
+          3: atto
+          4: femto
+          5: pico
+          6: nano
+          7: micro
+          8: milli
+          9: units
+          10: kilo
+          11: mega
+          12: giga
+          13: tera
+          14: exa
+          15: peta
+          16: zetta
+          17: yotta
+      - symbol:
+          OID: 1.3.6.1.2.1.99.1.1.1.3
+          name: entPhySensorPrecision
+        tag: ent_phy_sensor_precision
+      - symbol:
+          OID: 1.3.6.1.2.1.99.1.1.1.6
+          name: entPhySensorUnitsDisplay
+        tag: ent_phy_sensor_units_display
+      - symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.2
+          name: entPhysicalDescr
+        tag: ent_physical_descr
+      - symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.5
+          name: entPhysicalClass
+        tag: ent_physical_class
+        mapping:
+          1: other
+          2: unknown
+          3: chassis
+          4: backplane
+          5: container
+          6: power_supply
+          7: fan
+          8: sensor
+          9: module
+          10: port
+          11: stack
+          12: cpu
+          13: energy_object
+          14: battery
+          15: storage_drive
+      - symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.7
+          name: entPhysicalName
+        tag: ent_physical_name
+      - symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.11
+          name: entPhysicalSerialNum
+        tag: ent_physical_serial_num
+      - symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.13
+          name: entPhysicalModelName
+        tag: ent_physical_model_name
+      - symbol:
+          OID: 1.3.6.1.2.1.99.1.1.1.5
+          name: entPhySensorOperStatus
+        tag: ent_phy_sensor_oper_status
+        mapping:
+          1: ok
+          2: unavailable
+          3: nonoperational

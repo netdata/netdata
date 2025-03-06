@@ -1,0 +1,171 @@
+# Profile for Aruba Switch devices
+#
+# Examples:
+# Switch Products:
+#     sysObjectID                        SysDescr
+#     1.3.6.1.4.1.14823.1.1.17           ArubaOS (MODEL: Aruba3600-US), Version 6.4.4.17 (63295)
+#     1.3.6.1.4.1.14823.1.1.19           ArubaOS (MODEL: Aruba650-US), Version 6.4.4.17 (63295)
+#     1.3.6.1.4.1.14823.1.1.32           ArubaOS (MODEL: Aruba7210), Version 6.5.4.9 (67129)
+#     1.3.6.1.4.1.14823.1.1.32           ArubaOS (MODEL: Aruba7210-US), Version 6.5.4.9 (67129)
+#     1.3.6.1.4.1.14823.1.1.32           ArubaOS (MODEL: Aruba7210-US), Version 6.4.4.17 (63295)
+#     1.3.6.1.4.1.14823.1.1.33           ArubaOS (MODEL: Aruba7220-US), Version 6.5.4.9 (67129)
+#     1.3.6.1.4.1.14823.1.1.36           Aruba S1500 Mobility Access Switch
+#     1.3.6.1.4.1.14823.1.1.39           ArubaOS (MODEL: Aruba7005-US), Version 6.5.4.8 (65873)
+#     1.3.6.1.4.1.14823.1.1.40           ArubaOS (MODEL: Aruba7010-US), Version 6.5.1.4 (58698)
+
+extends:
+  - _base.yaml
+  - _aruba-base.yaml
+  - _generic-if.yaml
+  - _generic-ospf.yaml
+  - _aruba-switch-cpu-memory.yaml
+
+# All Switch Products (switchProducts/1.3.6.1.4.1.14823.1.1) from ARUBA-MIB
+sysobjectid: 1.3.6.1.4.1.14823.1.1.*
+
+device:
+  vendor: "aruba"
+
+metadata:
+  device:
+    fields:
+      serial_number:
+        symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.29.0
+          name: wlsxSysExtSerialNumber
+          # Examples: `CV0009287`
+      version:
+        # wlsxSysExtSwVersion used for both version and os_version
+        symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.28.0
+          name: wlsxSysExtSwVersion
+          # Examples: `8.6.0.4`
+      product_name:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: '\bMODEL:\s+([\w-]+)'
+          match_value: '$1'
+          # Examples: ArubaOS (MODEL: Aruba7010-US), Version 6.5.1.4 (58698)
+      model:
+        symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.1.2.0
+          name: wlsxModelName
+          # Example: A7210
+      os_name:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: '\bArubaOS\b'
+          match_value: 'ArubaOS'
+      os_version:
+        # wlsxSysExtSwVersion used for both version and os_version
+        symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.28.0
+          name: wlsxSysExtSwVersion
+          # Examples: `8.6.0.4`
+      type:
+        value: "switch"
+
+metrics:
+  ### Sensor
+
+  # The table of all supported fans in the controller.
+  # Not supported in Aruba 200/800 and 2400 controllers.
+  - MIB: WLSX-SYSTEMEXT-MIB
+    table:
+      OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17
+      name: wlsxSysExtFanTable
+    symbols:
+      - # NOTE: active(1), inactive(2)
+        OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17.1.2
+        name: sysExtFanStatus
+    metric_tags:
+      - tag: fan_index
+        symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17.1.1
+          name: sysExtFanIndex
+
+  - MIB: WLSX-SYSTEMEXT-MIB
+    table:
+      OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17
+      name: wlsxSysExtFanTable
+    symbols:
+      - name: wlsxSysExtFan
+        constant_value_one: true
+    metric_tags:
+      - tag: fan_index
+        symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17.1.1
+          name: sysExtFanIndex
+      - tag: fan_status
+        symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17.1.2
+          name: sysExtFanStatus
+        mapping:
+          1: active
+          2: inactive
+
+  ### Power
+
+  # The table of Power supplies in the controller.
+  # Not supported in Aruba 200, 800 and 2400 controllers.
+  - MIB: WLSX-SYSTEMEXT-MIB
+    table:
+      OID: 1.3.6.1.4.1.14823.2.2.1.2.1.18
+      name: wlsxSysExtPowerSupplyTable
+    symbols:
+      # NOTE: active(1), inactive(2)
+      - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.18.1.2
+        name: sysExtPowerSupplyStatus
+    metric_tags:
+      - tag: powersupply_index
+        symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.18.1.1
+          name: sysExtPowerSupplyIndex
+
+  ### Processor
+
+  - # The table of processors contained by the controller.
+    MIB: WLSX-SYSTEMEXT-MIB
+    table:
+      OID: 1.3.6.1.4.1.14823.2.2.1.2.1.13
+      name: wlsxSysExtProcessorTable
+    symbols:
+      # The average, over the last minute, of the percentage of time that this processor was not idle.
+      - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.13.1.3
+        name: sysExtProcessorLoad
+    metric_tags:
+      - tag: processor_index
+        symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.13.1.1
+          name: sysExtProcessorID
+
+  ### Memory
+
+  - # The memory status of the controller. All memory values measured in KB.
+    MIB: WLSX-SYSTEMEXT-MIB
+    table:
+      OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1
+      name: wlsxSysExtMemoryTable
+    symbols:
+      - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.2
+        name: sysExtMemorySize
+      - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.3
+        name: sysExtMemoryUsed
+      - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.4
+        name: sysExtMemoryFree
+    metric_tags:
+      - tag: memory_index
+        symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.1
+          name: sysExtMemoryIndex
+
+
+  ### Interface
+
+  # The packet loss count of the switch.
+  - MIB: WLSX-SYSTEMEXT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.14823.2.2.1.2.1.32.0
+      name: wlsxSysExtPacketLossPercent

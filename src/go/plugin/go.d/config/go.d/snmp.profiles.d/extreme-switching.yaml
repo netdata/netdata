@@ -1,0 +1,119 @@
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+  - _generic-entity-sensor.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.1916.2.89
+  - 1.3.6.1.4.1.1916.2.343
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "extreme-networks"
+      type:
+        value: "switch"
+
+metrics:
+  - MIB: EXTREME-SOFTWARE-MONITOR-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.1916.1.32.1.2.0
+  - MIB: EXTREME-SOFTWARE-MONITOR-MIB
+    table:
+      name: extremeMemoryMonitorSystemTable
+      OID: 1.3.6.1.4.1.1916.1.32.2.2
+    symbols:
+      - name: memory.total
+        OID: 1.3.6.1.4.1.1916.1.32.2.2.1.2
+      - name: memory.free
+        OID: 1.3.6.1.4.1.1916.1.32.2.2.1.3
+    metric_tags:
+      - index: 1  # extremeMemoryMonitorSystemSlotId
+        tag: mem
+  # - MIB: EXTREME-SYSTEM-MIB
+  #   symbol:
+  #     name: extremeOverTemperatureAlarm
+  #     OID: 1.3.6.1.4.1.1916.1.1.1.7.0
+  #     enum:
+  #       true: 1
+  #       false: 2
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  - MIB: EXTREME-SYSTEM-MIB
+    symbol:
+      name: extremeCurrentTemperature
+      OID: 1.3.6.1.4.1.1916.1.1.1.8.0
+  # - MIB: EXTREME-SYSTEM-MIB
+  #   symbol:
+  #     name: extremePrimaryPowerOperational
+  #     OID: 1.3.6.1.4.1.1916.1.1.1.10.0
+  #     enum:
+  #       true: 1
+  #       false: 2
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  # - MIB: EXTREME-SYSTEM-MIB
+  #   symbol:
+  #     name: extremeRedundantPowerStatus
+  #     OID: 1.3.6.1.4.1.1916.1.1.1.11.0
+  #     enum:
+  #       notPresent: 1
+  #       presentOK: 2
+  #       presentNotOK: 3
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  # - MIB: EXTREME-SYSTEM-MIB
+  #   symbol:
+  #     name: extremeRedundantPowerAlarm
+  #     OID: 1.3.6.1.4.1.1916.1.1.1.12.0
+  #     enum:
+  #       true: 1
+  #       false: 2
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  # - MIB: EXTREME-SYSTEM-MIB
+  #   symbol:
+  #     name: extremePrimarySoftwareRev
+  #     OID: 1.3.6.1.4.1.1916.1.1.1.13.0
+  # scalar string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+  # - MIB: EXTREME-SYSTEM-MIB
+  #   symbol:
+  #     name: extremeSecondarySoftwareRev
+  #     OID: 1.3.6.1.4.1.1916.1.1.1.14.0
+  # scalar string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+  - MIB: EXTREME-SYSTEM-MIB
+    symbol:
+      name: extremeInputPowerVoltage
+      OID: 1.3.6.1.4.1.1916.1.1.1.20.0
+  # - MIB: EXTREME-SYSTEM-MIB
+  #   symbol:
+  #     name: extremePowerStatus
+  #     OID: 1.3.6.1.4.1.1916.1.1.1.21.0
+  #     enum:
+  #       notPresent: 1
+  #       presentOK: 2
+  #       presentNotOK: 3
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  # - MIB: EXTREME-SYSTEM-MIB
+  #   symbol:
+  #     name: extremePowerAlarm
+  #     OID: 1.3.6.1.4.1.1916.1.1.1.22.0
+  #     enum:
+  #       true: 1
+  #       false: 2
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  # - MIB: EXTREME-SYSTEM-MIB
+  #   symbol:
+  #     name: extremeSystemPowerState
+  #     OID: 1.3.6.1.4.1.1916.1.1.1.36.0
+  #     enum:
+  #       computing: 1
+  #       sufficientButNotRedundantPower: 2
+  #       redundantPowerAvailable: 3
+  #       insufficientPower: 4
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)

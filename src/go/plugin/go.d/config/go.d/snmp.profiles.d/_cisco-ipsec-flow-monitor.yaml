@@ -1,0 +1,94 @@
+metrics:
+  - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
+    table:
+      name: cikeTunnelTable
+      OID: 1.3.6.1.4.1.9.9.171.1.2.3
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.15
+        name: cikeTunLifeTime
+      - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.19
+        name: cikeTunInOctets
+      - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.20
+        name: cikeTunInPkts
+      - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.21
+        name: cikeTunInDropPkts
+      - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.27
+        name: cikeTunOutOctets
+      - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.28
+        name: cikeTunOutPkts
+      - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.29
+        name: cikeTunOutDropPkts
+    metric_tags:
+      - index: 1
+        tag: phase_1_tunnel_index
+      - tag: peer_local_value
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.3
+          name: cikeTunLocalValue
+      - tag: peer_remote_value
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.7
+          name: cikeTunRemoteValue
+      - tag: tunnel_status
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.35
+          name: cikeTunStatus
+        mapping:
+          1: active
+          2: destroy
+  - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
+    table:
+      name: cipSecTunnelTable
+      OID: 1.3.6.1.4.1.9.9.171.1.3.2
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.9
+        name: cipSecTunLifeTime
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.26
+        name: cipSecTunInOctets
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.27
+        name: cipSecTunHcInOctets
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.32
+        name: cipSecTunInPkts
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.36
+        name: cipSecTunInAuthFails
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.38
+        name: cipSecTunInDecryptFails
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.39
+        name: cipSecTunOutOctets
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.40
+        name: cipSecTunHcOutOctets
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.45
+        name: cipSecTunOutPkts
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.48
+        name: cipSecTunOutAuthFails
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.50
+        name: cipSecTunOutEncryptFails
+    metric_tags:
+      - index: 1
+        tag: phase_2_tunnel_index
+      - tag: phase_1_tunnel_index
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.2
+          name: cipSecTunIkeTunnelIndex
+      - tag: tunnel_alive
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.3
+          name: cipSecTunIkeTunnelAlive
+        mapping:
+          1: true
+          2: false
+      - tag: peer_local_address
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.4
+          name: cipSecTunLocalAddr
+      - tag: peer_remote_address
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.5
+          name: cipSecTunRemoteAddr
+      - tag: tunnel_status
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.51
+          name: cipSecTunStatus
+        mapping:
+          1: active
+          2: destroy

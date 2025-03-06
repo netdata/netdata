@@ -1,0 +1,269 @@
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "synology"
+      type:
+        value: "storage"
+
+sysobjectid: 1.3.6.1.4.1.6574.*
+metrics:
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.2021.10.1.5.1
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.2.1.25.2.3.1.6.1  # hrStorageUsed.1 = Physical memory
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.25.2.3.1.6.6  # hrStorageUsed.6 = Memory buffers
+      name: hrMemoryBuffers
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.25.2.3.1.6.7  # hrStorageUsed.7 = Cached memory
+      name: hrCachedMemory
+#  - MIB: SYNOLOGY-SYSTEM-MIB
+#    symbol:
+#      name: synology.system.systemStatus
+#      OID: 1.3.6.1.4.1.6574.1.1.0
+#      enum:
+#        normal: 1
+#        failed: 2
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: SYNOLOGY-SYSTEM-MIB
+    symbol:
+      name: synology.system.temperature
+      OID: 1.3.6.1.4.1.6574.1.2.0
+#  - MIB: SYNOLOGY-SYSTEM-MIB
+#    symbol:
+#      name: synology.system.powerStatus
+#      OID: 1.3.6.1.4.1.6574.1.3.0
+#      enum:
+#        normal: 1
+#        failed: 2
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: SYNOLOGY-SYSTEM-MIB
+#    symbol:
+#      name: synology.system.systemFanStatus
+#      OID: 1.3.6.1.4.1.6574.1.4.1.0
+#      enum:
+#        normal: 1
+#        failed: 2
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: SYNOLOGY-SYSTEM-MIB
+#    symbol:
+#      name: synology.system.cpuFanStatus
+#      OID: 1.3.6.1.4.1.6574.1.4.2.0
+#      enum:
+#        normal: 1
+#        failed: 2
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: SYNOLOGY-SYSTEM-MIB
+#    symbol:
+#      name: synology.system.upgradeAvailable
+#      OID: 1.3.6.1.4.1.6574.1.5.4.0
+#      enum:
+#        available: 1
+#        unavailable: 2
+#        connecting: 3
+#        disconnected: 4
+#        others: 5
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: SYNOLOGY-DISK-MIB
+    table:
+      name: diskTable
+      OID: 1.3.6.1.4.1.6574.2.1
+    symbols:
+      - name: synology.diskTemperature
+        OID: 1.3.6.1.4.1.6574.2.1.1.6
+    metric_tags:
+      - symbol:
+          name: synology.diskID
+          OID: 1.3.6.1.4.1.6574.2.1.1.2
+        tag: synology_disk_id
+      - symbol:
+          name: synology.diskModel
+          OID: 1.3.6.1.4.1.6574.2.1.1.3
+        tag: synology_disk_model
+      - symbol:
+          name: synology.diskType
+          OID: 1.3.6.1.4.1.6574.2.1.1.4
+        tag: synology_disk_type
+      - symbol:
+          OID: 1.3.6.1.4.1.6574.2.1.1.5
+          name: synology.diskStatus
+        tag: synology_disk_status
+        mapping:
+          1: normal
+          2: initialized
+          3: not_initialized
+          4: system_partition_failed
+          5: crashed
+          # mapping in the metric description
+  - MIB: SYNOLOGY-RAID-MIB
+    table:
+      name: raidTable
+      OID: 1.3.6.1.4.1.6574.3.1
+    symbols:
+      - name: synology.raidFreeSize
+        OID: 1.3.6.1.4.1.6574.3.1.1.4
+        metric_type: monotonic_count
+      - name: synology.raidTotalSize
+        OID: 1.3.6.1.4.1.6574.3.1.1.5
+        metric_type: monotonic_count
+    metric_tags:
+      - symbol:
+          name: synology.raid.raidName
+          OID: 1.3.6.1.4.1.6574.3.1.1.2
+        tag: synology_raid_name
+      - symbol:
+          OID: 1.3.6.1.4.1.6574.3.1.1.3
+          name: synology.raid.raidStatus
+        tag: synology_raid_status
+        mapping:
+          1: normal
+          2: repairing
+          3: migrating
+          4: expanding
+          5: deleting
+          6: creating
+          7: raid_syncing
+          8: raid_parity_checking
+          9: raid_assembling
+          10: canceling
+          11: degrade
+          12: crashed
+          13: data_scrubbing
+          14: raid_deploying
+          15: raid_un_deploying
+          16: raid_mount_cache
+          17: raid_unmount_cache
+          18: raid_expanding_unfinished_shr
+          19: raid_convert_shr_to_pool
+          20: raid_migrate_shr1_to_shr2
+          21: raid_unknown_status
+          # full list of mappings here https://global.download.synology.com/download/Document/Software/DeveloperGuide/Firmware/DSM/All/enu/Synology_DiskStation_MIB_Guide.pdf
+  - MIB: SYNOLOGY-SMART-MIB
+    table:
+      name: diskSMARTTable
+      OID: 1.3.6.1.4.1.6574.5.1
+    symbols:
+      - name: synology.diskSMARTAttrCurrent
+        OID: 1.3.6.1.4.1.6574.5.1.1.5
+      - name: synology.diskSMARTAttrThreshold
+        OID: 1.3.6.1.4.1.6574.5.1.1.7
+    metric_tags:
+      - symbol:
+          name: synology.diskSMARTInfoDevName
+          OID: 1.3.6.1.4.1.6574.5.1.1.2
+        tag: synology_disk_smart_info_dev_name
+      - symbol:
+          name: synology.diskSMARTAttrName
+          OID: 1.3.6.1.4.1.6574.5.1.1.3
+        tag: synology_disk_smart_attr_name
+      - symbol:
+          name: synology.diskSMARTAttrId
+          OID: 1.3.6.1.4.1.6574.5.1.1.4
+        tag: synology_disk_smart_attr_id
+      - symbol:
+          OID: 1.3.6.1.4.1.6574.5.1.1.9
+          name: synology.diskSMARTAttrStatus
+        tag: synology_disk_smart_attr_status
+  - MIB: SYNOLOGY-SERVICES-MIB
+    table:
+      name: serviceTable
+      OID: 1.3.6.1.4.1.6574.6.1
+    symbols:
+      - name: synology.serviceUsers
+        OID: 1.3.6.1.4.1.6574.6.1.1.3
+    metric_tags:
+      - symbol:
+          name: synology.serviceName
+          OID: 1.3.6.1.4.1.6574.6.1.1.2
+        tag: synology_service_name
+  - MIB: SYNOLOGY-STORAGEIO-MIB
+    table:
+      name:
+      OID: 1.3.6.1.4.1.6574.101.1
+    symbols:
+      - name: synology.storageIOReads
+        OID: 1.3.6.1.4.1.6574.101.1.1.5
+        metric_type: monotonic_count
+      - name: synology.storageIOWrites
+        OID: 1.3.6.1.4.1.6574.101.1.1.6
+        metric_type: monotonic_count
+      - name: synology.storageIOLA
+        OID: 1.3.6.1.4.1.6574.101.1.1.8
+      - name: synology.storageIONReadX
+        OID: 1.3.6.1.4.1.6574.101.1.1.12
+        metric_type: monotonic_count
+      - name: synology.storageIONWrittenX
+        OID: 1.3.6.1.4.1.6574.101.1.1.13
+        metric_type: monotonic_count
+    metric_tags:
+      - symbol:
+          name: synology.storageIODevice
+          OID: 1.3.6.1.4.1.6574.101.1.1.2
+        tag: synology_storage_io_device
+  - MIB: SYNOLOGY-SPACEIO-MIB
+    table:
+      name:
+      OID: 1.3.6.1.4.1.6574.102.1
+    symbols:
+      - name: synology.spaceIOReads
+        OID: 1.3.6.1.4.1.6574.102.1.1.5
+        metric_type: monotonic_count
+      - name: synology.spaceIOWrites
+        OID: 1.3.6.1.4.1.6574.102.1.1.6
+        metric_type: monotonic_count
+      - name: synology.spaceIOLA
+        OID: 1.3.6.1.4.1.6574.102.1.1.8
+      - name: synology.spaceIONReadX
+        OID: 1.3.6.1.4.1.6574.102.1.1.12
+        metric_type: monotonic_count
+      - name: synology.spaceIONWrittenX
+        OID: 1.3.6.1.4.1.6574.102.1.1.13
+        metric_type: monotonic_count
+    metric_tags:
+      - symbol:
+          name: synology.spaceIODevice
+          OID: 1.3.6.1.4.1.6574.102.1.1.2
+        tag: synology_space_io_device
+#  - MIB: SYNOLOGY-GPUINFO-MIB
+#    symbol:
+#      name: synology.system.gpuInfoSupported
+#      OID: 1.3.6.1.4.1.6574.108.1.0
+#      enum:
+#        supported: 0
+#        unsupported: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: SYNOLOGY-GPUINFO-MIB
+    symbol:
+      name: synology.gpuUtilization
+      OID: 1.3.6.1.4.1.6574.108.2.0
+  - MIB: SYNOLOGY-GPUINFO-MIB
+    symbol:
+      name: synology.gpuMemoryUtilization
+      OID: 1.3.6.1.4.1.6574.108.3.0
+metric_tags:
+  - OID: 1.3.6.1.4.1.6574.1.5.1.0
+    symbol: modelName
+    tag: synology_model_name
+  - OID: 1.3.6.1.4.1.6574.1.5.2.0
+    symbol: serialNumber
+    tag: synology_serial_number
+  - OID: 1.3.6.1.4.1.6574.1.5.3.0
+    symbol: version
+    tag: synology_version

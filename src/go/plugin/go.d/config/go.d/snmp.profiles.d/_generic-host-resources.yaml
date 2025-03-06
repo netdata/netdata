@@ -1,0 +1,4 @@
+# Generic Resource metrics for devices with cpu and memory metrics combined
+extends:
+  - _generic-host-resources-base.yaml
+  - _generic-host-cpu-memory.yaml
