@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- Revert broken DEB priority configuration in repoconfig packages. [\#19783](https://github.com/netdata/netdata/pull/19783) ([Ferroin](https://github.com/Ferroin))
+- Restructure shutdown logic used during updates. [\#19781](https://github.com/netdata/netdata/pull/19781) ([Ferroin](https://github.com/Ferroin))
+- add unique machine id to status file [\#19778](https://github.com/netdata/netdata/pull/19778) ([ktsaou](https://github.com/ktsaou))
+- fix\(go.d/sd\): fix logging cfg source when disabled [\#19777](https://github.com/netdata/netdata/pull/19777) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d/sd\): add file path to k8s/snmp discovered job source [\#19776](https://github.com/netdata/netdata/pull/19776) ([ilyam8](https://github.com/ilyam8))
+- Improve agent shutdown [\#19775](https://github.com/netdata/netdata/pull/19775) ([stelfrag](https://github.com/stelfrag))
+- Fix SIGSEGV on static installs due to dengine log [\#19774](https://github.com/netdata/netdata/pull/19774) ([ktsaou](https://github.com/ktsaou))
+- kickstart: install native pkg on RPi2+ [\#19773](https://github.com/netdata/netdata/pull/19773) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/sd\): rename discoverers pkgs [\#19772](https://github.com/netdata/netdata/pull/19772) ([ilyam8](https://github.com/ilyam8))
 - block signals before curl [\#19771](https://github.com/netdata/netdata/pull/19771) ([ktsaou](https://github.com/ktsaou))
 - block all signals before spawning any threads [\#19770](https://github.com/netdata/netdata/pull/19770) ([ktsaou](https://github.com/ktsaou))
 - add handling for sigabrt in the status file [\#19769](https://github.com/netdata/netdata/pull/19769) ([ktsaou](https://github.com/ktsaou))
@@ -63,6 +72,7 @@
 - Check for final step [\#19708](https://github.com/netdata/netdata/pull/19708) ([stelfrag](https://github.com/stelfrag))
 - daemon status improvements 3 [\#19707](https://github.com/netdata/netdata/pull/19707) ([ktsaou](https://github.com/ktsaou))
 - fix runtime directory; annotate daemon status file [\#19706](https://github.com/netdata/netdata/pull/19706) ([ktsaou](https://github.com/ktsaou))
+- Add repository priority configuration for DEB package repositories. [\#19705](https://github.com/netdata/netdata/pull/19705) ([Ferroin](https://github.com/Ferroin))
 - add host/os fields to status file [\#19704](https://github.com/netdata/netdata/pull/19704) ([ktsaou](https://github.com/ktsaou))
 - under MSYS2 use stat [\#19703](https://github.com/netdata/netdata/pull/19703) ([ktsaou](https://github.com/ktsaou))
 - Document journal v2 index file format. [\#19701](https://github.com/netdata/netdata/pull/19701) ([vkalintiris](https://github.com/vkalintiris))
@@ -483,18 +493,6 @@
 - fix the renamed function under windows [\#19240](https://github.com/netdata/netdata/pull/19240) ([ktsaou](https://github.com/ktsaou))
 - update netdata internal metrics ctx [\#19239](https://github.com/netdata/netdata/pull/19239) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d.plugin\): enable dyncfg vnodes [\#19238](https://github.com/netdata/netdata/pull/19238) ([ilyam8](https://github.com/ilyam8))
-- docs: fix win deploy command for nightly [\#19236](https://github.com/netdata/netdata/pull/19236) ([ilyam8](https://github.com/ilyam8))
-- RRDHOST system-info isolation [\#19235](https://github.com/netdata/netdata/pull/19235) ([ktsaou](https://github.com/ktsaou))
-- Allow more threads to load contexts during startup [\#19234](https://github.com/netdata/netdata/pull/19234) ([stelfrag](https://github.com/stelfrag))
-- Fix memory leak  [\#19233](https://github.com/netdata/netdata/pull/19233) ([stelfrag](https://github.com/stelfrag))
-- fix\(go.d/mongodb\): add missing disconnect in initClient [\#19232](https://github.com/netdata/netdata/pull/19232) ([ilyam8](https://github.com/ilyam8))
-- docs: update ui 3rd party link [\#19231](https://github.com/netdata/netdata/pull/19231) ([ilyam8](https://github.com/ilyam8))
-- docs: split redistributed and add judy and dlib [\#19230](https://github.com/netdata/netdata/pull/19230) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/lmittmann/tint from 1.0.5 to 1.0.6 in /src/go [\#19229](https://github.com/netdata/netdata/pull/19229) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Fix: fix heap use after free in health [\#19228](https://github.com/netdata/netdata/pull/19228) ([ktsaou](https://github.com/ktsaou))
-- ci: replace exit 1 with conditional skip in website update workflow [\#19227](https://github.com/netdata/netdata/pull/19227) ([ilyam8](https://github.com/ilyam8))
-- fix\(ml\): remove logging for earch not acquired dimension [\#19226](https://github.com/netdata/netdata/pull/19226) ([ilyam8](https://github.com/ilyam8))
-- Fix static builds to ensure usability on intended baseline hardware. [\#19224](https://github.com/netdata/netdata/pull/19224) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
