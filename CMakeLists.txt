@@ -3628,15 +3628,15 @@ if(ENABLE_PLUGIN_GO)
 
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles.d)
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles)
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles.d/default)
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/default)
 
-    file(GLOB GO_SD_CONF_FILES src/go/plugin/go.d/config/go.d/snmp.profiles.d/default/*.yaml)
+    file(GLOB GO_SD_CONF_FILES src/go/plugin/go.d/config/go.d/snmp.profiles/default/*.yaml)
     install(FILES ${GO_SD_CONF_FILES}
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles.d/default)
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/default)
 
     if(BUILD_FOR_PACKAGING)
         install(FILES
