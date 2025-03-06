@@ -1,0 +1,45 @@
+# Generic metadata for Juniper JUNOS gears.
+
+# sysDescr examples:
+#  - Juniper Networks, Inc. ex2200-24t-4g internet router, kernel JUNOS 10.2R1.8 #0: 2010-05-27 20:13:49 UTC
+#  - Juniper Networks, Inc. ex2200-48t-4g internet router, kernel JUNOS 10.2R1.8 #0: 2010-05-27 20:13:49 UTC
+#  - Juniper Networks, Inc. mx480 internet router, kernel JUNOS 11.2R1.10 #0: 2011-07-29 07:15:34 UTC
+#  - Juniper Networks, Inc. srx1400 internet router, kernel JUNOS 10.4R3.4 #0: 2011-03-19 22:06:23 UTC
+#  - Juniper Networks, Inc. RX1400 Edge Switch Router SW Version : (10.3.2 patch-0.2 [BuildId 12841]) Build Date : February 3, 2011 16:26 Copyright
+# Credit: Some examples are from: https://github.com/mtoshi/sysdescrparser/blob/master/samples/sample_data.json
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "juniper-networks"
+      os_name:
+        value: "JUNOS"
+      os_version:
+        symbols:
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            extract_value: '\s*kernel\s+JUNOS\s([a-zA-Z0-9\-\.]+)'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            extract_value: '\s*Edge\s+.*\s+Version\s+:\s+\((.*)\)\s+Build'
+      model:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          extract_value: '\s*Juniper Networks, Inc\.\s+([a-zA-Z0-9\-]+)'
+      serial_number:
+        symbol:
+          MIB: JUNIPER-MIB
+          OID: 1.3.6.1.4.1.2636.3.1.3.0
+          name: jnxBoxSerialNo
+      product_name:
+        symbol:
+          MIB: JUNIPER-MIB
+          OID: 1.3.6.1.4.1.2636.3.1.2.0
+          name: jnxBoxDescr
+      version:
+        symbol:
+          MIB: JUNIPER-MIB
+          OID: 1.3.6.1.4.1.2636.3.1.4.0
+          name: jnxBoxRevision

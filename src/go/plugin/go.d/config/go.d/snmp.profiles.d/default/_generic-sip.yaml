@@ -1,0 +1,55 @@
+metrics:
+  - MIB: SIP-COMMON-MIB
+    table:
+      name: sipCommonCfgTable
+      OID: 1.3.6.1.2.1.149.1.1.1
+    symbols:
+      - OID: 1.3.6.1.2.1.149.1.1.1.1.2
+        name: sipCommonCfgServiceOperStatus
+    metric_tags:
+    - index: 1
+      tag: applIndex
+  - MIB: SIP-COMMON-MIB
+    table:
+      name: sipCommonSummaryStatsTable
+      OID: 1.3.6.1.2.1.149.1.3.1
+    symbols:
+      - OID: 1.3.6.1.2.1.149.1.3.1.1.1
+        name: sipCommonSummaryInRequests
+      - OID: 1.3.6.1.2.1.149.1.3.1.1.2
+        name: sipCommonSummaryOutRequests
+      - OID: 1.3.6.1.2.1.149.1.3.1.1.3
+        name: sipCommonSummaryInResponses
+      - OID: 1.3.6.1.2.1.149.1.3.1.1.4
+        name: sipCommonSummaryOutResponses
+      - OID: 1.3.6.1.2.1.149.1.3.1.1.5
+        name: sipCommonSummaryTotalTransactions
+    metric_tags:
+    - index: 1
+      tag: applIndex
+  - MIB: SIP-COMMON-MIB
+    table:
+      name: sipCommonStatusCodeTable
+      OID: 1.3.6.1.2.1.149.1.5.1
+    symbols:
+      - OID: 1.3.6.1.2.1.149.1.5.1.1.3
+        name: sipCommonStatusCodeIns
+      - OID: 1.3.6.1.2.1.149.1.5.1.1.4
+        name: sipCommonStatusCodeOuts
+    metric_tags:
+    - index: 1
+      tag: applIndex
+    - index: 2
+      tag: sipCommonStatusCodeMethod
+    - index: 3
+      tag: sipCommonStatusCodeValue
+  - MIB: SIP-COMMON-MIB
+    table:
+      name: sipCommonTransCurrentTable
+      OID: 1.3.6.1.2.1.149.1.6.1
+    symbols:
+      - OID: 1.3.6.1.2.1.149.1.6.1.1.1
+        name: sipCommonTransCurrentactions
+    metric_tags:
+    - index: 1
+      tag: applIndex

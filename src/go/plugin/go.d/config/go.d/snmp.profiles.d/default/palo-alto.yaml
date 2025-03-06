@@ -1,0 +1,164 @@
+# Profile for Palo Alto devices
+
+# https://docs.paloaltonetworks.com/pan-os/9-1/pan-os-admin/monitoring/snmp-monitoring-and-traps/supported-mibs/pan-common-mibmy.html#idaeaa4a59-0bf4-4f66-90cf-9c0096c6f8a4
+# https://docs.paloaltonetworks.com/content/dam/techdocs/en_US/pdf/pan-os/9-1/pan-os-admin/pan-os-admin.pdf
+
+# Example sysDescr:
+#  - Palo Alto Networks VM-Series firewall
+#  - Palo Alto Networks PA-220 series firewall
+#  - Palo Alto Networks PA-800 series firewall
+#  - Palo Alto Networks PA-3200 series firewall
+#  - Palo Alto Networks WildFire Appliance
+#  - Palo Alto Networks PA-800 series firewall
+#  - Palo Alto Networks PA-3000 series firewall
+
+extends:
+  - _palo-alto.yaml
+  - _generic-if.yaml
+  - _generic-host-resources.yaml
+  - _generic-ospf.yaml
+  - _generic-tcp.yaml
+  - _generic-udp.yaml
+  - _generic-ip.yaml
+
+device:
+  vendor: "paloaltonetworks"
+
+# All Palo Alto Networks sysObjectID start with `1.3.6.1.4.1.25461.2.3` (panMibs)
+sysobjectid: 1.3.6.1.4.1.25461.2.3.*
+
+# Note related to use of index `1` of entPhysicalTable columns:
+# Based on snmpwalks of Palo Alto Networks devices, the main/chassis hardware have the index `1`
+# Librennms is also using index `1`: https://github.com/librenms/librenms/blob/1ac60e3b1d90616119f3c4adc28213e3c35c2477/includes/definitions/discovery/arista_eos.yaml#L4
+metadata:
+  device:
+    fields:
+      serial_number:
+        symbol:
+          OID: 1.3.6.1.4.1.25461.2.1.2.1.3.0
+          name: panSysSerialNumber # The serial number of the unit. If not available, an empty string is returned.
+      version:
+        symbol:
+          OID: 1.3.6.1.4.1.25461.2.1.2.1.1.0
+          name: panSysSwVersion # Full software version. The first two components of the full version are the major
+                                # and minor versions. The third component indicates the maintenance release number
+                                # and the fourth, the build number.
+      product_name:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: 'Palo Alto Networks\s+(PA-\d+ series firewall|WildFire Appliance|VM-Series firewall)'
+          match_value: '$1'
+          # Examples:
+          #  - Palo Alto Networks VM-Series firewall
+          #  - Palo Alto Networks PA-3200 series firewall
+          #  - Palo Alto Networks WildFire Appliance
+      model:
+        symbol:
+          OID: 1.3.6.1.4.1.25461.2.1.2.2.1.0
+          name: panChassisType
+          # Examples:
+          #  - PA-3020
+      os_name:
+        # "PAN‑OS® is the software that runs all Palo Alto Networks® next-generation firewalls."
+        # Source https://docs.paloaltonetworks.com/pan-os.html
+        value: 'PAN-OS'
+      os_version:
+        symbol:
+          OID: 1.3.6.1.4.1.25461.2.1.2.1.1.0
+          name: panSysSwVersion # Full software version. The first two components of the full version are the major
+                                # and minor versions. The third component indicates the maintenance release number
+                                # and the fourth, the build number.
+
+metrics:
+  #
+  # Session Utilization Metrics
+  #
+
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.3.1.0
+      name: panSessionUtilization
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.3.2.0
+      name: panSessionMax
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.3.3.0
+      name: panSessionActive
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.3.4.0
+      name: panSessionActiveTcp
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.3.5.0
+      name: panSessionActiveUdp
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.3.6.0
+      name: panSessionActiveICMP
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.3.7.0
+      name: panSessionActiveSslProxy
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.3.8.0
+      name: panSessionSslProxyUtilization
+
+  #
+  # GlobalProtect gateway utilization
+  #
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.5.1.1.0
+      name: panGPGWUtilizationPct
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.5.1.2.0
+      name: panGPGWUtilizationMaxTunnels
+  - MIB: PAN-COMMON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.2.1.2.5.1.3.0
+      name: panGPGWUtilizationActiveTunnels
+  - MIB: PAN-ENTITY-EXT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.1.1.7.1.1.2.0
+      name: panEntityTotalPowerUsed
+  - MIB: PAN-ENTITY-EXT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25461.1.1.7.1.1.1.0
+      name: panEntityTotalPowerAvail
+  - MIB: PAN-ENTITY-EXT-MIB
+    table:
+      OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1
+      name: panEntityFRUModuleTable
+    symbols:
+      - OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1
+        name: panEntryFRUModulePowerUsed
+      - OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1.1.2
+        name: panEntryFRUModuleNumPorts
+    metric_tags:
+      - MIB: ENTITY-MIB
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.2
+          name: entPhysicalDescr
+        table: entPhysicalTable
+        tag: ent_descr
+
+  - MIB: PAN-ENTITY-EXT-MIB
+    table:
+      OID: 1.3.6.1.4.1.25461.1.1.7.1.3.1
+      name: panEntityFanTrayTable
+    symbols:
+      - OID: 1.3.6.1.4.1.25461.1.1.7.1.3.1.1.1
+        name: panEntryFanTrayPowerUsed
+    metric_tags:
+      - MIB: ENTITY-MIB
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.2
+          name: entPhysicalDescr
+        table: entPhysicalTable
+        tag: ent_descr

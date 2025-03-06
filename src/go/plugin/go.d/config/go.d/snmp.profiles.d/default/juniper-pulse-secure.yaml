@@ -1,0 +1,117 @@
+extends:
+  - _generic-host-resources-base.yaml
+  - _generic-if.yaml
+  - _generic-ucd.yaml
+  - _juniper.yaml
+sysobjectid: 1.3.6.1.4.1.12532.256.*
+metrics:
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.1.0
+      name: juniper.ive.logFullPercent
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.2.0
+      name: juniper.ive.signedInWebUsers
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.3.0
+      name: juniper.ive.signedInMailUsers
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.10.0
+      name: cpu.usage
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.11.0
+      name: memory.usage
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.12.0
+      name: juniper.ive.iveConcurrentUsers
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.13.0
+      name: juniper.ive.clusterConcurrentUsers
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.14.0
+      name: juniper.ive.iveTotalHits
+    metric_type: monotonic_count
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.15.0
+      name: juniper.ive.iveFileHits
+    metric_type: monotonic_count
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.16.0
+      name: juniper.ive.iveWebHits
+    metric_type: monotonic_count
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.17.0
+      name: juniper.ive.iveAppletHits
+    metric_type: monotonic_count
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.18.0
+      name: juniper.ive.ivetermHits
+    metric_type: monotonic_count
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.19.0
+      name: juniper.ive.iveSAMHits
+    metric_type: monotonic_count
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.20.0
+      name: juniper.ive.iveNCHits
+    metric_type: monotonic_count
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.21.0
+      name: juniper.ive.meetingHits
+    metric_type: monotonic_count
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.24.0
+      name: juniper.ive.iveSwapUtil
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.25.0
+      name: juniper.ive.diskFullPercent
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.42.0
+      name: juniper.ive.iveTemperature
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.43.0
+      name: juniper.ive.iveVPNTunnels
+  - MIB: JUNIPER-IVE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12532.44.0
+      name: juniper.ive.iveSSLConnections
+# Commented since iveTotalSignedInUsers is not present in the most recent JUNIPER-IVE-MIB we managed to find
+#  - MIB: JUNIPER-IVE-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.12532.48.0
+#      name: juniper.ive.iveTotalSignedInUsers
+metric_tags:
+  - # MIB: PULSESECURE-PSG-MIB
+    tag: juniper_ive_product_name
+    OID: 1.3.6.1.4.1.12532.6.0
+    symbol: productName
+  - # MIB: PULSESECURE-PSG-MIB
+    tag: juniper_ive_product_version
+    OID: 1.3.6.1.4.1.12532.7.0
+    symbol: productVersion
+  - # MIB: PULSESECURE-PSG-MIB
+    tag: juniper_ive_esap_version
+    OID: 1.3.6.1.4.1.12532.45.0
+    symbol: esapVersion
+  - # MIB: PULSESECURE-PSG-MIB
+    tag: juniper_ive_ive_max_concurrent_users_license_capacity
+    OID: 1.3.6.1.4.1.12532.55.0
+    symbol: iveMaxConcurrentUsersLicenseCapacity

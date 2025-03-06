@@ -1,0 +1,354 @@
+extends:
+  - _base.yaml
+  - fortinet.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.12356.103.1.*          # Fortinet FortiManager
+  - 1.3.6.1.4.1.12356.103.1.64         # Fortinet fmgvm
+  - 1.3.6.1.4.1.12356.103.1.1000      # Fortinet fmg100
+  - 1.3.6.1.4.1.12356.103.1.1001      # Fortinet fmgvm
+  - 1.3.6.1.4.1.12356.103.1.1003      # Fortinet fmg100C
+  - 1.3.6.1.4.1.12356.103.1.2004      # Fortinet fmg200D
+  - 1.3.6.1.4.1.12356.103.1.2005      # Fortinet fmg200E
+  - 1.3.6.1.4.1.12356.103.1.2006      # Fortinet fmg200F
+  - 1.3.6.1.4.1.12356.103.1.3004      # Fortinet fmg300D
+  - 1.3.6.1.4.1.12356.103.1.3005      # Fortinet fmg300E
+  - 1.3.6.1.4.1.12356.103.1.3006      # Fortinet fmg300F
+  - 1.3.6.1.4.1.12356.103.1.4000      # Fortinet fmg400
+  - 1.3.6.1.4.1.12356.103.1.4001      # Fortinet fmg400A
+  - 1.3.6.1.4.1.12356.103.1.4002      # Fortinet fmg400B
+  - 1.3.6.1.4.1.12356.103.1.4003      # Fortinet fmg400C
+  - 1.3.6.1.4.1.12356.103.1.4005      # Fortinet fmg400E
+  - 1.3.6.1.4.1.12356.103.1.10003     # Fortinet fmg1000C
+  - 1.3.6.1.4.1.12356.103.1.10004     # Fortinet fmg1000D
+  - 1.3.6.1.4.1.12356.103.1.20000     # Fortinet fmg2000XL
+  - 1.3.6.1.4.1.12356.103.1.20005     # Fortinet fmg2000E
+  - 1.3.6.1.4.1.12356.103.1.30002     # Fortinet fmg3000B
+  - 1.3.6.1.4.1.12356.103.1.30003     # Fortinet fmg3000C
+  - 1.3.6.1.4.1.12356.103.1.30006     # Fortinet fmg3000F
+  - 1.3.6.1.4.1.12356.103.1.39005     # Fortinet fmg3900E
+  - 1.3.6.1.4.1.12356.103.1.40004     # Fortinet fmg4000D
+  - 1.3.6.1.4.1.12356.103.1.40005     # Fortinet fmg4000E
+  - 1.3.6.1.4.1.12356.103.1.50011     # Fortinet fmg5001A
+  - 1.3.6.1.4.1.12356.103.3.*         # Fortinet FortiAnalyzer
+  - 1.3.6.1.4.1.12356.103.3.20        # Fortinet fazvm
+  - 1.3.6.1.4.1.12356.103.3.64        # Fortinet fazvm
+  - 1.3.6.1.4.1.12356.103.3.1000      # Fortinet faz100
+  - 1.3.6.1.4.1.12356.103.3.1001      # Fortinet faz100A
+  - 1.3.6.1.4.1.12356.103.3.1002      # Fortinet faz100B
+  - 1.3.6.1.4.1.12356.103.3.1003      # Fortinet faz100C
+  - 1.3.6.1.4.1.12356.103.3.2004      # Fortinet faz200D
+  - 1.3.6.1.4.1.12356.103.3.2005      # Fortinet faz200E
+  - 1.3.6.1.4.1.12356.103.3.2006      # Fortinet faz200F
+  - 1.3.6.1.4.1.12356.103.3.3004      # Fortinet faz300D
+  - 1.3.6.1.4.1.12356.103.3.3006      # Fortinet faz300F
+  - 1.3.6.1.4.1.12356.103.3.4000      # Fortinet faz400
+  - 1.3.6.1.4.1.12356.103.3.4002      # Fortinet faz400B
+  - 1.3.6.1.4.1.12356.103.3.4003      # Fortinet faz400C
+  - 1.3.6.1.4.1.12356.103.3.4005      # Fortinet faz400E
+  - 1.3.6.1.4.1.12356.103.3.8000      # Fortinet faz800
+  - 1.3.6.1.4.1.12356.103.3.8002      # Fortinet faz800B
+  - 1.3.6.1.4.1.12356.103.3.8006      # Fortinet faz800F
+  - 1.3.6.1.4.1.12356.103.3.10002     # Fortinet faz1000B
+  - 1.3.6.1.4.1.12356.103.3.10003     # Fortinet faz1000C
+  - 1.3.6.1.4.1.12356.103.3.10004     # Fortinet faz1000D
+  - 1.3.6.1.4.1.12356.103.3.10005     # Fortinet faz1000E
+  - 1.3.6.1.4.1.12356.103.3.20000     # Fortinet faz2000
+  - 1.3.6.1.4.1.12356.103.3.20001     # Fortinet faz2000A
+  - 1.3.6.1.4.1.12356.103.3.20002     # Fortinet faz2000B
+  - 1.3.6.1.4.1.12356.103.3.20005     # Fortinet faz2000E
+  - 1.3.6.1.4.1.12356.103.3.30004     # Fortinet faz3000D
+  - 1.3.6.1.4.1.12356.103.3.30005     # Fortinet faz3000E
+  - 1.3.6.1.4.1.12356.103.3.30006     # Fortinet faz3000F
+  - 1.3.6.1.4.1.12356.103.3.35005     # Fortinet faz3500E
+  - 1.3.6.1.4.1.12356.103.3.35006     # Fortinet faz3500F
+  - 1.3.6.1.4.1.12356.103.3.37006     # Fortinet faz3700F
+  - 1.3.6.1.4.1.12356.103.3.39005     # Fortinet faz3900E
+  - 1.3.6.1.4.1.12356.103.3.40000     # Fortinet faz4000
+  - 1.3.6.1.4.1.12356.103.3.40001     # Fortinet faz4000A
+  - 1.3.6.1.4.1.12356.103.3.40002     # Fortinet faz4000B
+
+metrics:
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.12356.103.2.1.1.0
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: memory.used
+      OID: 1.3.6.1.4.1.12356.103.2.1.2.0
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.4.1.12356.103.2.1.3.0
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: fmSysDiskUsage
+      OID: 1.3.6.1.4.1.12356.103.2.1.4.0
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: fmSysDiskCapacity
+      OID: 1.3.6.1.4.1.12356.103.2.1.5.0
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: fmSysCpuUsageExcludedNice
+      OID: 1.3.6.1.4.1.12356.103.2.1.6.0
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: fmLogRate
+      OID: 1.3.6.1.4.1.12356.103.2.1.9.0
+  # - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+  #   symbol:
+  #     name: fmRaidLevel
+  #     OID: 1.3.6.1.4.1.12356.103.7.1.1.0
+  #     enum:
+  #       unavailable: 0
+  #       linear: 1
+  #       raid-0: 2
+  #       raid-1: 3
+  #       raid-1s: 4
+  #       raid-5: 5
+  #       raid-5s: 6
+  #       raid-6: 7
+  #       raid-6s: 8
+  #       raid-10: 9
+  #       raid-10s: 10
+  #       raid-50: 11
+  #       raid-50s: 12
+  #       raid-60: 13
+  #       raid-60s: 14
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  # - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+  #   symbol:
+  #     name: fmRaidState
+  #     OID: 1.3.6.1.4.1.12356.103.7.1.2.0
+  #     enum:
+  #       unavailable: 0
+  #       ok: 1
+  #       degraded: 2
+  #       failed: 3
+  #       background-initializing: 4
+  #       background-verifying: 5
+  #       background-rebuilding: 6
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: fmRaidSize
+      OID: 1.3.6.1.4.1.12356.103.7.1.3.0
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: fmRaidDiskNumber
+      OID: 1.3.6.1.4.1.12356.103.7.1.4.0
+  # - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+  #   symbol:
+  #     name: fmHaMode
+  #     OID: 1.3.6.1.4.1.12356.103.9.1.1.0
+  #     enum:
+  #       standalone: 0
+  #       master: 1
+  #       slave: 2
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: fmHaClusterId
+      OID: 1.3.6.1.4.1.12356.103.9.1.2.0
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    symbol:
+      name: fmHaPeerNumber
+      OID: 1.3.6.1.4.1.12356.103.9.1.3.0
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.103.6.2
+      name: fmDeviceTable
+    symbols:
+      - name: fmDevice
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          name: fmDeviceEntName
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.2
+        tag: fm_device_ent_name
+      - symbol:
+          name: fmDeviceEntSn
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.3
+        tag: fm_device_ent_sn
+      - symbol:
+          name: fmDeviceEntMode
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.4
+        tag: fm_device_ent_mode
+        mapping:
+          0: unregistered
+          1: fmg
+          2: faz
+          3: fmg-faz
+      - symbol:
+          name: fmDeviceEntAdom
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.5
+        tag: fm_device_ent_adom
+      - symbol:
+          name: fmDeviceEntIp
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.6
+        tag: fm_device_ent_ip
+      - symbol:
+          name: fmDeviceEntHaMode
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.10
+        tag: fm_device_ent_ha_mode
+        mapping:
+          0: standalone
+          1: a-p
+          2: a-a
+          3: elbc
+          4: dual
+          5: fmg
+      - symbol:
+          name: fmDeviceEntHaGroup
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.11
+        tag: fm_device_ent_ha_group
+      - symbol:
+          name: fmDeviceEntDesc
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.24
+        tag: fm_device_ent_desc
+      - symbol:
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.12
+          name: fmDeviceEntConnectState
+        tag: fm_device_ent_connect_state
+        mapping:
+          0: unknown
+          1: up
+          2: down
+      - symbol:
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.13
+          name: fmDeviceEntDbState
+        tag: fm_device_ent_db_state
+        mapping:
+          0: unknown
+          1: not-modified
+          2: modified
+      - symbol:
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.14
+          name: fmDeviceEntConfigState
+        tag: fm_device_ent_config_state
+        mapping:
+          0: unknown
+          1: in-sync
+          2: out-of-sync
+      - symbol:
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.15
+          name: fmDeviceEntState
+        tag: fm_device_ent_state
+        mapping:
+          0: none
+          1: unknown
+          2: checked-in
+          3: in-progress
+          4: installed
+          5: aborted
+          6: sched
+          7: retry
+          8: canceled
+          9: pending
+          10: retrieved
+          11: changed-conf
+          12: sync-fail
+          13: timeout
+          14: rev-reverted
+          15: auto-updated
+      - symbol:
+          OID: 1.3.6.1.4.1.12356.103.6.2.1.18
+          name: fmDeviceEntSupportState
+        tag: fm_device_ent_support_state
+        mapping:
+          0: expired
+          1: valid
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.103.7.2
+      name: fmRaidDiskTable
+    symbols:
+      - name: fmRaidDiskEntSize
+        OID: 1.3.6.1.4.1.12356.103.7.2.1.3
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.12356.103.7.2.1.2
+          name: fmRaidDiskEntState
+        tag: fm_raid_disk_ent_state
+        mapping:
+          0: unavailable
+          1: unused
+          2: ok
+          3: rebuilding
+          4: failed
+          5: spare
+  # - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+  #   table:
+  #     OID: 1.3.6.1.4.1.12356.103.8.2
+  #     name: fmSensorTable
+  #   symbols:
+  #     - name: fmSensorEntVal
+  #       OID: 1.3.6.1.4.1.12356.103.8.2.1.3
+  # scalar string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+  #   metric_tags:
+  #     - symbol:
+  #         name: fmSensorEntName
+  #         OID: 1.3.6.1.4.1.12356.103.8.2.1.2
+  #       tag: fm_sensor_ent_name
+  #     - symbol:
+  #         name: fmSensorEntType
+  #         OID: 1.3.6.1.4.1.12356.103.8.2.1.4
+  #       tag: fm_sensor_ent_type
+  #       mapping:
+  #         0: power
+  #         1: fan
+  #         2: temperature
+  #         3: voltage
+  #     - symbol:
+  #         OID: 1.3.6.1.4.1.12356.103.8.2.1.5
+  #         name: fmSensorEntState
+  #       tag: fm_sensor_ent_state
+  #       mapping:
+  #         0: ok
+  #         1: failed
+  #         2: out-of-range-not-critical
+  #         3: out-of-range-critical
+  #         4: out-of-range-not-recoverable
+  #         5: input-lost
+  #         6: not-present
+  - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.103.9.2
+      name: fmHaPeerTable
+    symbols:
+      - name: fmHaPeer
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          name: fmHaPeerEntIp
+          OID: 1.3.6.1.4.1.12356.103.9.2.1.2
+        tag: fm_ha_peer_ent_ip
+      - symbol:
+          name: fmHaPeerEntSn
+          OID: 1.3.6.1.4.1.12356.103.9.2.1.3
+        tag: fm_ha_peer_ent_sn
+      - symbol:
+          name: fmHaPeerEntHostName
+          OID: 1.3.6.1.4.1.12356.103.9.2.1.5
+        tag: fm_ha_peer_ent_host_name
+      - symbol:
+          OID: 1.3.6.1.4.1.12356.103.9.2.1.4
+          name: fmHaPeerEntEnabled
+        tag: fm_ha_peer_ent_enabled
+        mapping:
+          1: disabled
+          2: enabled
+      - symbol:
+          OID: 1.3.6.1.4.1.12356.103.9.2.1.6
+          name: fmHaPeerEntState
+        tag: fm_ha_peer_ent_state
+        mapping:
+          0: down
+          1: negotiating
+          2: synchronizing
+          3: up

@@ -1,0 +1,18 @@
+extends:
+  - _generic-bgp4.yaml
+  - _generic-host-resources.yaml
+  - _generic-if.yaml
+  - _generic-ospf.yaml
+  - _juniper-cos.yaml
+  - _juniper-dcu.yaml
+  - _juniper-firewall.yaml
+  - _juniper-virtualchassis.yaml
+  - _juniper.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.2636.1.1.1.2.82      # QFX Switch
+  - 1.3.6.1.4.1.2636.1.1.1.4.82.*    # QFX Switch Variant
+metadata:
+  device:
+    fields:
+      type:
+        value: "switch"

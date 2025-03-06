@@ -1,0 +1,4 @@
+# Backward compatibility shim, in case users referenced this in their own profiles before the rename.
+extends:
+  - _base.yaml
+  - _cisco-generic.yaml

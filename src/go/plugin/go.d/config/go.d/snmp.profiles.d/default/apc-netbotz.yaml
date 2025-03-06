@@ -1,0 +1,360 @@
+extends:
+  - _apc.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.5528.100.20.*
+metadata:
+  device:
+    fields:
+      type:
+        value: "sensor"
+metrics:
+  - MIB: NETBOTZV2-MIB
+    table:
+      OID: 1.3.6.1.4.1.5528.100.2.1
+      name: enclosureTable
+    symbols:
+      - name: netbotz.enclosure
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.2.1.1.7
+          name: enclosureIndex
+        tag: netbotz_enclosure_index
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.2.1.1.1
+          name: enclosureId
+        tag: netbotz_enclosure_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.2.1.1.4
+          name: enclosureLabel
+        tag: netbotz_enclosure_label
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.2.1.1.2
+          name: enclosureStatus
+        tag: netbotz_enclosure_status
+        mapping:
+          0: disconnected
+          1: error
+          2: normal
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.2.1.1.3
+          name: enclosureErrorStatus
+        tag: netbotz_enclosure_error_status
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+  - MIB: NETBOTZV2-MIB
+    table:
+      OID: 1.3.6.1.4.1.5528.100.3.1
+      name: dinPortTable
+    symbols:
+      - name: netbotz.dinPort
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.1.1.9
+          name: dinPortIndex
+        tag: netbotz_din_port_index
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.1.1.1
+          name: dinPortId
+        tag: netbotz_din_port_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.1.1.2
+          name: dinPortStatus
+        tag: netbotz_din_port_status
+        mapping:
+          0: disconnected
+          1: error
+          2: normal
+  - MIB: NETBOTZV2-MIB
+    table:
+      OID: 1.3.6.1.4.1.5528.100.3.10
+      name: otherPortTable
+    symbols:
+      - name: netbotz.otherPort
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.10.1.5
+          name: otherPortIndex
+        tag: netbotz_other_port_index
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.10.1.1
+          name: otherPortId
+        tag: netbotz_other_port_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.10.1.3
+          name: otherPortLabel
+        tag: netbotz_other_port_label
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.10.1.4
+          name: otherPortEncId
+        tag: netbotz_other_port_enc_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.10.1.2
+          name: otherPortStatus
+        tag: netbotz_other_port_status
+        mapping:
+          0: disconnected
+          1: error
+          2: normal
+  - MIB: NETBOTZV2-MIB
+    table:
+      OID: 1.3.6.1.4.1.5528.100.4.1.1
+      name: tempSensorTable
+    symbols:
+      - OID: 1.3.6.1.4.1.5528.100.4.1.1.1.8
+        name: netbotz.tempSensorValueInt
+      - OID: 1.3.6.1.4.1.5528.100.4.1.1.1.9
+        name: netbotz.tempSensorValueIntF
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.1.1.10
+          name: tempSensorIndex
+        tag: netbotz_temp_sensor_index
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.1.1.1
+          name: tempSensorId
+        tag: netbotz_temp_sensor_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.1.1.4
+          name: tempSensorLabel
+        tag: netbotz_temp_sensor_label
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.1.1.5
+          name: tempSensorEncId
+        tag: netbotz_temp_sensor_enc_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.1.1.3
+          name: tempSensorErrorStatus
+        tag: netbotz_temp_sensor_error_status
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+  - MIB: NETBOTZV2-MIB
+    table:
+      OID: 1.3.6.1.4.1.5528.100.4.1.2
+      name: humiSensorTable
+    symbols:
+      - OID: 1.3.6.1.4.1.5528.100.4.1.2.1.8
+        name: netbotz.humiSensorValueInt
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.2.1.9
+          name: humiSensorIndex
+        tag: netbotz_humi_sensor_index
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.2.1.1
+          name: humiSensorId
+        tag: netbotz_humi_sensor_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.2.1.4
+          name: humiSensorLabel
+        tag: netbotz_humi_sensor_label
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.2.1.5
+          name: humiSensorEncId
+        tag: netbotz_humi_sensor_enc_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.2.1.3
+          name: humiSensorErrorStatus
+        tag: netbotz_humi_sensor_error_status
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+  - MIB: NETBOTZ410-MIB
+    table:
+      OID: 1.3.6.1.4.1.5528.100.4.1.3
+      name: dewPointSensorTable
+    symbols:
+      - OID: 1.3.6.1.4.1.5528.100.4.1.3.1.8
+        name: netbotz.dewPointSensorValueInt
+      - OID: 1.3.6.1.4.1.5528.100.4.1.3.1.9
+        name: netbotz.dewPointSensorValueIntF
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.3.1.10
+          name: dewPointSensorIndex
+        tag: netbotz_dew_point_sensor_index
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.3.1.1
+          name: dewPointSensorId
+        tag: netbotz_dew_point_sensor_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.3.1.4
+          name: dewPointSensorLabel
+        tag: netbotz_dew_point_sensor_label
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.3.1.5
+          name: dewPointSensorEncId
+        tag: netbotz_dew_point_sensor_enc_id
+  - MIB: NETBOTZV2-MIB
+    table:
+      OID: 1.3.6.1.4.1.5528.100.4.1.10
+      name: otherNumericSensorTable
+    symbols:
+      - OID: 1.3.6.1.4.1.5528.100.4.1.10.1.8
+        name: netbotz.otherNumericSensorValueInt
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.10.1.12
+          name: otherNumericSensorIndex
+        tag: netbotz_other_numeric_sensor_index
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.10.1.1
+          name: otherNumericSensorId
+        tag: netbotz_other_numeric_sensor_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.10.1.4
+          name: otherNumericSensorLabel
+        tag: netbotz_other_numeric_sensor_label
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.10.1.5
+          name: otherNumericSensorEncId
+        tag: netbotz_other_numeric_sensor_enc_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.10.1.9
+          name: otherNumericSensorUnits
+        tag: netbotz_other_numeric_sensor_units
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.10.1.3
+          name: otherNumericSensorErrorStatus
+        tag: netbotz_other_numeric_sensor_error_status
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+  - MIB: NETBOTZV2-MIB
+    table:
+      OID: 1.3.6.1.4.1.5528.100.4.2.2
+      name: doorSwitchSensorTable
+    symbols:
+      - name: netbotz.doorSwitchSensor
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.8
+          name: doorSwitchSensorIndex
+        tag: netbotz_door_switch_sensor_index
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.1
+          name: doorSwitchSensorId
+        tag: netbotz_door_switch_sensor_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.4
+          name: doorSwitchSensorLabel
+        tag: netbotz_door_switch_sensor_label
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.5
+          name: doorSwitchSensorEncId
+        tag: netbotz_door_switch_sensor_enc_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.7
+          name: doorSwitchSensorValueStr
+        tag: netbotz_door_switch_sensor_value_str
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.2
+          name: doorSwitchSensorValue
+        tag: netbotz_door_switch_sensor_value
+        mapping:
+          -1: 'null'
+          0: open
+          1: closed
+  - MIB: NETBOTZV2-MIB
+    table:
+      OID: 1.3.6.1.4.1.5528.100.4.2.10
+      name: otherStateSensorTable
+    symbols:
+      - name: netbotz.otherStateSensor
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.4
+          name: otherStateSensorLabel
+        tag: netbotz_other_state_sensor_label
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.5
+          name: otherStateSensorEncId
+        tag: netbotz_other_state_sensor_enc_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.7
+          name: otherStateSensorValueStr
+        tag: netbotz_other_state_sensor_value_str
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.1
+          name: otherStateSensorId
+        tag: netbotz_other_state_sensor_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.3
+          name: otherStateSensorErrorStatus
+        tag: netbotz_other_state_sensor_error_status
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+  - MIB: NETBOTZV2-MIB
+    table:
+      OID: 1.3.6.1.4.1.5528.100.5.1
+      name: errorCondTable
+    symbols:
+      - name: netbotz.errorCond
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.12
+          name: errorCondIndex
+        tag: netbotz_error_cond_index
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.1
+          name: errorCondId
+        tag: netbotz_error_cond_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.3
+          name: errorCondTypeId
+        tag: netbotz_error_cond_type_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.9
+          name: errorCondEncId
+        tag: netbotz_error_cond_enc_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.11
+          name: errorCondSensorId
+        tag: netbotz_error_cond_sensor_id
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.2
+          name: errorCondSeverity
+        tag: netbotz_error_cond_severity
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.6
+          name: errorCondResolved
+        tag: netbotz_error_cond_resolved
+        mapping:
+          0: no
+          1: yes
+          2: 'null'
