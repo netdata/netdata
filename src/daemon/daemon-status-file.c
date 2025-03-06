@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 10
+#define STATUS_FILE_VERSION 11
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -558,6 +558,13 @@ void daemon_status_file_load(DAEMON_STATUS_FILE *ds) {
 static bool save_status_file(const char *directory, const char *content, size_t content_size) {
     // THIS FUNCTION MUST USE ONLY ASYNC-SAFE OPERATIONS
 
+    // Linux: https://man7.org/linux/man-pages/man7/signal-safety.7.html
+    // memcpy(), strlen(), open(), write(), fsync(), close(), chmod(), rename(), unlink()
+
+    // MacOS: https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/sigaction.2.html#//apple_ref/doc/man/2/sigaction
+    // open(), write(), fsync(), close(), chmod(), rename(), unlink()
+    // does not explicitly mention memcpy() and strlen(), but they are safe
+
     if(!directory || !*directory)
         return false;
 
@@ -810,6 +817,11 @@ struct log_priority PRI_USER_SHOULD_FIX     = { NDLP_WARNING, NDLP_INFO };
 struct log_priority PRI_NETDATA_BUG         = { NDLP_CRIT, NDLP_ERR };
 struct log_priority PRI_BAD_BUT_NO_REASON   = { NDLP_ERR, NDLP_WARNING };
 
+static bool is_ci(void) {
+    const char *ci = getenv("CI");
+    return ci && *ci && strcasecmp(ci, "true") == 0;
+}
+
 void daemon_status_file_check_crash(void) {
     FUNCTION_RUN_ONCE();
 
@@ -1015,7 +1027,7 @@ void daemon_status_file_check_crash(void) {
 
     // check if we have already posted this crash in the last 24 hours
     XXH64_hash_t hash = daemon_status_file_hash(&last_session_status, msg, cause);
-    if(dedup_already_posted(&session_status, hash))
+    if(dedup_already_posted(&session_status, hash) || (last_session_status.restarts < 10 && is_ci()))
         disable_crash_report = true;
 
     if(!disable_crash_report && (analytics_check_enabled() || post_crash_report)) {
