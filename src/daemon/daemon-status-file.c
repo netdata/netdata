@@ -810,6 +810,11 @@ struct log_priority PRI_USER_SHOULD_FIX     = { NDLP_WARNING, NDLP_INFO };
 struct log_priority PRI_NETDATA_BUG         = { NDLP_CRIT, NDLP_ERR };
 struct log_priority PRI_BAD_BUT_NO_REASON   = { NDLP_ERR, NDLP_WARNING };
 
+static bool is_ci(void) {
+    const char *ci = getenv("CI");
+    return ci && *ci && strcasecmp(ci, "true") == 0;
+}
+
 void daemon_status_file_check_crash(void) {
     FUNCTION_RUN_ONCE();
 
@@ -1015,7 +1020,7 @@ void daemon_status_file_check_crash(void) {
 
     // check if we have already posted this crash in the last 24 hours
     XXH64_hash_t hash = daemon_status_file_hash(&last_session_status, msg, cause);
-    if(dedup_already_posted(&session_status, hash))
+    if(dedup_already_posted(&session_status, hash) || (last_session_status.restarts < 10 && is_ci()))
         disable_crash_report = true;
 
     if(!disable_crash_report && (analytics_check_enabled() || post_crash_report)) {
