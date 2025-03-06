@@ -1,0 +1,79 @@
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+  - avaya.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.45.3.71.10 # 4526T
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "switch"
+
+metrics:
+  - MIB: S5-CHASSIS-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.5.3.10.0 # s5ChasUtilCPUUsageLast1Minute.3.10.0
+  - MIB: S5-CHASSIS-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.12.3.10.0 # s5ChasUtilMemoryTotalMB.3.10.0
+  - MIB: S5-CHASSIS-MIB
+    symbol:
+      name: memory.free
+      OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.13.3.10.0 # s5ChasUtilMemoryAvailableMB.3.10.0
+  - MIB: S5-CHASSIS-MIB
+    symbol:
+      name: avaya.s5ChasTmpSnrTmpValue
+      OID: 1.3.6.1.4.1.45.1.6.3.7.1.1.5.5.10.0 # s5ChasTmpSnrTmpValue.5.10.0
+  - MIB: S5-CHASSIS-MIB
+    table:
+      name: s5ChasComTable
+      OID: 1.3.6.1.4.1.45.1.6.3.3.1
+    symbols:
+      - name: avaya.s5ChasCom
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          name: avaya.s5ChasComDescr
+          OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.5
+        tag: avaya_s5_chas_com_descr
+      - symbol:
+          OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.9
+          name: avaya.s5ChasComAdminState
+        tag: avaya_s5_chas_com_admin_state
+        mapping:
+          1: other
+          2: not_avail
+          3: disable
+          4: enable
+          5: reset
+          6: test
+      - symbol:
+          OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.10
+          name: avaya.s5ChasComOperState
+        tag: avaya_s5_chas_com_oper_state
+        mapping:
+          1: other
+          2: not_avail
+          3: removed
+          4: disabled
+          5: normal
+          6: reset_in_prog
+          7: testing
+          8: warning
+          9: non_fatal_err
+          10: fatal_err
+          11: not_config
+          12: obsoleted
+
+metric_tags:
+  - OID: 1.3.6.1.4.1.45.1.6.3.1.5.0
+    symbol: s5ChasVer
+    tag: avaya_s5_chas_ver
+  - OID: 1.3.6.1.4.1.45.1.6.3.1.6.0
+    symbol: s5ChasSerNum
+    tag: avaya_s5_chas_ser_num

@@ -1,0 +1,30 @@
+# CPU and memory metrics for F5 BIG-IP devices
+
+metrics:
+  # Memory stats
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.1.44.0
+        # core check only
+      name: memory.total
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.1.45.0
+        # core check only
+      name: memory.used
+  # CPU
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.1.7.5.2
+      name: sysMultiHostCpuTable
+    metric_type: gauge
+    symbols:
+      - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.27
+        name: cpu.usage # sysMultiHostCpuUsageRatio1m
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
+          name: sysMultiHostCpuId
+        tag: cpu

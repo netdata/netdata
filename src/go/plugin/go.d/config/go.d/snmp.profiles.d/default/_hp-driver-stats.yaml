@@ -1,0 +1,59 @@
+metrics:
+  # Physical drives statistical information
+  - MIB: CPQIDA-MIB
+    metric_type: monotonic_count
+    table:
+      OID: 1.3.6.1.4.1.232.3.2.5.1
+      name: cpqDaPhyDrvTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.8
+        name: cpqDaPhyDrvUsedReallocs
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.9
+        name: cpqDaPhyDrvRefHours
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.16
+        name: cpqDaPhyDrvHardReadErrs
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.17
+        name: cpqDaPhyDrvRecvReadErrs
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.18
+        name: cpqDaPhyDrvHardWriteErrs
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.19
+        name: cpqDaPhyDrvRecvWriteErrs
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.20
+        name: cpqDaPhyDrvHSeekErrs
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.21
+        name: cpqDaPhyDrvSeekErrs
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.3.2.5.1.1.1
+          name: cpqDaPhyDrvCntlrIndex
+        tag: drive_cntrl_idx
+      - symbol:
+          OID: 1.3.6.1.4.1.232.3.2.5.1.1.2
+          name: cpqDaPhyDrvIndex
+        tag: drive_index
+  - MIB: CPQIDA-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.3.2.5.1
+      name: cpqDaPhyDrvTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.6
+        name: cpqDaPhyDrvStatus
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.7
+        name: cpqDaPhyDrvFactReallocs
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.22
+        name: cpqDaPhyDrvSpinupTime
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.45
+        name: cpqDaPhyDrvSize
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.57
+        name: cpqDaPhyDrvSmartStatus
+      - OID: 1.3.6.1.4.1.232.3.2.5.1.1.70
+        name: cpqDaPhyDrvCurrentTemperature
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.3.2.5.1.1.1
+          name: cpqDaPhyDrvCntlrIndex
+        tag: drive_cntrl_idx
+      - symbol:
+          OID: 1.3.6.1.4.1.232.3.2.5.1.1.2
+          name: cpqDaPhyDrvIndex
+        tag: drive_index

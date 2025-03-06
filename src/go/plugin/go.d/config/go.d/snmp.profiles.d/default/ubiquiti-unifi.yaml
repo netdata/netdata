@@ -1,0 +1,65 @@
+extends:
+  - _generic-if.yaml
+  - _ubiquiti.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.41112  # Ubiquiti Networks, Inc.
+
+metrics:
+  - MIB: FROGFOOT-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.10002.1.1.1.1.1.0
+      name: memory.total
+  - MIB: FROGFOOT-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.10002.1.1.1.1.2.0
+      name: memory.free
+# TODO: Update once we support matching on specific tag (`match_attributes`)
+#  - MIB: FROGFOOT-RESOURCES-MIB
+#    table:
+#      OID: 1.3.6.1.4.1.10002.1.1.1.4.2
+#      name: loadTable
+#    symbols:
+#      - OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.3.1
+#        name: cpu.usage
+#    metric_tags:
+#      - index: 1
+#        tag: cpu
+#      - symbol:
+#          OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.2.1
+#          name: loadDescr
+#          match_attributes:
+#            - 1 Minute Average
+#        tag: load_descr
+  - MIB: UBNT-UniFi-MIB
+    table:
+      OID: 1.3.6.1.4.1.41112.1.6.1.1
+      name: unifiRadioTable
+    symbols:
+      - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.4
+        name: ubiquiti.unifiRadioRxPackets
+        metric_type: monotonic_count
+      - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.5
+        name: ubiquiti.unifiRadioTxPackets
+        metric_type: monotonic_count
+      - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.6
+        name: ubiquiti.unifiRadioCuTotal
+      - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.7
+        name: ubiquiti.unifiRadioCuSelfRx
+      - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.8
+        name: ubiquiti.unifiRadioCuSelfTx
+      - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.9
+        name: ubiquiti.unifiRadioOtherBss
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.41112.1.6.1.1.1.1
+          name: ubiquiti.unifiRadioIndex
+        tag: ubiquiti_unifi_radio_index
+      - symbol:
+          OID: 1.3.6.1.4.1.41112.1.6.1.1.1.2
+          name: ubiquiti.unifiRadioName
+        tag: ubiquiti_unifi_radio_name
+      - symbol:
+          OID: 1.3.6.1.4.1.41112.1.6.1.1.1.3
+          name: ubiquiti.unifiRadioRadio
+        tag: ubiquiti_unifi_radio_radio

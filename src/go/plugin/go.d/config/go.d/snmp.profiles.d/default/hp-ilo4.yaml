@@ -1,0 +1,18 @@
+# Profile for HP iLO4 devices.
+
+# This corresponds to the 'cpqSm2ProdRILO4' OID listed in CPQSM2-MIB.
+# Source: CPQSM2-MIB, can downloaded here: https://support.hpe.com/hpsc/swd/public/detail?swItemId=MTX_53293d026fb147958b223069b6
+
+extends:
+  - hp-ilo.yaml
+
+device:
+  vendor: "hp"
+
+sysobjectid: 1.3.6.1.4.1.232.9.4.10
+
+metadata:
+  device:
+    fields:
+      model:
+        value: iLO4

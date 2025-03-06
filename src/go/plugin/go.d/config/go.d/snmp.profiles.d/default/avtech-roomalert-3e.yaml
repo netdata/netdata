@@ -1,0 +1,137 @@
+sysobjectid:
+  - 1.3.6.1.4.1.20916.1.9.*
+
+extends:
+  - avtech.yaml
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "sensor"
+
+metrics:
+  - MIB: ROOMALERT3E-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.9.1.1.1.1.0
+      name: roomalert.3e.digital_sen1_1
+  - MIB: ROOMALERT3E-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.9.1.1.1.2.0
+      name: roomalert.3e.digital_sen1_2
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.1.1.1.3.0
+#      name: roomalert.3e.digital_sen1_label
+#      format: TODO_handle_conversion_to_one
+  - MIB: ROOMALERT3E-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.9.1.1.2.1.0
+      name: roomalert.3e.digital_sen2_1
+  - MIB: ROOMALERT3E-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.9.1.1.2.2.0
+      name: roomalert.3e.digital_sen2_2
+  - MIB: ROOMALERT3E-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.9.1.1.2.3.0
+      name: roomalert.3e.digital_sen2_3
+  - MIB: ROOMALERT3E-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.9.1.1.2.4.0
+      name: roomalert.3e.digital_sen2_4
+  - MIB: ROOMALERT3E-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.9.1.1.2.5.0
+      name: roomalert.3e.digital_sen2_5
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.1.1.2.6.0
+#      name: roomalert.3e.digital_sen2_label
+#      format: TODO_handle_conversion_to_one
+  - MIB: ROOMALERT3E-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.9.1.1.2.7.0
+      name: roomalert.3e.digital_sen2_7
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.1.1.2.8.0
+#      name: roomalert.3e.digital_sen2_label
+#      format: TODO_handle_conversion_to_one
+  - MIB: ROOMALERT3E-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.9.1.2.1.0
+      name: roomalert.3e.switch_sen1
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.1.2.2.0
+#      name: roomalert.3e.switch_label
+#      format: TODO_handle_conversion_to_one
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.2.1.0
+#      name: roomalert.3e.red_led
+#      enum:
+#        off: 0
+#        on: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.2.2.0
+#      name: roomalert.3e.amber_led
+#      enum:
+#        off: 0
+#        on: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.2.3.0
+#      name: roomalert.3e.green_led
+#      enum:
+#        off: 0
+#        on: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.2.4.0
+#      name: roomalert.3e.blue_led
+#      enum:
+#        off: 0
+#        on: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.2.5.0
+#      name: roomalert.3e.white_led
+#      enum:
+#        off: 0
+#        on: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.2.6.0
+#      name: roomalert.3e.alarm1
+#      enum:
+#        off: 0
+#        on: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.2.7.0
+#      name: roomalert.3e.alarm2
+#      enum:
+#        off: 0
+#        on: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT3E-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.9.3.1.0
+#      name: roomalert.3e.alarmmessage
+#      format: TODO_handle_conversion_to_one

@@ -1,0 +1,243 @@
+extends:
+  - _dell.yaml
+  - _generic-host-resources-base.yaml
+  - _generic-ucd.yaml
+#  - if32-mib.yaml  # TODO: later (NDM-1933)
+
+sysobjectid:
+  - 1.3.6.1.4.1.674.11000.5000.100.2.*      # OS10 family
+  - 1.3.6.1.4.1.674.11000.5000.100.2.1.1    # s6000on
+  - 1.3.6.1.4.1.674.11000.5000.100.2.1.9    # s4128Ton
+  - 1.3.6.1.4.1.674.11000.5000.100.2.1.20   # s5232Fon
+  - 1.3.6.1.4.1.674.11000.5000.100.2.1.21   # s5248Fon
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "switch"
+
+metrics:
+  - MIB: HOST-RESOURCES-MIB
+    table:
+      OID: 1.3.6.1.2.1.25.3.3
+      name: hrProcessorTable
+    symbols:
+      - OID: 1.3.6.1.2.1.25.3.3.1.2
+        name: cpu.usage
+    metric_tags:
+      - tag: hr_processor_frw_id
+        symbol:
+          OID: 1.3.6.1.2.1.25.3.3.1.1
+          name: hrProcessorFrwID
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.2.1.25.2.3.1.5.1
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: memory.used
+      OID: 1.3.6.1.2.1.25.2.3.1.6.1
+  - MIB: DELLEMC-OS10-CHASSIS-MIB
+    symbol:
+      name: dell.os10ChassisTemp
+      OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.11
+  - MIB: DELLEMC-OS10-CHASSIS-MIB
+    table:
+      OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4
+      name: dell.os10CardTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.5
+        name: dell.os10CardTemp
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.3
+          name: dell.os10CardDescription
+        tag: dell_os10_card_description
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.9
+          name: dell.os10CardServiceTag
+        tag: dell_os10_card_service_tag
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.4
+          name: dell.os10CardStatus
+        tag: dell_os10_card_status
+        mapping:
+          1: ready
+          2: card_mis_match
+          3: card_problem
+          4: diag_mode
+          5: card_absent
+          6: offline
+  - MIB: DELLEMC-OS10-CHASSIS-MIB
+    table:
+      OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.1
+      name: dell.os10PowerSupplyTable
+    symbols:
+      - name: dell.os10PowerSupply
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.1.1.4
+          name: dell.os10PowerSupplyOperStatus
+        tag: dell_os10_power_supply_oper_status
+        mapping:
+          1: up
+          2: down
+          3: testing
+          4: unknown
+          5: dormant
+          6: not_present
+          7: lower_layer_down
+          8: failed
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.1.1.1
+          name: dell.os10PowerSupplyIndex
+        tag: dell_os10_power_supply_index
+  - MIB: DELLEMC-OS10-CHASSIS-MIB
+    table:
+      OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.2
+      name: dell.os10FanTrayTable
+    symbols:
+      - name: dell.os10FanTray
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.2.1.4
+          name: dell.os10FanTrayOperStatus
+        tag: dell_os10_fan_tray_oper_status
+        mapping:
+          1: up
+          2: down
+          3: testing
+          4: unknown
+          5: dormant
+          6: not_present
+          7: lower_layer_down
+          8: failed
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.2.1.1
+          name: dell.os10FanTrayIndex
+        tag: dell_os10_fan_tray_index
+  - MIB: DELLEMC-OS10-CHASSIS-MIB
+    table:
+      OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.3
+      name: dell.os10FanTable
+    symbols:
+      - name: dell.os10Fan
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.3.1.7
+          name: dell.os10FanOperStatus
+        tag: dell_os10_fan_oper_status
+        mapping:
+          1: up
+          2: down
+          3: testing
+          4: unknown
+          5: dormant
+          6: not_present
+          7: lower_layer_down
+          8: failed
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.3.1.1
+          name: dell.os10FanIndex
+        tag: dell_os10_fan_index
+  - MIB: DELLEMC-OS10-BGP4V2-MIB
+    table:
+      OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2
+      name: dell.os10bgp4V2PeerTable
+    symbols:
+      - name: dell.os10bgp4V2Peer
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.2
+          name: dell.os10bgp4V2PeerLocalAddrType
+        tag: dell_os10bgp4_v2_peer_local_addr_type
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+          25: l2vpn
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.3
+          name: dell.os10bgp4V2PeerLocalAddr
+        tag: dell_os10bgp4_v2_peer_local_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.4
+          name: dell.os10bgp4V2PeerRemoteAddrType
+        tag: dell_os10bgp4_v2_peer_remote_addr_type
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+          25: l2vpn
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.5
+          name: dell.os10bgp4V2PeerRemoteAddr
+        tag: dell_os10bgp4_v2_peer_remote_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.6
+          name: dell.os10bgp4V2PeerLocalPort
+        tag: dell_os10bgp4_v2_peer_local_port
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.7
+          name: dell.os10bgp4V2PeerLocalAs
+        tag: dell_os10bgp4_v2_peer_local_as
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.8
+          name: dell.os10bgp4V2PeerLocalIdentifier
+        tag: dell_os10bgp4_v2_peer_local_identifier
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.9
+          name: dell.os10bgp4V2PeerRemotePort
+        tag: dell_os10bgp4_v2_peer_remote_port
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.10
+          name: dell.os10bgp4V2PeerRemoteAs
+        tag: dell_os10bgp4_v2_peer_remote_as
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.11
+          name: dell.os10bgp4V2PeerRemoteIdentifier
+        tag: dell_os10bgp4_v2_peer_remote_identifier
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.14
+          name: dell.os10bgp4V2PeerDescription
+        tag: dell_os10bgp4_v2_peer_description
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.12
+          name: dell.os10bgp4V2PeerAdminStatus
+        tag: dell_os10bgp4_v2_peer_admin_status
+        mapping:
+          1: halted
+          2: running
+      - symbol:
+          OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.13
+          name: dell.os10bgp4V2PeerState
+        tag: dell_os10bgp4_v2_peer_state
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+# Tagging by column OID is not supported at the moment. Should be a table/columns metric + tags instead.
+# metric_tags:
+#   - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.6
+#     symbol: dell.os10ChassisHwRev
+#     tag: dell_os10_chassis_hw_rev
+#   - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.7
+#     symbol: dell.os10ChassisServiceTag
+#     tag: dell_os10_chassis_service_tag
+#   - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.8
+#     symbol: dell.os10ChassisExpServiceCode
+#     tag: dell_os10_chassis_exp_service_code

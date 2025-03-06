@@ -1,0 +1,676 @@
+# Profile for F5 BIG-IP devices
+#
+# Details related to F5-BIGIP-SYSTEM-MIB:
+#   http://www.mibdepot.com/cgi-bin/getmib3.cgi?win=mib_a&r=f5&f=F5-BIGIP-SYSTEM-MIB&v=v2&t=tree
+# Example sysDescr:
+#   BIG-IP Virtual Edition : Linux 3.10.0-862.14.4.el7.ve.x86_64 : BIG-IP software release 15.0.1, build 0.0.11
+
+extends:
+  - _base.yaml
+  - _generic-if.yaml # F5-specific variants of the other metrics are provided in this profile.
+  - _generic-bgp4.yaml
+  - _generic-ospf.yaml
+  - _generic-tcp.yaml
+  - _generic-udp.yaml
+  - _generic-ip.yaml
+  - _f5-big-ip-cpu-memory.yaml
+
+device:
+  vendor: "f5"
+
+
+sysobjectid: 1.3.6.1.4.1.3375.2.1.3.4.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "f5"
+      serial_number:
+        symbol:
+          MIB: F5-BIGIP-SYSTEM-MIB
+          OID: 1.3.6.1.4.1.3375.2.1.3.3.3.0
+          name: sysGeneralChassisSerialNum # The system serial number. 26ff4a4d-190e-12ac-d4257ed36ba6
+      version:
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.1.4.2.0
+          name: sysProductVersion # Displays BIG-IP software version information. e.g. 15.0.1
+      product_name:
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.1.4.1.0
+          name: sysProductName # The product name. e.g. BIG-IP
+      model:
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.1.3.3.1.0
+          name: sysGeneralHwName # The name of the system hardware model. e.g. Z100
+      os_name:
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.1.6.1.0
+          name: sysSystemName # The operating system name. e.g. Linux
+      os_version:
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.1.6.3.0
+          name: sysSystemRelease # The current system release level. e.g. 3.10.0-862.14.4.el7.ve.x86_64
+      type:
+        value: "load_balancer"
+
+metrics:
+  # Memory stats
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.1.44.0
+      name: sysStatMemoryTotal
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.1.45.0
+      name: sysStatMemoryUsed
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.21.28.0
+      name: sysGlobalTmmStatMemoryTotal
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.21.29.0
+      name: sysGlobalTmmStatMemoryUsed
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.20.44.0
+      name: sysGlobalHostOtherMemoryTotal
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.20.45.0
+      name: sysGlobalHostOtherMemoryUsed
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.20.46.0
+      name: sysGlobalHostSwapTotal
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.20.47.0
+      name: sysGlobalHostSwapUsed
+  # CPU
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.1.7.5.2
+      name: sysMultiHostCpuTable
+    metric_type: gauge
+    symbols:
+      - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.11
+        name: sysMultiHostCpuUsageRatio
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
+          name: sysMultiHostCpuId
+        tag: cpu
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.1.7.5.2
+      name: sysMultiHostCpuTable
+    metric_type: percent
+    symbols:
+      - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.4
+        name: sysMultiHostCpuUser
+      - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.5
+        name: sysMultiHostCpuNice
+      - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.6
+        name: sysMultiHostCpuSystem
+      - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.7
+        name: sysMultiHostCpuIdle
+      - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.8
+        name: sysMultiHostCpuIrq
+      - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.9
+        name: sysMultiHostCpuSoftirq
+      - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.10
+        name: sysMultiHostCpuIowait
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
+          name: sysMultiHostCpuId
+        tag: cpu
+
+  # TCP stats
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.12.2.0
+      name: sysTcpStatOpen
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.12.3.0
+      name: sysTcpStatCloseWait
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.12.4.0
+      name: sysTcpStatFinWait
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.12.5.0
+      name: sysTcpStatTimeWait
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.12.6.0
+      name: sysTcpStatAccepts
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.12.7.0
+      name: sysTcpStatAcceptfails
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.12.8.0
+      name: sysTcpStatConnects
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.12.9.0
+      name: sysTcpStatConnfails
+  # UDP stats
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.13.2.0
+      name: sysUdpStatOpen
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.13.3.0
+      name: sysUdpStatAccepts
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.13.4.0
+      name: sysUdpStatAcceptfails
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.13.5.0
+      name: sysUdpStatConnects
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.13.6.0
+      name: sysUdpStatConnfails
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.9.2.0
+      name: sysClientsslStatCurConns
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.9.10.0
+      name: sysClientsslStatEncryptedBytesIn
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.9.11.0
+      name: sysClientsslStatEncryptedBytesOut
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.9.12.0
+      name: sysClientsslStatDecryptedBytesIn
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.9.13.0
+      name: sysClientsslStatDecryptedBytesOut
+  - MIB: F5-BIGIP-SYSTEM-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.1.1.2.9.29.0
+      name: sysClientsslStatHandshakeFailures
+
+  # Metrics from F5-BIGIP-LOCAL-MIB provide monitoring information about virtual servers, nodes, and pools.
+  # These concepts are related to the LTM (Local Traffic Management) features of BIG IP devices.
+  # TL;DR:
+  # * Virtual servers act as load balancers that are assigned pools of nodes (= servers).
+  # * Clients can use a virtual server as an entrypoint to an application service that spans multiple machines.
+  # Learn more: https://techdocs.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-basics-11-6-0.html
+
+  # Virtual servers.
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.2.10.1.1
+      name: ltmVirtualServNumber
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.10.1.2
+      name: ltmVirtualServTable
+    symbols:
+      # Gauges
+      - OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.9
+        name: ltmVirtualServEnabled
+      - OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.10
+        name: ltmVirtualServConnLimit
+    metric_tags:
+      - tag: server
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.1
+          name: ltmVirtualServName
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.10.13.2
+      name: ltmVsStatusTable
+    symbols:
+      # Gauges
+      - name: ltmVsStatus
+        constant_value_one: true
+    metric_tags:
+      - tag: ltm_vs_status_avail_state
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.2
+          name: ltmVsStatusAvailState
+        mapping:
+          0: none
+          1: green
+          2: yellow
+          3: red
+          4: blue
+          5: gray
+      - tag: ltm_vs_status_name
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.1
+          name: ltmVsStatusName
+      - tag: ltm_vs_status_enabled_state
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.3
+          name: ltmVsStatusEnabledState
+        mapping:
+          0: none
+          1: enabled
+          2: disabled
+          3: disabledbyparent
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.10.2.3
+      name: ltmVirtualServStatTable
+    symbols:
+      # Counters (= rates)
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.6
+        name: ltmVirtualServStatClientPktsIn
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.7
+        name: ltmVirtualServStatClientBytesIn
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.8
+        name: ltmVirtualServStatClientPktsOut
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.9
+        name: ltmVirtualServStatClientBytesOut
+      # Gauges
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.12
+        name: ltmVirtualServStatClientCurConns
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.31
+        name: ltmVirtualServStatVsUsageRatio5s
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.32
+        name: ltmVirtualServStatVsUsageRatio1m
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.33
+        name: ltmVirtualServStatVsUsageRatio5m
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.34
+        name: ltmVirtualServStatCurrentConnsPerSec
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.35
+        name: ltmVirtualServStatDurationRateExceeded
+    metric_tags:
+      - tag: server
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.1
+          name: ltmVirtualServStatName
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.10.2.3
+      name: ltmVirtualServStatTable
+    symbols:
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.5
+        name: ltmVirtualServStatNoNodesErrors
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.11
+        name: ltmVirtualServStatClientTotConns
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.27
+        name: ltmVirtualServStatTotRequests
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.40
+        name: ltmVirtualServStatClientEvictedConns
+      - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.41
+        name: ltmVirtualServStatClientSlowKilled
+    metric_type: monotonic_count
+    metric_tags:
+      - tag: server
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.1
+          name: ltmVirtualServStatName
+
+  # Nodes.
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.2.4.1.1
+      name: ltmNodeAddrNumber
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.4.1.2
+      name: ltmNodeAddrTable
+    symbols:
+      # Gauges
+      - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.3
+        name: ltmNodeAddrConnLimit
+      - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.4
+        name: ltmNodeAddrRatio
+      - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.5
+        name: ltmNodeAddrDynamicRatio
+      - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.6
+        name: ltmNodeAddrMonitorState
+      - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.7
+        name: ltmNodeAddrMonitorStatus
+      - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.10
+        name: ltmNodeAddrSessionStatus
+    metric_tags:
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.17
+          name: ltmNodeAddrName
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.4.1.2
+      name: ltmNodeAddrTable
+    symbols:
+      # Gauges
+      - name: ltmNodeAddr
+        constant_value_one: true
+    metric_tags:
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.17
+          name: ltmNodeAddrName
+      - tag: monitor_state
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.6
+          name: ltmNodeAddrMonitorState
+        mapping:
+          0: unchecked
+          1: checking
+          2: inband
+          3: forced_up
+          4: up
+          19: down
+          20: forced_down
+          22: irule_down
+          23: inband_down
+          24: down_manual_resume
+          25: disabled
+          26: fqdn_checking
+          27: fqdn_down
+          28: fqdn_up
+          29: fqdn_up_no_address
+      - tag: monitor_status
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.7
+          name: ltmNodeAddrMonitorStatus
+        mapping:
+          0: unchecked
+          1: checking
+          2: inband
+          3: forced_up
+          4: up
+          18: addr_down
+          19: down
+          20: forced_down
+          21: maint
+          22: irule_down
+          23: inband_down
+          24: down_manual_resume
+          26: fqdn_checking
+          27: fqdn_down
+          28: fqdn_up
+          29: fqdn_up_no_address
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.4.2.3
+      name: ltmNodeAddrStatTable
+    symbols:
+      # Counters (= rates)
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.3
+        name: ltmNodeAddrStatServerPktsIn
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.4
+        name: ltmNodeAddrStatServerBytesIn
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.5
+        name: ltmNodeAddrStatServerPktsOut
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.6
+        name: ltmNodeAddrStatServerBytesOut
+      # Gauges
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.9
+        name: ltmNodeAddrStatServerCurConns
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.21
+        name: ltmNodeAddrStatCurSessions
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.22
+        name: ltmNodeAddrStatCurrentConnsPerSec
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.23
+        name: ltmNodeAddrStatDurationRateExceeded
+    metric_tags:
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.20
+          name: ltmNodeAddrStatNodeName
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.4.2.3
+      name: ltmNodeAddrStatTable
+    symbols:
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.8
+        name: ltmNodeAddrStatServerTotConns
+      - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.17
+        name: ltmNodeAddrStatTotRequests
+    metric_type: monotonic_count
+    metric_tags:
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.20
+          name: ltmNodeAddrStatNodeName
+
+  # Pools.
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.2.5.1.1
+      name: ltmPoolNumber
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.5.1.2
+      name: ltmPoolTable
+    symbols:
+      # Gauges
+      - OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.8
+        name: ltmPoolActiveMemberCnt
+      - OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.16
+        name: ltmPoolDynamicRatioSum
+      - OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.23
+        name: ltmPoolMemberCnt
+    metric_tags:
+      - tag: pool
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.1
+          name: ltmPoolName
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.5.2.3
+      name: ltmPoolStatTable
+    symbols:
+      # Counters (= rates)
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.2
+        name: ltmPoolStatServerPktsIn
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.3
+        name: ltmPoolStatServerBytesIn
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.4
+        name: ltmPoolStatServerPktsOut
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.5
+        name: ltmPoolStatServerBytesOut
+      # Gauges
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.8
+        name: ltmPoolStatServerCurConns
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.18
+        name: ltmPoolStatConnqDepth
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.19
+        name: ltmPoolStatConnqAgeHead
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.31
+        name: ltmPoolStatCurSessions
+    metric_tags:
+      - tag: pool
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.1
+          name: ltmPoolStatName
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.5.2.3
+      name: ltmPoolStatTable
+    symbols:
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.7
+        name: ltmPoolStatServerTotConns
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.23
+        name: ltmPoolStatConnqServiced
+      - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.30
+        name: ltmPoolStatTotRequests
+    metric_type: monotonic_count
+    metric_tags:
+      - tag: pool
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.1
+          name: ltmPoolStatName
+
+  # Pool members.
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3375.2.2.5.3.1
+      name: ltmPoolMemberNumber
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.5.3.2
+      name: ltmPoolMemberTable
+    symbols:
+      # Gauges
+      - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.5
+        name: ltmPoolMemberConnLimit
+      - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.6
+        name: ltmPoolMemberRatio
+      - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.9
+        name: ltmPoolMemberDynamicRatio
+      - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.10
+        name: ltmPoolMemberMonitorState
+      - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.11
+        name: ltmPoolMemberMonitorStatus
+      - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.13
+        name: ltmPoolMemberSessionStatus
+    metric_tags:
+      - tag: pool
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.1
+          name: ltmPoolMemberPoolName
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.19
+          name: ltmPoolMemberNodeName
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.5.3.2
+      name: ltmPoolMemberTable
+    symbols:
+      # Gauges
+      - name: ltmPoolMember
+        constant_value_one: true
+    metric_tags:
+      - tag: pool
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.1
+          name: ltmPoolMemberPoolName
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.19
+          name: ltmPoolMemberNodeName
+      - tag: monitor_state
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.10
+          name: ltmPoolMemberMonitorState
+        mapping:
+          0: unchecked
+          1: checking
+          2: inband
+          3: forced_up
+          4: up
+          19: down
+          20: forced_down
+          22: irule_down
+          23: inband_down
+          24: down_manual_resume
+          25: disabled
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.5.4.3
+      name: ltmPoolMemberStatTable
+    symbols:
+      # Counters (= rates)
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.5
+        name: ltmPoolMemberStatServerPktsIn
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.6
+        name: ltmPoolMemberStatServerBytesIn
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.7
+        name: ltmPoolMemberStatServerPktsOut
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.8
+        name: ltmPoolMemberStatServerBytesOut
+      # Gauges
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.11
+        name: ltmPoolMemberStatServerCurConns
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.22
+        name: ltmPoolMemberStatConnqDepth
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.23
+        name: ltmPoolMemberStatConnqAgeHead
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.29
+        name: ltmPoolMemberStatCurSessions
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.30
+        name: ltmPoolMemberStatCurrentConnsPerSec
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.31
+        name: ltmPoolMemberStatDurationRateExceeded
+    metric_tags:
+      - tag: pool
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.1
+          name: ltmPoolMemberStatPoolName
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.28
+          name: ltmPoolMemberStatNodeName
+
+  - MIB: F5-BIGIP-LOCAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.3375.2.2.5.4.3
+      name: ltmPoolMemberStatTable
+    symbols:
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.10
+        name: ltmPoolMemberStatServerTotConns
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.19
+        name: ltmPoolMemberStatTotRequests
+      - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.27
+        name: ltmPoolMemberStatConnqServiced
+    metric_type: monotonic_count
+    metric_tags:
+      - tag: pool
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.1
+          name: ltmPoolMemberStatPoolName
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.28
+          name: ltmPoolMemberStatNodeName

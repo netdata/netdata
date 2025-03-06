@@ -1,0 +1,69 @@
+# Generic Resource metrics for devices
+
+# Currently covers basic uptime and system process count along with storage stats
+# TODO: add device table
+
+metrics:
+  #
+  # General System Information
+  #
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.25.1.1.0
+      name: hrSystemUptime
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.25.1.5.0
+      name: hrSystemNumUsers
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.25.1.6.0
+      name: hrSystemProcesses
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.25.1.7.0
+      name: hrSystemMaxProcesses
+
+  #
+  # Storage Devices
+  #
+  - MIB: HOST-RESOURCES-MIB
+    table:
+      OID: 1.3.6.1.2.1.25.2.3
+      name: hrStorageTable
+    symbols:
+      - OID: 1.3.6.1.2.1.25.2.3.1.4
+        name: hrStorageAllocationUnits
+      - OID: 1.3.6.1.2.1.25.2.3.1.5
+        name: hrStorageSize
+      - OID: 1.3.6.1.2.1.25.2.3.1.6
+        name: hrStorageUsed
+      - OID: 1.3.6.1.2.1.25.2.3.1.7
+        name: hrStorageAllocationFailures
+    metric_tags:
+      - tag: storagedesc
+        symbol:
+          OID: 1.3.6.1.2.1.25.2.3.1.3
+          name: hrStorageDescr
+      - tag: storagetype
+        symbol:
+          OID: 1.3.6.1.2.1.25.2.3.1.2
+          name: hrStorageType
+
+  #
+  # Processor Load
+  #
+  - MIB: HOST-RESOURCES-MIB
+    table:
+      OID: 1.3.6.1.2.1.25.3.3
+      name: hrProcessorTable
+    symbols:
+      - OID: 1.3.6.1.2.1.25.3.3.1.2
+        name: hrProcessorLoad
+    metric_tags:
+      - index: 1  # hrDeviceIndex
+        tag: hr_device_index
+      - tag: processorid
+        symbol:
+          OID: 1.3.6.1.2.1.25.3.3.1.1
+          name: hrProcessorFrwID

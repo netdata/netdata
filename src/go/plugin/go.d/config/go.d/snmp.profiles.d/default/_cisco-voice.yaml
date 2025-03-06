@@ -1,0 +1,169 @@
+# Metrics mixin for Cisco voice devices.
+
+metrics:
+  - MIB: HOST-RESOURCES-MIB
+    table:
+      name: hrSWRunPerfTable
+      OID: 1.3.6.1.2.1.25.5.1
+    symbols:
+      - name: hrSWRunPerfMem
+        OID: 1.3.6.1.2.1.25.5.1.1.2
+      - name: hrSWRunPerfCPU
+        OID: 1.3.6.1.2.1.25.5.1.1.1
+    metric_tags:
+      - symbol:
+          name: hrSWRunIndex
+          OID: 1.3.6.1.2.1.25.4.2.1.1
+        table: hrSWRunTable
+        tag: run_index
+  - MIB: HOST-RESOURCES-MIB
+    table:
+      name: hrSWRunTable
+      OID: 1.3.6.1.2.1.25.4.2
+    symbols:
+      - name: hrSWRunStatus
+        OID: 1.3.6.1.2.1.25.4.2.1.7
+    metric_tags:
+      - symbol:
+          name: hrSWRunIndex
+          OID: 1.3.6.1.2.1.25.4.2.1.1
+        table: hrSWRunTable
+        tag: run_index
+  - MIB: CISCO-CVP-MIB
+    table:
+      name: ccvpSipTable
+      OID: 1.3.6.1.4.1.9.9.590.1.6.1
+    symbols:
+      - name: ccvpSipIntAvgLatency1
+        OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.5
+      - name: ccvpSipIntAvgLatency2
+        OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.6
+      - name: ccvpSipIntConnectsRcv
+        OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.4
+      - name: ccvpSipIntNewCalls
+        OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.3
+      - name: ccvpSipRtActiveCalls
+        OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.1
+      - name: ccvpSipRtTotalCallLegs
+        OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.2
+    metric_tags:
+      - symbol:
+          name: ccvpServiceIndex
+          OID: 1.3.6.1.4.1.9.9.590.1.5.1.1.1
+        table: ccvpServiceTable
+        tag: service_index
+
+  - MIB: CISCO-CVP-MIB
+    metric_type: gauge
+    symbol:
+      name: ccvpLicAggMaxPortsInUse
+      OID: 1.3.6.1.4.1.9.9.590.1.2.12.0
+  - MIB: CISCO-CVP-MIB
+    symbol:
+      name: ccvpLicRtPortsInUse
+      OID: 1.3.6.1.4.1.9.9.590.1.2.2.0
+
+  - MIB: CISCO-CCM-MIB
+    metric_type: gauge
+    symbol:
+      name: ccmRegisteredGateways
+      OID: 1.3.6.1.4.1.9.9.156.1.5.8.0
+  - MIB: CISCO-CCM-MIB
+    metric_type: gauge
+    symbol:
+      name: ccmRegisteredPhones
+      OID: 1.3.6.1.4.1.9.9.156.1.5.5.0
+  - MIB: CISCO-CCM-MIB
+    metric_type: gauge
+    symbol:
+      name: ccmRejectedPhones
+      OID: 1.3.6.1.4.1.9.9.156.1.5.7.0
+  - MIB: CISCO-CCM-MIB
+    metric_type: gauge
+    symbol:
+      name: ccmUnregisteredPhones
+      OID: 1.3.6.1.4.1.9.9.156.1.5.6.0
+
+  - MIB: CISCO-VOICE-DIAL-CONTROL-MIB
+    table:
+      name: cvCallVolIfTable
+      OID: 1.3.6.1.4.1.9.9.63.1.3.8.5
+    symbols:
+      - name: cvCallVolMediaIncomingCalls
+        OID: 1.3.6.1.4.1.9.9.63.1.3.8.5.1.1
+      - name: cvCallVolMediaOutgoingCalls
+        OID: 1.3.6.1.4.1.9.9.63.1.3.8.5.1.2
+    metric_tags:
+      - MIB: IF-MIB
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        table: ifXTable
+        tag: interface
+
+  - MIB: CISCO-VOICE-DIAL-CONTROL-MIB
+    table:
+      name: cvCallVolPeerTable
+      OID: 1.3.6.1.4.1.9.9.63.1.3.8.4
+    symbols:
+      - name: cvCallVolPeerIncomingCalls
+        OID: 1.3.6.1.4.1.9.9.63.1.3.8.4.1.1
+      - name: cvCallVolPeerOutgoingCalls
+        OID: 1.3.6.1.4.1.9.9.63.1.3.8.4.1.2
+    metric_tags:
+      - index: 1
+        tag: peer_index
+
+  - MIB: DIAL-CONTROL-MIB
+    metric_type: monotonic_count
+    table:
+      name: dialCtlPeerStatsTable
+      OID: 1.3.6.1.2.1.10.21.1.2.2
+    symbols:
+      - name: dialCtlPeerStatsAcceptCalls
+        OID: 1.3.6.1.2.1.10.21.1.2.2.1.5
+      - name: dialCtlPeerStatsFailCalls
+        OID: 1.3.6.1.2.1.10.21.1.2.2.1.4
+      - name: dialCtlPeerStatsRefuseCalls
+        OID: 1.3.6.1.2.1.10.21.1.2.2.1.6
+      - name: dialCtlPeerStatsSuccessCalls
+        OID: 1.3.6.1.2.1.10.21.1.2.2.1.3
+    metric_tags:
+      - index: 1
+        tag: peer_index
+
+  - MIB: CISCO-CONTACT-CENTER-APPS-MIB
+    table:
+      name: cccaPimTable
+      OID: 1.3.6.1.4.1.9.9.473.1.3.6
+    symbols:
+      - name: cccaPimStatus
+        OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.4
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.1
+          name: cccaPimNumber
+        tag: pim_num
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.2
+          name: cccaPimPeripheralName
+        tag: pim_name
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.5
+          name: cccaPimPeripheralHostName
+        tag: pim_host
+
+  - MIB: CISCO-CONTACT-CENTER-APPS-MIB
+    table:
+      name: cccaRouterTable
+      OID: 1.3.6.1.4.1.9.9.473.1.3.1
+    symbols:
+      - name: cccaRouterAgentsLoggedOn
+        OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.3
+      - name: cccaRouterCallsInProgress
+        OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.4
+      - name: cccaRouterCallsInQueue
+        OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.8
+    metric_tags:
+      - tag: instance_number
+        index: 1  # Index of cccaRouterTable is (cccaInstanceNumber, cccaComponentIndex)

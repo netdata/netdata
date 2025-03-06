@@ -1,0 +1,239 @@
+metrics:
+  # Generic device health metrics for HP devices.
+  # The latest version of these MIBs can be downloaded here:
+  # https://support.hpe.com/hpsc/swd/public/detail?swItemId=MTX_53293d026fb147958b223069b6
+
+  # System utilization.
+
+  - # Total time the system has been in full operation.
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.8.1.0
+      name: cpqHeSysUtilLifeTime
+
+  - # EISA bus utilization as percentage of theoretical maximum during last minute.
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.8.2.0
+      name: cpqHeSysUtilEisaBusMin
+
+  # Critical errors.
+
+  - # Overall condition of the critical error log feature.
+    # NOTE: other(1), ok(2), degraded(3), failed(4)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.2.2.0
+      name: cpqHeCritLogCondition
+
+  # Correctable memory errors tracking.
+
+  - # Overall status of the correctable memory error log feature.
+    # NOTE: other(1), notSupported(2), disabled(3), enabled(4)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.3.1.0
+      name: cpqHeCorrMemLogStatus
+
+  - # Overall condition of the correctable memory error log feature.
+    # NOTE: other(1), ok(2), degraded(3), failed(4)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.3.2.0
+      name: cpqHeCorrMemLogCondition
+
+  - # Number of correctable memory errors that have occurred.
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.3.3.0
+      name: cpqHeCorrMemTotalErrs
+    metric_type: monotonic_count
+
+  # ASR (Automatic Server Recovery)
+
+  - # Overall status of the ASR feature.
+    # NOTE: other(1), notAvailable(2), disabled(3), enabled(4)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.5.1.0
+      name: cpqHeAsrStatus
+
+  - # Whether the ASR timer passed the server Power-On Self-Test (POST).
+    # NOTE: other(1), failed(2), ok(3)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.5.6.0
+      name: cpqHeAsrPost
+
+  - # Number of ASR reboots that occurred on the server since last manual reboot.
+    # NOTE: -1 if not supported.
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.5.10.0
+      name: cpqHeAsrRebootCount
+    metric_type: monotonic_count
+
+  - # Overall condition of the ASR feature.
+    # NOTE: other(1), notAvailable(2), disabled(3), enabled(4)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.5.17.0
+      name: cpqHeAsrCondition
+
+  - # Status of the ASR network access feature.
+    # NOTE: other(1), disabled(2), enabled(3)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.5.21.0
+      name: cpqHeAsrNetworkAccessStatus
+
+  # Temperature and fans.
+
+  - # Status of temperature sensors.
+    # NOTE: other(1), ok(2), degraded(3), failed(4)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.6.3.0
+      name: cpqHeThermalTempStatus
+
+  - # Status of fan(s).
+    # NOTE: other(1), ok(2), degraded(3), failed(4)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.6.4.0
+      name: cpqHeThermalSystemFanStatus
+
+  - # Status of processor fan(s).
+    # NOTE: other(1), ok(2), failed(4)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.6.5.0
+      name: cpqHeThermalCpuFanStatus
+
+  - # Temperator sensors.
+    MIB: CPQHLTH-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.6.2.6.8
+      name: cpqHeTemperatureTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.6.2.6.8.1.4
+        name: cpqHeTemperatureCelsius
+      - # NOTE: other(1), ok(2), degraded(3), failed(4)
+        OID: 1.3.6.1.4.1.232.6.2.6.8.1.6
+        name: cpqHeTemperatureCondition
+    metric_tags:
+      - tag: temperature_index
+        symbol:
+          OID: 1.3.6.1.4.1.232.6.2.6.8.1.3
+          name: cpqHeTemperatureIndex
+
+  # Power supplies.
+
+  - # Current power meter reading in Watts.
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.15.3.0
+      name: cpqHePowerMeterCurrReading
+
+  - # A table of battery entries.
+    MIB: CPQHLTH-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.6.2.17.2
+      name: cpqHeSysBatteryTable
+    symbols:
+      - # NOTE: other(1), ok(2), degraded(3), failed(4)
+        OID: 1.3.6.1.4.1.232.6.2.17.2.1.4
+        name: cpqHeSysBatteryCondition
+      - # NOTE: 15 different statuses are possible -- not listed here, see MIB.
+        OID: 1.3.6.1.4.1.232.6.2.17.2.1.5
+        name: cpqHeSysBatteryStatus
+    metric_tags:
+      - tag: battery_index
+        symbol:
+          OID: 1.3.6.1.4.1.232.6.2.17.2.1.2
+          name: cpqHeSysBatteryIndex
+
+  - # Overall condition of the thermal environment.
+    # NOTE: other(1), ok(2), degraded(3), failed(4)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.6.1.0
+      name: cpqHeThermalCondition
+  - # NOTE: other(1), notSupported(2), notInstalled(3), installed(4)
+    MIB: CPQHLTH-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.6.2.9.2.0
+      name: cpqHeFltTolPwrSupplyStatus
+
+  - MIB: CPQHLTH-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.6.2.14.13
+      name: cpqHeResMem2ModuleTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.6.2.14.13.1.20
+        name: cpqHeResMem2ModuleCondition
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.6.2.14.13.1.15
+          name: cpqHeResMem2ModuleCellTablePtr
+        tag: mem_board_index
+
+  # DEPRECATED: use the next table instead
+  - MIB: CPQHLTH-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.6.2.9.3
+      name: cpqHeFltTolPowerSupplyTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.6.2.9.3.1.5
+        name: cpqHeFltTolPowerSupplyStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.6.2.9.3.1.1
+          name: cpqHeFltTolPowerSupplyChassis
+        tag: chassis_num
+
+  - MIB: CPQHLTH-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.6.2.9.3
+      name: cpqHeFltTolPowerSupplyTable
+    symbols:
+      - name: cpqHeFltTolPowerSupply
+        constant_value_one: true
+      - OID: 1.3.6.1.4.1.232.6.2.9.3.1.7
+        name: cpqHeFltTolPowerSupplyCapacityUsed
+      - OID: 1.3.6.1.4.1.232.6.2.9.3.1.8
+        name: cpqHeFltTolPowerSupplyCapacityMaximum
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.6.2.9.3.1.5
+          name: cpqHeFltTolPowerSupplyStatus
+        mapping:
+          1: no_error
+          2: general_failure
+          3: bist_failure
+          4: fan_failure
+          5: temp_failure
+          6: interlock_open
+          7: eprom_failed
+          8: vref_failed
+          9: dac_failed
+          10: ram_test_failed
+          11: voltage_channel_failed
+          12: orringdiode_failed
+          13: brown_out
+          14: giveup_on_startup
+          15: nvram_invalid
+          16: calibration_table_invalid
+          17: no_power_input
+        tag: power_supply_status
+      - symbol:
+          OID: 1.3.6.1.4.1.232.6.2.9.3.1.1
+          name: cpqHeFltTolPowerSupplyChassis
+        tag: chassis_num
+
+#  TODO: NDM-1592
+#  - # NOTE: unknown(1), poweredOff(2), poweredOn(3), insufficientPowerOrPowerOnDenied(4)
+#    MIB: CPQSM2-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.232.9.2.2.32
+#      name: cpqSm2CntlrServerPowerState

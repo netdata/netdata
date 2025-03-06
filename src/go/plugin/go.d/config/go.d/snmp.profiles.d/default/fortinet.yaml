@@ -1,0 +1,17 @@
+# Profile for Fortinet  devices
+# For Fortinet FortiGate devices, a separate fortinet-fortigate profile is used
+
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "fortinet"
+
+sysobjectid:
+  - 1.3.6.1.4.1.12356.103.*   # Fortinet Appliance
+  - 1.3.6.1.4.1.12356.106.*   # Fortinet fortiswitch
+  

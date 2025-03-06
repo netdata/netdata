@@ -1,0 +1,431 @@
+sysobjectid:
+  - 1.3.6.1.4.1.20916.1.11
+metadata:
+  device:
+    fields:
+      type:
+        value: "sensor"
+extends:
+  - avtech.yaml
+metrics:
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.1.1.0
+      name: roomalert.32s.internal_tempf
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.1.2.0
+      name: roomalert.32s.internal_tempc
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.2.1.0
+      name: roomalert.32s.internal_humidity
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.1.3.1.0
+#      name: roomalert.32s.internal_power
+#      enum:
+#        battery: 0
+#        ac: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.4.1.0
+      name: roomalert.32s.internal_heat_index
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.4.2.0
+      name: roomalert.32s.internal_heat_indexC
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.5.1.0
+      name: roomalert.32s.internal_analog1
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.5.2.0
+      name: roomalert.32s.internal_analog2
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.6.1.0
+      name: roomalert.32s.internal_relay1
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.6.2.0
+      name: roomalert.32s.internal_relay2
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.7.1.0
+      name: roomalert.32s.internal_dew_point_c
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.1.7.2.0
+      name: roomalert.32s.internal_dew_point_f
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.1.1.0
+      name: roomalert.32s.digital_sen1_1
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.1.2.0
+      name: roomalert.32s.digital_sen1_2
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.1.3.0
+      name: roomalert.32s.digital_sen1_3
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.1.4.0
+      name: roomalert.32s.digital_sen1_4
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.1.5.0
+      name: roomalert.32s.digital_sen1_5
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.1.6.0
+      name: roomalert.32s.digital_sen1_6
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.1.7.0
+      name: roomalert.32s.digital_sen1_7
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.2.1.0
+      name: roomalert.32s.digital_sen2_1
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.2.2.0
+      name: roomalert.32s.digital_sen2_2
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.2.3.0
+      name: roomalert.32s.digital_sen2_3
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.2.4.0
+      name: roomalert.32s.digital_sen2_4
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.2.5.0
+      name: roomalert.32s.digital_sen2_5
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.2.6.0
+      name: roomalert.32s.digital_sen2_6
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.2.7.0
+      name: roomalert.32s.digital_sen2_7
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.3.1.0
+      name: roomalert.32s.digital_sen3_1
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.3.2.0
+      name: roomalert.32s.digital_sen3_2
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.3.3.0
+      name: roomalert.32s.digital_sen3_3
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.3.4.0
+      name: roomalert.32s.digital_sen3_4
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.3.5.0
+      name: roomalert.32s.digital_sen3_5
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.3.6.0
+      name: roomalert.32s.digital_sen3_6
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.3.7.0
+      name: roomalert.32s.digital_sen3_7
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.4.1.0
+      name: roomalert.32s.digital_sen4_1
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.4.2.0
+      name: roomalert.32s.digital_sen4_2
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.4.3.0
+      name: roomalert.32s.digital_sen4_3
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.4.4.0
+      name: roomalert.32s.digital_sen4_4
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.4.5.0
+      name: roomalert.32s.digital_sen4_5
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.4.6.0
+      name: roomalert.32s.digital_sen4_6
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.4.7.0
+      name: roomalert.32s.digital_sen4_7
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.5.1.0
+      name: roomalert.32s.digital_sen5_1
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.5.2.0
+      name: roomalert.32s.digital_sen5_2
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.5.3.0
+      name: roomalert.32s.digital_sen5_3
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.5.4.0
+      name: roomalert.32s.digital_sen5_4
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.5.5.0
+      name: roomalert.32s.digital_sen5_5
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.5.6.0
+      name: roomalert.32s.digital_sen5_6
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.5.7.0
+      name: roomalert.32s.digital_sen5_7
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.6.1.0
+      name: roomalert.32s.digital_sen6_1
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.6.2.0
+      name: roomalert.32s.digital_sen6_2
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.6.3.0
+      name: roomalert.32s.digital_sen6_3
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.6.4.0
+      name: roomalert.32s.digital_sen6_4
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.6.5.0
+      name: roomalert.32s.digital_sen6_5
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.6.6.0
+      name: roomalert.32s.digital_sen6_6
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.6.7.0
+      name: roomalert.32s.digital_sen6_7
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.7.1.0
+      name: roomalert.32s.digital_sen7_1
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.7.2.0
+      name: roomalert.32s.digital_sen7_2
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.7.3.0
+      name: roomalert.32s.digital_sen7_3
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.7.4.0
+      name: roomalert.32s.digital_sen7_4
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.7.5.0
+      name: roomalert.32s.digital_sen7_5
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.7.6.0
+      name: roomalert.32s.digital_sen7_6
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.7.7.0
+      name: roomalert.32s.digital_sen7_7
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.8.1.0
+      name: roomalert.32s.digital_sen8_1
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.8.2.0
+      name: roomalert.32s.digital_sen8_2
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.8.3.0
+      name: roomalert.32s.digital_sen8_3
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.8.4.0
+      name: roomalert.32s.digital_sen8_4
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.8.5.0
+      name: roomalert.32s.digital_sen8_5
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.8.6.0
+      name: roomalert.32s.digital_sen8_6
+  - MIB: ROOMALERT32S-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.20916.1.11.1.2.8.7.0
+      name: roomalert.32s.digital_sen8_7
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.1.0
+#      name: roomalert.32s.switch_sen1
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.2.0
+#      name: roomalert.32s.switch_sen2
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.3.0
+#      name: roomalert.32s.switch_sen3
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.4.0
+#      name: roomalert.32s.switch_sen4
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.5.0
+#      name: roomalert.32s.switch_sen5
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.6.0
+#      name: roomalert.32s.switch_sen6
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.7.0
+#      name: roomalert.32s.switch_sen7
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.8.0
+#      name: roomalert.32s.switch_sen8
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.9.0
+#      name: roomalert.32s.switch_sen9
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.10.0
+#      name: roomalert.32s.switch_sen10
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.11.0
+#      name: roomalert.32s.switch_sen11
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.12.0
+#      name: roomalert.32s.switch_sen12
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.13.0
+#      name: roomalert.32s.switch_sen13
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.14.0
+#      name: roomalert.32s.switch_sen14
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.15.0
+#      name: roomalert.32s.switch_sen15
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: ROOMALERT32S-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.20916.1.11.1.3.16.0
+#      name: roomalert.32s.switch_sen16
+#      enum:
+#        open: 0
+#        closed: 1
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)

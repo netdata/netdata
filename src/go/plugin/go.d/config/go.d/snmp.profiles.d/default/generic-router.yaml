@@ -1,0 +1,5 @@
+# generic-device.yaml is now the generic profile for network devices
+# this profile is kept only for backward compatibility
+
+extends:
+  - generic-device.yaml

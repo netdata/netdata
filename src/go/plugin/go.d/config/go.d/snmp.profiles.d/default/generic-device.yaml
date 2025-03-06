@@ -1,0 +1,11 @@
+# Generic profile for network devices
+
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+  - _generic-ip.yaml
+  - _generic-tcp.yaml
+  - _generic-udp.yaml
+  - _generic-ospf.yaml
+
+sysobjectid: 1.3.6.1.4.*

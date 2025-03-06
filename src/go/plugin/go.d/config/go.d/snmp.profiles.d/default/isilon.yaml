@@ -1,0 +1,200 @@
+# Example sysDescr:
+# - device-name-3 263829375 Isilon OneFS v8.2.0.0
+# - device-name-5 2316163007 Isilon OneFS v8.1.2.0
+extends:
+  - _base.yaml
+  - _generic-ip.yaml
+  - _generic-tcp.yaml
+  - _generic-udp.yaml
+
+device:
+  vendor: "dell"
+
+sysobjectid:
+  - 1.3.6.1.4.1.12124.*
+
+  # Looks like EMC Isilon devices might use the wrong sysObjectID `1.3.6.1.4.1.12325.1.1.2.1.1` (FreeBSD-FOKUS)
+  # Few related discussions:
+  # - https://thwack.solarwinds.com/product-forums/network-performance-monitor-npm/f/forum/66098/emc-isilon-showing-up-as-non-emc-device-after-upgrade/39511
+  # - https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0761173
+  # - https://github.com/librenms/librenms/issues/6412
+  # Long term solution:
+  # Similar to librenms a possible solution is to have other ways to match devices like sysDescr text matching. See example:
+  # https://github.com/librenms/librenms/pull/6416/files#diff-ec0470a0c495f1349b349f62b0dfdf14b928a5acb94f0de5f6c5a6e523f7817cR12-R16
+  - 1.3.6.1.4.1.12325.1.1.2.1.1
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "dell"
+      serial_number:
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.51.1.3.1
+          name: chassisSerialNumber  # The chassis serial number.
+      version:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: 'Isilon OneFS v(\S+)'
+          match_value: '$1'
+          # Examples:
+          #  - device-name-3 263829375 Isilon OneFS v8.2.0.0
+      product_name:
+        value: 'Isilon OneFS'
+      model:
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.51.1.4.1
+          name: chassisModel  # The chassis model name.
+          # source/hints:
+          # - https://www.dell.com/support/kbdoc/fr-fr/000020536/isilon-how-to-find-serial-numbers-for-isilon-nodes?lang=en
+          # - https://www.dell.com/community/Isilon/Querying-Isilon-Cluster-via-SNMP-For-Node-Model/td-p/7048622
+      os_name:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: '\bOneFS\b'
+          match_value: 'OneFS'
+          # Examples:
+          #  - device-name-3 263829375 Isilon OneFS v8.2.0.0
+      os_version:
+        # OneFS operating system version seems to be the same as the OneFS filestem version
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: 'Isilon OneFS v(\S+)'
+          match_value: '$1'
+          # Examples:
+          #  - device-name-3 263829375 Isilon OneFS v8.2.0.0
+      type:
+        value: "storage"
+
+metrics:
+  # fan hardware
+  - MIB: ISILON-MIB
+    table:
+      OID: 1.3.6.1.4.1.12124.2.53
+      name: fanTable
+    symbols:
+      - OID: 1.3.6.1.4.1.12124.2.53.1.4
+        name: fanSpeed
+    metric_tags:
+      - tag: fan_name
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.53.1.2
+          name: fanName
+      - tag: fan_number
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.53.1.1
+          name: fanNumber
+
+  # cluster
+  - MIB: ISILON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12124.1.1.2.0
+      name: clusterHealth
+  - MIB: ISILON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12124.1.2.1.1.0
+      name: clusterIfsInBytes
+  - MIB: ISILON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12124.1.2.1.3.0
+      name: clusterIfsOutBytes
+
+  # file system
+  - MIB: ISILON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12124.1.3.2.0
+      name: ifsUsedBytes
+  - MIB: ISILON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12124.1.3.1.0
+      name: ifsTotalBytes
+
+  # node
+  - MIB: ISILON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12124.2.1.2.0
+      name: nodeHealth
+  - MIB: ISILON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12124.2.2.1.1.0
+      name: nodeIfsInBytes
+  - MIB: ISILON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12124.2.2.1.3.0
+      name: nodeIfsOutBytes
+
+  # disk
+  - MIB: ISILON-MIB
+    table:
+      OID: 1.3.6.1.4.1.12124.2.52
+      name: diskTable
+    symbols:
+      - OID: 1.3.6.1.4.1.12124.2.52.1.9
+        name: diskSizeBytes
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.12124.2.52.1.5
+          name: diskStatus
+        tag: disk_status
+      - symbol:
+          OID: 1.3.6.1.4.1.12124.2.52.1.1
+          name: diskBay
+        tag: disk_bay
+
+
+  # protocol
+  - MIB: ISILON-MIB
+    table:
+      OID: 1.3.6.1.4.1.12124.2.2.10
+      name: nodeProtocolPerfTable
+    symbols:
+      - OID: 1.3.6.1.4.1.12124.2.2.10.1.3
+        name: protocolOpsPerSecond
+      - OID: 1.3.6.1.4.1.12124.2.2.10.1.14
+        name: latencyMin
+      - OID: 1.3.6.1.4.1.12124.2.2.10.1.15
+        name: latencyMax
+      - OID: 1.3.6.1.4.1.12124.2.2.10.1.16
+        name: latencyAverage
+    metric_tags:
+      - tag: protocol_name
+        symbol:
+          OID: 1.3.6.1.4.1.12124.2.2.10.1.1
+          name: protocolName
+
+  # quota
+  - MIB: ISILON-MIB
+    table:
+      OID: 1.3.6.1.4.1.12124.1.12.1
+      name: quotaTable
+    symbols:
+      - OID: 1.3.6.1.4.1.12124.1.12.1.1.7
+        name: quotaHardThreshold
+      - OID: 1.3.6.1.4.1.12124.1.12.1.1.9
+        name: quotaSoftThreshold
+      - OID: 1.3.6.1.4.1.12124.1.12.1.1.13
+        name: quotaUsage
+      - OID: 1.3.6.1.4.1.12124.1.12.1.1.11
+        name: quotaAdvisoryThreshold
+    metric_tags:
+      - tag: quota_type
+        symbol:
+          OID: 1.3.6.1.4.1.12124.1.12.1.1.2
+          name: quotaType
+      - tag: quota_id
+        symbol:
+          OID: 1.3.6.1.4.1.12124.1.12.1.1.3
+          name: quotaID
+metric_tags:
+  - tag: cluster_name
+    OID: 1.3.6.1.4.1.12124.1.1.1.0
+    symbol: clusterName
+  - tag: node_name
+    OID: 1.3.6.1.4.1.12124.2.1.1.0
+    symbol: nodeName
+  - tag: node_type
+    OID: 1.3.6.1.4.1.12124.2.1.3.0
+    symbol: nodeType

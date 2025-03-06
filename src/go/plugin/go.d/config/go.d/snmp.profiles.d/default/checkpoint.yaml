@@ -1,0 +1,231 @@
+# Profile for Checkpoint devices
+#
+# Example sysDescr:
+# - 1.3.6.1.4.1.2620.1.6.123.1.49   Linux host1 3.10.0-957.21.3cpx86_64 #1 SMP Tue Jan 28 17:26:12 IST 2020 x86_64
+# - 1.3.6.1.4.1.2620.1.6.123.1.56   Linux host2 2.6.18-92cpx86_64 #1 SMP Tue May 16 12:09:46 IDT 2017 x86_64"
+# - 1.3.6.1.4.1.2620.1.6.123.1.56   Linux host3 2.6.18-92cpx86_64 #1 SMP Tue May 16 12:09:46 IDT 2017 x86_64"
+
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+  - _generic-tcp.yaml
+  - _generic-udp.yaml
+  - _generic-ip.yaml
+  - _checkpoint-firewall-cpu-memory.yaml
+
+device:
+  vendor: "checkpoint"
+
+sysobjectid: 1.3.6.1.4.1.2620.1.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "checkpoint"
+      serial_number:
+        symbol:
+          MIB: CHECKPOINT-MIB
+          OID: 1.3.6.1.4.1.2620.1.6.16.3.0
+          name: svnApplianceSerialNumber  # Appliance Serial Number
+          # Example: 1711BA4008
+      version:
+        symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.4.1.0
+          name: svnVersion  # SVN version
+          # Example: R80.10
+          # Reference to R80.10 here https://supportcenter.checkpoint.com/supportcenter/portal?eventSubmit_doGoviewsolutiondetails=&solutionid=sk111841
+      product_name:
+        symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.1.0
+          name: svnProdName  # Product name
+          # Example: SVN Foundation
+      model:
+        symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.16.7.0
+          name: svnApplianceProductName  # Appliance Product Name
+          # Example: Check Point 3200
+      os_name:
+        symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.5.1.0
+          name: osName  # OS name
+      os_version:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          extract_value: 'Linux\s+\S+\s+(\d+(?:\.\d+)*)'
+          # Example: `3.10.0` in `Linux host1 3.10.0-957.21.3cpx86_64`
+          #
+          # Note: The os version is also stored in two separate OIDs for major and minor. Example:
+          #       .1.3.6.1.4.1.2620.1.6.5.2.0 (osMajorVer) = 2
+          #       .1.3.6.1.4.1.2620.1.6.5.3.0 (osMinorVer) = 6
+          #       In this example, the OS Version is 2.6, at the moment it's not possible to add metadata based on 2 OIDs
+      type:
+        value: "firewall"
+
+
+metrics:
+    # CPU
+  - MIB: CHECKPOINT-MIB
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.5.1.1
+          name: multiProcIndex
+        tag: cpu_core
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.2
+        name: multiProcUserTime
+      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.3
+        name: multiProcSystemTime
+      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.4
+        name: multiProcIdleTime
+      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.5
+        name: multiProcUsage
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.5
+      name: multiProcTable
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.6.7.2.7.0
+      name: procNum
+    # Memory
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.6.7.4.3.0
+      name: memTotalReal64
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.6.7.4.4.0
+      name: memActiveReal64
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.6.7.4.5.0
+      name: memFreeReal64
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.6.7.4.1.0
+      name: memTotalVirtual64
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.6.7.4.2.0
+      name: memActiveVirtual64
+    # Disk
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.6.1.1
+          name: multiDiskIndex
+        tag: disk_index
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.6.1.2
+          name: multiDiskName
+        tag: disk_name
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.3
+        name: multiDiskSize
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.4
+        name: multiDiskUsed
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.5
+        name: multiDiskFreeTotalBytes
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.7
+        name: multiDiskFreeAvailableBytes
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.6
+        name: multiDiskFreeTotalPercent
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.8
+        name: multiDiskFreeAvailablePercent
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.6
+      name: multiDiskTable
+    # Appliances
+  - MIB: CHECKPOINT-MIB
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.1
+          name: fanSpeedSensorIndex
+        tag: sensor_index
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.2
+          name: fanSpeedSensorName
+        tag: sensor_name
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.3
+        name: fanSpeedSensorValue
+      - OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.6
+        name: fanSpeedSensorStatus
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.8.2
+      name: fanSpeedSensorTable
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.8.2
+      name: fanSpeedSensorTable
+    symbols:
+      - name: fanSpeedSensor
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.6
+          name: fanSpeedSensorStatus
+        tag: fan_speed_sensor_status
+        # mapping from description:
+        #   Sensor is out of range TRUE(1), FALSE(0), READING ERROR(2)
+        mapping:
+          0: false
+          1: true
+          2: reading_error
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.1
+          name: fanSpeedSensorIndex
+        tag: sensor_index
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.2
+          name: fanSpeedSensorName
+        tag: sensor_name
+  - MIB: CHECKPOINT-MIB
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.1
+          name: tempertureSensorIndex
+        tag: sensor_index
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.2
+          name: tempertureSensorName
+        tag: sensor_name
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.3
+        name: tempertureSensorValue
+      - OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.6
+        name: tempertureSensorStatus
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.8.1
+      name: tempertureSensorTable
+    # Network
+  - MIB: CHECKPOINT-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.4.0
+      name: fwAccepted
+  - MIB: CHECKPOINT-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.6.0
+      name: fwDropped
+  - MIB: CHECKPOINT-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.5.0
+      name: fwRejected
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.25.3.0
+      name: fwNumConn
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.25.4.0
+      name: fwPeakNumConn
