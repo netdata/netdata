@@ -64,6 +64,8 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_ACLK_NODE_INFO, "aclk host node info");
     worker_register_job_name(UV_EVENT_ACLK_ALERT_PUSH, "aclk alert push");
     worker_register_job_name(UV_EVENT_ACLK_ALERT_HOST_PUSH, "aclk alert host push");
+    worker_register_job_name(UV_EVENT_ACLK_ALERT_HOST_SNAPSHOT, "aclk alert host snapshot");
+    worker_register_job_name(UV_EVENT_ACLK_ALERT_HOST_PROCESS, "aclk alert host process");
     worker_register_job_name(UV_EVENT_ACLK_QUERY_EXECUTE, "aclk query execute");
     // aclk
     worker_register_job_name(UV_EVENT_CTX_STOP_STREAMING, "ctx stop streaming");

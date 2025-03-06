@@ -621,9 +621,9 @@ static void start_alert_push_for_host(uv_work_t *req)
     sqlite3_stmt *res = NULL;
     sqlite3_stmt *res_version = NULL;
 
-    worker_is_busy(UV_EVENT_ACLK_ALERT_HOST_PUSH);
+    // worker will be set in the following function
     aclk_push_alert_events_for_host(host, &res, &res_version);
-    worker_is_idle();
+
 
     SQLITE_FINALIZE(res);
     SQLITE_FINALIZE(res_version);
