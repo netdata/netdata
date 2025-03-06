@@ -599,6 +599,36 @@ done:
     return added > 0;
 }
 
+
+void aclk_push_alert_events_for_host(RRDHOST *host, sqlite3_stmt **res, sqlite3_stmt **res_version)
+{
+    if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS) ||
+        rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
+        return;
+
+    rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+
+    struct aclk_sync_cfg_t *wc = host->aclk_config;
+    if (!wc || false == wc->stream_alerts || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+        (void)process_alert_pending_queue(host);
+        commit_alert_events(host);
+        return;
+    }
+
+    if (wc->send_snapshot) {
+        rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+        if (wc->send_snapshot == 1)
+            return;
+        (void)process_alert_pending_queue(host);
+        commit_alert_events(host);
+        rebuild_host_alert_version_table(host);
+        send_alert_snapshot_to_cloud(host);
+        wc->snapshot_count++;
+        wc->send_snapshot = 0;
+    } else
+        aclk_push_alert_event(host, res, res_version);
+}
+
 void aclk_push_alert_events_for_all_hosts(void)
 {
     RRDHOST *host;
@@ -606,32 +636,7 @@ void aclk_push_alert_events_for_all_hosts(void)
     sqlite3_stmt *res = NULL;               // used to scan pending alerts to send
     sqlite3_stmt *res_version = NULL;       // used to update the alert version
     dfe_start_reentrant(rrdhost_root_index, host) {
-        if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS) ||
-            rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
-            continue;
-
-        rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-
-        struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (!wc || false == wc->stream_alerts || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-            (void)process_alert_pending_queue(host);
-            commit_alert_events(host);
-            continue;
-        }
-
-        if (wc->send_snapshot) {
-            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            if (wc->send_snapshot == 1)
-                continue;
-            (void)process_alert_pending_queue(host);
-            commit_alert_events(host);
-            rebuild_host_alert_version_table(host);
-            send_alert_snapshot_to_cloud(host);
-            wc->snapshot_count++;
-            wc->send_snapshot = 0;
-        }
-        else
-            aclk_push_alert_event(host, &res, &res_version);
+        aclk_push_alert_events_for_host(host, &res, &res_version);
     }
     dfe_done(host);
     SQLITE_FINALIZE(res);

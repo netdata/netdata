@@ -62,6 +62,7 @@ enum event_loop_job {
     // aclk_sync
     UV_EVENT_ACLK_NODE_INFO,
     UV_EVENT_ACLK_ALERT_PUSH,
+    UV_EVENT_ACLK_ALERT_HOST_PUSH,
     UV_EVENT_ACLK_QUERY_EXECUTE,
 
     //

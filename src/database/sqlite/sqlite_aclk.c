@@ -602,6 +602,35 @@ static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
     uv_close(handle, NULL);  // Automatically close and free the handle
 }
 
+static void after_start_alert_push_for_host(uv_work_t *req, int status __maybe_unused)
+{
+    struct worker_data *data = req->data;
+    RRDHOST *host = data->payload;
+
+    HEALTH *health = &host->health;
+    health->alert_processing_running = false;
+    freez(data);
+}
+
+// Worker thread to scan hosts for pending metadata to store
+static void start_alert_push_for_host(uv_work_t *req)
+{
+    register_libuv_worker_jobs();
+
+    struct worker_data *data =  req->data;
+    RRDHOST *host = data->payload;
+
+    sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res_version = NULL;
+
+    worker_is_busy(UV_EVENT_ACLK_ALERT_HOST_PUSH);
+    aclk_push_alert_events_for_host(host, &res, &res_version);
+    worker_is_idle();
+
+    SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res_version);
+}
+
 static void after_start_alert_push(uv_work_t *req, int status __maybe_unused)
 {
     struct worker_data *data = req->data;
@@ -674,6 +703,7 @@ static void aclk_synchronization(void *arg)
     worker_register_job_name(ACLK_DATABASE_NOOP,                "noop");
     worker_register_job_name(ACLK_DATABASE_NODE_STATE,          "node state");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,          "alert push");
+    worker_register_job_name(ACLK_DATABASE_PUSH_HOST_ALERT,     "alert host push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,   "alert conf push");
     worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,           "aclk query execute sync");
     worker_register_job_name(ACLK_QUERY_BATCH_EXECUTE,          "aclk batch execute");
@@ -808,6 +838,25 @@ static void aclk_synchronization(void *arg)
                         config->alert_push_running = false;
                     }
                     break;
+                case ACLK_DATABASE_PUSH_HOST_ALERT:
+                    host = cmd.param[0];
+                    HEALTH *health = &host->health;
+                    if (health->alert_processing_running)
+                        break;
+
+                    health->alert_processing_running = true;
+
+                    data = mallocz(sizeof(*data));
+                    data->request.data = data;
+                    data->config = config;
+                    data->payload = host;
+
+                    if (uv_queue_work(loop, &data->request, start_alert_push_for_host, after_start_alert_push_for_host)) {
+                        freez(data);
+                        health->alert_processing_running = false;
+                    }
+                    break;
+
                 case ACLK_MQTT_WSS_CLIENT:
                     config->client = (mqtt_wss_client)cmd.param[0];
                     break;
@@ -1069,6 +1118,14 @@ void aclk_add_job(aclk_query_t query)
         return;
 
     queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
+}
+
+void aclk_push_host_alert(RRDHOST *host)
+{
+    if (unlikely(!aclk_sync_config.initialized))
+        return;
+
+    queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_HOST_ALERT, host, NULL);
 }
 
 void aclk_query_init(mqtt_wss_client client) {
