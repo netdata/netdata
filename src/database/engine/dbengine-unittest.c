@@ -408,7 +408,7 @@ int test_dbengine(void) {
     }
 
     rrd_wrlock();
-    rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
+    rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si, false);
     rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
     rrd_wrunlock();

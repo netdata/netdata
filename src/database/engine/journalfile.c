@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
+
+// the default value is set in ND_PROFILE, not here
+time_t dbengine_journal_v2_unmount_time = 120;
+
 /* Careful to always call this before creating a new journal file */
 void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, WAL *wal)
 {
@@ -210,6 +214,8 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
 
             madvise_dontfork(journalfile->mmap.data, journalfile->mmap.size);
             madvise_dontdump(journalfile->mmap.data, journalfile->mmap.size);
+            // madvise_dontneed(journalfile->mmap.data, journalfile->mmap.size);
+            madvise_random(journalfile->mmap.data, journalfile->mmap.size);
 
             spinlock_lock(&journalfile->v2.spinlock);
             journalfile->v2.flags |= JOURNALFILE_FLAG_IS_AVAILABLE | JOURNALFILE_FLAG_IS_MOUNTED;
@@ -219,11 +225,6 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
             if(flags & JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION) {
                 // we need the entire metrics directory into memory to process it
                 madvise_willneed(journalfile->mmap.data, journalfile->v2.size_of_directory);
-            }
-            else {
-                // let the kernel know that we don't want read-ahead on this file
-                madvise_random(journalfile->mmap.data, journalfile->mmap.size);
-                // madvise_dontneed(journalfile->mmap.data, journalfile->mmap.size);
             }
         }
     }
@@ -312,8 +313,9 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
                 if (!journalfile->v2.not_needed_since_s)
                     journalfile->v2.not_needed_since_s = now_s;
 
-                else if (now_s - journalfile->v2.not_needed_since_s >= 120)
-                    // 2 minutes have passed since last use
+                else if (
+                    dbengine_journal_v2_unmount_time && now_s - journalfile->v2.not_needed_since_s >= dbengine_journal_v2_unmount_time)
+                    // enough time has passed since we last needed this journal
                     unmount = true;
             }
             spinlock_unlock(&journalfile->v2.spinlock);

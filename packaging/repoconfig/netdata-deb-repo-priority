@@ -1,0 +1,3 @@
+Package: *
+Pin: origin "repository.netdata.cloud"
+Priority: 1000

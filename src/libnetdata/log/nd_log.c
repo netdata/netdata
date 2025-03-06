@@ -118,7 +118,7 @@ static void nd_log_event(struct log_field *fields, size_t fields_max __maybe_unu
 
     nd_log_event_this = false;
 
-    if(!nd_log.log_event_cb)
+    if(!nd_log.fatal_data_cb)
         return;
 
     const char *filename = log_field_strdupz(&fields[NDF_FILE]);
@@ -128,17 +128,17 @@ static void nd_log_event(struct log_field *fields, size_t fields_max __maybe_unu
     const char *errno_str = log_field_strdupz(&fields[NDF_ERRNO]);
     long line = log_field_to_int64(&fields[NDF_LINE]);
 
-    nd_log.log_event_cb(filename, function, message, errno_str, stack_trace, line);
+    nd_log.fatal_data_cb(filename, function, message, errno_str, stack_trace, line);
 }
 
-void nd_log_register_event_cb(log_event_t cb) {
-    nd_log.log_event_cb = cb;
+void nd_log_register_fatal_data_cb(log_event_t cb) {
+    nd_log.fatal_data_cb = cb;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
-void nd_log_register_fatal_cb(fatal_event_t cb) {
-    nd_log.fatal_event_cb = cb;
+void nd_log_register_fatal_final_cb(fatal_event_t cb) {
+    nd_log.fatal_final_cb = cb;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -268,7 +268,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
     // set the common fields that are automatically set by the logging subsystem
 
-    if(likely(!thread_log_fields[NDF_STACK_TRACE].entry.set))
+    if(likely(!thread_log_fields[NDF_STACK_TRACE].entry.set) && priority <= NDLP_WARNING)
         thread_log_fields[NDF_STACK_TRACE].entry = ND_LOG_FIELD_CB(NDF_STACK_TRACE, stack_trace_formatter, NULL);
 
     if(likely(!thread_log_fields[NDF_INVOCATION_ID].entry.set))
@@ -517,25 +517,12 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     char action_result[200+1];
     snprintfz(action_result, 60, "%s:%s:%s", program_name, tag_to_send, function);
 
-#if !defined(ENABLE_SENTRY) && defined(HAVE_BACKTRACE)
-    int fd = nd_log.sources[NDLS_DAEMON].fd;
-    if(fd == -1)
-        fd = STDERR_FILENO;
-
-    int nptrs;
-    void *buffer[10000];
-
-    nptrs = backtrace(buffer, sizeof(buffer));
-    if(nptrs)
-        backtrace_symbols_fd(buffer, nptrs, fd);
-#endif
-
 #ifdef NETDATA_INTERNAL_CHECKS
-    // abort();
+    abort();
 #endif
 
-    if(nd_log.fatal_event_cb)
-        nd_log.fatal_event_cb();
+    if(nd_log.fatal_final_cb)
+        nd_log.fatal_final_cb();
 
     exit(1);
 }

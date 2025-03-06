@@ -100,15 +100,16 @@ static void *rrdeng_exit_background(void *ptr) {
 }
 
 #ifdef ENABLE_DBENGINE
-static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors) {
+static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only)
+{
     static size_t starting_size_to_flush = 0;
 
     if(!pgc_hot_and_dirty_entries(main_cache))
         return;
 
-    nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE dirty pages...");
+    nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE %s dirty pages...", dirty_only ? "only" : "hot &");
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-        rrdeng_quiesce(multidb_ctx[tier]);
+        rrdeng_quiesce(multidb_ctx[tier], dirty_only);
 
     struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
     size_t size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
@@ -185,7 +186,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 #ifdef ENABLE_DBENGINE
     if(!ret && dbengine_enabled)
         // flush all dirty pages asap
-        rrdeng_flush_everything_and_wait(false, false);
+        rrdeng_flush_everything_and_wait(false, false, true);
 #endif
 
     // send the stat from our caller
@@ -196,21 +197,17 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     statistic = (analytics_statistic_t) {"EXIT", ret?"ERROR":"OK","-"};
     analytics_statistic_send(&statistic);
 
-    watcher_step_complete(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
-
     netdata_main_spawn_server_cleanup();
     watcher_step_complete(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
-
-    watcher_step_complete(WATCHER_STEP_ID_DBENGINE_EXIT_MODE);
 
     webrtc_close_all_connections();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
     service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS |
-                        ABILITY_STREAMING_CONNECTIONS | SERVICE_ACLK);
+                        ABILITY_STREAMING_CONNECTIONS | SERVICE_ACLK | SERVICE_SYSTEMD);
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
 
-    service_wait_exit(SERVICE_MAINTENANCE, 3 * USEC_PER_SEC);
+    service_wait_exit(SERVICE_MAINTENANCE | SERVICE_SYSTEMD, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
 
     service_wait_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
@@ -223,7 +220,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 #ifdef ENABLE_DBENGINE
     if(!ret && dbengine_enabled)
         // flush all dirty pages now that all collectors and streaming completed
-        rrdeng_flush_everything_and_wait(false, false);
+        rrdeng_flush_everything_and_wait(false, false, false);
 #endif
 
     service_wait_exit(SERVICE_REPLICATION, 3 * USEC_PER_SEC);
@@ -267,7 +264,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
             // flush anything remaining and wait for collectors to finish
-            rrdeng_flush_everything_and_wait(true, true);
+            rrdeng_flush_everything_and_wait(true, true, false);
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
 
             ND_THREAD *th[nd_profile.storage_tiers];
@@ -275,7 +272,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
                 th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_JOINABLE, rrdeng_exit_background, multidb_ctx[tier]);
 
             // flush anything remaining again - just in case
-            rrdeng_flush_everything_and_wait(true, false);
+            rrdeng_flush_everything_and_wait(true, false, false);
 
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 nd_thread_join(th[tier]);
@@ -304,24 +301,26 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     sqlite_close_databases();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
-
-
+    
     // unlink the pid
-    if(pidfile && *pidfile) {
-        if(unlink(pidfile) != 0)
-            netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
-    }
+    if(pidfile && *pidfile && unlink(pidfile) != 0)
+        netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
+
+    // unlink the pipe
+    const char *pipe = daemon_pipename();
+    if(pipe && *pipe && unlink(pipe) != 0)
+        netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
+
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
 
     netdata_ssl_cleanup();
     watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
 
-    watcher_step_complete(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE);
-
     watcher_shutdown_end();
     watcher_thread_stop();
     curl_global_cleanup();
 
+    daemon_status_file_shutdown_step(NULL);
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
 
 #ifdef OS_WINDOWS

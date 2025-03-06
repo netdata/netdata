@@ -88,26 +88,35 @@ static inline int check_socks_enviroment(const char **proxy)
     }
 
     safe_log_proxy_error(
-        "Environment var \"socks_proxy\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:ip\".",
+        "Environment var \"socks_proxy\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:port\".",
         tmp);
     return 1;
 }
 
-static inline int check_http_enviroment(const char **proxy)
+static inline int check_http_environment(const char **proxy)
 {
-    char *tmp = getenv("http_proxy");
+    const char *var = "http_proxy";
+    char *tmp = getenv(var);
 
-    if (!tmp || !*tmp)
-        return 1;
+    if (!tmp || !*tmp) {
+        var = "https_proxy";
+        tmp = getenv(var);
+        if (!tmp || !*tmp)
+            return 1;
+    }
 
     if (aclk_verify_proxy(tmp) == PROXY_TYPE_HTTP) {
         *proxy = tmp;
         return 0;
     }
 
-    safe_log_proxy_error(
-        "Environment var \"http_proxy\" defined but of unknown format. Supported syntax: \"http[s]://[user:pass@]host:ip\".",
-        tmp);
+    char buf[1024];
+    snprintfz(buf, sizeof(buf),
+              "Environment var '%s' defined but of unknown format '%s'. "
+              "Supported syntax: 'http://[user:pass@]host:port'.",
+              var, tmp);
+    safe_log_proxy_error(buf, tmp);
+
     return 1;
 }
 
@@ -132,7 +141,7 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
                 proxy);
 #endif
         }
-        if (check_http_enviroment(&proxy) == 0)
+        if (check_http_environment(&proxy) == 0)
             *type = PROXY_TYPE_HTTP;
         return proxy;
     }

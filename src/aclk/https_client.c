@@ -738,13 +738,13 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
         free(err_str);
     }
 
-#ifdef ACLK_SSL_ALLOW_SELF_SIGNED
-    if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)
-    {
-        preverify_ok = 1;
-        netdata_log_error("ACLK: Self Signed Certificate Accepted as the agent was built with ACLK_SSL_ALLOW_SELF_SIGNED");
+    if(cloud_config_insecure_get()) {
+        if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT) {
+            preverify_ok = 1;
+            netdata_log_error(
+                "ACLK: Self Signed Certificate Accepted as the agent was configured with ACLK_SSL_ALLOW_SELF_SIGNED");
+        }
     }
-#endif
 
     return preverify_ok;
 }

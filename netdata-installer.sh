@@ -1167,6 +1167,6 @@ else
   progress "is installed now!"
 fi
 
-echo >&2 "  enjoy real-time performance and health monitoring..."
+echo >&2 "  Enjoy X-Ray Vision for your infrastructure..."
 echo >&2
 exit 0

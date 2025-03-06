@@ -486,6 +486,14 @@ check_function_exists(sysinfo HAVE_SYSINFO)
 
 check_function_exists(timegm HAVE_TIMEGM)
 
+# Add -rdynamic when backtrace is available but libunwind is not
+if(HAVE_BACKTRACE AND NOT ENABLE_LIBUNWIND AND NOT STATIC_BUILD)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        add_link_options(-rdynamic)
+        message(STATUS "Adding -rdynamic to link options for better backtrace support")
+    endif()
+endif()
+
 #
 # check source compilation
 #
@@ -1030,7 +1038,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/benchmark.h
         src/libnetdata/locks/benchmark-rw.c
         src/libnetdata/locks/benchmark-rw.h
-        src/libnetdata/log/nd_log-libunwind.c
+        src/libnetdata/log/nd_log-stacktrace.c
         src/libnetdata/memory/nd-mallocz.c
         src/libnetdata/memory/nd-mallocz.h
         src/libnetdata/memory/nd-mmap.c
@@ -1058,6 +1066,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/file_lock.h
         src/libnetdata/os/mmap_limit.c
         src/libnetdata/os/mmap_limit.h
+        src/libnetdata/signals/signals.c
+        src/libnetdata/signals/signals.h
+        src/libnetdata/os/machine_id.c
+        src/libnetdata/os/machine_id.h
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
@@ -1163,8 +1175,8 @@ set(DAEMON_FILES
         src/daemon/environment.c
         src/daemon/win_system-info.c
         src/daemon/win_system-info.h
-        src/daemon/signals.c
-        src/daemon/signals.h
+        src/daemon/signal-handler.c
+        src/daemon/signal-handler.h
         src/daemon/service.c
         src/daemon/daemon-shutdown-watcher.c
         src/daemon/daemon-shutdown-watcher.h
@@ -2252,16 +2264,24 @@ if(ENABLE_LIBUNWIND)
   if(TARGET PkgConfig::LIBUNWIND)
     set(HAVE_LIBUNWIND On)
 
+    if(STATIC_BUILD)
+      set(unwind_prefix /libunwind-static/lib/libunwind-)
+      set(suffix ${CMAKE_STATIC_LIBRARY_SUFFIX})
+    else()
+      set(unwind_prefix -lunwind-)
+      set(suffix "")
+    endif()
+
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
-      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-x86_64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND ${unwind_prefix}x86_64${suffix})
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^i?.86")
-      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-x86)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND ${unwind_prefix}x86${suffix})
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(arm64)|(aarch64)")
-      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-aarch64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND ${unwind_prefix}aarch64${suffix})
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
-      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-arm)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND ${unwind_prefix}arm${suffix})
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "p(ower)?pc64")
-      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-ppc64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND ${unwind_prefix}ppc64${suffix})
     else()
       message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR} for libunwind. Stack traces may not work.")
       target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND)

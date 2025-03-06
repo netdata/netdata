@@ -1217,11 +1217,14 @@ static int libsensors_update_every = 1;
 void *libsensors_thread(void *ptr __maybe_unused) {
     int update_every = libsensors_update_every;
 
-    // first try the default directory for libsensors
-    FILE *fp = fopen("/etc/sensors3.conf", "r");
-    if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "../sensors3.conf");
-    if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "sensors3.conf");
-    if(!fp) fp = sensors_open_file("NETDATA_STOCK_CONFIG_DIR", LIBCONFIG_DIR, "sensors3.conf");
+    FILE *fp = NULL;
+    if(access("/etc/sensors3.conf", R_OK) != 0 &&
+        access("/etc/sensors.conf", R_OK) != 0 &&
+        access("/etc/sensors.d", R_OK | X_OK) != 0) {
+                fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "../sensors3.conf");
+        if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "sensors3.conf");
+        if(!fp) fp = sensors_open_file("NETDATA_STOCK_CONFIG_DIR", LIBCONFIG_DIR, "sensors3.conf");
+    }
 
     if (sensors_init(fp) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot initialize libsensors - disabling sensors monitoring");

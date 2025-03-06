@@ -98,15 +98,6 @@ int uv_errno_to_errno(int uv_err) {
     }
 }
 
-static void posix_unmask_sigchld_on_thread(void) {
-    sigset_t sigset;
-    sigemptyset(&sigset);  // Initialize the signal set to empty
-    sigaddset(&sigset, SIGCHLD);  // Add SIGCHLD to the set
-
-    if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
-        netdata_log_error("SPAWN SERVER: cannot unmask SIGCHLD");
-}
-
 static void server_thread(void *arg) {
     SPAWN_SERVER *server = (SPAWN_SERVER *)arg;
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -114,7 +105,7 @@ static void server_thread(void *arg) {
 
     // this thread needs to process SIGCHLD (by libuv)
     // otherwise the on_exit() callback is never run
-    posix_unmask_sigchld_on_thread();
+    signals_unblock_one(SIGCHLD);
 
     // run the event loop
     uv_run(server->loop, UV_RUN_DEFAULT);

@@ -874,74 +874,68 @@ bool analytics_check_enabled(void) {
 }
 
 void analytics_statistic_send(const analytics_statistic_t *statistic) {
-    if (!statistic || !statistic->action || !analytics_check_enabled() || !analytics_script_exists())
+    if (!statistic || !statistic->action || !*statistic->action|| !analytics_check_enabled() || !analytics_script_exists())
         return;
 
     const char *action_result = statistic->result;
     const char *action_data = statistic->data;
 
-    if (!statistic->result)
-        action_result = "";
-
-    if (!statistic->data)
-        action_data = "";
-
-    char *command_to_run = mallocz(
-        sizeof(char) * (strlen(statistic->action) + strlen(action_result) + strlen(action_data) + FILENAME_MAX +
-                        analytics_data.data_length + (ANALYTICS_NO_OF_ITEMS * 3) + 15));
-    sprintf(
-        command_to_run,
+    CLEAN_BUFFER *cmd = buffer_create(0, NULL);
+    buffer_sprintf(
+        cmd,
         "%s/anonymous-statistics.sh '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
         netdata_configured_primary_plugins_dir,
         statistic->action,
-        action_result,
-        action_data,
-        analytics_data.netdata_config_stream_enabled,
-        analytics_data.netdata_config_memory_mode,
-        analytics_data.netdata_config_exporting_enabled,
-        analytics_data.netdata_exporting_connectors,
-        analytics_data.netdata_allmetrics_prometheus_used,
-        analytics_data.netdata_allmetrics_shell_used,
-        analytics_data.netdata_allmetrics_json_used,
-        analytics_data.netdata_dashboard_used,
-        analytics_data.netdata_collectors,
-        analytics_data.netdata_collectors_count,
-        analytics_data.netdata_buildinfo,
-        analytics_data.netdata_config_page_cache_size,
-        analytics_data.netdata_config_multidb_disk_quota,
-        analytics_data.netdata_config_https_enabled,
-        analytics_data.netdata_config_web_enabled,
-        analytics_data.netdata_config_release_channel,
-        analytics_data.netdata_mirrored_host_count,
-        analytics_data.netdata_mirrored_hosts_reachable,
-        analytics_data.netdata_mirrored_hosts_unreachable,
-        analytics_data.netdata_notification_methods,
-        analytics_data.netdata_alarms_normal,
-        analytics_data.netdata_alarms_warning,
-        analytics_data.netdata_alarms_critical,
-        analytics_data.netdata_charts_count,
-        analytics_data.netdata_metrics_count,
-        analytics_data.netdata_config_is_parent,
-        analytics_data.netdata_config_hosts_available,
-        analytics_data.netdata_host_cloud_available,
-        analytics_data.netdata_host_aclk_available,
-        analytics_data.netdata_host_aclk_protocol,
-        analytics_data.netdata_host_aclk_implementation,
-        analytics_data.netdata_host_agent_claimed,
-        analytics_data.netdata_host_cloud_enabled,
-        analytics_data.netdata_config_https_available,
-        analytics_data.netdata_install_type,
-        analytics_data.netdata_config_is_private_registry,
-        analytics_data.netdata_config_use_private_registry,
-        analytics_data.netdata_config_oom_score,
-        analytics_data.netdata_prebuilt_distro,
-        analytics_data.netdata_fail_reason);
+        action_result ? action_result : "",
+        action_data ? action_data : "",
+        analytics_data.netdata_config_stream_enabled ? analytics_data.netdata_config_stream_enabled : "",
+        analytics_data.netdata_config_memory_mode ? analytics_data.netdata_config_memory_mode : "",
+        analytics_data.netdata_config_exporting_enabled ? analytics_data.netdata_config_exporting_enabled : "",
+        analytics_data.netdata_exporting_connectors ? analytics_data.netdata_exporting_connectors : "",
+        analytics_data.netdata_allmetrics_prometheus_used ? analytics_data.netdata_allmetrics_prometheus_used : "",
+        analytics_data.netdata_allmetrics_shell_used ? analytics_data.netdata_allmetrics_shell_used : "",
+        analytics_data.netdata_allmetrics_json_used ? analytics_data.netdata_allmetrics_json_used : "",
+        analytics_data.netdata_dashboard_used ? analytics_data.netdata_dashboard_used : "",
+        analytics_data.netdata_collectors ? analytics_data.netdata_collectors : "",
+        analytics_data.netdata_collectors_count ? analytics_data.netdata_collectors_count : "",
+        analytics_data.netdata_buildinfo ? analytics_data.netdata_buildinfo : "",
+        analytics_data.netdata_config_page_cache_size ? analytics_data.netdata_config_page_cache_size : "",
+        analytics_data.netdata_config_multidb_disk_quota ? analytics_data.netdata_config_multidb_disk_quota : "",
+        analytics_data.netdata_config_https_enabled ? analytics_data.netdata_config_https_enabled : "",
+        analytics_data.netdata_config_web_enabled ? analytics_data.netdata_config_web_enabled : "",
+        analytics_data.netdata_config_release_channel ? analytics_data.netdata_config_release_channel : "",
+        analytics_data.netdata_mirrored_host_count ? analytics_data.netdata_mirrored_host_count : "",
+        analytics_data.netdata_mirrored_hosts_reachable ? analytics_data.netdata_mirrored_hosts_reachable : "",
+        analytics_data.netdata_mirrored_hosts_unreachable ? analytics_data.netdata_mirrored_hosts_unreachable : "",
+        analytics_data.netdata_notification_methods ? analytics_data.netdata_notification_methods : "",
+        analytics_data.netdata_alarms_normal ? analytics_data.netdata_alarms_normal : "",
+        analytics_data.netdata_alarms_warning ? analytics_data.netdata_alarms_warning : "",
+        analytics_data.netdata_alarms_critical ? analytics_data.netdata_alarms_critical : "",
+        analytics_data.netdata_charts_count ? analytics_data.netdata_charts_count : "",
+        analytics_data.netdata_metrics_count ? analytics_data.netdata_metrics_count : "",
+        analytics_data.netdata_config_is_parent ? analytics_data.netdata_config_is_parent : "",
+        analytics_data.netdata_config_hosts_available ? analytics_data.netdata_config_hosts_available : "",
+        analytics_data.netdata_host_cloud_available ? analytics_data.netdata_host_cloud_available : "",
+        analytics_data.netdata_host_aclk_available ? analytics_data.netdata_host_aclk_available : "",
+        analytics_data.netdata_host_aclk_protocol ? analytics_data.netdata_host_aclk_protocol : "",
+        analytics_data.netdata_host_aclk_implementation ? analytics_data.netdata_host_aclk_implementation : "",
+        analytics_data.netdata_host_agent_claimed ? analytics_data.netdata_host_agent_claimed : "",
+        analytics_data.netdata_host_cloud_enabled ? analytics_data.netdata_host_cloud_enabled : "",
+        analytics_data.netdata_config_https_available ? analytics_data.netdata_config_https_available : "",
+        analytics_data.netdata_install_type ? analytics_data.netdata_install_type : "",
+        analytics_data.netdata_config_is_private_registry ? analytics_data.netdata_config_is_private_registry : "",
+        analytics_data.netdata_config_use_private_registry ? analytics_data.netdata_config_use_private_registry : "",
+        analytics_data.netdata_config_oom_score ? analytics_data.netdata_config_oom_score : "",
+        analytics_data.netdata_prebuilt_distro ? analytics_data.netdata_prebuilt_distro : "",
+        analytics_data.netdata_fail_reason ? analytics_data.netdata_fail_reason : ""
+        );
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "%s/anonymous-statistics.sh '%s' '%s' '%s'",
-           netdata_configured_primary_plugins_dir, statistic->action, action_result, action_data);
+           netdata_configured_primary_plugins_dir, statistic->action,
+           action_result ? action_result : "", action_data ? action_data : "");
 
-    POPEN_INSTANCE *instance = spawn_popen_run(command_to_run);
+    POPEN_INSTANCE *instance = spawn_popen_run(buffer_tostring(cmd));
     if (instance) {
         char buffer[4 + 1];
         char *s = fgets(buffer, 4, spawn_popen_stdout(instance));
@@ -962,8 +956,6 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "Failed to run statistics script: %s/anonymous-statistics.sh",
                netdata_configured_primary_plugins_dir);
-
-    freez(command_to_run);
 }
 
 void analytics_reset(void) {

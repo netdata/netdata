@@ -605,11 +605,6 @@ const char *aclk_cloud_base_url = NULL;
  *          >0 - exit_initiated
  */
 #define CLOUD_BASE_URL_READ_RETRY 30
-#ifdef ACLK_SSL_ALLOW_SELF_SIGNED
-#define ACLK_SSL_FLAGS MQTT_WSS_SSL_ALLOW_SELF_SIGNED
-#else
-#define ACLK_SSL_FLAGS MQTT_WSS_SSL_CERT_CHECK_FULL
-#endif
 static int aclk_attempt_to_connect(mqtt_wss_client client)
 {
     https_client_resp_t rc;
@@ -743,11 +738,13 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         mqtt_conn_params.will_msg = aclk_generate_lwt(&mqtt_conn_params.will_msg_len);
 
+        int ssl_flags = cloud_config_insecure_get() ? MQTT_WSS_SSL_ALLOW_SELF_SIGNED : MQTT_WSS_SSL_CERT_CHECK_FULL;
+
 #ifdef ACLK_DISABLE_CHALLENGE
-        int mqtt_rc = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf);
+        int mqtt_rc = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf);
         url_t_destroy(&base_url);
 #else
-        int mqtt_rc = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf, &fallback_ipv4);
+        int mqtt_rc = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf, &fallback_ipv4);
         url_t_destroy(&mqtt_url);
 
         freez((char*)mqtt_conn_params.clientid);

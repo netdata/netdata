@@ -2,6 +2,11 @@
 
 Netdata offers a convenient Windows installer for easy setup. This executable provides two distinct installation modes, outlined below.
 
+The Netdata Windows Agent is designed for users with paid Netdata subscriptions. If you are using a free (non-paid Netdata account), or no Netdata account at all, the Windows Agent will have restricted functionality. Specifically:
+
+- **Standalone Agents**: The user interface within the Windows Agent will be locked, preventing access to monitoring data.
+- [**Child Agents**](/docs/observability-centralization-points/metrics-centralization-points/README.md): Even when a Windows Agent streams data to a Linux parent Netdata instance, the Windows Agent's monitoring data will be locked and inaccessible within the parent dashboard's user interface.
+
 ## Download the MSI Installer
 
 You can download the Netdata Windows installer (MSI) from the official releases page:
@@ -10,10 +15,6 @@ You can download the Netdata Windows installer (MSI) from the official releases 
 |--------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | [Stable](https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi)            | This is the recommended version for most users as it provides the most reliable and well-tested features.                                                                 |
 | [Nightly](https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi) | Offers the latest features but may contain bugs or instabilities. Use this option if you require access to the newest features and are comfortable with potential issues. |
-
-> **Note**
->
-> The Windows version of Netdata is intended for users on paid plans.
 
 ## Silent Mode (Command line)
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"sync"
 
@@ -13,14 +14,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/filepersister"
 )
 
+func statusFileName(dir string) string {
+	return filepath.Join(dir, "god-jobs-statuses.json")
+}
+
 func (m *Manager) loadFileStatus() {
 	m.fileStatus = newFileStatus()
 
-	if isTerminal || m.StateFile == "" {
+	if isTerminal || m.VarLibDir == "" {
 		return
 	}
 
-	s, err := loadFileStatus(m.StateFile)
+	s, err := loadFileStatus(statusFileName(m.VarLibDir))
 	if err != nil {
 		m.Warningf("failed to load state file: %v", err)
 		return
@@ -29,10 +34,12 @@ func (m *Manager) loadFileStatus() {
 }
 
 func (m *Manager) runFileStatusPersistence() {
-	if m.StateFile == "" {
+	if m.VarLibDir == "" {
 		return
 	}
-	p := filepersister.New(m.StateFile)
+
+	p := filepersister.New(statusFileName(m.VarLibDir))
+
 	p.Run(m.ctx, m.fileStatus)
 }
 

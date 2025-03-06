@@ -24,7 +24,7 @@ bool load_claiming_state(void);
 void cloud_conf_load(int silent);
 void cloud_conf_init_after_registry(void);
 bool cloud_conf_save(void);
-bool cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure);
+bool cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, bool insecure);
 CLOUD_STATUS claim_reload_and_wait_online(void);
 
 const char *cloud_config_url_get(void);

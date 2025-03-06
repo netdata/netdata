@@ -811,6 +811,11 @@ get_system_info() {
           DISTRO_COMPAT_NAME="${DISTRO}"
       else
           case "${DISTRO}" in
+          raspbian)
+              if [ "$SYSARCH" = "armv7l" ] || [ "$SYSARCH" = "aarch64" ]; then
+                DISTRO_COMPAT_NAME="debian"
+              fi
+              ;;
           opensuse-leap)
               DISTRO_COMPAT_NAME="opensuse"
               ;;

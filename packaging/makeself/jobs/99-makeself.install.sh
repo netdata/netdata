@@ -93,7 +93,7 @@ run "${NETDATA_MAKESELF_PATH}/makeself.sh" \
   --help-header "${NETDATA_MAKESELF_PATH}/makeself-help-header.txt" \
   "${NETDATA_INSTALL_PATH}" \
   "${NETDATA_INSTALL_PATH}.gz.run" \
-  "netdata, the real-time performance and health monitoring system" \
+  "Netdata, X-Ray Vision for your infrastructure" \
   ./system/post-installer.sh
 
 run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"

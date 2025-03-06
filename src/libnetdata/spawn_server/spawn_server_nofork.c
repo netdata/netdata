@@ -830,21 +830,13 @@ static void spawn_server_process_sigchld(void) {
     }
 }
 
-static void posix_unmask_sigchld_on_thread(void) {
-    sigset_t sigset;
-    sigemptyset(&sigset);  // Initialize the signal set to empty
-    sigaddset(&sigset, SIGCHLD);  // Add SIGCHLD to the set
-
-    if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN SERVER: cannot unmask SIGCHLD");
-}
-
 static int spawn_server_event_loop(SPAWN_SERVER *server) {
     int pipe_fd = server->pipe[1];
     close(server->pipe[0]); server->pipe[0] = -1;
 
-    posix_unmask_sigchld_on_thread();
+    signals_block_all();
+    int wanted_signals[] = {SIGTERM, SIGCHLD};
+    signals_unblock(wanted_signals, _countof(wanted_signals));
 
     // Set up the signal handler for SIGCHLD and SIGTERM
     struct sigaction sa;
