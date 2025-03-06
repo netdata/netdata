@@ -486,10 +486,7 @@ static void process_repeating_alarms(RRDHOST *host, time_t now, struct health_ra
     foreach_rrdcalc_in_rrdhost_done(rc);
 }
 
-SPINLOCK health_log_spinlock;
-SPINLOCK alert_queue_spinlock;
-
-// returns the number of runnable alerts
+Drop // returns the number of runnable alerts
 static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_run)
 {
     size_t runnable = 0;
@@ -615,7 +612,6 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
     }
 
     // Store all transitions
-    spinlock_lock(&health_log_spinlock);
     Word_t Index = 0;
     bool first = true;
     Pvoid_t *Pvalue;
@@ -625,7 +621,6 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
         sql_health_alarm_log_save(host, ae);
     }
     db_execute(db_health, "COMMIT TRANSACTION");
-    spinlock_unlock(&health_log_spinlock);
     (void) JudyLFreeArray(&host->health.JudyL_ae, PJE0);
 
     // Delete AE as needed
@@ -643,14 +638,11 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
         rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
     } else {
         worker_is_busy(UV_EVENT_HEALTH_JOB_ALARM_LOG_QUEUE);
-        spinlock_lock(&alert_queue_spinlock);
 
         db_execute(db_aclk, "BEGIN TRANSACTION");
         if (process_alert_pending_queue(host))
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         db_execute(db_aclk, "COMMIT TRANSACTION");
-
-        spinlock_unlock(&alert_queue_spinlock);
     }
 
     worker_is_idle();
@@ -1115,8 +1107,6 @@ static void health_ev_loop(void *arg)
 
     worker_register("HEALTH");
 
-    spinlock_init(&health_log_spinlock);
-    spinlock_init(&alert_queue_spinlock);
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
     worker_register_job_name(HEALTH_NOOP,  "noop");
