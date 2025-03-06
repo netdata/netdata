@@ -820,7 +820,7 @@ enum crash_report_t {
 static enum crash_report_t check_crash_reports_config(void) {
     bool analytics = analytics_check_enabled();
 
-    const char *t = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "crash reports", analytics ? "off" : "all");
+    const char *t = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "crash reports", analytics ? "all" : "off");
 
     enum crash_report_t rc;
     if(!t || !*t)
