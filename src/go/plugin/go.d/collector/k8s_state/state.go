@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -16,6 +17,8 @@ func newKubeState() *kubeState {
 		nodes:       make(map[string]*nodeState),
 		pods:        make(map[string]*podState),
 		deployments: make(map[string]*deploymentState),
+		cronJobs:    make(map[string]*cronJobState),
+		jobs:        make(map[string]*jobState),
 	}
 }
 
@@ -47,11 +50,25 @@ func newDeploymentState() *deploymentState {
 	}
 }
 
+func newCronJobState() *cronJobState {
+	return &cronJobState{
+		new: true,
+	}
+}
+
+func newJobState() *jobState {
+	return &jobState{
+		new: true,
+	}
+}
+
 type kubeState struct {
 	*sync.Mutex
 	nodes       map[string]*nodeState
 	pods        map[string]*podState
 	deployments map[string]*deploymentState
+	cronJobs    map[string]*cronJobState
+	jobs        map[string]*jobState
 }
 
 type (
@@ -176,3 +193,40 @@ type deploymentState struct {
 }
 
 func (ds deploymentState) id() string { return ds.namespace + "_" + ds.name }
+
+type cronJobState struct {
+	new     bool
+	deleted bool
+
+	uid          string
+	name         string
+	namespace    string
+	creationTime time.Time
+}
+
+func (cs cronJobState) id() string { return cs.namespace + "_" + cs.name }
+
+type jobState struct {
+	new     bool
+	deleted bool
+
+	uid          string
+	name         string
+	namespace    string
+	creationTime time.Time
+
+	controller struct {
+		kind string
+		name string
+		uid  string
+	}
+
+	conditions []batchv1.JobCondition
+
+	startTime               *time.Time
+	active                  int32
+	uncountedTerminatedPods struct {
+		succeeded int
+		failed    int
+	}
+}

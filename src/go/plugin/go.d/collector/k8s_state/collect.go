@@ -10,6 +10,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -110,6 +111,7 @@ func (c *Collector) collectKubeState(mx map[string]int64) {
 	c.collectPodsState(mx)
 	c.collectNodesState(mx)
 	c.collectDeploymentState(mx)
+	c.collectCronJobState(mx)
 }
 
 func (c *Collector) collectPodsState(mx map[string]int64) {
@@ -346,6 +348,59 @@ func (c *Collector) collectDeploymentState(mx map[string]int64) {
 				mx[px+"condition_progressing"] = v
 			case appsv1.DeploymentReplicaFailure:
 				mx[px+"condition_replica_failure"] = v
+			}
+		}
+
+		return false
+	})
+}
+
+func (c *Collector) collectCronJobState(mx map[string]int64) {
+	now := time.Now()
+
+	maps.DeleteFunc(c.state.jobs, func(s string, st *jobState) bool {
+		return st.deleted
+	})
+
+	maps.DeleteFunc(c.state.cronJobs, func(s string, st *cronJobState) bool {
+		if st.deleted {
+			c.removeCronJobCharts(st)
+			return true
+		}
+		if st.new {
+			c.addCronJobCharts(st)
+			st.new = false
+		}
+
+		px := fmt.Sprintf("cronjob_%s_", st.id())
+
+		mx[px+"age"] = int64(now.Sub(st.creationTime).Seconds())
+
+		mx[px+"running_jobs"] = 0
+		mx[px+"failed_jobs"] = 0
+		mx[px+"complete_jobs"] = 0
+		mx[px+"suspended_jobs"] = 0
+
+		for _, job := range c.state.jobs {
+			switch {
+			case job.controller.kind != "CronJob", job.controller.uid != st.uid, job.startTime == nil:
+				continue
+			case job.active > 0:
+				mx[px+"running_jobs"]++
+			case len(job.conditions) > 0:
+				for _, cond := range job.conditions {
+					if cond.Status != corev1.ConditionTrue {
+						continue
+					}
+					switch cond.Type {
+					case batchv1.JobFailed:
+						mx[px+"failed_jobs"]++
+					case batchv1.JobComplete:
+						mx[px+"complete_jobs"]++
+					case batchv1.JobSuspended:
+						mx[px+"suspended_jobs"]++
+					}
+				}
 			}
 		}
 
