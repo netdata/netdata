@@ -4,24 +4,6 @@
 #include <sched.h>
 
 char *pidfile = NULL;
-char *netdata_exe_path = NULL;
-
-void get_netdata_execution_path(void) {
-    struct passwd *passwd = getpwuid(getuid());
-    char *user = (passwd && passwd->pw_name) ? passwd->pw_name : "";
-
-    char b[FILENAME_MAX + 1];
-    size_t b_size = sizeof(b) - 1;
-    int ret = uv_exepath(b, &b_size);
-    if (ret != 0) {
-        fatal("Cannot start netdata without getting execution path. "
-            "(uv_exepath(\"%s\", %zu), user: '%s', failed: %s).",
-            b, b_size, user, uv_strerror(ret));
-    }
-    b[b_size] = '\0';
-
-    netdata_exe_path = strdupz(b);
-}
 
 static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid, bool recursive)
 {

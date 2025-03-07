@@ -759,20 +759,26 @@ int netdata_main(int argc, char **argv) {
 
     netdata_conf_section_logs();
     nd_log_limits_unlimited();
-
-    // initialize the log files
     nd_log_initialize();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // this MUST be before anything else - to load the old status file before saving a new one
+
+    daemon_status_file_init(); // this loads the old file
     nd_log_register_fatal_data_cb(daemon_status_file_register_fatal);
     nd_log_register_fatal_final_cb(fatal_status_file_save);
+    exit_initiated_init();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("signals");
+
+    signals_block_all_except_deadly();
+    nd_initialize_signals(); // catches deadly signals and stores them in the status file
+
+    // ----------------------------------------------------------------------------------------------------------------
 
     netdata_conf_section_global(); // get hostname, host prefix, profile, etc
     registry_init(); // for machine_guid, must be after netdata_conf_section_global()
-
-    // initialize thread - this is required before the first nd_thread_create()
-    default_stacksize = netdata_threads_init();
-    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
-    if (default_stacksize < 1 * 1024 * 1024)
-        default_stacksize = 1 * 1024 * 1024;
 
     // make sure we are the only instance running
     {
@@ -794,18 +800,25 @@ int netdata_main(int argc, char **argv) {
 
     nd_profile_setup();
 
-    // status and crash/update/exit detection
-    signals_block_all_except_deadly();
-    exit_initiated_reset();
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("stack size");
+
+    // initialize thread - this is required before the first nd_thread_create()
+    default_stacksize = netdata_threads_init();
+
+    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
+    if (default_stacksize < 1 * 1024 * 1024)
+        default_stacksize = 1 * 1024 * 1024;
+
+    netdata_threads_set_stack_size(default_stacksize);
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("crash reports");
+
     daemon_status_file_check_crash();
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("signals");
-
-    nd_initialize_signals();
-
-    // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("temporary spawn server");
+    delta_startup_time("temp spawn server");
 
     netdata_main_spawn_server_init("init", argc, (const char **)argv);
 
@@ -813,12 +826,6 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("ssl");
 
     netdata_conf_ssl();
-
-    // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("execution path");
-
-    // Get the execution path before switching user to avoid permission issues
-    get_netdata_execution_path();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("environment for plugins");
@@ -989,7 +996,8 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("threads after fork");
 
-    netdata_threads_init_after_fork((size_t)inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
+    netdata_threads_set_stack_size(
+        (size_t)inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("registry");
