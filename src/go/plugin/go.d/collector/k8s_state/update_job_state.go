@@ -50,17 +50,9 @@ func (c *Collector) updateJobState(r resource) {
 	if job.Status.StartTime != nil {
 		st.startTime = ptr(job.Status.StartTime.Time)
 	}
-
-	st.active = job.Status.Active
-
-	st.conditions = job.Status.Conditions
-
-	st.uncountedTerminatedPods.succeeded = 0
-	st.uncountedTerminatedPods.failed = 0
-
-	if v := job.Status.UncountedTerminatedPods; v != nil {
-		st.uncountedTerminatedPods.succeeded = len(v.Succeeded)
-		st.uncountedTerminatedPods.failed = len(v.Failed)
+	if job.Status.CompletionTime != nil {
+		st.completionTime = ptr(job.Status.CompletionTime.Time)
 	}
-
+	st.active = job.Status.Active
+	st.conditions = job.Status.Conditions
 }

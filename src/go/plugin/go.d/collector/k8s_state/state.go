@@ -202,6 +202,9 @@ type cronJobState struct {
 	name         string
 	namespace    string
 	creationTime time.Time
+
+	lastScheduleTime   *time.Time
+	lastSuccessfulTime *time.Time
 }
 
 func (cs cronJobState) id() string { return cs.namespace + "_" + cs.name }
@@ -223,10 +226,7 @@ type jobState struct {
 
 	conditions []batchv1.JobCondition
 
-	startTime               *time.Time
-	active                  int32
-	uncountedTerminatedPods struct {
-		succeeded int
-		failed    int
-	}
+	startTime      *time.Time
+	completionTime *time.Time
+	active         int32
 }

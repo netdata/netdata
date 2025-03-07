@@ -262,12 +262,45 @@ modules:
             - name: k8s_state.cronjob_jobs_count_by_status
               description: CronJob Jobs Count by Status
               unit: 'jobs'
-              chart_type: stacked
+              chart_type: line
               dimensions:
                 - name: completed
                 - name: failed
                 - name: running
                 - name: suspended
+            - name: k8s_state.cronjob_jobs_failed_by_reason
+              description: CronJob Jobs Failed by Reason
+              unit: 'jobs'
+              chart_type: line
+              dimensions:
+                - name: pod_failure_policy
+                - name: backoff_limit_exceeded
+                - name: deadline_exceeded
+            - name: k8s_state.cronjob_last_execution_status
+              description: CronJob Last Execution Status
+              unit: 'status'
+              chart_type: line
+              dimensions:
+                - name: completed
+                - name: failed
+            - name: k8s_state.cronjob_last_completion_duration
+              description: CronJob Last Completion Duration
+              unit: 'seconds'
+              chart_type: line
+              dimensions:
+                - name: last_completion
+            - name: k8s_state.cronjob_last_completed_time_ago
+              description: CronJob Last Completed Time Ago
+              unit: 'seconds'
+              chart_type: line
+              dimensions:
+                - name: last_completed_ago
+            - name: k8s_state.cronjob_last_schedule_time_ago
+              description: CronJob Last Schedule Time Ago
+              unit: 'seconds'
+              chart_type: line
+              dimensions:
+                - name: last_schedule_ago
             - name: k8s_state.cronjob_age
               description: CronJob Age
               unit: 'seconds'

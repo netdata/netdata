@@ -63,6 +63,11 @@ const (
 
 const (
 	prioCronJobJobsCountByStatus = 50700 + iota
+	prioCronJobJobsFailedByReason
+	prioCronJobLastExecutionStatus
+	prioCronJobLastCompletionDuration
+	prioCronJobLastCompletedTimeAgo
+	prioCronJobLastScheduleTimeAgo
 	prioCronJobAge
 )
 
@@ -143,6 +148,11 @@ var deploymentChartsTmpl = module.Charts{
 
 var cronJobChartsTmpl = module.Charts{
 	cronJobJobsCountByStatusChartTmpl.Copy(),
+	cronJobJobsFailedByReasonChartTmpl.Copy(),
+	cronJobLastExecutionStatusChartTmpl.Copy(),
+	cronJobLastCompletionDurationChartTmpl.Copy(),
+	cronJobLastCompletedTimeAgoChartTmpl.Copy(),
+	cronJobLastScheduleTimeAgoChartTmpl.Copy(),
 	cronJobAgeChartTmpl.Copy(),
 }
 
@@ -849,12 +859,74 @@ var (
 		Fam:      "cronjob jobs",
 		Ctx:      "k8s_state.cronjob_jobs_count_by_status",
 		Priority: prioCronJobJobsCountByStatus,
-		Type:     module.Stacked,
 		Dims: module.Dims{
 			{ID: "cronjob_%s_complete_jobs", Name: "completed"},
 			{ID: "cronjob_%s_failed_jobs", Name: "failed"},
 			{ID: "cronjob_%s_running_jobs", Name: "running"},
 			{ID: "cronjob_%s_suspended_jobs", Name: "suspended"},
+		},
+	}
+	cronJobJobsFailedByReasonChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "cronjob_%s.jobs_failed_by_reason",
+		Title:    "CronJob Jobs Failed by Reason",
+		Units:    "jobs",
+		Fam:      "cronjob jobs",
+		Ctx:      "k8s_state.cronjob_jobs_failed_by_reason",
+		Priority: prioCronJobJobsFailedByReason,
+		Dims: module.Dims{
+			{ID: "cronjob_%s_failed_jobs_reason_pod_failure_policy", Name: "pod_failure_policy"},
+			{ID: "cronjob_%s_failed_jobs_reason_backoff_limit_exceeded", Name: "backoff_limit_exceeded"},
+			{ID: "cronjob_%s_failed_jobs_reason_deadline_exceeded", Name: "deadline_exceeded"},
+		},
+	}
+	cronJobLastExecutionStatusChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "cronjob_%s.last_execution_status",
+		Title:    "CronJob Last Execution Status",
+		Units:    "status",
+		Fam:      "cronjob execution",
+		Ctx:      "k8s_state.cronjob_last_execution_status",
+		Priority: prioCronJobLastExecutionStatus,
+		Dims: module.Dims{
+			{ID: "cronjob_%s_last_execution_status_succeeded", Name: "completed"},
+			{ID: "cronjob_%s_last_execution_status_failed", Name: "failed"},
+		},
+	}
+	cronJobLastCompletionDurationChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "cronjob_%s.last_completion_duration",
+		Title:    "CronJob Last Completion Duration",
+		Units:    "seconds",
+		Fam:      "cronjob execution",
+		Ctx:      "k8s_state.cronjob_last_completion_duration",
+		Priority: prioCronJobLastCompletionDuration,
+		Dims: module.Dims{
+			{ID: "cronjob_%s_last_completion_duration", Name: "last_completion"},
+		},
+	}
+	cronJobLastCompletedTimeAgoChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "cronjob_%s.last_completed_time_ago",
+		Title:    "CronJob Last Completed Time Ago",
+		Units:    "seconds",
+		Fam:      "cronjob execution",
+		Ctx:      "k8s_state.cronjob_last_completed_time_ago",
+		Priority: prioCronJobLastCompletedTimeAgo,
+		Dims: module.Dims{
+			{ID: "cronjob_%s_last_successful_seconds_ago", Name: "last_completed_ago"},
+		},
+	}
+	cronJobLastScheduleTimeAgoChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "cronjob_%s.last_schedule_time_ago",
+		Title:    "CronJob Last Schedule Time Ago",
+		Units:    "seconds",
+		Fam:      "cronjob execution",
+		Ctx:      "k8s_state.cronjob_last_schedule_time_ago",
+		Priority: prioCronJobLastScheduleTimeAgo,
+		Dims: module.Dims{
+			{ID: "cronjob_%s_last_schedule_seconds_ago", Name: "last_schedule_ago"},
 		},
 	}
 	cronJobAgeChartTmpl = module.Chart{
