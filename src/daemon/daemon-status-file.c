@@ -835,15 +835,13 @@ static enum crash_report_t check_crash_reports_config(void) {
     return rc;
 }
 
-void daemon_status_file_check_crash(void) {
-    FUNCTION_RUN_ONCE();
-
+void daemon_status_file_init(void) {
     static_save_buffer_init();
-
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
-
     daemon_status_file_load(&last_session_status);
-    daemon_status_file_startup_step("startup(read status file)");
+}
+
+void daemon_status_file_check_crash(void) {
     struct log_priority pri = PRI_ALL_NORMAL;
 
     bool new_version = strcmp(last_session_status.version, session_status.version) != 0;
@@ -1051,8 +1049,6 @@ void daemon_status_file_check_crash(void) {
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause))
 
         ) {
-        daemon_status_file_startup_step("startup(post status file)");
-
         netdata_conf_ssl();
 
         struct post_status_file_thread_data d = {

@@ -69,7 +69,7 @@ int nd_thread_has_tag(void);
 #define THREAD_TAG_STREAM_SENDER "SNDR"
 
 size_t netdata_threads_init(void);
-void netdata_threads_init_after_fork(size_t stacksize);
+void netdata_threads_set_stack_size(size_t stacksize);
 void netdata_threads_init_for_external_plugins(size_t stacksize);
 
 ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine) (void *), void *arg);

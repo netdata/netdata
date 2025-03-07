@@ -95,7 +95,7 @@ static bool is_system_shutdown(void) {
 static const char *self_path = NULL;
 static OS_FILE_METADATA self = { 0 };
 
-void exit_initiated_reset(void) {
+void exit_initiated_init(void) {
     exit_initiated = EXIT_REASON_NONE;
 
     freez((char *)self_path);
