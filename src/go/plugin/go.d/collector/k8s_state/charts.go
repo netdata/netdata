@@ -851,7 +851,7 @@ var (
 		Priority: prioCronJobJobsCountByStatus,
 		Type:     module.Stacked,
 		Dims: module.Dims{
-			{ID: "cronjob_%s_complete_jobs", Name: "complete"},
+			{ID: "cronjob_%s_complete_jobs", Name: "completed"},
 			{ID: "cronjob_%s_failed_jobs", Name: "failed"},
 			{ID: "cronjob_%s_running_jobs", Name: "running"},
 			{ID: "cronjob_%s_suspended_jobs", Name: "suspended"},

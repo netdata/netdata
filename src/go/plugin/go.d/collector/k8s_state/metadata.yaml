@@ -264,7 +264,7 @@ modules:
               unit: 'jobs'
               chart_type: stacked
               dimensions:
-                - name: complete
+                - name: completed
                 - name: failed
                 - name: running
                 - name: suspended
