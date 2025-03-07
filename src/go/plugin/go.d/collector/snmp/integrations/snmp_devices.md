@@ -50,7 +50,8 @@ This collector supports collecting metrics from multiple instances of this integ
 
 #### Auto-Detection
 
-This integration doesn't support auto-detection.
+SNMP service discovery is a dedicated component that automatically scans configured networks to find SNMP-enabled devices. This feature is disabled by default and requires explicit user configuration to activate. When enabled, it discovers devices using customizable credentials, supports various IP range formats (single IPs, ranges, CIDR) with a limit of 512 IPs per subnet, and optimizes network traffic through configurable caching of discovery results. Discovered devices are automatically made available to the SNMP collector for monitoring. See [configuration examples](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/sd/snmp.conf) for details on setting up credentials and networks to scan.
+
 
 #### Limits
 
