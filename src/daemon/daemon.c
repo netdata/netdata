@@ -422,34 +422,49 @@ static void sched_setscheduler_set(void) {
 }
 #endif /* HAVE_SCHED_SETSCHEDULER */
 
-int become_daemon(int dont_fork, const char *user)
-{
+int become_daemon(int dont_fork, const char *user) {
     if(!dont_fork) {
+        daemon_status_file_startup_step("startup(become daemon - fork1)");
         int i = fork();
         if(i == -1) {
-            perror("cannot fork");
+            fatal("cannot fork");
             exit(1);
         }
-        if(i != 0) exit(0); // the parent
+        if(i != 0) {
+            // the parent
+            exit(0);
+        }
+
+        // the child
         gettid_uncached();
+        nd_initialize_signals();
 
         // become session leader
         if (setsid() < 0) {
-            perror("Cannot become session leader.");
+            fatal("Cannot become session leader.");
             exit(2);
         }
 
         // fork() again
+        daemon_status_file_startup_step("startup(become daemon - fork2)");
         i = fork();
         if(i == -1) {
-            perror("cannot fork");
+            fatal("cannot fork for a second time");
             exit(1);
         }
-        if(i != 0) exit(0); // the parent
+        if(i != 0) {
+            // the parent
+            exit(0);
+        }
+
+        // the child
         gettid_uncached();
+        nd_initialize_signals();
     }
 
     // generate our pid file
+    daemon_status_file_startup_step("startup(become daemon - write pid)");
+
     int pidfd = -1;
     if(pidfile && *pidfile) {
         pidfd = open(pidfile, O_WRONLY | O_CREAT | O_CLOEXEC, 0644);
@@ -471,12 +486,15 @@ int become_daemon(int dont_fork, const char *user)
     umask(0007);
 
     // adjust my Out-Of-Memory score
+    daemon_status_file_startup_step("startup(become daemon - oom)");
     oom_score_adj();
 
     // never become a problem
+    daemon_status_file_startup_step("startup(become daemon - sched)");
     sched_setscheduler_set();
 
     if(user && *user) {
+        daemon_status_file_startup_step("startup(become daemon - user)");
         if(become_user(user, pidfd) != 0) {
             netdata_log_error("Cannot become user '%s'. Continuing as we are.", user);
         }
@@ -484,9 +502,11 @@ int become_daemon(int dont_fork, const char *user)
             netdata_log_debug(D_SYSTEM, "Successfully became user '%s'.", user);
     }
     else {
+        daemon_status_file_startup_step("startup(become daemon - dirs)");
         prepare_required_directories(getuid(), getgid());
     }
 
+    daemon_status_file_startup_step("startup(become daemon - done)");
     if(pidfd != -1)
         close(pidfd);
 
