@@ -780,7 +780,9 @@ int netdata_main(int argc, char **argv) {
     netdata_conf_section_global(); // get hostname, host prefix, profile, etc
     registry_init(); // for machine_guid, must be after netdata_conf_section_global()
 
-    // make sure we are the only instance running
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("run dir");
+
     {
         const char *run_dir = os_run_dir(true);
         if(!run_dir) {
