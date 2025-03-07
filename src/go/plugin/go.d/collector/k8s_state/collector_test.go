@@ -533,16 +533,24 @@ func TestCollector_Collect(t *testing.T) {
 				step1 := func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
-						"cronjob_default_cronjob01_age":            10,
-						"cronjob_default_cronjob01_complete_jobs":  1,
-						"cronjob_default_cronjob01_failed_jobs":    1,
-						"cronjob_default_cronjob01_running_jobs":   1,
-						"cronjob_default_cronjob01_suspended_jobs": 1,
-						"discovery_node_discoverer_state":          1,
-						"discovery_pod_discoverer_state":           1,
+						"cronjob_default_cronjob01_age":                                       10,
+						"cronjob_default_cronjob01_complete_jobs":                             1,
+						"cronjob_default_cronjob01_failed_jobs":                               1,
+						"cronjob_default_cronjob01_failed_jobs_reason_backoff_limit_exceeded": 0,
+						"cronjob_default_cronjob01_failed_jobs_reason_deadline_exceeded":      1,
+						"cronjob_default_cronjob01_failed_jobs_reason_pod_failure_policy":     0,
+						"cronjob_default_cronjob01_last_completion_duration":                  60,
+						"cronjob_default_cronjob01_last_execution_status_failed":              0,
+						"cronjob_default_cronjob01_last_execution_status_succeeded":           1,
+						"cronjob_default_cronjob01_last_schedule_seconds_ago":                 130,
+						"cronjob_default_cronjob01_last_successful_seconds_ago":               70,
+						"cronjob_default_cronjob01_running_jobs":                              1,
+						"cronjob_default_cronjob01_suspended_jobs":                            1,
+						"discovery_node_discoverer_state":                                     1,
+						"discovery_pod_discoverer_state":                                      1,
 					}
 
-					copyAge(expected, mx)
+					copyIfSuffix(expected, mx, "age", "ago")
 
 					assert.Equal(t, expected, mx)
 					assert.Equal(t,
@@ -1068,6 +1076,10 @@ func prepareCronJob(name string) *batchv1.CronJob {
 			UID:               types.UID(name),
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
+		Status: batchv1.CronJobStatus{
+			LastScheduleTime:   &metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
+			LastSuccessfulTime: &metav1.Time{Time: time.Now().Add(-1 * time.Minute)},
+		},
 	}
 }
 
@@ -1084,7 +1096,8 @@ func prepareCronJobRunningJob(name string, cj *batchv1.CronJob) *batchv1.Job {
 
 func prepareCronJobCompleteJob(name string, cj *batchv1.CronJob) *batchv1.Job {
 	job := prepareCronJobJob(name, cj)
-	job.Status.StartTime = &metav1.Time{Time: time.Now()}
+	job.Status.StartTime = &metav1.Time{Time: time.Now().Add(-1 * time.Minute)}
+	job.Status.CompletionTime = &metav1.Time{Time: time.Now()}
 	job.Status.Conditions = []batchv1.JobCondition{
 		{Type: batchv1.JobComplete, Status: corev1.ConditionTrue},
 	}
@@ -1095,7 +1108,12 @@ func prepareCronJobFailedJob(name string, cj *batchv1.CronJob) *batchv1.Job {
 	job := prepareCronJobJob(name, cj)
 	job.Status.StartTime = &metav1.Time{Time: time.Now()}
 	job.Status.Conditions = []batchv1.JobCondition{
-		{Type: batchv1.JobFailed, Status: corev1.ConditionTrue},
+		{
+			Type:               batchv1.JobFailed,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+			Reason:             batchv1.JobReasonDeadlineExceeded,
+		},
 	}
 	return job
 }
@@ -1161,15 +1179,20 @@ func mustQuantity(s string) apiresource.Quantity {
 	return q
 }
 
-func copyAge(dst, src map[string]int64) {
+func copyIfSuffix(dst, src map[string]int64, suffixes ...string) {
 	for k, v := range src {
-		if !strings.HasSuffix(k, "_age") {
-			continue
-		}
-		if _, ok := dst[k]; ok {
-			dst[k] = v
+		for _, suffix := range suffixes {
+			if strings.HasSuffix(k, suffix) {
+				if _, ok := dst[k]; ok {
+					dst[k] = v
+				}
+			}
 		}
 	}
+}
+
+func copyAge(dst, src map[string]int64) {
+	copyIfSuffix(dst, src, "_age")
 }
 
 func isLabelValueSet(c *module.Chart, name string) bool {
