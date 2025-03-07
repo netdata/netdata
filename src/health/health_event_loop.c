@@ -458,8 +458,6 @@ static void process_repeating_alarms(RRDHOST *host, time_t now, struct health_ra
     RRDCALC *rc;
 
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!rrdhost_should_run_health(host)))
-            break;
 
         int repeat_every = 0;
         if(unlikely(rrdcalc_isrepeating(rc) && rc->delay_up_to_timestamp <= now)) {
@@ -522,8 +520,6 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
     // the first loop is to lookup values from the db
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(!rrdhost_should_run_health(host))
-            break;
 
         rrdcalc_update_info_using_rrdset_labels(rc);
 
@@ -559,8 +555,6 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
 
     if (unlikely(runnable)) {
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if(unlikely(!rrdhost_should_run_health(host)))
-                break;
 
             if (unlikely(!(rc->run_flags & RRDCALC_FLAG_RUNNABLE) || rc->run_flags & RRDCALC_FLAG_DISABLED))
                 continue;
@@ -594,11 +588,6 @@ static void health_event_loop_for_host(RRDHOST *host, time_t now, time_t *next_r
 
         // process repeating alarms
         process_repeating_alarms(host, now, hrm);
-    }
-
-    if(unlikely(!rrdhost_should_run_health(host))) {
-        alerts_raised_summary_free(hrm);
-        return;
     }
 
     // execute notifications
