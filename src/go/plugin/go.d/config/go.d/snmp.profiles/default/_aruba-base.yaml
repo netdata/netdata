@@ -1,0 +1,5 @@
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "aruba"

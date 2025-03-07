@@ -1,0 +1,183 @@
+# Profile for NetApp devices.
+# Example sysDescr:
+# - "NetApp Release 9.7P9: Fri Nov 06 01:13:45 UTC 2020"
+# - "NetApp Release 9.7P14: Thu Jun 10 22:54:31 UTC 2021"
+# - "NetApp Release 8.2.5P3 7-Mode: Tue Jul 16 01:37:24 PDT 2019"
+
+extends:
+  - _base.yaml
+
+device:
+  vendor: "netapp"
+
+# All netapp products have netappProducts (1.3.6.1.4.1.789.2) OID as parent
+sysobjectid: 1.3.6.1.4.1.789.2.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "netapp"
+      serial_number:
+        symbol:
+          MIB: NETAPP-MIB
+          OID: 1.3.6.1.4.1.789.1.1.9.0
+          name: productSerialNum  # The product serial number. Returns unknown if it cannot be determined.
+      version:
+        # We can alternatively use 1.3.6.1.4.1.789.1.1.2.0/productVersion, but it seems to contain the same string as sysDescr.
+        # Choosing to use sysDescr since it's already retrieved anyway.
+        # Info about NetApp version: https://mysupport.netapp.com/site/info/version-support
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: 'NetApp Release\s+(\S+)[:\s]'
+          match_value: '$1'
+      # product_name:
+      #   TODO: No suitable info found yet that can be used as product_name
+      model:
+        symbol:
+          MIB: NETAPP-MIB
+          OID: 1.3.6.1.4.1.789.1.1.5.0
+          name: productModel  # The model name of the system. Examples are FAS980 and FAS3050.
+      os_name:
+        # Data ONTAP is the operating system for all NetApp storage systems.
+        # Source: https://library.netapp.com/ecmdocs/ECMP1155684/html/GUID-C6A665D4-EB47-485E-B2C9-29405DEE4510.html
+        value: 'ONTAP'
+      os_version:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: 'NetApp Release\s+(\d+(?:\.\d+)*)'  # First part of the version composed of digits and `.`
+                                                             # Example: 9.7P14 => 9.7
+          match_value: '$1'
+
+
+metrics:
+  - MIB: NETAPP-MIB
+    OID: 1.3.6.1.4.1.789.1.2.3.8.0
+    name: cfInterconnectStatus  # The current status of the interconnect. The partialFailure(3) status indicates that
+                                # one of the links in the interconnect hardware is down.
+  - MIB: NETAPP-MIB
+    OID: 1.3.6.1.4.1.789.1.2.2.23.0
+    name: miscCacheAge  # Age in minutes of the oldest read-only blocks in the buffer cache.
+                        # This indicates how fast read operations are cycling through system memory;
+                        # when the appliance is reading very large files (larger than the machine's memory size),
+                        # buffer cache age will be very low.
+  - MIB: NETAPP-MIB
+    OID: 1.3.6.1.4.1.789.1.8.3.6.36.0
+    name: ncHttpActiveCliConns  # Number of currently active TCP/IP connections to HTTP clients
+
+  - MIB: NETAPP-MIB
+    OID: 1.3.6.1.4.1.789.1.26.8.0
+    name: extcache64Hits  # Indicates number of wafl buffers read from the external cache
+    metric_type: monotonic_count
+
+  # Snap vaults
+
+  - MIB: NETAPP-MIB
+    table:
+      OID: 1.3.6.1.4.1.789.1.19.11
+      name: snapvaultStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.789.1.19.11.1.9
+        name: svTotalFailures
+    metric_type: monotonic_count
+    metric_tags:
+      - tag: index
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.19.11.1.1
+          name: svIndex
+      - tag: destination
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.19.11.1.3
+          name: svDst
+      - tag: state
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.19.11.1.5
+          name: svState
+
+  # Snap mirrors
+
+  - MIB: NETAPP-MIB
+    table:
+      OID: 1.3.6.1.4.1.789.1.9.20
+      name: snapmirrorStatusTable
+    metric_type: gauge
+    symbols:
+      - OID: 1.3.6.1.4.1.789.1.9.20.1.6
+        name: snapmirrorLag # SNMP type is TimeTicks
+    metric_tags:
+      - tag: index
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.9.20.1.1
+          name: snapmirrorIndex
+      - tag: state
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.9.20.1.5
+          name: snapmirrorState
+
+  - MIB: NETAPP-MIB
+    table:
+      OID: 1.3.6.1.4.1.789.1.9.20
+      name: snapmirrorStatusTable
+    metric_type: monotonic_count
+    symbols:
+      - OID: 1.3.6.1.4.1.789.1.9.20.1.9
+        name: snapmirrorTotalFailures
+    metric_tags:
+      - tag: index
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.9.20.1.1
+          name: snapmirrorIndex
+      - tag: state
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.9.20.1.5
+          name: snapmirrorState
+
+  # Disk filesystems
+
+  - MIB: NETAPP-MIB
+    table:
+      OID: 1.3.6.1.4.1.789.1.5.4
+      name: dfTable
+    metric_type: gauge
+    symbols:
+      - OID: 1.3.6.1.4.1.789.1.5.4.1.14
+        name: dfHighTotalKBytes
+      - OID: 1.3.6.1.4.1.789.1.5.4.1.18
+        name: dfHighAvailKBytes
+      - OID: 1.3.6.1.4.1.789.1.5.4.1.7
+        name: dfInodesUsed
+      - OID: 1.3.6.1.4.1.789.1.5.4.1.8
+        name: dfInodesFree
+    metric_tags:
+      - tag: index
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.5.4.1.1
+          name: dfIndex
+      - tag: filesystem
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.5.4.1.2
+          name: dfFileSys
+
+  # Network interfaces
+
+  - MIB: NETAPP-MIB
+    table:
+      OID: 1.3.6.1.4.1.789.1.22.1.2
+      name: netifTable
+    metric_type: monotonic_count_and_rate
+    symbols:
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.3
+        name: ifHighInOctets
+    metric_tags:
+      - tag: index
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.22.1.2.1.1
+          name: netifIndex
+      - tag: interface
+        symbol:
+          # A DisplayString that represents the manufacturer, product name and hardware version.
+          # Will be normalized to something like 'netgear_ifX300_v1'.
+          OID: 1.3.6.1.4.1.789.1.22.1.2.1.2
+          name: netifDescr

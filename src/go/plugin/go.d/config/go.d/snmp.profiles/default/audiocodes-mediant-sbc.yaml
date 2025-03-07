@@ -1,0 +1,26 @@
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.5003.8.1.1.71
+
+metrics:
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.2.1.25.2.3.1.5.1
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: memory.used
+      OID: 1.3.6.1.2.1.25.2.3.1.6.1
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.2.1.25.3.3.1.2.1
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "audiocodes"

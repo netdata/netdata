@@ -211,7 +211,7 @@ size_t netdata_threads_init(void) {
 // ----------------------------------------------------------------------------
 // late initialization
 
-void netdata_threads_init_after_fork(size_t stacksize) {
+void netdata_threads_set_stack_size(size_t stacksize) {
     int i;
 
     // set pthread stack size
@@ -234,7 +234,7 @@ void netdata_threads_init_for_external_plugins(size_t stacksize) {
     if(default_stacksize < 1 * 1024 * 1024)
         default_stacksize = 1 * 1024 * 1024;
 
-    netdata_threads_init_after_fork(stacksize ? stacksize : default_stacksize);
+    netdata_threads_set_stack_size(stacksize ? stacksize : default_stacksize);
 }
 
 // ----------------------------------------------------------------------------

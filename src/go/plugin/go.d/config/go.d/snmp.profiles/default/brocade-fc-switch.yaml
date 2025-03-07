@@ -1,0 +1,148 @@
+extends:
+  - brocade.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.1588.2.1.1.*
+  - 1.3.6.1.4.1.1588.2.1.1.32
+  - 1.3.6.1.4.1.1588.2.1.1.44
+  - 1.3.6.1.4.1.1588.2.1.1.62
+  - 1.3.6.1.4.1.1588.2.1.1.64
+  - 1.3.6.1.4.1.1588.2.1.1.66
+  - 1.3.6.1.4.1.1588.2.1.1.71
+  - 1.3.6.1.4.1.1588.2.1.1.72
+  - 1.3.6.1.4.1.1588.2.1.1.77
+  - 1.3.6.1.4.1.1588.2.1.1.83
+  - 1.3.6.1.4.1.1588.2.1.1.109
+  - 1.3.6.1.4.1.1588.2.1.1.117
+  - 1.3.6.1.4.1.1588.2.1.1.118
+  - 1.3.6.1.4.1.1588.2.1.1.120
+  - 1.3.6.1.4.1.1588.2.1.1.133
+  - 1.3.6.1.4.1.1588.2.1.3
+metadata:
+  device:
+    fields:
+      type:
+        value: "switch"
+metrics:
+  - MIB: RESOURCE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.1588.2.1.1.1.26.1.0
+      name: cpu.usage
+  - MIB: RESOURCE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.1588.2.1.1.1.26.6.0
+      name: memory.usage
+  - MIB: FIBRE-CHANNEL-FE-MIB
+    table:
+      OID: 1.3.6.1.2.1.75.1.2.1
+      name: fcFxPortStatusTable  # fcFxPortStatusEntry AUGMENTS { fcFxPortEntry }
+    symbols:
+      - name: fcFxPortStatus
+        constant_value_one: true
+    metric_tags:
+      - index: 1  # fcFeModuleIndex is index #1 of fcFxPortEntry
+        tag: fc_fe_module_index
+      - index: 2  # fcFxPortIndex is index #2 of fcFxPortEntry
+        tag: fc_fx_port_index
+      - symbol:
+          OID: 1.3.6.1.2.1.75.1.2.1.1.3
+          name: fcFxPortOperMode
+        tag: fc_fx_port_oper_mode
+        mapping:
+          1: unknown
+          2: f_port
+          3: fl_port
+      - symbol:
+          OID: 1.3.6.1.2.1.75.1.2.1.1.4
+          name: fcFxPortAdminMode
+        tag: fc_fx_port_admin_mode
+        mapping:
+          2: f_port
+          3: fl_port
+  - MIB: FIBRE-CHANNEL-FE-MIB
+    table:
+      OID: 1.3.6.1.2.1.75.1.2.2
+      name: fcFxPortPhysTable  # fcFxPortStatusEntry AUGMENTS { fcFxPortEntry }
+    symbols:
+      - name: fcFxPortPhys
+        constant_value_one: true
+    metric_tags:
+      - index: 1  # fcFeModuleIndex is index #1 of fcFxPortEntry
+        tag: fc_fe_module_index
+      - index: 2  # fcFxPortIndex is index #2 of fcFxPortEntry
+        tag: fc_fx_port_index
+      - symbol:
+          OID: 1.3.6.1.2.1.75.1.2.2.1.1
+          name: fcFxPortPhysAdminStatus
+        tag: fc_fx_port_phys_admin_status
+        mapping:
+          1: online
+          2: offline
+          3: testing
+      - symbol:
+          OID: 1.3.6.1.2.1.75.1.2.2.1.2
+          name: fcFxPortPhysOperStatus
+        tag: fc_fx_port_phys_oper_status
+        mapping:
+          1: online
+          2: offline
+          3: testing
+          4: link_failure
+  - MIB: SW-MIB
+    table:
+      name: swFCPortTable
+      OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2
+    symbols:
+      - name: swFCPortTxFrames
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.13
+        metric_type: monotonic_count
+      - name: swFCPortRxFrames
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.14
+        metric_type: monotonic_count
+      - name: swFCPortRxC2Frames
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.15
+        metric_type: monotonic_count
+      - name: swFCPortRxC3Frames
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.16
+        metric_type: monotonic_count
+      - name: swFCPortRxLCs
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.17
+        metric_type: monotonic_count
+      - name: swFCPortTooManyRdys
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.19
+        metric_type: monotonic_count
+      - name: swFCPortNoTxCredits
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.20
+        metric_type: monotonic_count
+      - name: swFCPortRxEncInFrs
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.21
+        metric_type: monotonic_count
+      - name: swFCPortRxCrcs
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.22
+        metric_type: monotonic_count
+      - name: swFCPortRcTruncs
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.23
+        metric_type: monotonic_count
+      - name: swFCPortRxTooLongs
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.24
+        metric_type: monotonic_count
+      - name: swFCPortRxBadEofs
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.25
+        metric_type: monotonic_count
+      - name: swFCPortRxEncOutFrs
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.26
+        metric_type: monotonic_count
+      - name: swFCPortRxBadOs
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.27
+        metric_type: monotonic_count
+      - name: swFCPortC3Discards
+        OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.28
+        metric_type: monotonic_count
+    metric_tags:
+      - symbol:
+          name: swFCPortName
+          OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.36
+        tag: sw_fc_port_name
+      - symbol:
+          name: swFCPortSpecifier
+          OID: 1.3.6.1.4.1.1588.2.1.1.1.6.2.1.37
+        tag: sw_fc_port_specifier

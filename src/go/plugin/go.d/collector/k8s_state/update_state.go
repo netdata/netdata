@@ -7,15 +7,19 @@ func (c *Collector) runUpdateState(in <-chan resource) {
 		select {
 		case <-c.ctx.Done():
 			return
-		case r := <-in:
+		case res := <-in:
 			c.state.Lock()
-			switch r.kind() {
+			switch res.kind() {
 			case kubeResourceNode:
-				c.updateNodeState(r)
+				c.updateNodeState(res)
 			case kubeResourcePod:
-				c.updatePodState(r)
+				c.updatePodState(res)
 			case kubeResourceDeployment:
-				c.updateDeploymentState(r)
+				c.updateDeploymentState(res)
+			case kubeResourceCronJob:
+				c.updateCronJobState(res)
+			case kubeResourceJob:
+				c.updateJobState(res)
 			}
 			c.state.Unlock()
 		}
@@ -26,4 +30,8 @@ func copyLabels(dst, src map[string]string) {
 	for k, v := range src {
 		dst[k] = v
 	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }

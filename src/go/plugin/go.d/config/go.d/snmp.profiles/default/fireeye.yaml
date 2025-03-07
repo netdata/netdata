@@ -1,0 +1,181 @@
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "fireeye"
+
+sysobjectid:
+  - 1.3.6.1.4.1.25597.1
+
+metrics:
+  - MIB: HOST-RESOURCES-MIB
+    table:
+      OID: 1.3.6.1.2.1.25.3.3
+      name: hrProcessorTable
+    symbols:
+      - OID: 1.3.6.1.2.1.25.3.3.1.2
+        name: cpu.usage
+    metric_tags:
+      - tag: hr_processor_frw_id
+        symbol:
+          OID: 1.3.6.1.2.1.25.3.3.1.1
+          name: hrProcessorFrwID
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.25.2.3.1.6.1 # hrStorageUsed.1 = Physical memory
+      name: memory.total
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.25.2.3.1.6.6 # hrStorageUsed.6 = Memory buffers
+      name: feMemoryBuffers
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.25.2.3.1.6.7 # hrStorageUsed.7 = Cached memory
+      name: feCachedMemory
+  # - MIB: FE-FIREEYE-MIB
+  #   symbol:
+  #     OID: 1.3.6.1.4.1.25597.11.5.1.10.0
+  #     name: feProductLicenseActive
+  #     enum:
+  #       true: 1
+  #       false: 2
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  # - MIB: FE-FIREEYE-MIB
+  #   symbol:
+  #     OID: 1.3.6.1.4.1.25597.11.1.1.1.0
+  #     name: feSystemStatus
+  # scalar string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+  # - MIB: FE-FIREEYE-MIB
+  #   symbol:
+  #     OID: 1.3.6.1.4.1.25597.11.1.1.6.0
+  #     name: feTemperatureIsHealthy
+  #     enum:
+  #       true: 1
+  #       false: 2
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  # - MIB: FE-FIREEYE-MIB
+  #   symbol:
+  #     OID: 1.3.6.1.4.1.25597.11.2.1.2.0
+  #     name: feRaidIsHealthy
+  #     enum:
+  #       true: 1
+  #       false: 2
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  - MIB: FE-FIREEYE-MIB
+    table:
+      OID: 1.3.6.1.4.1.25597.11.2.1.3
+      name: fePhysicalDiskTable
+    symbols:
+      - name: fePhysicalDisk
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.25597.11.2.1.3.1.2
+          name: fePhysicalDiskName
+        tag: fe_physical_disk_name
+      - symbol:
+          OID: 1.3.6.1.4.1.25597.11.2.1.3.1.4
+          name: fePhysicalDiskIsHealthy
+        tag: fe_physical_disk_is_healthy
+        mapping:
+          1: 'true'
+          2: 'false'
+  # - MIB: FE-FIREEYE-MIB
+  #   symbol:
+  #     OID: 1.3.6.1.4.1.25597.11.3.1.2.0
+  #     name: fePowerSupplyOverallIsHealthy
+  #     enum:
+  #       true: 1
+  #       false: 2
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  # - MIB: FE-FIREEYE-MIB
+  #   symbol:
+  #     OID: 1.3.6.1.4.1.25597.11.4.1.2.0
+  #     name: feFanOverallIsHealthy
+  #     enum:
+  #       true: 1
+  #       false: 2
+  #     TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #       comment in profile until it's fixed)
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.1.0
+      name: feTotalEmailCount
+    metric_type: monotonic_count
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.4.0
+      name: feInfectedEmailCount
+    metric_type: monotonic_count
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.7.0
+      name: feAnalyzedEmailCount
+    metric_type: monotonic_count
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.10.0
+      name: feTotalUrlCount
+    metric_type: monotonic_count
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.13.0
+      name: feInfectedUrlCount
+    metric_type: monotonic_count
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.16.0
+      name: feAnalyzedUrlCount
+    metric_type: monotonic_count
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.19.0
+      name: feTotalAttachmentCount
+    metric_type: monotonic_count
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.22.0
+      name: feInfectedAttachmentCount
+    metric_type: monotonic_count
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.25.0
+      name: feAnalyzedAttachmentCount
+    metric_type: monotonic_count
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.40.0
+      name: feeQuarantineUsage
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.44.0
+      name: feDeferredEmailCount
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.13.1.45.0
+      name: feHoldQueueEmailCount
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.15.1.1.0
+      name: feTotalObjectAnalyzedCount
+    metric_type: monotonic_count
+  - MIB: FE-FIREEYE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.25597.15.1.4.0
+      name: feTotalMaliciousObjectCount
+    metric_type: monotonic_count
+metric_tags:
+  - tag: fe_hardware_model
+    OID: 1.3.6.1.4.1.25597.11.1.1.2.0
+    symbol: feHardwareModel
+  - tag: fe_serial_number
+    OID: 1.3.6.1.4.1.25597.11.1.1.3.0
+    symbol: feSerialNumber

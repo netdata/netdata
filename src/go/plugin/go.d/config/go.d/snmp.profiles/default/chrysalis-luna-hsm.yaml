@@ -1,0 +1,54 @@
+extends:
+  - chrysalis.yaml
+  - _generic-tcp.yaml
+  - _generic-ucd.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.12383.3.1.1
+metrics:
+  - MIB: CHRYSALIS-UTSP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12383.3.1.1.1.0
+      name: hsmOperationRequests
+  - MIB: CHRYSALIS-UTSP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12383.3.1.1.2.0
+      name: hsmOperationErrors
+  - MIB: CHRYSALIS-UTSP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12383.3.1.1.3.0
+      name: hsmCriticalEvents
+  - MIB: CHRYSALIS-UTSP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12383.3.1.1.4.0
+      name: hsmNonCriticalEvents
+# TODO: enum in scalar metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+#  - MIB: CHRYSALIS-UTSP-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.12383.3.1.2.1.0
+#      name: ntlsOperStatus
+#      enum:
+#        up: 1
+#        down: 2
+#        unknown: 3
+  - MIB: CHRYSALIS-UTSP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12383.3.1.2.2.0
+      name: ntlsConnectedClients
+  - MIB: CHRYSALIS-UTSP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12383.3.1.2.3.0
+      name: ntlsLinks
+  - MIB: CHRYSALIS-UTSP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12383.3.1.2.4.0
+      name: ntlsSuccessfulClientConnections
+  - MIB: CHRYSALIS-UTSP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12383.3.1.2.5.0
+      name: ntlsFailedClientConnections
+# TODO: sending tags for scalar metric is not supported yet (keep this metric and this)
+# - MIB: CHRYSALIS-UTSP-MIB
+#   OID: 1.3.6.1.4.1.12383.3.1.2.6.0
+#   symbol: ntlsCertExpireDay
+#   tag: ntls_cert_expire_day
+

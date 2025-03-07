@@ -5,7 +5,7 @@
 #if defined(OS_LINUX)
 #include <unistd.h>
 
-char *os_get_process_path(void) {
+static char *os_get_process_path_internal(void) {
     char path[PATH_MAX + 1] = "";
     ssize_t len = readlink("/proc/self/exe", path, PATH_MAX);
 
@@ -22,7 +22,7 @@ char *os_get_process_path(void) {
 #if defined(OS_FREEBSD)
 #include <sys/sysctl.h>
 
-char *os_get_process_path(void) {
+static char *os_get_process_path_internal(void) {
     char path[PATH_MAX + 1] = "";
     int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
     size_t len = sizeof(path);
@@ -39,7 +39,7 @@ char *os_get_process_path(void) {
 #if defined(OS_MACOS)
 #include <mach-o/dyld.h>
 
-char *os_get_process_path(void) {
+static char *os_get_process_path_internal(void) {
     char path[PATH_MAX + 1] = "";
     uint32_t size = sizeof(path);
 
@@ -62,7 +62,7 @@ char *os_get_process_path(void) {
 #if defined(OS_WINDOWS)
 #include <windows.h>
 
-char *os_get_process_path(void) {
+static char *os_get_process_path_internal(void) {
     wchar_t wpath[32768] = L"";  // Maximum path length in Windows
     DWORD length = GetModuleFileNameW(NULL, wpath, sizeof(wpath)/sizeof(wpath[0]));
 
@@ -88,3 +88,17 @@ char *os_get_process_path(void) {
     return path;
 }
 #endif
+
+char *os_get_process_path(void) {
+    char b[FILENAME_MAX + 1];
+    size_t b_size = sizeof(b) - 1;
+    int ret = uv_exepath(b, &b_size);
+    if(ret == 0)
+        b[b_size] = '\0';
+
+    if (ret != 0 || access(b, R_OK) != 0)
+        return os_get_process_path_internal();
+
+    b[b_size] = '\0';
+    return strdupz(b);
+}

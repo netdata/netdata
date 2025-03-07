@@ -1,0 +1,171 @@
+metrics:
+#  - MIB: UPS-MIB
+#    symbol:
+#      OID: 1.3.6.1.2.1.33.1.2.1.0
+#      name: upsBatteryStatus
+#      enum:
+#        unknown: 1
+#        batteryNormal: 2
+#        batteryLow: 3
+#        batteryDepleted: 4
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.2.2.0
+      name: upsSecondsOnBattery
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.2.3.0
+      name: upsEstimatedMinutesRemaining
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.2.4.0
+      name: upsEstimatedChargeRemaining
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.2.5.0
+      name: upsBatteryVoltage
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.2.6.0
+      name: upsBatteryCurrent
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.2.7.0
+      name: upsBatteryTemperature
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.3.1.0
+      name: upsInputLineBads
+    metric_type: monotonic_count
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.3.2.0
+      name: upsInputNumLines
+#  - MIB: UPS-MIB
+#    symbol:
+#      OID: 1.3.6.1.2.1.33.1.4.1.0
+#      name: upsOutputSource
+#      enum:
+#        other: 1
+#        none: 2
+#        normal: 3
+#        bypass: 4
+#        battery: 5
+#        booster: 6
+#        reducer: 7
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.4.2.0
+      name: upsOutputFrequency
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.4.3.0
+      name: upsOutputNumLines
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.5.1.0
+      name: upsBypassFrequency
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.5.2.0
+      name: upsBypassNumLines
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.6.1.0
+      name: upsAlarmsPresent
+#  - MIB: UPS-MIB
+#    symbol:
+#      OID: 1.3.6.1.2.1.33.1.7.3.0
+#      name: upsTestResultsSummary
+#      enum:
+#        donePass: 1
+#        doneWarning: 2
+#        doneError: 3
+#        aborted: 4
+#        inProgress: 5
+#        noTestsInitiated: 6
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: UPS-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.33.1.7.5.0
+      name: upsTestStartTime
+  - MIB: UPS-MIB
+    table:
+      OID: 1.3.6.1.2.1.33.1.4.4
+      name: upsOutputTable
+    symbols:
+      - OID: 1.3.6.1.2.1.33.1.4.4.1.2
+        name: upsOutputVoltage
+      - OID: 1.3.6.1.2.1.33.1.4.4.1.3
+        name: upsOutputCurrent
+      - OID: 1.3.6.1.2.1.33.1.4.4.1.4
+        name: upsOutputPower
+      - OID: 1.3.6.1.2.1.33.1.4.4.1.5
+        name: upsOutputPercentLoad
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.33.1.4.4.1.1
+          name: upsOutputLineIndex
+        tag: ups_output_line_index
+  - MIB: UPS-MIB
+    table:
+      OID: 1.3.6.1.2.1.33.1.3.3
+      name: upsInputTable
+    symbols:
+      - OID: 1.3.6.1.2.1.33.1.3.3.1.2
+        name: upsInputFrequency
+      - OID: 1.3.6.1.2.1.33.1.3.3.1.3
+        name: upsInputVoltage
+      - OID: 1.3.6.1.2.1.33.1.3.3.1.4
+        name: upsInputCurrent
+      - OID: 1.3.6.1.2.1.33.1.3.3.1.5
+        name: upsInputTruePower
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.33.1.3.3.1.1
+          name: upsInputLineIndex
+        tag: ups_input_line_index
+  - MIB: UPS-MIB
+    table:
+      OID: 1.3.6.1.2.1.33.1.5.3
+      name: upsBypassTable
+    symbols:
+      - OID: 1.3.6.1.2.1.33.1.5.3.1.2
+        name: upsBypassVoltage
+      - OID: 1.3.6.1.2.1.33.1.5.3.1.3
+        name: upsBypassCurrent
+      - OID: 1.3.6.1.2.1.33.1.5.3.1.4
+        name: upsBypassPower
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.33.1.5.3.1.1
+          name: upsBypassLineIndex
+        tag: ups_bypass_line_index
+  - MIB: UPS-MIB
+    table:
+      OID: 1.3.6.1.2.1.33.1.6.2
+      name: upsAlarmTable
+    symbols:
+      - OID: 1.3.6.1.2.1.33.1.6.2.1.3
+        name: upsAlarmTime
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.33.1.6.2.1.2
+          name: upsAlarmDescr
+        tag: ups_alarm_descr
+
+metric_tags:
+  - OID: 1.3.6.1.2.1.33.1.1.1
+    symbol: upsIdentManufacturer
+    tag: ups_ident_manufacturer
+  - OID: 1.3.6.1.2.1.33.1.1.2
+    symbol: upsIdentModel
+    tag: ups_ident_model
+  - OID: 1.3.6.1.2.1.33.1.1.5
+    symbol: upsIdentName
+    tag: ups_ident_name

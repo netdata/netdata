@@ -1,0 +1,67 @@
+extends:
+  - 3com.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.43.45.1.2.*  # 3Com Huawei Products (a3Com.jv-mib.huawei.hwproducts)
+
+metrics:
+  - MIB: A3COM-HUAWEI-LswDEVM-MIB
+    table:
+      name: hwCpuTable  # indexes: hwCpuIndex
+      OID: 1.3.6.1.4.1.43.45.1.6.1.1
+    symbols:
+      - name: cpu.usage
+        OID: 1.3.6.1.4.1.43.45.1.6.1.1.1.3
+    metric_tags:
+      - index: 1
+        tag: cpu
+  - MIB: A3COM-HUAWEI-LswDEVM-MIB
+    table:
+      name: hwMemTable  # indexes: hwMemModuleIndex
+      OID: 1.3.6.1.4.1.43.45.1.6.1.2.1
+    symbols:
+      - name: memory.total
+        OID: 1.3.6.1.4.1.43.45.1.6.1.2.1.1.2
+      - name: memory.free
+        OID: 1.3.6.1.4.1.43.45.1.6.1.2.1.1.3
+    metric_tags:
+      - index: 1
+        tag: mem
+  - MIB: A3COM-HUAWEI-LswDEVM-MIB
+    table:
+      name: hwdevMFanStatusTable  # indexes: hwDevMFanNum
+      OID: 1.3.6.1.4.1.43.45.1.2.23.1.9.1.1
+    symbols:
+      - name: hwdevMFanStatus
+        constant_value_one: true
+    metric_tags:
+      - index: 1
+        tag: fan_num
+      - symbol:
+          OID: 1.3.6.1.4.1.43.45.1.2.23.1.9.1.1.1.2
+          name: hwDevMFanStatus
+        tag: fan_status
+        mapping:
+          1: active
+          2: deactive
+          3: not_installed
+          4: unsupported
+  - MIB: A3COM-HUAWEI-LswDEVM-MIB
+    table:
+      name: hwdevMPowerStatusTable  # indexes: hwDevMPowerNum
+      OID: 1.3.6.1.4.1.43.45.1.2.23.1.9.1.2
+    symbols:
+      - name: hwdevMPowerStatus
+        constant_value_one: true
+    metric_tags:
+      - index: 1
+        tag: power_num
+      - symbol:
+          OID: 1.3.6.1.4.1.43.45.1.2.23.1.9.1.2.1.2
+          name: hwDevMPowerStatus
+        tag: power_status
+        mapping:
+          1: active
+          2: deactive
+          3: not_installed
+          4: unsupported

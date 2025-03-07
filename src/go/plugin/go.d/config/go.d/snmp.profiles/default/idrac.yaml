@@ -1,0 +1,55 @@
+# Profile for iDRAC devices
+# iDRAC is an integrated component of PowerEdge servers to allow out-of-band remote management.
+# This profile is for monitoring of Dell Servers via their iDRAC interface.
+
+
+extends:
+  - _dell.yaml
+  - _dell-rac.yaml
+  - _intel-lan-adapters.yaml
+
+device:
+  vendor: "dell"
+
+sysobjectid:
+ - 1.3.6.1.4.1.674.10892.2  # DRAC v1-v5 and iDRAC v6-v7
+ - 1.3.6.1.4.1.674.10892.5  # iDRAC v7+
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "dell"
+      serial_number:
+        symbol:
+          MIB: IDRAC-MIB-SMIv2
+          OID: 1.3.6.1.4.1.674.10892.5.1.3.2.0
+          name: systemServiceTag  # Serial number of the system, `GX0DH03`
+      version:
+         symbol:
+          MIB: IDRAC-MIB-SMIv2
+          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.8.1.1  # First element of a table
+          name: systemBIOSVersionName  # This attribute defines the version name of the system BIOS.
+      product_name:
+        value: PowerEdge  # iDRAC is just the Remote Access controller, any device with iDRAC is a PowerEdge server
+      model:
+        symbols:
+          - MIB: IDRAC-MIB-SMIv2
+            OID: 1.3.6.1.4.1.674.10892.5.1.3.12.0
+            name: systemModelName
+            extract_value: '\s*PowerEdge\s*([-a-zA-Z0-9_ ]+)' # The product name. e.g. PowerEdge R740xd, only extract "R740xd"
+          - MIB: IDRAC-MIB-SMIv2
+            OID: 1.3.6.1.4.1.674.10892.5.1.3.12.0
+            name: systemModelName
+      os_name:
+        symbol:
+          MIB: IDRAC-MIB-SMIv2
+          OID: 1.3.6.1.4.1.674.10892.5.1.3.6.0
+          name: systemOSName  # The operating system name. e.g. Ubuntu
+      os_version:
+        symbol:
+          MIB: IDRAC-MIB-SMIv2
+          OID: 1.3.6.1.4.1.674.10892.5.1.3.14.0
+          name: systemOSVersion  # The operating system name. e.g. 18.04.3 LTS (Bionic Beaver) Kernel 4.15.0-91-generic (x86_64)
+      type:
+        value: "server"

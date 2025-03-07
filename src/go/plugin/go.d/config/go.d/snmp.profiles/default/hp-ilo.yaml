@@ -1,0 +1,172 @@
+# Profile for HP iLO devices.
+# For HP iLO4 devices, a separate hp-ilo4 profile is used
+
+extends:
+  - _hp.yaml
+  - _hp-base.yaml
+  - _hp-compaq-health.yaml
+  - _hp-driver-stats.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.232.9.4.*     # HP iLO
+
+metadata:
+  device:
+    fields:
+      product_name:
+        value: Integrated Lights-Out
+      type:
+        value: "server"
+
+metrics:
+  # iLO controller metrics.
+
+  - # Power state.
+    # NOTE: unknown(1), poweredOff(2), poweredOn(3), insufficientPowerOrPowerOnDenied(4)
+    MIB: CPQSM2-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.9.2.2.32.0
+      name: cpqSm2CntlrServerPowerState
+
+  - # Status of battery.
+    # NOTE: other(1), batteryOk(2), batteryFailed(3), batteryDisconnected(4)
+    MIB: CPQSM2-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.9.2.2.5.0
+      name: cpqSm2CntlrBatteryStatus
+
+  - # Charge level of battery.
+    MIB: CPQSM2-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.9.2.2.6.0
+      name: cpqSm2CntlrBatteryPercentCharged
+
+  - # A bitmap of self-test errors.
+    # NOTE: 0 indicates that no errors have occurred.
+    MIB: CPQSM2-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.9.2.2.9.0
+      name: cpqSm2CntlrSelfTestErrors
+
+  - # Whether a remote session is active.
+    # NOTE: other(1), active(2), inactive(3)
+    MIB: CPQSM2-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.9.2.2.16.0
+      name: cpqSm2CntlrRemoteSessionStatus
+
+  - # Status of the remote interface.
+    # NOTE: other(1), ok(2), notResponding(3)
+    MIB: CPQSM2-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.9.2.2.17.0
+      name: cpqSm2CntlrInterfaceStatus
+
+  # Event log.
+
+  - # Number of entries in the event log.
+    MIB: CPQSM2-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.9.2.3.1.0
+      name: cpqSm2EventTotalEntries
+
+  # Network interfaces and traffic.
+
+  - # Network interface card statistics.
+    MIB: CPQSM2-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.9.2.5.2
+      name: cpqSm2NicStatsTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.9.2.5.2.1.2
+        name: cpqSm2NicXmitBytes
+      - OID: 1.3.6.1.4.1.232.9.2.5.2.1.3
+        name: cpqSm2NicXmitTotalPackets
+      - OID: 1.3.6.1.4.1.232.9.2.5.2.1.6
+        name: cpqSm2NicXmitDiscardPackets
+      - OID: 1.3.6.1.4.1.232.9.2.5.2.1.7
+        name: cpqSm2NicXmitErrorPackets
+      - OID: 1.3.6.1.4.1.232.9.2.5.2.1.8
+        name: cpqSm2NicXmitQueueLength
+      - OID: 1.3.6.1.4.1.232.9.2.5.2.1.9
+        name: cpqSm2NicRecvBytes
+      - OID: 1.3.6.1.4.1.232.9.2.5.2.1.10
+        name: cpqSm2NicRecvTotalPackets
+      - OID: 1.3.6.1.4.1.232.9.2.5.2.1.13
+        name: cpqSm2NicRecvDiscardPackets
+      - OID: 1.3.6.1.4.1.232.9.2.5.2.1.14
+        name: cpqSm2NicRecvErrorPackets
+      - OID: 1.3.6.1.4.1.232.9.2.5.2.1.15
+        name: cpqSm2NicRecvUnknownPackets
+    metric_type: monotonic_count # Sent as Counter (would be ingested as rates if not forced).
+    metric_tags:
+      - # Location of the controller (embedded controller vs. PC card).
+        # NOTE: other(1), embedded(2), pcmcia(3)
+        tag: nic_stats_location
+        symbol:
+          OID: 1.3.6.1.4.1.232.9.2.5.2.1.1
+          name: cpqSm2NicStatsLocation
+
+  - # Network physical adapters statistics (counts).
+    MIB: CPQNIC-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.18.2.3.1
+      name: cpqNicIfPhysAdapterTable
+    symbols:
+      - # Number of frames successfully transmitted.
+        OID: 1.3.6.1.4.1.232.18.2.3.1.1.16
+        name: cpqNicIfPhysAdapterGoodTransmits
+      - # Number of frames successfully received.
+        OID: 1.3.6.1.4.1.232.18.2.3.1.1.17
+        name: cpqNicIfPhysAdapterGoodReceives
+      - # Number of frames not transmitted because of an error.
+        # NOTE: this is the sum of 4 other metrics. (As a result, we don't submit those 4 metrics.)
+        # NOTE: MIB recommends looking at details stats and take action if this counter increments frequently.
+        OID: 1.3.6.1.4.1.232.18.2.3.1.1.18
+        name: cpqNicIfPhysAdapterBadTransmits
+      - # Number of frames not received because of an error.
+        # NOTE: this is the sum of 4 other metrics. (As a result, we don't submit those 4 metrics.)
+        # NOTE: MIB recommends looking at details stats and take action if this counter increments frequently.
+        OID: 1.3.6.1.4.1.232.18.2.3.1.1.19
+        name: cpqNicIfPhysAdapterBadReceives
+      - # Number of octets received.
+        OID: 1.3.6.1.4.1.232.18.2.3.1.1.37
+        name: cpqNicIfPhysAdapterInOctets
+      - # Number of octets sent.
+        OID: 1.3.6.1.4.1.232.18.2.3.1.1.38
+        name: cpqNicIfPhysAdapterOutOctets
+    metric_type: monotonic_count  # Sent as Counters (not forcing would make us ingest them as rates).
+    metric_tags:
+      - tag: interface
+        symbol:
+          OID: 1.3.6.1.4.1.232.18.2.3.1.1.39
+          name: cpqNicIfPhysAdapterName
+
+  - # Network physical adapters statistics (rates).
+    MIB: CPQNIC-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.18.2.3.1
+      name: cpqNicIfPhysAdapterTable
+    symbols:
+      - # Estimate of current bandwidth in bps.
+        # NOTE: this is zero if the value exceeds 4Gbps.
+        OID: 1.3.6.1.4.1.232.18.2.3.1.1.33
+        name: cpqNicIfPhysAdapterSpeed
+      - # Estimate of current bandwidth in Mbps.
+        OID: 1.3.6.1.4.1.232.18.2.3.1.1.36
+        name: cpqNicIfPhysAdapterSpeedMbps
+    # NOTE: no 'metric_type', as these are correctly sent as gauges.
+    metric_tags:
+      - tag: interface
+        symbol:
+          OID: 1.3.6.1.4.1.232.18.2.3.1.1.39
+          name: cpqNicIfPhysAdapterName
+
+  # Miscellaneous.
+
+  - # Virus activity detection.
+    # NOTE: notDetected(1), detected(2)
+    MIB: CPQNIC-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.232.18.2.5.3.0
+      name: cpqNicVtVirusActivity

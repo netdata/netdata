@@ -1,0 +1,301 @@
+extends:
+  - servertech.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.1718.3  # Sentry 3rd Gen PDU
+metadata:
+  device:
+    fields:
+      type:
+        value: "PDU"
+metrics:
+  - MIB: SENTRY3-MIB
+    symbol:
+      name: servertech.sentry3.systemTotalPower
+      OID: 1.3.6.1.4.1.1718.3.1.6.0
+  - MIB: SENTRY3-MIB
+    symbol:
+      name: servertech.sentry3.systemConfigModifiedCount
+      OID: 1.3.6.1.4.1.1718.3.1.15.0
+  - MIB: SENTRY3-MIB
+    table:
+      name: towerTable
+      OID: 1.3.6.1.4.1.1718.3.2.1
+    symbols:
+      - name: servertech.sentry3.towerInfeedCount
+        OID: 1.3.6.1.4.1.1718.3.2.1.1.5
+      - name: servertech.sentry3.towerVACapacity
+        OID: 1.3.6.1.4.1.1718.3.2.1.1.9
+      - name: servertech.sentry3.towerVACapacityUsed
+        OID: 1.3.6.1.4.1.1718.3.2.1.1.10
+      - name: servertech.sentry3.towerActivePower
+        OID: 1.3.6.1.4.1.1718.3.2.1.1.11
+      - name: servertech.sentry3.towerApparentPower
+        OID: 1.3.6.1.4.1.1718.3.2.1.1.12
+      - name: servertech.sentry3.towerPowerFactor
+        OID: 1.3.6.1.4.1.1718.3.2.1.1.13
+      - name: servertech.sentry3.towerEnergy
+        OID: 1.3.6.1.4.1.1718.3.2.1.1.14
+      - name: servertech.sentry3.towerLineFrequency
+        OID: 1.3.6.1.4.1.1718.3.2.1.1.15
+    metric_tags:
+      - symbol:
+          name: servertech.sentry3.towerID
+          OID: 1.3.6.1.4.1.1718.3.2.1.1.2
+        tag: servertech_sentry3_tower_id
+      - symbol:
+          name: servertech.sentry3.towerName
+          OID: 1.3.6.1.4.1.1718.3.2.1.1.3
+        tag: servertech_sentry3_tower_name
+      - symbol:
+          name: servertech.sentry3.towerProductSN
+          OID: 1.3.6.1.4.1.1718.3.2.1.1.6
+        tag: servertech_sentry3_tower_product_sn
+      - symbol:
+          name: servertech.sentry3.towerModelNumber
+          OID: 1.3.6.1.4.1.1718.3.2.1.1.7
+        tag: servertech_sentry3_tower_model_number
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.1.1.4
+          name: servertech.sentry3.towerStatus
+        tag: servertech_sentry3_tower_status
+        mapping:
+          0: normal
+          1: no_comm
+          2: fan_fail
+          3: over_temp
+          4: nvm_fail
+          5: out_of_balance
+  - MIB: SENTRY3-MIB
+    table:
+      name: infeedTable
+      OID: 1.3.6.1.4.1.1718.3.2.2
+    symbols:
+      - name: servertech.sentry3.infeedLoadValue
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.7
+      - name: servertech.sentry3.infeedOutletCount
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.9
+      - name: servertech.sentry3.infeedCapacity
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.10
+      - name: servertech.sentry3.infeedVoltage
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.11
+      - name: servertech.sentry3.infeedPower
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.12
+      - name: servertech.sentry3.infeedEnergy
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.16
+      - name: servertech.sentry3.infeedPhaseVoltage
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.18
+      - name: servertech.sentry3.infeedPhaseCurrent
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.19
+      - name: servertech.sentry3.infeedCapacityUsed
+        OID: 1.3.6.1.4.1.1718.3.2.2.1.20
+    metric_tags:
+      - symbol:
+          name: servertech.sentry3.infeedID
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.2
+        tag: servertech_sentry3_infeed_id
+      - symbol:
+          name: servertech.sentry3.infeedName
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.3
+        tag: servertech_sentry3_infeed_name
+      - symbol:
+          name: servertech.sentry3.infeedLineID
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.21
+        tag: servertech_sentry3_infeed_line_id
+      - symbol:
+          name: servertech.sentry3.infeedLineToLineID
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.22
+        tag: servertech_sentry3_infeed_line_to_line_id
+      - symbol:
+          name: servertech.sentry3.infeedPhaseID
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.23
+        tag: servertech_sentry3_infeed_phase_id
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.5
+          name: servertech.sentry3.infeedStatus
+        tag: servertech_sentry3_infeed_status
+        mapping:
+          0: off
+          1: on
+          2: off_wait
+          3: on_wait
+          4: off_error
+          5: on_error
+          6: no_comm
+          7: reading
+          8: off_fuse
+          9: on_fuse
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.6
+          name: servertech.sentry3.infeedLoadStatus
+        tag: servertech_sentry3_infeed_load_status
+        mapping:
+          0: normal
+          1: not_on
+          2: reading
+          3: load_low
+          4: load_high
+          5: over_load
+          6: read_error
+          7: no_comm
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.2.1.17
+          name: servertech.sentry3.infeedReactance
+        tag: servertech_sentry3_infeed_reactance
+        mapping:
+          0: unknown
+          1: capacitive
+          2: inductive
+          3: resistive
+  - MIB: SENTRY3-MIB
+    table:
+      name: outletTable
+      OID: 1.3.6.1.4.1.1718.3.2.3
+    symbols:
+      - name: servertech.sentry3.outlet
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          name: servertech.sentry3.outletID
+          OID: 1.3.6.1.4.1.1718.3.2.3.1.2
+        tag: servertech_sentry3_outlet_id
+      - symbol:
+          name: servertech.sentry3.outletName
+          OID: 1.3.6.1.4.1.1718.3.2.3.1.3
+        tag: servertech_sentry3_outlet_name
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.3.1.5
+          name: servertech.sentry3.outletStatus
+        tag: servertech_sentry3_outlet_status
+        mapping:
+          0: off
+          1: on
+          2: off_wait
+          3: on_wait
+          4: off_error
+          5: on_error
+          6: no_comm
+          7: reading
+          8: off_fuse
+          9: on_fuse
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.3.1.10
+          name: servertech.sentry3.outletControlState
+        tag: servertech_sentry3_outlet_control_state
+        mapping:
+          0: idle_off
+          1: idle_on
+          2: wake_off
+          3: wake_on
+          4: off
+          5: on
+          6: locked_off
+          7: locked_on
+          8: reboot
+          9: shutdown
+          10: pend_on
+          11: pend_off
+          12: minimum_off
+          13: minimum_on
+          14: event_off
+          15: event_on
+          16: event_reboot
+          17: event_shutdown
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.3.1.19
+          name: servertech.sentry3.outletWakeupState
+        tag: servertech_sentry3_outlet_wakeup_state
+        mapping:
+          1: last
+          2: off
+          3: on
+  - MIB: SENTRY3-MIB
+    table:
+      name: envMonTable
+      OID: 1.3.6.1.4.1.1718.3.2.4
+    symbols:
+      - name: servertech.sentry3.envMon
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          name: servertech.sentry3.envMonID
+          OID: 1.3.6.1.4.1.1718.3.2.4.1.2
+        tag: servertech_sentry3_env_mon_id
+      - symbol:
+          name: servertech.sentry3.envMonName
+          OID: 1.3.6.1.4.1.1718.3.2.4.1.3
+        tag: servertech_sentry3_env_mon_name
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.4.1.4
+          name: servertech.sentry3.envMonStatus
+        tag: servertech_sentry3_env_mon_status
+        mapping:
+          0: normal
+          1: no_comm
+  - MIB: SENTRY3-MIB
+    table:
+      name: tempHumidSensorTable
+      OID: 1.3.6.1.4.1.1718.3.2.5
+    symbols:
+      - name: servertech.sentry3.tempHumidSensorTempValue
+        OID: 1.3.6.1.4.1.1718.3.2.5.1.6
+      - name: servertech.sentry3.tempHumidSensorHumidValue
+        OID: 1.3.6.1.4.1.1718.3.2.5.1.10
+    metric_tags:
+      - symbol:
+          name: servertech.sentry3.tempHumidSensorID
+          OID: 1.3.6.1.4.1.1718.3.2.5.1.2
+        tag: servertech_sentry3_temp_humid_sensor_id
+      - symbol:
+          name: servertech.sentry3.tempHumidSensorName
+          OID: 1.3.6.1.4.1.1718.3.2.5.1.3
+        tag: servertech_sentry3_temp_humid_sensor_name
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.5.1.4
+          name: servertech.sentry3.tempHumidSensorStatus
+        tag: servertech_sentry3_temp_humid_sensor_status
+        mapping:
+          0: found
+          1: not_found
+          2: lost
+          3: no_comm
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.5.1.5
+          name: servertech.sentry3.tempHumidSensorTempStatus
+        tag: servertech_sentry3_temp_humid_sensor_temp_status
+        mapping:
+          0: normal
+          1: not_found
+          2: reading
+          3: temp_low
+          4: temp_high
+          5: read_error
+          6: lost
+          7: no_comm
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.5.1.9
+          name: servertech.sentry3.tempHumidSensorHumidStatus
+        tag: servertech_sentry3_temp_humid_sensor_humid_status
+        mapping:
+          0: normal
+          1: not_found
+          2: reading
+          3: humid_low
+          4: humid_high
+          5: read_error
+          6: lost
+          7: no_comm
+      - symbol:
+          OID: 1.3.6.1.4.1.1718.3.2.5.1.13
+          name: servertech.sentry3.tempHumidSensorTempScale
+        tag: servertech_sentry3_temp_humid_sensor_temp_scale
+        mapping:
+          0: celsius
+          1: fahrenheit
+metric_tags:
+  - OID: 1.3.6.1.4.1.1718.3.1.1.0
+    symbol: systemVersion
+    tag: servertech_sentry3_system_version
+  - OID: 1.3.6.1.4.1.1718.3.1.2.0
+    symbol: systemNICSerialNumber
+    tag: servertech_sentry3_system_nic_serial_number

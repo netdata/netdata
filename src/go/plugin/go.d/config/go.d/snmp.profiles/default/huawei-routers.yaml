@@ -1,0 +1,314 @@
+extends:
+  - huawei.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.2011.2.224.279
+metadata:
+  device:
+    fields:
+      type:
+        value: "router"
+metrics:
+  - MIB: HUAWEI-BGP-VPN-MIB
+    table:
+      name: hwBgpPeerTable
+      OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2
+    symbols:
+      - name: huawei.hwBgpPeerNegotiatedVersion
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.1
+      - name: huawei.hwBgpPeerRemoteAs
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2
+      - name: huawei.hwBgpPeerFsmEstablishedCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.6
+      - name: huawei.hwBgpPeerFsmEstablishedTime
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.7
+    metric_tags:
+      - symbol:
+          name: huawei.hwBgpPeerVrfName
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
+        tag: huawei_hw_bgp_peer_vrf_name
+      - symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          format: ip_address
+        tag: huawei_hw_bgp_peer_remote_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.5
+          name: huawei.hwBgpPeerState
+        tag: huawei_hw_bgp_peer_state
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.10
+          name: huawei.hwBgpPeerUnAvaiReason
+        tag: huawei_hw_bgp_peer_un_avai_reason
+        mapping:
+          1: configuration_lead_peer_down
+          2: receive_notification
+          3: receive_error_packet
+          4: hold_timer_expire
+          5: remote_peer_not_reachable
+          6: direct_connect_interface_down
+          7: route_limit
+          # the mapping is defined in the metric description
+  - MIB: HUAWEI-BGP-VPN-MIB
+    table:
+      name: hwBgpPeerRouteTable
+      OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3
+    symbols:
+      - name: huawei.hwBgpPeerPrefixRcvCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.1
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerPrefixActiveCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.2
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerPrefixAdvCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.3
+        metric_type: monotonic_count
+    metric_tags:
+      - symbol:
+          name: huawei.hwBgpPeerVrfName
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
+        tag: huawei_hw_bgp_peer_vrf_name
+      - symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          format: ip_address
+        tag: huawei_hw_bgp_peer_remote_addr
+  - MIB: HUAWEI-BGP-VPN-MIB
+    table:
+      name: hwBgpPeerMessageTable
+      OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4
+    symbols:
+      - name: huawei.hwBgpPeerInTotalMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.1
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerOutTotalMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.2
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerInOpenMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.3
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerInUpdateMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.4
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerInNotificationMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.5
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerInKeepAliveMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.6
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerInRouteFreshMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.7
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerOutOpenMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.8
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerOutUpdateMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.9
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerOutNotificationMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.10
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerOutKeepAliveMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.11
+        metric_type: monotonic_count
+      - name: huawei.hwBgpPeerOutRouteFreshMsgCounter
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.12
+        metric_type: monotonic_count
+    metric_tags:
+      - symbol:
+          name: huawei.hwBgpPeerVrfName
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
+        tag: huawei_hw_bgp_peer_vrf_name
+      - symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          format: ip_address
+        tag: huawei_hw_bgp_peer_remote_addr
+  - MIB: HUAWEI-DNS-MIB
+    table:
+      name: hwDnsHostsDynamicTable
+      OID: 1.3.6.1.4.1.2011.5.25.194.1.1
+    symbols:
+      - name: huawei.hwDnsTtl
+        OID: 1.3.6.1.4.1.2011.5.25.194.1.1.1.3
+    metric_tags:
+      - symbol:
+          name: huawei.hwDnsDomainName
+          OID: 1.3.6.1.4.1.2011.5.25.194.1.1.1.1
+        tag: huawei_hw_dns_domain_name
+      - symbol:
+          name: huawei.hwDnsIpAddress
+          OID: 1.3.6.1.4.1.2011.5.25.194.1.1.1.2
+        tag: huawei_hw_dns_ip_address
+      - symbol:
+          name: huawei.hwDnsAlias
+          OID: 1.3.6.1.4.1.2011.5.25.194.1.1.1.4
+        tag: huawei_hw_dns_alias
+  - MIB: HUAWEI-DNS-MIB
+    table:
+      name: hwDnsServerAddrTable
+      OID: 1.3.6.1.4.1.2011.5.25.194.1.4
+    symbols:
+      - name: huawei.hwDnsServerAddr
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          name: huawei.hwServerAddr
+          OID: 1.3.6.1.4.1.2011.5.25.194.1.4.1.1
+        tag: huawei_hw_server_addr
+      # - symbol:
+      #     OID: 1.3.6.1.4.1.2011.5.25.194.1.4.1.2
+      #     name: huawei.hwServerStatus
+      #   tag: huawei_hw_server_status
+      #   mapping:
+      #     1: static
+      #     2: dynamic
+      #   mapping absent in MIB
+  - MIB: HUAWEI-FIREWALL-MIB
+    table:
+      name: hwFwNetEventsTable
+      OID: 1.3.6.1.4.1.2011.5.25.222.1.1.2.4
+    symbols:
+      - name: huawei.hwFwNetEvents
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.222.1.1.2.4.1.4
+          name: huawei.hwFwNetEventSrcIpAddress
+        tag: huawei_hw_fw_net_event_src_ip_address
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.222.1.1.2.4.1.7
+          name: huawei.hwFwNetEventDstIpAddress
+        tag: huawei_hw_fw_net_event_dst_ip_address
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.222.1.1.2.4.1.2
+          name: huawei.hwFwNetEventInterface
+        tag: huawei_hw_fw_net_event_interface
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.222.1.1.2.4.1.3
+          name: huawei.hwFwNetEventSrcVrfName
+        tag: huawei_hw_fw_net_event_src_vrf_name
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.222.1.1.2.4.1.9
+          name: huawei.hwFwNetEventSrcIpPort
+        tag: huawei_hw_fw_net_event_src_ip_port
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.222.1.1.2.4.1.11
+          name: huawei.hwFwNetEventDstIpPort
+        tag: huawei_hw_fw_net_event_dst_ip_port
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.222.1.1.2.4.1.16
+          name: huawei.hwFwNetEventDescription
+        tag: huawei_hw_fw_net_event_description
+  - MIB: HUAWEI-FIREWALL-MIB
+    table:
+      name: hwFwConnectionStatTable
+      OID: 1.3.6.1.4.1.2011.5.25.222.1.2.2.2
+    symbols:
+      - name: huawei.hwFwConnectionStatCount
+        OID: 1.3.6.1.4.1.2011.5.25.222.1.2.2.2.1.4
+    metric_tags:
+      - symbol:
+          name: huawei.hwFwConnectionStatDescription
+          OID: 1.3.6.1.4.1.2011.5.25.222.1.2.2.2.1.3
+        tag: huawei_hw_fw_connection_stat_description
+  - MIB: HUAWEI-NAT-EXT-MIB
+    table:
+      name: hwNatAddrPoolTable
+      OID: 1.3.6.1.4.1.2011.5.25.226.2.3.2
+    symbols:
+      - name: huawei.hwNatAddrPoolRefTimes
+        OID: 1.3.6.1.4.1.2011.5.25.226.2.3.2.1.4
+    metric_tags:
+      - symbol:
+          name: huawei.hwNatAddrPoolStartAddr
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.3.2.1.2
+        tag: huawei_hw_nat_addr_pool_start_addr
+      - symbol:
+          name: huawei.hwNatAddrPoolEndAddr
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.3.2.1.3
+        tag: huawei_hw_nat_addr_pool_end_addr
+      # the mapping value is ambiguous, difference between the type definition and the metric description
+      # keep this commented until further investigated
+      # - symbol:
+      #     name: huawei.hwNatAddrPoolRefType
+      #     OID: 1.3.6.1.4.1.2011.5.25.226.2.3.2.1.5
+      #   tag: huawei_hw_nat_addr_pool_ref_type
+      #   mapping:
+      #     0: nopat
+      #     1: pat
+      #     2: easy_ip
+  - MIB: HUAWEI-NAT-EXT-MIB
+    table:
+      name: hwNatSessionTable
+      OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2
+    symbols:
+      - name: huawei.hwNatSession
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.1
+          name: huawei.hwNatSessionSrcLocalAddr
+        tag: huawei_hw_nat_session_src_local_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.2
+          name: huawei.hwNatSessionDstLocalAddr
+        tag: huawei_hw_nat_session_dst_local_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.3
+          name: huawei.hwNatSessionSrcLocalPort
+        tag: huawei_hw_nat_session_src_local_port
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.4
+          name: huawei.hwNatSessionDstLocalPort
+        tag: huawei_hw_nat_session_dst_local_port
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.6
+          name: huawei.hwNatSessionSrcGlobalAddr
+        tag: huawei_hw_nat_session_src_global_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.7
+          name: huawei.hwNatSessionDstGlobalAddr
+        tag: huawei_hw_nat_session_dst_global_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.8
+          name: huawei.hwNatSessionSrcGlobalPort
+        tag: huawei_hw_nat_session_src_global_port
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.9
+          name: huawei.hwNatSessionDstGlobalPort
+        tag: huawei_hw_nat_session_dst_global_port
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.5
+          name: huawei.hwNatSessionProtocol
+        tag: huawei_hw_nat_session_protocol
+        mapping:
+          1: other
+          2: icmp
+          3: udp
+          4: tcp
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.10
+          name: huawei.hwNatSessionSrcVPN
+        tag: huawei_hw_nat_session_src_vpn
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.11
+          name: huawei.hwNatSessionDstVPN
+        tag: huawei_hw_nat_session_dst_vpn
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.12
+          name: huawei.hwNatSessionStatus
+        tag: huawei_hw_nat_session_status
+        mapping:
+          1: active
+          2: not_in_service
+          3: not_ready
+          4: create_and_go
+          5: create_and_wait
+          6: destroy

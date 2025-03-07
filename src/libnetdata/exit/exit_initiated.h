@@ -52,7 +52,7 @@ BITMAP_STR_DEFINE_FUNCTIONS_EXTERN(EXIT_REASON);
 
 extern volatile EXIT_REASON exit_initiated;
 
-void exit_initiated_reset(void);
+void exit_initiated_init(void);
 void exit_initiated_set(EXIT_REASON reason);
 void exit_initiated_add(EXIT_REASON reason);
 

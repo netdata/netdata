@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- User configurable crash reporting [\#19789](https://github.com/netdata/netdata/pull/19789) ([ktsaou](https://github.com/ktsaou))
+- detect when running in CI and disable posting status [\#19787](https://github.com/netdata/netdata/pull/19787) ([ktsaou](https://github.com/ktsaou))
+- chore: rename snmp.profiles.d -\> snmp.profiles [\#19786](https://github.com/netdata/netdata/pull/19786) ([ilyam8](https://github.com/ilyam8))
+- add datadog profiles for snmp collector [\#19785](https://github.com/netdata/netdata/pull/19785) ([Ancairon](https://github.com/Ancairon))
 - Revert broken DEB priority configuration in repoconfig packages. [\#19783](https://github.com/netdata/netdata/pull/19783) ([Ferroin](https://github.com/Ferroin))
 - Restructure shutdown logic used during updates. [\#19781](https://github.com/netdata/netdata/pull/19781) ([Ferroin](https://github.com/Ferroin))
 - add unique machine id to status file [\#19778](https://github.com/netdata/netdata/pull/19778) ([ktsaou](https://github.com/ktsaou))
@@ -21,6 +25,7 @@
 - copy fields only when the source is valid [\#19768](https://github.com/netdata/netdata/pull/19768) ([ktsaou](https://github.com/ktsaou))
 - detect crashes during status file processing [\#19767](https://github.com/netdata/netdata/pull/19767) ([ktsaou](https://github.com/ktsaou))
 - post status syncrhonously [\#19766](https://github.com/netdata/netdata/pull/19766) ([ktsaou](https://github.com/ktsaou))
+- enable libunwind in static builds [\#19764](https://github.com/netdata/netdata/pull/19764) ([ktsaou](https://github.com/ktsaou))
 - fix invalid free [\#19763](https://github.com/netdata/netdata/pull/19763) ([ktsaou](https://github.com/ktsaou))
 - make status file use fixed size character arrays [\#19761](https://github.com/netdata/netdata/pull/19761) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/sd/snmp\): use rescan and cache ttl only when set [\#19760](https://github.com/netdata/netdata/pull/19760) ([ilyam8](https://github.com/ilyam8))
@@ -472,7 +477,6 @@
 - feat\(go.d\): add  NATS collector [\#19252](https://github.com/netdata/netdata/pull/19252) ([ilyam8](https://github.com/ilyam8))
 - Monitor sensors using libsensors via debugfs.plugin [\#19251](https://github.com/netdata/netdata/pull/19251) ([ktsaou](https://github.com/ktsaou))
 - Add option to updater to report status of auto-updates on the system. [\#19248](https://github.com/netdata/netdata/pull/19248) ([Ferroin](https://github.com/Ferroin))
-- DBENGINE: pgc tuning, replication tuning [\#19237](https://github.com/netdata/netdata/pull/19237) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
@@ -489,10 +493,6 @@
 - chore\(go.d\): simplify cli is help [\#19246](https://github.com/netdata/netdata/pull/19246) ([ilyam8](https://github.com/ilyam8))
 - Health transition saving optimization [\#19245](https://github.com/netdata/netdata/pull/19245) ([stelfrag](https://github.com/stelfrag))
 - Avoid blocking waiting for an event during shutdown [\#19244](https://github.com/netdata/netdata/pull/19244) ([stelfrag](https://github.com/stelfrag))
-- Do not call finalize on shutdown [\#19241](https://github.com/netdata/netdata/pull/19241) ([stelfrag](https://github.com/stelfrag))
-- fix the renamed function under windows [\#19240](https://github.com/netdata/netdata/pull/19240) ([ktsaou](https://github.com/ktsaou))
-- update netdata internal metrics ctx [\#19239](https://github.com/netdata/netdata/pull/19239) ([ilyam8](https://github.com/ilyam8))
-- feat\(go.d.plugin\): enable dyncfg vnodes [\#19238](https://github.com/netdata/netdata/pull/19238) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 

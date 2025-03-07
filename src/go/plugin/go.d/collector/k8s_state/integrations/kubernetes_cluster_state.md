@@ -112,6 +112,31 @@ Metrics:
 | k8s_state.deployment_replicas | desired, current, ready | replicas |
 | k8s_state.deployment_age | age | seconds |
 
+### Per cronjob
+
+These metrics refer to CronJobs.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| k8s_cluster_id | Cluster ID. This is equal to the kube-system namespace UID. |
+| k8s_cluster_name | Cluster name. Cluster name discovery only works in GKE. |
+| k8s_cronjob_name | CronJob name. |
+| k8s_namespace | Namespace. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| k8s_state.cronjob_jobs_count_by_status | completed, failed, running, suspended | jobs |
+| k8s_state.cronjob_jobs_failed_by_reason | pod_failure_policy, backoff_limit_exceeded, deadline_exceeded | jobs |
+| k8s_state.cronjob_last_execution_status | completed, failed | status |
+| k8s_state.cronjob_last_completion_duration | last_completion | seconds |
+| k8s_state.cronjob_last_completed_time_ago | last_completed_ago | seconds |
+| k8s_state.cronjob_last_schedule_time_ago | last_schedule_ago | seconds |
+| k8s_state.cronjob_age | age | seconds |
+
 ### Per pod
 
 These metrics refer to the Pod.

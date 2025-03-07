@@ -1,0 +1,23 @@
+
+metrics:
+  - MIB: JUNIPER-USERFIREWALL-MIB
+    table:
+      OID: 1.3.6.1.4.1.2636.3.89.1.1.3
+      name: jnxUserFwLDAPTable
+    metric_type: monotonic_count
+    symbols:
+    #  Total LDAP query number.
+    - OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.3
+      name: jnxUserFwLDAPTotalQuery
+    #  LDAP failed query number.
+    - OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.4
+      name: jnxUserFwLDAPFailedQuery
+    metric_tags:
+    - symbol:
+        OID:  1.3.6.1.4.1.2636.3.89.1.1.3.1.1
+        name: jnxUserFwLDAPDomain
+      tag: ldap_domain_name
+    - symbol:
+        OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.2
+        name: jnxUserFwLDAPHost
+      tag: ldap_host

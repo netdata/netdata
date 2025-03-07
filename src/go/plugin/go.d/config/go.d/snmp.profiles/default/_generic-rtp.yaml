@@ -1,0 +1,57 @@
+metrics:
+  - MIB: RTP-MIB
+    table:
+      name: rtpSessionTable
+      OID: 1.3.6.1.2.1.87.1.3
+    symbols:
+      - OID: 1.3.6.1.2.1.87.1.3.1.6
+        name: rtpSessionSenderJoins
+      - OID: 1.3.6.1.2.1.87.1.3.1.7
+        name: rtpSessionReceiverJoins
+      - OID: 1.3.6.1.2.1.87.1.3.1.8
+        name: rtpSessionByes
+    metric_tags:
+      - index: 1
+        tag: rtpSessionIndex
+      - tag: rtpSessionRemAddr
+        symbol:
+          OID: 1.3.6.1.2.1.87.1.3.1.3
+          name: rtpSessionRemAddr
+      - tag: rtpSessionLocAddr
+        symbol:
+          OID: 1.3.6.1.2.1.87.1.3.1.4
+          name: rtpSessionLocAddr
+  - MIB: RTP-MIB
+    table:
+      name: rtpSenderTable
+      OID: 1.3.6.1.2.1.87.1.5
+    symbols:
+      - OID: 1.3.6.1.2.1.87.1.5.1.4
+        name: rtpSenderPackets
+      - OID: 1.3.6.1.2.1.87.1.5.1.5
+        name: rtpSenderOctets
+    metric_tags:
+      - index: 1
+        tag: rtpSessionIndex
+      - index: 2
+        tag: rtpSenderSSRC
+  - MIB: RTP-MIB
+    table:
+      name: rtpRcvrTable
+      OID: 1.3.6.1.2.1.87.1.7
+    symbols:
+      - OID: 1.3.6.1.2.1.87.1.7.1.12
+        name: rtpRcvrPackets
+      - OID: 1.3.6.1.2.1.87.1.7.1.13
+        name: rtpRcvrOctets
+      - OID: 1.3.6.1.2.1.87.1.7.1.6
+        name: rtpRcvrLostPackets
+      - OID: 1.3.6.1.2.1.87.1.7.1.7
+        name: rtpRcvrJitter
+    metric_tags:
+      - index: 1
+        tag: rtpSessionIndex
+      - index: 2
+        tag: rtpRcvrSRCSSRC
+      - index: 3
+        tag: rtpRcvrSSRC

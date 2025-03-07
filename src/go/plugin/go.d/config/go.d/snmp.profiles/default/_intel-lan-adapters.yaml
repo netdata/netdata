@@ -1,0 +1,35 @@
+# Provide Intel lan adapters metrics
+
+metrics:
+  - MIB: INTEL-LAN-ADAPTERS-MIB
+    table:
+      OID: 1.3.6.1.4.1.343.2.7.2.2.1.3
+      name: genericAdaptersTrafficStatsAttrTable
+    metric_type: monotonic_count
+    symbols:
+      - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.1
+        name: adapterRxPackets
+      - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.2
+        name: adapterTxPackets
+      - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.3
+        name: adapterRxBytes
+      - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.4
+        name: adapterTxBytes
+      - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.5
+        name: adapterRxErrors
+      - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.6
+        name: adapterTxErrors
+      - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.7
+        name: adapterRxDropped
+      - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.8
+        name: adapterTxDropped
+      - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.9
+        name: adapterRxMulticast
+      - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.10
+        name: adapterCollisions
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.343.2.7.2.2.1.1.1.2
+          name: adapterName
+        table: genericAdaptersAttrTable
+        tag: adapter

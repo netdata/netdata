@@ -1,0 +1,15 @@
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+  - _generic-host-resources-base.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.3097.1.5.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "watchguard"
+      type:
+        value: "firewall"

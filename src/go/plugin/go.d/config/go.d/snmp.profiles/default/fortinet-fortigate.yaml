@@ -1,0 +1,319 @@
+# Profile for Fortinet FortiGate devices
+#
+# For Fortinet FortiGate devices, the sysDescr is not a reliable source of info.
+
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+  - _fortinet-fortigate-cpu-memory.yaml
+  - _fortinet-fortigate-vpn-tunnel.yaml
+
+device:
+  vendor: "fortinet"
+
+# All fortinet devices have sysObjectID starting with `1.3.6.1.4.1.12356.101.1` (fgModel)
+# We only target Fortinet Fortigate devices (1.3.6.1.4.1.12356.101/fnFortiGateMib)
+sysobjectid: 1.3.6.1.4.1.12356.101.1.*
+
+
+# Note related to use of index `1` of entPhysicalTable columns:
+# Based on snmpwalks of Fortigate devices, the main/chassis hardware have the index `1`
+# Librennms is also using index `1`: https://github.com/librenms/librenms/blob/1ac60e3b1d90616119f3c4adc28213e3c35c2477/includes/definitions/discovery/fortigate.yaml#L10-L13
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "fortinet"
+      serial_number:
+        symbol:
+          MIB: ENTITY-MIB
+          OID: 1.3.6.1.2.1.47.1.1.1.1.11.1  # entPhysicalSerialNum OID at index `1`
+          name: entPhysicalSerialNum
+          # Examples: `FG5H1E1110000000`
+      version:
+        symbol:
+          MIB: FORTINET-FORTIGATE-MIB
+          OID: 1.3.6.1.4.1.12356.101.4.1.1.0
+          name: fgSysVersion
+          # Example fgSysVersion (Firmware version of the device)
+          # - v5.6.4,build1575,180425 (GA)
+          # - v5.4.8,build1183,180115 (GA)
+      product_name:
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.10.1  # entPhysicalName OID at index `1`
+          name: entPhysicalSoftwareRev
+          match_pattern: '^(\S+)\s+'
+          match_value: '$1'
+          # Examples: `FortiGate-1500D` from `FortiGate-1500D v5.4.8,build1183b1183,180115 (GA)`
+      model:
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.13.1  # entPhysicalModelName OID at index `1`
+          name: entPhysicalModelName
+          # Examples: `FGT_501E`
+      os_name:
+        # "FortiOS is a security-hardened, purpose-built operating system that is the software foundation of FortiGate.
+        # Control all the security and networking capabilities in all your FortiGates across your entire network with
+        # one intuitive operating system."
+        # source: 'http://www.corex.at/Produktinfos/FortiOS_6_0.pdf'
+        value: FortiOS
+      os_version:
+        # The device firmware version and FortiOS version are same
+        symbol:
+          MIB: FORTINET-FORTIGATE-MIB
+          OID: 1.3.6.1.4.1.12356.101.4.1.1.0
+          name: fgSysVersion
+          match_pattern: 'v([\d.]+)'
+          match_value: '$1'
+          # Examples: `5.6.4` from `v5.6.4,build1575,180425 (GA)`
+
+metrics:
+
+  ### CPU
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # Current CPU usage (percentage).
+      OID: 1.3.6.1.4.1.12356.101.4.1.3.0
+      name: fgSysCpuUsage
+
+  ### Processors
+  # Only valid for processors types that support these statistics.
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.4.2
+      name: fgProcessorTable
+    metric_type: monotonic_count_and_rate
+    symbols:
+      # The total number of packets received by this processor.
+      - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.6
+        name: fgProcessorPktRxCount
+      # The total number of packets transmitted by this processor.
+      - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.7
+        name: fgProcessorPktTxCount
+      # The total number of packets dropped by this processor.
+      - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.8
+        name: fgProcessorPktDroppedCount
+    metric_tags:
+      # A unique identifier within the fgProcessorTable.
+      - tag: processor_index
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.4.2.1.1
+          name: fgProcessorEntIndex
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.4.2
+      name: fgProcessorTable
+    symbols:
+      # The processor's CPU usage (percentage), which is an average calculated over the last minute.
+      - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.2
+        name: fgProcessorUsage
+      # The processor's CPU system space usage, which is an average calculated over the last minute.
+      - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.10
+        name: fgProcessorSysUsage
+    metric_tags:
+      # A unique identifier within the fgProcessorTable.
+      - tag: processor_index
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.4.2.1.1
+          name: fgProcessorEntIndex
+
+  ### Memory
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # Current memory utilization (percentage).
+      OID: 1.3.6.1.4.1.12356.101.4.1.4.0
+      name: fgSysMemUsage
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # Total physical memory (RAM) installed (KB).
+      OID: 1.3.6.1.4.1.12356.101.4.1.5.0
+      name: fgSysMemCapacity
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # Current lowmem utilization (percentage). Lowmem is memory available for the kernel's own data structures and kernel specific tables. The system can get into a bad state if it runs out of lowmem.
+      OID: 1.3.6.1.4.1.12356.101.4.1.9.0
+      name: fgSysLowMemUsage
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # Total lowmem capacity (KB). See fgSysLowMemUsage for the description of lowmem.
+      OID: 1.3.6.1.4.1.12356.101.4.1.10.0
+      name: fgSysLowMemCapacity
+
+  ### Disk
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # Current hard disk usage (MB), if disk is present.
+      OID: 1.3.6.1.4.1.12356.101.4.1.6.0
+      name: fgSysDiskUsage
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # Total hard disk capacity (MB), if disk is present.
+      OID: 1.3.6.1.4.1.12356.101.4.1.7.0
+      name: fgSysDiskCapacity
+
+  ### Virtual Domains
+  # A table of virtual domains configured on the device.
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.3.2.1
+      name: fgVdTable
+    symbols:
+      # Operation mode of the virtual domain: nat(1), transparent(2)
+      - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.3
+        name: fgVdEntOpMode
+      # HA cluster member state of the virtual domain on this device: master(1), backup(2), standalone(3)
+      - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.4
+        name: fgVdEntHaState
+      # CPU usage of the virtual domain (percentage).
+      - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.5
+        name: fgVdEntCpuUsage
+      # Memory usage of the virtual domain (percentage).
+      - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.6
+        name: fgVdEntMemUsage
+      # Number of active sessions on the virtual domain.
+      - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.7
+        name: fgVdEntSesCount
+      # The session setup rate on the virtual domain.
+      - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.8
+        name: fgVdEntSesRate
+    metric_tags:
+      - tag: virtualdomain_index
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.1
+          name: fgVdEntIndex
+      - tag: virtualdomain_name
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.2
+          name: fgVdEntName
+
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.3.2.1
+      name: fgVdTable
+    symbols:
+      - name: fgVirtualDomain
+        constant_value_one: true
+    metric_tags:
+      - tag: virtualdomain_index
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.1
+          name: fgVdEntIndex
+      - tag: virtualdomain_name
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.2
+          name: fgVdEntName
+      - tag: virtualdomain_state
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.4
+          name: fgVdEntHaState
+        mapping:
+          1: primary
+          2: secondary
+          3: standalone
+
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # The number of virtual domains in vdTable.
+      OID: 1.3.6.1.4.1.12356.101.3.1.1.0
+      name: fgVdNumber
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # The maximum number of virtual domains allowed on the device as allowed by hardware and/or licensing.
+      OID: 1.3.6.1.4.1.12356.101.3.1.2.0
+      name: fgVdMaxVdoms
+
+  ### Interfaces
+  # Fortinet specific extensions to MIB-2 ifTable.
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.7.2.1
+      name: fgIntfTable
+    symbols:
+      - OID: 1.3.6.1.4.1.12356.101.7.2.1.1.1
+        name: fgIntfEntVdom
+    metric_tags:
+      # The virtual domain the interface belongs to. This index corresponds to the index used by fgVdTable.
+      - tag: virtualdomain_index
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.1
+          name: fgVdEntIndex
+      - MIB: IF-MIB
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        table: ifXTable
+        tag: interface
+
+
+  ### Sessions
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # Number of active sessions on the device.
+      OID: 1.3.6.1.4.1.12356.101.4.1.8.0
+      name: fgSysSesCount
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # The average session setup rate over the past minute.
+      OID: 1.3.6.1.4.1.12356.101.4.1.11.0
+      name: fgSysSesRate1
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # Number of active ipv6 sessions on the device.
+      OID: 1.3.6.1.4.1.12356.101.4.1.15.0
+      name: fgSysSes6Count
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # The average ipv6 session setup rate over the past minute.
+      OID: 1.3.6.1.4.1.12356.101.4.1.16.0
+      name: fgSysSes6Rate1
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # HTTP proxy current connections.
+      OID: 1.3.6.1.4.1.12356.101.10.100.4.0
+      name: fgApHTTPConnections
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      # Maximum number of connections supported by HTTP proxy.
+      OID: 1.3.6.1.4.1.12356.101.10.100.5.0
+      name: fgApHTTPMaxConnections
+
+  ### Firewall
+  # Firewall policy statistics table.
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.5.1.2.1
+      name: fgFwPolStatsTable
+    metric_type: monotonic_count_and_rate
+    symbols:
+      # Number of packets matched to policy (passed or blocked, depending on policy action). Count is from the time the policy became active.
+      - OID: 1.3.6.1.4.1.12356.101.5.1.2.1.1.2
+        name: fgFwPolPktCount
+      # Number of bytes in packets matching the policy.
+      - OID: 1.3.6.1.4.1.12356.101.5.1.2.1.1.3
+        name: fgFwPolByteCount
+    metric_tags:
+      # Internal virtual domain index used to uniquely identify rows in this table. This index is also used by other tables referencing a virtual domain.
+      - index: 1
+        tag: virtualdomain_index
+      # Firewall policy ID. Only enabled policies are present in this table. Policy IDs are only unique within a virtual domain.
+      - index: 2
+        tag: policy_index
+  # Firewall policy6 statistics table.
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.5.1.2.2
+      name: fgFwPol6StatsTable
+    metric_type: monotonic_count_and_rate
+    symbols:
+      # Number of packets matched to policy (passed or blocked, depending on policy action). Count is from the time the policy became active.
+      - OID: 1.3.6.1.4.1.12356.101.5.1.2.2.1.2
+        name: fgFwPol6PktCount
+      # Number of bytes in packets matching the policy. See fgFwPol6PktCount.
+      - OID: 1.3.6.1.4.1.12356.101.5.1.2.2.1.3
+        name: fgFwPol6ByteCount
+    metric_tags:
+      # Internal virtual domain index used to uniquely identify rows in this table. This index is also used by other tables referencing a virtual domain.
+      - index: 1
+        tag: virtualdomain_index
+      # Firewall policy6 ID. Only enabled policies are present in this table. Policy IDs are only unique within a virtual domain.
+      - index: 2
+        tag: policy6_index

@@ -1,0 +1,176 @@
+extends:
+  - _dell.yaml
+  - _generic-if.yaml
+
+metadata:
+  device:
+    fields:
+      version:
+        symbol:
+          MIB: Dell-Vendor-MIB
+          OID: 1.3.6.1.4.1.674.10895.3000.1.2.100.4.0
+          name: productIdentificationVersion
+      type:
+        value: "switch"
+
+sysobjectid:
+  - 1.3.6.1.4.1.674.10895.*       # PowerConnect
+  - 1.3.6.1.4.1.674.10895.3008    # PowerConnect 3424P
+  - 1.3.6.1.4.1.674.10895.3009    # PowerConnect 3448P
+  - 1.3.6.1.4.1.674.10895.3010    # PowerConnect 6224
+  - 1.3.6.1.4.1.674.10895.3011    # PowerConnect 6248
+  - 1.3.6.1.4.1.674.10895.3012    # PowerConnect 6224P
+  - 1.3.6.1.4.1.674.10895.3013    # PowerConnect 6248P
+  - 1.3.6.1.4.1.674.10895.3014    # PowerConnect 6224F
+  - 1.3.6.1.4.1.674.10895.3015    # PowerConnect M6220
+  - 1.3.6.1.4.1.674.10895.3017    # PowerConnect 3548
+  - 1.3.6.1.4.1.674.10895.3018    # PowerConnect 3524P
+  - 1.3.6.1.4.1.674.10895.3019    # PowerConnect 3548P
+  - 1.3.6.1.4.1.674.10895.3020    # PowerConnect 5424
+  - 1.3.6.1.4.1.674.10895.3022    # PowerConnect M8024
+  - 1.3.6.1.4.1.674.10895.3023    # PowerConnect 8024
+  - 1.3.6.1.4.1.674.10895.3024    # PowerConnect 8024F
+  - 1.3.6.1.4.1.674.10895.3025    # PowerConnect M6384
+  - 1.3.6.1.4.1.674.10895.3034    # PowerConnect 7024
+  - 1.3.6.1.4.1.674.10895.3035    # PowerConnect 7048
+  - 1.3.6.1.4.1.674.10895.3036    # PowerConnect 7024P
+  - 1.3.6.1.4.1.674.10895.3037    # PowerConnect 7048P
+  - 1.3.6.1.4.1.674.10895.3038    # PowerConnect 7024F
+  - 1.3.6.1.4.1.674.10895.3039    # PowerConnect 7048R
+  - 1.3.6.1.4.1.674.10895.3040    # PowerConnect 7048RRA
+  - 1.3.6.1.4.1.674.10895.3041    # PowerConnect M8024K
+  - 1.3.6.1.4.1.674.10895.3042    # PowerConnect N4032
+  - 1.3.6.1.4.1.674.10895.3044    # PowerConnect N4032F
+  - 1.3.6.1.4.1.674.10895.3045    # PowerConnect N4064
+  - 1.3.6.1.4.1.674.10895.3046    # PowerConnect N4064F
+  - 1.3.6.1.4.1.674.10895.3053    # PowerConnect N2024
+  - 1.3.6.1.4.1.674.10895.3054    # PowerConnect N2048
+  - 1.3.6.1.4.1.674.10895.3055    # PowerConnect N2024P
+  - 1.3.6.1.4.1.674.10895.3056    # PowerConnect N2048P
+  - 1.3.6.1.4.1.674.10895.3057    # PowerConnect N3024
+  - 1.3.6.1.4.1.674.10895.3058    # PowerConnect N3048
+  - 1.3.6.1.4.1.674.10895.3059    # PowerConnect N3024P
+  - 1.3.6.1.4.1.674.10895.3060    # PowerConnect N3048P
+  - 1.3.6.1.4.1.674.10895.3061    # PowerConnect N3024F
+  - 1.3.6.1.4.1.674.10895.3063    # PowerConnect N1524
+  - 1.3.6.1.4.1.674.10895.3064    # PowerConnect N1524P
+  - 1.3.6.1.4.1.674.10895.3065    # PowerConnect N1548
+  - 1.3.6.1.4.1.674.10895.3066    # PowerConnect N1548P
+  - 1.3.6.1.4.1.674.10895.3076    # PowerConnect N3132PX
+  - 1.3.6.1.4.1.674.10895.3077    # PowerConnect N2128PX
+  - 1.3.6.1.4.1.674.10895.3078    # PowerConnect N1108T-ON
+  - 1.3.6.1.4.1.674.10895.3079    # PowerConnect N1108P-ON
+  - 1.3.6.1.4.1.674.10895.3080    # PowerConnect N1124T-ON
+  - 1.3.6.1.4.1.674.10895.3081    # PowerConnect N1124P-ON
+  - 1.3.6.1.4.1.674.10895.3082    # PowerConnect N1148T-ON
+  - 1.3.6.1.4.1.674.10895.3083    # PowerConnect N1148P-ON
+  - 1.3.6.1.4.1.674.10895.3084    # PowerConnect N3048EP-ON
+  - 1.3.6.1.4.1.674.10895.3085    # PowerConnect N3048ET-ON
+  - 1.3.6.1.4.1.674.10895.3086    # PowerConnect N3024EP-ON
+  - 1.3.6.1.4.1.674.10895.3087    # PowerConnect N3024EF-ON
+  - 1.3.6.1.4.1.674.10895.3088    # PowerConnect N3024ET-ON
+  - 1.3.6.1.4.1.674.10895.3089    # PowerConnect N1608X-ON
+  - 1.3.6.1.4.1.674.10895.3090    # PowerConnect N1608PX-ON
+  - 1.3.6.1.4.1.674.10895.3091    # PowerConnect N1616X-ON
+  - 1.3.6.1.4.1.674.10895.3092    # PowerConnect N1616PX-ON
+  - 1.3.6.1.4.1.674.10895.3093    # PowerConnect N1624X-ON
+  - 1.3.6.1.4.1.674.10895.3094    # PowerConnect N1624PX-ON
+  - 1.3.6.1.4.1.674.10895.3095    # PowerConnect N1648X-ON
+  - 1.3.6.1.4.1.674.10895.3096    # PowerConnect N1648PX-ON
+  - 1.3.6.1.4.1.674.10895.3097    # PowerConnect N2224X-ON
+  - 1.3.6.1.4.1.674.10895.3098    # PowerConnect N2224PX-ON
+  - 1.3.6.1.4.1.674.10895.3099    # PowerConnect N2248X-ON
+  - 1.3.6.1.4.1.674.10895.3100    # PowerConnect N2248PX-ON
+  - 1.3.6.1.4.1.674.10895.3104    # PowerConnect NN3208PX-ON
+  - 1.3.6.1.4.1.674.10895.3105    # PowerConnect N3224X-ON
+  - 1.3.6.1.4.1.674.10895.3106    # PowerConnect N3224PX-ON
+  - 1.3.6.1.4.1.674.10895.3107    # PowerConnect N3248X-ON
+  - 1.3.6.1.4.1.674.10895.3109    # PowerConnect N3248PXE-ON
+  - 1.3.6.1.4.1.674.10895.3110    # PowerConnect N3224T-ON
+  - 1.3.6.1.4.1.674.10895.3111    # PowerConnect N3224F-ON
+  - 1.3.6.1.4.1.674.10895.3112    # PowerConnect N3224P-ON
+  - 1.3.6.1.4.1.674.10895.3113    # PowerConnect N3248TE-ON
+  - 1.3.6.1.4.1.674.10895.3114    # PowerConnect N3248P-ON
+  - 1.3.6.1.4.1.674.10895.3115    # PowerConnect N1108EP-ON
+
+metrics:
+  - MIB: DNOS-SWITCHING-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.9.0
+      extract_value: 60 Secs.*?(\d+[.]?\d+)
+  - MIB: DNOS-SWITCHING-MIB
+    symbol:
+      name: memory.free
+      OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.1.0
+  - MIB: DNOS-SWITCHING-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.2.0
+#  - MIB: Dell-Vendor-MIB
+#    symbol:
+#      name: productStatusGlobalStatus
+#      OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.1.0
+#      enum:
+#        ok: 3
+#        non-critical: 4
+#        critical: 5
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+  - MIB: Dell-Vendor-MIB
+    table:
+      name: dell.envMonFanStatusTable
+      OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1
+    symbols:
+      - name: dell.envMonFanSpeed
+        OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.4
+    metric_tags:
+      - symbol:
+          name: dell.envMonFanStatusDescr
+          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.2
+        tag: dell_env_mon_fan_status_descr
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.3
+          name: dell.envMonFanState
+        tag: dell_env_mon_fan_state
+        mapping:
+          1: normal
+          2: warning
+          3: critical
+          4: shutdown
+          5: not_present
+          6: not_functioning
+  - MIB: Dell-Vendor-MIB
+    table:
+      name: dell.envMonSupplyStatusTable
+      OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2
+    symbols:
+      - name: dell.envMonSupplyCurrentPower
+        OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.5
+      - name: dell.envMonSupplyAveragePower
+        OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.6
+    metric_tags:
+      - symbol:
+          name: dell.envMonSupplyStatusDescr
+          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.2
+        tag: dell_env_mon_supply_status_descr
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.3
+          name: dell.envMonSupplyState
+        tag: dell_env_mon_supply_state
+        mapping:
+          1: normal
+          2: warning
+          3: critical
+          4: shutdown
+          5: not_present
+          6: not_functioning
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.4
+          name: dell.envMonSupplySource
+        tag: dell_env_mon_supply_source
+        mapping:
+          1: unknown
+          2: ac
+          3: dc
+          4: external_power_supply
+          5: internal_redundant

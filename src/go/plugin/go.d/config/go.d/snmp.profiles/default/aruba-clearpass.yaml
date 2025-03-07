@@ -1,0 +1,228 @@
+extends:
+  - aruba.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.14823.1.6.1
+metrics:
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.2.1.25.3.3.1.2.196608
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: memory.total
+      OID: 1.3.6.1.4.1.2021.4.5.0
+  - MIB: UCD-SNMP-MIB
+    symbol:
+      name: memory.free
+      OID: 1.3.6.1.4.1.2021.4.6.0
+  - MIB: CPPM-MIB
+    table:
+      name: cppmSystemTable
+      OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1
+    symbols:
+      - name: cppmSystemMemoryTotal
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.12
+      - name: cppmSystemMemoryFree
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.13
+      - name: cppmSystemDiskSpaceTotal
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.14
+      - name: cppmSystemDiskSpaceFree
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.15
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.4
+          name: cppmSystemHostname
+        tag: cppm_system_hostname
+  - MIB: CPPM-MIB
+    table:
+      name: radiusServerTable
+      OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1
+    symbols:
+      - name: radPolicyEvalTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.1
+      - name: radAuthRequestTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.2
+      - name: radServerCounterSuccess
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.3
+      - name: radServerCounterFailure
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.4
+      - name: radServerCounterCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.5
+    metric_tags:
+      - table: cppmSystemTable
+        symbol:
+          OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.4
+          name: cppmSystemHostname
+        tag: cppm_system_hostname
+  - MIB: CPPM-MIB
+    table:
+      name: radiusServerAuthTable
+      OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2
+    symbols:
+      - name: radAuthCounterSuccess
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.3
+      - name: radAuthCounterFailure
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.4
+      - name: radAuthCounterCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.5
+      - name: radAuthCounterTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.6
+    metric_tags:
+      - symbol:
+          name: radAuthSourceName
+          OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.2
+        tag: rad_auth_source_name
+  - MIB: CPPM-MIB
+    table:
+      name: policyServerTable
+      OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3
+    symbols:
+      - name: psServicePolicyEvalCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.1
+      - name: psRolemappingPolicyEvalCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.2
+      - name: psPosturePolicyEvalCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.3
+      - name: psAuditPolicyEvalCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.4
+      - name: psRestrictionPolicyEvalCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.5
+      - name: psEnforcementPolicyEvalCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.6
+      - name: psServicePolicyEvalTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.7
+      - name: psRolemappingPolicyEvalTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.8
+      - name: psPosturePolicyEvalTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.9
+      - name: psAuditPolicyEvalTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.10
+      - name: psRestrictionPolicyEvalTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.11
+      - name: psEnforcementPolicyEvalTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.12
+      - name: psSessionlogTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.13
+      - name: psAuthCounterSuccess
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.14
+      - name: psAuthCounterFailure
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.15
+      - name: psAuthCounterTotal
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.16
+      - name: dailySuccessAuthCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.17
+      - name: dailyFailedAuthCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.18
+      - name: dailyTotalAuthCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.19
+    metric_tags:
+      - table: cppmSystemTable
+        symbol:
+          OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.4
+          name: cppmSystemHostname
+        tag: cppm_system_hostname
+  - MIB: CPPM-MIB
+    table:
+      name: policyServerAutzTable
+      OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5
+    symbols:
+      - name: psAutzCounterSuccess
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.3
+      - name: psAutzCounterFailure
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.4
+      - name: psAutzCounterCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.5
+      - name: psAutzCounterTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.6
+    metric_tags:
+      - symbol:
+          name: psAutzSourceName
+          OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.2
+        tag: ps_autz_source_name
+  - MIB: CPPM-MIB
+    table:
+      name: tacacsAuthTable
+      OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7
+    symbols:
+      - name: tacAuthCounterSuccess
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.1
+      - name: tacAuthCounterFailure
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.2
+      - name: tacAuthCounterCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.3
+      - name: tacAuthCounterTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.4
+      - name: tacAuthCounterAuthTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.5
+      - name: tacServicePolicyEvalTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.6
+      - name: tacPolicyEvalTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.7
+    metric_tags:
+      - table: cppmSystemTable
+        symbol:
+          OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.4
+          name: cppmSystemHostname
+        tag: cppm_system_hostname
+  - MIB: CPPM-MIB
+    table:
+      name: tacacsAutzTable
+      OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8
+    symbols:
+      - name: tacAutzCounterSuccess
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.1
+      - name: tacAutzCounterFailure
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.2
+      - name: tacAutzCounterCount
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.3
+      - name: tacAutzCounterTime
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.4
+    metric_tags:
+      - table: cppmSystemTable
+        symbol:
+          OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.4
+          name: cppmSystemHostname
+        tag: cppm_system_hostname
+  - MIB: CPPM-MIB
+    table:
+      name: networkTrafficTable
+      OID: 1.3.6.1.4.1.14823.1.6.1.1.3.1
+    symbols:
+      - name: nwAppPort
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.3.1.1.3
+      - name: nwTrafficTotal
+        OID: 1.3.6.1.4.1.14823.1.6.1.1.3.1.1.4
+    metric_tags:
+      - symbol:
+          name: nwAppName
+          OID: 1.3.6.1.4.1.14823.1.6.1.1.3.1.1.2
+        tag: nw_app_name
+metric_tags:
+  - OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.3.0
+    symbol: cppmSystemVersion
+    tag: cppm_system_version
+  - OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.5.0
+    symbol: cppmClusterNodeType
+    tag: cppm_cluster_node_type
+  - OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.6.0
+    symbol: cppmZoneName
+    tag: cppm_zone_name
+  - OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.7.0
+    symbol: cppmNumClusterNodes
+    tag: cppm_num_cluster_nodes
+  - OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.8.0
+    symbol: cppmNwMgmtPortIPAddress
+    tag: cppm_nw_mgmt_port_ip_address
+  - OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.9.0
+    symbol: cppmNwMgmtPortMACAddress
+    tag: cppm_nw_mgmt_port_mac_address
+  - OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.10.0
+    symbol: cppmNwDataPortIPAddress
+    tag: cppm_nw_data_port_ip_address
+  - OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.11.0
+    symbol: cppmNwDataPortMACAddress
+    tag: cppm_nw_data_port_mac_address
+  - OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.16.0
+    symbol: cppmSystemNumCPUs
+    tag: cppm_system_num_cp_us

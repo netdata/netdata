@@ -1,0 +1,10 @@
+# Profile for Dell devices
+
+extends:
+  - _base.yaml
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "dell"
