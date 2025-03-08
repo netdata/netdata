@@ -63,6 +63,7 @@ struct netdata_static_thread {
 
 #define NETDATA_THREAD_TAG_MAX 100
 const char *nd_thread_tag(void);
+const char *nd_thread_tag_async_safe(void);
 int nd_thread_has_tag(void);
 
 #define THREAD_TAG_STREAM_RECEIVER "RCVR"
