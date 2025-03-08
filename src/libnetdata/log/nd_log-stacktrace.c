@@ -18,6 +18,10 @@ void capture_stack_trace_flush(void) {
     unw_flush_cache(unw_local_addr_space, 0, 0);
 }
 
+bool capture_stack_trace_is_async_signal_safe(void) {
+    return true;
+}
+
 void capture_stack_trace(BUFFER *wb) {
     // this function is async-signal-safe, if the buffer has enough space to hold the stack trace
 
@@ -72,6 +76,10 @@ void capture_stack_trace_init(void) {
 
 void capture_stack_trace_flush(void) {
     ;
+}
+
+bool capture_stack_trace_is_async_signal_safe(void) {
+    return false;
 }
 
 void capture_stack_trace(BUFFER *wb) {
@@ -135,6 +143,10 @@ void capture_stack_trace_init(void) {
 
 void capture_stack_trace_flush(void) {
     ;
+}
+
+bool capture_stack_trace_is_async_signal_safe(void) {
+    return false;
 }
 
 void capture_stack_trace(BUFFER *wb) {

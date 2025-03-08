@@ -43,11 +43,16 @@ static void signal_handler(int signo) {
             daemon_status_file_deadly_signal_received(signals_waiting[i].reason);
 
             // log it
-            char buffer[200 + 1];
-            snprintfz(buffer, sizeof(buffer) - 1, "\nSIGNAL HANDLER: received: %s in thread %d!\n",
-                      signals_waiting[i].name, gettid_cached());
+            char b[512];
+            strncpyz(b, "SIGNAL HANDLER: received deadly signal: ", sizeof(b) - 1);
+            strcat(b, signals_waiting[i].name);
+            strcat(b, " in thread ");
+            print_uint64(&b[strlen(b)], gettid_cached());
+            strcat(b, " ");
+            strcat(b, nd_thread_tag_async_safe());
+            strcat(b, "!\n");
 
-            if(write(STDERR_FILENO, buffer, strlen(buffer)) == -1) {
+            if(write(STDERR_FILENO, b, strlen(b)) == -1) {
                 // nothing to do - we cannot write but there is no way to complain about it
                 ;
             }

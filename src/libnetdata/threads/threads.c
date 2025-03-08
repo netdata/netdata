@@ -130,6 +130,13 @@ const char *nd_thread_tag(void) {
     return nd_thread_get_name(false);
 }
 
+const char *nd_thread_tag_async_safe(void) {
+    if(nd_thread_has_tag())
+        return _nd_thread_info->tag;
+
+    return _nd_thread_os_name;
+}
+
 void nd_thread_tag_set(const char *tag) {
     if(!tag || !*tag) return;
 
