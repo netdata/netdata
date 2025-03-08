@@ -254,6 +254,10 @@ struct sched_def {
         // the available members are important too!
         // these are all the possible scheduling policies supported by netdata
 
+    // do not change the scheduling priority
+    { "keep", 0, 0, SCHED_FLAG_KEEP_AS_IS },
+    { "none", 0, 0, SCHED_FLAG_KEEP_AS_IS },
+
 #ifdef SCHED_BATCH
         { "batch", SCHED_BATCH, 0, SCHED_FLAG_USE_NICE },
 #endif
@@ -274,10 +278,6 @@ struct sched_def {
 #ifdef SCHED_FIFO
         { "fifo", SCHED_FIFO, 0, SCHED_FLAG_PRIORITY_CONFIGURABLE },
 #endif
-
-        // do not change the scheduling priority
-        { "keep", 0, 0, SCHED_FLAG_KEEP_AS_IS },
-        { "none", 0, 0, SCHED_FLAG_KEEP_AS_IS },
 
         // array termination
         { NULL, 0, 0, 0 }
