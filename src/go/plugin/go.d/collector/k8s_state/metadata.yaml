@@ -57,7 +57,15 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: k8s_state_deployment_condition_available
+        metric: k8s_state.deployment_conditions
+        info: 'Deployment ${label:k8s_deployment_name} does not have the minimum required replicas'
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8sstate.conf
+      - name: k8s_state_cronjob_last_execution_failed
+        metric: k8s_state.cronjob_last_execution_status
+        info: 'CronJob ${label:k8s_cronjob_name} in ${label:k8s_namespace} failing'
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8sstate.conf
     metrics:
       folding:
         title: Metrics
