@@ -119,7 +119,7 @@ static const char** argv_decode(const char *buffer, size_t size) {
 // --------------------------------------------------------------------------------------------------------------------
 // status reports
 
-typedef enum __attribute__((packed)) {
+typedef enum {
     STATUS_REPORT_NONE = 0,
     STATUS_REPORT_STARTED,
     STATUS_REPORT_FAILED,

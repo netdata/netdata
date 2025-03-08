@@ -3,12 +3,16 @@
 #include "../libnetdata.h"
 
 void signals_block_all(void) {
+#if defined(FSANITIZE)
+    ;
+#else
     sigset_t sigset;
     sigfillset(&sigset);
 
     if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "SIGNALS: cannot apply the default mask for signals");
+#endif
 }
 
 void signals_unblock_one(int signo) {
@@ -35,8 +39,12 @@ void signals_unblock(int signals[], size_t count) {
 }
 
 void signals_unblock_deadly(void) {
+#if defined(FSANITIZE)
+    ;
+#else
     int deadly_signals[] = {SIGBUS, SIGSEGV, SIGFPE, SIGILL, SIGABRT};
     signals_unblock(deadly_signals, _countof(deadly_signals));
+#endif
 }
 
 void signals_block_all_except_deadly(void) {

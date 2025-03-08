@@ -4,7 +4,13 @@
 #include "stream-sender-internals.h"
 #include "stream-replication-sender.h"
 
-static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, STREAM_HANDSHAKE receiver_reason, bool reconnect);
+// help the IDE detect use after free
+#define stream_sender_move_running_to_connector_or_remove(sth, s, reason, receiver_reason, reconnect) do {      \
+        stream_sender_move_running_to_connector_or_remove_internal(sth, s, reason, receiver_reason, reconnect); \
+        (s) = NULL;                                                                                             \
+} while(0)
+
+static void stream_sender_move_running_to_connector_or_remove_internal(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, STREAM_HANDSHAKE receiver_reason, bool reconnect);
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -404,7 +410,7 @@ static void stream_sender_log_disconnection(struct stream_thread *sth, struct se
                sth->id, rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(reason));
 }
 
-static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, STREAM_HANDSHAKE receiver_reason, bool reconnect) {
+static void stream_sender_move_running_to_connector_or_remove_internal(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, STREAM_HANDSHAKE receiver_reason, bool reconnect) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     ND_LOG_STACK lgs[] = {
@@ -714,6 +720,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
                 // this is not executed from the opcode handling mechanism
                 // so we can safely remove the sender
                 stream_sender_move_running_to_connector_or_remove(sth, s, reason, 0, true);
+                break;
             }
             else {
                 // protection against this case:
@@ -783,8 +790,8 @@ bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *
                    "STREAM SND[%zu] '%s' [to %s]: %s (fd %d) - restarting sender connection.",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip, disconnect_reason, s->sock.fd);
 
-            stream_sender_move_running_to_connector_or_remove(
-                sth, s, reason, 0, true);
+            stream_sender_move_running_to_connector_or_remove(sth, s, reason, 0, true);
+            break;
         }
         else if(status == EVLOOP_STATUS_CONTINUE && process_opcodes && stream_thread_process_opcodes(sth, &s->thread.meta))
             status = EVLOOP_STATUS_OPCODE_ON_ME;

@@ -87,6 +87,9 @@ static void posix_unmask_my_signals(void) {
 }
 
 void nd_initialize_signals(void) {
+#if defined(FSANITIZE)
+    ;
+#else
     signals_block_all_except_deadly();
 
     // Catch signals which we want to use
@@ -109,6 +112,7 @@ void nd_initialize_signals(void) {
         if(sigaction(signals_waiting[i].signo, &sa, NULL) == -1)
             netdata_log_error("SIGNAL: Failed to change signal handler for: %s", signals_waiting[i].name);
     }
+#endif
 }
 
 static void process_triggered_signals(void) {
@@ -161,6 +165,10 @@ static void process_triggered_signals(void) {
 }
 
 void nd_process_signals(void) {
+#if defined(FSANITIZE)
+    while(true)
+        pause();
+#else
     posix_unmask_my_signals();
     const usec_t save_every_ut = 15 * 60 * USEC_PER_SEC;
     usec_t last_update_mt = now_monotonic_usec();
@@ -175,4 +183,5 @@ void nd_process_signals(void) {
         poll(NULL, 0, 13 * MSEC_PER_SEC + 379);
         process_triggered_signals();
     }
+#endif
 }
