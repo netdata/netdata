@@ -163,17 +163,16 @@ static void process_triggered_signals(void) {
 void nd_process_signals(void) {
     posix_unmask_my_signals();
     const usec_t save_every_ut = 15 * 60 * USEC_PER_SEC;
-    usec_t last_update_ut = now_monotonic_usec() - (now_realtime_usec() % save_every_ut);
+    usec_t last_update_mt = now_monotonic_usec();
 
     while (true) {
-        usec_t now_ut = now_monotonic_usec();
-        if ((now_ut - last_update_ut) >= save_every_ut) {
-            // this will save about 100 times per day
+        usec_t mt = now_monotonic_usec();
+        if ((mt - last_update_mt) >= save_every_ut) {
             daemon_status_file_update_status(DAEMON_STATUS_NONE);
-            last_update_ut += save_every_ut;
+            last_update_mt += save_every_ut;
         }
 
-        poll(NULL, 0, 13 * MSEC_PER_SEC + 379); // don't align with anything else
+        poll(NULL, 0, 13 * MSEC_PER_SEC + 379);
         process_triggered_signals();
     }
 }
