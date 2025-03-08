@@ -49,7 +49,7 @@ void store_metric_at_tier_flush_last_completed(RRDDIM *rd __maybe_unused, size_t
 }
 
 ALWAYS_INLINE_HOT
-void store_metric_at_tier_save_last_completed(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp) {
+static void store_metric_at_tier_save_last_completed(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp) {
     // make sure the last_completed_point is empty
     store_metric_at_tier_flush_last_completed(rd, tier, t);
 

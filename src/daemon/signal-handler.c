@@ -87,7 +87,7 @@ static void posix_unmask_my_signals(void) {
 }
 
 void nd_initialize_signals(void) {
-#if defined(FSANITIZE)
+#if defined(FSANITIZE_ADDRESS)
     ;
 #else
     signals_block_all_except_deadly();
@@ -165,7 +165,7 @@ static void process_triggered_signals(void) {
 }
 
 void nd_process_signals(void) {
-#if defined(FSANITIZE)
+#if defined(FSANITIZE_ADDRESS)
     while(true)
         pause();
 #else

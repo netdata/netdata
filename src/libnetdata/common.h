@@ -335,7 +335,7 @@ typedef uint32_t uid_t;
 
 #define UNUSED(x) (void)(x)
 
-#if defined(__GNUC__) && !defined(FSANITIZE)
+#if defined(__GNUC__) && !defined(FSANITIZE_ADDRESS)
 #define UNUSED_FUNCTION(x) __attribute__((unused)) UNUSED_##x
 #define ALWAYS_INLINE_ONLY __attribute__((always_inline))
 #define ALWAYS_INLINE inline __attribute__((always_inline))             // Forces inlining
