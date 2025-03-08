@@ -2397,3 +2397,281 @@ modules:
               chart_type: line
               dimensions:
                 - name: processing_time
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibADFS
+      monitored_instance:
+        name: Active Directory Federation Service
+        link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-fs/ad-fs-overview"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - active directory
+        - adfs
+        - ad
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Active Directory Federation Services statistics.
+        method_description: |
+          It queries 'AD FS' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibADFS
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Federation Service
+          description: "These metrics refer to the Federated Identity and Access Management on host."
+          labels: []
+          metrics:
+            - name: adfs.ad_login_connection_failures
+              description: Connection failures
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: connection
+            - name: adfs.certificate_authentications
+              description: User Certificate authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: authentications
+            - name: adfs.db_artifact_failures
+              description: Connection failures to the artifact database
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: connection
+            - name: adfs.db_artifact_query_time_seconds
+              description: Time taken for an artifact database query
+              unit: seconds/s
+              chart_type: line
+              dimensions:
+                - name: query_time
+            - name: adfs.db_config_failures
+              description: Connection failures to the configuration database
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: connection
+            - name: adfs.db_config_query_time_seconds
+              description: Time taken for a configuration database query
+              unit: seconds/s
+              chart_type: line
+              dimensions:
+                - name: query_time
+            - name: adfs.device_authentications
+              description: Device authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: authentications
+            - name: adfs.external_authentications
+              description: Authentications from external MFA providers
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.federated_authentications
+              description: Authentications from Federated Sources
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: authentications
+            - name: adfs.federation_metadata_requests
+              description: Federation Metadata requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: adfs.oauth_authorization_requests
+              description: Incoming requests to the OAuth Authorization endpoint
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: adfs.oauth_client_authentications
+              description: OAuth client credentials requests
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.oauth_client_credentials_requests
+              description: OAuth client credentials requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.oauth_client_privkey_jwt_authentications
+              description: OAuth client private key JWT authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.oauth_client_secret_basic_authentications
+              description: OAuth client secret basic authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.oauth_client_secret_basic_authentications
+              description: OAuth client secret basic authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.oauth_client_secret_post_authentications
+              description: OAuth client secret post authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.oauth_client_windows_authentications
+              description: OAuth client windows integrated authentications
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.oauth_logon_certificate_requests
+              description: OAuth logon certificate requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.oauth_password_grant_requests
+              description: OAuth password grant requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.oauth_token_requests_success
+              description: Successful RP token requests over OAuth protocol
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: adfs.passive_requests
+              description: Passive requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: passive
+            - name: adfs.passport_authentications
+              description: Microsoft Passport SSO authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: passport
+            - name: adfs.password_change_requests
+              description: Password change requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.samlp_token_requests_success
+              description: Successful RP token requests over SAML-P protocol
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: adfs.sso_authentications
+              description: SSO authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.token_requests
+              description: Token access requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: adfs.userpassword_authentications
+              description: AD U/P authentications
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+            - name: adfs.windows_integrated_authentications
+              description: Windows integrated authentications using Kerberos or NTLM
+              unit: authentications/s
+              chart_type: line
+              dimensions:
+                - name: authentications
+            - name: adfs.wsfed_token_requests_success
+              description: Successful RP token requests over WS-Fed protocol
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: adfs.wstrust_token_requests_success
+              description: Successful RP token requests over WS-Trust protocol
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
