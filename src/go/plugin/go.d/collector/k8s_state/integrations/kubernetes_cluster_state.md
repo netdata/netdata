@@ -202,7 +202,13 @@ Metrics:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ k8s_state_deployment_condition_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8sstate.conf) | k8s_state.deployment_conditions | Deployment ${label:k8s_deployment_name} does not have the minimum required replicas |
+| [ k8s_state_cronjob_last_execution_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8sstate.conf) | k8s_state.cronjob_last_execution_status | CronJob ${label:k8s_cronjob_name} in ${label:k8s_namespace} failing |
 
 
 ## Setup
