@@ -111,63 +111,70 @@ void nd_initialize_signals(void) {
     }
 }
 
+static void process_triggered_signals(void) {
+    size_t found;
+    do {
+        found = 0;
+        for (size_t i = 0; i < _countof(signals_waiting) ; i++) {
+            if (!signals_waiting[i].count)
+                continue;
+
+            found++;
+            signals_waiting[i].count = 0;
+            const char *name = signals_waiting[i].name;
+
+            switch (signals_waiting[i].action) {
+                case NETDATA_SIGNAL_RELOAD_HEALTH:
+                    nd_log_limits_unlimited();
+                    netdata_log_info("SIGNAL: Received %s. Reloading HEALTH configuration...", name);
+                    nd_log_limits_reset();
+                    execute_command(CMD_RELOAD_HEALTH, NULL, NULL);
+                    break;
+
+                case NETDATA_SIGNAL_REOPEN_LOGS:
+                    nd_log_limits_unlimited();
+                    netdata_log_info("SIGNAL: Received %s. Reopening all log files...", name);
+                    nd_log_limits_reset();
+                    execute_command(CMD_REOPEN_LOGS, NULL, NULL);
+                    break;
+
+                case NETDATA_SIGNAL_EXIT_CLEANLY:
+                    nd_log_limits_unlimited();
+                    netdata_log_info("SIGNAL: Received %s. Cleaning up to exit...", name);
+                    commands_exit();
+                    netdata_cleanup_and_exit(signals_waiting[i].reason, NULL, NULL, NULL);
+                    exit(0);
+                    break;
+
+                case NETDATA_SIGNAL_DEADLY:
+                    nd_log_limits_unlimited();
+                    daemon_status_file_deadly_signal_received(signals_waiting[i].reason);
+                    _exit(1);
+                    break;
+
+                default:
+                    netdata_log_info("SIGNAL: Received %s. No signal handler configured. Ignoring it.", name);
+                    break;
+            }
+        }
+    } while(found);
+}
+
 void nd_process_signals(void) {
     posix_unmask_my_signals();
+    const usec_t save_every_ut = 15 * 60 * USEC_PER_SEC;
+    usec_t now_ut = now_realtime_usec();
+    usec_t last_update_ut = now_ut - (now_ut % save_every_ut);
 
-    while(true) {
-        sleep(10 * 60);
+    while (true) {
+        now_ut = now_realtime_usec();
+        if ((now_ut - last_update_ut) >= save_every_ut) {
+            // this will save about 100 times per day
+            daemon_status_file_update_status(DAEMON_STATUS_NONE);
+            last_update_ut += save_every_ut;
+        }
 
-        daemon_status_file_update_status(DAEMON_STATUS_NONE);
-        errno_clear();
-
-        // loop once, but keep looping while signals are coming in,
-        // this is needed because a few operations may take some time
-        // so we need to check for new signals before pausing again
-        size_t found;
-        do {
-            found = 0;
-            for (size_t i = 0; i < _countof(signals_waiting) ; i++) {
-                if (!signals_waiting[i].count)
-                    continue;
-
-                found++;
-                signals_waiting[i].count = 0;
-                const char *name = signals_waiting[i].name;
-
-                switch (signals_waiting[i].action) {
-                    case NETDATA_SIGNAL_RELOAD_HEALTH:
-                        nd_log_limits_unlimited();
-                        netdata_log_info("SIGNAL: Received %s. Reloading HEALTH configuration...", name);
-                        nd_log_limits_reset();
-                        execute_command(CMD_RELOAD_HEALTH, NULL, NULL);
-                        break;
-
-                    case NETDATA_SIGNAL_REOPEN_LOGS:
-                        nd_log_limits_unlimited();
-                        netdata_log_info("SIGNAL: Received %s. Reopening all log files...", name);
-                        nd_log_limits_reset();
-                        execute_command(CMD_REOPEN_LOGS, NULL, NULL);
-                        break;
-
-                    case NETDATA_SIGNAL_EXIT_CLEANLY:
-                        nd_log_limits_unlimited();
-                        netdata_log_info("SIGNAL: Received %s. Cleaning up to exit...", name);
-                        commands_exit();
-                        netdata_cleanup_and_exit(signals_waiting[i].reason, NULL, NULL, NULL);
-                        exit(0);
-                        break;
-
-                    case NETDATA_SIGNAL_DEADLY:
-                        nd_log_limits_unlimited();
-                        daemon_status_file_deadly_signal_received(signals_waiting[i].reason);
-                        _exit(1);
-                        break;
-
-                    default:
-                        netdata_log_info("SIGNAL: Received %s. No signal handler configured. Ignoring it.", name);
-                        break;
-                }
-            }
-        } while(found);
+        poll(NULL, 0, 13 * MSEC_PER_SEC + 379); // don't align with anything else
+        process_triggered_signals();
     }
 }
