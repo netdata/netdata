@@ -129,6 +129,14 @@ void capture_stack_trace(BUFFER *wb) {
 
 #else
 
+void capture_stack_trace_init(void) {
+    ;
+}
+
+void capture_stack_trace_flush(void) {
+    ;
+}
+
 void capture_stack_trace(BUFFER *wb) {
     buffer_strcat(wb, NO_STACK_TRACE_PREFIX "no back-end available");
 
