@@ -375,31 +375,69 @@ func (c *Collector) collectCronJobState(mx map[string]int64) {
 		px := fmt.Sprintf("cronjob_%s_", st.id())
 
 		mx[px+"age"] = int64(now.Sub(st.creationTime).Seconds())
+		if st.lastScheduleTime != nil {
+			mx[px+"last_schedule_seconds_ago"] = int64(now.Sub(*st.lastScheduleTime).Seconds())
+		}
+		if st.lastSuccessfulTime != nil {
+			mx[px+"last_successful_seconds_ago"] = int64(now.Sub(*st.lastSuccessfulTime).Seconds())
+		}
 
 		mx[px+"running_jobs"] = 0
 		mx[px+"failed_jobs"] = 0
 		mx[px+"complete_jobs"] = 0
+		mx[px+"complete_jobs"] = 0
 		mx[px+"suspended_jobs"] = 0
 
+		mx[px+"failed_jobs_reason_pod_failure_policy"] = 0
+		mx[px+"failed_jobs_reason_backoff_limit_exceeded"] = 0
+		mx[px+"failed_jobs_reason_deadline_exceeded"] = 0
+
+		mx[px+"last_execution_status_succeeded"] = 0
+		mx[px+"last_execution_status_failed"] = 0
+
+		var lastExecutedEndTime time.Time
+		var lastCompleteTime time.Time
+
 		for _, job := range c.state.jobs {
-			switch {
-			case job.controller.kind != "CronJob", job.controller.uid != st.uid, job.startTime == nil:
+			if job.controller.kind != "CronJob" || job.controller.uid != st.uid || job.startTime == nil {
 				continue
-			case job.active > 0:
+			}
+			if job.active > 0 {
 				mx[px+"running_jobs"]++
-			case len(job.conditions) > 0:
-				for _, cond := range job.conditions {
-					if cond.Status != corev1.ConditionTrue {
-						continue
+				continue
+			}
+
+			for _, cond := range job.conditions {
+				if cond.Status != corev1.ConditionTrue {
+					continue
+				}
+
+				switch cond.Type {
+				case batchv1.JobComplete:
+					mx[px+"complete_jobs"]++
+					if job.completionTime != nil {
+						if job.completionTime.After(lastExecutedEndTime) {
+							lastExecutedEndTime = *job.completionTime
+							mx[px+"last_execution_status_succeeded"] = 1
+							mx[px+"last_execution_status_failed"] = 0
+						}
+						if job.completionTime.After(lastCompleteTime) {
+							lastCompleteTime = *job.completionTime
+							mx[px+"last_completion_duration"] = int64(job.completionTime.Sub(*job.startTime).Seconds())
+						}
 					}
-					switch cond.Type {
-					case batchv1.JobFailed:
-						mx[px+"failed_jobs"]++
-					case batchv1.JobComplete:
-						mx[px+"complete_jobs"]++
-					case batchv1.JobSuspended:
-						mx[px+"suspended_jobs"]++
+				case batchv1.JobFailed:
+					mx[px+"failed_jobs"]++
+					mx[px+"failed_jobs_reason_pod_failure_policy"] += metrix.Bool(cond.Reason == batchv1.JobReasonPodFailurePolicy)
+					mx[px+"failed_jobs_reason_backoff_limit_exceeded"] += metrix.Bool(cond.Reason == batchv1.JobReasonBackoffLimitExceeded)
+					mx[px+"failed_jobs_reason_deadline_exceeded"] += metrix.Bool(cond.Reason == batchv1.JobReasonDeadlineExceeded)
+					if cond.LastTransitionTime.Time.After(lastExecutedEndTime) {
+						lastExecutedEndTime = cond.LastTransitionTime.Time
+						mx[px+"last_execution_status_succeeded"] = 0
+						mx[px+"last_execution_status_failed"] = 1
 					}
+				case batchv1.JobSuspended:
+					mx[px+"suspended_jobs"]++
 				}
 			}
 		}

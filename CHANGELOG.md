@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- bump dag jinja to 3.1.6 [\#19800](https://github.com/netdata/netdata/pull/19800) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump golang.org/x/net from 0.35.0 to 0.37.0 in /src/go [\#19799](https://github.com/netdata/netdata/pull/19799) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Regenerate integrations docs [\#19797](https://github.com/netdata/netdata/pull/19797) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/k8s\_state\): add more CronJob metrics [\#19796](https://github.com/netdata/netdata/pull/19796) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19794](https://github.com/netdata/netdata/pull/19794) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/k8s\_state\): collect cronjobs [\#19793](https://github.com/netdata/netdata/pull/19793) ([ilyam8](https://github.com/ilyam8))
+- status file improvements 12 [\#19792](https://github.com/netdata/netdata/pull/19792) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#19791](https://github.com/netdata/netdata/pull/19791) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/snmp\): add snmp discovery information [\#19790](https://github.com/netdata/netdata/pull/19790) ([ilyam8](https://github.com/ilyam8))
 - User configurable crash reporting [\#19789](https://github.com/netdata/netdata/pull/19789) ([ktsaou](https://github.com/ktsaou))
 - detect when running in CI and disable posting status [\#19787](https://github.com/netdata/netdata/pull/19787) ([ktsaou](https://github.com/ktsaou))
 - chore: rename snmp.profiles.d -\> snmp.profiles [\#19786](https://github.com/netdata/netdata/pull/19786) ([ilyam8](https://github.com/ilyam8))
@@ -177,6 +186,7 @@
 - Generate protobuf source files in build dir. [\#19576](https://github.com/netdata/netdata/pull/19576) ([vkalintiris](https://github.com/vkalintiris))
 - Switch from x86 to ARM build host for POWER8+ builds. [\#19575](https://github.com/netdata/netdata/pull/19575) ([Ferroin](https://github.com/Ferroin))
 - fix\(go.d\): clean up charts for stopped and removed jobs [\#19573](https://github.com/netdata/netdata/pull/19573) ([ilyam8](https://github.com/ilyam8))
+- Modify eBPF.plugin integration \(Part II, the sockets\) [\#19572](https://github.com/netdata/netdata/pull/19572) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix memory leak [\#19569](https://github.com/netdata/netdata/pull/19569) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/prometheus-community/pro-bing from 0.6.0 to 0.6.1 in /src/go [\#19567](https://github.com/netdata/netdata/pull/19567) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Code cleanup on ACLK messages [\#19566](https://github.com/netdata/netdata/pull/19566) ([stelfrag](https://github.com/stelfrag))
@@ -472,11 +482,6 @@
 - fix crash when the DRM file does not contain the right information [\#19258](https://github.com/netdata/netdata/pull/19258) ([ktsaou](https://github.com/ktsaou))
 - docs: change "node-membership-rules" filename/title [\#19257](https://github.com/netdata/netdata/pull/19257) ([ilyam8](https://github.com/ilyam8))
 - Updated copyright notices [\#19256](https://github.com/netdata/netdata/pull/19256) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#19254](https://github.com/netdata/netdata/pull/19254) ([netdatabot](https://github.com/netdatabot))
-- docs: fix nats metadata suffix [\#19253](https://github.com/netdata/netdata/pull/19253) ([ilyam8](https://github.com/ilyam8))
-- feat\(go.d\): add  NATS collector [\#19252](https://github.com/netdata/netdata/pull/19252) ([ilyam8](https://github.com/ilyam8))
-- Monitor sensors using libsensors via debugfs.plugin [\#19251](https://github.com/netdata/netdata/pull/19251) ([ktsaou](https://github.com/ktsaou))
-- Add option to updater to report status of auto-updates on the system. [\#19248](https://github.com/netdata/netdata/pull/19248) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
@@ -485,14 +490,6 @@
 ## [v2.1.0](https://github.com/netdata/netdata/tree/v2.1.0) (2024-12-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.0.3...v2.1.0)
-
-**Merged pull requests:**
-
-- use inactive memory when calculating cgroups total memory [\#19249](https://github.com/netdata/netdata/pull/19249) ([ktsaou](https://github.com/ktsaou))
-- chore\(aclk/mqtt\): remove client\_id len check [\#19247](https://github.com/netdata/netdata/pull/19247) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d\): simplify cli is help [\#19246](https://github.com/netdata/netdata/pull/19246) ([ilyam8](https://github.com/ilyam8))
-- Health transition saving optimization [\#19245](https://github.com/netdata/netdata/pull/19245) ([stelfrag](https://github.com/stelfrag))
-- Avoid blocking waiting for an event during shutdown [\#19244](https://github.com/netdata/netdata/pull/19244) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 

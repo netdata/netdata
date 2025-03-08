@@ -16,14 +16,24 @@ func (c *Collector) updateCronJobState(r resource) {
 		return
 	}
 
-	_, ok := c.state.cronJobs[r.source()]
+	st, ok := c.state.cronJobs[r.source()]
 	if !ok {
-		st := newCronJobState()
+		st = newCronJobState()
 		c.state.cronJobs[r.source()] = st
 
 		st.uid = string(cj.UID)
 		st.name = cj.Name
 		st.namespace = cj.Namespace
 		st.creationTime = cj.CreationTimestamp.Time
+	}
+
+	st.lastScheduleTime = nil
+	st.lastSuccessfulTime = nil
+
+	if cj.Status.LastScheduleTime != nil {
+		st.lastScheduleTime = ptr(cj.Status.LastScheduleTime.Time)
+	}
+	if cj.Status.LastSuccessfulTime != nil {
+		st.lastSuccessfulTime = ptr(cj.Status.LastSuccessfulTime.Time)
 	}
 }

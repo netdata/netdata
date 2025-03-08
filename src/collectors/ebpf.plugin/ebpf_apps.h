@@ -4,7 +4,7 @@
 #define NETDATA_EBPF_APPS_H 1
 
 #include "libnetdata/libnetdata.h"
-#include "collectors/collectors-ipc/collectors-ipc.h"
+#include "collectors/collectors-ipc/ebpf-ipc.h"
 #include "libbpf_api/ebpf.h"
 
 #define NETDATA_APPS_FAMILY "apps"
@@ -32,6 +32,8 @@
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"
 #include "ebpf_vfs.h"
+
+#include "ebpf_socket_ipc.h"
 
 #define EBPF_MAX_COMPARE_NAME 95
 #define EBPF_MAX_NAME 100
