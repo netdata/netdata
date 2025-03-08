@@ -65,7 +65,13 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
 }
 #endif
 
-static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, STREAM_HANDSHAKE reason);
+// help the IDE identify use after free
+#define stream_receiver_remove(sth, rpt, reason) do {           \
+        stream_receiver_remove_internal(sth, rpt, reason);      \
+        (rpt) = NULL;                                           \
+} while(0)
+
+static void stream_receiver_remove_internal(struct stream_thread *sth, struct receiver_state *rpt, STREAM_HANDSHAKE reason);
 
 // When a child disconnects this is the maximum we will wait
 // before we update the cloud that the child is offline
@@ -523,7 +529,7 @@ void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *s
     }
 }
 
-static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, STREAM_HANDSHAKE reason) {
+static void stream_receiver_remove_internal(struct stream_thread *sth, struct receiver_state *rpt, STREAM_HANDSHAKE reason) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     receiver_set_exit_reason(rpt, reason, false);
@@ -540,7 +546,9 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     ND_LOG_STACK_PUSH(lgs);
 
     PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
-    size_t count = parser ? parser->user.data_collections_count : 0;
+    size_t count = 0;
+    if(parser)
+        count = parser->user.data_collections_count;
 
     errno_clear();
     nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -850,6 +858,7 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
                    stream_handshake_error_to_string(reason), rpt->sock.fd);
 
             stream_receiver_remove(sth, rpt, reason);
+            break;
         }
         else if(status == EVLOOP_STATUS_CONTINUE && process_opcodes && stream_thread_process_opcodes(sth, &rpt->thread.meta))
             status = EVLOOP_STATUS_OPCODE_ON_ME;
