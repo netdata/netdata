@@ -1055,6 +1055,7 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
                    __atomic_load_n(&host->stream.rcv.status.replication.counter_in, __ATOMIC_RELAXED));
 
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_REPLICATION_STALLED);
+            continue;
         }
 
         rpt->replication.last_checked_ut = rpt->replication.last_progress_ut;

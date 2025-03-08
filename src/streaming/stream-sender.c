@@ -630,6 +630,7 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
                    __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED));
 
             stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_REPLICATION_STALLED, 0, true);
+            continue;
         }
 
         s->replication.last_checked_ut = s->replication.last_progress_ut;
