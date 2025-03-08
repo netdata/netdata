@@ -127,7 +127,7 @@ func TestCollector_Collect(t *testing.T) {
 	}{
 		"success with web password": {
 			prepare:       caseSuccessWithWebPassword,
-			wantNumCharts: len(baseCharts) + 2,
+			wantNumCharts: len(summaryCharts) + 2,
 			wantMetrics: map[string]int64{
 				"A":                        1229,
 				"AAAA":                     1229,
