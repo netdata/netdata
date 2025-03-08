@@ -64,9 +64,23 @@ void capture_stack_trace(BUFFER *wb) {
     // Format the stack trace (removing the address part)
     for (i = 0; i < size; i++) {
         if(messages[i] && *messages[i]) {
+#if defined(OS_MACOS)
+            // remove the address part
+            char *p = strstr(messages[i], "0x");
+            char *e = p ? strchr(p, ' ') : NULL;
+            if (e) {
+                e++;
+                buffer_sprintf(wb, "#%d %s\n", added, e);
+
+            }
+            else
+                buffer_sprintf(wb, "%s\n", messages[i]);
+#else
+            // remove the address part
             char *p = strstr(messages[i], " [");
             size_t len = p ? (size_t)(p - messages[i]) : strlen(messages[i]);
             buffer_sprintf(wb, "#%d %.*s\n", i, (int)len, messages[i]);
+#endif
             added++;
         }
     }
