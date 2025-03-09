@@ -13,19 +13,8 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/curl" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/curl"
 fi
 
-cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/curl"
-
-if [ -d "${cache}" ]; then
-  echo "Found cached copy of build directory for curl, using it."
-  cp -a "${cache}/curl" "${NETDATA_MAKESELF_PATH}/tmp/"
-  CACHE_HIT=1
-else
-  echo "No cached copy of build directory for curl found, fetching sources instead."
-  run git clone --branch "${CURL_VERSION}" --single-branch --depth 1 "${CURL_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/curl"
-  CACHE_HIT=0
-fi
-
-cd "${NETDATA_MAKESELF_PATH}/tmp/curl" || exit 1
+cache_key="${CURL_VERSION}"
+fetch_git curl "${CURL_REPO}" "${CURL_VERSION}" "${cache_key}"
 
 export CFLAGS="${TUNING_FLAGS} -I/openssl-static/include -pipe"
 export CXXFLAGS="${CFLAGS}"
@@ -38,6 +27,8 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
 
     run ./configure \
         --prefix="/curl-local" \
+        --with-ca-bundle=/opt/netdata/etc/ssl/certs/ca-certificates.crt \
+        --with-ca-path=/opt/netdata/etc/ssl/certs \
         --enable-optimize \
         --disable-shared \
         --enable-static \
@@ -55,10 +46,12 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
         --disable-gopher \
         --enable-ipv6 \
         --enable-cookies \
+        --enable-openssl-auto-load-config \
+        --disable-docs \
         --with-ca-fallback \
         --with-openssl \
-        --with-ca-bundle=/opt/netdata/etc/ssl/certs/ca-certificates.crt \
-        --with-ca-path=/opt/netdata/etc/ssl/certs \
+        --without-libpsl \
+        --without-brotli \
         --disable-dependency-tracking
 
     # Curl autoconf does not honour the curl_LDFLAGS environment variable
@@ -70,7 +63,7 @@ fi
 
 run make install
 
-store_cache curl "${NETDATA_MAKESELF_PATH}/tmp/curl"
+store_cache "${cache_key}" "${NETDATA_MAKESELF_PATH}/tmp/curl"
 
 cp /curl-local/bin/curl "${NETDATA_INSTALL_PATH}"/bin/curl
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then

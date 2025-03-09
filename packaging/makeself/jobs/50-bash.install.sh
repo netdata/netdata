@@ -9,8 +9,12 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building bash" || true
 
-fetch "bash-${BASH_VERSION}" "${BASH_ARTIFACT_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
-    "${BASH_ARTIFACT_SHA256}" bash
+# For some stupid reason, the GNU bash project does not actually tag
+# releases, so we need to use a branch ofr the version, and that in turn
+# only tracks down to the minor version. Thus, we need to cache by day to
+# ensure we get the latest copy.
+cache_key="${BASH_VERSION}-$(date +%F)"
+fetch_git bash "${BASH_REPO}" "${BASH_VERSION}" "${cache_key}"
 
 export CFLAGS="${TUNING_FLAGS} -pipe"
 export CXXFLAGS="${CFLAGS}"
@@ -20,8 +24,8 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run ./configure \
         --prefix="${NETDATA_INSTALL_PATH}" \
         --without-bash-malloc \
+        --with-installed-readline \
         --enable-static-link \
-        --enable-net-redirections \
         --enable-array-variables \
         --disable-progcomp \
         --disable-profiling \
@@ -40,7 +44,7 @@ fi
 
 run make install
 
-store_cache bash "${NETDATA_MAKESELF_PATH}/tmp/bash-${BASH_VERSION}"
+store_cache "${cache_key}" "${NETDATA_MAKESELF_PATH}/tmp/bash"
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/bash
