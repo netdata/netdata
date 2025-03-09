@@ -5,12 +5,9 @@
 
 // ----------------------------------------------------------------------------
 
-inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
+inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    if (async)
-        metadata_queue_ae_save(host, ae);
-    else
-        sql_health_alarm_log_save(host, ae);
+    health_schedule_ae_save(host, ae);
 }
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function) {
@@ -193,7 +190,6 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->flags |= flags;
 
     ae->last_repeat = 0;
-    ae->pending_save_count = 0;
 
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
         ae->non_clear_duration += ae->duration;
@@ -201,7 +197,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     return ae;
 }
 
-inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async)
+inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae)
 {
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
@@ -228,7 +224,7 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
                     ae->non_clear_duration += t->non_clear_duration;
 
-                health_alarm_log_save(host, t, async);
+                health_alarm_log_save(host, t);
             }
 
             // no need to continue
@@ -237,28 +233,25 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
     }
     rw_spinlock_read_unlock(&host->health_log.spinlock);
 
-    health_alarm_log_save(host, ae, async);
+    health_alarm_log_save(host, ae);
 }
 
-inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
-    if(__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED))
-        metadata_queue_ae_deletion(ae);
-    else {
-        string_freez(ae->name);
-        string_freez(ae->chart);
-        string_freez(ae->chart_context);
-        string_freez(ae->classification);
-        string_freez(ae->component);
-        string_freez(ae->type);
-        string_freez(ae->exec);
-        string_freez(ae->recipient);
-        string_freez(ae->source);
-        string_freez(ae->units);
-        string_freez(ae->info);
-        string_freez(ae->old_value_string);
-        string_freez(ae->new_value_string);
-        freez(ae);
-    }
+inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae)
+{
+    string_freez(ae->name);
+    string_freez(ae->chart);
+    string_freez(ae->chart_context);
+    string_freez(ae->classification);
+    string_freez(ae->component);
+    string_freez(ae->type);
+    string_freez(ae->exec);
+    string_freez(ae->recipient);
+    string_freez(ae->source);
+    string_freez(ae->units);
+    string_freez(ae->info);
+    string_freez(ae->old_value_string);
+    string_freez(ae->new_value_string);
+    freez(ae);
 }
 
 inline void health_alarm_log_free(RRDHOST *host) {
