@@ -1218,9 +1218,6 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
 
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
 
-    if (update_retention)
-        update_metrics_first_time_s(ctx, datafile, datafile->next, worker);
-
     while (!datafile_got_for_deletion) {
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
@@ -1238,6 +1235,9 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
             sleep_usec(1 * USEC_PER_SEC);
         }
     }
+
+    if (update_retention)
+        update_metrics_first_time_s(ctx, datafile, datafile->next, worker);
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_started, 1, __ATOMIC_RELAXED);
     netdata_log_info("DBENGINE: deleting data file '%s/"
