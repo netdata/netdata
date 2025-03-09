@@ -1144,7 +1144,8 @@ int main(int argc, char *argv[])
         return rc;
 
 #if defined(FSANITIZE_ADDRESS)
-    fprintf(stderr, "Running with AddressSanitizer - stderr is here...\n");
+    fprintf(stdout, "STDOUT: Sanitizers mode enabled...\n");
+    fprintf(stderr, "STDERR: Sanitizers mode enabled...\n");
 #endif
 
     nd_process_signals();
