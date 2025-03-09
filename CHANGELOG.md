@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- fix fsanitize ifdefs [\#19809](https://github.com/netdata/netdata/pull/19809) ([ktsaou](https://github.com/ktsaou))
+- do not change the scheduling policy by default [\#19808](https://github.com/netdata/netdata/pull/19808) ([ktsaou](https://github.com/ktsaou))
+- Help finding leaks and running valgrind [\#19806](https://github.com/netdata/netdata/pull/19806) ([ktsaou](https://github.com/ktsaou))
+- fix memory corruption in streaming [\#19805](https://github.com/netdata/netdata/pull/19805) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#19804](https://github.com/netdata/netdata/pull/19804) ([netdatabot](https://github.com/netdatabot))
+- Regenerate integrations docs [\#19803](https://github.com/netdata/netdata/pull/19803) ([netdatabot](https://github.com/netdatabot))
+- async-signal-safe stack traces [\#19802](https://github.com/netdata/netdata/pull/19802) ([ktsaou](https://github.com/ktsaou))
+- add k8s\_state\_cronjob\_last\_execution\_failed alert [\#19801](https://github.com/netdata/netdata/pull/19801) ([ilyam8](https://github.com/ilyam8))
 - bump dag jinja to 3.1.6 [\#19800](https://github.com/netdata/netdata/pull/19800) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump golang.org/x/net from 0.35.0 to 0.37.0 in /src/go [\#19799](https://github.com/netdata/netdata/pull/19799) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations docs [\#19797](https://github.com/netdata/netdata/pull/19797) ([netdatabot](https://github.com/netdatabot))
@@ -91,6 +99,7 @@
 - under MSYS2 use stat [\#19703](https://github.com/netdata/netdata/pull/19703) ([ktsaou](https://github.com/ktsaou))
 - Document journal v2 index file format. [\#19701](https://github.com/netdata/netdata/pull/19701) ([vkalintiris](https://github.com/vkalintiris))
 - build\(deps\): update go.d packages [\#19700](https://github.com/netdata/netdata/pull/19700) ([ilyam8](https://github.com/ilyam8))
+- ADFS \(windows.plugin\) [\#19699](https://github.com/netdata/netdata/pull/19699) ([thiagoftsm](https://github.com/thiagoftsm))
 - build\(deps\): bump github.com/sijms/go-ora/v2 from 2.8.23 to 2.8.24 in /src/go [\#19698](https://github.com/netdata/netdata/pull/19698) ([dependabot[bot]](https://github.com/apps/dependabot))
 - change the moto and the description of netdata [\#19696](https://github.com/netdata/netdata/pull/19696) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.0 to 9.7.1 in /src/go [\#19693](https://github.com/netdata/netdata/pull/19693) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -474,14 +483,6 @@
 - build\(deps\): bump github.com/docker/docker from 27.4.0+incompatible to 27.4.1+incompatible in /src/go [\#19268](https://github.com/netdata/netdata/pull/19268) ([dependabot[bot]](https://github.com/apps/dependabot))
 - improvement\(go.d/nats\): add gatewayz metrics [\#19266](https://github.com/netdata/netdata/pull/19266) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19265](https://github.com/netdata/netdata/pull/19265) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/nats\): add routez metrics [\#19264](https://github.com/netdata/netdata/pull/19264) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19263](https://github.com/netdata/netdata/pull/19263) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/nats\): add accstatz metrics [\#19262](https://github.com/netdata/netdata/pull/19262) ([ilyam8](https://github.com/ilyam8))
-- HELP and TYPE in prometheus fix [\#19261](https://github.com/netdata/netdata/pull/19261) ([ktsaou](https://github.com/ktsaou))
-- Add an alert guide for reboot required [\#19260](https://github.com/netdata/netdata/pull/19260) ([ralphm](https://github.com/ralphm))
-- fix crash when the DRM file does not contain the right information [\#19258](https://github.com/netdata/netdata/pull/19258) ([ktsaou](https://github.com/ktsaou))
-- docs: change "node-membership-rules" filename/title [\#19257](https://github.com/netdata/netdata/pull/19257) ([ilyam8](https://github.com/ilyam8))
-- Updated copyright notices [\#19256](https://github.com/netdata/netdata/pull/19256) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
