@@ -17,6 +17,7 @@ HRESULT InitializeWMI(void);
 void CleanupWMI(void);
 
 #include "windows-wmi-GetDiskDriveInfo.h"
+#include "windows-wmi-GetMSSQLDataFileSize.h"
 
 #endif
 
