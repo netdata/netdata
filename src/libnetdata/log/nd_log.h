@@ -15,7 +15,7 @@ extern "C" {
 #define ND_LOG_DEFAULT_THROTTLE_PERIOD 60
 
 void errno_clear(void);
-int nd_log_systemd_journal_fd(void);
+
 void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting);
 void nd_log_set_facility(const char *facility);
 void nd_log_set_priority_level(const char *setting);
@@ -44,8 +44,10 @@ void nd_log_register_fatal_data_cb(log_event_t cb);
 typedef void (*fatal_event_t)(void);
 void nd_log_register_fatal_final_cb(fatal_event_t cb);
 
+int nd_log_systemd_journal_fd(void);
 int nd_log_health_fd(void);
 int nd_log_collectors_fd(void);
+
 typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);
 
 struct log_stack_entry {
