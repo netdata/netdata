@@ -748,6 +748,9 @@ int netdata_main(int argc, char **argv) {
         // the caller may have left open files (lxc-attach has this issue)
         os_close_all_non_std_open_fds_except(NULL, 0, 0);
     }
+#else
+    fprintf(stderr, "Running with a Sanitizer, custom allocators are disabled.\n");
+    fprintf(stderr, "Running with a Sanitizer, not closing open fds.\n");
 #endif
 
     if(!config_loaded) {

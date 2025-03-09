@@ -144,6 +144,8 @@ static int become_user(const char *username, int pid_fd) {
         netdata_log_error("Cannot effectively switch to user %s (uid: %u).", username, uid);
         return -1;
     }
+#else
+    fprintf(stderr, "Running with a Sanitizer, skipping setuid/setgid\n");
 #endif
 
     return(0);
