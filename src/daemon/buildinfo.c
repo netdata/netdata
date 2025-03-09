@@ -159,6 +159,7 @@ static struct {
     const char *json;
     bool status;
     const char *value;
+    bool value_allocated;
 } BUILD_INFO[] = {
         [BIB_PACKAGING_NETDATA_VERSION] = {
                 .category = BIC_PACKAGING,
@@ -1117,7 +1118,14 @@ static struct {
 };
 
 static void build_info_set_value(BUILD_INFO_SLOT slot, const char *value) {
+    const char *old = BUILD_INFO[slot].value;
+
     BUILD_INFO[slot].value = value;
+
+    if(BUILD_INFO[slot].value_allocated)
+        freez((void *)old);
+
+    BUILD_INFO[slot].value_allocated = false;
 }
 
 static void build_info_append_value(BUILD_INFO_SLOT slot, const char *value) {
@@ -1133,13 +1141,30 @@ static void build_info_append_value(BUILD_INFO_SLOT slot, const char *value) {
     else
         strcpy(buf, value);
 
-    freez((void *)BUILD_INFO[slot].value);
+    const char *old = BUILD_INFO[slot].value;
+
     BUILD_INFO[slot].value = strdupz(buf);
+
+    if(BUILD_INFO[slot].value_allocated)
+        freez((void *)old);
+
+    BUILD_INFO[slot].value_allocated = true;
 }
 
 static void build_info_set_value_strdupz(BUILD_INFO_SLOT slot, const char *value) {
     if(!value) value = "";
-    build_info_set_value(slot, strdupz(value));
+
+    if(BUILD_INFO[slot].value && strcmp(BUILD_INFO[slot].value, value) == 0)
+        return;
+
+    const char *old = BUILD_INFO[slot].value;
+
+    BUILD_INFO[slot].value = strdupz(value);
+
+    if(old && BUILD_INFO[slot].value_allocated)
+        freez((void *)old);
+
+    BUILD_INFO[slot].value_allocated = true;
 }
 
 static void build_info_set_status(BUILD_INFO_SLOT slot, bool status) {
@@ -1375,18 +1400,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 // system info
 
 static void populate_system_info(void) {
-    static bool populated = false;
-    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-
-    if(populated)
-        return;
-
-    spinlock_lock(&spinlock);
-
-    if(populated) {
-        spinlock_unlock(&spinlock);
-        return;
-    }
+    FUNCTION_RUN_ONCE();
 
     struct rrdhost_system_info *system_info;
     bool free_system_info = false;
@@ -1441,9 +1455,6 @@ static void populate_system_info(void) {
 
     if(free_system_info)
         rrdhost_system_info_free(system_info);
-
-    populated = true;
-    spinlock_unlock(&spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -1496,43 +1507,35 @@ void get_install_type(struct rrdhost_system_info *system_info) {
 }
 
 static struct {
-    SPINLOCK spinlock;
-    bool populated;
     char *install_type;
     char *prebuilt_arch;
     char *prebuilt_distro;
 } BUILD_PACKAGING_INFO = { 0 };
 
 static void populate_packaging_info() {
-    if(!BUILD_PACKAGING_INFO.populated) {
-        spinlock_lock(&BUILD_PACKAGING_INFO.spinlock);
-        if(!BUILD_PACKAGING_INFO.populated) {
-            BUILD_PACKAGING_INFO.populated = true;
+    FUNCTION_RUN_ONCE();
 
-            get_install_type_internal(&BUILD_PACKAGING_INFO.install_type, &BUILD_PACKAGING_INFO.prebuilt_arch, &BUILD_PACKAGING_INFO.prebuilt_distro);
+    get_install_type_internal(&BUILD_PACKAGING_INFO.install_type, &BUILD_PACKAGING_INFO.prebuilt_arch, &BUILD_PACKAGING_INFO.prebuilt_distro);
 
-            if(!BUILD_PACKAGING_INFO.install_type)
-                BUILD_PACKAGING_INFO.install_type = "unknown";
+    if(!BUILD_PACKAGING_INFO.install_type)
+        BUILD_PACKAGING_INFO.install_type = "unknown";
 
-            if(!BUILD_PACKAGING_INFO.prebuilt_arch)
-                BUILD_PACKAGING_INFO.prebuilt_arch = "unknown";
+    if(!BUILD_PACKAGING_INFO.prebuilt_arch)
+        BUILD_PACKAGING_INFO.prebuilt_arch = "unknown";
 
-            if(!BUILD_PACKAGING_INFO.prebuilt_distro)
-                BUILD_PACKAGING_INFO.prebuilt_distro = "unknown";
+    if(!BUILD_PACKAGING_INFO.prebuilt_distro)
+        BUILD_PACKAGING_INFO.prebuilt_distro = "unknown";
 
-            build_info_set_value(BIB_PACKAGING_INSTALL_TYPE, strdupz(BUILD_PACKAGING_INFO.install_type));
-            build_info_set_value(BIB_PACKAGING_ARCHITECTURE, strdupz(BUILD_PACKAGING_INFO.prebuilt_arch));
-            build_info_set_value(BIB_PACKAGING_DISTRO, strdupz(BUILD_PACKAGING_INFO.prebuilt_distro));
+    build_info_set_value_strdupz(BIB_PACKAGING_INSTALL_TYPE, BUILD_PACKAGING_INFO.install_type);
+    build_info_set_value_strdupz(BIB_PACKAGING_ARCHITECTURE, BUILD_PACKAGING_INFO.prebuilt_arch);
+    build_info_set_value_strdupz(BIB_PACKAGING_DISTRO, BUILD_PACKAGING_INFO.prebuilt_distro);
 
-            CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            ND_PROFILE_2buffer(wb, nd_profile_detect_and_configure(false), " ");
-            build_info_set_value_strdupz(BIB_RUNTIME_PROFILE, buffer_tostring(wb));
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    ND_PROFILE_2buffer(wb, nd_profile_detect_and_configure(false), " ");
+    build_info_set_value_strdupz(BIB_RUNTIME_PROFILE, buffer_tostring(wb));
 
-            build_info_set_status(BIB_RUNTIME_PARENT, stream_conf_is_parent(false));
-            build_info_set_status(BIB_RUNTIME_CHILD, stream_conf_is_child());
-        }
-        spinlock_unlock(&BUILD_PACKAGING_INFO.spinlock);
-    }
+    build_info_set_status(BIB_RUNTIME_PARENT, stream_conf_is_parent(false));
+    build_info_set_status(BIB_RUNTIME_CHILD, stream_conf_is_child());
 
     OS_SYSTEM_MEMORY sm = os_system_memory(true);
     if(OS_SYSTEM_MEMORY_OK(sm)) {

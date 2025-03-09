@@ -742,11 +742,16 @@ int netdata_main(int argc, char **argv) {
         }
     }
 
+#if !defined(FSANITIZE_ADDRESS)
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
         os_close_all_non_std_open_fds_except(NULL, 0, 0);
     }
+#else
+    fprintf(stderr, "Running with a Sanitizer, custom allocators are disabled.\n");
+    fprintf(stderr, "Running with a Sanitizer, not closing open fds.\n");
+#endif
 
     if(!config_loaded) {
         netdata_conf_load(NULL, 0, &user);
@@ -1140,6 +1145,11 @@ int main(int argc, char *argv[])
     int rc = netdata_main(argc, argv);
     if (rc != 10)
         return rc;
+
+#if defined(FSANITIZE_ADDRESS)
+    fprintf(stdout, "STDOUT: Sanitizers mode enabled...\n");
+    fprintf(stderr, "STDERR: Sanitizers mode enabled...\n");
+#endif
 
     nd_process_signals();
     return 1;

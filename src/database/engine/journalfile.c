@@ -1328,7 +1328,8 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     int fd_v2;
     uint8_t *data_start = nd_mmap_advanced(path, total_file_size, MAP_SHARED, 0, false, true, &fd_v2);
-    uint8_t *data = data_start;
+    if(!data_start)
+        fatal("DBENGINE: failed to memory map file '%s' of size %zu.", path, total_file_size);
 
     memset(data_start, 0, extent_offset);
 
@@ -1353,7 +1354,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     struct journal_v2_block_trailer *journal_v2_trailer;
 
-    data = journalfile_v2_write_extent_list(JudyL_extents_pos, data_start + extent_offset);
+    uint8_t *data = journalfile_v2_write_extent_list(JudyL_extents_pos, data_start + extent_offset);
     internal_error(true, "DBENGINE: write extent list so far %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
     fatal_assert(data == data_start + extent_offset_trailer);

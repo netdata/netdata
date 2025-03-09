@@ -525,8 +525,7 @@ static void rrdhost_update(RRDHOST *host
                            , const char *prog_version
                            , int update_every
                            , long history
-                           ,
-    RRD_DB_MODE mode
+                           , RRD_DB_MODE mode
                            , bool health
                            , bool stream
                            , STRING *parents
