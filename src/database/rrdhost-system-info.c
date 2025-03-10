@@ -9,7 +9,8 @@
 static inline void coverity_remove_taint(char *s __maybe_unused) { }
 
 void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_system_info *b) {
-    SWAP(*a, *b);
+    if(a && b)
+        SWAP(*a, *b);
 }
 
 // ----------------------------------------------------------------------------

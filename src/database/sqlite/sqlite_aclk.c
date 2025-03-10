@@ -174,6 +174,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         system_info,
         1);
 
+    rrdhost_system_info_free(system_info);
+
     if (likely(host)) {
         if (is_ephemeral)
             rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);

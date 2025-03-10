@@ -174,6 +174,9 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             rpt->system_info,
             0);
 
+        rrdhost_system_info_free(rpt->system_info);
+        rpt->system_info = NULL;
+
         if(!host) {
             stream_receiver_log_status(
                 rpt,
