@@ -323,6 +323,8 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
 
 #if defined(FSANITIZE_ADDRESS)
+    rrdhost_free_all();
+
     if(cleanup_destroyed_dictionaries())
         fprintf(stderr, "WARNING: There are still dictionaries with references in them, that cannot be destroyed.\n");
 
@@ -330,11 +332,14 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     pgc_destroy(extent_cache);
     pgc_destroy(open_cache);
     pgc_destroy(main_cache);
-    mrg_destroy(main_mrg); // this is incomplete
+
+    size_t metrics_referenced = mrg_destroy(main_mrg);
+    if(metrics_referenced)
+        fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
+            metrics_referenced);
+
     // uuidmap_destroy();
     // strings_destroy();
-    // rrdcontexts_destroy();
-    // web_clients_cache_destroy();
     // functions_destroy();
     // dyncfg_destroy();
 #endif

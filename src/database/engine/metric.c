@@ -357,14 +357,79 @@ struct aral_statistics *mrg_aral_stats(void) {
     return &mrg_aral_statistics;
 }
 
-void mrg_destroy(MRG *mrg __maybe_unused) {
-    // no destruction possible
-    // we can't traverse the metrics list
+size_t mrg_destroy(MRG *mrg) {
+    if (unlikely(!mrg))
+        return 0;
 
-    // to delete entries, the caller needs to keep pointers to them
-    // and delete them one by one
+    size_t remaining_metrics = 0;
 
-    pulse_aral_unregister(mrg->index[0].aral);
+    // Traverse all partitions
+    for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++) {
+        // Lock the partition to prevent new entries while we're cleaning up
+        mrg_index_write_lock(mrg, partition);
+
+        Pvoid_t uuid_judy = mrg->index[partition].uuid_judy;
+        Word_t uuid_index = 0;
+        Pvoid_t *uuid_pvalue;
+
+        // Traverse all UUIDs in this partition
+        for (uuid_pvalue = JudyLFirst(uuid_judy, &uuid_index, PJE0);
+             uuid_pvalue != NULL && uuid_pvalue != PJERR;
+             uuid_pvalue = JudyLNext(uuid_judy, &uuid_index, PJE0)) {
+
+            if (!(*uuid_pvalue))
+                continue;
+
+            // Get the sections judy for this UUID
+            Pvoid_t sections_judy = *uuid_pvalue;
+            Word_t section_index = 0;
+            Pvoid_t *section_pvalue;
+
+            // Traverse all sections for this UUID
+            for (section_pvalue = JudyLFirst(sections_judy, &section_index, PJE0);
+                 section_pvalue != NULL && section_pvalue != PJERR;
+                 section_pvalue = JudyLNext(sections_judy, &section_index, PJE0)) {
+
+                if (!(*section_pvalue))
+                    continue;
+
+                METRIC *metric = *section_pvalue;
+
+                // Try to acquire metric for deletion
+                if (!refcount_acquire_for_deletion(&metric->refcount)) {
+                    // do not free the metric, let it be a memory leak
+                    // so that the sanitizer can catch it
+                    remaining_metrics++;
+                }
+                else {
+                    uuidmap_free(metric->uuid);
+                    aral_freez(mrg->index[partition].aral, metric);
+                    MRG_STATS_DELETED_METRIC(mrg, partition);
+                }
+            }
+
+            JudyLFreeArray(&sections_judy, PJE0);
+        }
+
+        JudyLFreeArray(&uuid_judy, PJE0);
+
+        // Update the main Judy array reference
+        mrg->index[partition].uuid_judy = uuid_judy;
+
+        // Unlock the partition
+        mrg_index_write_unlock(mrg, partition);
+
+        // Destroy the aral for this partition
+        aral_destroy(mrg->index[partition].aral);
+    }
+
+    // Unregister the aral statistics
+    pulse_aral_unregister_statistics(&mrg_aral_statistics);
+
+    // Free the MRG structure
+    freez(mrg);
+
+    return remaining_metrics;
 }
 
 ALWAYS_INLINE METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {

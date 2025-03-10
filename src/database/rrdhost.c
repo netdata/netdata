@@ -863,5 +863,12 @@ void rrdhost_free_all(void) {
     if(localhost)
         rrdhost_free___while_having_rrd_wrlock(localhost);
 
+    localhost = NULL;
+
+    dictionary_destroy(rrdhost_root_index_hostname);
+    dictionary_destroy(rrdhost_root_index);
+    rrdhost_root_index_hostname = NULL;
+    rrdhost_root_index = NULL;
+
     rrd_wrunlock();
 }
