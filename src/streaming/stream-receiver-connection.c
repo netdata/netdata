@@ -173,8 +173,6 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             rpt->config.replication.step,
             rpt->system_info,
             0);
-        // IMPORTANT: system_info is now consumed!
-        rpt->system_info = NULL;
 
         if(!host) {
             stream_receiver_log_status(

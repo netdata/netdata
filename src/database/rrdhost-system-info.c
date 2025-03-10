@@ -8,6 +8,10 @@
 // coverity[ +tainted_string_sanitize_content : arg-0 ]
 static inline void coverity_remove_taint(char *s __maybe_unused) { }
 
+void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_system_info *b) {
+    SWAP(*a, *b);
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
 // system_info fields must be heap allocated or NULL
