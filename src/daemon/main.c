@@ -1026,20 +1026,19 @@ int netdata_main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = rrdhost_system_info_create();
     rrdhost_system_info_detect(system_info);
 
-    // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("install type");
-
     get_install_type(system_info);
+
+    set_late_analytics_variables(system_info);
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("RRD structures");
 
     abort_on_fatal_disable();
-    if(rrd_init(netdata_configured_hostname, system_info, false)) {
-        set_late_analytics_variables(system_info);
+    if (rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
-    }
+
     abort_on_fatal_enable();
+    system_info = NULL; // system_info is now freed by rrd_init
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("localhost labels");
@@ -1064,7 +1063,6 @@ int netdata_main(int argc, char **argv) {
 
     netdata_conf_section_web();
 
-    set_late_analytics_variables(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
