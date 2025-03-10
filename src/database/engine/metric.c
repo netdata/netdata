@@ -357,7 +357,7 @@ struct aral_statistics *mrg_aral_stats(void) {
     return &mrg_aral_statistics;
 }
 
-ALWAYS_INLINE void mrg_destroy(MRG *mrg __maybe_unused) {
+void mrg_destroy(MRG *mrg __maybe_unused) {
     // no destruction possible
     // we can't traverse the metrics list
 

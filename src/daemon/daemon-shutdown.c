@@ -322,6 +322,23 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     daemon_status_file_shutdown_step(NULL);
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
 
+#if defined(FSANITIZE_ADDRESS)
+    if(cleanup_destroyed_dictionaries())
+        fprintf(stderr, "WARNING: There are still dictionaries with references in them, that cannot be destroyed.\n");
+
+    // destroy the caches in reverse order (extent and open depend on main cache)
+    pgc_destroy(extent_cache);
+    pgc_destroy(open_cache);
+    pgc_destroy(main_cache);
+    mrg_destroy(main_mrg); // this is incomplete
+    // uuidmap_destroy();
+    // strings_destroy();
+    // rrdcontexts_destroy();
+    // web_clients_cache_destroy();
+    // functions_destroy();
+    // dyncfg_destroy();
+#endif
+
 #ifdef OS_WINDOWS
     curl_global_cleanup();
     return;
