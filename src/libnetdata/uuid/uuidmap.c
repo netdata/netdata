@@ -278,6 +278,59 @@ UUIDMAP_ID uuidmap_dup(UUIDMAP_ID id) {
     return id;
 }
 
+size_t uuidmap_destroy(void) {
+    size_t referenced = 0;
+
+    // Traverse all partitions
+    for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++) {
+        // Lock the partition to prevent new entries while we're cleaning up
+        rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
+
+        Pvoid_t uuid_to_id = uuid_map.p[partition].uuid_to_id;
+        Pvoid_t id_to_uuid = uuid_map.p[partition].id_to_uuid;
+        Pvoid_t freed_ids = uuid_map.p[partition].freed_ids;
+
+        // Process all entries in the id_to_uuid map
+        Word_t id_index = 0;
+        Pvoid_t *id_pvalue;
+
+        for (id_pvalue = JudyLFirst(id_to_uuid, &id_index, PJE0);
+             id_pvalue != NULL && id_pvalue != PJERR;
+             id_pvalue = JudyLNext(id_to_uuid, &id_index, PJE0)) {
+
+            if (!(*id_pvalue))
+                continue;
+
+            struct uuidmap_entry *ue = *id_pvalue;
+
+            // Try to acquire for deletion
+            if (!refcount_acquire_for_deletion(&ue->refcount))
+                referenced++;
+
+            aral_freez(uuid_map.ar, ue);
+        }
+
+        // Free all Judy arrays
+        JudyHSFreeArray(&uuid_to_id, PJE0);
+        JudyLFreeArray(&id_to_uuid, PJE0);
+        JudyLFreeArray(&freed_ids, PJE0);
+
+        // Reset partition data
+        memset(&uuid_map.p[partition], 0, sizeof(uuid_map.p[partition]));
+
+        rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
+    }
+
+    // Destroy ARAL
+    if (uuid_map.ar) {
+        aral_destroy(uuid_map.ar);
+        uuid_map.ar = NULL;
+    }
+
+    memset(&uuid_map, 0, sizeof(uuid_map));
+    return referenced;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 static volatile bool stop_flag = false;

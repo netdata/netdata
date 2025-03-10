@@ -168,7 +168,7 @@ void dictionary_version_increment(DICTIONARY *dict);
 
 void dictionary_garbage_collect(DICTIONARY *dict);
 
-void cleanup_destroyed_dictionaries(void);
+bool cleanup_destroyed_dictionaries(void);
 
 // ----------------------------------------------------------------------------
 // Set an item in the dictionary

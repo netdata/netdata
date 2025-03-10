@@ -330,11 +330,11 @@ static void dictionary_queue_for_destruction(DICTIONARY *dict) {
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 }
 
-void cleanup_destroyed_dictionaries(void) {
+bool cleanup_destroyed_dictionaries(void) {
     netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
     if (!dictionaries_waiting_to_be_destroyed) {
         netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
-        return;
+        return false;
     }
 
     DICTIONARY *dict, *last = NULL, *next = NULL;
@@ -371,7 +371,10 @@ void cleanup_destroyed_dictionaries(void) {
         }
     }
 
+    bool ret = dictionaries_waiting_to_be_destroyed != NULL;
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+
+    return ret;
 }
 
 // ----------------------------------------------------------------------------

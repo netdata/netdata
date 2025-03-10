@@ -33,6 +33,17 @@ void pulse_aral_register_statistics(struct aral_statistics *stats, const char *n
     spinlock_unlock(&globals.spinlock);
 }
 
+void pulse_aral_unregister_statistics(struct aral_statistics *stats) {
+    spinlock_lock(&globals.spinlock);
+    struct aral_info *ai = ARAL_STATS_GET(&globals.idx, (Word_t)stats);
+    if(ai) {
+        ARAL_STATS_DEL(&globals.idx, (Word_t)stats);
+        freez((void *)ai->name);
+        freez(ai);
+    }
+    spinlock_unlock(&globals.spinlock);
+}
+
 void pulse_aral_register(ARAL *ar, const char *name) {
     if(!ar) return;
 
@@ -47,15 +58,7 @@ void pulse_aral_register(ARAL *ar, const char *name) {
 void pulse_aral_unregister(ARAL *ar) {
     if(!ar) return;
     struct aral_statistics *stats = aral_get_statistics(ar);
-
-    spinlock_lock(&globals.spinlock);
-    struct aral_info *ai = ARAL_STATS_GET(&globals.idx, (Word_t)stats);
-    if(ai) {
-        ARAL_STATS_DEL(&globals.idx, (Word_t)stats);
-        freez((void *)ai->name);
-        freez(ai);
-    }
-    spinlock_unlock(&globals.spinlock);
+    pulse_aral_unregister_statistics(stats);
 }
 
 void pulse_aral_init(void) {

@@ -1718,7 +1718,6 @@ void *replication_thread_main(void *ptr) {
         for(size_t i = 0; i < threads ;i++) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "REPLAY[%zu]", i + 2);
-            replication_globals.main_thread.threads_ptrs[i] = mallocz(sizeof(ND_THREAD *));
             __atomic_add_fetch(&replication_buffers_allocated, sizeof(ND_THREAD *), __ATOMIC_RELAXED);
             replication_globals.main_thread.threads_ptrs[i] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
                                                                                replication_worker_thread, NULL);

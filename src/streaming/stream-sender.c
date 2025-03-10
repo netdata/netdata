@@ -367,9 +367,7 @@ void stream_sender_remove(struct sender_state *s, STREAM_HANDSHAKE reason) {
     s->exit.reason = 0;
 
     __atomic_store_n(&s->exit.shutdown, false, __ATOMIC_RELAXED);
-    rrdhost_flag_clear(s->host,
-                       RRDHOST_FLAG_STREAM_SENDER_ADDED | RRDHOST_FLAG_STREAM_SENDER_CONNECTED |
-                           RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_SENDER_ADDED | RRDHOST_FLAG_STREAM_SENDER_CONNECTED | RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     s->last_state_since_t = now_realtime_sec();
     stream_parent_set_host_disconnect_reason(s->host, reason, s->last_state_since_t);

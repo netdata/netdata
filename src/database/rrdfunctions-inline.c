@@ -2,22 +2,18 @@
 
 #include "rrdfunctions-inline.h"
 
-struct rrd_function_inline {
-    rrd_function_execute_inline_cb_t cb;
-};
-
 static int rrd_function_run_inline(struct rrd_function_execute *rfe, void *data) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
-    struct rrd_function_inline *fi = data;
+    rrd_function_execute_inline_cb_t execute_cb = data;
 
     int code;
 
     if(rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     else
-        code = fi->cb(rfe->result.wb, rfe->function, rfe->payload, rfe->source);
+        code = execute_cb(rfe->result.wb, rfe->function, rfe->payload, rfe->source);
 
     if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))) {
         buffer_flush(rfe->result.wb);
@@ -36,10 +32,7 @@ void rrd_function_add_inline(RRDHOST *host, RRDSET *st, const char *name, int ti
 
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
 
-    struct rrd_function_inline *fi = callocz(1, sizeof(struct rrd_function_inline));
-    fi->cb = execute_cb;
-
     rrd_function_add(host, st, name, timeout, priority, version,
                      help, tags, access, true,
-                     rrd_function_run_inline, fi);
+                     rrd_function_run_inline, execute_cb);
 }

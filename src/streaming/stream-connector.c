@@ -531,7 +531,7 @@ static void *stream_connector_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES, "cancelled nodes", "nodes", WORKER_METRIC_ABSOLUTE);
 
     unsigned job_id = 0;
-    while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
+    while(service_running(SERVICE_STREAMING)) {
 
         worker_is_idle();
         job_id = completion_wait_for_a_job_with_timeout(&sc->completion, job_id, 1000);
@@ -618,6 +618,27 @@ static void *stream_connector_thread(void *ptr) {
         worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_FAILED_NODES, (NETDATA_DOUBLE)failed_nodes);
         worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES, (NETDATA_DOUBLE)cancelled_nodes);
     }
+
+#if defined(FSANITIZE_ADDRESS)
+    // sometimes this thread exits, with localhost still in the queue
+    sleep(3);
+#endif
+
+    spinlock_lock(&sc->queue.spinlock);
+    Word_t idx = 0;
+    for(struct sender_state *s = SENDERS_FIRST(&sc->queue.senders, &idx);
+         s;
+         s = SENDERS_NEXT(&sc->queue.senders, &idx)) {
+        SENDERS_DEL(&sc->queue.senders, idx);
+        spinlock_unlock(&sc->queue.spinlock);
+
+        // do not have the connector lock when calling these
+        stream_sender_on_disconnect(s);
+        stream_sender_remove(s, s->exit.reason);
+
+        spinlock_lock(&sc->queue.spinlock);
+    }
+    spinlock_unlock(&sc->queue.spinlock);
 
     return NULL;
 }

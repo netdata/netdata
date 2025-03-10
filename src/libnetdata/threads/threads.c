@@ -421,6 +421,7 @@ void nd_thread_signal_cancel(ND_THREAD *nti) {
     spinlock_unlock(&nti->canceller.spinlock);
 }
 
+ALWAYS_INLINE
 bool nd_thread_signaled_to_cancel(void) {
     if(!_nd_thread_info) return false;
     return __atomic_load_n(&_nd_thread_info->cancel_atomic, __ATOMIC_RELAXED);

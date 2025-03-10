@@ -50,10 +50,10 @@ typedef struct aclk_sync_cfg_t {
     time_t node_info_send_time;
     time_t node_collectors_send;
     char node_id[UUID_STR_LEN];
-    char *alerts_snapshot_uuid;        // will contain the snapshot_uuid value if snapshot was requested
 } aclk_sync_cfg_t;
 
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id);
+void destroy_aclk_config(RRDHOST *host);
 void sql_aclk_sync_init(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void schedule_node_state_update(RRDHOST *host, uint64_t delay);
