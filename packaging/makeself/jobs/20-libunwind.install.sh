@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Can’t do libunwind on ppc64le with musl, so skip it.
-[ "${BUILDARCH}" = "ppc64le" ] && exit 0
-
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 # Source of truth for all the packages we bundle in static builds
@@ -11,9 +8,9 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building libunwind" || true
 
-export CFLAGS="${TUNING_FLAGS} -fno-lto -pipe"
+export CFLAGS="${TUNING_FLAGS} -I/libucontext-static/usr/include -fno-lto -pipe"
 export CXXFLAGS="${CFLAGS}"
-export LDFLAGS="-static"
+export LDFLAGS="-static -L/libucontext-static/usr/lib/ -lucontext"
 export PKG_CONFIG="pkg-config --static"
 
 if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libunwind" ]; then
