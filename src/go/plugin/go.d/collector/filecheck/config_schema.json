@@ -35,8 +35,7 @@
             ],
             "items": {
               "title": "Filepath",
-              "type": "string",
-              "pattern": "^$|^/"
+              "type": "string"
             },
             "uniqueItems": true
           },
@@ -49,8 +48,7 @@
             ],
             "items": {
               "title": "Filepath",
-              "type": "string",
-              "pattern": "^$|^/"
+              "type": "string"
             },
             "uniqueItems": true
           }
@@ -82,8 +80,7 @@
             ],
             "items": {
               "title": "Directory",
-              "type": "string",
-              "pattern": "^$|^/"
+              "type": "string"
             },
             "uniqueItems": true
           },
@@ -96,8 +93,7 @@
             ],
             "items": {
               "title": "Directory",
-              "type": "string",
-              "pattern": "^$|^/"
+              "type": "string"
             },
             "uniqueItems": true
           }
