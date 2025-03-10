@@ -368,7 +368,8 @@ RRDHOST *rrdhost_create(
 
     rrdhost_set_replication_parameters(host, memory_mode, replication_period, replication_step);
 
-    host->system_info = system_info;
+    host->system_info = rrdhost_system_info_create();
+    rrdhost_system_info_swap(host->system_info, system_info);
 
     rrdset_index_init(host);
 
@@ -543,12 +544,8 @@ static void rrdhost_update(RRDHOST *host
 
     host->health.enabled = (mode == RRD_DB_MODE_NONE) ? 0 : health;
 
-    {
-        struct rrdhost_system_info *old = host->system_info;
-        host->system_info = system_info;
-        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);
-        rrdhost_system_info_free(old);
-    }
+    rrdhost_system_info_swap(host->system_info, system_info);
+    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);
 
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone, abbrev_timezone, utc_offset);
@@ -676,10 +673,8 @@ RRDHOST *rrdhost_find_or_create(
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
 
-        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
-            rrdhost_system_info_free(system_info);
+        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
             return host;
-        }
 
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
         nd_log(NDLS_DAEMON, NDLP_INFO,
@@ -747,9 +742,6 @@ RRDHOST *rrdhost_find_or_create(
                 , replication_step
                 , system_info);
     }
-
-    if(!host)
-        rrdhost_system_info_free(system_info);
 
     return host;
 }

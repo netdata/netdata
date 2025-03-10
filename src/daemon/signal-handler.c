@@ -6,6 +6,9 @@
 typedef enum signal_action {
     NETDATA_SIGNAL_IGNORE,
     NETDATA_SIGNAL_EXIT_CLEANLY,
+#if defined(FSANITIZE_ADDRESS)
+    NETDATA_SIGNAL_EXIT_NOW,
+#endif
     NETDATA_SIGNAL_REOPEN_LOGS,
     NETDATA_SIGNAL_RELOAD_HEALTH,
     NETDATA_SIGNAL_DEADLY,
@@ -23,6 +26,9 @@ static struct {
     { SIGQUIT, "SIGQUIT", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGQUIT },
     { SIGTERM, "SIGTERM", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGTERM },
     { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS, EXIT_REASON_NONE },
+#if defined(FSANITIZE_ADDRESS)
+    { SIGUSR1, "SIGUSR1", 0, NETDATA_SIGNAL_EXIT_NOW, EXIT_REASON_NONE },
+#endif
     { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH, EXIT_REASON_NONE },
     { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGBUS },
     { SIGSEGV, "SIGSEGV", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSEGV },
@@ -37,6 +43,11 @@ static void signal_handler(int signo) {
             continue;
 
         signals_waiting[i].count++;
+
+#if defined(FSANITIZE_ADDRESS)
+        if(signals_waiting[i].action == NETDATA_SIGNAL_EXIT_NOW)
+            exit(1);
+#endif
 
         if(signals_waiting[i].action == NETDATA_SIGNAL_DEADLY) {
             // Update the status file
