@@ -318,12 +318,12 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 
     watcher_shutdown_end();
     watcher_thread_stop();
-    curl_global_cleanup();
 
     daemon_status_file_shutdown_step(NULL);
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
 
 #ifdef OS_WINDOWS
+    curl_global_cleanup();
     return;
 #endif
 
@@ -335,12 +335,15 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
         abort();
     } else {
         nd_sentry_fini();
+        curl_global_cleanup();
         exit(ret);
     }
 #else
     if(ret)
         _exit(ret);
-    else
+    else {
+        curl_global_cleanup();
         exit(ret);
+    }
 #endif
 }
