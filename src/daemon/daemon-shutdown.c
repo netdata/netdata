@@ -323,25 +323,40 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
 
 #if defined(FSANITIZE_ADDRESS)
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "Freeing all RRDHOSTs...\n");
     rrdhost_free_all();
 
+    fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
     if(cleanup_destroyed_dictionaries())
         fprintf(stderr, "WARNING: There are still dictionaries with references in them, that cannot be destroyed.\n");
 
     // destroy the caches in reverse order (extent and open depend on main cache)
+    fprintf(stderr, "Destroying extent cache (PGC)...\n");
     pgc_destroy(extent_cache);
+    fprintf(stderr, "Destroying open cache (PGC)...\n");
     pgc_destroy(open_cache);
+    fprintf(stderr, "Destroying main cache (PGC)...\n");
     pgc_destroy(main_cache);
 
+    fprintf(stderr, "Destroying metrics registry (MRG)...\n");
     size_t metrics_referenced = mrg_destroy(main_mrg);
     if(metrics_referenced)
         fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
             metrics_referenced);
 
-    // uuidmap_destroy();
+    fprintf(stderr, "Destroying UUIDMap...\n");
+    size_t uuid_referenced = uuidmap_destroy();
+    if(uuid_referenced)
+        fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
+            uuid_referenced);
+
     // strings_destroy();
     // functions_destroy();
     // dyncfg_destroy();
+
+    fprintf(stderr, "All done, exiting...\n");
 #endif
 
 #ifdef OS_WINDOWS

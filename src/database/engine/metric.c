@@ -361,7 +361,7 @@ size_t mrg_destroy(MRG *mrg) {
     if (unlikely(!mrg))
         return 0;
 
-    size_t remaining_metrics = 0;
+    size_t referenced = 0;
 
     // Traverse all partitions
     for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++) {
@@ -396,16 +396,12 @@ size_t mrg_destroy(MRG *mrg) {
                 METRIC *metric = *section_pvalue;
 
                 // Try to acquire metric for deletion
-                if (!refcount_acquire_for_deletion(&metric->refcount)) {
-                    // do not free the metric, let it be a memory leak
-                    // so that the sanitizer can catch it
-                    remaining_metrics++;
-                }
-                else {
-                    uuidmap_free(metric->uuid);
-                    aral_freez(mrg->index[partition].aral, metric);
-                    MRG_STATS_DELETED_METRIC(mrg, partition);
-                }
+                if (!refcount_acquire_for_deletion(&metric->refcount))
+                    referenced++;
+
+                uuidmap_free(metric->uuid);
+                aral_freez(mrg->index[partition].aral, metric);
+                MRG_STATS_DELETED_METRIC(mrg, partition);
             }
 
             JudyLFreeArray(&sections_judy, PJE0);
@@ -429,7 +425,7 @@ size_t mrg_destroy(MRG *mrg) {
     // Free the MRG structure
     freez(mrg);
 
-    return remaining_metrics;
+    return referenced;
 }
 
 ALWAYS_INLINE METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {

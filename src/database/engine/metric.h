@@ -42,7 +42,7 @@ struct mrg_statistics {
 
 MRG *mrg_create(void);
 
-// returns the number of metrics that could not be freed because they are referenced
+// returns the number of metrics that were freed, but were still referenced
 size_t mrg_destroy(MRG *mrg);
 
 METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric);
