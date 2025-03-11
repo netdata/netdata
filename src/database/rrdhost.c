@@ -9,7 +9,7 @@
 RRDHOST *localhost = NULL;
 netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
-RRDHOST *find_host_by_node_id(char *node_id) {
+RRDHOST *rrdhost_find_by_node_id(char *node_id) {
 
     ND_UUID node_uuid;
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid.uuid)))
@@ -27,21 +27,34 @@ RRDHOST *find_host_by_node_id(char *node_id) {
     return ret;
 }
 
+RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
+    if(strcmp(hostname, "localhost") == 0)
+        return localhost;
+
+    STRING *name = string_strdupz(hostname);
+
+    RRDHOST *host, *ret = NULL;
+    dfe_start_read(rrdhost_root_index, host) {
+        if (host->hostname == name) {
+            ret = host;
+            break;
+        }
+    }
+    dfe_done(host);
+
+    string_freez(name);
+
+    return ret;
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST indexes management
 
 DICTIONARY *rrdhost_root_index = NULL;
-static DICTIONARY *rrdhost_root_index_hostname = NULL;
 
 void rrdhost_init() {
     if(unlikely(!rrdhost_root_index)) {
         rrdhost_root_index = dictionary_create_advanced(
-            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
-            &dictionary_stats_category_rrdhost, 0);
-    }
-
-    if(unlikely(!rrdhost_root_index_hostname)) {
-        rrdhost_root_index_hostname = dictionary_create_advanced(
             DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
             &dictionary_stats_category_rrdhost, 0);
     }
@@ -102,66 +115,17 @@ static void rrdhost_index_del_by_guid(RRDHOST *host) {
 }
 
 // ----------------------------------------------------------------------------
-// RRDHOST index by hostname
-
-inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
-    if(unlikely(!strcmp(hostname, "localhost")))
-        return localhost;
-
-    RRDHOST *host = dictionary_get(rrdhost_root_index_hostname, hostname);
-    return host;
-}
-
-static inline void rrdhost_index_del_hostname(RRDHOST *host) {
-    if(unlikely(!host->hostname)) return;
-
-    if(rrdhost_option_check(host, RRDHOST_OPTION_INDEXED_HOSTNAME)) {
-        if(!dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)))
-            nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                   "RRDHOST: failed to delete hostname '%s' from index",
-                   rrdhost_hostname(host));
-
-        rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
-    }
-}
-
-static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
-    if(!host->hostname) return host;
-
-    RRDHOST *ret_hostname = dictionary_set(rrdhost_root_index_hostname, rrdhost_hostname(host), host, sizeof(RRDHOST));
-    if(ret_hostname == host)
-        rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
-    else {
-        // have the same hostname, but it's not the same host
-        // keep the new one only if the old one is orphan or archived
-        if (rrdhost_flag_check(ret_hostname, RRDHOST_FLAG_ORPHAN) || rrdhost_flag_check(ret_hostname, RRDHOST_FLAG_ARCHIVED)) {
-            rrdhost_index_del_hostname(ret_hostname);
-            rrdhost_index_add_hostname(host);
-        }
-        else
-            rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
-    }
-
-    return host;
-}
-
-// ----------------------------------------------------------------------------
 // RRDHOST - internal helpers
 
-static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname, bool add_to_index) {
+static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
     if(unlikely(hostname && !*hostname)) hostname = NULL;
 
     if(host->hostname && hostname && !strcmp(rrdhost_hostname(host), hostname))
         return;
 
-    rrdhost_index_del_hostname(host);
-
     STRING *old = host->hostname;
     host->hostname = string_strdupz(hostname?hostname:"localhost");
     string_freez(old);
-
-    if(add_to_index)
-        rrdhost_index_add_hostname(host);
 }
 
 static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
@@ -349,7 +313,7 @@ RRDHOST *rrdhost_create(
         prog_name,
         prog_version);
 
-    rrdhost_init_hostname(host, hostname, false);
+    rrdhost_init_hostname(host, hostname);
 
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->health.enabled = ((memory_mode == RRD_DB_MODE_NONE)) ? false : health;
@@ -453,8 +417,6 @@ RRDHOST *rrdhost_create(
         rrd_wrunlock();
         return NULL;
     }
-
-    rrdhost_index_add_hostname(host);
 
     if(is_localhost)
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(localhost, host, prev, next);
@@ -560,9 +522,7 @@ static void rrdhost_update(RRDHOST *host
                "Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.",
                rrdhost_hostname(host), hostname);
 
-        rrdhost_init_hostname(host, hostname, true);
-    } else {
-        rrdhost_index_add_hostname(host);
+        rrdhost_init_hostname(host, hostname);
     }
 
     if(strcmp(rrdhost_program_name(host), prog_name) != 0) {
@@ -814,7 +774,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // first remove it from the indexes, so that it will not be discoverable
 
-    rrdhost_index_del_hostname(host);
     rrdhost_index_del_by_guid(host);
 
     if (host->prev)
@@ -868,9 +827,7 @@ void rrdhost_free_all(void) {
 
     localhost = NULL;
 
-    dictionary_destroy(rrdhost_root_index_hostname);
     dictionary_destroy(rrdhost_root_index);
-    rrdhost_root_index_hostname = NULL;
     rrdhost_root_index = NULL;
 
     rrd_wrunlock();
