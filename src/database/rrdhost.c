@@ -132,12 +132,14 @@ static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
     if(ret_hostname == host)
         rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
     else {
-        //have the same hostname but it's not the same host
-        //keep the new one only if the old one is orphan or archived
+        // have the same hostname, but it's not the same host
+        // keep the new one only if the old one is orphan or archived
         if (rrdhost_flag_check(ret_hostname, RRDHOST_FLAG_ORPHAN) || rrdhost_flag_check(ret_hostname, RRDHOST_FLAG_ARCHIVED)) {
             rrdhost_index_del_hostname(ret_hostname);
             rrdhost_index_add_hostname(host);
         }
+        else
+            rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
     }
 
     return host;
@@ -838,6 +840,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
 
     rrdhost_destroy_rrdcontexts(host);
     rrdlabels_destroy(host->rrdlabels);
+    destroy_aclk_config(host);
 
     string_freez(host->hostname);
     string_freez(host->os);
@@ -862,6 +865,13 @@ void rrdhost_free_all(void) {
 
     if(localhost)
         rrdhost_free___while_having_rrd_wrlock(localhost);
+
+    localhost = NULL;
+
+    dictionary_destroy(rrdhost_root_index_hostname);
+    dictionary_destroy(rrdhost_root_index);
+    rrdhost_root_index_hostname = NULL;
+    rrdhost_root_index = NULL;
 
     rrd_wrunlock();
 }
