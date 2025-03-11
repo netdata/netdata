@@ -90,28 +90,22 @@ inline RRDHOST *rrdhost_find_by_guid(const char *guid) {
 }
 
 static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
-    RRDHOST *ret_machine_guid = dictionary_set(rrdhost_root_index, host->machine_guid, host, sizeof(RRDHOST));
-    if(ret_machine_guid == host)
-        rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID);
-    else {
-        rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID);
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "RRDHOST: host with machine guid '%s' is already indexed. Not adding it again.",
-               host->machine_guid);
-    }
-
-    return host;
+    return dictionary_set(rrdhost_root_index, host->machine_guid, host, sizeof(RRDHOST));
 }
 
 static void rrdhost_index_del_by_guid(RRDHOST *host) {
-    if(rrdhost_option_check(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID)) {
-        if(!dictionary_del(rrdhost_root_index, host->machine_guid))
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "RRDHOST: failed to delete machine guid '%s' from index",
-               host->machine_guid);
-
-        rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID);
+    RRDHOST *t = rrdhost_find_by_guid(host->machine_guid);
+    if(t == host) {
+        if (!dictionary_del(rrdhost_root_index, host->machine_guid))
+            nd_log(
+                NDLS_DAEMON, NDLP_NOTICE,
+                "RRDHOST: failed to delete machine guid '%s' from index",
+                host->machine_guid);
     }
+    else
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "RRDHOST: failed to delete machine guid '%s' from index, not found",
+               host->machine_guid);
 }
 
 // ----------------------------------------------------------------------------
