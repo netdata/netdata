@@ -352,6 +352,11 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
         fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
             uuid_referenced);
 
+    size_t strings_referenced = string_destroy();
+    if(strings_referenced)
+        fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
+                strings_referenced);
+
     // strings_destroy();
     // functions_destroy();
     // dyncfg_destroy();
