@@ -177,7 +177,7 @@ ND_UUID os_machine_id(void) {
         else {
             char buf[UUID_STR_LEN];
             uuid_unparse_lower(cached_machine_id.uuid, buf);
-            nd_log(NDLS_DAEMON, NDLP_WARNING, "OS_MACHINE_ID: machine ID found '%s'", buf);
+            nd_log(NDLS_DAEMON, NDLP_NOTICE, "OS_MACHINE_ID: machine ID found '%s'", buf);
         }
     }
 
