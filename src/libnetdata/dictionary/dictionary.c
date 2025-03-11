@@ -595,6 +595,8 @@ void dictionary_flush(DICTIONARY *dict) {
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
     DICTIONARY_STATS_DICT_FLUSHES_PLUS1(dict);
+
+    dictionary_garbage_collect(dict);
 }
 
 size_t dictionary_destroy(DICTIONARY *dict) {
