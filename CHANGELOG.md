@@ -6,9 +6,15 @@
 
 **Merged pull requests:**
 
+- Fix LSAN and memory leaks [\#19819](https://github.com/netdata/netdata/pull/19819) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#19816](https://github.com/netdata/netdata/pull/19816) ([netdatabot](https://github.com/netdatabot))
+- fix\(go.d/filecheck\): remove dyncfg path validation pattern  [\#19815](https://github.com/netdata/netdata/pull/19815) ([ilyam8](https://github.com/ilyam8))
+- Acquire datafile for deletion before calculating retention [\#19812](https://github.com/netdata/netdata/pull/19812) ([stelfrag](https://github.com/stelfrag))
 - Detect memory leaks [\#19811](https://github.com/netdata/netdata/pull/19811) ([ktsaou](https://github.com/ktsaou))
+- Avoid zero timeout in libuv timers [\#19810](https://github.com/netdata/netdata/pull/19810) ([stelfrag](https://github.com/stelfrag))
 - fix fsanitize ifdefs [\#19809](https://github.com/netdata/netdata/pull/19809) ([ktsaou](https://github.com/ktsaou))
 - do not change the scheduling policy by default [\#19808](https://github.com/netdata/netdata/pull/19808) ([ktsaou](https://github.com/ktsaou))
+- fix\(go.d/pihole\): switch to pihole6 api [\#19807](https://github.com/netdata/netdata/pull/19807) ([ilyam8](https://github.com/ilyam8))
 - Help finding leaks and running valgrind [\#19806](https://github.com/netdata/netdata/pull/19806) ([ktsaou](https://github.com/ktsaou))
 - fix memory corruption in streaming [\#19805](https://github.com/netdata/netdata/pull/19805) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations docs [\#19804](https://github.com/netdata/netdata/pull/19804) ([netdatabot](https://github.com/netdatabot))
@@ -476,13 +482,6 @@
 - fix\(go.d/rabbitmq\): handle insufficient perms when querying definitions [\#19277](https://github.com/netdata/netdata/pull/19277) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19276](https://github.com/netdata/netdata/pull/19276) ([netdatabot](https://github.com/netdatabot))
 - Updates to onprem docs [\#19275](https://github.com/netdata/netdata/pull/19275) ([M4itee](https://github.com/M4itee))
-- Skip label cleanup during metadata processing [\#19274](https://github.com/netdata/netdata/pull/19274) ([stelfrag](https://github.com/stelfrag))
-- build\(deps\): update go toolchain to v1.23.4 [\#19273](https://github.com/netdata/netdata/pull/19273) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.1 to 5.7.2 in /src/go [\#19271](https://github.com/netdata/netdata/pull/19271) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.0 to 0.2.2 in /src/go [\#19270](https://github.com/netdata/netdata/pull/19270) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump golang.org/x/net from 0.32.0 to 0.33.0 in /src/go [\#19269](https://github.com/netdata/netdata/pull/19269) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/docker/docker from 27.4.0+incompatible to 27.4.1+incompatible in /src/go [\#19268](https://github.com/netdata/netdata/pull/19268) ([dependabot[bot]](https://github.com/apps/dependabot))
-- improvement\(go.d/nats\): add gatewayz metrics [\#19266](https://github.com/netdata/netdata/pull/19266) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
