@@ -183,14 +183,14 @@ static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTO
 
             JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(rule, path, "enabled", ap->match.enabled, error, strict);
 
-            STRING *type = NULL;
-            JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(rule, path, "type", type, error, strict);
-            if(string_strcmp(type, "template") == 0)
+            char type[32];
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(rule, path, "type", type, error, strict);
+            if(strcmp(type, "template") == 0)
                 ap->match.is_template = true;
-            else if(string_strcmp(type, "instance") == 0)
+            else if(strcmp(type, "instance") == 0)
                 ap->match.is_template = false;
             else {
-                buffer_sprintf(error, "type is '%s', but it can only be 'instance' or 'template'", string2str(type));
+                buffer_sprintf(error, "type is '%s', but it can only be 'instance' or 'template'", type);
                 return false;
             }
 
