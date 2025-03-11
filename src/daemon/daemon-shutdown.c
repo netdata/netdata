@@ -119,7 +119,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 
     if(wait_collectors) {
         size_t running = 1;
-        size_t count = 10;
+        size_t count = 50;
         while (running && count) {
             running = 0;
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
@@ -272,7 +272,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
                 th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_JOINABLE, rrdeng_exit_background, multidb_ctx[tier]);
 
             // flush anything remaining again - just in case
-            rrdeng_flush_everything_and_wait(true, false, false);
+            rrdeng_flush_everything_and_wait(true, true, false);
 
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 nd_thread_join(th[tier]);
@@ -334,11 +334,11 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 
     // destroy the caches in reverse order (extent and open depend on main cache)
     fprintf(stderr, "Destroying extent cache (PGC)...\n");
-    pgc_destroy(extent_cache);
+    pgc_destroy(extent_cache, false);
     fprintf(stderr, "Destroying open cache (PGC)...\n");
-    pgc_destroy(open_cache);
+    pgc_destroy(open_cache, false);
     fprintf(stderr, "Destroying main cache (PGC)...\n");
-    pgc_destroy(main_cache);
+    pgc_destroy(main_cache, false);
 
     fprintf(stderr, "Destroying metrics registry (MRG)...\n");
     size_t metrics_referenced = mrg_destroy(main_mrg);
