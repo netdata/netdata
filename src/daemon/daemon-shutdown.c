@@ -220,7 +220,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 #ifdef ENABLE_DBENGINE
     if(!ret && dbengine_enabled)
         // flush all dirty pages now that all collectors and streaming completed
-        rrdeng_flush_everything_and_wait(false, false, false);
+        rrdeng_flush_everything_and_wait(false, false, true);
 #endif
 
     service_wait_exit(SERVICE_REPLICATION, 3 * USEC_PER_SEC);
