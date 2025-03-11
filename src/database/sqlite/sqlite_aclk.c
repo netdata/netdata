@@ -909,6 +909,15 @@ void create_aclk_config(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __may
     wc->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
 }
 
+void destroy_aclk_config(RRDHOST *host)
+{
+    if (!host || !host->aclk_config)
+        return;
+
+    freez(host->aclk_config);
+    host->aclk_config = NULL;
+}
+
 #define SQL_FETCH_ALL_HOSTS                                                                                            \
     "SELECT host_id, hostname, registry_hostname, update_every, os, "                                                  \
     "timezone, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "                                         \

@@ -840,6 +840,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
 
     rrdhost_destroy_rrdcontexts(host);
     rrdlabels_destroy(host->rrdlabels);
+    destroy_aclk_config(host);
 
     string_freez(host->hostname);
     string_freez(host->os);
