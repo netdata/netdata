@@ -337,8 +337,7 @@ RRDHOST *rrdhost_create(
         host->cache_dir  = strdupz(netdata_configured_cache_dir);
 
     // this is also needed for custom host variables - not only health
-    if(!host->rrdvars)
-        host->rrdvars = rrdvariables_create();
+    host->rrdvars = rrdvariables_create();
 
     if (likely(!uuid_parse(host->machine_guid, host->host_id.uuid)))
         sql_load_node_id(host);
@@ -821,6 +820,14 @@ void rrdhost_free_all(void) {
 
     localhost = NULL;
 
+    RRDHOST *host;
+    dfe_start_write(rrdhost_root_index, host) {
+        fprintf(stderr, "RRDHOST: MACHINE_GUID '%s' is still in the dictionary!\n",
+                host_dfe.name);
+    }
+    dfe_done(host);
+
+    dictionary_garbage_collect(rrdhost_root_index);
     dictionary_destroy(rrdhost_root_index);
     rrdhost_root_index = NULL;
 
