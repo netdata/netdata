@@ -131,7 +131,7 @@ void web_client_set_conn_webrtc(struct web_client *w);
 #define NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE 4096
 #define NETDATA_WEB_RESPONSE_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
-#define NETDATA_WEB_REQUEST_MAX_SIZE 65536
+#define NETDATA_WEB_REQUEST_MAX_SIZE (128 * 1024)
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
 
 #define CLOUD_CLIENT_NAME_LENGTH 64
@@ -242,7 +242,7 @@ void web_client_free(struct web_client *w);
 
 #include "web/api/web_api_v1.h"
 #include "web/api/web_api_v2.h"
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);

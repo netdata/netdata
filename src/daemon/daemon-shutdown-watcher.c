@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon-shutdown-watcher.h"
+#include "daemon-status-file.h"
 
 watcher_step_t *watcher_steps;
 
@@ -32,6 +33,8 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
     netdata_log_info("shutdown step: [%d/%d] - {at %s} started '%s'...",
                      (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
                      watcher_steps[step_id].msg);
+
+    daemon_status_file_shutdown_step(watcher_steps[step_id].msg);
 
 #ifdef ENABLE_SENTRY
     // Wait with a timeout
@@ -65,6 +68,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
                           (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
                           watcher_steps[step_id].msg, step_duration_txt);
 
+        daemon_status_file_shutdown_step("sentry timeout");
         abort();
     }
 }
@@ -81,9 +85,7 @@ void *watcher_main(void *arg)
 
     usec_t shutdown_start_time = now_monotonic_usec();
 
-    watcher_wait_for_step(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_DBENGINE_EXIT_MODE, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD, shutdown_start_time);
@@ -104,7 +106,6 @@ void *watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE, shutdown_start_time);
 
     completion_wait_for(&shutdown_end_completion);
     usec_t shutdown_end_time = now_monotonic_usec();
@@ -119,12 +120,8 @@ void *watcher_main(void *arg)
 void watcher_thread_start() {
     watcher_steps = callocz(WATCHER_STEP_ID_MAX, sizeof(watcher_step_t));
 
-    watcher_steps[WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE].msg =
-        "create shutdown file";
     watcher_steps[WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER].msg =
         "destroy main spawn server";
-    watcher_steps[WATCHER_STEP_ID_DBENGINE_EXIT_MODE].msg =
-        "dbengine exit mode";
     watcher_steps[WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS].msg =
         "close webrtc connections";
     watcher_steps[WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK].msg =
@@ -165,8 +162,6 @@ void watcher_thread_start() {
         "remove pid file";
     watcher_steps[WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES].msg =
         "free openssl structures";
-    watcher_steps[WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE].msg =
-        "remove incomplete shutdown file";
 
     for (size_t i = 0; i != WATCHER_STEP_ID_MAX; i++) {
         completion_init(&watcher_steps[i].p);

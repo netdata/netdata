@@ -3,14 +3,8 @@
 #include <daemon/main.h>
 #include "libuv_workers.h"
 
-// Register workers
-void register_libuv_worker_jobs() {
-    static __thread bool registered = false;
-
-    if(likely(registered))
-        return;
-
-    registered = true;
+static void register_libuv_worker_jobs_internal(void) {
+    signals_block_all_except_deadly();
 
     worker_register("LIBUV");
 
@@ -47,6 +41,7 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_DBENGINE_EVICT_OPEN_CACHE, "evict open");
     worker_register_job_name(UV_EVENT_DBENGINE_EVICT_EXTENT_CACHE, "evict extent");
     worker_register_job_name(UV_EVENT_DBENGINE_BUFFERS_CLEANUP, "dbengine buffers cleanup");
+    worker_register_job_name(UV_EVENT_DBENGINE_FLUSH_DIRTY, "dbengine flush dirty");
     worker_register_job_name(UV_EVENT_DBENGINE_QUIESCE, "dbengine quiesce");
     worker_register_job_name(UV_EVENT_DBENGINE_SHUTDOWN, "dbengine shutdown");
 
@@ -97,4 +92,16 @@ void register_libuv_worker_jobs() {
     char buf[NETDATA_THREAD_TAG_MAX + 1];
     snprintfz(buf, NETDATA_THREAD_TAG_MAX, "UV_WORKER[%d]", worker_id);
     uv_thread_set_name_np(buf);
+}
+
+// Register workers
+ALWAYS_INLINE
+void register_libuv_worker_jobs() {
+    static __thread bool registered = false;
+
+    if(likely(registered))
+        return;
+
+    registered = true;
+    register_libuv_worker_jobs_internal();
 }

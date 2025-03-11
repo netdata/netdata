@@ -13,17 +13,14 @@
     - graphite
     - remote write
     - time series
-  overview:
+  overview: &overview
     exporter_description: |
       Use the Graphite connector for the exporting engine to archive your Netdata metrics to Graphite providers for long-term storage,
       further analysis, or correlation with data from other sources.
     exporter_limitations: ''
   setup:
     prerequisites:
-      list:
-        - title: ''
-          description: |
-            - You have already installed Netdata and Graphite.
+      list: []
     configuration:
       file:
         name: 'exporting.conf'
@@ -177,6 +174,10 @@
                   # send hosts matching = localhost *
 - <<: *graphexport
   id: 'export-blueflood'
+  overview:
+    <<: *overview
+    exporter_description: |
+      Export your Netdata metrics to Blueflood DB using the Graphite protocol, allowing you to archive your data for long-term storage, further analysis, or correlation with data from other sources.
   meta:
     <<: *meta
     name: Blueflood
@@ -187,19 +188,11 @@
       - Blueflood
       - graphite
 - <<: *graphexport
-  id: 'export-influxdb'
-  meta:
-    <<: *meta
-    name: InfluxDB
-    link: https://www.influxdata.com/
-    icon_filename: 'influxdb.svg'
-    keywords:
-      - InfluxDB
-      - Influx
-      - export
-      - graphite
-- <<: *graphexport
   id: 'export-kairosdb'
+  overview:
+    <<: *overview
+    exporter_description: |
+      Export your Netdata metrics to KairosDB using the Graphite protocol, allowing you to archive your data for long-term storage, further analysis, or correlation with data from other sources.
   meta:
     <<: *meta
     name: KairosDB

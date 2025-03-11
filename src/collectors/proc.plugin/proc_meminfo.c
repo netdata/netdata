@@ -103,19 +103,19 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             ;
 
     if(unlikely(!arl_base)) {
-        do_ram          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system ram", CONFIG_BOOLEAN_YES);
-        do_swap         = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system swap", CONFIG_BOOLEAN_AUTO);
-        do_hwcorrupt    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hardware corrupted ECC", CONFIG_BOOLEAN_AUTO);
-        do_committed    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "committed memory", CONFIG_BOOLEAN_YES);
-        do_writeback    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "writeback memory", CONFIG_BOOLEAN_YES);
-        do_kernel       = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "kernel memory", CONFIG_BOOLEAN_YES);
-        do_slab         = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "slab memory", CONFIG_BOOLEAN_YES);
-        do_hugepages    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hugepages", CONFIG_BOOLEAN_AUTO);
-        do_transparent_hugepages = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "transparent hugepages", CONFIG_BOOLEAN_AUTO);
-        do_reclaiming   = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "memory reclaiming", CONFIG_BOOLEAN_AUTO);
-        do_high_low     = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "high low memory", CONFIG_BOOLEAN_AUTO);
-        do_cma          = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "cma memory", CONFIG_BOOLEAN_AUTO);
-        do_directmap    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "direct maps", CONFIG_BOOLEAN_AUTO);
+        do_ram          = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system ram", CONFIG_BOOLEAN_YES);
+        do_swap         = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system swap", CONFIG_BOOLEAN_AUTO);
+        do_hwcorrupt    = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hardware corrupted ECC", CONFIG_BOOLEAN_AUTO);
+        do_committed    = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "committed memory", CONFIG_BOOLEAN_YES);
+        do_writeback    = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "writeback memory", CONFIG_BOOLEAN_YES);
+        do_kernel       = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "kernel memory", CONFIG_BOOLEAN_YES);
+        do_slab         = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "slab memory", CONFIG_BOOLEAN_YES);
+        do_hugepages    = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hugepages", CONFIG_BOOLEAN_AUTO);
+        do_transparent_hugepages = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "transparent hugepages", CONFIG_BOOLEAN_AUTO);
+        do_reclaiming   = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "memory reclaiming", CONFIG_BOOLEAN_AUTO);
+        do_high_low     = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "high low memory", CONFIG_BOOLEAN_AUTO);
+        do_cma          = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "cma memory", CONFIG_BOOLEAN_AUTO);
+        do_directmap    = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "direct maps", CONFIG_BOOLEAN_AUTO);
 
         // https://github.com/torvalds/linux/blob/master/fs/proc/meminfo.c
 
@@ -214,7 +214,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/meminfo");
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff))
             return 1;
     }

@@ -167,11 +167,32 @@ static inline bool json_parse_number(LOG_JSON_STATE *js) {
     }
 }
 
+static inline void copy_newline(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
+    if(*remaining > 3) {
+        *(*d)++ = '\\';
+        *(*d)++ = 'n';
+        (*remaining) -= 2;
+    }
+}
+
+static inline void copy_tab(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
+    if(*remaining > 3) {
+        *(*d)++ = '\\';
+        *(*d)++ = 't';
+        (*remaining) -= 2;
+    }
+}
+
 static inline bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) {
     if (codepoint <= 0x7F) {
         // 1-byte sequence
         if (*remaining < 2) return false; // +1 for the null
-        *(*d)++ = (char)codepoint;
+        if(codepoint == '\n')
+            copy_newline(NULL, d, remaining);
+        else if(codepoint == '\t')
+            copy_tab(NULL, d, remaining);
+        else
+            *(*d)++ = (char)codepoint;
         (*remaining)--;
     }
     else if (codepoint <= 0x7FF) {
@@ -252,22 +273,6 @@ size_t parse_surrogate(const char *s, char *d, size_t *remaining) {
         }
         codepoint = (unsigned)strtoul(hex, NULL, 16);
         return encode_utf8(codepoint, &d, remaining) ? 10 : 0; // \UXXXXXXXX
-    }
-}
-
-static inline void copy_newline(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
-    if(*remaining > 3) {
-        *(*d)++ = '\\';
-        *(*d)++ = 'n';
-        (*remaining) -= 2;
-    }
-}
-
-static inline void copy_tab(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
-    if(*remaining > 3) {
-        *(*d)++ = '\\';
-        *(*d)++ = 't';
-        (*remaining) -= 2;
     }
 }
 
@@ -511,29 +516,33 @@ static inline bool json_parse_array(LOG_JSON_STATE *js) {
 
     json_consume_char(js);
 
-    size_t index = 0;
-    do {
-        if(!json_key_index_and_push(js, index))
-            return false;
-
-        if(!json_parse_value(js))
-            return false;
-
-        json_key_pop(js);
-
-        if(!json_expect_char_after_white_space(js, ",]"))
-            return false;
-
-        const char *s = json_current_pos(js);
+    const char *s = json_current_pos(js);
+    if(*s == ']')
         json_consume_char(js);
-        if(*s == ',') {
-            index++;
-            continue;
-        }
-        else // }
-            break;
+    else {
+        size_t index = 0;
+        do {
+            if (!json_key_index_and_push(js, index))
+                return false;
 
-    } while(true);
+            if (!json_parse_value(js))
+                return false;
+
+            json_key_pop(js);
+
+            if (!json_expect_char_after_white_space(js, ",]"))
+                return false;
+
+            s = json_current_pos(js);
+            json_consume_char(js);
+            if (*s == ',') {
+                index++;
+                continue;
+            } else // ']'
+                break;
+
+        } while (true);
+    }
 
     return true;
 }
@@ -544,34 +553,39 @@ static inline bool json_parse_object(LOG_JSON_STATE *js) {
 
     json_consume_char(js);
 
-    do {
-        if (!json_expect_char_after_white_space(js, "\""))
-            return false;
-
-        if(!json_parse_key_and_push(js))
-            return false;
-
-        if(!json_expect_char_after_white_space(js, ":"))
-            return false;
-
+    const char *s = json_current_pos(js);
+    if(*s == '}')
         json_consume_char(js);
+    else {
+        do {
+            if (!json_expect_char_after_white_space(js, "\""))
+                return false;
 
-        if(!json_parse_value(js))
-            return false;
+            if (!json_parse_key_and_push(js))
+                return false;
 
-        json_key_pop(js);
+            if (!json_expect_char_after_white_space(js, ":"))
+                return false;
 
-        if(!json_expect_char_after_white_space(js, ",}"))
-            return false;
+            json_consume_char(js);
 
-        const char *s = json_current_pos(js);
-        json_consume_char(js);
-        if(*s == ',')
-            continue;
-        else // }
-            break;
+            if (!json_parse_value(js))
+                return false;
 
-    } while(true);
+            json_key_pop(js);
+
+            if (!json_expect_char_after_white_space(js, ",}"))
+                return false;
+
+            s = json_current_pos(js);
+            json_consume_char(js);
+            if (*s == ',')
+                continue;
+            else // '}'
+                break;
+
+        } while (true);
+    }
 
     return true;
 }

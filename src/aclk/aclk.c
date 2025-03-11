@@ -199,7 +199,7 @@ static int wait_till_agent_claimed(void)
  * @param aclk_hostname points to location where string pointer to hostname will be set
  * @param aclk_port port to int where port will be saved
  * 
- * @return If non 0 returned irrecoverable error happened (or netdata_exit) and ACLK should be terminated
+ * @return If non 0 returned irrecoverable error happened (or exit_initiated) and ACLK should be terminated
  */
 static int wait_till_agent_claim_ready()
 {
@@ -306,7 +306,7 @@ static int handle_connection(mqtt_wss_client client)
 {
     while (service_running(SERVICE_ACLK)) {
         // timeout 1000 to check at least once a second
-        // for netdata_exit
+        // for exit_initiated
         int rc = mqtt_wss_service(client, 1000);
         if (rc < 0){
             worker_is_busy(WORKER_ACLK_DISCONNECTED);
@@ -452,9 +452,9 @@ static unsigned long aclk_reconnect_delay() {
     return aclk_tbeb_delay(0, aclk_env->backoff.base, aclk_env->backoff.min_s, aclk_env->backoff.max_s);
 }
 
-/* Block till aclk_reconnect_delay is satisfied or netdata_exit is signalled
+/* Block till aclk_reconnect_delay is satisfied or exit_initiated is signalled
  * @return 0 - Go ahead and connect (delay expired)
- *         1 - netdata_exit
+ *         1 - exit_initiated
  */
 #define NETDATA_EXIT_POLL_MS (MSEC_PER_SEC/4)
 static int aclk_block_till_recon_allowed() {
@@ -466,7 +466,7 @@ static int aclk_block_till_recon_allowed() {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Wait before attempting to reconnect in %.3f seconds", recon_delay / (float)MSEC_PER_SEC);
 
-    // we want to wake up from time to time to check netdata_exit
+    // we want to wake up from time to time to check exit_initiated
     worker_is_busy(WORKER_ACLK_WAITING_TO_CONNECT);
     while (recon_delay)
     {
@@ -602,14 +602,9 @@ const char *aclk_cloud_base_url = NULL;
  * @param client instance of mqtt_wss_client
  * @return  0 - Successful Connection,
  *          <0 - Irrecoverable Error -> Kill ACLK,
- *          >0 - netdata_exit
+ *          >0 - exit_initiated
  */
 #define CLOUD_BASE_URL_READ_RETRY 30
-#ifdef ACLK_SSL_ALLOW_SELF_SIGNED
-#define ACLK_SSL_FLAGS MQTT_WSS_SSL_ALLOW_SELF_SIGNED
-#else
-#define ACLK_SSL_FLAGS MQTT_WSS_SSL_CERT_CHECK_FULL
-#endif
 static int aclk_attempt_to_connect(mqtt_wss_client client)
 {
     https_client_resp_t rc;
@@ -743,11 +738,13 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         mqtt_conn_params.will_msg = aclk_generate_lwt(&mqtt_conn_params.will_msg_len);
 
+        int ssl_flags = cloud_config_insecure_get() ? MQTT_WSS_SSL_ALLOW_SELF_SIGNED : MQTT_WSS_SSL_CERT_CHECK_FULL;
+
 #ifdef ACLK_DISABLE_CHALLENGE
-        int mqtt_rc = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf);
+        int mqtt_rc = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf);
         url_t_destroy(&base_url);
 #else
-        int mqtt_rc = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf, &fallback_ipv4);
+        int mqtt_rc = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf, &fallback_ipv4);
         url_t_destroy(&mqtt_url);
 
         freez((char*)mqtt_conn_params.clientid);
@@ -851,7 +848,7 @@ void *aclk_main(void *ptr)
     size_t default_ssl_log_filename_size = strlen(netdata_configured_log_dir) + strlen(DEFAULT_SSKEYLOGFILE_NAME) + 2;
     char *default_ssl_log_filename = mallocz(default_ssl_log_filename_size);
     snprintfz(default_ssl_log_filename, default_ssl_log_filename_size, "%s/%s", netdata_configured_log_dir, DEFAULT_SSKEYLOGFILE_NAME);
-    ssl_log_filename = config_get(CONFIG_SECTION_CLOUD, "aclk ssl keylog file", default_ssl_log_filename);
+    ssl_log_filename = inicfg_get(&netdata_config, CONFIG_SECTION_CLOUD, "aclk ssl keylog file", default_ssl_log_filename);
     freez(default_ssl_log_filename);
     if (ssl_log_filename) {
         error_report("SSLKEYLOGFILE active (path:\"%s\")!", ssl_log_filename);
@@ -865,7 +862,7 @@ void *aclk_main(void *ptr)
     mqtt_wss_set_max_buf_size(mqttwss_client, 25*1024*1024);
 
     // Keep reconnecting and talking until our time has come
-    // and the Grim Reaper (netdata_exit) calls
+    // and the Grim Reaper (exit_initiated) calls
     netdata_log_info("ACLK: Starting ACLK query event loop");
     aclk_query_init(mqttwss_client);
     do {
@@ -875,7 +872,7 @@ void *aclk_main(void *ptr)
 
         if (schedule_node_update) {
             worker_is_busy(WORKER_ACLK_NODE_UPDATE);
-            schedule_node_state_update(localhost, 0);
+            schedule_node_state_update(localhost, 10);
             schedule_node_update = false;
         }
 
@@ -932,148 +929,94 @@ bool aclk_host_state_update_auto(RRDHOST *host) {
     return true;
 }
 
-void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
+void aclk_create_node_instance_job(RRDHOST *host)
 {
-    ND_UUID node_id;
+    if (unlikely(!host))
+        return;
 
+    CLAIM_ID claim_id = claim_id_get();
+    if (!claim_id_is_set(claim_id))
+        return;
+
+    aclk_query_t query = aclk_query_new(REGISTER_NODE);
+    int32_t hops =  rrdhost_ingestion_hops(host);
+    node_instance_creation_t node_instance_creation = {
+        .hops = hops,
+        .hostname = rrdhost_hostname(host),
+        .machine_guid = host->machine_guid,
+        .claim_id = claim_id.str
+    };
+
+    query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
+    query->data.bin_payload.msg_name = "CreateNodeInstance";
+    query->data.bin_payload.payload = generate_node_instance_creation(&query->data.bin_payload.size, &node_instance_creation);
+
+    nd_log_daemon(NDLP_DEBUG, "Queuing registration for host=%s, hops=%d", host->machine_guid, hops);
+
+    aclk_add_job(query);
+}
+
+void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable)
+{
+    if (unlikely(!host))
+        return;
+
+    CLAIM_ID claim_id = claim_id_get();
+    if (!claim_id_is_set(claim_id))
+        return;
+
+    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
+
+    int32_t hops = rrdhost_ingestion_hops(host);
+    node_instance_connection_t node_state_update = {
+        .claim_id = claim_id.str,
+        .hops = hops,
+        .live = live,
+        .queryable = queryable,
+        .session_id = aclk_session_newarch};
+
+    char node_id[UUID_STR_LEN];
+    uuid_unparse_lower(host->node_id.uuid, node_id);
+
+    node_state_update.node_id = node_id;
+    node_state_update.capabilities = aclk_get_node_instance_capas(host);
+
+    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
+    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
+    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
+
+    nd_log_daemon(
+        NDLP_DEBUG,
+        "Queuing status update for node=%s, live=%d, hops=%d, queryable=%d",
+        (char *)node_state_update.node_id,
+        live,
+        hops,
+        queryable);
+
+    freez((void *)node_state_update.capabilities);
+    aclk_add_job(query);
+}
+
+void aclk_host_state_update(RRDHOST *host, int live, int queryable)
+{
     if (!aclk_online())
         return;
 
-    if (!UUIDiszero(host->node_id)) {
-        node_id = host->node_id;
-    }
-    else {
-        int ret = get_node_id(&host->host_id.uuid, &node_id.uuid);
-        if (ret > 0) {
-            // this means we were not able to check if node_id already present
-            netdata_log_error("ACLK: Unable to check for node_id. Ignoring the host state update.");
-            return;
-        }
-        if (ret < 0) {
-            // node_id not found
-            aclk_query_t create_query;
-            create_query = aclk_query_new(REGISTER_NODE);
-            CLAIM_ID claim_id = claim_id_get();
-
-            node_instance_creation_t node_instance_creation = {
-                .claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL,
-                .hops = rrdhost_ingestion_hops(host),
-                .hostname = rrdhost_hostname(host),
-                .machine_guid = host->machine_guid};
-
-            create_query->data.bin_payload.payload =
-                generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-
-            create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
-            create_query->data.bin_payload.msg_name = "CreateNodeInstance";
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "Registering host=%s, hops=%d", host->machine_guid,
-                   rrdhost_ingestion_hops(host));
-
-            aclk_add_job(create_query);
-            return;
-        }
-    }
-
-    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-    node_instance_connection_t node_state_update = {
-        .hops = rrdhost_ingestion_hops(host),
-        .live = cmd,
-        .queryable = queryable,
-        .session_id = aclk_session_newarch
-    };
-    node_state_update.node_id = mallocz(UUID_STR_LEN);
-    uuid_unparse_lower(node_id.uuid, (char*)node_state_update.node_id);
-
-    node_state_update.capabilities = aclk_get_agent_capas();
-
-    CLAIM_ID claim_id = claim_id_get();
-    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
-    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "Queuing status update for node=%s, live=%d, hops=%d, queryable=%d",
-           (char*)node_state_update.node_id, cmd,
-           rrdhost_ingestion_hops(host), queryable);
-
-    freez((void*)node_state_update.node_id);
-    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
-    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-    aclk_add_job(query);
+    if (uuid_is_null(host->node_id.uuid))
+        aclk_create_node_instance_job(host);
+    else
+        aclk_update_node_instance_job(host, live, queryable);
 }
 
 void aclk_send_node_instances()
 {
-    struct node_instance_list *list_head = get_node_list();
-    struct node_instance_list *list = list_head;
-    if (unlikely(!list)) {
-        error_report("Failure to get_node_list from DB!");
-        return;
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host)
+    {
+        int live = rrdhost_ingestion_status(host) == RRDHOST_INGEST_STATUS_ONLINE ? 1 : 0;
+        aclk_host_state_update(host, live, 1);
     }
-    while (!uuid_is_null(list->host_id)) {
-        if (!uuid_is_null(list->node_id)) {
-            aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-            node_instance_connection_t node_state_update = {
-                .live = list->live,
-                .hops = list->hops,
-                .queryable = 1,
-                .session_id = aclk_session_newarch
-            };
-            node_state_update.node_id = mallocz(UUID_STR_LEN);
-            uuid_unparse_lower(list->node_id, (char*)node_state_update.node_id);
-
-            char host_id[UUID_STR_LEN];
-            uuid_unparse_lower(list->host_id, host_id);
-
-            RRDHOST *host = rrdhost_find_by_guid(host_id);
-            if (unlikely(!host)) {
-                freez((void*)node_state_update.node_id);
-                freez(query);
-                continue;
-            }
-            node_state_update.capabilities = aclk_get_node_instance_capas(host);
-
-            CLAIM_ID claim_id = claim_id_get();
-            node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
-            query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "Queuing status update for node=%s, live=%d, hops=%d, queryable=1",
-                   (char*)node_state_update.node_id, list->live, list->hops);
-
-            freez((void*)node_state_update.capabilities);
-            freez((void*)node_state_update.node_id);
-            query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
-            query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-            aclk_add_job(query);
-        } else {
-            aclk_query_t create_query;
-            create_query = aclk_query_new(REGISTER_NODE);
-            node_instance_creation_t node_instance_creation = {
-                .hops = list->hops,
-                .hostname = list->hostname,
-            };
-            node_instance_creation.machine_guid = mallocz(UUID_STR_LEN);
-            uuid_unparse_lower(list->host_id, (char*)node_instance_creation.machine_guid);
-            create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
-            create_query->data.bin_payload.msg_name = "CreateNodeInstance";
-
-            CLAIM_ID claim_id = claim_id_get();
-            node_instance_creation.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL,
-            create_query->data.bin_payload.payload = generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "Queuing registration for host=%s, hops=%d",
-                   (char*)node_instance_creation.machine_guid, list->hops);
-
-            freez((void *)node_instance_creation.machine_guid);
-            aclk_add_job(create_query);
-        }
-        freez(list->hostname);
-
-        list++;
-    }
-    freez(list_head);
+    dfe_done(host);
 }
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)

@@ -3,7 +3,7 @@
 #define PULSE_INTERNALS 1
 #include "pulse-db-dbengine.h"
 
-size_t pulse_dbengine_total_memory = 0;
+int64_t pulse_dbengine_total_memory = 0;
 
 #if defined(ENABLE_DBENGINE)
 
@@ -660,21 +660,21 @@ void pulse_dbengine_do(bool extended) {
 
     struct rrdeng_buffer_sizes dbmem = rrdeng_pulse_memory_sizes();
 
-    size_t buffers_total_size = dbmem.xt_buf + dbmem.wal;
+    int64_t buffers_total_size = (int64_t)dbmem.xt_buf + (int64_t)dbmem.wal;
 
-    size_t aral_structures_total_size = 0, aral_used_total_size = 0;
-    size_t aral_padding_total_size = 0;
+    int64_t aral_structures_total_size = 0, aral_used_total_size = 0;
+    int64_t aral_padding_total_size = 0;
     for(size_t i = 0; i < RRDENG_MEM_MAX ; i++) {
-        buffers_total_size += aral_free_bytes_from_stats(dbmem.as[i]);
-        aral_structures_total_size += aral_structures_bytes_from_stats(dbmem.as[i]);
-        aral_used_total_size += aral_used_bytes_from_stats(dbmem.as[i]);
-        aral_padding_total_size += aral_padding_bytes_from_stats(dbmem.as[i]);
+        buffers_total_size += (int64_t)aral_free_bytes_from_stats(dbmem.as[i]);
+        aral_structures_total_size += (int64_t)aral_structures_bytes_from_stats(dbmem.as[i]);
+        aral_used_total_size += (int64_t)aral_used_bytes_from_stats(dbmem.as[i]);
+        aral_padding_total_size += (int64_t)aral_padding_bytes_from_stats(dbmem.as[i]);
     }
 
     pulse_dbengine_total_memory =
-        pgc_main_stats.size + (ssize_t)pgc_open_stats.size + pgc_extent_stats.size +
+        pgc_main_stats.size + pgc_open_stats.size + pgc_extent_stats.size +
         mrg_stats.size +
-        buffers_total_size + aral_structures_total_size + aral_padding_total_size + pgd_padding_bytes();
+        buffers_total_size + aral_structures_total_size + aral_padding_total_size + (int64_t)pgd_padding_bytes();
 
     // we need all the above for the total dbengine memory as reported by the non-extended netdata memory chart
     if(!main_cache || !main_mrg || !extended)
@@ -685,7 +685,7 @@ void pulse_dbengine_do(bool extended) {
     dbengine2_cache_statistics_charts(&extent_cache_ptrs, &pgc_extent_stats, &pgc_extent_stats_old, "extent", 135300);
     mrg_get_statistics(main_mrg, &mrg_stats);
 
-    size_t priority = 135000;
+    int priority = 135000;
     {
         static RRDSET *st_pgc_memory = NULL;
         static RRDDIM *rd_pgc_memory_main = NULL;

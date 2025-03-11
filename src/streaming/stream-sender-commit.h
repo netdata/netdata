@@ -29,8 +29,8 @@ void sender_host_buffer_free(struct rrdhost *host);
 // get the thread buffer
 // this is the preferred buffer for dedicated workers sending a lot of messages (like replication)
 // these threads need to maintain enough allocation for repeated use of the buffer
-BUFFER *sender_thread_buffer_with_trace(struct sender_state *s, const char *func);
-#define sender_thread_buffer(s) sender_thread_buffer_with_trace(s, __FUNCTION__)
+BUFFER *sender_thread_buffer_with_trace(struct sender_state *s, size_t default_size, const char *func);
+#define sender_thread_buffer(s, default_size) sender_thread_buffer_with_trace(s, default_size, __FUNCTION__)
 
 // get the global host buffer
 // this is the preferred buffer for stream threads (unified receiver / sender threads)

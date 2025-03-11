@@ -4,6 +4,7 @@ package k8s_kubelet
 
 import (
 	"math"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
@@ -190,7 +191,7 @@ func (c *Collector) collectStorageDataKeyGenerationLatencies(raw prometheus.Seri
 
 	for _, metric := range raw.FindByName(metricName) {
 		value := metric.Value
-		bucket := metric.Labels.Get("le")
+		bucket, _ := strings.CutSuffix(metric.Labels.Get("le"), ".0")
 		switch bucket {
 		case "5":
 			latencies.LE5.Set(value)

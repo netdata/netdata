@@ -101,8 +101,8 @@ RRDHOST_INGEST_STATUS rrdhost_ingestion_status(RRDHOST *host) {
 }
 
 int16_t rrdhost_ingestion_hops(RRDHOST *host) {
-    if(rrdhost_is_local(host)) return 0;
-    if(!host->system_info) return 1;
+    if(host == localhost) return 0;
+    if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !host->system_info) return 1;
     return rrdhost_system_info_hops(host->system_info);
 }
 
@@ -150,7 +150,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
     uint32_t replicating_instances = UINT32_MAX;
 
     time_t since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
-    STREAM_HANDSHAKE reason = (online) ? STREAM_HANDSHAKE_NEVER : host->stream.rcv.status.exit_reason;
+    STREAM_HANDSHAKE reason = host->stream.rcv.status.reason;
 
     if (online) {
         if (db_status == RRDHOST_DB_STATUS_INITIALIZING)
@@ -169,7 +169,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             status = RRDHOST_INGEST_STATUS_ONLINE;
     }
     else {
-        if(!since)
+        if(!host->stream.rcv.status.connections)
             status = RRDHOST_INGEST_STATUS_ARCHIVED;
         else
             status = RRDHOST_INGEST_STATUS_OFFLINE;
@@ -247,7 +247,6 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
 
         if (rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED)) {
             s->stream.hops = host->sender->hops;
-            s->stream.reason = STREAM_HANDSHAKE_NEVER;
             s->stream.capabilities = host->sender->capabilities;
 
             s->stream.replication.completion = rrdhost_sender_replication_completion_unsafe(host, now, &s->stream.replication.instances);
@@ -258,13 +257,13 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
             else
                 s->stream.status = RRDHOST_STREAM_STATUS_ONLINE;
 
-            s->stream.compression = host->sender->compressor.initialized;
+            s->stream.compression = host->sender->thread.compressor.initialized;
         }
         else {
             s->stream.status = RRDHOST_STREAM_STATUS_OFFLINE;
             s->stream.hops = (int16_t)(s->ingest.hops + 1);
-            s->stream.reason = host->sender->exit.reason;
         }
+        s->stream.reason = host->stream.snd.status.reason;
 
         stream_sender_unlock(host->sender);
     }

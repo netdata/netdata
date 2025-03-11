@@ -78,6 +78,8 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_LIBCRYPTO,
     BIB_LIB_LIBYAML,
     BIB_LIB_LIBMNL,
+    BIB_LIB_LIBUNWIND,
+    BIB_LIB_BACKTRACE,
     BIB_PLUGIN_APPS,
     BIB_PLUGIN_LINUX_CGROUPS,
     BIB_PLUGIN_LINUX_CGROUP_NETWORK,
@@ -86,6 +88,7 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_LINUX_DISKSPACE,
     BIB_PLUGIN_FREEBSD,
     BIB_PLUGIN_MACOS,
+    BIB_PLUGIN_WINDOWS,
     BIB_PLUGIN_STATSD,
     BIB_PLUGIN_TIMEX,
     BIB_PLUGIN_IDLEJITTER,
@@ -94,6 +97,9 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_CUPS,
     BIB_PLUGIN_EBPF,
     BIB_PLUGIN_FREEIPMI,
+    BIB_PLUGIN_NETWORK_VIEWER,
+    BIB_PLUGIN_SYSTEMD_JOURNAL,
+    BIB_PLUGIN_WINDOWS_EVENTS,
     BIB_PLUGIN_NFACCT,
     BIB_PLUGIN_PERF,
     BIB_PLUGIN_SLABINFO,
@@ -114,6 +120,11 @@ typedef enum __attribute__((packed)) {
     BIB_EXPORT_SHELL,
     BIB_DEVEL_TRACE_ALLOCATIONS,
     BIB_DEVELOPER_MODE,
+    BIB_RUNTIME_PROFILE,
+    BIB_RUNTIME_PARENT,
+    BIB_RUNTIME_CHILD,
+    BIB_RUNTIME_MEM_TOTAL,
+    BIB_RUNTIME_MEM_AVAIL,
 
     // leave this last
     BIB_TERMINATOR,
@@ -131,7 +142,8 @@ typedef enum __attribute__((packed)) {
     BIC_LIBS,
     BIC_PLUGINS,
     BIC_EXPORTERS,
-    BIC_DEBUG_DEVEL
+    BIC_DEBUG_DEVEL,
+    BIC_RUNTIME,
 } BUILD_INFO_CATEGORY;
 
 typedef enum __attribute__((packed)) {
@@ -147,6 +159,7 @@ static struct {
     const char *json;
     bool status;
     const char *value;
+    bool value_allocated;
 } BUILD_INFO[] = {
         [BIB_PACKAGING_NETDATA_VERSION] = {
                 .category = BIC_PACKAGING,
@@ -716,6 +729,22 @@ static struct {
             .json = "libmnl",
             .value = NULL,
         },
+        [BIB_LIB_LIBUNWIND] = {
+            .category = BIC_LIBS,
+            .type = BIT_BOOLEAN,
+            .analytics = "libunwind",
+            .print = "libunwind (library for getting stack traces)",
+            .json = "libunwind",
+            .value = NULL,
+        },
+        [BIB_LIB_BACKTRACE] = {
+            .category = BIC_LIBS,
+            .type = BIT_BOOLEAN,
+            .analytics = "backtrace",
+            .print = "backtrace (library for getting stack traces)",
+            .json = "backtrace",
+            .value = NULL,
+        },
         [BIB_PLUGIN_APPS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
@@ -780,6 +809,14 @@ static struct {
                 .json = "macos",
                 .value = NULL,
         },
+        [BIB_PLUGIN_WINDOWS] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = NULL,
+            .print = "windows (monitor Windows systems)",
+            .json = "windows",
+            .value = NULL,
+        },
         [BIB_PLUGIN_STATSD] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
@@ -843,6 +880,30 @@ static struct {
                 .print = "freeipmi (monitor enterprise server H/W)",
                 .json = "freeipmi",
                 .value = NULL,
+        },
+        [BIB_PLUGIN_NETWORK_VIEWER] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = "NETWORK-VIEWER",
+            .print = "network-viewer (monitor TCP/UDP IPv4/6 sockets)",
+            .json = "network-viewer",
+            .value = NULL,
+        },
+        [BIB_PLUGIN_SYSTEMD_JOURNAL] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = "SYSTEMD-JOURNAL",
+            .print = "systemd-journal (monitor journal logs)",
+            .json = "systemd-journal",
+            .value = NULL,
+        },
+        [BIB_PLUGIN_WINDOWS_EVENTS] = {
+            .category = BIC_PLUGINS,
+            .type = BIT_BOOLEAN,
+            .analytics = "WINDOWS-EVENTS",
+            .print = "windows-events (monitor Windows events)",
+            .json = "windows-events",
+            .value = NULL,
         },
         [BIB_PLUGIN_NFACCT] = {
                 .category = BIC_PLUGINS,
@@ -1004,6 +1065,46 @@ static struct {
                 .json = "dev-mode",
                 .value = NULL,
         },
+        [BIB_RUNTIME_PROFILE] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_STRING,
+            .analytics = "ConfigProfile",
+            .print = "Profile",
+            .json = "profile",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_PARENT] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_BOOLEAN,
+            .analytics = "StreamParent",
+            .print = "Stream Parent (accept data from Children)",
+            .json = "parent",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_CHILD] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_BOOLEAN,
+            .analytics = "StreamChild",
+            .print = "Stream Child (send data to a Parent)",
+            .json = "child",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_MEM_TOTAL] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_STRING,
+            .analytics = "TotalMemory",
+            .print = "Total System Memory",
+            .json = "mem-total",
+            .value = NULL,
+        },
+        [BIB_RUNTIME_MEM_AVAIL] = {
+            .category = BIC_RUNTIME,
+            .type = BIT_STRING,
+            .analytics = "AvailableMemory",
+            .print = "Available System Memory",
+            .json = "mem-available",
+            .value = NULL,
+        },
 
         // leave this last
         [BIB_TERMINATOR] = {
@@ -1017,7 +1118,14 @@ static struct {
 };
 
 static void build_info_set_value(BUILD_INFO_SLOT slot, const char *value) {
+    const char *old = BUILD_INFO[slot].value;
+
     BUILD_INFO[slot].value = value;
+
+    if(BUILD_INFO[slot].value_allocated)
+        freez((void *)old);
+
+    BUILD_INFO[slot].value_allocated = false;
 }
 
 static void build_info_append_value(BUILD_INFO_SLOT slot, const char *value) {
@@ -1033,13 +1141,30 @@ static void build_info_append_value(BUILD_INFO_SLOT slot, const char *value) {
     else
         strcpy(buf, value);
 
-    freez((void *)BUILD_INFO[slot].value);
+    const char *old = BUILD_INFO[slot].value;
+
     BUILD_INFO[slot].value = strdupz(buf);
+
+    if(BUILD_INFO[slot].value_allocated)
+        freez((void *)old);
+
+    BUILD_INFO[slot].value_allocated = true;
 }
 
 static void build_info_set_value_strdupz(BUILD_INFO_SLOT slot, const char *value) {
     if(!value) value = "";
-    build_info_set_value(slot, strdupz(value));
+
+    if(BUILD_INFO[slot].value && strcmp(BUILD_INFO[slot].value, value) == 0)
+        return;
+
+    const char *old = BUILD_INFO[slot].value;
+
+    BUILD_INFO[slot].value = strdupz(value);
+
+    if(old && BUILD_INFO[slot].value_allocated)
+        freez((void *)old);
+
+    BUILD_INFO[slot].value_allocated = true;
 }
 
 static void build_info_set_status(BUILD_INFO_SLOT slot, bool status) {
@@ -1069,6 +1194,8 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_PLUGIN_MACOS, true);
 #endif
 #ifdef OS_WINDOWS
+    build_info_set_status(BIB_PLUGIN_WINDOWS, true);
+    build_info_set_status(BIB_PLUGIN_WINDOWS_EVENTS, true);
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
 #if defined(__CYGWIN__) && defined(__MSYS__)
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows (MSYS)");
@@ -1185,6 +1312,11 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_LIBMNL
     build_info_set_status(BIB_LIB_LIBMNL, true);
 #endif
+#ifdef HAVE_LIBUNWIND
+    build_info_set_status(BIB_LIB_LIBUNWIND, true);
+#elif defined(HAVE_BACKTRACE)
+    build_info_set_status(BIB_LIB_BACKTRACE, true);
+#endif
 
 #ifdef ENABLE_PLUGIN_APPS
     build_info_set_status(BIB_PLUGIN_APPS, true);
@@ -1209,6 +1341,12 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef ENABLE_PLUGIN_FREEIPMI
     build_info_set_status(BIB_PLUGIN_FREEIPMI, true);
+#endif
+#ifdef ENABLE_PLUGIN_SYSTEMD_JOURNAL
+    build_info_set_status(BIB_PLUGIN_SYSTEMD_JOURNAL, true);
+#endif
+#ifdef ENABLE_PLUGIN_NETWORK_VIEWER
+    build_info_set_status(BIB_PLUGIN_NETWORK_VIEWER, true);
 #endif
 #ifdef ENABLE_PLUGIN_NFACCT
     build_info_set_status(BIB_PLUGIN_NFACCT, true);
@@ -1262,18 +1400,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 // system info
 
 static void populate_system_info(void) {
-    static bool populated = false;
-    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-
-    if(populated)
-        return;
-
-    spinlock_lock(&spinlock);
-
-    if(populated) {
-        spinlock_unlock(&spinlock);
-        return;
-    }
+    FUNCTION_RUN_ONCE();
 
     struct rrdhost_system_info *system_info;
     bool free_system_info = false;
@@ -1328,9 +1455,6 @@ static void populate_system_info(void) {
 
     if(free_system_info)
         rrdhost_system_info_free(system_info);
-
-    populated = true;
-    spinlock_unlock(&spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -1383,35 +1507,46 @@ void get_install_type(struct rrdhost_system_info *system_info) {
 }
 
 static struct {
-    SPINLOCK spinlock;
-    bool populated;
     char *install_type;
     char *prebuilt_arch;
     char *prebuilt_distro;
 } BUILD_PACKAGING_INFO = { 0 };
 
 static void populate_packaging_info() {
-    if(!BUILD_PACKAGING_INFO.populated) {
-        spinlock_lock(&BUILD_PACKAGING_INFO.spinlock);
-        if(!BUILD_PACKAGING_INFO.populated) {
-            BUILD_PACKAGING_INFO.populated = true;
+    FUNCTION_RUN_ONCE();
 
-            get_install_type_internal(&BUILD_PACKAGING_INFO.install_type, &BUILD_PACKAGING_INFO.prebuilt_arch, &BUILD_PACKAGING_INFO.prebuilt_distro);
+    get_install_type_internal(&BUILD_PACKAGING_INFO.install_type, &BUILD_PACKAGING_INFO.prebuilt_arch, &BUILD_PACKAGING_INFO.prebuilt_distro);
 
-            if(!BUILD_PACKAGING_INFO.install_type)
-                BUILD_PACKAGING_INFO.install_type = "unknown";
+    if(!BUILD_PACKAGING_INFO.install_type)
+        BUILD_PACKAGING_INFO.install_type = "unknown";
 
-            if(!BUILD_PACKAGING_INFO.prebuilt_arch)
-                BUILD_PACKAGING_INFO.prebuilt_arch = "unknown";
+    if(!BUILD_PACKAGING_INFO.prebuilt_arch)
+        BUILD_PACKAGING_INFO.prebuilt_arch = "unknown";
 
-            if(!BUILD_PACKAGING_INFO.prebuilt_distro)
-                BUILD_PACKAGING_INFO.prebuilt_distro = "unknown";
+    if(!BUILD_PACKAGING_INFO.prebuilt_distro)
+        BUILD_PACKAGING_INFO.prebuilt_distro = "unknown";
 
-            build_info_set_value(BIB_PACKAGING_INSTALL_TYPE, strdupz(BUILD_PACKAGING_INFO.install_type));
-            build_info_set_value(BIB_PACKAGING_ARCHITECTURE, strdupz(BUILD_PACKAGING_INFO.prebuilt_arch));
-            build_info_set_value(BIB_PACKAGING_DISTRO, strdupz(BUILD_PACKAGING_INFO.prebuilt_distro));
-        }
-        spinlock_unlock(&BUILD_PACKAGING_INFO.spinlock);
+    build_info_set_value_strdupz(BIB_PACKAGING_INSTALL_TYPE, BUILD_PACKAGING_INFO.install_type);
+    build_info_set_value_strdupz(BIB_PACKAGING_ARCHITECTURE, BUILD_PACKAGING_INFO.prebuilt_arch);
+    build_info_set_value_strdupz(BIB_PACKAGING_DISTRO, BUILD_PACKAGING_INFO.prebuilt_distro);
+
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    ND_PROFILE_2buffer(wb, nd_profile_detect_and_configure(false), " ");
+    build_info_set_value_strdupz(BIB_RUNTIME_PROFILE, buffer_tostring(wb));
+
+    build_info_set_status(BIB_RUNTIME_PARENT, stream_conf_is_parent(false));
+    build_info_set_status(BIB_RUNTIME_CHILD, stream_conf_is_child());
+
+    OS_SYSTEM_MEMORY sm = os_system_memory(true);
+    if(OS_SYSTEM_MEMORY_OK(sm)) {
+        char buf[1024];
+        snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_total_bytes);
+        // size_snprintf(buf, sizeof(buf), sm.ram_total_bytes, "B", false);
+        build_info_set_value_strdupz(BIB_RUNTIME_MEM_TOTAL, buf);
+
+        snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_available_bytes);
+        // size_snprintf(buf, sizeof(buf), sm.ram_available_bytes, "B", false);
+        build_info_set_value_strdupz(BIB_RUNTIME_MEM_AVAIL, buf);
     }
 }
 
@@ -1425,7 +1560,6 @@ static void populate_directories(void) {
     build_info_set_value(BIB_DIR_PLUGINS, netdata_configured_primary_plugins_dir);
     build_info_set_value(BIB_DIR_WEB, netdata_configured_web_dir);
     build_info_set_value(BIB_DIR_LOG, netdata_configured_log_dir);
-    build_info_set_value(BIB_DIR_LOCK, netdata_configured_lock_dir);
     build_info_set_value(BIB_DIR_HOME, netdata_configured_home_dir);
 }
 
@@ -1485,6 +1619,7 @@ void print_build_info(void) {
     print_build_info_category_to_console(BIC_PLUGINS, "Plugins");
     print_build_info_category_to_console(BIC_EXPORTERS, "Exporters");
     print_build_info_category_to_console(BIC_DEBUG_DEVEL, "Debug/Developer Features");
+    print_build_info_category_to_console(BIC_RUNTIME, "Runtime Information");
 }
 
 void build_info_to_json_object(BUFFER *b) {
@@ -1504,6 +1639,7 @@ void build_info_to_json_object(BUFFER *b) {
     print_build_info_category_to_json(b, BIC_PLUGINS, "plugins");
     print_build_info_category_to_json(b, BIC_EXPORTERS, "exporters");
     print_build_info_category_to_json(b, BIC_DEBUG_DEVEL, "debug-n-devel");
+    print_build_info_category_to_json(b, BIC_RUNTIME, "runtime");
 }
 
 void print_build_info_json(void) {
@@ -1539,3 +1675,22 @@ void analytics_build_info(BUFFER *b) {
     }
 }
 
+void print_build_info_cmake_cache(void) {
+        const char *path = NETDATA_RUNTIME_PREFIX "/"
+                           BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH "/"
+                           BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME;
+
+        gzFile f = gzopen(path, "rb");
+        if (!f) {
+            printf("Could not open build info cmake cache archive located at %s\n",
+                   path);
+            return;
+        }
+
+        char line[1024];
+        while (gzgets(f, line, sizeof(line))) {
+            printf("%s", line);
+        }
+
+        gzclose(f);
+}

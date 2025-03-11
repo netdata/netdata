@@ -38,7 +38,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     return datafile;
 }
 
-bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
+ALWAYS_INLINE bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
     bool ret;
 
     spinlock_lock(&df->users.spinlock);
@@ -260,10 +260,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     datafile->file = file;
     __atomic_add_fetch(&ctx->stats.datafile_creations, 1, __ATOMIC_RELAXED);
 
-    ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
-    if (unlikely(ret)) {
-        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
-    }
+    (void)posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     memset(superblock, 0, sizeof(*superblock));
     (void) strncpy(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ);
     (void) strncpy(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ);
@@ -278,7 +275,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
         ctx_io_error(ctx);
     }
     uv_fs_req_cleanup(&req);
-    posix_memfree(superblock);
+    posix_memalign_freez(superblock);
     if (ret < 0) {
         destroy_data_file_unsafe(datafile);
         return ret;
@@ -297,10 +294,7 @@ static int check_data_file_superblock(uv_file file)
     uv_buf_t iov;
     uv_fs_t req;
 
-    ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
-    if (unlikely(ret)) {
-        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
-    }
+    (void)posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
     ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
@@ -321,7 +315,7 @@ static int check_data_file_superblock(uv_file file)
         ret = 0;
     }
     error:
-    posix_memfree(superblock);
+        posix_memalign_freez(superblock);
     return ret;
 }
 

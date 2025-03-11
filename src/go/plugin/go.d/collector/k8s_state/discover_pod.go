@@ -19,7 +19,7 @@ func newPodDiscoverer(si cache.SharedInformer, l *logger.Logger) *podDiscoverer 
 		panic("nil pod shared informer")
 	}
 
-	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{Name: "pod"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "pod"})
 
 	_, _ = si.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { enqueue(queue, obj) },
@@ -48,7 +48,7 @@ func (r podResource) value() any             { return r.val }
 type podDiscoverer struct {
 	*logger.Logger
 	informer cache.SharedInformer
-	queue    *workqueue.Typed[any]
+	queue    *workqueue.Typed[string]
 	readyCh  chan struct{}
 	stopCh   chan struct{}
 }
@@ -76,15 +76,14 @@ func (d *podDiscoverer) stopped() bool { return isChanClosed(d.stopCh) }
 
 func (d *podDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
 	for {
-		item, shutdown := d.queue.Get()
+		key, shutdown := d.queue.Get()
 		if shutdown {
 			return
 		}
 
 		func() {
-			defer d.queue.Done(item)
+			defer d.queue.Done(key)
 
-			key := item.(string)
 			ns, name, err := cache.SplitMetaNamespaceKey(key)
 			if err != nil {
 				return

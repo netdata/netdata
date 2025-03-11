@@ -1,0 +1,199 @@
+extends:
+  - _generic-ups.yaml
+  - tripplite.yaml
+
+sysobjectid:
+  - 1.3.6.1.4.1.850.1.1.3.1  #  tlpHardware.tlpDeviceTypes.tlpUps
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "UPS"
+
+metrics:
+#  - MIB: TRIPPLITE-12X
+#    symbol:
+#      OID: 1.3.6.1.4.1.850.100.1.12.1.0
+#      name: tlUpsMainOutletState
+#      enum:
+#        unknown: 0
+#        off: 1
+#        on: 2
+#        mixed: 3
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: TRIPPLITE-12X
+    symbol:
+      OID: 1.3.6.1.4.1.850.100.1.13.1.0
+      name: tlUpsTemperature
+  - MIB: TRIPPLITE-12X
+    symbol:
+      OID: 1.3.6.1.4.1.850.100.1.2.1.0
+      name: tlUpsBatteryAge  # The age of the battery in years.
+  - MIB: TRIPPLITE-12X
+    symbol:
+      OID: 1.3.6.1.4.1.850.100.1.2.2.0
+      name: tlUpsTemperatureF
+  - MIB: TRIPPLITE-12X
+    symbol:
+      OID: 1.3.6.1.4.1.850.100.1.2.3.0
+      name: tlUpsExternalBatteryAge  # The age of the battery in years.
+  - MIB: TRIPPLITE-12X
+    symbol:
+      OID: 1.3.6.1.4.1.850.100.1.6.1.0
+      name: tlUpsAlarmsPresent
+#  - MIB: TRIPPLITE-12X
+#    symbol:
+#      OID: 1.3.6.1.4.1.850.100.1.7.1.0
+#      name: tlUpsTestDate  # The date of the last self-test run on the ups, in the format YYYYMMDD.
+#    TODO: this is not a numerical value and possibly not suitable as global metric tags since it might have high cardinality
+#  - MIB: TRIPPLITE-12X
+#    symbol:
+#      OID: 1.3.6.1.4.1.850.100.1.7.2.0
+#      name: tlUpsTestResultsDetail
+#    TODO: this is not a numerical value
+#  - MIB: TRIPPLITE-12X
+#    symbol:
+#      OID: 1.3.6.1.4.1.850.100.1.9.1.0
+#      name: tlUpsConfigBattReplDate  # The date on which the battery was last replaced, in the format YYYYMMDD.
+#    TODO: this is not a numerical value and possibly not suitable as global metric tags since it might have high cardinality
+#  - MIB: TRIPPLITE-12X
+#    symbol:
+#      OID: 1.3.6.1.4.1.850.100.1.9.5.0
+#      name: tlUpsConfigExternalBattReplDate  # The date on which the external battery was last replaced, in the format YYYYMMDD.
+#    TODO: this is not a numerical value and possibly not suitable as global metric tags since it might have high cardinality
+  - MIB: TRIPPLITE-12X
+    symbol:
+      OID: 1.3.6.1.4.1.850.101.1.1.1.0
+      name: tlEnvTemperatureC
+  - MIB: TRIPPLITE-12X
+    symbol:
+      OID: 1.3.6.1.4.1.850.101.1.1.2.0
+      name: tlEnvTemperatureF
+#  - MIB: TRIPPLITE-12X
+#    symbol:
+#      OID: 1.3.6.1.4.1.850.101.1.1.5.0
+#      name: tlEnvTemperatureInAlarm
+#      enum:
+#        true: 1
+#        false: 2
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: TRIPPLITE-12X
+    symbol:
+      OID: 1.3.6.1.4.1.850.101.1.2.1.0
+      name: tlEnvHumidity
+#  - MIB: TRIPPLITE-12X
+#    symbol:
+#      OID: 1.3.6.1.4.1.850.101.1.2.4.0
+#      name: tlEnvHumidityInAlarm
+#      enum:
+#        true: 1
+#        false: 2
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: TRIPPLITE-12X
+    table:
+      OID: 1.3.6.1.4.1.850.100.1.3.2
+      name: tlUpsInputVoltageTable
+    symbols:
+      - OID: 1.3.6.1.4.1.850.100.1.3.2.1.3
+        name: tlUpsInputVoltage
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.850.100.1.3.2.1.1
+          name: tlUpsInputVoltageIndex
+        tag: tl_ups_input_voltage_index
+      - symbol:
+          OID: 1.3.6.1.4.1.850.100.1.3.2.1.2
+          name: tlUpsInputVoltageType
+        tag: tl_ups_input_voltage_type
+        mapping:
+          0: phase_to_neutral
+          1: phase_to_phase
+  - MIB: TRIPPLITE-12X
+    table:
+      OID: 1.3.6.1.4.1.850.100.1.4.7
+      name: tlUpsOutputCircuitTable
+    symbols:
+      - OID: 1.3.6.1.4.1.850.100.1.4.7.1.3
+        name: tlUpsOutputCircuitLoadCurrent
+      - OID: 1.3.6.1.4.1.850.100.1.4.7.1.4
+        name: tlUpsOutputCircuitVoltage
+      - OID: 1.3.6.1.4.1.850.100.1.4.7.1.5
+        name: tlUpsOutputCircuitPower
+    metric_tags:
+      - index: 1
+        tag:  tl_ups_output_circuit_index
+      - symbol:
+          OID: 1.3.6.1.4.1.850.100.1.4.7.1.2
+          name: tlUpsOutputCircuitStatus
+        tag: tl_ups_output_circuit_status
+        mapping:
+          0: open
+          1: closed
+  - MIB: TRIPPLITE-12X
+    table:
+      OID: 1.3.6.1.4.1.850.101.2.1
+      name: tlEnvContactTable
+    symbols:
+      - name: tlEnvContact
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.850.101.2.1.1.2
+          name: tlEnvContactName
+        tag: tl_env_contact_name
+      - symbol:
+          OID: 1.3.6.1.4.1.850.101.2.1.1.4
+          name: tlEnvContactConfig
+        tag: tl_env_contact_config
+        mapping:
+          0: normally_open
+          1: normally_closed
+      - symbol:
+          OID: 1.3.6.1.4.1.850.101.2.1.1.3
+          name: tlEnvContactStatus
+        tag: tl_env_contact_status
+        mapping:
+          0: normal
+          1: alarm
+  - MIB: TRIPPLITE-12X
+    table:
+      OID: 1.3.6.1.4.1.850.100.1.10.2
+      name: tlUpsOutletTable
+    symbols:
+      - name: tlUpsOutlet
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.850.100.1.11.2.1.3
+          name: tlUpsOutletGroupName
+        tag: tl_ups_outlet_group_name
+      - symbol:
+          OID: 1.3.6.1.4.1.850.100.1.11.2.1.4
+          name: tlUpsOutletGroupDesc
+        tag: tl_ups_outlet_group_desc
+      - symbol:
+          OID: 1.3.6.1.4.1.850.100.1.11.2.1.5
+          name: tlUpsOutletGroupState
+        tag: tl_ups_outlet_group_state
+        mapping:
+          0: unknown
+          1: off
+          2: on
+          3: mixed
+metric_tags:
+  - tag: tl_ups_ident_serial_num
+    OID: 1.3.6.1.4.1.850.100.1.1.2.0
+    symbol: tlUpsIdentSerialNum
+  - OID: 1.3.6.1.4.1.850.100.1.1.3.0
+    symbol: tlUpsIdentID
+    tag: tl_ups_ident_id
+  - OID: 1.3.6.1.4.1.850.100.1.1.4.0
+    symbol: tlUpsSnmpCardSerialNum
+    tag: tl_ups_snmp_card_serial_num
+  - OID: 1.3.6.1.4.1.850.100.1.1.6.0
+    symbol: tlUpsLocation
+    tag: tl_ups_location

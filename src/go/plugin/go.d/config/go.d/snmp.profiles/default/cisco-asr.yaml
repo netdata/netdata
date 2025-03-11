@@ -1,0 +1,92 @@
+# Profile for Cisco ASR devices
+
+extends:
+  - _base.yaml
+  - _cisco-generic.yaml
+
+device:
+  vendor: "cisco"
+
+sysobjectid:
+  - 1.3.6.1.4.1.9.1.403  # ciscoASR7401
+  - 1.3.6.1.4.1.9.1.923  # ciscoASR1002
+  - 1.3.6.1.4.1.9.1.924  # ciscoASR1004
+  - 1.3.6.1.4.1.9.1.925  # ciscoASR1006
+  - 1.3.6.1.4.1.9.1.1017 # ciscoASR9010
+  - 1.3.6.1.4.1.9.1.1018 # ciscoASR9006
+  - 1.3.6.1.4.1.9.1.1036 # ciscoASR14K4S
+  - 1.3.6.1.4.1.9.1.1037 # ciscoASR14K8S
+  - 1.3.6.1.4.1.9.1.1116 # ciscoASR1002F
+  - 1.3.6.1.4.1.9.1.1165 # ciscoASR1001
+  - 1.3.6.1.4.1.9.1.1166 # ciscoASR1013
+  - 1.3.6.1.4.1.9.1.1441 # ciscoASR903
+  - 1.3.6.1.4.1.9.1.1457 # ciscoASR5500
+  - 1.3.6.1.4.1.9.1.1498 # ciscoASR9KMOD80SE
+  - 1.3.6.1.4.1.9.1.1499 # ciscoASR9KMOD80TR
+  - 1.3.6.1.4.1.9.1.1500 # ciscoASR9KMOD160SE
+  - 1.3.6.1.4.1.9.1.1501 # ciscoASR9KMOD160TR
+  - 1.3.6.1.4.1.9.1.1502 # ciscoASR9KMPA2X10GE
+  - 1.3.6.1.4.1.9.1.1503 # ciscoASR9KMPA4X10GE
+  - 1.3.6.1.4.1.9.1.1504 # ciscoASR9KMPA20X1GE
+  - 1.3.6.1.4.1.9.1.1505 # ciscoASR9KMPA1X40GE
+  - 1.3.6.1.4.1.9.1.1506 # ciscoASR9KMPA2X40GE
+  - 1.3.6.1.4.1.9.1.1521 # ciscoASR901
+  - 1.3.6.1.4.1.9.1.1522 # ciscoASR901E
+  - 1.3.6.1.4.1.9.1.1525 # ciscoASR1002X
+  - 1.3.6.1.4.1.9.1.1538 # ciscoASR5000
+  - 1.3.6.1.4.1.9.1.1639 # ciscoASR9001
+  - 1.3.6.1.4.1.9.1.1640 # ciscoASR9922
+  - 1.3.6.1.4.1.9.1.1688 # ciscoASR1002XC
+  - 1.3.6.1.4.1.9.1.1709 # ciscoASR9912
+  - 1.3.6.1.4.1.9.1.1724 # ciscoASR901TenGigDCE
+  - 1.3.6.1.4.1.9.1.1725 # ciscoASR901TenGigACE
+  - 1.3.6.1.4.1.9.1.1726 # ciscoASR901TenGigDC
+  - 1.3.6.1.4.1.9.1.1727 # ciscoASR901TenGigAC
+  - 1.3.6.1.4.1.9.1.1762 # ciscoASR9904
+  - 1.3.6.1.4.1.9.1.1818 # ciscoASR901S4SGFD
+  - 1.3.6.1.4.1.9.1.1819 # ciscoASR901S3SGFD
+  - 1.3.6.1.4.1.9.1.1820 # ciscoASR901S2SGFD
+  - 1.3.6.1.4.1.9.1.1821 # ciscoASR901S3SGFAH
+  - 1.3.6.1.4.1.9.1.1822 # ciscoASR901S2SGFAH
+  - 1.3.6.1.4.1.9.1.1861 # ciscoASR1001X
+  - 1.3.6.1.4.1.9.1.1897 # ciscoASR902
+  - 1.3.6.1.4.1.9.1.2098 # ciscoASR901AC10GS
+  - 1.3.6.1.4.1.9.1.2099 # ciscoASR901DC10GS
+  - 1.3.6.1.4.1.9.1.2100 # ciscoASR92024SZIM
+  - 1.3.6.1.4.1.9.1.2101 # ciscoASR92024TZM
+  - 1.3.6.1.4.1.9.1.2102 # ciscoASR92024SZM
+  - 1.3.6.1.4.1.9.1.2143 # ciscoASR1006X
+  - 1.3.6.1.4.1.9.1.2144 # ciscoASR1009X
+  - 1.3.6.1.4.1.9.1.2155 # ciscoASR9204SZD
+  - 1.3.6.1.4.1.9.1.2156 # ciscoASR9208SZ0A
+  - 1.3.6.1.4.1.9.1.2157 # ciscoASR92012CZA
+  - 1.3.6.1.4.1.9.1.2158 # ciscoASR92012CZD
+  - 1.3.6.1.4.1.9.1.2159 # ciscoASR9204SZA
+  - 1.3.6.1.4.1.9.1.2160 # ciscoASR92010SZ0D
+  - 1.3.6.1.4.1.9.1.2247 # ciscoASR92016SZIM
+  - 1.3.6.1.4.1.9.1.2252 # ciscoASR1002HX
+  - 1.3.6.1.4.1.9.1.2320 # ciscoASR901CC
+  - 1.3.6.1.4.1.9.1.2321 # ciscoASR901ECC
+  - 1.3.6.1.4.1.9.1.2322 # ciscoASR901DC10GCC
+  - 1.3.6.1.4.1.9.1.2323 # ciscoASR901EDC10GCC
+  - 1.3.6.1.4.1.9.1.2324 # ciscoASR901DC0GSCC
+  - 1.3.6.1.4.1.9.1.2325 # ciscoASR92012SZIMCC
+  - 1.3.6.1.4.1.9.1.2348 # ciscoASR1001HX
+  - 1.3.6.1.4.1.9.1.2390 # ciscoASR9910
+  - 1.3.6.1.4.1.9.1.2480 # ciscoASR914
+  - 1.3.6.1.4.1.9.1.2502 # ciscoASR903U
+  - 1.3.6.1.4.1.9.1.2503 # ciscoASR902U
+  - 1.3.6.1.4.1.9.1.2504 # ciscoASR920U16SZIM
+  - 1.3.6.1.4.1.9.1.2572 # ciscoASR9906
+  - 1.3.6.1.4.1.9.1.2658 # ciscoASR9901
+  - 1.3.6.1.4.1.9.1.2678 # ciscoASR92012SZD
+  - 1.3.6.1.4.1.9.1.2679 # ciscoASR92012SZA
+  - 1.3.6.1.4.1.9.1.2705 # ciscoASR92020SZM
+  - 1.3.6.1.4.1.9.1.3075 # ciscoASR9903
+  - 1.3.6.1.4.1.9.1.3090 # ciscoASR9902
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "router"

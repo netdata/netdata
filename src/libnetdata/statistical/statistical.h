@@ -28,6 +28,7 @@ NETDATA_DOUBLE holtwinters(const NETDATA_DOUBLE *series, size_t entries,
 NETDATA_DOUBLE sum_and_count(const NETDATA_DOUBLE *series, size_t entries, size_t *count);
 NETDATA_DOUBLE sum(const NETDATA_DOUBLE *series, size_t entries);
 NETDATA_DOUBLE median_on_sorted_series(const NETDATA_DOUBLE *series, size_t entries);
+NETDATA_DOUBLE percentile_on_sorted_series(const NETDATA_DOUBLE *series, size_t entries, double percentile);
 NETDATA_DOUBLE *copy_series(const NETDATA_DOUBLE *series, size_t entries);
 void sort_series(NETDATA_DOUBLE *series, size_t entries);
 

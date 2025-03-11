@@ -1,0 +1,150 @@
+# Generic IP metrics.
+
+metrics:
+- MIB: IP-MIB
+  table:
+    OID: 1.3.6.1.2.1.4.31.1
+    name: ipSystemStatsTable
+  metric_type: monotonic_count
+  symbols:
+  - OID: 1.3.6.1.2.1.4.31.1.1.4
+    name: ipSystemStatsHCInReceives
+  - OID: 1.3.6.1.2.1.4.31.1.1.6
+    name: ipSystemStatsHCInOctets
+  - OID: 1.3.6.1.2.1.4.31.1.1.7
+    name: ipSystemStatsInHdrErrors
+  - OID: 1.3.6.1.2.1.4.31.1.1.8
+    name: ipSystemStatsInNoRoutes
+  - OID: 1.3.6.1.2.1.4.31.1.1.9
+    name: ipSystemStatsInAddrErrors
+  - OID: 1.3.6.1.2.1.4.31.1.1.10
+    name: ipSystemStatsInUnknownProtos
+  - OID: 1.3.6.1.2.1.4.31.1.1.11
+    name: ipSystemStatsInTruncatedPkts
+  - OID: 1.3.6.1.2.1.4.31.1.1.13
+    name: ipSystemStatsHCInForwDatagrams
+  - OID: 1.3.6.1.2.1.4.31.1.1.14
+    name: ipSystemStatsReasmReqds
+  - OID: 1.3.6.1.2.1.4.31.1.1.15
+    name: ipSystemStatsReasmOKs
+  - OID: 1.3.6.1.2.1.4.31.1.1.16
+    name: ipSystemStatsReasmFails
+  - OID: 1.3.6.1.2.1.4.31.1.1.17
+    name: ipSystemStatsInDiscards
+  - OID: 1.3.6.1.2.1.4.31.1.1.19
+    name: ipSystemStatsHCInDelivers
+  - OID: 1.3.6.1.2.1.4.31.1.1.21
+    name: ipSystemStatsHCOutRequests
+  - OID: 1.3.6.1.2.1.4.31.1.1.22
+    name: ipSystemStatsOutNoRoutes
+  - OID: 1.3.6.1.2.1.4.31.1.1.24
+    name: ipSystemStatsHCOutForwDatagrams
+  - OID: 1.3.6.1.2.1.4.31.1.1.25
+    name: ipSystemStatsOutDiscards
+  - OID: 1.3.6.1.2.1.4.31.1.1.26
+    name: ipSystemStatsOutFragReqds
+  - OID: 1.3.6.1.2.1.4.31.1.1.27
+    name: ipSystemStatsOutFragOKs
+  - OID: 1.3.6.1.2.1.4.31.1.1.28
+    name: ipSystemStatsOutFragFails
+  - OID: 1.3.6.1.2.1.4.31.1.1.29
+    name: ipSystemStatsOutFragCreates
+  - OID: 1.3.6.1.2.1.4.31.1.1.31
+    name: ipSystemStatsHCOutTransmits
+  - OID: 1.3.6.1.2.1.4.31.1.1.33
+    name: ipSystemStatsHCOutOctets
+  - OID: 1.3.6.1.2.1.4.31.1.1.35
+    name: ipSystemStatsHCInMcastPkts
+  - OID: 1.3.6.1.2.1.4.31.1.1.37
+    name: ipSystemStatsHCInMcastOctets
+  - OID: 1.3.6.1.2.1.4.31.1.1.39
+    name: ipSystemStatsHCOutMcastPkts
+  - OID: 1.3.6.1.2.1.4.31.1.1.41
+    name: ipSystemStatsHCOutMcastOctets
+  - OID: 1.3.6.1.2.1.4.31.1.1.43
+    name: ipSystemStatsHCInBcastPkts
+  - OID: 1.3.6.1.2.1.4.31.1.1.45
+    name: ipSystemStatsHCOutBcastPkts
+  metric_tags:
+  - index: 1
+    tag: ipversion
+    mapping:
+      0: unknown
+      1: ipv4
+      2: ipv6
+      3: ipv4z
+      4: ipv6z
+      16: dns
+- MIB: IP-MIB
+  table:
+    OID: 1.3.6.1.2.1.4.31.3
+    name: ipIfStatsTable
+  metric_type: monotonic_count
+  symbols:
+  - OID: 1.3.6.1.2.1.4.31.3.1.6
+    name: ipIfStatsHCInOctets
+  - OID: 1.3.6.1.2.1.4.31.3.1.7
+    name: ipIfStatsInHdrErrors
+  - OID: 1.3.6.1.2.1.4.31.3.1.8
+    name: ipIfStatsInNoRoutes
+  - OID: 1.3.6.1.2.1.4.31.3.1.9
+    name: ipIfStatsInAddrErrors
+  - OID: 1.3.6.1.2.1.4.31.3.1.10
+    name: ipIfStatsInUnknownProtos
+  - OID: 1.3.6.1.2.1.4.31.3.1.11
+    name: ipIfStatsInTruncatedPkts
+  - OID: 1.3.6.1.2.1.4.31.3.1.13
+    name: ipIfStatsHCInForwDatagrams
+  - OID: 1.3.6.1.2.1.4.31.3.1.14
+    name: ipIfStatsReasmReqds
+  - OID: 1.3.6.1.2.1.4.31.3.1.15
+    name: ipIfStatsReasmOKs
+  - OID: 1.3.6.1.2.1.4.31.3.1.16
+    name: ipIfStatsReasmFails
+  - OID: 1.3.6.1.2.1.4.31.3.1.17
+    name: ipIfStatsInDiscards
+  - OID: 1.3.6.1.2.1.4.31.3.1.19
+    name: ipIfStatsHCInDelivers
+  - OID: 1.3.6.1.2.1.4.31.3.1.21
+    name: ipIfStatsHCOutRequests
+  - OID: 1.3.6.1.2.1.4.31.3.1.24
+    name: ipIfStatsHCOutForwDatagrams
+  - OID: 1.3.6.1.2.1.4.31.3.1.25
+    name: ipIfStatsOutDiscards
+  - OID: 1.3.6.1.2.1.4.31.3.1.26
+    name: ipIfStatsOutFragReqds
+  - OID: 1.3.6.1.2.1.4.31.3.1.27
+    name: ipIfStatsOutFragOKs
+  - OID: 1.3.6.1.2.1.4.31.3.1.28
+    name: ipIfStatsOutFragFails
+  - OID: 1.3.6.1.2.1.4.31.3.1.29
+    name: ipIfStatsOutFragCreates
+  - OID: 1.3.6.1.2.1.4.31.3.1.31
+    name: ipIfStatsHCOutTransmits
+  - OID: 1.3.6.1.2.1.4.31.3.1.33
+    name: ipIfStatsHCOutOctets
+  - OID: 1.3.6.1.2.1.4.31.3.1.35
+    name: ipIfStatsHCInMcastPkts
+  - OID: 1.3.6.1.2.1.4.31.3.1.37
+    name: ipIfStatsHCInMcastOctets
+  - OID: 1.3.6.1.2.1.4.31.3.1.39
+    name: ipIfStatsHCOutMcastPkts
+  - OID: 1.3.6.1.2.1.4.31.3.1.41
+    name: ipIfStatsHCOutMcastOctets
+  - OID: 1.3.6.1.2.1.4.31.3.1.43
+    name: ipIfStatsHCInBcastPkts
+  - OID: 1.3.6.1.2.1.4.31.3.1.45
+    name: ipIfStatsHCOutBcastPkts
+  metric_tags:
+  - index: 1
+    tag: ipversion
+    mapping:
+      0: unknown
+      1: ipv4
+      2: ipv6
+      3: ipv4z
+      4: ipv6z
+      16: dns
+  - index: 2
+    tag: interface
+

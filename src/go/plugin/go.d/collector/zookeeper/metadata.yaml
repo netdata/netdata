@@ -138,8 +138,8 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: These metrics refer to the entire monitored application.
+        - name: ZooKeeper server
+          description: These metrics refer to ZooKeeper servers.
           labels: []
           metrics:
             - name: zookeeper.requests
@@ -156,12 +156,63 @@ modules:
                 - name: min
                 - name: avg
                 - name: max
+            - name: zookeeper.stale_requests
+              description: Stale Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: stale
+            - name: zookeeper.stale_requests_dropped
+              description: Stale Requests Dropped
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: dropped
             - name: zookeeper.connections
               description: Alive Connections
               unit: connections
               chart_type: line
               dimensions:
                 - name: alive
+            - name: zookeeper.connections_dropped
+              description: Dropped Connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: dropped
+            - name: zookeeper.connections_rejected
+              description: Rejected Connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: rejected
+            - name: zookeeper.auth_fails
+              description: Auth Fails
+              unit: fails/s
+              chart_type: line
+              dimensions:
+                - name: auth
+            - name: zookeeper.global_sessions
+              description: Global Sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: global
+            - name: zookeeper.server_state
+              description: Server State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: leader
+                - name: follower
+                - name: observer
+                - name: standalone
+            - name: zookeeper.throttled_ops
+              description: Throttled Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: throttled
             - name: zookeeper.packets
               description: Packets
               unit: pps
@@ -194,9 +245,9 @@ modules:
               chart_type: line
               dimensions:
                 - name: size
-            - name: zookeeper.server_state
-              description: Server State
-              unit: state
+            - name: zookeeper.uptime
+              description: Uptime
+              unit: seconds
               chart_type: line
               dimensions:
-                - name: state
+                - name: uptime

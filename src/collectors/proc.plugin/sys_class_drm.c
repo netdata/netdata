@@ -838,7 +838,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
     if(unlikely(!drm_dir)) {
         char filename[FILENAME_MAX];
         snprintfz(filename, sizeof(filename), "%s%s", netdata_configured_host_prefix, "/sys/class/drm");
-        const char *drm_dir_name = config_get(CONFIG_SECTION_PLUGIN_PROC_DRM, "directory to monitor", filename);
+        const char *drm_dir_name = inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DRM, "directory to monitor", filename);
         if(unlikely(NULL == (drm_dir = opendir(drm_dir_name)))){
             collector_error("Cannot read directory '%s'", drm_dir_name);
             return 1;

@@ -24,7 +24,8 @@
       "create_vnode": {
         "title": "Create",
         "description": "If set, the collector will create a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes) for this SNMP device, which will appear as a separate Node in Netdata.",
-        "type": "boolean"
+        "type": "boolean",
+        "default": true
       },
       "vnode": {
         "title": "Configuration",

@@ -1,0 +1,151 @@
+extends:
+  - _hp.yaml
+  - _hp-base.yaml
+  - _hp-compaq-health.yaml
+  - _hp-driver-stats.yaml
+  - _generic-if.yaml
+  - _generic-tcp.yaml
+  - _generic-udp.yaml
+  - _generic-ip.yaml
+
+device:
+  vendor: "hp"
+
+sysobjectid: 1.3.6.1.4.1.232.*
+metadata:
+  device:
+    fields:
+      product_name:
+        value: ProLiant
+      model:
+        symbols:
+          - MIB: CPQSINFO-MIB
+            OID: 1.3.6.1.4.1.232.2.2.4.2
+            name: cpqSiProductName
+            extract_value: '\s*ProLiant\s*([-a-zA-Z0-9_ ]+)' # The product name. e.g. ProLiant BL35p G1, only extract "BL35p G1"
+          - MIB: CPQSINFO-MIB
+            OID: 1.3.6.1.4.1.232.2.2.4.2
+            name: cpqSiProductName  # Fallback if unable to parse the product name
+metrics:
+  - MIB: CPQSTDEQ-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.1.2.2.1
+      name: cpqSeCpuTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.2
+        name: cpqSeCpuSlot
+      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.4
+        name: cpqSeCpuSpeed
+      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.6
+        name: cpqSeCpuStatus
+      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.7
+        name: cpqSeCpuExtSpeed
+      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.15
+        name: cpqSeCpuCore
+      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.25
+        name: cpqSeCPUCoreMaxThreads
+      - OID: 1.3.6.1.4.1.232.1.2.2.1.1.27
+        name: cpqSeCpuPrimary
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.1.2.2.1.1.1
+          name: cpqSeCpuUnitIndex
+        tag: cpu_index
+  - MIB: CPQHOST-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.11.2.3.1
+      name: cpqHoCpuUtilTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.11.2.3.1.1.2
+        name: cpqHoCpuUtilMin
+      - OID: 1.3.6.1.4.1.232.11.2.3.1.1.3
+        name: cpqHoCpuUtilFiveMin
+      - OID: 1.3.6.1.4.1.232.11.2.3.1.1.4
+        name: cpqHoCpuUtilThirtyMin
+      - OID: 1.3.6.1.4.1.232.11.2.3.1.1.5
+        name: cpqHoCpuUtilHour
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.11.2.3.1.1.1
+          name: cpqHoCpuUtilUnitIndex
+        tag: cpu_unit_index
+  - MIB: CPQHOST-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.11.2.4.1
+      name: cpqHoFileSysTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.11.2.4.1.1.3
+        name: cpqHoFileSysSpaceTotal
+      - OID: 1.3.6.1.4.1.232.11.2.4.1.1.4
+        name: cpqHoFileSysSpaceUsed
+      - OID: 1.3.6.1.4.1.232.11.2.4.1.1.5
+        name: cpqHoFileSysPercentSpaceUsed
+      - OID: 1.3.6.1.4.1.232.11.2.4.1.1.6
+        name: cpqHoFileSysAllocUnitsTotal
+      - OID: 1.3.6.1.4.1.232.11.2.4.1.1.7
+        name: cpqHoFileSysAllocUnitsUsed
+      - OID: 1.3.6.1.4.1.232.11.2.4.1.1.8
+        name: cpqHoFileSysStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.11.2.4.1.1.1
+          name: cpqHoFileSysIndex
+        tag: file_sys_index
+  - MIB: CPQSINFO-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.2.2.4.5
+      name: cpqSiMemModuleTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.2.2.4.5.1.3
+        name: cpqSiMemModuleSize
+      - OID: 1.3.6.1.4.1.232.2.2.4.5.1.4
+        name: cpqSiMemModuleType
+      - OID: 1.3.6.1.4.1.232.2.2.4.5.1.5
+        name: cpqSiMemModuleSpeed
+      - OID: 1.3.6.1.4.1.232.2.2.4.5.1.6
+        name: cpqSiMemModuleTechnology
+      - OID: 1.3.6.1.4.1.232.2.2.4.5.1.11
+        name: cpqSiMemModuleECCStatus
+      - OID: 1.3.6.1.4.1.232.2.2.4.5.1.13
+        name: cpqSiMemModuleFrequency
+      - OID: 1.3.6.1.4.1.232.2.2.4.5.1.15
+        name: cpqSiMemModuleCellStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.2.2.4.5.1.1
+          name: cpqSiMemBoardIndex
+        tag: mem_board_index
+      - symbol:
+          OID: 1.3.6.1.4.1.232.2.2.4.5.1.2
+          name: cpqSiMemModuleIndex
+        tag: mem_module_index
+  - MIB: CPQNIC-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.18.2.3.1
+      name: cpqNicIfPhysAdapterTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.13
+        name: cpqNicIfPhysAdapterState
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.14
+        name: cpqNicIfPhysAdapterStatus
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.18.2.3.1.1.4
+          name: cpqNicIfPhysAdapterMACAddress
+        tag: adapter_mac_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.232.18.2.3.1.1.39
+          name: cpqNicIfPhysAdapterName
+        tag: adapter_name
+  - MIB: CPQIDA-MIB
+    table:
+      OID: 1.3.6.1.4.1.232.3.2.2.1
+      name: cpqDaCntlrTable
+    symbols:
+      - OID: 1.3.6.1.4.1.232.3.2.2.1.1.6
+        name: cpqDaCntlrCondition
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.232.3.2.2.1.1.1
+          name: cpqDaCntlrIndex
+        tag: controller_index

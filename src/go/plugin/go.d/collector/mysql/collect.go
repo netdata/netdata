@@ -38,6 +38,10 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	if hasInnodbOSLog(mx) {
 		c.addInnoDBOSLogOnce.Do(c.addInnoDBOSLogCharts)
+	} else if hasInnodbOSLogIO(mx) {
+		// most of Innodb_os_log_* status variables was removed in MariaDB 10.8
+		// but InnoDB_os_log_written was preserved
+		c.addInnoDBOSLogOnce.Do(c.addInnoDBOSLogIOChart)
 	}
 	if hasInnodbDeadlocks(mx) {
 		c.addInnodbDeadlocksOnce.Do(c.addInnodbDeadlocksChart)
@@ -57,6 +61,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		if err := c.collectGlobalVariables(); err != nil {
 			return nil, fmt.Errorf("error on collecting global variables: %v", err)
 		}
+		c.recheckGlobalVarsTime = now
 	}
 	mx["max_connections"] = c.varMaxConns
 	mx["table_open_cache"] = c.varTableOpenCache
@@ -123,6 +128,11 @@ func calcThreadCacheMisses(collected map[string]int64) {
 func hasInnodbOSLog(collected map[string]int64) bool {
 	// removed in MariaDB 10.8 (https://mariadb.com/kb/en/innodb-status-variables/#innodb_os_log_fsyncs)
 	_, ok := collected["innodb_os_log_fsyncs"]
+	return ok
+}
+
+func hasInnodbOSLogIO(collected map[string]int64) bool {
+	_, ok := collected["innodb_os_log_written"]
 	return ok
 }
 

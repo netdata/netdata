@@ -57,6 +57,9 @@ var (
 	dataMariaGaleraClusterVer1084GlobalVariables, _ = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/global_variables.txt")
 	dataMariaGaleraClusterVer1084UserStatistics, _  = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/user_statistics.txt")
 	dataMariaGaleraClusterVer1084ProcessList, _     = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/process_list.txt")
+
+	dataMariaVer1145Version, _        = os.ReadFile("testdata/mariadb/v11.4.5/version.txt")
+	dataMariaVer1145UserStatistics, _ = os.ReadFile("testdata/mariadb/v11.4.5/user_statistics.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -90,6 +93,8 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataMariaGaleraClusterVer1084GlobalVariables": dataMariaGaleraClusterVer1084GlobalVariables,
 		"dataMariaGaleraClusterVer1084UserStatistics":  dataMariaGaleraClusterVer1084UserStatistics,
 		"dataMariaGaleraClusterVer1084ProcessList":     dataMariaGaleraClusterVer1084ProcessList,
+		"dataMariaVer1145Version":                      dataMariaVer1145Version,
+		"dataMariaVer1145UserStatistics":               dataMariaVer1145UserStatistics,
 	} {
 		require.NotNil(t, data, fmt.Sprintf("read data: %s", name))
 		_, err := prepareMockRows(data)
@@ -278,7 +283,188 @@ func TestCollector_Collect(t *testing.T) {
 		check       func(t *testing.T, my *Collector)
 	}
 	tests := map[string][]testCaseStep{
-		"MariaDB-Standalone[v5.5.46]: success on all queries": {
+		"MariaDB-Standalone[v11.4.5]: success on all queries": {
+			{
+				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
+					mockExpect(t, m, queryShowVersion, dataMariaVer1145Version)
+					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+					mockExpect(t, m, queryDisableSessionQueryLog, nil)
+					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
+					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
+					mockExpect(t, m, queryShowAllSlavesStatus, nil)
+					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1145UserStatistics)
+					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
+				},
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+
+					expected := map[string]int64{
+						"aborted_connects":                        2,
+						"binlog_cache_disk_use":                   0,
+						"binlog_cache_use":                        0,
+						"binlog_stmt_cache_disk_use":              0,
+						"binlog_stmt_cache_use":                   0,
+						"bytes_received":                          81392,
+						"bytes_sent":                              56794,
+						"com_delete":                              0,
+						"com_insert":                              0,
+						"com_replace":                             0,
+						"com_select":                              6,
+						"com_update":                              0,
+						"connection_errors_accept":                0,
+						"connection_errors_internal":              0,
+						"connection_errors_max_connections":       0,
+						"connection_errors_peer_address":          0,
+						"connection_errors_select":                0,
+						"connection_errors_tcpwrap":               0,
+						"connections":                             12,
+						"created_tmp_disk_tables":                 0,
+						"created_tmp_files":                       5,
+						"created_tmp_tables":                      2,
+						"handler_commit":                          30,
+						"handler_delete":                          0,
+						"handler_prepare":                         0,
+						"handler_read_first":                      7,
+						"handler_read_key":                        7,
+						"handler_read_next":                       3,
+						"handler_read_prev":                       0,
+						"handler_read_rnd":                        0,
+						"handler_read_rnd_next":                   626,
+						"handler_rollback":                        0,
+						"handler_savepoint":                       0,
+						"handler_savepoint_rollback":              0,
+						"handler_update":                          3,
+						"handler_write":                           13,
+						"innodb_buffer_pool_bytes_data":           5062656,
+						"innodb_buffer_pool_bytes_dirty":          475136,
+						"innodb_buffer_pool_pages_data":           309,
+						"innodb_buffer_pool_pages_dirty":          29,
+						"innodb_buffer_pool_pages_flushed":        0,
+						"innodb_buffer_pool_pages_free":           7755,
+						"innodb_buffer_pool_pages_misc":           0,
+						"innodb_buffer_pool_pages_total":          8064,
+						"innodb_buffer_pool_read_ahead":           0,
+						"innodb_buffer_pool_read_ahead_evicted":   0,
+						"innodb_buffer_pool_read_ahead_rnd":       0,
+						"innodb_buffer_pool_read_requests":        1911,
+						"innodb_buffer_pool_reads":                171,
+						"innodb_buffer_pool_wait_free":            0,
+						"innodb_buffer_pool_write_requests":       148,
+						"innodb_data_fsyncs":                      17,
+						"innodb_data_pending_fsyncs":              0,
+						"innodb_data_pending_reads":               0,
+						"innodb_data_pending_writes":              0,
+						"innodb_data_read":                        2801664,
+						"innodb_data_reads":                       185,
+						"innodb_data_writes":                      16,
+						"innodb_data_written":                     0,
+						"innodb_deadlocks":                        0,
+						"innodb_log_waits":                        0,
+						"innodb_log_write_requests":               109,
+						"innodb_log_writes":                       15,
+						"innodb_os_log_written":                   6097,
+						"innodb_row_lock_current_waits":           0,
+						"innodb_rows_deleted":                     0,
+						"innodb_rows_inserted":                    0,
+						"innodb_rows_read":                        0,
+						"innodb_rows_updated":                     0,
+						"key_blocks_not_flushed":                  0,
+						"key_blocks_unused":                       107163,
+						"key_blocks_used":                         0,
+						"key_read_requests":                       0,
+						"key_reads":                               0,
+						"key_write_requests":                      0,
+						"key_writes":                              0,
+						"max_connections":                         151,
+						"max_used_connections":                    1,
+						"open_files":                              29,
+						"open_tables":                             10,
+						"opened_files":                            100,
+						"opened_tables":                           16,
+						"process_list_fetch_query_duration":       0,
+						"process_list_longest_query_duration":     9,
+						"process_list_queries_count_system":       0,
+						"process_list_queries_count_user":         2,
+						"qcache_free_blocks":                      1,
+						"qcache_free_memory":                      1031272,
+						"qcache_hits":                             0,
+						"qcache_inserts":                          0,
+						"qcache_lowmem_prunes":                    0,
+						"qcache_not_cached":                       0,
+						"qcache_queries_in_cache":                 0,
+						"qcache_total_blocks":                     1,
+						"queries":                                 33,
+						"questions":                               24,
+						"select_full_join":                        0,
+						"select_full_range_join":                  0,
+						"select_range":                            0,
+						"select_range_check":                      0,
+						"select_scan":                             2,
+						"slow_queries":                            0,
+						"sort_merge_passes":                       0,
+						"sort_range":                              0,
+						"sort_scan":                               0,
+						"table_locks_immediate":                   60,
+						"table_locks_waited":                      0,
+						"table_open_cache":                        2000,
+						"table_open_cache_overflows":              0,
+						"thread_cache_misses":                     1666,
+						"threads_cached":                          0,
+						"threads_connected":                       1,
+						"threads_created":                         2,
+						"threads_running":                         3,
+						"userstats_netdata_access_denied":         33,
+						"userstats_netdata_binlog_bytes_written":  0,
+						"userstats_netdata_commit_transactions":   0,
+						"userstats_netdata_cpu_time":              40377,
+						"userstats_netdata_denied_connections":    49698,
+						"userstats_netdata_empty_queries":         66,
+						"userstats_netdata_lost_connections":      0,
+						"userstats_netdata_other_commands":        0,
+						"userstats_netdata_rollback_transactions": 0,
+						"userstats_netdata_rows_deleted":          0,
+						"userstats_netdata_rows_inserted":         0,
+						"userstats_netdata_rows_read":             0,
+						"userstats_netdata_rows_sent":             99,
+						"userstats_netdata_rows_updated":          0,
+						"userstats_netdata_select_commands":       33,
+						"userstats_netdata_total_connections":     1,
+						"userstats_netdata_update_commands":       0,
+						"userstats_root_access_denied":            0,
+						"userstats_root_binlog_bytes_written":     0,
+						"userstats_root_commit_transactions":      0,
+						"userstats_root_cpu_time":                 20188,
+						"userstats_root_denied_connections":       0,
+						"userstats_root_empty_queries":            0,
+						"userstats_root_lost_connections":         0,
+						"userstats_root_other_commands":           0,
+						"userstats_root_rollback_transactions":    0,
+						"userstats_root_rows_deleted":             0,
+						"userstats_root_rows_inserted":            0,
+						"userstats_root_rows_read":                0,
+						"userstats_root_rows_sent":                2,
+						"userstats_root_rows_updated":             0,
+						"userstats_root_select_commands":          0,
+						"userstats_root_total_connections":        1,
+						"userstats_root_update_commands":          0,
+						"wsrep_cluster_size":                      0,
+						"wsrep_cluster_status_disconnected":       1,
+						"wsrep_cluster_status_non_primary":        0,
+						"wsrep_cluster_status_primary":            0,
+						"wsrep_connected":                         0,
+						"wsrep_local_bf_aborts":                   0,
+						"wsrep_ready":                             0,
+						"wsrep_thread_count":                      0,
+					}
+
+					copyProcessListQueryDuration(mx, expected)
+					require.Equal(t, expected, mx)
+					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
+				},
+			},
+		},
+		"MariaDB-Standalone[v5.5.64]: success on all queries": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer5564Version)

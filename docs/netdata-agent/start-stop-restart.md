@@ -10,11 +10,11 @@ The Netdata Agent automatically starts at boot after installation.
 
 ### Using `systemctl`, `service`, or `init.d`
 
-| Action  | Systemd                        | Non-systemd                  |
-|---------|--------------------------------|------------------------------|
-| start   | `sudo systemctl start netdata` | `sudo service netdata start` |
-| stop    | `sudo systemctl stop netdata`  | `sudo service netdata stop`  |
-| restart | `sudo systemctl stop netdata`  | `sudo service netdata stop`  |
+| Action  | Systemd                         | Non-systemd                    |
+|---------|---------------------------------|--------------------------------|
+| start   | `sudo systemctl start netdata`  | `sudo service netdata start`   |
+| stop    | `sudo systemctl stop netdata`   | `sudo service netdata stop`    |
+| restart | `sudo systemctl restart netdata`| `sudo service netdata restart` |
 
 ### Using `netdata`
 

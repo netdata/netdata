@@ -8,9 +8,11 @@ extern "C" {
 # endif
 
 #include "common.h"
+#include "signals/signals.h"
 #include "memory/alignment.h"
 #include "memory/nd-mallocz.h"
 #include "memory/nd-mmap.h"
+#include "libnetdata/exit/exit_initiated.h"
 #include "log/nd_log-fatal.h"
 #include "atomics/atomics.h"
 
@@ -39,8 +41,6 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
 int verify_netdata_host_prefix(bool log_msg);
 
-extern volatile sig_atomic_t netdata_exit;
-
 char *read_by_filename(const char *filename, long *file_size);
 char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
@@ -56,12 +56,6 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
-
-#ifdef OS_WINDOWS
-void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data);
-#else
-void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) NORETURN;
-#endif
 
 extern const char *netdata_configured_host_prefix;
 
@@ -115,8 +109,7 @@ extern const char *netdata_configured_host_prefix;
 #include "datetime/rfc7231.h"
 #include "sanitizers/sanitizers.h"
 
-#include "config/dyncfg.h"
-#include "config/appconfig.h"
+#include "config/config.h"
 #include "spawn_server/spawn_server.h"
 #include "spawn_server/spawn_popen.h"
 #include "procfile/procfile.h"
@@ -125,9 +118,6 @@ extern const char *netdata_configured_host_prefix;
 
 #include "log/systemd-journal-helpers.h"
 
-#if defined(HAVE_LIBBPF) && !defined(__cplusplus)
-#include "ebpf/ebpf.h"
-#endif
 #include "eval/eval.h"
 #include "statistical/statistical.h"
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
@@ -145,7 +135,7 @@ extern const char *netdata_configured_host_prefix;
 #include "functions_evloop/functions_evloop.h"
 #include "query_progress/progress.h"
 
-static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
+static ALWAYS_INLINE PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
     if(unlikely(*first)) {
         *first = false;
         return JudyLFirst(PArray, PIndex, PJE0);
@@ -154,7 +144,7 @@ static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool
     return JudyLNext(PArray, PIndex, PJE0);
 }
 
-static inline PPvoid_t JudyLLastThenPrev(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
+static ALWAYS_INLINE PPvoid_t JudyLLastThenPrev(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
     if(unlikely(*first)) {
         *first = false;
         return JudyLLast(PArray, PIndex, PJE0);

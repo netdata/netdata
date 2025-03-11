@@ -1,0 +1,8 @@
+extends:
+ - _base.yaml
+ - _generic-if.yaml
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "huawei"

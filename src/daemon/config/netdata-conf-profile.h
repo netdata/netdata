@@ -52,6 +52,7 @@ struct nd_profile_t {
     time_t update_every;
     size_t malloc_arenas;
     size_t malloc_trim;
+    time_t dbengine_journal_v2_unmount_time;
     ND_COMPRESSION_PROFILE stream_sender_compression;
 };
 

@@ -335,14 +335,20 @@ typedef uint32_t uid_t;
 
 #define UNUSED(x) (void)(x)
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(FSANITIZE_ADDRESS)
 #define UNUSED_FUNCTION(x) __attribute__((unused)) UNUSED_##x
-#define ALWAYS_INLINE inline __attribute__((always_inline))
 #define ALWAYS_INLINE_ONLY __attribute__((always_inline))
+#define ALWAYS_INLINE inline __attribute__((always_inline))             // Forces inlining
+#define ALWAYS_INLINE_HOT inline __attribute__((hot, always_inline))    // Encourages optimization and forces inlining
+#define ALWAYS_INLINE_HOT_FLATTEN inline __attribute__((hot, always_inline, flatten))    // Encourages optimization and forces inlining and flattening
+#define NOT_INLINE_HOT __attribute__((hot))                             // Encourages optimization but doesn’t force inlining.
 #else
 #define UNUSED_FUNCTION(x) UNUSED_##x
-#define ALWAYS_INLINE inline
 #define ALWAYS_INLINE_ONLY
+#define ALWAYS_INLINE inline
+#define ALWAYS_INLINE_HOT inline
+#define ALWAYS_INLINE_HOT_FLATTEN inline
+#define NOT_INLINE_HOT
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -363,6 +369,22 @@ typedef uint32_t uid_t;
     b = a;              \
     a = _tmp;           \
 } while(0)
+
+// returns the number of times the divider fits into the total
+// if the divider is 0, it is treated as 1 (it returns total)
+#define HOWMANY(total, divider) ({ \
+    typeof(total) _t = (total);    \
+    typeof(total) _d = (divider);  \
+    _d = _d ? _d : 1;              \
+    (_t + (_d - 1)) / _d;          \
+})
+
+#define FIT_IN_RANGE(value, min, max) ({ \
+    typeof(value) _v = (value);     \
+    typeof(min) _min = (min);       \
+    typeof(max) _max = (max);       \
+    (_v < _min) ? _min : ((_v > _max) ? _max : _v); \
+})
 
 // --------------------------------------------------------------------------------------------------------------------
 // NETDATA CLOUD
@@ -401,6 +423,22 @@ typedef uint32_t uid_t;
 #define CONCAT_INDIRECT(a, b) a##b
 #define CONCAT(a, b) CONCAT_INDIRECT(a, b)
 #define PAD64(type) uint8_t CONCAT(padding, __COUNTER__)[64 - sizeof(type)]; type
+
+// --------------------------------------------------------------------------------------------------------------------
+
+#define FUNCTION_RUN_ONCE() {                                           \
+    static bool __run_once = false;                                     \
+    if (!__sync_bool_compare_and_swap(&__run_once, false, true)) {      \
+        return;                                                         \
+    }                                                                   \
+}
+
+#define FUNCTION_RUN_ONCE_RET(ret) {                                    \
+    static bool __run_once = false;                                     \
+    if (!__sync_bool_compare_and_swap(&__run_once, false, true)) {      \
+        return (ret);                                                   \
+    }                                                                   \
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 

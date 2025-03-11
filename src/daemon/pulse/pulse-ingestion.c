@@ -7,7 +7,7 @@ static struct ingest_statistics {
     uint64_t db_points_stored_per_tier[RRD_STORAGE_TIERS];
 } ingest_statistics = { 0 };
 
-void pulse_queries_rrdset_collection_completed(size_t *points_read_per_tier_array) {
+ALWAYS_INLINE void pulse_queries_rrdset_collection_completed(size_t *points_read_per_tier_array) {
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         __atomic_fetch_add(&ingest_statistics.db_points_stored_per_tier[tier], points_read_per_tier_array[tier], __ATOMIC_RELAXED);
         points_read_per_tier_array[tier] = 0;

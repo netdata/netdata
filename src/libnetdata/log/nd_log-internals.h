@@ -125,6 +125,8 @@ struct nd_log {
     nd_uuid_t invocation_id;
 
     ND_LOG_SOURCES overwrite_process_source;
+    log_event_t fatal_data_cb;
+    fatal_event_t fatal_final_cb;
 
     struct nd_log_source sources[_NDLS_MAX];
 
@@ -148,6 +150,8 @@ struct nd_log {
     struct {
         bool etw; // when set use etw, otherwise wel
         bool initialized;
+        bool provider_enabled;  // track etw provider state
+        SPINLOCK provider_lock; // Protect etw provider state access
     } eventlog;
 
     struct {
@@ -209,6 +213,7 @@ const char *winerror_annotator(struct log_field *lf);
 
 uint64_t log_field_to_uint64(struct log_field *lf);
 int64_t log_field_to_int64(struct log_field *lf);
+const char *log_field_strdupz(struct log_field *lf);
 
 // --------------------------------------------------------------------------------------------------------------------
 // common text formatters

@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGINSD_PARSER_H
 #define NETDATA_PLUGINSD_PARSER_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
 #include "streaming/stream-receiver-internals.h"
@@ -19,7 +19,6 @@
 
 #define PLUGINSD_MIN_RRDSET_POINTERS_CACHE 1024
 
-#define HOST_LABEL_IS_EPHEMERAL "_is_ephemeral"
 // PARSER return codes
 typedef enum __attribute__ ((__packed__)) parser_rc {
     PARSER_RC_OK,       // Callback was successful, go on

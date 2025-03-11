@@ -54,8 +54,6 @@ if(NOT CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-include(NetdataCompilerFlags)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 # Check for the mold linker and try to use it if available
@@ -149,6 +147,13 @@ else()
         message(FATAL_ERROR "Unknown/unsupported platform: ${CMAKE_SYSTEM_NAME} (Supported platforms: FreeBSD, Linux, macOS, Windows)")
 endif()
 
+include(NetdataCompilerFlags)
+
+check_c_compiler_flag("-fexceptions" HAVE_FEXCEPTIONS)
+if (NOT HAVE_FEXCEPTIONS)
+    message(FATAL_ERROR "Missing required compiler flag: -fexceptions.")
+endif()
+
 # This is intended to make life easier for developers who are working on one
 # specific feature.
 #
@@ -164,6 +169,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_OTEL "Enable metrics collection via OpenTelemetry collector" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS OR OS_WINDOWS" False)
@@ -263,7 +269,42 @@ if(ENABLE_MIMALLOC)
         netdata_add_mimalloc()
 endif()
 
-if(ENABLE_PLUGIN_GO)
+option(ENABLE_JEMALLOC "Disable jemalloc allocator" OFF)
+
+if(ENABLE_JEMALLOC)
+    pkg_check_modules(JEMALLOC QUIET jemalloc)
+    if(JEMALLOC_FOUND)
+        # Check if jemalloc has arena API
+        set(CMAKE_REQUIRED_INCLUDES ${JEMALLOC_INCLUDE_DIRS})
+        set(CMAKE_REQUIRED_LIBRARIES ${JEMALLOC_LIBRARIES})
+        check_c_source_compiles("
+            #include <jemalloc/jemalloc.h>
+            int main() {
+                unsigned narenas;
+                size_t sz = sizeof(narenas);
+                mallctl(\"arenas.narenas\", &narenas, &sz, NULL, 0);
+                return 0;
+            }
+        " HAVE_JEMALLOC_ARENA_API)
+
+        if(HAVE_JEMALLOC_ARENA_API)
+            set(ENABLE_JEMALLOC ON CACHE BOOL "Enable jemalloc allocator" FORCE)
+            message(STATUS "Jemalloc found with arena API support - enabling")
+        else()
+            if(ENABLE_JEMALLOC)
+                message(FATAL_ERROR "Jemalloc was found but does not have arena API support")
+            endif()
+            message(STATUS "Jemalloc found but does not have arena API support - disabling")
+        endif()
+    else()
+        if(ENABLE_JEMALLOC)
+            message(FATAL_ERROR "Jemalloc support was explicitly enabled but jemalloc was not found")
+        endif()
+        message(STATUS "Jemalloc not found - disabling")
+    endif()
+endif()
+
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_OTEL)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
@@ -444,12 +485,31 @@ check_function_exists(arc4random_uniform HAVE_ARC4RANDOM_UNIFORM)
 check_function_exists(getrandom HAVE_GETRANDOM)
 check_function_exists(sysinfo HAVE_SYSINFO)
 
+check_function_exists(timegm HAVE_TIMEGM)
+
+# Add -rdynamic when backtrace is available but libunwind is not
+if(HAVE_BACKTRACE AND NOT ENABLE_LIBUNWIND AND NOT STATIC_BUILD)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        add_link_options(-rdynamic)
+        message(STATUS "Adding -rdynamic to link options for better backtrace support")
+    endif()
+endif()
+
 #
 # check source compilation
 #
 
 include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
+
+check_c_source_compiles("
+#include <time.h>
+int main(void) {
+    struct tm t;
+    (void)t.tm_gmtoff;
+    return 0;
+}
+" HAVE_TM_GMTOFF)
 
 set(CMAKE_REQUIRED_LIBRARIES pthread)
 check_c_source_compiles("
@@ -712,12 +772,30 @@ set(LIBJUDY_SOURCES
         ${LIBJUDY_NEXT_FILES}
 )
 
+set(INICFG_FILES
+        src/libnetdata/inicfg/inicfg.c
+        src/libnetdata/inicfg/inicfg.h
+        src/libnetdata/inicfg/inicfg_internals.h
+        src/libnetdata/inicfg/inicfg_exporters.c
+        src/libnetdata/inicfg/inicfg_conf_file.c
+        src/libnetdata/inicfg/inicfg_cleanup.c
+        src/libnetdata/inicfg/inicfg_sections.c
+        src/libnetdata/inicfg/inicfg_options.c
+        src/libnetdata/inicfg/inicfg_migrate.c
+        src/libnetdata/inicfg/inicfg_traversal.c
+        src/libnetdata/inicfg/inicfg_api.c
+        src/libnetdata/inicfg/dyncfg.c
+        src/libnetdata/inicfg/dyncfg.h
+)
+
+set(CONFIG_FILES
+        src/libnetdata/config/config.h
+)
+
 set(LIBNETDATA_FILES
         ${CONFIG_H}
         src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.c
         src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
-        src/libnetdata/config/appconfig.c
-        src/libnetdata/config/appconfig.h
         src/libnetdata/aral/aral.c
         src/libnetdata/aral/aral.h
         src/libnetdata/avl/avl.c
@@ -805,8 +883,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/http/http_defs.h
         src/libnetdata/http/content_type.c
         src/libnetdata/http/content_type.h
-        src/libnetdata/config/dyncfg.c
-        src/libnetdata/config/dyncfg.h
         src/libnetdata/json/json-c-parser-inline.h
         src/libnetdata/template-enum.h
         src/libnetdata/dictionary/dictionary-internals.h
@@ -891,24 +967,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/parsers/size.h
         src/libnetdata/libjudy/judy-malloc.c
         src/libnetdata/libjudy/judy-malloc.h
-        src/libnetdata/config/appconfig_internals.h
-        src/libnetdata/config/appconfig_exporters.c
-        src/libnetdata/config/appconfig_conf_file.c
-        src/libnetdata/config/appconfig_cleanup.c
-        src/libnetdata/config/appconfig_sections.c
-        src/libnetdata/config/appconfig_options.c
-        src/libnetdata/config/appconfig_migrate.c
-        src/libnetdata/config/appconfig_traversal.c
-        src/libnetdata/config/appconfig_api_sizes.c
-        src/libnetdata/config/appconfig_api_sizes.h
-        src/libnetdata/config/appconfig_api_durations.c
-        src/libnetdata/config/appconfig_api_durations.h
-        src/libnetdata/config/appconfig_api_numbers.c
-        src/libnetdata/config/appconfig_api_numbers.h
-        src/libnetdata/config/appconfig_api_text.c
-        src/libnetdata/config/appconfig_api_text.h
-        src/libnetdata/config/appconfig_api_boolean.c
-        src/libnetdata/config/appconfig_api_boolean.h
         src/libnetdata/facets/logs_query_status.h
         src/libnetdata/os/timestamps.c
         src/libnetdata/os/timestamps.h
@@ -981,7 +1039,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/benchmark.h
         src/libnetdata/locks/benchmark-rw.c
         src/libnetdata/locks/benchmark-rw.h
-        src/libnetdata/log/nd_log-libunwind.c
+        src/libnetdata/log/nd_log-stacktrace.c
         src/libnetdata/memory/nd-mallocz.c
         src/libnetdata/memory/nd-mallocz.h
         src/libnetdata/memory/nd-mmap.c
@@ -991,7 +1049,32 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/get_system_pagesize.h
         src/libnetdata/os/hostname.c
         src/libnetdata/os/hostname.h
+        src/libnetdata/exit/exit_initiated.c
+        src/libnetdata/exit/exit_initiated.h
+        src/libnetdata/os/disk_space.c
+        src/libnetdata/os/disk_space.h
+        src/libnetdata/os/file_metadata.c
+        src/libnetdata/os/file_metadata.h
+        src/libnetdata/os/process_path.c
+        src/libnetdata/os/process_path.h
+        src/libnetdata/os/boottime.c
+        src/libnetdata/os/boottime.h
+        src/libnetdata/os/boot_id.c
+        src/libnetdata/os/boot_id.h
+        src/libnetdata/os/run_dir.c
+        src/libnetdata/os/run_dir.h
+        src/libnetdata/os/file_lock.c
+        src/libnetdata/os/file_lock.h
+        src/libnetdata/os/mmap_limit.c
+        src/libnetdata/os/mmap_limit.h
+        src/libnetdata/signals/signals.c
+        src/libnetdata/signals/signals.h
+        src/libnetdata/os/machine_id.c
+        src/libnetdata/os/machine_id.h
 )
+
+list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
+list(APPEND LIBNETDATA_FILES ${CONFIG_FILES})
 
 set(LIBH2O_FILES
         src/web/server/h2o/libh2o/deps/cloexec/cloexec.c
@@ -1093,8 +1176,8 @@ set(DAEMON_FILES
         src/daemon/environment.c
         src/daemon/win_system-info.c
         src/daemon/win_system-info.h
-        src/daemon/signals.c
-        src/daemon/signals.h
+        src/daemon/signal-handler.c
+        src/daemon/signal-handler.h
         src/daemon/service.c
         src/daemon/daemon-shutdown-watcher.c
         src/daemon/daemon-shutdown-watcher.h
@@ -1176,6 +1259,12 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-db-dbengine-retention.h
         src/daemon/pulse/pulse-parents.c
         src/daemon/pulse/pulse-parents.h
+        src/daemon/daemon-status-file.c
+        src/daemon/daemon-status-file.h
+        src/daemon/config/netdata-conf-ssl.c
+        src/daemon/config/netdata-conf-ssl.h
+        src/daemon/daemon-systemd-watcher.c
+        src/daemon/daemon-systemd-watcher.h
 )
 
 set(H2O_FILES
@@ -1412,6 +1501,11 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem-pgfaults.h
         src/collectors/common-contexts/mem-available.h
 )
+
+set(INTERCOMMUNICATION_COLLECTORS_FILES
+        src/collectors/collectors-ipc/ebpf-ipc.c
+        src/collectors/collectors-ipc/ebpf-ipc.h
+        )
 
 set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/plugins_d.c
@@ -1666,6 +1760,8 @@ set(WEB_PLUGIN_FILES
         src/web/api/queries/backfill.h
         src/web/api/functions/function-metrics-cardinality.c
         src/web/api/functions/function-metrics-cardinality.h
+        src/web/api/request_source.c
+        src/web/api/request_source.h
 )
 
 set(CLAIM_PLUGIN_FILES
@@ -1770,8 +1866,11 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemUptime.c
         src/collectors/windows.plugin/GetSystemRAM.c
         src/collectors/windows.plugin/GetSystemCPU.c
+        src/collectors/windows.plugin/perflib-adcs.c
+        src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
         src/collectors/windows.plugin/perflib-rrd.h
+        src/collectors/windows.plugin/perflib-ad.c
         src/collectors/windows.plugin/perflib-mssql.c
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
@@ -2151,11 +2250,6 @@ if(OS_WINDOWS)
         endif()
 endif()
 
-# ebpf
-if(ENABLE_PLUGIN_EBPF)
-        netdata_add_libbpf_to_target(libnetdata)
-endif()
-
 # judy
 target_link_libraries(libnetdata PUBLIC judy)
 
@@ -2163,22 +2257,37 @@ netdata_add_jsonc_to_target(libnetdata)
 
 netdata_add_libyaml_to_target(libnetdata)
 
+# jemalloc
+if(ENABLE_JEMALLOC)
+    target_link_libraries(libnetdata PUBLIC ${JEMALLOC_LIBRARIES})
+    target_include_directories(libnetdata PUBLIC ${JEMALLOC_INCLUDE_DIRS})
+    target_compile_options(libnetdata PUBLIC ${JEMALLOC_CFLAGS_OTHER})
+endif()
+
 # libunwind
 if(ENABLE_LIBUNWIND)
   pkg_check_modules(LIBUNWIND libunwind IMPORTED_TARGET)
   if(TARGET PkgConfig::LIBUNWIND)
     set(HAVE_LIBUNWIND On)
 
+    if(STATIC_BUILD)
+      set(unwind_prefix /libunwind-static/lib/libunwind-)
+      set(suffix ${CMAKE_STATIC_LIBRARY_SUFFIX})
+    else()
+      set(unwind_prefix -lunwind-)
+      set(suffix "")
+    endif()
+
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
-      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-x86_64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND ${unwind_prefix}x86_64${suffix})
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^i?.86")
-      target_link_libraries(libnetdata PUBLIC PkgCOnfig::LIBUNWIND -lunwind-x86)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND ${unwind_prefix}x86${suffix})
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(arm64)|(aarch64)")
-      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-aarch64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND ${unwind_prefix}aarch64${suffix})
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
-      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-arm)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND ${unwind_prefix}arm${suffix})
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "p(ower)?pc64")
-      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND -lunwind-ppc64)
+      target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND ${unwind_prefix}ppc64${suffix})
     else()
       message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR} for libunwind. Stack traces may not work.")
       target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND)
@@ -2285,7 +2394,7 @@ endif()
 # proto definitions
 #
 netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
-                            "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                            "${CMAKE_BINARY_DIR}/src/aclk/aclk-schemas"
                             ACLK_PROTO_BUILT_SRCS
                             ACLK_PROTO_BUILT_HDRS
                             ${ACLK_PROTO_DEFS})
@@ -2629,6 +2738,8 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_shm.h
             src/collectors/ebpf.plugin/ebpf_socket.c
             src/collectors/ebpf.plugin/ebpf_socket.h
+            src/collectors/ebpf.plugin/ebpf_socket_ipc.c
+            src/collectors/ebpf.plugin/ebpf_socket_ipc.h
             src/collectors/ebpf.plugin/ebpf_softirq.c
             src/collectors/ebpf.plugin/ebpf_softirq.h
             src/collectors/ebpf.plugin/ebpf_sync.c
@@ -2649,9 +2760,10 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/libbpf_api/ebpf.h
     )
 
-    add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES})
+    add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES} ${INTERCOMMUNICATION_COLLECTORS_FILES})
     target_link_libraries(ebpf.plugin libnetdata)
 
+    netdata_add_libbpf_to_target(ebpf.plugin)
     netdata_add_ebpf_co_re_to_target(ebpf.plugin)
 
     install(TARGETS ebpf.plugin
@@ -2773,7 +2885,7 @@ if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         endif()
 
         netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
-                                    "${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
+                                    "${CMAKE_BINARY_DIR}/src/exporting/prometheus/remote_write"
                                     PROMETHEUS_REMOTE_WRITE_BUILT_SRCS
                                     PROMETHEUS_REMOTE_WRITE_BUILT_HDRS
                                     "src/exporting/prometheus/remote_write/remote_write.proto")
@@ -2832,7 +2944,7 @@ target_compile_options(netdata PRIVATE
 )
 
 target_include_directories(netdata PRIVATE
-        "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+        "${CMAKE_BINARY_DIR}/src/aclk/aclk-schemas"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
 )
@@ -2943,6 +3055,18 @@ if(ENABLE_PLUGIN_GO)
 endif()
 
 #
+# Handle OTel Collector plugin
+#
+
+if(ENABLE_PLUGIN_OTEL)
+  include(${CMAKE_SOURCE_DIR}/src/go/otel-collector/CMakeLists.txt)
+
+  install(PROGRAMS ${CMAKE_BINARY_DIR}/otel-collector/otelcol.plugin
+          COMPONENT plugin-otelcol
+          DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+#
 # Generate config file
 #
 if(NOT NETDATA_RUNTIME_PREFIX STREQUAL "")
@@ -2965,11 +3089,39 @@ endif()
 set(WEB_DEST "${WEB_DIR}")
 set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 
+# Collect all compiler flags
+get_directory_property(NETDATA_COMPILE_OPTIONS COMPILE_OPTIONS)
+get_directory_property(NETDATA_COMPILE_DEFINITIONS COMPILE_DEFINITIONS)
 
-set(CONFIGURE_COMMAND "dummy-configure-command")
+# Collect all linker flags
+get_directory_property(NETDATA_LINK_OPTIONS LINK_OPTIONS)
+get_directory_property(NETDATA_LINK_LIBRARIES LINK_LIBRARIES)
+
+list(APPEND CONFIGURE_OPTIONS
+        # Build type and languages
+        "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+        "-DCMAKE_C_STANDARD=${CMAKE_C_STANDARD}"
+        "-DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}"
+        "-DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}"
+
+        # Compiler flags (dynamically collected)
+        "-DCMAKE_C_FLAGS='${CMAKE_C_FLAGS} ${NETDATA_COMPILE_OPTIONS}'"
+        "-DCMAKE_CXX_FLAGS='${CMAKE_CXX_FLAGS} ${NETDATA_COMPILE_OPTIONS}'"
+        "-DCMAKE_COMPILE_DEFINITIONS='${NETDATA_COMPILE_DEFINITIONS}'"
+
+        # Linker flags (dynamically collected)
+        "-DCMAKE_EXE_LINKER_FLAGS='${CMAKE_EXE_LINKER_FLAGS} ${NETDATA_LINK_OPTIONS}'"
+        "-DCMAKE_SHARED_LINKER_FLAGS='${CMAKE_SHARED_LINKER_FLAGS}'"
+)
+
+string(JOIN " " CONFIGURE_COMMAND "cmake" ${CONFIGURE_OPTIONS})
+
 if (NOT NETDATA_USER)
         set(NETDATA_USER "netdata")
 endif()
+
+set(BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME "build-info-cmake-cache.gz")
+set(BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH "usr/share/netdata")
 
 configure_file(packaging/cmake/config.cmake.h.in config.h)
 
@@ -3495,6 +3647,18 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/sd)
 
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles)
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/default)
+
+    file(GLOB GO_SD_CONF_FILES src/go/plugin/go.d/config/go.d/snmp.profiles/default/*.yaml)
+    install(FILES ${GO_SD_CONF_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/default)
+
     if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
@@ -3511,67 +3675,33 @@ if(ENABLE_DASHBOARD)
   include(NetdataDashboard)
   bundle_dashboard()
 
-  include(src/web/gui/v1/dashboard_v1.cmake)
-  include(src/web/gui/gui.cmake)
-
-  function(cat IN_FILE OUT_FILE)
-    file(READ ${IN_FILE} CONTENTS)
-    file(APPEND ${OUT_FILE} "${CONTENTS}")
-  endfunction()
-
-  file(WRITE ${CMAKE_BINARY_DIR}/src/web/gui/dashboard.js.in "")
-
-  foreach(JS_FILE ${DASHBOARD_JS_FILES})
-    cat(${JS_FILE} ${CMAKE_BINARY_DIR}/dashboard.js.in)
-  endforeach()
-
-  configure_file(${CMAKE_BINARY_DIR}/dashboard.js.in
-                 ${CMAKE_BINARY_DIR}/dashboard.js COPYONLY)
-
   install(FILES
-          ${CMAKE_BINARY_DIR}/dashboard.js
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST})
-
-  install(FILES
-          src/web/gui/dashboard_info_custom_example.js
-          src/web/gui/dashboard_info.js
-          src/web/gui/main.css
-          src/web/gui/main.js
-          src/web/gui/switch.html
           src/web/gui/ilove.html
           COMPONENT dashboard
           DESTINATION ${WEB_DEST})
 
-  install(FILES
-          src/web/gui/old/index.html
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/old)
-
-  install(FILES
-          src/web/gui/static/img/netdata-logomark.svg
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/static/img)
-
-  install(FILES
-          src/web/gui/css/morris-0.5.1.css
-          src/web/gui/css/c3-0.4.18.min.css
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/css)
-
-  install(FILES
-          src/web/gui/.well-known/dnt/cookies
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST}/.well-known/dnt)
-
-  if(NOT OS_WINDOWS)
-    # v0 dashboard
-    install(FILES
-            src/web/gui/v0/index.html
-            COMPONENT dashboard
-            DESTINATION ${WEB_DEST}/v0)
-  endif()
 endif()
+
+#
+# Ship CMakeCache.txt as an archive
+#
+
+install(CODE "
+        execute_process(COMMAND gzip -c \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
+                        OUTPUT_FILE \"${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+                        WORKING_DIRECTORY \"${CMAKE_BINARY_DIR}\"
+                        RESULT_VARIABLE result)
+        if(NOT result EQUAL 0)
+                message(WARNING \"Failed to compress CMakeCache.txt\")
+        endif()
+
+        file(INSTALL \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+             DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
+")
+
+#
+# vendor msys stuff on Windows
+#
 
 if(OS_WINDOWS)
         install(FILES /usr/bin/msys-protobuf-32.dll
@@ -3584,5 +3714,9 @@ if(OS_WINDOWS)
         # Make curl work with ssl
         install(DIRECTORY /usr/ssl DESTINATION usr)
 endif()
+
+#
+# Include packaging logic
+#
 
 include(Packaging)

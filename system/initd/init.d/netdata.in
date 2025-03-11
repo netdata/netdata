@@ -1,12 +1,12 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Netdata -	Monitoring and troubleshooting, transformed!
+# Netdata -	X-Ray Vision for your infrastructure!
 # chkconfig: 345 99 01
-# description:  Netdata is a daemon that collects data in real-time (per second)
-#               and presents a web site to view and analyze them. The presentation
-#               is also real-time and full of interactive charts that precisely
-#               render all collected values.
+# description: netdata is a high-resolution, real-time, low-latency observability platform.
+#              Per-second data collection, high-performance long-term storage, low-latency
+#              visualization, machine-learning based anomaly detection, alerts and notifications,
+#              advanced correlations and fast root cause analysis, native horizontal scalability.
 # processname:	netdata
 
 # Source functions

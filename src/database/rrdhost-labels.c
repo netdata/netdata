@@ -22,7 +22,7 @@ static bool config_label_cb(void *data __maybe_unused, const char *name, const c
 }
 
 static void rrdhost_load_config_labels(void) {
-    int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
+    int status = inicfg_load(&netdata_config, NULL, 1, CONFIG_SECTION_HOST_LABEL);
     if(!status) {
         char *filename = CONFIG_DIR "/" CONFIG_FILENAME;
         nd_log(NDLS_DAEMON, NDLP_WARNING,
@@ -30,7 +30,7 @@ static void rrdhost_load_config_labels(void) {
                filename);
     }
 
-    appconfig_foreach_value_in_section(&netdata_config, CONFIG_SECTION_HOST_LABEL, config_label_cb, NULL);
+    inicfg_foreach_value_in_section(&netdata_config, CONFIG_SECTION_HOST_LABEL, config_label_cb, NULL);
 }
 
 static void rrdhost_load_kubernetes_labels(void) {
@@ -70,10 +70,10 @@ static void rrdhost_load_auto_labels(void) {
     // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
     // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.
 
-    int is_ephemeral = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "is ephemeral node", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", RRDLABEL_SRC_AUTO);
+    int is_ephemeral = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "is ephemeral node", CONFIG_BOOLEAN_NO);
+    rrdlabels_add(labels, HOST_LABEL_IS_EPHEMERAL, is_ephemeral ? "true" : "false", RRDLABEL_SRC_CONFIG);
 
-    int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
+    int has_unstable_connection = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
     rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     rrdlabels_add(labels, "_is_parent", (stream_receivers_currently_connected() > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
@@ -83,6 +83,9 @@ static void rrdhost_load_auto_labels(void) {
 
     if (localhost->stream.snd.destination)
         rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);
+
+    rrdlabels_add(labels, "_timezone", rrdhost_timezone(localhost), RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_abbrev_timezone", rrdhost_abbrev_timezone(localhost), RRDLABEL_SRC_AUTO);
 }
 
 void reload_host_labels(void) {

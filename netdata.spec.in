@@ -120,7 +120,7 @@ AutoReqProv: yes
 # Filter known bogus deps that would be caught by AutoReqProv.
 %global __requires_exclude_from ^%{_libdir}/%{name}/system/.*$
 
-Summary:	Netdata - Monitoring and troubleshooting, transformed!
+Summary:	Netdata - X-Ray Vision for your infrastructure!
 Name:		netdata
 Version:	%{version}
 Release:	1%{?dist}
@@ -160,6 +160,7 @@ BuildRequires: pkgconfig(libcurl)
 BuildRequires: pkgconfig(liblz4)
 BuildRequires: pkgconfig(yaml-0.1)
 BuildRequires: pkgconfig(json-c)
+BuildRequires: pkgconfig(libunwind)
 %if %{_have_log2journal}
 BuildRequires: pkgconfig(libpcre2-8)
 %endif
@@ -316,13 +317,10 @@ BuildRequires: flex
 # #####################################################################
 
 %description
-  netdata is the fastest way to visualize metrics. It is a resource
-efficient, highly optimized system for collecting and visualizing any
-type of realtime timeseries data, from CPU usage, disk activity, SQL
-queries, API calls, web site visitors, etc.
-  netdata tries to visualize the truth of now, in its greatest detail,
-so that you can get insights of what is happening now and what just
-happened, on your systems and applications.
+ netdata is a high-resolution, real-time, low-latency observability platform.
+Per-second data collection, high-performance long-term storage, low-latency
+visualization, machine-learning based anomaly detection, alerts and notifications,
+advanced correlations and fast root cause analysis, native horizontal scalability.
 
 %prep
 %setup -q -n "%{name}-%{version}"
@@ -335,6 +333,9 @@ happened, on your systems and applications.
 	%if %{centos_ver} < 8
 	-DUSE_CXX_11=On \
 	%endif
+	%endif
+	%if 0%{?suse_version}
+	-DUSE_LTO=Off \
 	%endif
 	%if %{_have_cups}
 	-DENABLE_PLUGIN_CUPS=On \
@@ -403,7 +404,8 @@ happened, on your systems and applications.
 	-DENABLE_PLUGIN_SYSTEMD_JOURNAL=On \
 	-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On \
 	-DENABLE_BUNDLED_JSONC=Off \
-	-DENABLE_BUNDLED_YAML=Off
+	-DENABLE_BUNDLED_YAML=Off \
+	-DENABLE_LBIUNWIND=On
 
 # Build step
 %{cmake_build}
@@ -521,6 +523,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_unitdir}/%{name}-updater.service
 %{_presetdir}/50-%{name}.preset
 %{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf
+
+%{_datarootdir}/%{name}/build-info-cmake-cache.gz
 
 %dir %{_libexecdir}/%{name}
 %dir %{_libexecdir}/%{name}/plugins.d
@@ -806,9 +810,6 @@ Conflicts: %{name} < %{version}
 Suggests: nvme-cli
 Suggests: sudo
 %endif
-%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
-Recommends: lm_sensors
-%endif
 
 %description plugin-go
  This plugin adds a selection of additional collectors written in Go to the Netdata Agent
@@ -1005,11 +1006,13 @@ fi
 %{_datadir}/%{name}/web
 
 %changelog
-* Thu Aug 29 2024 Austin Hemmelgarn <austin@netdata.cloud>
+* Tue Jan 28 2025 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-30
+- Removed lm_sensors dependency for plugin-go package
+* Thu Aug 29 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-29
 - Split dashboard to it’s own package
-* Fri Jul 19 2024 Austin Hemmelgarn <austin@netdata.cloud>
+* Fri Jul 19 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-28
 - Fix dependency issues with old logs-management plugin
-* Tue Jul 16 2024 Austin Hemmelgarn <austin@netdata.cloud>
+* Tue Jul 16 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-27
 - Removed logs-management plugin
 * Wed Jul 03 2024 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-26
 - Added lm_sensors as weak dependency for plugin-go package

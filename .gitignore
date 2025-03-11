@@ -33,10 +33,6 @@ src/collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
 src/libnetdata/ebpf/includes/
 
-# protoc generated files
-*.pb.cc
-*.pb.h
-
 # installation artifacts
 packaging/installer/.environment.sh
 *.tar.*
@@ -59,14 +55,6 @@ netdata-coverity-analysis.tgz
 README
 TODO.md
 TODO.txt
-
-src/web/gui/chart-info/
-src/web/gui/control.html
-src/web/gui/dashboard.js
-src/web/gui/datasource.css
-src/web/gui/gadget.xml
-src/web/gui/index_new.html
-src/web/gui/version.txt
 
 # related to karma/javascript/node
 /node_modules/

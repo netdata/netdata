@@ -9,9 +9,9 @@ void sanity_check(void) {
 }
 
 #include "sqlite_aclk_node.h"
-#include "../aclk_query_queue.h"
-#include "../aclk_query.h"
-#include "../aclk_capas.h"
+#include "aclk/aclk_query_queue.h"
+#include "aclk/aclk_query.h"
+#include "aclk/aclk_capas.h"
 
 static void create_node_instance_result_job(const char *machine_guid, const char *node_id)
 {
@@ -32,33 +32,8 @@ static void create_node_instance_result_job(const char *machine_guid, const char
         netdata_log_error("Cannot find machine_guid provided by CreateNodeInstanceResult");
         return;
     }
-
     sql_update_node_id(&host_uuid, &node_uuid);
-
-    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-    node_instance_connection_t node_state_update = {
-        .hops = 1,
-        .live = 0,
-        .queryable = 1,
-        .session_id = aclk_session_newarch,
-        .node_id = node_id,
-        .capabilities = NULL};
-
-    node_state_update.live = rrdhost_is_local(host) ? 1 : 0;
-    node_state_update.hops = rrdhost_ingestion_hops(host);
-    node_state_update.capabilities = aclk_get_node_instance_capas(host);
-    schedule_node_state_update(host, 5000);
-
-    CLAIM_ID claim_id = claim_id_get();
-    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
-    query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-
-    freez((void *)node_state_update.capabilities);
-
-    query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
-    query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-
-    aclk_add_job(query);
+    schedule_node_state_update(host, 1000);
 }
 
 struct aclk_sync_config_s {
@@ -156,7 +131,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     char guid[UUID_STR_LEN];
     uuid_unparse_lower(*(nd_uuid_t *)argv[IDX_HOST_ID], guid);
 
-    if (is_ephemeral && age > rrdhost_free_ephemeral_time_s) {
+    if (is_ephemeral && ((!is_registered && last_connected == 1) || (rrdhost_free_ephemeral_time_s && age > rrdhost_free_ephemeral_time_s))) {
         netdata_log_info(
             "%s ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds)",
             is_registered ? "Loading registered" : "Skipping unregistered",
@@ -164,8 +139,9 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
             guid,
             age,
             rrdhost_free_ephemeral_time_s);
+
         if (!is_registered)
-            return 0;
+           goto done;
     }
 
     struct rrdhost_system_info *system_info = rrdhost_system_info_create();
@@ -198,6 +174,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         system_info,
         1);
 
+    rrdhost_system_info_free(system_info);
+
     if (likely(host)) {
         if (is_ephemeral)
             rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
@@ -220,6 +198,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"  ephemeral=%d",
                    rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
 #endif
+
+done:
     return 0;
 }
 
@@ -373,8 +353,6 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
         return;
     }
 
-    struct ctxs_checkpoint *cmd;
-
     bool ok_to_send = true;
 
     switch (query->type) {
@@ -387,20 +365,12 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             break;
         case CTX_CHECKPOINT:;
             worker_is_busy(UV_EVENT_CTX_CHECKPOINT);
-            cmd = query->data.payload;
-            rrdcontext_hub_checkpoint_command(cmd);
-            freez(cmd->claim_id);
-            freez(cmd->node_id);
-            freez(cmd);
+            rrdcontext_hub_checkpoint_command(query->data.payload);
             ok_to_send = false;
             break;
         case CTX_STOP_STREAMING:
             worker_is_busy(UV_EVENT_CTX_STOP_STREAMING);
-            cmd = query->data.payload;
-            rrdcontext_hub_stop_streaming_command(cmd);
-            freez(cmd->claim_id);
-            freez(cmd->node_id);
-            freez(cmd);
+            rrdcontext_hub_stop_streaming_command(query->data.payload);
             ok_to_send = false;
             break;
         case SEND_NODE_INSTANCES:
@@ -411,21 +381,16 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
         case ALERT_START_STREAMING:
             worker_is_busy(UV_EVENT_ALERT_START_STREAMING);
             aclk_start_alert_streaming(query->data.node_id, query->version);
-            freez(query->data.node_id);
             ok_to_send = false;
             break;
         case ALERT_CHECKPOINT:
             worker_is_busy(UV_EVENT_ALERT_CHECKPOINT);
             aclk_alert_version_check(query->data.node_id, query->claim_id, query->version);
-            freez(query->data.node_id);
-            freez(query->claim_id);
             ok_to_send = false;
             break;
         case CREATE_NODE_INSTANCE:
             worker_is_busy(UV_EVENT_CREATE_NODE_INSTANCE);
             create_node_instance_result_job(query->machine_guid, query->data.node_id);
-            freez(query->data.node_id);
-            freez(query->machine_guid);
             ok_to_send = false;
             break;
 
@@ -611,6 +576,19 @@ int schedule_query_in_worker(uv_loop_t *loop, struct aclk_sync_config_s *config,
     return rc;
 }
 
+static void free_query_list(Pvoid_t JudyL)
+{
+    bool first = true;
+    Pvoid_t *Pvalue;
+    Word_t Index = 0;
+    aclk_query_t query;
+    while ((Pvalue = JudyLFirstThenNext(JudyL, &Index, &first))) {
+        if (!*Pvalue)
+            continue;
+        query = *Pvalue;
+        aclk_query_free(query);
+    }
+}
 
 static void aclk_synchronization(void *arg)
 {
@@ -650,8 +628,11 @@ static void aclk_synchronization(void *arg)
 
     struct worker_data *data;
     aclk_query_t query;
+
+    // This holds queries that need to be executed one by one
     struct judy_list_t *aclk_query_batch = NULL;
-    struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));;
+    // This holds queries that can be dispatched in parallel in ACLK QUERY worker threads
+    struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));
     size_t pending_queries = 0;
 
     Pvoid_t *Pvalue;
@@ -880,6 +861,18 @@ static void aclk_synchronization(void *arg)
 
     (void) uv_loop_close(loop);
 
+    // Free execute commands / queries
+    free_query_list(aclk_query_execute->JudyL);
+    (void)JudyLFreeArray(&aclk_query_execute->JudyL, PJE0);
+    freez(aclk_query_execute);
+
+    // Free batch commands
+    if (aclk_query_batch) {
+        free_query_list(aclk_query_batch->JudyL);
+        (void)JudyLFreeArray(&aclk_query_batch->JudyL, PJE0);
+        freez(aclk_query_batch);
+    }
+
     aral_by_size_release(config->ar);
 
     worker_unregister();
@@ -914,6 +907,15 @@ void create_aclk_config(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __may
     wc->stream_alerts = false;
     time_t now = now_realtime_sec();
     wc->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
+}
+
+void destroy_aclk_config(RRDHOST *host)
+{
+    if (!host || !host->aclk_config)
+        return;
+
+    freez(host->aclk_config);
+    host->aclk_config = NULL;
 }
 
 #define SQL_FETCH_ALL_HOSTS                                                                                            \

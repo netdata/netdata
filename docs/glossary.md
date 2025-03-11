@@ -35,8 +35,6 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Context**](/docs/dashboards-and-charts/netdata-charts.md#contexts): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
 
-- [**Custom dashboards**](/src/web/gui/custom/README.md) A dashboard that you can create using simple HTML (no JavaScript is required for basic dashboards).
-
 ## D
 
 - [**Dashboard**](/docs/dashboards-and-charts/README.md): Out-of-the-box visual representation of metrics to provide insight into your infrastructure, its health and performance.

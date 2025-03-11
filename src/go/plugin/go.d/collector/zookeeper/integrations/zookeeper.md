@@ -60,9 +60,9 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per ZooKeeper instance
+### Per ZooKeeper server
 
-These metrics refer to the entire monitored application.
+These metrics refer to ZooKeeper servers.
 
 This scope has no labels.
 
@@ -72,13 +72,21 @@ Metrics:
 |:------|:----------|:----|
 | zookeeper.requests | outstanding | requests |
 | zookeeper.requests_latency | min, avg, max | ms |
+| zookeeper.stale_requests | stale | requests/s |
+| zookeeper.stale_requests_dropped | dropped | requests/s |
 | zookeeper.connections | alive | connections |
+| zookeeper.connections_dropped | dropped | connections/s |
+| zookeeper.connections_rejected | rejected | connections/s |
+| zookeeper.auth_fails | auth | fails/s |
+| zookeeper.global_sessions | global | sessions |
+| zookeeper.server_state | leader, follower, observer, standalone | state |
+| zookeeper.throttled_ops | throttled | ops/s |
 | zookeeper.packets | received, sent | pps |
 | zookeeper.file_descriptor | open | file descriptors |
 | zookeeper.nodes | znode, ephemerals | nodes |
 | zookeeper.watches | watches | watches |
 | zookeeper.approximate_data_size | size | KiB |
-| zookeeper.server_state | state | state |
+| zookeeper.uptime | uptime | seconds |
 
 
 

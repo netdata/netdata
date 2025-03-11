@@ -18,6 +18,5 @@
   "tls_cert": "ok",
   "tls_key": "ok",
   "tls_skip_verify": true,
-  "force_http2": true,
-  "setup_vars_path": "ok"
+  "force_http2": true
 }

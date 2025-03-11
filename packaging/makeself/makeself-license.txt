@@ -1,7 +1,7 @@
 
   ^
-  |.-.   .-.   .-.   .-.   .  netdata
-  |   '-'   '-'   '-'   '-'   monitoring and troubleshooting, transformed!
+  |.-.   .-.   .-.   .-.   .  Netdata
+  |   '-'   '-'   '-'   '-'   X-Ray Vision for your infrastructure!
   +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
 
   Copyright 2018-2025 Netdata Inc.

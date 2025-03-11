@@ -987,19 +987,19 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         netdata_log_debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, tok);
 
         if(nodeid) {
-            host = find_host_by_node_id(tok);
-            if(!host) {
-                host = rrdhost_find_by_hostname(tok);
-                if (!host)
-                    host = rrdhost_find_by_guid(tok);
-            }
-        }
-        else {
-            host = rrdhost_find_by_hostname(tok);
+            host = rrdhost_find_by_node_id(tok);
             if(!host) {
                 host = rrdhost_find_by_guid(tok);
                 if (!host)
-                    host = find_host_by_node_id(tok);
+                    host = rrdhost_find_by_hostname(tok);
+            }
+        }
+        else {
+            host = rrdhost_find_by_guid(tok);
+            if(!host) {
+                host = rrdhost_find_by_node_id(tok);
+                if (!host)
+                    host = rrdhost_find_by_hostname(tok);
             }
         }
 
@@ -1173,7 +1173,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: generating netdata.conf ...", w->id);
             w->response.data->content_type = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
-            netdata_conf_generate(w->response.data, 0);
+
+            inicfg_generate(&netdata_config, w->response.data, 0, true);
             return HTTP_RESP_OK;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1184,13 +1185,13 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             w->response.data->content_type = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
 
-            if(!netdata_exit)
+            if(!exit_initiated)
                 buffer_strcat(w->response.data, "ok, will do...");
             else
                 buffer_strcat(w->response.data, "I am doing it already");
 
             netdata_log_error("web request to exit received.");
-            netdata_cleanup_and_exit(0, NULL, NULL, NULL);
+            netdata_cleanup_and_exit(EXIT_REASON_API_QUIT, NULL, NULL, NULL);
             return HTTP_RESP_OK;
         }
         else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {

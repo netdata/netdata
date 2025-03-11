@@ -17,7 +17,7 @@ int do_proc_loadavg(int update_every, usec_t dt) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/loadavg");
 
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "filename to monitor", filename), " \t,:|/", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "filename to monitor", filename), " \t,:|/", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff))
             return 1;
     }
@@ -27,8 +27,8 @@ int do_proc_loadavg(int update_every, usec_t dt) {
         return 0; // we return 0, so that we will retry to open it next time
 
     if(unlikely(do_loadavg == -1)) {
-        do_loadavg          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "enable load average", 1);
-        do_all_processes    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "enable total processes", 1);
+        do_loadavg          = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "enable load average", 1);
+        do_all_processes    = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "enable total processes", 1);
     }
 
     if(unlikely(procfile_lines(ff) < 1)) {

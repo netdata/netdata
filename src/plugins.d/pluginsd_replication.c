@@ -109,7 +109,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) {
+ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
     ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
     if(slot >= 0) idx++;
@@ -214,7 +214,7 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) 
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARSER *parser) {
+ALWAYS_INLINE PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
     ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
     if(slot >= 0) idx++;
@@ -290,7 +290,7 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARSER *parser) {
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, PARSER *parser) {
+ALWAYS_INLINE PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, PARSER *parser) {
     if(parser->user.replay.rset_enabled == false)
         return PARSER_RC_OK;
 
@@ -333,7 +333,7 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, PARSER *parser) {
+ALWAYS_INLINE PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, PARSER *parser) {
     if(parser->user.replay.rset_enabled == false)
         return PARSER_RC_OK;
 
@@ -367,7 +367,7 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
+ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
     if (num_words < 7) { // accepts 7, but the 7th is optional
         nd_log(NDLS_DAEMON, NDLP_ERR, "REPLAY: malformed " PLUGINSD_KEYWORD_REPLAY_END " command");
         return PARSER_RC_ERROR;
@@ -385,7 +385,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
     time_t first_entry_child = (time_t) str2ull_encoded(first_entry_child_txt);
     time_t last_entry_child = (time_t) str2ull_encoded(last_entry_child_txt);
 
-    bool start_streaming = (strcmp(start_streaming_txt, "true") == 0);
+    bool start_streaming = stream_parse_enable_streaming(start_streaming_txt);
     time_t first_entry_requested = (time_t) str2ull_encoded(first_entry_requested_txt);
     time_t last_entry_requested = (time_t) str2ull_encoded(last_entry_requested_txt);
 

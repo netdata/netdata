@@ -11,14 +11,14 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     static int do_bandwidth = -1, do_sockets = -1, do_packets = -1;
     static procfile *ff = NULL;
 
-    if(do_bandwidth == -1)  do_bandwidth    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "IPVS bandwidth", 1);
-    if(do_sockets == -1)    do_sockets      = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "IPVS connections", 1);
-    if(do_packets == -1)    do_packets      = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "IPVS packets", 1);
+    if(do_bandwidth == -1)  do_bandwidth    = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "IPVS bandwidth", 1);
+    if(do_sockets == -1)    do_sockets      = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "IPVS connections", 1);
+    if(do_packets == -1)    do_packets      = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "IPVS packets", 1);
 
     if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/ip_vs_stats");
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
     }
     if(!ff) return 1;
 

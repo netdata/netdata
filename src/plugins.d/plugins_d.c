@@ -24,7 +24,7 @@ inline size_t pluginsd_initialize_plugin_directories()
     // Get the configuration entry
     if (likely(!plugins_dir_list)) {
         snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
-        plugins_dir_list = strdupz(config_get(CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
+        plugins_dir_list = strdupz(inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
     }
 
     // Parse it and store it to plugin directories
@@ -261,18 +261,18 @@ static bool is_plugin(char *dst, size_t dst_size, const char *filename) {
 void *pluginsd_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(pluginsd_main_cleanup) cleanup_ptr = ptr;
 
-    int automatic_run = config_get_boolean(CONFIG_SECTION_PLUGINS, "enable running new plugins", 1);
-    int scan_frequency = (int)config_get_duration_seconds(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
+    int automatic_run = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, "enable running new plugins", 1);
+    int scan_frequency = (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
     if (scan_frequency < 1)
         scan_frequency = 1;
 
     // disable some plugins by default
-    config_get_boolean(CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
+    inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
     // it crashes (both threads) on Alpine after we made it multi-threaded
     // works with "--device /dev/ipmi0", but this is not default
     // see https://github.com/netdata/netdata/pull/15564 for details
     if (getenv("NETDATA_LISTENER_PORT"))
-        config_get_boolean(CONFIG_SECTION_PLUGINS, "freeipmi", CONFIG_BOOLEAN_NO);
+        inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, "freeipmi", CONFIG_BOOLEAN_NO);
 
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop
@@ -312,7 +312,7 @@ void *pluginsd_main(void *ptr) {
                     continue;
                 }
 
-                int enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
+                int enabled = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
                 if (unlikely(!enabled)) {
                     netdata_log_debug(D_PLUGINSD, "plugin '%s' is not enabled", file->d_name);
                     continue;
@@ -356,7 +356,7 @@ void *pluginsd_main(void *ptr) {
                     cd->unsafe.enabled = enabled;
                     cd->unsafe.running = false;
 
-                    cd->update_every = (int)config_get_duration_seconds(string2str(cd->id), "update every", localhost->rrd_update_every);
+                    cd->update_every = (int)inicfg_get_duration_seconds(&netdata_config, string2str(cd->id), "update every", localhost->rrd_update_every);
                     cd->started_t = now_realtime_sec();
 
                     {
@@ -365,7 +365,7 @@ void *pluginsd_main(void *ptr) {
 
                         snprintfz(
                             buf, sizeof(buf), "exec %s %d %s", string2str(cd->fullfilename),
-                            cd->update_every, config_get(string2str(cd->id), "command options", def));
+                            cd->update_every, inicfg_get(&netdata_config, string2str(cd->id), "command options", def));
 
                         string_freez(cd->cmd);
                         cd->cmd = string_strdupz(buf);

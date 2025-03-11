@@ -344,7 +344,11 @@ struct nd_log nd_log = {
             .method = NDLM_DEFAULT,
             .format = NDLF_LOGFMT,
             .filename = LOG_DIR "/collector.log",
+#if defined(FSANITIZE_ADDRESS)
+            .fd = -1,
+#else
             .fd = STDERR_FILENO,
+#endif
             .fp = NULL,
             .min_priority = NDLP_INFO,
             .limits = ND_LOG_LIMITS_DEFAULT,
@@ -354,7 +358,11 @@ struct nd_log nd_log = {
             .method = NDLM_DISABLED,
             .format = NDLF_LOGFMT,
             .filename = LOG_DIR "/debug.log",
+#if defined(FSANITIZE_ADDRESS)
+            .fd = -1,
+#else
             .fd = STDOUT_FILENO,
+#endif
             .fp = NULL,
             .min_priority = NDLP_DEBUG,
             .limits = ND_LOG_LIMITS_UNLIMITED,
@@ -707,15 +715,6 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
         .logfmt = "alert_notification_timestamp",
         .logfmt_annotator = timestamp_usec_annotator,
     },
-    [NDF_STACK_TRACE] = {
-        .journal = "ND_STACK_TRACE",
-        .eventlog = "StackTrace",
-        .logfmt = NULL,
-    },
-
-    // put new items here
-    // leave the request URL and the message last
-
     [NDF_REQUEST] = {
         .journal = "ND_REQUEST",
         .eventlog = "Request",
@@ -726,6 +725,13 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
         .eventlog = "Message",
         .logfmt = "msg",
     },
+    [NDF_STACK_TRACE] = {
+            .journal = "ND_STACK_TRACE",
+            .eventlog = "StackTrace",
+            .logfmt = NULL,
+    },
+
+    // put new items here
 };
 
 // --------------------------------------------------------------------------------------------------------------------

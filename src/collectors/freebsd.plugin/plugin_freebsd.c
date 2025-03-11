@@ -91,14 +91,14 @@ void *freebsd_main(void *ptr)
 
     // initialize FreeBSD plugin
     if (freebsd_plugin_init())
-        netdata_cleanup_and_exit(1, NULL, NULL, NULL);
+        netdata_cleanup_and_exit(EXIT_REASON_FATAL, NULL, NULL, NULL);
 
     // check the enabled status for each module
     int i;
     for (i = 0; freebsd_modules[i].name; i++) {
         struct freebsd_module *pm = &freebsd_modules[i];
 
-        pm->enabled = config_get_boolean("plugin:freebsd", pm->name, pm->enabled);
+        pm->enabled = inicfg_get_boolean(&netdata_config, "plugin:freebsd", pm->name, pm->enabled);
         pm->rd = NULL;
 
         worker_register_job_name(i, freebsd_modules[i].dim);

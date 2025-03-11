@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -29,13 +30,11 @@ func (n *nvmeDeviceList) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	for _, d := range n.Devices {
-		if d.DevicePath != "" {
-			return nil
-		}
-		n.Devices = n.Devices[:0]
-		break
+	if len(n.Devices) > 0 && n.Devices[0].DevicePath != "" {
+		return nil
 	}
+
+	n.Devices = n.Devices[:0]
 
 	var v211Format struct {
 		Devices []struct {
@@ -60,13 +59,17 @@ func (n *nvmeDeviceList) UnmarshalJSON(b []byte) error {
 		for _, subsystem := range device.Subsystems {
 			for _, controller := range subsystem.Controllers {
 				for _, namespace := range controller.Namespaces {
+					devPath := namespace.NameSpace
+					if !strings.HasPrefix(devPath, "/dev/") {
+						devPath = "/dev/" + devPath
+					}
 					n.Devices = append(n.Devices, struct {
 						DevicePath   string `json:"DevicePath"`
 						Firmware     string `json:"Firmware"`
 						ModelNumber  string `json:"ModelNumber"`
 						SerialNumber string `json:"SerialNumber"`
 					}{
-						DevicePath:   namespace.NameSpace,
+						DevicePath:   devPath,
 						Firmware:     controller.Firmware,
 						ModelNumber:  controller.ModelNumber,
 						SerialNumber: controller.SerialNumber,

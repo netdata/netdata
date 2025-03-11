@@ -2,7 +2,8 @@
 
 #include "common.h"
 #include "buildinfo.h"
-#include "daemon/daemon-shutdown-watcher.h"
+#include "daemon-shutdown-watcher.h"
+#include "daemon-status-file.h"
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 
@@ -22,7 +23,7 @@
 #endif
 
 bool unittest_running = false;
-int netdata_anonymous_statistics_enabled;
+bool netdata_anonymous_statistics_enabled = true;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
@@ -100,8 +101,8 @@ int help(int exitcode) {
 
     fprintf(stream, "%s", "\n"
             " ^\n"
-            " |.-.   .-.   .-.   .-.   .  netdata                                         \n"
-            " |   '-'   '-'   '-'   '-'   monitoring and troubleshooting, transformed!    \n"
+            " |.-.   .-.   .-.   .-.   .  Netdata                                         \n"
+            " |   '-'   '-'   '-'   '-'   X-Ray Vision for your infrastructure!           \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
             " Copyright 2018-2025 Netdata Inc.\n"
@@ -160,6 +161,7 @@ int help(int exitcode) {
             "  -W buildinfojson         Print the version, the configure options,\n"
             "                           a list of optional features, and whether they\n"
             "                           are enabled or not, in JSON format.\n\n"
+            "  -W cmakecache            Print the cmake cache used for building this agent\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
 #ifdef OS_WINDOWS
@@ -182,16 +184,17 @@ int help(int exitcode) {
    be set in this procedure to be called in all the relevant code paths.
 */
 
-#define delta_startup_time(msg)                         \
-    {                                                   \
-        usec_t now_ut = now_monotonic_usec();           \
-        if(prev_msg)                                    \
+#define delta_startup_time(msg)                                     \
+    do {                                                            \
+        usec_t now_ut = now_monotonic_usec();                       \
+        if(prev_msg)                                                \
             netdata_log_info("NETDATA STARTUP: in %7llu ms, %s - next: %s", (now_ut - last_ut) / USEC_PER_MS, prev_msg, msg); \
-        else                                            \
-            netdata_log_info("NETDATA STARTUP: next: %s", msg);    \
-        last_ut = now_ut;                               \
-        prev_msg = msg;                                 \
-    }
+        else                                                        \
+            netdata_log_info("NETDATA STARTUP: next: %s", msg);     \
+        last_ut = now_ut;                                           \
+        prev_msg = msg;                                             \
+        daemon_status_file_startup_step("startup(" msg ")");        \
+    } while(0)
 
 int buffer_unittest(void);
 int pgc_unittest(void);
@@ -226,7 +229,18 @@ int unittest_prepare_rrd(const char **user) {
     return 0;
 }
 
+static void fatal_cleanup_and_exit_cb(void) {
+    netdata_cleanup_and_exit(EXIT_REASON_FATAL, "fatal error", "exiting", NULL);
+    exit(1);
+}
+
+static void fatal_status_file_save(void) {
+    daemon_status_file_update_status(DAEMON_STATUS_NONE);
+    exit(1);
+}
+
 int netdata_main(int argc, char **argv) {
+    libjudy_malloc_init();
     string_init();
     analytics_init();
 
@@ -296,22 +310,22 @@ int netdata_main(int argc, char **argv) {
                 case 'h':
                     return help(0);
                 case 'i':
-                    config_set(CONFIG_SECTION_WEB, "bind to", optarg);
+                    inicfg_set(&netdata_config, CONFIG_SECTION_WEB, "bind to", optarg);
                     break;
                 case 'P':
                     pidfile = strdupz(optarg);
                     break;
                 case 'p':
-                    config_set(CONFIG_SECTION_GLOBAL, "default port", optarg);
+                    inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "default port", optarg);
                     break;
                 case 's':
-                    config_set(CONFIG_SECTION_GLOBAL, "host access prefix", optarg);
+                    inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "host access prefix", optarg);
                     break;
                 case 't':
-                    config_set(CONFIG_SECTION_GLOBAL, "update every", optarg);
+                    inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "update every", optarg);
                     break;
                 case 'u':
-                    config_set(CONFIG_SECTION_GLOBAL, "run as user", optarg);
+                    inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "run as user", optarg);
                     break;
                 case 'v':
                 case 'V':
@@ -354,7 +368,7 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
 
                             // set defaults for dbegnine unittest
-                            config_set(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
+                            inicfg_set(&netdata_config, CONFIG_SECTION_DB, "dbengine page type", "gorilla");
 #ifdef ENABLE_DBENGINE
                             default_rrdeng_disk_quota_mb = default_multidb_disk_quota_mb = 256;
 #endif
@@ -570,11 +584,11 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strncmp(optarg, stacksize_string, strlen(stacksize_string)) == 0) {
                             optarg += strlen(stacksize_string);
-                            config_set(CONFIG_SECTION_GLOBAL, "pthread stack size", optarg);
+                            inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", optarg);
                         }
                         else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
                             optarg += strlen(debug_flags_string);
-                            config_set(CONFIG_SECTION_LOGS, "debug flags",  optarg);
+                            inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "debug flags",  optarg);
                             debug_flags = strtoull(optarg, NULL, 0);
                         }
                         else if(strcmp(optarg, "set") == 0) {
@@ -603,7 +617,7 @@ int netdata_main(int argc, char **argv) {
                             // so the caller can use -c netdata.conf before or
                             // after this parameter to prevent or allow overwriting
                             // variables at netdata.conf
-                            config_set_default_raw_value(section, key, value);
+                            inicfg_set_default_raw_value(&netdata_config, section, key, value);
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
@@ -636,7 +650,7 @@ int netdata_main(int argc, char **argv) {
                             // so the caller can use -c netdata.conf before or
                             // after this parameter to prevent or allow overwriting
                             // variables at netdata.conf
-                            appconfig_set_default_raw_value(tmp_config, section, key, value);
+                            inicfg_set_default_raw_value(tmp_config, section, key, value);
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
@@ -662,7 +676,7 @@ int netdata_main(int argc, char **argv) {
                             const char *section = argv[optind];
                             const char *key = argv[optind + 1];
                             const char *def = argv[optind + 2];
-                            const char *value = config_get(section, key, def);
+                            const char *value = inicfg_get(&netdata_config, section, key, def);
                             printf("%s\n", value);
                             return 0;
                         }
@@ -692,7 +706,7 @@ int netdata_main(int argc, char **argv) {
                             const char *section = argv[optind + 1];
                             const char *key = argv[optind + 2];
                             const char *def = argv[optind + 3];
-                            const char *value = appconfig_get(tmp_config, section, key, def);
+                            const char *value = inicfg_get(tmp_config, section, key, def);
                             printf("%s\n", value);
                             return 0;
                         }
@@ -702,6 +716,10 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "buildinfojson") == 0) {
                             print_build_info_json();
+                            return 0;
+                        }
+                        else if(strcmp(optarg, "cmakecache") == 0) {
+                            print_build_info_cmake_cache();
                             return 0;
                         }
                         else if(strcmp(optarg, "keepopenfds") == 0) {
@@ -724,11 +742,16 @@ int netdata_main(int argc, char **argv) {
         }
     }
 
+#if !defined(FSANITIZE_ADDRESS)
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
         os_close_all_non_std_open_fds_except(NULL, 0, 0);
     }
+#else
+    fprintf(stderr, "Running with a Sanitizer, custom allocators are disabled.\n");
+    fprintf(stderr, "Running with a Sanitizer, not closing open fds.\n");
+#endif
 
     if(!config_loaded) {
         netdata_conf_load(NULL, 0, &user);
@@ -741,45 +764,97 @@ int netdata_main(int argc, char **argv) {
 
     netdata_conf_section_logs();
     nd_log_limits_unlimited();
-
-    // initialize the log files
     nd_log_initialize();
-    {
-        ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_startup_msgid),
-            ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
 
-        netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
+    // ----------------------------------------------------------------------------------------------------------------
+    // this MUST be before anything else - to load the old status file before saving a new one
+
+    daemon_status_file_init(); // this loads the old file
+    nd_log_register_fatal_data_cb(daemon_status_file_register_fatal);
+    nd_log_register_fatal_final_cb(fatal_status_file_save);
+    exit_initiated_init();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("signals");
+
+    signals_block_all_except_deadly();
+    nd_initialize_signals(); // catches deadly signals and stores them in the status file
+
+    // ----------------------------------------------------------------------------------------------------------------
+
+    netdata_conf_section_global(); // get hostname, host prefix, profile, etc
+    registry_init(); // for machine_guid, must be after netdata_conf_section_global()
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("run dir");
+
+    {
+        const char *run_dir = os_run_dir(true);
+        if(!run_dir) {
+            netdata_log_error("Cannot get/create a run directory.");
+            exit(1);
+        }
+        netdata_log_info("Netdata run directory is '%s'", run_dir);
+
+//        char lock_file[FILENAME_MAX];
+//        snprintfz(lock_file, sizeof(lock_file), "%s/netdata.lock", run_dir);
+//        FILE_LOCK lock = file_lock_get(lock_file);
+//        if(!FILE_LOCK_OK(lock)) {
+//            netdata_log_error("Cannot get exclusive lock on file '%s'. Is Netdata already running?", lock_file);
+//            exit(1);
+//        }
     }
 
-    // ----------------------------------------------------------------------------------------------------------------
-    // global configuration
-
-    netdata_conf_section_global();
-
-    // Get execution path before switching user to avoid permission issues
-    get_netdata_execution_path();
+    nd_profile_setup();
 
     // ----------------------------------------------------------------------------------------------------------------
-    // analytics
+    delta_startup_time("stack size");
 
-    analytics_reset();
-    get_system_timezone();
+    // initialize thread - this is required before the first nd_thread_create()
+    default_stacksize = netdata_threads_init();
+
+    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
+    if (default_stacksize < 1 * 1024 * 1024)
+        default_stacksize = 1 * 1024 * 1024;
+
+    netdata_threads_set_stack_size(default_stacksize);
 
     // ----------------------------------------------------------------------------------------------------------------
-    // data collection plugins
+    delta_startup_time("crash reports");
+
+    daemon_status_file_check_crash();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("temp spawn server");
+
+    netdata_main_spawn_server_init("init", argc, (const char **)argv);
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("ssl");
+
+    netdata_conf_ssl();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("environment for plugins");
 
     // prepare configuration environment variables for the plugins
     set_environment_for_plugins_and_scripts();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("cd to user config dir");
 
     // cd into config_dir to allow the plugins refer to their config files using relative filenames
     if(chdir(netdata_configured_user_config_dir) == -1)
         fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
 
     // ----------------------------------------------------------------------------------------------------------------
-    // pulse (internal netdata instrumentation)
+    delta_startup_time("analytics");
+
+    analytics_reset();
+    get_system_timezone();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("pulse");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     pulse_enabled = true;
@@ -787,97 +862,82 @@ int netdata_main(int argc, char **argv) {
 #endif
 
     pulse_extended_enabled =
-        config_get_boolean(CONFIG_SECTION_PULSE, "extended", pulse_extended_enabled);
+        inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PULSE, "extended", pulse_extended_enabled);
 
     if(pulse_extended_enabled)
         // this has to run before starting any other threads that use workers
         workers_utilization_enable();
 
     // ----------------------------------------------------------------------------------------------------------------
-    // profiles
-
-    nd_profile_setup();
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // streaming, replication, functions initialization
+    delta_startup_time("replication");
 
     replication_initialize();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("inflight functions");
+
     rrd_functions_inflight_init();
 
-    {
-        // --------------------------------------------------------------------
-        // alerts SILENCERS
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("silencers");
 
-        health_set_silencers_filename();
-        health_initialize_global_silencers();
+    health_set_silencers_filename();
+    health_initialize_global_silencers();
 
-        // --------------------------------------------------------------------
-        // setup process signals
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("static threads");
 
-        // block signals while initializing threads.
-        // this causes the threads to block signals.
+    for (i = 0; static_threads[i].name != NULL ; i++) {
+        struct netdata_static_thread *st = &static_threads[i];
 
-        delta_startup_time("initialize signals");
-        nd_initialize_signals(); // setup the signals we want to use
+        if(st->enable_routine)
+            st->enabled = st->enable_routine();
 
-        // --------------------------------------------------------------------
-        // check which threads are enabled and initialize them
+        if(st->config_name)
+            st->enabled = inicfg_get_boolean(&netdata_config, st->config_section, st->config_name, st->enabled);
 
-        delta_startup_time("initialize static threads");
+        if(st->enabled && st->init_routine)
+            st->init_routine();
 
-        // setup threads configs
-        default_stacksize = netdata_threads_init();
-        // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
-        if (default_stacksize < 1 * 1024 * 1024)
-            default_stacksize = 1 * 1024 * 1024;
+        if(st->env_name)
+            nd_setenv(st->env_name, st->enabled?"YES":"NO", 1);
 
-        for (i = 0; static_threads[i].name != NULL ; i++) {
-            struct netdata_static_thread *st = &static_threads[i];
-
-            if(st->enable_routine)
-                st->enabled = st->enable_routine();
-
-            if(st->config_name)
-                st->enabled = config_get_boolean(st->config_section, st->config_name, st->enabled);
-
-            if(st->enabled && st->init_routine)
-                st->init_routine();
-
-            if(st->env_name)
-                nd_setenv(st->env_name, st->enabled?"YES":"NO", 1);
-
-            if(st->global_variable)
-                *st->global_variable = (st->enabled) ? true : false;
-        }
-
-        // --------------------------------------------------------------------
-        // create the listening sockets
-
-        delta_startup_time("initialize web server");
-
-        // get the certificate and start security
-        netdata_conf_web_security_init();
-
-        nd_web_api_init();
-        web_server_threading_selection();
-
-        if(web_server_mode != WEB_SERVER_MODE_NONE) {
-            if (!api_listen_sockets_setup()) {
-                netdata_log_error("Cannot setup listen port(s). Is Netdata already running?");
-                exit(1);
-            }
-        }
-        if (sqlite_library_init())
-            fatal("Failed to initialize sqlite library");
-
-        // --------------------------------------------------------------------
-        // Initialize ML configuration
-
-        delta_startup_time("initialize ML");
-        ml_init();
+        if(st->global_variable)
+            *st->global_variable = (st->enabled) ? true : false;
     }
 
-    delta_startup_time("set resource limits");
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("web server api");
+
+    // get the certificate and start security
+    netdata_conf_web_security_init();
+    nd_web_api_init();
+    web_server_threading_selection();
+
+    delta_startup_time("web server sockets");
+    if(web_server_mode != WEB_SERVER_MODE_NONE) {
+        errno_clear();
+        if (!api_listen_sockets_setup()) {
+            exit_initiated_add(EXIT_REASON_ALREADY_RUNNING);
+            daemon_status_file_update_status(DAEMON_STATUS_NONE);
+            fatal("Cannot setup listen port(s). Is Netdata already running?");
+            exit(1);
+        }
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("sqlite");
+
+    if (sqlite_library_init())
+        fatal("Failed to initialize sqlite library");
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("ML");
+
+    ml_init();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("resource limits");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
@@ -892,111 +952,117 @@ int netdata_main(int argc, char **argv) {
 
     set_nofile_limit(&rlimit_nofile);
 
-    delta_startup_time("become daemon");
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("stop temporary spawn server");
+
+    // stop the old server and later start a new one under the new permissions
+    netdata_main_spawn_server_cleanup();
+
+// ----------------------------------------------------------------------------------------------------------------
 
 #if defined(OS_LINUX) || defined(OS_MACOS) || defined(OS_FREEBSD)
-    // fork, switch user, create pid file, set process priority
+    delta_startup_time("become daemon");
+
+    // fork, switch user, create the pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
 #else
     (void)dont_fork;
 #endif
 
-    netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
-    watcher_thread_start();
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("plugins spawn server");
 
-    // init sentry
+    netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
+
 #ifdef ENABLE_SENTRY
-        nd_sentry_init();
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("sentry");
+
+    nd_sentry_init();
 #endif
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("home");
 
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
     struct passwd *pw = getpwuid(getuid());
-    if (config_exists(CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
-        netdata_configured_home_dir = config_get(CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
-    } else {
-        netdata_configured_home_dir = config_get(CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
+    if (inicfg_exists(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
+        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
     }
+    else
+        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
 
     nd_setenv("HOME", netdata_configured_home_dir, 1);
 
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("dyncfg");
+
     dyncfg_init(true);
 
-    netdata_log_info("netdata started on pid %d.", getpid());
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("threads after fork");
 
-    delta_startup_time("initialize threads after fork");
+    netdata_threads_set_stack_size(
+        (size_t)inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
 
-    netdata_threads_init_after_fork((size_t)config_get_size_bytes(CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("registry");
 
-    // initialize internal registry
-    delta_startup_time("initialize registry");
-    registry_init();
+    registry_load();
     cloud_conf_init_after_registry();
     netdata_random_session_id_generate();
 
-    // ------------------------------------------------------------------------
-    // initialize rrd, registry, health, streaming, etc.
-
-    delta_startup_time("collecting system info");
-
-    netdata_anonymous_statistics_enabled=-1;
-    struct rrdhost_system_info *system_info = rrdhost_system_info_create();
-    rrdhost_system_info_detect(system_info);
-
-    const char *guid = registry_get_this_machine_guid();
+    const char *guid = registry_get_this_machine_guid(true);
 #ifdef ENABLE_SENTRY
     nd_sentry_set_user(guid);
 #else
     UNUSED(guid);
 #endif
 
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("system info");
+
+    struct rrdhost_system_info *system_info = rrdhost_system_info_create();
+    rrdhost_system_info_detect(system_info);
+
     get_install_type(system_info);
 
-    delta_startup_time("initialize RRD structures");
+    set_late_analytics_variables(system_info);
 
-    if(rrd_init(netdata_configured_hostname, system_info, false)) {
-        set_late_analytics_variables(system_info);
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("RRD structures");
+
+    abort_on_fatal_disable();
+    if (rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
-    }
 
-    delta_startup_time("check for incomplete shutdown");
+    abort_on_fatal_enable();
+    system_info = NULL; // system_info is now freed by rrd_init
 
-    char agent_crash_file[FILENAME_MAX + 1];
-    char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
-    snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
-    int incomplete_shutdown_detected = (unlink(agent_incomplete_shutdown_file) == 0);
-    snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
-    int crash_detected = (unlink(agent_crash_file) == 0);
-    int fd = open(agent_crash_file, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 444);
-    if (fd >= 0)
-        close(fd);
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("localhost labels");
 
-    // ------------------------------------------------------------------------
-    // Claim netdata agent to a cloud endpoint
-
-    delta_startup_time("collect claiming info");
-    load_claiming_state();
-
-    // ------------------------------------------------------------------------
-    // enable log flood protection
-
-    nd_log_limits_reset();
-
-    // Load host labels
-    delta_startup_time("collect host labels");
     reload_host_labels();
 
-    // ------------------------------------------------------------------------
-    // spawn the threads
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("saved bearer tokens");
 
-    get_agent_event_time_median_init();
     bearer_tokens_init();
 
-    delta_startup_time("start the static threads");
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("claiming info");
+
+    load_claiming_state();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("static threads");
+
+    nd_log_limits_reset();
+    get_agent_event_time_median_init();
 
     netdata_conf_section_web();
 
-    set_late_analytics_variables(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
@@ -1009,38 +1075,42 @@ int netdata_main(int argc, char **argv) {
     }
     ml_start_threads();
 
-    // ------------------------------------------------------------------------
-    // Initialize netdata agent command serving from cli and signals
-
-    delta_startup_time("initialize commands API");
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("commands API");
 
     commands_init();
 
-    delta_startup_time("ready");
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("agent start timings");
 
     usec_t ready_ut = now_monotonic_usec();
     add_agent_event(EVENT_AGENT_START_TIME, (int64_t ) (ready_ut - started_ut));
     usec_t median_start_time = get_agent_event_time_median(EVENT_AGENT_START_TIME);
     netdata_log_info(
-        "NETDATA STARTUP: completed in %llu ms (median start up time is %llu ms). Enjoy real-time performance monitoring!",
+        "NETDATA STARTUP: completed in %llu ms (median start up time is %llu ms). "
+        "Enjoy X-Ray Vision for your infrastructure!",
         (ready_ut - started_ut) / USEC_PER_MS, median_start_time / USEC_PER_MS);
 
     cleanup_agent_event_log();
     netdata_ready = true;
 
-    analytics_statistic_t start_statistic = { "START", "-",  "-" };
-    analytics_statistic_send(&start_statistic);
-    if (crash_detected) {
-        analytics_statistic_t crash_statistic = { "CRASH", "-",  "-" };
-        analytics_statistic_send(&crash_statistic);
-    }
-    if (incomplete_shutdown_detected) {
-        analytics_statistic_t incomplete_shutdown_statistic = { "INCOMPLETE_SHUTDOWN", "-", "-" };
-        analytics_statistic_send(&incomplete_shutdown_statistic);
-    }
+    // ----------------------------------------------------------------------------------------------------------------
 
-    //check if ANALYTICS needs to start
-    if (netdata_anonymous_statistics_enabled == 1) {
+    if(analytics_check_enabled()) {
+        delta_startup_time("anonymous analytics");
+
+        analytics_statistic_t start_statistic = {"START", "-", "-"};
+        analytics_statistic_send(&start_statistic);
+        if (daemon_status_file_has_last_crashed()) {
+            analytics_statistic_t crash_statistic = {"CRASH", "-", "-"};
+            analytics_statistic_send(&crash_statistic);
+        }
+        if (daemon_status_file_was_incomplete_shutdown()) {
+            analytics_statistic_t incomplete_shutdown_statistic = {"INCOMPLETE_SHUTDOWN", "-", "-"};
+            analytics_statistic_send(&incomplete_shutdown_statistic);
+        }
+
+        // check if ANALYTICS needs to start
         for (i = 0; static_threads[i].name != NULL; i++) {
             if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
                 struct netdata_static_thread *st = &static_threads[i];
@@ -1051,7 +1121,19 @@ int netdata_main(int argc, char **argv) {
         }
     }
 
+    // ----------------------------------------------------------------------------------------------------------------
+
+#ifdef HAVE_LIBDATACHANNEL
+    delta_startup_time("webrtc");
     webrtc_initialize();
+#endif
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("done");
+
+    nd_log_register_fatal_final_cb(fatal_cleanup_and_exit_cb);
+    daemon_status_file_startup_step(NULL);
+    daemon_status_file_update_status(DAEMON_STATUS_RUNNING);
     return 10;
 }
 
@@ -1061,6 +1143,11 @@ int main(int argc, char *argv[])
     int rc = netdata_main(argc, argv);
     if (rc != 10)
         return rc;
+
+#if defined(FSANITIZE_ADDRESS)
+    fprintf(stdout, "STDOUT: Sanitizers mode enabled...\n");
+    fprintf(stderr, "STDERR: Sanitizers mode enabled...\n");
+#endif
 
     nd_process_signals();
     return 1;

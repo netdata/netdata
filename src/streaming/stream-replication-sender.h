@@ -3,12 +3,15 @@
 #ifndef REPLICATION_H
 #define REPLICATION_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "stream-circular-buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define MAX_REPLICATION_THREADS 256
+#define MAX_REPLICATION_PREFETCH 256
 
 struct parser;
 
@@ -28,8 +31,11 @@ void replication_sender_delete_pending_requests(struct sender_state *sender);
 void replication_sender_request_add(struct sender_state *sender, const char *chart_id, time_t after, time_t before, bool start_streaming);
 void replication_sender_recalculate_buffer_used_ratio_unsafe(struct sender_state *s);
 
-size_t replication_sender_allocated_memory(void);
+int64_t replication_sender_allocated_memory(void);
 size_t replication_sender_allocated_buffers(void);
+
+int replication_prefetch_default(void);
+int replication_threads_default(void);
 
 #ifdef __cplusplus
 }

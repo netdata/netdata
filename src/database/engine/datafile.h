@@ -14,15 +14,15 @@ struct rrdengine_instance;
 #define DATAFILE_EXTENSION ".ndf"
 
 #ifndef MAX_DATAFILE_SIZE
-#define MAX_DATAFILE_SIZE   (512LU * 1024LU * 1024LU)
+#define MAX_DATAFILE_SIZE   (UINT32_MAX)
 #endif
 #if  MIN_DATAFILE_SIZE > MAX_DATAFILE_SIZE
 #error MIN_DATAFILE_SIZE > MAX_DATAFILE_SIZE
 #endif
 
-#define MIN_DATAFILE_SIZE   (4LU * 1024LU * 1024LU)
+#define MIN_DATAFILE_SIZE   (512LU * 1024LU)
 #define MAX_DATAFILES (65536 * 4) /* Supports up to 64TiB for now */
-#define TARGET_DATAFILES (50)
+#define TARGET_DATAFILES (100)
 
 // When trying to acquire a datafile for deletion and an attempt to evict pages is completed
 // the acquire for deletion will return true after this timeout

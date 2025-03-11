@@ -15,7 +15,7 @@ func (c *Collector) validateConfig() error {
 		return errors.New("url not set")
 	}
 	if !strings.HasSuffix(c.URL, "?auto") {
-		return errors.New("invalid URL, should ends in '?auto'")
+		c.Warningf("missing '?auto' parameter - needed for machine-readable output")
 	}
 	return nil
 }

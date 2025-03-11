@@ -8,33 +8,40 @@
 
 struct config disk_config = APPCONFIG_INITIALIZER;
 
-static ebpf_local_maps_t disk_maps[] = {{.name = "tbl_disk_iocall", .internal_input = NETDATA_DISK_HISTOGRAM_LENGTH,
-                                         .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+static ebpf_local_maps_t disk_maps[] = {
+    {.name = "tbl_disk_iocall",
+     .internal_input = NETDATA_DISK_HISTOGRAM_LENGTH,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                         .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                        },
-                                        {.name = "tmp_disk_tp_stat", .internal_input = 8192, .user_input = 8192,
-                                         .type = NETDATA_EBPF_MAP_STATIC,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = "tmp_disk_tp_stat",
+     .internal_input = 8192,
+     .user_input = 8192,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                         .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
-                                        },
-                                        {.name = NULL, .internal_input = 0, .user_input = 0,
-                                         .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    },
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                         .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
-                                         }};
+    }};
 static avl_tree_lock disk_tree;
 netdata_ebpf_disks_t *disk_list = NULL;
 
-char *tracepoint_block_type = { "block"} ;
-char *tracepoint_block_issue = { "block_rq_issue" };
-char *tracepoint_block_rq_complete = { "block_rq_complete" };
+char *tracepoint_block_type = {"block"};
+char *tracepoint_block_issue = {"block_rq_issue"};
+char *tracepoint_block_rq_complete = {"block_rq_complete"};
 
 static int was_block_issue_enabled = 0;
 static int was_block_rq_complete_enabled = 0;
@@ -57,9 +64,9 @@ pthread_mutex_t plot_mutex;
  * @param obj is the main structure for bpf objects.
  */
 static inline void ebpf_disk_set_hash_table(struct disk_bpf *obj)
- {
+{
     disk_maps[NETDATA_DISK_IO].map_fd = bpf_map__fd(obj->maps.tbl_disk_iocall);
- }
+}
 
 /**
  * Load and attach
@@ -177,7 +184,7 @@ static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *filename)
             file_length = FILENAME_MAX;
 
         content[file_length] = '\0';
-        w->end = w->start + strtoul(content, NULL, 10) -1;
+        w->end = w->start + strtoul(content, NULL, 10) - 1;
     }
     close(fd);
 
@@ -196,7 +203,7 @@ static void ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name)
 {
     static netdata_ebpf_disks_t *main_disk = NULL;
     static uint32_t key = 0;
-    char *path = { "/sys/block" };
+    char *path = {"/sys/block"};
     char disk[NETDATA_DISK_NAME_LEN + 1];
     char filename[FILENAME_MAX + 1];
     snprintfz(disk, NETDATA_DISK_NAME_LEN, "%s", name);
@@ -243,7 +250,8 @@ static void ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name)
  *
  * @return
  */
-static inline uint32_t netdata_new_encode_dev(uint32_t major, uint32_t minor) {
+static inline uint32_t netdata_new_encode_dev(uint32_t major, uint32_t minor)
+{
     return (minor & 0xff) | (major << 8) | ((minor & ~0xff) << 12);
 }
 
@@ -288,7 +296,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
 
     uint32_t dev = netdata_new_encode_dev(major, minor);
     find.dev = dev;
-    netdata_ebpf_disks_t *ret = (netdata_ebpf_disks_t *) avl_search_lock(&disk_tree, (avl_t *)&find);
+    netdata_ebpf_disks_t *ret = (netdata_ebpf_disks_t *)avl_search_lock(&disk_tree, (avl_t *)&find);
     if (ret) { // Disk is already present
         ret->flags |= NETDATA_DISK_IS_HERE;
         ret->last_update = current_time;
@@ -335,12 +343,13 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
     ebpf_read_disk_info(w, name);
 
     netdata_ebpf_disks_t *check;
-    check = (netdata_ebpf_disks_t *) avl_insert_lock(&disk_tree, (avl_t *)w);
+    check = (netdata_ebpf_disks_t *)avl_insert_lock(&disk_tree, (avl_t *)w);
     if (check != w)
         netdata_log_error("Internal error, cannot insert the AVL tree.");
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    netdata_log_info("The Latency is monitoring the hard disk %s (Major = %d, Minor = %d, Device = %u)", name, major, minor,w->dev);
+    netdata_log_info(
+        "The Latency is monitoring the hard disk %s (Major = %d, Minor = %d, Device = %u)", name, major, minor, w->dev);
 #endif
 
     w->flags |= NETDATA_DISK_IS_HERE;
@@ -367,7 +376,7 @@ static int read_local_disks()
 
     size_t lines = procfile_lines(ff), l;
     time_t current_time = now_realtime_sec();
-    for(l = 2; l < lines ;l++) {
+    for (l = 2; l < lines; l++) {
         size_t words = procfile_linewords(ff, l);
         // This is header or end of file
         if (unlikely(words < 4))
@@ -417,7 +426,7 @@ void ebpf_update_disks(ebpf_module_t *em)
  */
 static void ebpf_disk_disable_tracepoints()
 {
-    char *default_message = { "Cannot disable the tracepoint" };
+    char *default_message = {"Cannot disable the tracepoint"};
     if (!was_block_issue_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_issue))
             netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_issue);
@@ -479,16 +488,17 @@ static void ebpf_obsolete_disk_global(ebpf_module_t *em)
         netdata_ebpf_disks_t *ned = move->plot;
         uint32_t flags = ned->flags;
         if (flags & NETDATA_DISK_CHART_CREATED) {
-            ebpf_write_chart_obsolete(ned->histogram.name,
-                                      ned->family,
-                                      "",
-                                      "Disk latency",
-                                      EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                                      ned->family,
-                                      NETDATA_EBPF_CHART_TYPE_STACKED,
-                                      NETDATA_EBPF_DISK_LATENCY_CONTEXT,
-                                      ned->histogram.order,
-                                      em->update_every);
+            ebpf_write_chart_obsolete(
+                ned->histogram.name,
+                ned->family,
+                "",
+                "Disk latency",
+                EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                ned->family,
+                NETDATA_EBPF_CHART_TYPE_STACKED,
+                NETDATA_EBPF_DISK_LATENCY_CONTEXT,
+                ned->histogram.order,
+                em->update_every);
         }
 
         move = move->next;
@@ -505,7 +515,8 @@ static void ebpf_obsolete_disk_global(ebpf_module_t *em)
 static void ebpf_disk_exit(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!em) return;
+    if (!em)
+        return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -653,9 +664,17 @@ static void read_hard_disk_tables(int table, int maps_per_core)
  */
 static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w, int update_every)
 {
-    ebpf_write_chart_obsolete(w->histogram.name, w->family, "", "Disk latency", EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                              w->family, NETDATA_EBPF_CHART_TYPE_STACKED, NETDATA_EBPF_DISK_LATENCY_CONTEXT,
-                              w->histogram.order, update_every);
+    ebpf_write_chart_obsolete(
+        w->histogram.name,
+        w->family,
+        "",
+        "Disk latency",
+        EBPF_COMMON_UNITS_CALLS_PER_SEC,
+        w->family,
+        NETDATA_EBPF_CHART_TYPE_STACKED,
+        NETDATA_EBPF_DISK_LATENCY_CONTEXT,
+        w->histogram.order,
+        update_every);
 
     w->flags = NETDATA_DISK_NONE;
 }
@@ -677,10 +696,20 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w, int update_every)
     w->histogram.title = NULL;
     w->histogram.order = order;
 
-    ebpf_create_chart(w->histogram.name, family, "Disk latency", EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                      family, NETDATA_EBPF_DISK_LATENCY_CONTEXT, NETDATA_EBPF_CHART_TYPE_STACKED, order,
-                      ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
-                      update_every, NETDATA_EBPF_MODULE_NAME_DISK);
+    ebpf_create_chart(
+        w->histogram.name,
+        family,
+        "Disk latency",
+        EBPF_COMMON_UNITS_CALLS_PER_SEC,
+        family,
+        NETDATA_EBPF_DISK_LATENCY_CONTEXT,
+        NETDATA_EBPF_CHART_TYPE_STACKED,
+        order,
+        ebpf_create_global_dimension,
+        disk_publish_aggregated,
+        NETDATA_EBPF_HIST_MAX_BINS,
+        update_every,
+        NETDATA_EBPF_MODULE_NAME_DISK);
     order++;
 
     w->flags |= NETDATA_DISK_CHART_CREATED;
@@ -751,8 +780,8 @@ static void ebpf_latency_send_hd_data(int update_every)
         }
 
         if ((flags & NETDATA_DISK_CHART_CREATED)) {
-            write_histogram_chart(ned->histogram.name, ned->family,
-                                  ned->histogram.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+            write_histogram_chart(
+                ned->histogram.name, ned->family, ned->histogram.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
         }
 
         ned->flags &= ~NETDATA_DISK_IS_HERE;
@@ -919,8 +948,8 @@ void *ebpf_disk_thread(void *ptr)
     ebpf_fill_algorithms(algorithms, NETDATA_EBPF_HIST_MAX_BINS, NETDATA_EBPF_INCREMENTAL_IDX);
     dimensions = ebpf_fill_histogram_dimension(NETDATA_EBPF_HIST_MAX_BINS);
 
-    ebpf_global_labels(disk_aggregated_data, disk_publish_aggregated, dimensions, dimensions, algorithms,
-                       NETDATA_EBPF_HIST_MAX_BINS);
+    ebpf_global_labels(
+        disk_aggregated_data, disk_publish_aggregated, dimensions, dimensions, algorithms, NETDATA_EBPF_HIST_MAX_BINS);
 
     pthread_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);

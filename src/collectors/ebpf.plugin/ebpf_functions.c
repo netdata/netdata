@@ -48,7 +48,8 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
  * @param code         the error code to show with the message.
  * @param msg          the error message
  */
-static inline void ebpf_function_error(const char *transaction, int code, const char *msg) {
+static inline void ebpf_function_error(const char *transaction, int code, const char *msg)
+{
     pluginsd_function_json_error_to_stdout(transaction, code, msg);
 }
 
@@ -59,7 +60,8 @@ static inline void ebpf_function_error(const char *transaction, int code, const 
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
-static inline void ebpf_function_help(const char *transaction, const char *message) {
+static inline void ebpf_function_help(const char *transaction, const char *message)
+{
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
     fprintf(stdout, "%s", message);
     pluginsd_function_result_end_to_stdout();
@@ -69,7 +71,6 @@ static inline void ebpf_function_help(const char *transaction, const char *messa
 /*****************************************************************
  *  EBPF SOCKET FUNCTION
  *****************************************************************/
-
 
 /**
  * Fill Fake socket
@@ -90,7 +91,8 @@ static inline void ebpf_socket_fill_fake_socket(netdata_socket_plus_t *fake_valu
     fake_values->data.protocol = AF_UNSPEC;
 }
 
-static NETDATA_DOUBLE bytes_to_mb(uint64_t bytes) {
+static NETDATA_DOUBLE bytes_to_mb(uint64_t bytes)
+{
     return (NETDATA_DOUBLE)bytes / (1024 * 1024);
 }
 
@@ -183,7 +185,8 @@ static void ebpf_socket_clean_judy_array_unsafe()
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
         rw_spinlock_write_lock(&pid_ptr->socket_stats.rw_spinlock);
         if (pid_ptr->socket_stats.JudyLArray) {
-            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_socket, &first_socket))) {
+            while (
+                (socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_socket, &first_socket))) {
                 netdata_socket_plus_t *socket_clean = *socket_value;
                 aral_freez(aral_socket_table, socket_clean);
             }
@@ -217,7 +220,8 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
         Word_t local_timestamp = 0;
         rw_spinlock_read_lock(&pid_ptr->socket_stats.rw_spinlock);
         if (pid_ptr->socket_stats.JudyLArray) {
-            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_timestamp, &first_socket))) {
+            while ((
+                socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_timestamp, &first_socket))) {
                 netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
                 ebpf_fill_function_buffer(buf, values, pid_ptr->cmdline);
             }
@@ -227,7 +231,7 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
     }
 
     if (!counter) {
-        netdata_socket_plus_t fake_values = { };
+        netdata_socket_plus_t fake_values = {};
         ebpf_socket_fill_fake_socket(&fake_values);
         ebpf_fill_function_buffer(buf, &fake_values, NULL);
     }
@@ -249,8 +253,8 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
     // thread was not initialized or Array was reset
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     if (!em->maps || (em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
-        !ebpf_judy_pid.index.JudyLArray){
-        netdata_socket_plus_t fake_values = { };
+        !ebpf_judy_pid.index.JudyLArray) {
+        netdata_socket_plus_t fake_values = {};
 
         ebpf_socket_fill_fake_socket(&fake_values);
 
@@ -275,14 +279,15 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
  * @param timeout      The function timeout
  * @param cancelled    Variable used to store function status.
  */
-static void ebpf_function_socket_manipulation(const char *transaction,
-                                              char *function __maybe_unused,
-                                              usec_t *stop_monotonic_ut __maybe_unused,
-                                              bool *cancelled __maybe_unused,
-                                              BUFFER *payload __maybe_unused,
-                                              HTTP_ACCESS access __maybe_unused,
-                                              const char *source __maybe_unused,
-                                              void *data __maybe_unused)
+static void ebpf_function_socket_manipulation(
+    const char *transaction,
+    char *function __maybe_unused,
+    usec_t *stop_monotonic_ut __maybe_unused,
+    bool *cancelled __maybe_unused,
+    BUFFER *payload __maybe_unused,
+    HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused,
+    void *data __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SOCKET_IDX];
 
@@ -328,8 +333,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         "   interfaces\n"
         "      When the collector receives this command, it read all available interfaces on host.\n"
         "\n"
-        "Filters can be combined. Each filter can be given only one time. Default all ports\n"
-    };
+        "Filters can be combined. Each filter can be given only one time. Default all ports\n"};
 
     for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
@@ -428,19 +432,18 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         ebpf_socket_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-        collect_pids |= 1<<EBPF_MODULE_SOCKET_IDX;
+        collect_pids |= 1 << EBPF_MODULE_SOCKET_IDX;
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (ebpf_function_start_thread(em, period)) {
-            ebpf_function_error(transaction,
-                                HTTP_RESP_INTERNAL_SERVER_ERROR,
-                                "Cannot start thread.");
+            ebpf_function_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR, "Cannot start thread.");
             pthread_mutex_unlock(&ebpf_exit_cleanup);
             return;
         }
     } else {
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (period < 0)
-            em->lifetime = (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING) ? EBPF_NON_FUNCTION_LIFE_TIME : EBPF_DEFAULT_LIFETIME;
+            em->lifetime = (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING) ? EBPF_NON_FUNCTION_LIFE_TIME :
+                                                                                   EBPF_DEFAULT_LIFETIME;
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
@@ -452,7 +455,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION);
 
-    if(info)
+    if (info)
         goto close_and_send;
 
     // Collect data
@@ -466,33 +469,77 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
-        buffer_rrdf_table_add_field(wb, fields_id++, "PID", "Process ID", RRDF_FIELD_TYPE_INTEGER,
-            RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
-            RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "PID",
+            "Process ID",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
             RRDF_FIELD_FILTER_MULTISELECT,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Name", "Process Name", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_FULL_WIDTH,
-                                    NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Name",
+            "Process Name",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_FULL_WIDTH,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Origin", "Connection Origin", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
-                                    NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Origin",
+            "Connection Origin",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Src", "Source IP Address", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
-                                    NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Src",
+            "Source IP Address",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+            NULL);
 
         /*
         buffer_rrdf_table_add_field(wb, fields_id++, "SrcPort", "Source Port", RRDF_FIELD_TYPE_INTEGER,
@@ -503,47 +550,113 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     NULL);
                                     */
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Dst", "Destination IP Address", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
-                                    NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Dst",
+            "Destination IP Address",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "DstPort", "Destination Port", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
-                                    NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "DstPort",
+            "Destination Port",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Protocol", "Transport Layer Protocol", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_NONE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
-                                    NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Protocol",
+            "Transport Layer Protocol",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_NONE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Rcvd", "Traffic Received", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 3, "MB", NAN,
-                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_NONE,
-                                    RRDF_FIELD_OPTS_VISIBLE,
-                                    NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Rcvd",
+            "Traffic Received",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            3,
+            "MB",
+            NAN,
+            RRDF_FIELD_SORT_DESCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_VISIBLE,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Sent", "Traffic Sent", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 3, "MB", NAN,
-                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_NONE,
-                                    RRDF_FIELD_OPTS_VISIBLE,
-                                    NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Sent",
+            "Traffic Sent",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            3,
+            "MB",
+            NAN,
+            RRDF_FIELD_SORT_DESCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_VISIBLE,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id, "Conns", "Connections", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, "connections", NAN,
-                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_NONE,
-                                    RRDF_FIELD_OPTS_VISIBLE,
-                                    NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id,
+            "Conns",
+            "Connections",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            "connections",
+            NAN,
+            RRDF_FIELD_SORT_DESCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_VISIBLE,
+            NULL);
     }
     buffer_json_object_close(wb); // columns
 
@@ -692,10 +805,7 @@ void *ebpf_function_thread(void *ptr)
 {
     (void)ptr;
 
-    struct functions_evloop_globals *wg = functions_evloop_init(1,
-                                                                "EBPF",
-                                                                &lock,
-                                                                &ebpf_plugin_exit);
+    struct functions_evloop_globals *wg = functions_evloop_init(1, "EBPF", &lock, &ebpf_plugin_exit);
 
     functions_evloop_add_function(
         wg, EBPF_FUNCTION_SOCKET, ebpf_function_socket_manipulation, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
@@ -713,7 +823,7 @@ void *ebpf_function_thread(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
-    while(!ebpf_plugin_stop()) {
+    while (!ebpf_plugin_stop()) {
         heartbeat_next(&hb);
 
         if (ebpf_plugin_stop()) {

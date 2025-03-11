@@ -50,7 +50,8 @@ This collector supports collecting metrics from multiple instances of this integ
 
 #### Auto-Detection
 
-This integration doesn't support auto-detection.
+SNMP service discovery is a dedicated component that automatically scans configured networks to find SNMP-enabled devices. This feature is disabled by default and requires explicit user configuration to activate. When enabled, it discovers devices using customizable credentials, supports various IP range formats (single IPs, ranges, CIDR) with a limit of 512 IPs per subnet, and optimizes network traffic through configurable caching of discovery results. Discovered devices are automatically made available to the SNMP collector for monitoring. See [configuration examples](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/sd/snmp.conf) for details on setting up credentials and networks to scan.
+
 
 #### Limits
 
@@ -153,7 +154,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | hostname | Target ipv4 address. |  | yes |
-| create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | false | no |
+| create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
 | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
 | vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |

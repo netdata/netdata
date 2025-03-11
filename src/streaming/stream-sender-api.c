@@ -12,7 +12,7 @@ bool stream_sender_is_connected_with_ssl(struct rrdhost *host) {
 }
 
 bool stream_sender_has_compression(struct rrdhost *host) {
-    return host && host->sender && host->sender->compressor.initialized;
+    return host && host->sender && host->sender->thread.compressor.initialized;
 }
 
 void stream_sender_structures_init(RRDHOST *host, bool stream, STRING *parents, STRING *api_key, STRING *send_charts_matching) {
@@ -46,12 +46,28 @@ void stream_sender_structures_init(RRDHOST *host, bool stream, STRING *parents, 
     spinlock_init(&host->sender->spinlock);
     replication_sender_init(host->sender);
 
-    host->stream.snd.destination = string_dup(parents);
+    // gracefully swap destination
+    if(host->stream.snd.destination != parents) {
+        STRING *t = string_dup(parents);
+        SWAP(host->stream.snd.destination, t);
+        string_freez(t);
+    }
     rrdhost_stream_parents_update_from_destination(host);
 
-    host->stream.snd.api_key = string_dup(api_key);
-    host->stream.snd.charts_matching = simple_pattern_create(
-        string2str(send_charts_matching), NULL, SIMPLE_PATTERN_EXACT, true);
+    // gracefully swap api_key
+    if(host->stream.snd.api_key != api_key) {
+        STRING *t = string_dup(api_key);
+        SWAP(host->stream.snd.api_key, t);
+        string_freez(t);
+    }
+
+    // gracefully swap send_charts_matching
+    {
+        SIMPLE_PATTERN *t = simple_pattern_create(
+            string2str(send_charts_matching), NULL, SIMPLE_PATTERN_EXACT, true);
+        SWAP(host->stream.snd.charts_matching, t);
+        simple_pattern_free(t);
+    }
 
     rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
 }
@@ -66,7 +82,7 @@ void stream_sender_structures_free(struct rrdhost *host) {
     stream_circular_buffer_destroy(host->sender->scb);
     host->sender->scb = NULL;
     waitq_destroy(&host->sender->waitq);
-    stream_compressor_destroy(&host->sender->compressor);
+    stream_compressor_destroy(&host->sender->thread.compressor);
 
     replication_sender_cleanup(host->sender);
 

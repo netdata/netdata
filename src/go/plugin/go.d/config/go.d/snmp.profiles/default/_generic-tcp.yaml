@@ -1,0 +1,53 @@
+# Generic TCP metrics.
+
+metrics:
+- MIB: TCP-MIB
+  metric_type: monotonic_count
+  symbol:
+    OID: 1.3.6.1.2.1.6.5.0
+    name: tcpActiveOpens
+- MIB: TCP-MIB
+  metric_type: monotonic_count
+  symbol:
+    OID: 1.3.6.1.2.1.6.6.0
+    name: tcpPassiveOpens
+- MIB: TCP-MIB
+  metric_type: monotonic_count
+  symbol:
+    OID: 1.3.6.1.2.1.6.7.0
+    name: tcpAttemptFails
+- MIB: TCP-MIB
+  metric_type: monotonic_count
+  symbol:
+    OID: 1.3.6.1.2.1.6.8.0
+    name: tcpEstabResets
+- MIB: TCP-MIB
+  symbol:
+    OID: 1.3.6.1.2.1.6.9.0
+    name: tcpCurrEstab
+- MIB: TCP-MIB
+  metric_type: monotonic_count
+  symbol:
+    OID: 1.3.6.1.2.1.6.17.0
+    name: tcpHCInSegs
+- MIB: TCP-MIB
+  metric_type: monotonic_count
+  symbol:
+    OID: 1.3.6.1.2.1.6.18.0
+    name: tcpHCOutSegs
+- MIB: TCP-MIB
+  metric_type: monotonic_count
+  symbol:
+    OID: 1.3.6.1.2.1.6.12.0
+    name: tcpRetransSegs
+- MIB: TCP-MIB
+  metric_type: monotonic_count
+  symbol:
+    OID: 1.3.6.1.2.1.6.14.0
+    name: tcpInErrs
+- MIB: TCP-MIB
+  metric_type: monotonic_count
+  symbol:
+    OID: 1.3.6.1.2.1.6.15.0
+    name: tcpOutRsts
+

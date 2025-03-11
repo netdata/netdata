@@ -5,7 +5,8 @@
 
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_PROCESS "process"
-#define NETDATA_EBPF_MODULE_PROCESS_DESC "Monitor information about process life. This thread is integrated with apps and cgroup."
+#define NETDATA_EBPF_MODULE_PROCESS_DESC                                                                               \
+    "Monitor information about process life. This thread is integrated with apps and cgroup."
 
 // Groups used on Dashboard
 #define NETDATA_PROCESS_GROUP "processes"
@@ -56,14 +57,14 @@ enum netdata_ebpf_stats_order {
     NETDATA_EBPF_ORDER_FUNCTION_PER_THREAD,
 };
 
-enum netdata_ebpf_load_mode_stats{
+enum netdata_ebpf_load_mode_stats {
     NETDATA_EBPF_LOAD_STAT_LEGACY,
     NETDATA_EBPF_LOAD_STAT_CORE,
 
     NETDATA_EBPF_LOAD_STAT_END
 };
 
-enum netdata_ebpf_thread_per_core{
+enum netdata_ebpf_thread_per_core {
     NETDATA_EBPF_THREAD_PER_CORE,
     NETDATA_EBPF_THREAD_UNIQUE,
 
@@ -89,7 +90,7 @@ typedef enum ebpf_process_index {
 // Do not change the enum order because we use
 // different algorithms to make charts with incremental
 // values (the three initial positions) and absolute values
-// (the remaining charts). 
+// (the remaining charts).
 typedef enum netdata_publish_process {
     NETDATA_KEY_PUBLISH_PROCESS_EXIT,
     NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK,
@@ -99,11 +100,7 @@ typedef enum netdata_publish_process {
     NETDATA_KEY_PUBLISH_PROCESS_END
 } netdata_publish_process_t;
 
-enum ebpf_process_tables {
-    NETDATA_PROCESS_PID_TABLE,
-    NETDATA_PROCESS_GLOBAL_TABLE,
-    NETDATA_PROCESS_CTRL_TABLE
-};
+enum ebpf_process_tables { NETDATA_PROCESS_PID_TABLE, NETDATA_PROCESS_GLOBAL_TABLE, NETDATA_PROCESS_CTRL_TABLE };
 
 extern struct config process_config;
 

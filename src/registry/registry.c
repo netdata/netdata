@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "registry_internals.h"
 
 #define REGISTRY_STATUS_OK "ok"
@@ -174,7 +174,7 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not
         if(!UUIDiszero(localhost->node_id))
             buffer_json_member_add_uuid(w->response.data, "node_id", localhost->node_id.uuid);
 
-        CLAIM_ID claim_id = claim_id_get();
+        CLAIM_ID claim_id = rrdhost_claim_id_get(host);
         if (claim_id_is_set(claim_id))
             buffer_json_member_add_string(w->response.data, "claim_id", claim_id.str);
 

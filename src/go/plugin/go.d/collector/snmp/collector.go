@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
@@ -32,7 +33,8 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			Community: "public",
+			CreateVnode: true,
+			Community:   "public",
 			Options: Options{
 				Port:           161,
 				Retries:        1,
@@ -75,7 +77,7 @@ type Collector struct {
 
 	netInterfaces map[string]*netInterface
 
-	sysInfo *sysInfo
+	sysInfo *snmpsd.SysInfo
 
 	customOids []string
 }

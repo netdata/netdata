@@ -162,8 +162,8 @@ func (c *Collector) addNetIfaceCharts(iface *netInterface) {
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanIfaceName(iface.ifName))
 		chart.Labels = []module.Label{
-			{Key: "vendor", Value: c.sysInfo.organization},
-			{Key: "sysName", Value: c.sysInfo.name},
+			{Key: "vendor", Value: c.sysInfo.Organization},
+			{Key: "sysName", Value: c.sysInfo.Name},
 			{Key: "ifDescr", Value: iface.ifDescr},
 			{Key: "ifName", Value: iface.ifName},
 			{Key: "ifType", Value: ifTypeMapping[iface.ifType]},
@@ -191,8 +191,8 @@ func (c *Collector) removeNetIfaceCharts(iface *netInterface) {
 func (c *Collector) addSysUptimeChart() {
 	chart := uptimeChart.Copy()
 	chart.Labels = []module.Label{
-		{Key: "vendor", Value: c.sysInfo.organization},
-		{Key: "sysName", Value: c.sysInfo.name},
+		{Key: "vendor", Value: c.sysInfo.Organization},
+		{Key: "sysName", Value: c.sysInfo.Name},
 	}
 	if err := c.Charts().Add(chart); err != nil {
 		c.Warning(err)

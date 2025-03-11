@@ -845,8 +845,10 @@ static void *unittest_dict_view_thread(void *arg) {
     return arg;
 }
 
-static int dictionary_unittest_view_threads() {
+static struct dictionary_stats stats_master = { 0 };
+static struct dictionary_stats stats_view = { 0 };
 
+static int dictionary_unittest_view_threads() {
     struct thread_view_unittest tv = {
         .join = 0,
         .master = NULL,
@@ -856,8 +858,6 @@ static int dictionary_unittest_view_threads() {
     };
 
     // threads testing of dictionary
-    struct dictionary_stats stats_master = {};
-    struct dictionary_stats stats_view = {};
     tv.master = dictionary_create_advanced(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE, &stats_master, 0);
     tv.view = dictionary_create_view(tv.master);
     tv.view->stats = &stats_view;

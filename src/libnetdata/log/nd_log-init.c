@@ -19,6 +19,12 @@ __attribute__((constructor)) void initialize_invocation_id(void) {
     nd_setenv("NETDATA_INVOCATION_ID", uuid, 1);
 }
 
+ND_UUID nd_log_get_invocation_id(void) {
+    ND_UUID rc;
+    uuid_copy(rc.uuid, nd_log.invocation_id);
+    return rc;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 void nd_log_initialize_for_external_plugins(const char *name) {
@@ -88,8 +94,8 @@ void nd_log_initialize_for_external_plugins(const char *name) {
 
     switch(method) {
         case NDLM_JOURNAL:
-            if(!nd_log_journal_direct_init(getenv("NETDATA_SYSTEMD_JOURNAL_PATH")) ||
-                !nd_log_journal_direct_init(NULL) || !nd_log_journal_systemd_init()) {
+            if(!nd_log_journal_direct_init(getenv("NETDATA_SYSTEMD_JOURNAL_PATH")) &&
+                !nd_log_journal_direct_init(NULL) && !nd_log_journal_systemd_init()) {
                 nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to initialize journal. Using stderr.");
                 method = NDLM_STDERR;
             }
@@ -129,6 +135,8 @@ void nd_log_initialize_for_external_plugins(const char *name) {
     nd_log.sources[NDLS_COLLECTORS].fp = NULL;
 
     //    nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "FINAL_LOG_METHOD: %s", nd_log_id2method(method));
+
+    capture_stack_trace_init();
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -257,6 +265,8 @@ void nd_log_initialize(void) {
 
     for(size_t i = 0 ; i < _NDLS_MAX ; i++)
         nd_log_open(&nd_log.sources[i], i);
+
+    capture_stack_trace_init();
 }
 
 void nd_log_reopen_log_files(bool log) {
@@ -275,8 +285,11 @@ int nd_log_systemd_journal_fd(void) {
 
 void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     nd_log_forked = true;
+    nd_log.fatal_data_cb = NULL;
+    nd_log.fatal_final_cb = NULL;
 
     gettid_uncached();
+    capture_stack_trace_flush();
 
     if(nd_log.syslog.initialized) {
         closelog();
@@ -312,4 +325,3 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
 
     nd_log_initialize_for_external_plugins(name);
 }
-

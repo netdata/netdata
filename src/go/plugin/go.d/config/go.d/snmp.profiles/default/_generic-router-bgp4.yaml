@@ -1,0 +1,6 @@
+# Peer
+# This table contains one entry per neighbor (BGP peer) and information about the connections with BGP peers.
+# This profile is deprecated and kept in place for retrocompatibility purposes, please use `_generic-bgp4` instead.
+
+extends:
+  - _generic-bgp4.yaml

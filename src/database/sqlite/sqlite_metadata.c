@@ -4,7 +4,7 @@
 #include "database/sqlite/vendored/sqlite3recover.h"
 #include "health/health-alert-entry.h"
 
-//#include "sqlite_db_migration.h"
+#include "sqlite_db_migration.h"
 
 #define DB_METADATA_VERSION 18
 
@@ -420,11 +420,10 @@ done:
 
 #define SQL_UPDATE_NODE_ID  "UPDATE node_instance SET node_id = @node_id WHERE host_id = @host_id"
 
-int sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
+void sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
 {
     sqlite3_stmt *res = NULL;
     RRDHOST *host = NULL;
-    int rc = 2;
 
     char host_guid[GUID_LEN + 1];
     uuid_unparse_lower(*host_id, host_guid);
@@ -435,25 +434,23 @@ int sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
     rrd_wrunlock();
 
     if (!REQUIRE_DB(db_meta))
-        return 1;
+        return;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_NODE_ID, &res))
-        return 1;
+        return;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, node_id, sizeof(*node_id), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
 
     param = 0;
-    rc = execute_insert(res);
+    int rc = sqlite3_step_monitored(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store node instance information, rc = %d", rc);
-    rc = sqlite3_changes(db_meta);
 
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-    return rc - 1;
 }
 
 #define SQL_SELECT_NODE_ID  "SELECT node_id FROM node_instance WHERE host_id = @host_id AND node_id IS NOT NULL"
@@ -512,71 +509,6 @@ void invalidate_node_instances(nd_uuid_t *host_id, nd_uuid_t *claim_id)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-}
-
-#define SQL_GET_NODE_INSTANCE_LIST                                                                                     \
-    "SELECT ni.node_id, ni.host_id, h.hostname "                                                                       \
-    "FROM node_instance ni, host h WHERE ni.host_id = h.host_id AND h.hops >=0"
-
-struct node_instance_list *get_node_list(void)
-{
-    struct node_instance_list *node_list = NULL;
-    sqlite3_stmt *res = NULL;
-
-    if (!REQUIRE_DB(db_meta))
-        return NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SQL_GET_NODE_INSTANCE_LIST, &res))
-        return NULL;
-
-    int row = 0;
-    char host_guid[UUID_STR_LEN];
-    while (sqlite3_step_monitored(res) == SQLITE_ROW)
-        row++;
-
-    if (sqlite3_reset(res) != SQLITE_OK) {
-        error_report("Failed to reset the prepared statement while fetching node instance information");
-        goto failed;
-    }
-    node_list = callocz(row + 1, sizeof(*node_list));
-    int max_rows = row;
-    row = 0;
-    // TODO: Check to remove lock
-    rrd_rdlock();
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        if (sqlite3_column_bytes(res, 0) == sizeof(nd_uuid_t))
-            uuid_copy(node_list[row].node_id, *((nd_uuid_t *)sqlite3_column_blob(res, 0)));
-        if (sqlite3_column_bytes(res, 1) == sizeof(nd_uuid_t)) {
-            nd_uuid_t *host_id = (nd_uuid_t *)sqlite3_column_blob(res, 1);
-            uuid_unparse_lower(*host_id, host_guid);
-            RRDHOST *host = rrdhost_find_by_guid(host_guid);
-            if (!host)
-                continue;
-
-            if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
-                nd_log_limit_static_global_var(erl, 1, 0);
-                nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                    "ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
-                continue;
-            }
-
-            uuid_copy(node_list[row].host_id, *host_id);
-            node_list[row].queryable = 1;
-            node_list[row].live = rrdhost_ingestion_status(host) == RRDHOST_INGEST_STATUS_ONLINE ? 1 : 0;
-            node_list[row].hops = rrdhost_ingestion_hops(host);
-            node_list[row].hostname =
-                sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
-        }
-        row++;
-        if (row == max_rows)
-            break;
-    }
-    rrd_rdunlock();
-
-failed:
-    SQLITE_FINALIZE(res);
-
-    return node_list;
 }
 
 #define SQL_GET_HOST_NODE_ID "SELECT node_id FROM node_instance WHERE host_id = @host_id"
@@ -843,9 +775,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         if (error_str)
             analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
         freez(error_str);
-        sqlite3_close(db_meta);
-        db_meta = NULL;
-        return 1;
+        goto close_database;
     }
 
     if (rebuild & DB_CHECK_RECLAIM_SPACE) {
@@ -898,17 +828,22 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
 
     if (configure_sqlite_database(db_meta, target_version, "meta_config"))
-        return 1;
+        goto close_database;
 
     if (init_database_batch(db_meta, &database_config[0], "meta_init"))
-        return 1;
+        goto close_database;
 
     if (init_database_batch(db_meta, &database_cleanup[0], "meta_cleanup"))
-        return 1;
+        goto close_database;
 
     netdata_log_info("SQLite database initialization completed");
 
     return 0;
+
+close_database:
+    sqlite3_close(db_meta);
+    db_meta = NULL;
+    return 1;
 }
 
 // Metadata functions
@@ -994,7 +929,7 @@ static int store_claim_id(nd_uuid_t *host_id, nd_uuid_t *claim_id)
         SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
 
     param = 0;
-    rc = execute_insert(res);
+    rc = sqlite3_step_monitored(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store host claim id rc = %d", rc);
 
@@ -1141,7 +1076,7 @@ static int store_chart_metadata(RRDSET *st, sqlite3_stmt **res)
             return 1;
     }
 
-    int rc =  SQLITE_DONE;
+    int rc = 1;
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, &st->chart_uuid, sizeof(st->chart_uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, &st->rrdhost->host_id.uuid, sizeof(st->rrdhost->host_id.uuid), SQLITE_STATIC));
@@ -1184,7 +1119,7 @@ static bool store_dimension_metadata(RRDDIM *rd, sqlite3_stmt **res)
             return 1;
     }
 
-    int rc = SQLITE_DONE;
+    int rc = 1;
     int param = 0;
 
     nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(rd->uuid);
@@ -2205,6 +2140,7 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, size_t *query
 
     SQLITE_FINALIZE(ml_load_stmt);
     SQLITE_FINALIZE(store_dimension);
+    SQLITE_FINALIZE(store_chart);
 
     return;
 }
@@ -2212,9 +2148,6 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, size_t *query
 
 static void store_host_and_system_info(RRDHOST *host, size_t *query_counter)
 {
-    if (!rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_INFO))
-        return;
-
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_INFO);
 
     if (unlikely(store_host_systeminfo(host))) {
@@ -2360,9 +2293,6 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list)
 
 static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter)
 {
-    if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS)))
-        return;
-
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
 
     int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_id.uuid);
@@ -2392,9 +2322,6 @@ static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer, size_t *q
 
 static void store_host_claim_id(RRDHOST *host, size_t *query_counter)
 {
-    if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID)))
-        return;
-
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_CLAIMID);
     int rc;
     ND_UUID uuid = claim_id_get_uuid();
@@ -2413,6 +2340,22 @@ static void store_host_claim_id(RRDHOST *host, size_t *query_counter)
     char var_name[64];                                    \
     duration_snprintf(var_name, sizeof(var_name),         \
                       (int64_t)((end) - (start)), unit, true)
+
+
+void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter)
+{
+    // Store labels (if needed)
+    if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS)))
+        meta_store_host_labels(host, work_buffer, query_counter);
+
+    // Store claim id (if needed)
+    if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID)))
+        store_host_claim_id(host, query_counter);
+
+    // Store host and system info (if needed);
+    if (rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_INFO))
+        store_host_and_system_info(host, query_counter);
+}
 
 // Worker thread to scan hosts for pending metadata to store
 static void start_metadata_hosts(uv_work_t *req)
@@ -2444,14 +2387,10 @@ static void start_metadata_hosts(uv_work_t *req)
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
 
         worker_is_busy(UV_EVENT_STORE_HOST);
-        // Store labels (if needed)
-        meta_store_host_labels(host, work_buffer, &query_counter);
 
-        // Store claim id (if needed)
-        store_host_claim_id(host, &query_counter);
+        // store labels, claim_id, host and system info (if needed)
+        store_host_info_and_metadata(host, work_buffer, &query_counter);
 
-        // Store host and system info (if needed);
-        store_host_and_system_info(host, &query_counter);
         worker_is_idle();
 
         metadata_scan_host(host, work_buffer, &query_counter, shutting_down);

@@ -15,7 +15,7 @@ extern "C" {
 #define ND_LOG_DEFAULT_THROTTLE_PERIOD 60
 
 void errno_clear(void);
-int nd_log_systemd_journal_fd(void);
+
 void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting);
 void nd_log_set_facility(const char *facility);
 void nd_log_set_priority_level(const char *setting);
@@ -31,9 +31,23 @@ ND_LOG_FIELD_ID nd_log_field_id_by_journal_name(const char *field, size_t len);
 int nd_log_priority2id(const char *priority);
 const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 const char *nd_log_method_for_external_plugins(const char *s);
+ND_UUID nd_log_get_invocation_id(void);
 
+void capture_stack_trace(BUFFER *wb);
+void capture_stack_trace_init(void);
+void capture_stack_trace_flush(void);
+bool capture_stack_trace_is_async_signal_safe(void);
+
+typedef void (*log_event_t)(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
+void nd_log_register_fatal_data_cb(log_event_t cb);
+
+typedef void (*fatal_event_t)(void);
+void nd_log_register_fatal_final_cb(fatal_event_t cb);
+
+int nd_log_systemd_journal_fd(void);
 int nd_log_health_fd(void);
 int nd_log_collectors_fd(void);
+
 typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);
 
 struct log_stack_entry {

@@ -25,6 +25,17 @@
     }                                                                                                           \
 } while(0)
 
+#define JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                 \
+    json_object *_j;                                                                                            \
+    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
+        strncpyz(dst, json_object_get_string(_j), sizeof(dst) - 1);                                             \
+    }                                                                                                           \
+    else if(required) {                                                                                         \
+        buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                      \
+        return false;                                                                                           \
+    }                                                                                                           \
+} while(0)
+
 #define JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {              \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
@@ -140,7 +151,7 @@
             typeof(dst) _bit = converter(_option_str);                                                          \
             if (_bit == 0) {                                                                                    \
                 buffer_sprintf(error, "unknown option '%s' in '%s.%s' at index %zu", _option_str, path, member, _i); \
-                return false;                                                                                   \
+                /* return false; */                                                                             \
             }                                                                                                   \
             dst |= _bit;                                                                                        \
         }                                                                                                       \
@@ -217,7 +228,7 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_SUBOBJECT(jobj, path, member, dst, callback, error, required) do { \
+#define JSONC_PARSE_SUBOBJECT_CB(jobj, path, member, dst, callback, error, required) do { \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         char _new_path[strlen(path) + strlen(member) + 2];                                                      \
@@ -231,8 +242,129 @@
     }                                                                                                           \
 } while(0)
 
-typedef bool (*json_parse_function_payload_t)(json_object *jobj, const char *path, void *data, BUFFER *error);
+#define JSONC_TEMP_VAR(type, line) JSONC_TEMP_VAR_IMPL(type, line)
+#define JSONC_TEMP_VAR_IMPL(type, line) _jsonc_temp_##type##line
+
+#define JSONC_PATH_CONCAT(path, sizeof_path, prefix, member, error) do {                                        \
+    size_t len = strlen(prefix);                                                                                \
+    if(len >= sizeof_path - 1) {                                                                                \
+        buffer_sprintf(error, "path too long while adding '%s'", member);                                       \
+        return false;                                                                                           \
+    }                                                                                                           \
+    if(len) {                                                                                                   \
+        if(len >= sizeof_path - 2) {                                                                            \
+            buffer_sprintf(error, "path too long while adding '.' before '%s'", member);                        \
+            return false;                                                                                       \
+        }                                                                                                       \
+        strncpyz(path + len, ".", sizeof_path - len);                                                           \
+        len++;                                                                                                  \
+    }                                                                                                           \
+    strncpyz(path + len, member, sizeof_path - len);                                                            \
+} while(0)
+
+#define JSONC_PATH_CONCAT_INDEX(path, sizeof_path, index, error) do {                                           \
+    char _idx_str[32];                                                                                          \
+    snprintfz(_idx_str, sizeof(_idx_str), "[%zu]", index);                                                      \
+    size_t _path_len = strlen(path);                                                                            \
+    if (_path_len + strlen(_idx_str) >= sizeof_path) {                                                          \
+        buffer_sprintf(error, "path too long while adding array index");                                        \
+        return false;                                                                                           \
+    }                                                                                                           \
+    strncpyz(path + _path_len, _idx_str, sizeof_path - _path_len);                                              \
+} while(0)
+
+#define JSONC_PARSE_SUBOBJECT(jobj, path, member, error, required, block) do { \
+    BUILD_BUG_ON(sizeof(path) < 128); /* ensure path is an array of at least 128 bytes */                       \
+    json_object *JSONC_TEMP_VAR(_j, __LINE__);                                                                  \
+    if (!json_object_object_get_ex(jobj, member, &JSONC_TEMP_VAR(_j, __LINE__))) {                              \
+        if(required) {                                                                                          \
+            buffer_sprintf(error, "missing '%s.%s' object", *path ? path : "", member);                         \
+            return false;                                                                                       \
+        }                                                                                                       \
+    }                                                                                                           \
+    else {                                                                                                      \
+        if (!json_object_is_type(JSONC_TEMP_VAR(_j, __LINE__), json_type_object)) {                             \
+            if(required) {                                                                                      \
+                buffer_sprintf(error, "not an object '%s.%s'", *path ? path : "", member);                      \
+                return false;                                                                                   \
+            }                                                                                                   \
+        }                                                                                                       \
+        else {                                                                                                  \
+            json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
+            jobj = JSONC_TEMP_VAR(_j, __LINE__);                                                                \
+            char JSONC_TEMP_VAR(saved_path, __LINE__)[strlen(path) + 1];                                        \
+            strncpyz(JSONC_TEMP_VAR(saved_path, __LINE__), path, sizeof(JSONC_TEMP_VAR(saved_path, __LINE__))); \
+            JSONC_PATH_CONCAT(path, sizeof(path), path, member, error);                                         \
+            /* Run the user's code block */                                                                     \
+            block                                                                                               \
+            /* Restore the previous scope's values */                                                           \
+            jobj = JSONC_TEMP_VAR(saved_jobj, __LINE__);                                                        \
+            strncpyz(path, JSONC_TEMP_VAR(saved_path, __LINE__), sizeof(path));                                 \
+        }                                                                                                       \
+    }                                                                                                           \
+} while(0)
+
+#define JSONC_PARSE_ARRAY(jobj, path, member, error, required, block) do {                                      \
+    BUILD_BUG_ON(sizeof(path) < 128); /* ensure path is an array of at least 128 bytes */                       \
+    json_object *JSONC_TEMP_VAR(_jarray, __LINE__);                                                             \
+    if (!json_object_object_get_ex(jobj, member, &JSONC_TEMP_VAR(_jarray, __LINE__))) {                         \
+        if (required) {                                                                                         \
+           buffer_sprintf(error, "missing '%s.%s' array", *path ? path : "", member);                           \
+           return false;                                                                                        \
+        }                                                                                                       \
+    }                                                                                                           \
+    else {                                                                                                      \
+        if (!json_object_is_type(JSONC_TEMP_VAR(_jarray, __LINE__), json_type_array)) {                         \
+            if (required) {                                                                                     \
+                buffer_sprintf(error, "not an array '%s.%s'", *path ? path : "", member);                       \
+                return false;                                                                                   \
+            }                                                                                                   \
+        }                                                                                                       \
+        else {                                                                                                  \
+            json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
+            jobj = JSONC_TEMP_VAR(_jarray, __LINE__);                                                           \
+            char JSONC_TEMP_VAR(saved_path, __LINE__)[strlen(path) + 1];                                        \
+            strncpyz(JSONC_TEMP_VAR(saved_path, __LINE__), path, sizeof(JSONC_TEMP_VAR(saved_path, __LINE__))); \
+            JSONC_PATH_CONCAT(path, sizeof(path), path, member, error);                                         \
+            /* Run the user's code block */                                                                     \
+            block                                                                                               \
+            /* Restore the previous scope's values */                                                           \
+            jobj = JSONC_TEMP_VAR(saved_jobj, __LINE__);                                                        \
+            strncpyz(path, JSONC_TEMP_VAR(saved_path, __LINE__), sizeof(path));                                 \
+        }                                                                                                       \
+    }                                                                                                           \
+} while(0)
+
+#define JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, index, required, block) do {                                  \
+    size_t JSONC_TEMP_VAR(_array_len, __LINE__) = json_object_array_length(jobj);                               \
+    for (index = 0; index < JSONC_TEMP_VAR(_array_len, __LINE__); index++) {                                    \
+        json_object *JSONC_TEMP_VAR(_jitem, __LINE__) = json_object_array_get_idx(jobj, index);                 \
+        if (!json_object_is_type(JSONC_TEMP_VAR(_jitem, __LINE__), json_type_object)) {                         \
+            if(required) {                                                                                      \
+                buffer_sprintf(error, "not an object '%s[%zu]'", *path ? path : "", index);                     \
+                return false;                                                                                   \
+            }                                                                                                   \
+        }                                                                                                       \
+        else {                                                                                                  \
+            json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
+            jobj = JSONC_TEMP_VAR(_jitem, __LINE__);                                                            \
+            char JSONC_TEMP_VAR(saved_path, __LINE__)[strlen(path) + 1];                                        \
+            strncpyz(JSONC_TEMP_VAR(saved_path, __LINE__), path, sizeof(JSONC_TEMP_VAR(saved_path, __LINE__))); \
+            JSONC_PATH_CONCAT_INDEX(path, sizeof(path), index, error);                                          \
+            /* Run the user's code block */                                                                     \
+            block                                                                                               \
+            /* Restore the previous scope's values */                                                           \
+            jobj = JSONC_TEMP_VAR(saved_jobj, __LINE__);                                                        \
+            strncpyz(path, JSONC_TEMP_VAR(saved_path, __LINE__), sizeof(path));                                 \
+        }                                                                                                       \
+    }                                                                                                           \
+} while(0)
+
+typedef bool (*json_parse_function_payload_t)(json_object *jobj, void *data, BUFFER *error);
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER *payload, int *code, json_parse_function_payload_t cb, void *cb_data);
+
+// return HTTP response code
+int json_parse_payload_or_error(BUFFER *payload, BUFFER *error, json_parse_function_payload_t cb, void *cb_data);
 
 #endif //NETDATA_JSON_C_PARSER_INLINE_H

@@ -74,6 +74,7 @@ void http_access2buffer_json_array(struct web_buffer *wb, const char *key, HTTP_
 void http_access2txt(char *buf, size_t size, const char *separator, HTTP_ACCESS access);
 HTTP_ACCESS http_access_from_hex(const char *str);
 HTTP_ACCESS http_access_from_hex_mapping_old_roles(const char *str);
+HTTP_ACCESS http_access_from_hex_str(const char *str);
 HTTP_ACCESS http_access_from_source(const char *str);
 bool log_cb_http_access_to_hex(struct web_buffer *wb, void *data);
 

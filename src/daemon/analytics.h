@@ -96,6 +96,7 @@ typedef struct {
 } analytics_statistic_t;
 
 void analytics_statistic_send(const analytics_statistic_t *statistic);
+bool analytics_check_enabled(void);
 
 extern struct analytics_data analytics_data;
 

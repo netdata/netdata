@@ -312,12 +312,8 @@ while [ -n "${1}" ]; do
       ;;
     "--enable-ml") NETDATA_ENABLE_ML=1 ;;
     "--disable-ml") NETDATA_ENABLE_ML=0 ;;
-    "--enable-lto")
-      # TODO: Needs CMake support
-      ;;
-    "--disable-lto")
-      # TODO: Needs CMake support
-      ;;
+    "--enable-lto") NETDATA_ENABLE_LTO=1 ;;
+    "--disable-lto") NETDATA_ENABLE_LTO=0 ;;
     "--disable-x86-sse")
       # XXX: No longer supported.
       ;;
@@ -429,7 +425,7 @@ if [ "$(id -u)" -ne 0 ] && [ -z "${NETDATA_PREPARE_ONLY}" ]; then
 fi
 
 netdata_banner
-progress "monitoring and troubleshooting, transformed!"
+progress "Netdata, X-Ray Vision for your infrastructure!"
 cat << BANNER1
 
   You are about to build and install netdata to your system.
@@ -1171,6 +1167,6 @@ else
   progress "is installed now!"
 fi
 
-echo >&2 "  enjoy real-time performance and health monitoring..."
+echo >&2 "  Enjoy X-Ray Vision for your infrastructure..."
 echo >&2
 exit 0

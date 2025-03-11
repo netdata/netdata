@@ -903,10 +903,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             do_carrier = do_mtu = CONFIG_BOOLEAN_YES;
 
         // only CSLIP, PPP
-        do_compressed   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "compressed packets for all interfaces", CONFIG_BOOLEAN_NO);
+        do_compressed   = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETDEV, "compressed packets for all interfaces", CONFIG_BOOLEAN_NO);
 
         disabled_list = simple_pattern_create(
-            config_get(
+            inicfg_get(&netdata_config, 
                 CONFIG_SECTION_PLUGIN_PROC_NETDEV,
                 "disable by default interfaces matching",
                 "lo fireqos* *-ifb fwpr* fwbr* fwln* ifb4*"),
@@ -1004,10 +1004,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
             snprintfz(buf, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
 
-            if (config_exists(buf, "enabled"))
-                d->enabled = config_get_boolean_ondemand(buf, "enabled", d->enabled);
-            if (config_exists(buf, "virtual"))
-                d->virtual = config_get_boolean(buf, "virtual", d->virtual);
+            if (inicfg_exists(&netdata_config, buf, "enabled"))
+                d->enabled = inicfg_get_boolean_ondemand(&netdata_config, buf, "enabled", d->enabled);
+            if (inicfg_exists(&netdata_config, buf, "virtual"))
+                d->virtual = inicfg_get_boolean(&netdata_config, buf, "virtual", d->virtual);
 
             if(d->enabled == CONFIG_BOOLEAN_NO)
                 continue;
@@ -1025,30 +1025,30 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             d->do_carrier = do_carrier;
             d->do_mtu = do_mtu;
 
-            if (config_exists(buf, "bandwidth"))
-                d->do_bandwidth = config_get_boolean_ondemand(buf, "bandwidth", do_bandwidth);
-            if (config_exists(buf, "packets"))
-                d->do_packets = config_get_boolean_ondemand(buf, "packets", do_packets);
-            if (config_exists(buf, "errors"))
-                d->do_errors = config_get_boolean_ondemand(buf, "errors", do_errors);
-            if (config_exists(buf, "drops"))
-                d->do_drops = config_get_boolean_ondemand(buf, "drops", do_drops);
-            if (config_exists(buf, "fifo"))
-                d->do_fifo = config_get_boolean_ondemand(buf, "fifo", do_fifo);
-            if (config_exists(buf, "compressed"))
-                d->do_compressed = config_get_boolean_ondemand(buf, "compressed", do_compressed);
-            if (config_exists(buf, "events"))
-                d->do_events = config_get_boolean_ondemand(buf, "events", do_events);
-            if (config_exists(buf, "speed"))
-                d->do_speed = config_get_boolean_ondemand(buf, "speed", do_speed);
-            if (config_exists(buf, "duplex"))
-                d->do_duplex = config_get_boolean_ondemand(buf, "duplex", do_duplex);
-            if (config_exists(buf, "operstate"))
-                d->do_operstate = config_get_boolean_ondemand(buf, "operstate", do_operstate);
-            if (config_exists(buf, "carrier"))
-                d->do_carrier = config_get_boolean_ondemand(buf, "carrier", do_carrier);
-            if (config_exists(buf, "mtu"))
-                d->do_mtu = config_get_boolean_ondemand(buf, "mtu", do_mtu);
+            if (inicfg_exists(&netdata_config, buf, "bandwidth"))
+                d->do_bandwidth = inicfg_get_boolean_ondemand(&netdata_config, buf, "bandwidth", do_bandwidth);
+            if (inicfg_exists(&netdata_config, buf, "packets"))
+                d->do_packets = inicfg_get_boolean_ondemand(&netdata_config, buf, "packets", do_packets);
+            if (inicfg_exists(&netdata_config, buf, "errors"))
+                d->do_errors = inicfg_get_boolean_ondemand(&netdata_config, buf, "errors", do_errors);
+            if (inicfg_exists(&netdata_config, buf, "drops"))
+                d->do_drops = inicfg_get_boolean_ondemand(&netdata_config, buf, "drops", do_drops);
+            if (inicfg_exists(&netdata_config, buf, "fifo"))
+                d->do_fifo = inicfg_get_boolean_ondemand(&netdata_config, buf, "fifo", do_fifo);
+            if (inicfg_exists(&netdata_config, buf, "compressed"))
+                d->do_compressed = inicfg_get_boolean_ondemand(&netdata_config, buf, "compressed", do_compressed);
+            if (inicfg_exists(&netdata_config, buf, "events"))
+                d->do_events = inicfg_get_boolean_ondemand(&netdata_config, buf, "events", do_events);
+            if (inicfg_exists(&netdata_config, buf, "speed"))
+                d->do_speed = inicfg_get_boolean_ondemand(&netdata_config, buf, "speed", do_speed);
+            if (inicfg_exists(&netdata_config, buf, "duplex"))
+                d->do_duplex = inicfg_get_boolean_ondemand(&netdata_config, buf, "duplex", do_duplex);
+            if (inicfg_exists(&netdata_config, buf, "operstate"))
+                d->do_operstate = inicfg_get_boolean_ondemand(&netdata_config, buf, "operstate", do_operstate);
+            if (inicfg_exists(&netdata_config, buf, "carrier"))
+                d->do_carrier = inicfg_get_boolean_ondemand(&netdata_config, buf, "carrier", do_carrier);
+            if (inicfg_exists(&netdata_config, buf, "mtu"))
+                d->do_mtu = inicfg_get_boolean_ondemand(&netdata_config, buf, "mtu", do_mtu);
         }
 
         if(unlikely(!d->enabled))

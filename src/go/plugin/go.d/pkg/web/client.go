@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 type Client struct {
@@ -69,13 +70,13 @@ func (c *Client) handleNokCode(req *http.Request, resp *http.Response) error {
 	if c.onNokCode != nil {
 		handled, err := c.onNokCode(resp)
 		if err != nil {
-			return fmt.Errorf("'%s' returned HTTP status code: %d (%w)", req.URL, resp.StatusCode, err)
+			return fmt.Errorf("%s '%s' returned HTTP status code: %d (%w)", req.Method, req.URL, resp.StatusCode, err)
 		}
 		if handled {
 			return nil
 		}
 	}
-	return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+	return fmt.Errorf("%s '%s' returned HTTP status code: %d", req.Method, req.URL, resp.StatusCode)
 }
 
 func CloseBody(resp *http.Response) {
@@ -83,4 +84,8 @@ func CloseBody(resp *http.Response) {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}
+}
+
+func IsStatusCode(err error, code int) bool {
+	return err != nil && strings.Contains(err.Error(), fmt.Sprintf("code: %d", code))
 }

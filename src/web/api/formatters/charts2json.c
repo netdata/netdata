@@ -44,7 +44,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
     time_t now = now_realtime_sec();
 
     if(unlikely(!custom_dashboard_info_js_filename))
-        custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
+        custom_dashboard_info_js_filename = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -90,7 +90,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
         rrd_rdlock();
         RRDHOST *h;
         rrdhost_foreach_read(h) {
-            if(!rrdhost_should_be_removed(h, host, now) /*&& !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED) */) {
+            if(!rrdhost_should_be_cleaned_up(h, host, now) /*&& !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED) */) {
                 buffer_json_add_array_item_object(wb);
                 buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(h));
                 buffer_json_object_close(wb);

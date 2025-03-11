@@ -102,7 +102,7 @@ static bool recursively_find_pci_aer(AER_TYPE types, const char *base_dir, const
 static void find_all_pci_aer(AER_TYPE types) {
     char name[FILENAME_MAX + 1];
     snprintfz(name, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices");
-    pci_aer_dirname = config_get("plugin:proc:/sys/devices/pci/aer", "directory to monitor", name);
+    pci_aer_dirname = inicfg_get(&netdata_config, "plugin:proc:/sys/devices/pci/aer", "directory to monitor", name);
 
     DIR *dir = opendir(pci_aer_dirname);
     if(unlikely(!dir)) {
@@ -195,16 +195,16 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
         int do_root_ports = CONFIG_BOOLEAN_AUTO;
         int do_pci_slots = CONFIG_BOOLEAN_NO;
 
-        char buffer[100 + 1] = "";
-        rrdlabels_get_value_strcpyz(localhost->rrdlabels, buffer, 100, "_virtualization");
+        char buffer[128];
+        rrdlabels_get_value_strcpyz(localhost->rrdlabels, buffer, sizeof(buffer), "_virtualization");
         if(strcmp(buffer, "none") != 0) {
             // no need to run on virtualized environments
             do_root_ports = CONFIG_BOOLEAN_NO;
             do_pci_slots = CONFIG_BOOLEAN_NO;
         }
 
-        do_root_ports = config_get_boolean("plugin:proc:/sys/class/pci/aer", "enable root ports", do_root_ports);
-        do_pci_slots = config_get_boolean("plugin:proc:/sys/class/pci/aer", "enable pci slots", do_pci_slots);
+        do_root_ports = inicfg_get_boolean(&netdata_config, "plugin:proc:/sys/class/pci/aer", "enable root ports", do_root_ports);
+        do_pci_slots = inicfg_get_boolean(&netdata_config, "plugin:proc:/sys/class/pci/aer", "enable pci slots", do_pci_slots);
 
         if(!do_root_ports && !do_pci_slots)
             return 1;

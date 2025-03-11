@@ -51,7 +51,7 @@ func (a *accumulator) run(ctx context.Context, in chan []model.TargetGroup) {
 			select {
 			case <-done:
 				a.Info("all discoverers exited")
-			case <-time.After(time.Second * 3):
+			case <-time.After(time.Second * 10):
 				a.Warning("not all discoverers exited")
 			}
 			a.trySend(in)
@@ -83,7 +83,7 @@ func (a *accumulator) runDiscoverer(ctx context.Context, d model.Discoverer, upd
 		case <-ctx.Done():
 			select {
 			case <-done:
-			case <-time.After(time.Second * 2):
+			case <-time.After(time.Second * 10):
 				a.Warningf("discoverer '%v' didn't exit on ctx done", d)
 			}
 			return

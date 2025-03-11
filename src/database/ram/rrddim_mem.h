@@ -30,6 +30,7 @@ void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh);
 
 bool rrddim_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s);
 bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
+void rrddim_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 
 STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
 void rrddim_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg);

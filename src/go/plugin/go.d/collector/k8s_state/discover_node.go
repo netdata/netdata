@@ -16,7 +16,7 @@ func newNodeDiscoverer(si cache.SharedInformer, l *logger.Logger) *nodeDiscovere
 		panic("nil node shared informer")
 	}
 
-	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{Name: "node"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "node"})
 
 	_, _ = si.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { enqueue(queue, obj) },
@@ -45,7 +45,7 @@ func (r nodeResource) value() any             { return r.val }
 type nodeDiscoverer struct {
 	*logger.Logger
 	informer cache.SharedInformer
-	queue    *workqueue.Typed[any]
+	queue    *workqueue.Typed[string]
 	readyCh  chan struct{}
 	stopCh   chan struct{}
 }
@@ -73,15 +73,14 @@ func (d *nodeDiscoverer) stopped() bool { return isChanClosed(d.stopCh) }
 
 func (d *nodeDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
 	for {
-		item, shutdown := d.queue.Get()
+		key, shutdown := d.queue.Get()
 		if shutdown {
 			return
 		}
 
 		func() {
-			defer d.queue.Done(item)
+			defer d.queue.Done(key)
 
-			key := item.(string)
 			_, name, err := cache.SplitMetaNamespaceKey(key)
 			if err != nil {
 				return

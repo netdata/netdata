@@ -72,7 +72,7 @@ void __wrap_finished_web_request_statistics(
     (void)compressed_content_size;
 }
 
-char *__wrap_config_get(struct config *root, const char *section, const char *name, const char *default_value)
+char *__wrap_inicfg_get(&netdata_config, struct config *root, const char *section, const char *name, const char *default_value)
 {
     (void)root;
     (void)section;
@@ -196,7 +196,7 @@ RRDHOST *localhost = NULL;
 struct config netdata_config = { .first_section = NULL,
                                  .last_section = NULL,
                                  .mutex = NETDATA_MUTEX_INITIALIZER,
-                                 .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+                                 .index = { .avl_tree = { .root = NULL, .compar = inicfg_section_compare },
                                             .rwlock = AVL_LOCK_INITIALIZER } };
 
 /* Note: this is not a CMocka group_test_setup/teardown pair. This is performed per-test.

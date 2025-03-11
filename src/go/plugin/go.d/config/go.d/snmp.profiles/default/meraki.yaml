@@ -1,0 +1,19 @@
+# Profile for Meraki devices
+# 1.3.6.1.4.1.29671.1 Meraki Cloud Controllers
+# 1.3.6.1.4.1.29671.2 Meraki Devices
+#
+# We don't extend from base for now, as sysName is useless for meraki.
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+
+device:
+  vendor: "meraki"
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "meraki"
+
+sysobjectid: 1.3.6.1.4.1.29671.*

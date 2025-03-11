@@ -1202,6 +1202,12 @@ func (c *Collector) addInnoDBOSLogCharts() {
 	}
 }
 
+func (c *Collector) addInnoDBOSLogIOChart() {
+	if err := c.Charts().Add(chartInnoDBOSLogIO.Copy()); err != nil {
+		c.Warning(err)
+	}
+}
+
 func (c *Collector) addMyISAMCharts() {
 	if err := c.Charts().Add(*chartsMyISAM.Copy()...); err != nil {
 		c.Warning(err)

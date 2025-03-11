@@ -51,36 +51,36 @@ struct pgc_queue_statistics {
     struct pgc_size_histogram size_histogram;
 
     PAD64(size_t) entries;
-    PAD64(size_t) size;
+    PAD64(int64_t) size;
 
     PAD64(size_t) max_entries;
-    PAD64(size_t) max_size;
+    PAD64(int64_t) max_size;
 
     PAD64(size_t) added_entries;
-    PAD64(size_t) added_size;
+    PAD64(int64_t) added_size;
 
     PAD64(size_t) removed_entries;
-    PAD64(size_t) removed_size;
+    PAD64(int64_t) removed_size;
 };
 
 struct pgc_statistics {
-    PAD64(size_t) wanted_cache_size;
-    PAD64(size_t) current_cache_size;
+    PAD64(int64_t) wanted_cache_size;
+    PAD64(int64_t) current_cache_size;
 
     // ----------------------------------------------------------------------------------------------------------------
     // volume
 
     PAD64(size_t) entries;                 // all the entries (includes clean, dirty, hot)
-    PAD64(size_t) size;                    // all the entries (includes clean, dirty, hot)
+    PAD64(int64_t) size;                   // all the entries (includes clean, dirty, hot)
 
     PAD64(size_t) referenced_entries;      // all the entries currently referenced
-    PAD64(size_t) referenced_size;         // all the entries currently referenced
+    PAD64(int64_t) referenced_size;        // all the entries currently referenced
 
     PAD64(size_t) added_entries;
-    PAD64(size_t) added_size;
+    PAD64(int64_t) added_size;
 
     PAD64(size_t) removed_entries;
-    PAD64(size_t) removed_size;
+    PAD64(int64_t) removed_size;
 
 #ifdef PGC_COUNT_POINTS_COLLECTED
     PAD64(size_t) points_collected;
@@ -90,13 +90,13 @@ struct pgc_statistics {
     // migrations
 
     PAD64(size_t) evicting_entries;
-    PAD64(size_t) evicting_size;
+    PAD64(int64_t) evicting_size;
 
     PAD64(size_t) flushing_entries;
-    PAD64(size_t) flushing_size;
+    PAD64(int64_t) flushing_size;
 
     PAD64(size_t) hot2dirty_entries;
-    PAD64(size_t) hot2dirty_size;
+    PAD64(int64_t) hot2dirty_size;
 
     PAD64(size_t) hot_empty_pages_evicted_immediately;
     PAD64(size_t) hot_empty_pages_evicted_later;
@@ -118,8 +118,8 @@ struct pgc_statistics {
     PAD64(size_t) searches_closest_misses;
 
     PAD64(size_t) flushes_completed;
-    PAD64(size_t) flushes_completed_size;
-    PAD64(size_t) flushes_cancelled_size;
+    PAD64(int64_t) flushes_completed_size;
+    PAD64(int64_t) flushes_cancelled_size;
 
     // ----------------------------------------------------------------------------------------------------------------
     // critical events
@@ -175,9 +175,10 @@ PGC *pgc_create(const char *name,
                 PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page);
 
 // destroy the cache
-void pgc_destroy(PGC *cache);
+void pgc_destroy(PGC *cache, bool flush);
 
 #define PGC_SECTION_ALL ((Word_t)0)
+void pgc_flush_dirty_pages(PGC *cache, Word_t section);
 void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section);
 
 // add a page to the cache and return a pointer to it
@@ -219,8 +220,8 @@ bool pgc_is_page_hot(PGC_PAGE *page);
 bool pgc_is_page_dirty(PGC_PAGE *page);
 bool pgc_is_page_clean(PGC_PAGE *page);
 void pgc_reset_hot_max(PGC *cache);
-size_t pgc_get_current_cache_size(PGC *cache);
-size_t pgc_get_wanted_cache_size(PGC *cache);
+int64_t pgc_get_current_cache_size(PGC *cache);
+int64_t pgc_get_wanted_cache_size(PGC *cache);
 
 // resetting the end time of a hot page
 void pgc_page_hot_set_end_time_s(PGC *cache, PGC_PAGE *page, time_t end_time_s, size_t additional_bytes);
@@ -232,7 +233,7 @@ void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafil
 size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 
-typedef size_t (*dynamic_target_cache_size_callback)(void);
+typedef int64_t (*dynamic_target_cache_size_callback)(void);
 void pgc_set_dynamic_target_cache_size_callback(PGC *cache, dynamic_target_cache_size_callback callback);
 
 typedef size_t (*nominal_page_size_callback)(void *);

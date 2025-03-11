@@ -1,0 +1,24 @@
+# Profile defining metadata for HP servers
+metadata:
+  device:
+    fields:
+      serial_number:
+        symbol:
+          MIB: CPQSINFO-MIB
+          OID: 1.3.6.1.4.1.232.2.2.2.1.0
+          name: cpqSiSysSerialNum # The serial number of the physical system unit.
+      version:
+        symbol:
+          MIB: CPQSTDEQ-MIB
+          OID: 1.3.6.1.4.1.232.1.2.6.1.0
+          name: cpqSeSysRomVer # eg. A03-03/01/2006
+      os_name:
+       symbol:
+         MIB: CPQHOST-MIB
+         OID: 1.3.6.1.4.1.232.11.2.2.1.0
+         name: cpqHoName # The operating system name. e.g. Microsoft Windows Server 2003
+      os_version:
+        symbol:
+          MIB: CPQHOST-MIB
+          OID: 1.3.6.1.4.1.232.11.2.2.2.0
+          name: cpqHoVersion # The current system release level. e.g. 3.10.0-862.14.4.el7.ve.x86_64

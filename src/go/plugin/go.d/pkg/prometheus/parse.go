@@ -50,7 +50,7 @@ type promTextParser struct {
 func (p *promTextParser) parseToSeries(text []byte) (Series, error) {
 	p.series.Reset()
 
-	parser := textparse.NewPromParser(text)
+	parser := textparse.NewPromParser(text, labels.NewSymbolTable())
 	for {
 		entry, err := parser.Next()
 		if err != nil {
@@ -88,7 +88,7 @@ var reSpace = regexp.MustCompile(`\s+`)
 func (p *promTextParser) parseToMetricFamilies(text []byte) (MetricFamilies, error) {
 	p.reset()
 
-	parser := textparse.NewPromParser(text)
+	parser := textparse.NewPromParser(text, labels.NewSymbolTable())
 	for {
 		entry, err := parser.Next()
 		if err != nil {

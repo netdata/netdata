@@ -1,0 +1,218 @@
+extends:
+  - apc.yaml
+
+sysobjectid: 1.3.6.1.4.1.318.1.3.4.*
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "PDU"
+
+metrics:
+  - MIB: PowerNet-MIB
+    table:
+      OID: 1.3.6.1.4.1.318.1.1.12.2.3.1
+      name: rPDULoadStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.2
+        name: powernet.rPDULoadStatusLoad
+    metric_tags:
+      - tag: powernet_r_pdu_load_status_index
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.1
+          name: rPDULoadStatusIndex
+      - symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.3
+          name: rPDULoadStatusLoadState
+        tag: powernet_r_pdu_load_status_load_state
+        mapping:
+          1: phase_load_normal
+          2: phase_load_low
+          3: phase_load_near_overload
+          4: phase_load_overload
+  - MIB: PowerNet-MIB
+    table:
+      OID: 1.3.6.1.4.1.318.1.1.12.3.5.1
+      name: rPDUOutletStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.7
+        name: powernet.rPDUOutletStatusLoad
+    metric_tags:
+      - tag: powernet_r_pdu_outlet_status_index
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.1
+          name: rPDUOutletStatusIndex
+      - tag: powernet_r_pdu_outlet_status_outlet_name
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.2
+          name: rPDUOutletStatusOutletName
+      - symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.4
+          name: rPDUOutletStatusOutletState
+        tag: powernet_r_pdu_outlet_status_outlet_state
+        mapping:
+          1: outlet_status_on
+          2: outlet_status_off
+#  - MIB: PowerNet-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.318.1.1.12.4.1.1.0
+#      name: rPDUPowerSupply1Status
+#      mapping:
+#        1: power_supply_one_ok
+#        2: power_supply_one_failed
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: PowerNet-MIB
+#    symbol:
+#      OID: 1.3.6.1.4.1.318.1.1.12.4.1.2.0
+#      name: rPDUPowerSupply2Status
+#      mapping:
+#        1: power_supply_two_ok
+#        2: power_supply_two_failed
+#        3: power_supply_two_not_present
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: PowerNet-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.12.4.1.3.0
+      name: powernet.rPDUPowerSupplyAlarm
+  - MIB: PowerNet-MIB
+    table:
+      OID: 1.3.6.1.4.1.318.1.1.12.5.2
+      name: rPDUStatusBankTable
+    symbols:
+      - name: powernet.rPDUStatusBank
+        constant_value_one: true
+    metric_tags:
+      - tag: powernet_r_pdu_status_bank_index
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.1
+          name: rPDUStatusBankIndex
+      - tag: powernet_r_pdu_status_bank_number
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.2
+          name: rPDUStatusBankNumber
+      - symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.3
+          name: rPDUStatusBankState
+        tag: powernet_r_pdu_status_bank_state
+        mapping:
+          1: bank_load_normal
+          2: bank_load_low
+          3: bank_load_near_overload
+          4: bank_load_overload
+  - MIB: PowerNet-MIB
+    table:
+      OID: 1.3.6.1.4.1.318.1.1.12.5.4
+      name: rPDUStatusPhaseTable
+    symbols:
+      - name: powernet.rPDUStatusPhase
+        constant_value_one: true
+    metric_tags:
+      - tag: powernet_r_pdu_status_phase_index
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.1
+          name: rPDUStatusPhaseIndex
+      - tag: powernet_r_pdu_status_phase_number
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.2
+          name: rPDUStatusPhaseNumber
+      - symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.3
+          name: rPDUStatusPhaseState
+        tag: powernet_r_pdu_status_phase_state
+        mapping:
+          1: phase_load_normal
+          2: phase_load_low
+          3: phase_load_near_overload
+          4: phase_load_overload
+  - MIB: PowerNet-MIB
+    table:
+      OID: 1.3.6.1.4.1.318.1.1.12.5.6
+      name: rPDUStatusOutletTable
+    symbols:
+      - name: powernet.rPDUStatusOutlet
+        constant_value_one: true
+    metric_tags:
+      - tag: powernet_r_pdu_status_outlet_index
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.1
+          name: rPDUStatusOutletIndex
+      - tag: powernet_r_pdu_status_outlet_number
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.2
+          name: rPDUStatusOutletNumber
+      - symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.3
+          name: rPDUStatusOutletState
+        tag: powernet_r_pdu_status_outlet_state
+        mapping:
+          1: outlet_load_normal
+          2: outlet_load_low
+          3: outlet_load_near_overload
+          4: outlet_load_overload
+  - MIB: PowerNet-MIB
+    table:
+      OID: 1.3.6.1.4.1.318.1.1.26.10.2.2
+      name: rPDU2SensorTempHumidityStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.7
+        name: powernet.rPDU2SensorTempHumidityStatusTempF
+      - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.8
+        name: powernet.rPDU2SensorTempHumidityStatusTempC
+      - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.10
+        name: powernet.rPDU2SensorTempHumidityStatusRelativeHumidity
+    metric_tags:
+      - tag: powernet_r_pdu2_sensor_temp_humidity_status_name
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.3
+          name: rPDU2SensorTempHumidityStatusName
+      - tag: powernet_r_pdu2_sensor_temp_humidity_status_type
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.5
+          name: rPDU2SensorTempHumidityStatusType
+        mapping:
+          1: temperature_only
+          2: temperature_humidity
+          3: comms_lost
+          4: not_installed
+      - symbol:
+          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.9
+          name: rPDU2SensorTempHumidityStatusTempStatus
+        tag: powernet_r_pdu2_sensor_temp_humidity_status_temp_status
+        mapping:
+          1: not_present
+          2: below_min
+          3: below_low
+          4: normal
+          5: above_high
+          6: above_max
+      - symbol:
+          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.11
+          name: rPDU2SensorTempHumidityStatusHumidityStatus
+        tag: powernet_r_pdu2_sensor_temp_humidity_status_humidity_status
+        mapping:
+          1: not_present
+          2: below_min
+          3: below_low
+          4: normal
+          5: above_high
+          6: above_max
+
+metric_tags:
+  - tag: powernet_r_pdu_ident_name
+    OID: 1.3.6.1.4.1.318.1.1.12.1.1.0
+    symbol: rPDUIdentName
+  - tag: powernet_r_pdu_ident_hardware_rev
+    OID: 1.3.6.1.4.1.318.1.1.12.1.2.0
+    symbol: rPDUIdentHardwareRev
+  - tag: powernet_r_pdu_ident_firmware_rev
+    OID: 1.3.6.1.4.1.318.1.1.12.1.3.0
+    symbol: rPDUIdentFirmwareRev
+  - tag: powernet_r_pdu_ident_model_number
+    OID: 1.3.6.1.4.1.318.1.1.12.1.5.0
+    symbol: rPDUIdentModelNumber
+  - tag: powernet_r_pdu_ident_serial_number
+    OID: 1.3.6.1.4.1.318.1.1.12.1.6.0
+    symbol: rPDUIdentSerialNumber

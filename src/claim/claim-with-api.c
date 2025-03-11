@@ -148,7 +148,7 @@ static int debug_callback(CURL *handle, curl_infotype type, char *data, size_t s
     return 0;
 }
 
-static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure, bool *can_retry) {
+static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, bool insecure, bool *can_retry) {
     CURL *curl;
     CURLcode res;
     char target_url[2048];
@@ -270,8 +270,16 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     // execute the request
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        claim_agent_failure_reason_set("Request failed with error: %s (proxy is set to '%s')",
-                                       curl_easy_strerror(res), proxy);
+        claim_agent_failure_reason_set("Request failed with error: %s\n"
+                                       "proxy: '%s',\n"
+                                       "insecure: %s,\n"
+                                       "public key file: '%s',\n"
+                                       "trusted key file: '%s'",
+                                       curl_easy_strerror(res),
+                                       proxy,
+                                       insecure ? "true" : "false",
+                                       public_key_file ? public_key_file : "none",
+                                       trusted_key_file ? trusted_key_file : "none");
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
         *can_retry = true;
@@ -372,7 +380,7 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
     bool done = false, can_retry = true;
     size_t retries = 0;
     do {
-        done = send_curl_request(registry_get_this_machine_guid(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, &can_retry);
+        done = send_curl_request(registry_get_this_machine_guid(true), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, &can_retry);
         if (done) break;
         sleep_usec(300 * USEC_PER_MS + 100 * retries * USEC_PER_MS);
         retries++;
@@ -385,7 +393,7 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
 bool claim_agent_from_environment(void) {
     const char *url = getenv("NETDATA_CLAIM_URL");
     if(!url || !*url) {
-        url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
+        url = inicfg_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
         if(!url || !*url) return false;
     }
 
@@ -418,15 +426,15 @@ bool claim_agent_from_claim_conf(void) {
 
     errno_clear();
     char *filename = filename_from_path_entry_strdupz(netdata_configured_user_config_dir, "claim.conf");
-    bool loaded = appconfig_load(&claim_config, filename, 1, NULL);
+    bool loaded = inicfg_load(&claim_config, filename, 1, NULL);
     freez(filename);
 
     if(loaded) {
-        const char *url = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
-        const char *token = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "token", "");
-        const char *rooms = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "rooms", "");
-        const char *proxy = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "proxy", "env");
-        bool insecure = appconfig_get_boolean(&claim_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
+        const char *url = inicfg_get(&claim_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
+        const char *token = inicfg_get(&claim_config, CONFIG_SECTION_GLOBAL, "token", "");
+        const char *rooms = inicfg_get(&claim_config, CONFIG_SECTION_GLOBAL, "rooms", "");
+        const char *proxy = inicfg_get(&claim_config, CONFIG_SECTION_GLOBAL, "proxy", "env");
+        bool insecure = inicfg_get_boolean(&claim_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
 
         if(token && *token && url && *url)
             ret = claim_agent(url, token, rooms, proxy, insecure);

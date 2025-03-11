@@ -51,15 +51,20 @@ void freez_int(void *ptr, const char *file, const char *function, size_t line);
 size_t mallocz_usable_size_int(void *ptr, const char *file, const char *function, size_t line);
 
 #else // NETDATA_TRACE_ALLOCATIONS
-char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
-char *strndupz(const char *s, size_t len) MALLOCLIKE NEVERNULL;
-void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
-void *mallocz(size_t size) MALLOCLIKE NEVERNULL;
-void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
+char *strdupz(const char *s) MALLOCLIKE NEVERNULL WARNUNUSED;
+char *strndupz(const char *s, size_t len) MALLOCLIKE NEVERNULL WARNUNUSED;
+void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL WARNUNUSED;
+void *mallocz(size_t size) MALLOCLIKE NEVERNULL WARNUNUSED;
+void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL WARNUNUSED;
 void freez(void *ptr);
 #endif // NETDATA_TRACE_ALLOCATIONS
 
 void mallocz_release_as_much_memory_to_the_system(void);
-void posix_memfree(void *ptr);
+
+int posix_memalignz(void **memptr, size_t alignment, size_t size);
+void posix_memalign_freez(void *ptr);
+
+typedef void (*out_of_memory_cb)(void);
+void mallocz_register_out_of_memory_cb(out_of_memory_cb cb);
 
 #endif //NETDATA_ND_MALLOCZ_H

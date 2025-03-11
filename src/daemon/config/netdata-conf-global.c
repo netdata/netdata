@@ -25,7 +25,7 @@ size_t netdata_conf_cpus(void) {
     if(!p)
         p = os_get_system_cpus_uncached();
 
-    p = config_get_number(CONFIG_SECTION_GLOBAL, "cpu cores", p);
+    p = inicfg_get_number(&netdata_config, CONFIG_SECTION_GLOBAL, "cpu cores", p);
     if(p < 1)
         p = 1;
 
@@ -41,11 +41,11 @@ skip:
 }
 
 void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_threshold __maybe_unused) {
-    wanted_arenas = config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", wanted_arenas);
+    wanted_arenas = inicfg_get_number(&netdata_config, CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", wanted_arenas);
     if(wanted_arenas < 1 || wanted_arenas > os_get_system_cpus_cached(true)) {
         if(wanted_arenas < 1) wanted_arenas = 1;
         else wanted_arenas = os_get_system_cpus_cached(true);
-        config_set_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", wanted_arenas);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", wanted_arenas);
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "malloc arenas can be from 1 to %zu. Setting it to %zu",
                os_get_system_cpus_cached(true), wanted_arenas);
@@ -56,11 +56,11 @@ void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_thre
     setenv("MALLOC_ARENA_MAX", buf, true);
 
 #if defined(HAVE_C_MALLOPT)
-    wanted_arenas = config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", wanted_arenas);
+    wanted_arenas = inicfg_get_number(&netdata_config, CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", wanted_arenas);
     if(wanted_arenas < 1 || wanted_arenas > os_get_system_cpus_cached(true)) {
         if(wanted_arenas < 1) wanted_arenas = 1;
         else wanted_arenas = os_get_system_cpus_cached(true);
-        config_set_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", wanted_arenas);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", wanted_arenas);
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "malloc arenas can be from 1 to %zu. Setting it to %zu",
                os_get_system_cpus_cached(true), wanted_arenas);
@@ -75,21 +75,13 @@ void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_thre
 #endif
 }
 
-static void libuv_initialize(void) {
+void libuv_initialize(void) {
     libuv_worker_threads = (int)netdata_conf_cpus() * 6;
+    libuv_worker_threads = MIN(MAX_LIBUV_WORKER_THREADS, MAX(MIN_LIBUV_WORKER_THREADS, libuv_worker_threads));
 
-    if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
-        libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
-
-    if(libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
-        libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
-
-
-    libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
-    if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
-        libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
-        config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
-    }
+    libuv_worker_threads = (int)inicfg_get_number_range(
+        &netdata_config, CONFIG_SECTION_GLOBAL, "libuv worker threads",
+        libuv_worker_threads, MIN_LIBUV_WORKER_THREADS, MAX_LIBUV_WORKER_THREADS);
 
     char buf[20 + 1];
     snprintfz(buf, sizeof(buf) - 1, "%d", libuv_worker_threads);
@@ -97,20 +89,22 @@ static void libuv_initialize(void) {
 }
 
 void netdata_conf_section_global(void) {
+    FUNCTION_RUN_ONCE();
+
+    netdata_conf_section_directories();
+
     // ------------------------------------------------------------------------
     // get the hostname
 
-    netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
+    netdata_configured_host_prefix = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "host access prefix", "");
     (void) verify_netdata_host_prefix(true);
 
     char buf[HOST_NAME_MAX * 4 + 1];
     if (!os_hostname(buf, sizeof(buf), netdata_configured_host_prefix))
         netdata_log_error("Cannot get machine hostname.");
 
-    netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
+    netdata_configured_hostname = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "hostname", buf);
     netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
-
-    netdata_conf_section_directories();
 
     nd_profile_setup(); // required for configuring the database
     netdata_conf_section_db();
@@ -120,8 +114,6 @@ void netdata_conf_section_global(void) {
 
     os_get_system_cpus_uncached();
     os_get_system_pid_max();
-
-    libuv_initialize();
 }
 
 void netdata_conf_section_global_run_as_user(const char **user) {
@@ -130,11 +122,11 @@ void netdata_conf_section_global_run_as_user(const char **user) {
 
     // IMPORTANT: this is required before web_files_uid()
     if(getuid() == 0) {
-        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
+        *user = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
     }
     else {
         struct passwd *passwd = getpwuid(getuid());
-        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
+        *user = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
     }
 }
 

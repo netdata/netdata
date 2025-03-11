@@ -420,8 +420,14 @@ static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const c
     return ri;
 }
 
-static inline void rrdinstance_rrdset_not_collected(RRDSET *st) {
+ALWAYS_INLINE void rrdinstance_rrdset_not_collected(RRDSET *st) {
     st->rrdcontexts.collected = false;
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        rrdmetric_not_collected_rrddim(rd);
+    }
+    rrddim_foreach_done(rd);
 }
 
 inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
@@ -450,8 +456,8 @@ inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     st->rrdcontexts.rrdcontext = NULL;
 }
 
-inline void rrdinstance_rrdset_has_updated_retention(RRDSET *st) {
-    rrdinstance_rrdset_not_collected(st);
+ALWAYS_INLINE void rrdinstance_rrdset_has_updated_retention(RRDSET *st) {
+    // rrdinstance_rrdset_not_collected(st);
 
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;
@@ -512,7 +518,7 @@ inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
     rrdinstance_trigger_updates(ri, __FUNCTION__ );
 }
 
-inline void rrdinstance_collected_rrdset(RRDSET *st) {
+ALWAYS_INLINE void rrdinstance_collected_rrdset(RRDSET *st) {
     if(st->rrdcontexts.collected)
         return;
 

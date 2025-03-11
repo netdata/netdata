@@ -8,7 +8,6 @@
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include "daemon/common.h"
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
@@ -249,7 +248,6 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_QUERY,
     RRDENG_OPCODE_EXTENT_WRITE,
     RRDENG_OPCODE_EXTENT_READ,
-    RRDENG_OPCODE_FLUSHED_TO_OPEN,
     RRDENG_OPCODE_DATABASE_ROTATE,
     RRDENG_OPCODE_JOURNAL_INDEX,
     RRDENG_OPCODE_FLUSH_MAIN,
@@ -257,6 +255,7 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_EVICT_OPEN,
     RRDENG_OPCODE_EVICT_EXTENT,
     RRDENG_OPCODE_CTX_SHUTDOWN,
+    RRDENG_OPCODE_CTX_FLUSH_DIRTY,
     RRDENG_OPCODE_CTX_QUIESCE,
     RRDENG_OPCODE_CTX_POPULATE_MRG,
     RRDENG_OPCODE_SHUTDOWN_EVLOOP,
@@ -270,10 +269,10 @@ enum rrdeng_opcode {
 // RRDENG_MAX_OPCODE + opcode            : reserved for the callbacks of each opcode
 // RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE : reserved for the timer
 #define RRDENG_TIMER_CB (RRDENG_OPCODE_MAX + RRDENG_OPCODE_MAX)
-#define RRDENG_FLUSH_TRANSACTION_BUFFER_CB (RRDENG_TIMER_CB + 1)
-#define RRDENG_OPCODES_WAITING             (RRDENG_TIMER_CB + 2)
-#define RRDENG_WORKS_DISPATCHED            (RRDENG_TIMER_CB + 3)
-#define RRDENG_WORKS_EXECUTING             (RRDENG_TIMER_CB + 4)
+#define RRDENG_OPCODES_WAITING             (RRDENG_TIMER_CB + 1)
+#define RRDENG_WORKS_DISPATCHED            (RRDENG_TIMER_CB + 2)
+#define RRDENG_WORKS_EXECUTING             (RRDENG_TIMER_CB + 3)
+#define RRDENG_RETENTION_TIMER_CB          (RRDENG_TIMER_CB + 4)
 
 struct extent_io_data {
     unsigned fileno;
@@ -285,29 +284,14 @@ struct extent_io_data {
 
 struct extent_io_descriptor {
     struct rrdengine_instance *ctx;
-    uv_fs_t uv_fs_request;
-    uv_buf_t iov;
-    uv_file file;
     void *buf;
-    struct wal *wal;
     uint64_t pos;
-    unsigned bytes;
-    struct completion *completion;
     unsigned descr_count;
+    unsigned bytes;
+    struct wal *wal;
+    uv_file file;
     struct page_descr_with_data *descr_array[MAX_PAGES_PER_EXTENT];
     struct rrdengine_datafile *datafile;
-    struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
-};
-
-struct generic_io_descriptor {
-    struct rrdengine_instance *ctx;
-    uv_fs_t req;
-    uv_buf_t iov;
-    void *buf;
-    void *data;
-    uint64_t pos;
-    unsigned bytes;
-    struct completion *completion;
 };
 
 typedef struct wal {
@@ -315,7 +299,6 @@ typedef struct wal {
     void *buf;
     size_t size;
     size_t buf_size;
-    struct generic_io_descriptor io_descr;
 
     struct {
         struct wal *prev;

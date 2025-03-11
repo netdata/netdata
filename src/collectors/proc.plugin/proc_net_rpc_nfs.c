@@ -148,18 +148,18 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
     if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/rpc/nfs");
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NFS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NFS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
     if(!ff) return 1;
 
     ff = procfile_readall(ff);
     if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
-    if(do_net == -1) do_net = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NFS, "network", 1);
-    if(do_rpc == -1) do_rpc = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NFS, "rpc", 1);
-    if(do_proc2 == -1) do_proc2 = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NFS, "NFS v2 procedures", 1);
-    if(do_proc3 == -1) do_proc3 = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NFS, "NFS v3 procedures", 1);
-    if(do_proc4 == -1) do_proc4 = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NFS, "NFS v4 procedures", 1);
+    if(do_net == -1) do_net = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NFS, "network", 1);
+    if(do_rpc == -1) do_rpc = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NFS, "rpc", 1);
+    if(do_proc2 == -1) do_proc2 = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NFS, "NFS v2 procedures", 1);
+    if(do_proc3 == -1) do_proc3 = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NFS, "NFS v3 procedures", 1);
+    if(do_proc4 == -1) do_proc4 = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NFS, "NFS v4 procedures", 1);
 
     // if they are enabled, reset them to 1
     // later we do them =2 to avoid doing strcmp() for all lines

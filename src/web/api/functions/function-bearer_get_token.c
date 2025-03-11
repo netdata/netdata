@@ -13,7 +13,8 @@ struct bearer_token_request {
     STRING *client_name;
 };
 
-static bool bearer_parse_json_payload(json_object *jobj, const char *path, void *data, BUFFER *error) {
+static bool bearer_parse_json_payload(json_object *jobj, void *data, BUFFER *error) {
+    const char *path = "";
     struct bearer_token_request *rq = data;
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "claim_id", rq->claim_id, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "machine_guid", rq->machine_guid, error, true);

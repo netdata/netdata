@@ -1,0 +1,41 @@
+# Example sysDescr for apc devices:
+#   - APC Web/SNMP Management Card (MB:v3.9.2 PF:v3.9.2 PN:apc_hw02_aos_392.bin AF1:v3.7.2 AN1:apc_hw02_sumx_372.bin MN:AP9619 HR:A10 SN: 5A1827E00000 MD:12/04/2007) (Embedded PowerNet SNMP Agent SW v2.2 compatible)
+#   - APC Web/SNMP Management Card (MB:v4.1.0	PF:v6.4.6	PN:apc_hw05_aos_646.bin AF1:v6.4.6 AN1:apc_hw05_rpdu2g_646.bin	MN:AP8881	HR:02	SN: 5A1827E02199	MD:07/04/2018)
+#   - APC Web/SNMP Management Card (MB:v4.1.0	PF:v6.5.0	PN:apc_hw05_aos_650.bin AF1:v6.5.0 AN1:apc_hw05_sumx_650.bin	MN:AP9630	HR:08	SN: ZA1744002099	MD:10/30/2017) (Embedded PowerNet SNMP Agent SW v2.2 compatible)
+
+extends:
+  - _apc.yaml
+
+metadata:
+  device:
+    fields:
+      serial_number:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: '\bSN:\s+(\w+)'
+          match_value: '$1'
+          # Examples: SN: 5A1827E00000
+          # Note: there is a whitespace between `SN:` and the serial number.
+      model:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: '\bMN:(\w+)'
+          match_value: '$1'
+          # Examples: MN:AP9631
+      os_name:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: '\bPN:apc_hw(\d+)_aos_'
+          match_value: 'AOS'
+          # Examples: PN:apc_hw02_aos_374.bin
+          #           PN:apc_hw21_aos_1.1.0.16.bin
+      os_version:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: '\bPF:(\S+)'
+          match_value: '$1'
+          # Examples: `MN:v3.9.2`, correspond to version in PN:apc_hw02_aos_392.bin

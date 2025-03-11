@@ -178,9 +178,9 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
     static int do_all_processes = -1, do_processes = -1, do_mem_real = -1;
 
     if (unlikely(do_all_processes == -1)) {
-        do_all_processes    = config_get_boolean("plugin:freebsd:vm.vmtotal", "enable total processes", 1);
-        do_processes        = config_get_boolean("plugin:freebsd:vm.vmtotal", "processes running", 1);
-        do_mem_real         = config_get_boolean("plugin:freebsd:vm.vmtotal", "real memory", 1);
+        do_all_processes    = inicfg_get_boolean(&netdata_config, "plugin:freebsd:vm.vmtotal", "enable total processes", 1);
+        do_processes        = inicfg_get_boolean(&netdata_config, "plugin:freebsd:vm.vmtotal", "processes running", 1);
+        do_mem_real         = inicfg_get_boolean(&netdata_config, "plugin:freebsd:vm.vmtotal", "real memory", 1);
     }
 
     if (likely(do_all_processes | do_processes | do_mem_real)) {
@@ -1425,8 +1425,8 @@ int do_net_isr(int update_every, usec_t dt) {
     static int do_netisr = -1, do_netisr_per_core = -1;
 
     if (unlikely(do_netisr == -1)) {
-        do_netisr =          config_get_boolean("plugin:freebsd:net.isr", "netisr",          1);
-        do_netisr_per_core = config_get_boolean("plugin:freebsd:net.isr", "netisr per core", 1);
+        do_netisr =          inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.isr", "netisr",          1);
+        do_netisr_per_core = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.isr", "netisr per core", 1);
     }
 
     static struct netisr_stats {
@@ -1659,18 +1659,18 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                do_tcpext_syncookies = -1, do_tcpext_listen = -1, do_ecn = -1;
 
     if (unlikely(do_tcp_packets == -1)) {
-        do_tcp_packets       = config_get_boolean("plugin:freebsd:net.inet.tcp.stats", "ipv4 TCP packets",          1);
-        do_tcp_errors        = config_get_boolean("plugin:freebsd:net.inet.tcp.stats", "ipv4 TCP errors",           1);
-        do_tcp_handshake     = config_get_boolean("plugin:freebsd:net.inet.tcp.stats", "ipv4 TCP handshake issues", 1);
-        do_tcpext_connaborts = config_get_boolean_ondemand("plugin:freebsd:net.inet.tcp.stats", "TCP connection aborts",
+        do_tcp_packets       = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.tcp.stats", "ipv4 TCP packets",          1);
+        do_tcp_errors        = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.tcp.stats", "ipv4 TCP errors",           1);
+        do_tcp_handshake     = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.tcp.stats", "ipv4 TCP handshake issues", 1);
+        do_tcpext_connaborts = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet.tcp.stats", "TCP connection aborts",
                                                            CONFIG_BOOLEAN_AUTO);
-        do_tcpext_ofo        = config_get_boolean_ondemand("plugin:freebsd:net.inet.tcp.stats", "TCP out-of-order queue",
+        do_tcpext_ofo        = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet.tcp.stats", "TCP out-of-order queue",
                                                            CONFIG_BOOLEAN_AUTO);
-        do_tcpext_syncookies = config_get_boolean_ondemand("plugin:freebsd:net.inet.tcp.stats", "TCP SYN cookies",
+        do_tcpext_syncookies = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet.tcp.stats", "TCP SYN cookies",
                                                            CONFIG_BOOLEAN_AUTO);
-        do_tcpext_listen     = config_get_boolean_ondemand("plugin:freebsd:net.inet.tcp.stats", "TCP listen issues",
+        do_tcpext_listen     = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet.tcp.stats", "TCP listen issues",
                                                            CONFIG_BOOLEAN_AUTO);
-        do_ecn               = config_get_boolean_ondemand("plugin:freebsd:net.inet.tcp.stats", "ECN packets",
+        do_ecn               = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet.tcp.stats", "ECN packets",
                                                            CONFIG_BOOLEAN_AUTO);
     }
 
@@ -2002,8 +2002,8 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
     static int do_udp_packets = -1, do_udp_errors = -1;
 
     if (unlikely(do_udp_packets == -1)) {
-        do_udp_packets = config_get_boolean("plugin:freebsd:net.inet.udp.stats", "ipv4 UDP packets", 1);
-        do_udp_errors  = config_get_boolean("plugin:freebsd:net.inet.udp.stats", "ipv4 UDP errors", 1);
+        do_udp_packets = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.udp.stats", "ipv4 UDP packets", 1);
+        do_udp_errors  = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.udp.stats", "ipv4 UDP errors", 1);
     }
 
     // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
@@ -2099,9 +2099,9 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
     static int do_icmp_packets = -1, do_icmp_errors = -1, do_icmpmsg = -1;
 
     if (unlikely(do_icmp_packets == -1)) {
-        do_icmp_packets = config_get_boolean("plugin:freebsd:net.inet.icmp.stats", "ipv4 ICMP packets",  1);
-        do_icmp_errors  = config_get_boolean("plugin:freebsd:net.inet.icmp.stats", "ipv4 ICMP errors",   1);
-        do_icmpmsg      = config_get_boolean("plugin:freebsd:net.inet.icmp.stats", "ipv4 ICMP messages", 1);
+        do_icmp_packets = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.icmp.stats", "ipv4 ICMP packets",  1);
+        do_icmp_errors  = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.icmp.stats", "ipv4 ICMP errors",   1);
+        do_icmpmsg      = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.icmp.stats", "ipv4 ICMP messages", 1);
     }
 
     if (likely(do_icmp_packets || do_icmp_errors || do_icmpmsg)) {
@@ -2240,10 +2240,10 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
     static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1;
 
     if (unlikely(do_ip_packets == -1)) {
-        do_ip_packets  = config_get_boolean("plugin:freebsd:net.inet.ip.stats", "ipv4 packets", 1);
-        do_ip_fragsout = config_get_boolean("plugin:freebsd:net.inet.ip.stats", "ipv4 fragments sent", 1);
-        do_ip_fragsin  = config_get_boolean("plugin:freebsd:net.inet.ip.stats", "ipv4 fragments assembly", 1);
-        do_ip_errors   = config_get_boolean("plugin:freebsd:net.inet.ip.stats", "ipv4 errors", 1);
+        do_ip_packets  = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.ip.stats", "ipv4 packets", 1);
+        do_ip_fragsout = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.ip.stats", "ipv4 fragments sent", 1);
+        do_ip_fragsin  = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.ip.stats", "ipv4 fragments assembly", 1);
+        do_ip_errors   = inicfg_get_boolean(&netdata_config, "plugin:freebsd:net.inet.ip.stats", "ipv4 errors", 1);
     }
 
     // see also http://net-snmp.sourceforge.net/docs/mibs/ip.html
@@ -2415,13 +2415,13 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
     static int do_ip6_packets = -1, do_ip6_fragsout = -1, do_ip6_fragsin = -1, do_ip6_errors = -1;
 
     if (unlikely(do_ip6_packets == -1)) {
-        do_ip6_packets  = config_get_boolean_ondemand("plugin:freebsd:net.inet6.ip6.stats", "ipv6 packets",
+        do_ip6_packets  = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.ip6.stats", "ipv6 packets",
                                                       CONFIG_BOOLEAN_AUTO);
-        do_ip6_fragsout = config_get_boolean_ondemand("plugin:freebsd:net.inet6.ip6.stats", "ipv6 fragments sent",
+        do_ip6_fragsout = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.ip6.stats", "ipv6 fragments sent",
                                                       CONFIG_BOOLEAN_AUTO);
-        do_ip6_fragsin  = config_get_boolean_ondemand("plugin:freebsd:net.inet6.ip6.stats", "ipv6 fragments assembly",
+        do_ip6_fragsin  = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.ip6.stats", "ipv6 fragments assembly",
                                                       CONFIG_BOOLEAN_AUTO);
-        do_ip6_errors   = config_get_boolean_ondemand("plugin:freebsd:net.inet6.ip6.stats", "ipv6 errors",
+        do_ip6_errors   = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.ip6.stats", "ipv6 errors",
                                                       CONFIG_BOOLEAN_AUTO);
     }
 
@@ -2604,19 +2604,19 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
             do_icmp6_neighbor = -1, do_icmp6_types = -1;
 
     if (unlikely(do_icmp6 == -1)) {
-        do_icmp6          = config_get_boolean_ondemand("plugin:freebsd:net.inet6.icmp6.stats", "icmp",
+        do_icmp6          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.icmp6.stats", "icmp",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_icmp6_redir    = config_get_boolean_ondemand("plugin:freebsd:net.inet6.icmp6.stats", "icmp redirects",
+        do_icmp6_redir    = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.icmp6.stats", "icmp redirects",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_icmp6_errors   = config_get_boolean_ondemand("plugin:freebsd:net.inet6.icmp6.stats", "icmp errors",
+        do_icmp6_errors   = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.icmp6.stats", "icmp errors",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_icmp6_echos    = config_get_boolean_ondemand("plugin:freebsd:net.inet6.icmp6.stats", "icmp echos",
+        do_icmp6_echos    = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.icmp6.stats", "icmp echos",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_icmp6_router   = config_get_boolean_ondemand("plugin:freebsd:net.inet6.icmp6.stats", "icmp router",
+        do_icmp6_router   = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.icmp6.stats", "icmp router",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_icmp6_neighbor = config_get_boolean_ondemand("plugin:freebsd:net.inet6.icmp6.stats", "icmp neighbor",
+        do_icmp6_neighbor = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.icmp6.stats", "icmp neighbor",
                                                         CONFIG_BOOLEAN_AUTO);
-        do_icmp6_types    = config_get_boolean_ondemand("plugin:freebsd:net.inet6.icmp6.stats", "icmp types",
+        do_icmp6_types    = inicfg_get_boolean_ondemand(&netdata_config, "plugin:freebsd:net.inet6.icmp6.stats", "icmp types",
                                                         CONFIG_BOOLEAN_AUTO);
     }
 

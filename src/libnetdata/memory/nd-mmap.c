@@ -112,11 +112,25 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
 #endif
 }
 
+#define THP_SIZE (2 * 1024 * 1024) // 2 MiB THP size
+#define THP_MASK (THP_SIZE - 1)    // Mask for alignment check
+
+inline int madvise_thp(void *mem __maybe_unused, size_t len __maybe_unused) {
+#ifdef MADV_HUGEPAGE
+    // Check if the size is at least THP size and aligned
+    if (len >= THP_SIZE && ((uintptr_t)mem & THP_MASK) == 0) {
+        return madvise(mem, len, MADV_HUGEPAGE);
+    }
+#endif
+    return 0; // Do nothing if THP is not supported or size is too small
+}
+
 int nd_munmap(void *ptr, size_t size) {
 #ifdef NETDATA_TRACE_ALLOCATIONS
     malloc_trace_munmap(size);
 #endif
 
+    workers_memory_call(WORKERS_MEMORY_CALL_MUNMAP);
     int rc = munmap(ptr, size);
 
     if(rc == 0) {
@@ -128,6 +142,8 @@ int nd_munmap(void *ptr, size_t size) {
 }
 
 void *nd_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset) {
+    workers_memory_call(WORKERS_MEMORY_CALL_MMAP);
+
     void *rc = mmap(addr, len, prot, flags, fd, offset);
 
     if(rc != MAP_FAILED) {
@@ -193,6 +209,7 @@ void *nd_mmap_advanced(const char *filename, size_t size, int flags, int ksm, bo
             else netdata_log_info("Cannot seek to beginning of file '%s'.", filename);
         }
 
+        madvise_thp(mem, size);
         // madvise_sequential(mem, size);
         // madvise_dontfork(mem, size); // aral is initialized before we daemonize
         if(dont_dump) madvise_dontdump(mem, size);

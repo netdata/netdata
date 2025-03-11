@@ -1,0 +1,12 @@
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "anue"
+
+sysobjectid:
+  - 1.3.6.1.4.1.32620.1.*

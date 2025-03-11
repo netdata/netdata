@@ -9,6 +9,7 @@ yaml-files:
 ignore: |
   mqtt_websockets/
   packaging/makeself/tmp/
+  src/go/plugin/go.d/config/go.d/snmp.profiles.d/default/
 
 rules:
   braces: enable

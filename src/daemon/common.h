@@ -70,7 +70,7 @@ extern "C" {
 #include "daemon.h"
 #include "main.h"
 #include "static_threads.h"
-#include "signals.h"
+#include "signal-handler.h"
 #include "commands.h"
 #include "pipename.h"
 #include "analytics.h"
@@ -84,14 +84,13 @@ extern const char *netdata_configured_primary_plugins_dir;
 extern const char *netdata_configured_web_dir;
 extern const char *netdata_configured_cache_dir;
 extern const char *netdata_configured_varlib_dir;
-extern const char *netdata_configured_lock_dir;
 extern const char *netdata_configured_cloud_dir;
 extern const char *netdata_configured_home_dir;
 extern const char *netdata_configured_host_prefix;
 extern const char *netdata_configured_timezone;
 extern const char *netdata_configured_abbrev_timezone;
 extern int32_t netdata_configured_utc_offset;
-extern int netdata_anonymous_statistics_enabled;
+extern bool netdata_anonymous_statistics_enabled;
 
 extern bool netdata_ready;
 extern time_t netdata_start_time;

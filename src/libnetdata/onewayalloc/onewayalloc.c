@@ -7,6 +7,7 @@ typedef struct owa_page {
     size_t stats_mallocs_size;
     size_t size;                // the total size of the page
     size_t offset;              // the first free byte of the page
+    bool mmap;
     struct owa_page *next;      // the next page on the list
     struct owa_page *last;      // the last page on the list - we currently allocate on this
 } OWA_PAGE;
@@ -54,7 +55,12 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
 
     // Use netdata_mmap instead of mallocz
     OWA_PAGE *page = (OWA_PAGE *)nd_mmap_advanced(NULL, size, MAP_ANONYMOUS | MAP_PRIVATE, 0, false, false, NULL);
-    if(unlikely(!page)) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
+    if(unlikely(!page)) {
+        page = mallocz(size);
+        page->mmap = false;
+    }
+    else
+        page->mmap = true;
 
     __atomic_add_fetch(&onewayalloc_total_memory, size, __ATOMIC_RELAXED);
 
@@ -196,7 +202,10 @@ void onewayalloc_destroy(ONEWAYALLOC *owa) {
         page = page->next;
 
         // Use netdata_munmap instead of freez
-        nd_munmap(p, p->size);
+        if(p->mmap)
+            nd_munmap(p, p->size);
+        else
+            freez(p);
     }
 
     __atomic_sub_fetch(&onewayalloc_total_memory, total_size, __ATOMIC_RELAXED);

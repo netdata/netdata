@@ -3,7 +3,7 @@
 #ifndef NETDATA_FUNCTION_BEARER_GET_TOKEN_H
 #define NETDATA_FUNCTION_BEARER_GET_TOKEN_H
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 
 int function_bearer_get_token(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 int call_function_bearer_get_token(RRDHOST *host, struct web_client *w, const char *claim_id, const char *machine_guid, const char *node_id);

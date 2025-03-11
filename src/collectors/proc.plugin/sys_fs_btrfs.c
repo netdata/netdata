@@ -687,17 +687,17 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/fs/btrfs");
-        btrfs_path = config_get("plugin:proc:/sys/fs/btrfs", "path to monitor", filename);
+        btrfs_path = inicfg_get(&netdata_config, "plugin:proc:/sys/fs/btrfs", "path to monitor", filename);
 
-        refresh_every = config_get_duration_seconds("plugin:proc:/sys/fs/btrfs", "check for btrfs changes every", refresh_every / USEC_PER_SEC) * USEC_PER_SEC;
+        refresh_every = inicfg_get_duration_seconds(&netdata_config, "plugin:proc:/sys/fs/btrfs", "check for btrfs changes every", refresh_every / USEC_PER_SEC) * USEC_PER_SEC;
         refresh_delta = refresh_every;
 
-        do_allocation_disks = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "physical disks allocation", do_allocation_disks);
-        do_allocation_data = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "data allocation", do_allocation_data);
-        do_allocation_metadata = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "metadata allocation", do_allocation_metadata);
-        do_allocation_system = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "system allocation", do_allocation_system);
-        do_commit_stats = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "commit stats", do_commit_stats);
-        do_error_stats = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "error stats", do_error_stats);
+        do_allocation_disks = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/sys/fs/btrfs", "physical disks allocation", do_allocation_disks);
+        do_allocation_data = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/sys/fs/btrfs", "data allocation", do_allocation_data);
+        do_allocation_metadata = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/sys/fs/btrfs", "metadata allocation", do_allocation_metadata);
+        do_allocation_system = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/sys/fs/btrfs", "system allocation", do_allocation_system);
+        do_commit_stats = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/sys/fs/btrfs", "commit stats", do_commit_stats);
+        do_error_stats = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/sys/fs/btrfs", "error stats", do_error_stats);
     }
 
     refresh_delta += dt;

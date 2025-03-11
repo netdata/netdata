@@ -88,6 +88,8 @@ struct worker_utilization {
     double workers_cpu_max;
     double workers_cpu_total;
 
+    uint64_t memory_calls[WORKERS_MEMORY_CALL_MAX];
+
     struct worker_thread *threads;
 
     RRDSET *st_workers_time;
@@ -113,6 +115,9 @@ struct worker_utilization {
     RRDSET *st_spinlocks_locks;
     RRDSET *st_spinlocks_spins;
     SPINLOCKS_JudyLSet spinlocks;
+
+    RRDSET *st_memory_calls;
+    RRDDIM *rd_memory_calls[WORKERS_MEMORY_CALL_MAX];
 };
 
 static struct worker_utilization all_workers_utilization[] = {
@@ -250,6 +255,46 @@ static void workers_total_spinlock_contention_chart(void) {
             else
                 rrddim_set_by_pointer(st, rd, (collected_number)((uint64_t)wusp->spins * 10000ULL / (uint64_t)wusp->locks));
         }
+
+        rrdset_done(st);
+    }
+}
+
+static void workers_total_memory_calls_chart(void) {
+    {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd[WORKERS_MEMORY_CALL_MAX] = { NULL };
+        uint64_t memory_calls[WORKERS_MEMORY_CALL_MAX] = { 0 };
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                "netdata"
+                , "memory_calls_total"
+                , NULL
+                , "memory calls"
+                , "netdata.memory_calls_total"
+                , "Netdata Total Memory Calls"
+                , "calls"
+                , "netdata"
+                , "pulse"
+                , 920005
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+
+            for (int j = 0; j < WORKERS_MEMORY_CALL_MAX; ++j)
+                rd[j] = rrddim_add(st, WORKERS_MEMORY_CALL_2str(j), NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        for(size_t i = 0; all_workers_utilization[i].name ;i++) {
+            struct worker_utilization *wu = &all_workers_utilization[i];
+
+            for (int j = 0; j < WORKERS_MEMORY_CALL_MAX; ++j)
+                memory_calls[j] += wu->memory_calls[j];
+        }
+
+        for (int j = 0; j < WORKERS_MEMORY_CALL_MAX; ++j)
+            rrddim_set_by_pointer(st, rd[j], (collected_number)memory_calls[j]);
 
         rrdset_done(st);
     }
@@ -654,6 +699,43 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     }
 
     // ----------------------------------------------------------------------
+    // memory calls
+    
+    {
+        if(unlikely(!wu->st_memory_calls)) {
+            char name[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_memory_calls_%s", wu->name_lowercase);
+
+            char context[RRD_ID_LENGTH_MAX + 1];
+            snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.memory_calls", wu->name_lowercase);
+
+            wu->st_memory_calls = rrdset_create_localhost(
+                "netdata"
+                , name
+                , NULL
+                , wu->family
+                , context
+                , "Netdata Memory Calls"
+                , "calls"
+                , "netdata"
+                , "pulse"
+                , wu->priority + 8
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+        }
+
+        for(size_t i = 0; i < WORKERS_MEMORY_CALL_MAX; i++) {
+            if(!wu->rd_memory_calls[i])
+                wu->rd_memory_calls[i] = rrddim_add(wu->st_memory_calls, WORKERS_MEMORY_CALL_2str(i), NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrddim_set_by_pointer(wu->st_memory_calls, wu->rd_memory_calls[i], (collected_number)wu->memory_calls[i]);
+        }
+
+        rrdset_done(wu->st_memory_calls);
+    }
+    
+    // ----------------------------------------------------------------------
     // custom metric types WORKER_METRIC_ABSOLUTE
 
     {
@@ -815,6 +897,8 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
         wt->enabled = false;
         wt->cpu_enabled = false;
     }
+
+    memset(wu->memory_calls, 0, sizeof(wu->memory_calls));
 }
 
 #define TASK_STAT_PREFIX "/proc/self/task/"
@@ -923,6 +1007,7 @@ static void worker_utilization_charts_callback(void *ptr
                                                , const char *spinlock_functions[]
                                                , size_t *spinlock_locks
                                                , size_t *spinlock_spins
+                                               , uint64_t *memory_calls
 ) {
     struct worker_utilization *wu = (struct worker_utilization *)ptr;
 
@@ -1024,6 +1109,12 @@ static void worker_utilization_charts_callback(void *ptr
         wusp->locks += spinlock_locks[i];
         wusp->spins += spinlock_spins[i];
     }
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // memory calls
+
+    for(size_t i = 0; i < WORKERS_MEMORY_CALL_MAX ;i++)
+        wu->memory_calls[i] += memory_calls[i];
 }
 
 void pulse_workers_cleanup(void) {
@@ -1082,4 +1173,5 @@ void pulse_workers_do(bool extended) {
 
     workers_total_cpu_utilization_chart();
     workers_total_spinlock_contention_chart();
+    workers_total_memory_calls_chart();
 }

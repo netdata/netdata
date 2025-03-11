@@ -2,6 +2,20 @@
 
 #include "internal.h"
 
+static struct {
+    bool enabled;
+    size_t db_rotations;
+    size_t instances_count;
+    size_t active_vs_archived_percentage;
+} extreme_cardinality = {
+    .enabled = true, // this value is ignored - there is a dynamic condition to enable it
+    .db_rotations = 0,
+    .instances_count = 1000,
+    .active_vs_archived_percentage = 50,
+};
+
+static void rrdcontext_dequeue_from_hub_queue(RRDCONTEXT *rc);
+
 static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused);
@@ -9,7 +23,7 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending _
 static void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
 
 static void rrdcontext_dequeue_from_post_processing(RRDCONTEXT *rc);
-static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
+static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
 
 static void rrdcontext_garbage_collect_for_all_hosts(void);
 
@@ -100,7 +114,10 @@ static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, 
 }
 
 void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs) {
-    rrdcontext_post_process_updates(rc, true, reason, worker_jobs);
+    bool forcefully_removed_instances = false;
+    do {
+        forcefully_removed_instances = rrdcontext_post_process_updates(rc, true, reason, worker_jobs);
+    } while(forcefully_removed_instances);
 }
 
 void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool worker_jobs) {
@@ -137,7 +154,7 @@ static void rrdcontext_recalculate_retention_all_hosts(void) {
 // ----------------------------------------------------------------------------
 // garbage collector
 
-void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_time_t, time_t *max_last_time_t) {
+void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_time_t, time_t *max_last_time_t, bool *tier0_retention) {
     *min_first_time_t = LONG_MAX;
     *max_last_time_t = 0;
 
@@ -152,6 +169,9 @@ void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_
             if (last_time_t > *max_last_time_t)
                 *max_last_time_t = last_time_t;
         }
+
+        if(tier == 0 && tier0_retention)
+            *tier0_retention = first_time_t || last_time_t;
     }
 }
 
@@ -161,21 +181,24 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
     if(rm->rrddim) {
         min_first_time_t = rrddim_first_entry_s(rm->rrddim);
         max_last_time_t = rrddim_last_entry_s(rm->rrddim);
+        rrd_flag_clear(rm, RRD_FLAG_NO_TIER0_RETENTION);
     }
-    else
-        get_metric_retention_by_id(rm->ri->rc->rrdhost, rm->uuid, &min_first_time_t, &max_last_time_t);
+    else {
+        bool tier0_retention;
+        get_metric_retention_by_id(rm->ri->rc->rrdhost, rm->uuid, &min_first_time_t, &max_last_time_t, &tier0_retention);
 
-    if((min_first_time_t == LONG_MAX || min_first_time_t == 0) && max_last_time_t == 0)
-        return false;
+        if(tier0_retention)
+            rrd_flag_clear(rm, RRD_FLAG_NO_TIER0_RETENTION);
+        else
+            rrd_flag_set(rm, RRD_FLAG_NO_TIER0_RETENTION);
+    }
 
     if(min_first_time_t == LONG_MAX)
         min_first_time_t = 0;
 
     if(min_first_time_t > max_last_time_t) {
         internal_error(true, "RRDMETRIC: retention of '%s' is flipped, first_time_t = %ld, last_time_t = %ld", string2str(rm->id), min_first_time_t, max_last_time_t);
-        time_t tmp = min_first_time_t;
-        min_first_time_t = max_last_time_t;
-        max_last_time_t = tmp;
+        SWAP(min_first_time_t, max_last_time_t);
     }
 
     // check if retention changed
@@ -402,7 +425,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
         worker_is_busy(WORKER_JOB_PP_INSTANCE);
 
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t metrics_active = 0, metrics_deleted = 0;
+    size_t metrics_active = 0, metrics_deleted = 0, metrics_no_tier0 = 0;
     bool live_retention = true, currently_collected = false;
     if(dictionary_entries(ri->rrdmetrics) > 0) {
         RRDMETRIC *rm;
@@ -417,6 +440,9 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
 
                     if(unlikely(!rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)))
                         live_retention = false;
+
+                    if(unlikely(rrd_flag_check(rm, RRD_FLAG_NO_TIER0_RETENTION)))
+                        metrics_no_tier0++;
 
                     if (unlikely((rrdmetric_should_be_deleted(rm)))) {
                         metrics_deleted++;
@@ -436,6 +462,11 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
                 }
         dfe_done(rm);
     }
+
+    if(metrics_no_tier0 && metrics_no_tier0 == metrics_active)
+        rrd_flag_set(ri, RRD_FLAG_NO_TIER0_RETENTION);
+    else
+        rrd_flag_clear(ri, RRD_FLAG_NO_TIER0_RETENTION);
 
     if(unlikely(live_retention && !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION)))
         rrd_flag_set(ri, RRD_FLAG_LIVE_RETENTION);
@@ -500,7 +531,98 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
     rrd_flag_unset_updated(ri);
 }
 
-static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs) {
+static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count, const char *descr) {
+    if(!count) return false;
+
+    RRDHOST *host = rc->rrdhost;
+
+    time_t from_s = LONG_MAX;
+    time_t to_s = 0;
+
+    size_t instances_deleted = 0;
+    size_t metrics_deleted = 0;
+    RRDINSTANCE *ri;
+    dfe_start_read(rc->rrdinstances, ri) {
+        if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(ri) || ri->rrdset)
+            continue;
+
+        size_t metrics_cleared = 0;
+        RRDMETRIC *rm;
+        dfe_start_read(ri->rrdmetrics, rm) {
+            if(!rrd_flag_check(rm, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(rm) || rm->rrddim)
+                continue;
+
+            rrdmetric_update_retention(rm);
+
+            if(rm->first_time_s < from_s)
+                from_s = rm->first_time_s;
+
+            if(rm->last_time_s > to_s)
+                to_s = rm->last_time_s;
+
+            for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+                STORAGE_ENGINE *eng = host->db[tier].eng;
+                eng->api.metric_retention_delete_by_id(host->db[tier].si, rm->uuid);
+            }
+
+            metrics_cleared++;
+            metrics_deleted++;
+            rrdmetric_update_retention(rm);
+            rrdmetric_trigger_updates(rm, __FUNCTION__ );
+        }
+        dfe_done(rm);
+
+        if(metrics_cleared) {
+            rrdinstance_trigger_updates(ri, __FUNCTION__ );
+            instances_deleted++;
+
+            if(--count == 0)
+                break;
+        }
+    }
+    dfe_done(ri);
+
+    if(metrics_deleted) {
+        char from_txt[128], to_txt[128];
+
+        if(!from_s || from_s == LONG_MAX)
+            snprintfz(from_txt, sizeof(from_txt), "%s", "NONE");
+        else
+            rfc3339_datetime_ut(from_txt, sizeof(from_txt), from_s * USEC_PER_SEC, 0, true);
+
+        if(!to_s)
+            snprintfz(to_txt, sizeof(to_txt), "%s", "NONE");
+        else
+            rfc3339_datetime_ut(to_txt, sizeof(to_txt), to_s * USEC_PER_SEC, 0, true);
+
+        ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_MODULE, "extreme cardinality protection"),
+            ND_LOG_FIELD_STR(NDF_NIDL_NODE, rc->rrdhost->hostname),
+            ND_LOG_FIELD_STR(NDF_NIDL_CONTEXT, rc->id),
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &extreme_cardinality_msgid),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "EXTREME CARDINALITY PROTECTION: host '%s', context '%s', %s: "
+               "forcefully cleared the retention of %zu metrics and %zu instances, "
+               "having non-tier0 retention from %s to %s.",
+               rrdhost_hostname(rc->rrdhost),
+               string2str(rc->id),
+               descr,
+               metrics_deleted, instances_deleted,
+               from_txt, to_txt);
+
+        return true;
+    }
+
+    return false;
+}
+
+static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs) {
+    bool ret = false;
+
     if(reason != RRD_FLAG_NONE)
         rrd_flag_set_updated(rc, reason);
 
@@ -511,7 +633,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     size_t min_priority_not_collected = LONG_MAX;
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t instances_active = 0, instances_deleted = 0;
+    size_t instances_active = 0, instances_deleted = 0, instances_no_tier0 = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
     if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
@@ -534,6 +656,9 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                         instances_deleted++;
                         continue;
                     }
+
+                    if(unlikely(rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION)))
+                        instances_no_tier0++;
 
                     bool ri_collected = rrd_flag_is_collected(ri);
 
@@ -570,6 +695,26 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                         max_last_time_t = ri->last_time_s;
                 }
         dfe_done(ri);
+
+        if(extreme_cardinality.enabled &&
+            extreme_cardinality.db_rotations &&
+            instances_active &&
+            instances_no_tier0 >= extreme_cardinality.instances_count) {
+            size_t percent = (100 * instances_no_tier0 / instances_active);
+            if(percent >= extreme_cardinality.active_vs_archived_percentage) {
+                size_t to_keep = extreme_cardinality.active_vs_archived_percentage * instances_active / 100;
+                to_keep = MAX(to_keep, extreme_cardinality.instances_count);
+                size_t to_remove = instances_no_tier0 > to_keep ? instances_no_tier0 - to_keep : 0;
+
+                if(to_remove) {
+                    char buf[256];
+                    snprintfz(buf, sizeof(buf),
+                              "total active instances %zu, not in tier0 %zu, ephemerality %zu%%",
+                              instances_active, instances_no_tier0, percent);
+                    ret = rrdinstance_forcefully_clear_retention(rc, to_remove, buf);
+                }
+            }
+        }
 
         if(min_priority_collected != LONG_MAX)
             // use the collected priority
@@ -669,6 +814,8 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 
     rrd_flag_unset_updated(rc);
     rrdcontext_unlock(rc);
+
+    return ret;
 }
 
 void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function __maybe_unused, RRD_FLAGS flags __maybe_unused) {
@@ -707,6 +854,7 @@ void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc) {
 }
 
 void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc) {
+    rrdcontext_dequeue_from_hub_queue(rc);
     rrdcontext_dequeue_from_post_processing(rc);
     dictionary_del(host->rrdctx.contexts, string2str(rc->id));
 }
@@ -1016,6 +1164,19 @@ void *rrdcontext_main(void *ptr) {
     heartbeat_t hb;
     heartbeat_init(&hb, RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC);
 
+    extreme_cardinality.enabled = inicfg_get_boolean(
+        &netdata_config, CONFIG_SECTION_DB, "extreme cardinality protection",
+        nd_profile.storage_tiers > 1 && default_rrd_memory_mode == RRD_DB_MODE_DBENGINE
+    );
+
+    extreme_cardinality.instances_count = inicfg_get_number_range(
+        &netdata_config, CONFIG_SECTION_DB, "extreme cardinality keep instances",
+        (long long)extreme_cardinality.instances_count, 1, 1000000);
+
+    extreme_cardinality.active_vs_archived_percentage = inicfg_get_number_range(
+        &netdata_config, CONFIG_SECTION_DB, "extreme cardinality min ephemerality",
+        (long long)extreme_cardinality.active_vs_archived_percentage, 0, 100);
+
     while (service_running(SERVICE_CONTEXT)) {
         worker_is_idle();
         heartbeat_next(&hb);
@@ -1025,6 +1186,7 @@ void *rrdcontext_main(void *ptr) {
         usec_t now_ut = now_realtime_usec();
 
         if(rrdcontext_next_db_rotation_ut && now_ut > rrdcontext_next_db_rotation_ut) {
+            extreme_cardinality.db_rotations++;
             rrdcontext_recalculate_retention_all_hosts();
             rrdcontext_garbage_collect_for_all_hosts();
             rrdcontext_next_db_rotation_ut = 0;
@@ -1039,6 +1201,11 @@ void *rrdcontext_main(void *ptr) {
 
             if(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
                 continue;
+
+            if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION)) {
+                rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, false);
+                rrdhost_flag_clear(host, RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION);
+            }
 
             worker_is_busy(WORKER_JOB_HOSTS);
 

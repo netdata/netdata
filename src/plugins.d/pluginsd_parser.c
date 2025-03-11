@@ -174,9 +174,27 @@ static inline PARSER_RC pluginsd_host_labels(char **words, size_t num_words, PAR
                                     PLUGINSD_KEYWORD_HOST_LABEL);
 }
 
+static inline void pluginsd_update_host_ephemerality(RRDHOST *host) {
+    char value[64];
+    rrdlabels_get_value_strcpyz(host->rrdlabels, value, sizeof(value), HOST_LABEL_IS_EPHEMERAL);
+    if(value[0] && inicfg_test_boolean_value(value)) {
+        rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+        strncpyz(value, "true", sizeof(value) - 1);
+    }
+    else {
+        rrdhost_option_clear(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+        strncpyz(value, "false", sizeof(value) - 1);
+    }
+
+    if(!rrdlabels_exist(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL))
+        rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, value, RRDLABEL_SRC_CONFIG);
+}
+
 static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     if(!parser->user.host_define.parsing_host)
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
+
+    struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(parser->user.host_define.rrdlabels);
 
     RRDHOST *host = rrdhost_find_or_create(
         string2str(parser->user.host_define.hostname),
@@ -199,8 +217,10 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         stream_receive.replication.enabled,
         stream_receive.replication.period,
         stream_receive.replication.step,
-        rrdhost_system_info_from_host_labels(parser->user.host_define.rrdlabels),
+        system_info,
         false);
+
+    rrdhost_system_info_free(system_info);
 
     rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
     rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
@@ -217,6 +237,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         parser->user.host_define.rrdlabels = NULL;
     }
 
+    pluginsd_update_host_ephemerality(host);
     pluginsd_host_define_cleanup(parser);
 
     parser->user.host = host;
@@ -608,17 +629,6 @@ static inline PARSER_RC pluginsd_label(char **words, size_t num_words, PARSER *p
     if(unlikely(!(parser->user.new_host_labels)))
         parser->user.new_host_labels = rrdlabels_create();
 
-    if (strcmp(name,HOST_LABEL_IS_EPHEMERAL) == 0) {
-        int is_ephemeral = appconfig_test_boolean_value((char *) value);
-        RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_LABEL);
-        if (host) {
-            if (is_ephemeral)
-                rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
-            else
-                rrdhost_option_clear(host, RRDHOST_OPTION_EPHEMERAL_HOST);
-        }
-    }
-
     rrdlabels_add(parser->user.new_host_labels, name, store, str2l(label_source));
 
     if (allocated_store)
@@ -637,8 +647,7 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
         host->rrdlabels = rrdlabels_create();
 
     rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
-    if (rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST))
-        rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, "true", RRDLABEL_SRC_CONFIG);
+    pluginsd_update_host_ephemerality(host);
 
     if(!rrdlabels_exist(host->rrdlabels, "_os"))
         rrdlabels_add(host->rrdlabels, "_os", string2str(host->os), RRDLABEL_SRC_AUTO);
@@ -698,7 +707,7 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
     return PARSER_RC_OK;
 }
 
-static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER *parser) {
+static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER *parser) {
     timing_init();
 
     int idx = 1;
@@ -838,7 +847,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     return PARSER_RC_OK;
 }
 
-static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *parser) {
+static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *parser) {
     timing_init();
 
     int idx = 1;
@@ -977,7 +986,7 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
     return PARSER_RC_OK;
 }
 
-static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
+static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     timing_init();
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_END_V2);
@@ -1229,7 +1238,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 
 #include "gperf-hashtable.h"
 
-PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words) {
+ALWAYS_INLINE PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words) {
     // put all the keywords ordered by the frequency they are used
 
     switch(keyword->id) {

@@ -6,38 +6,34 @@
 struct config hardirq_config = APPCONFIG_INITIALIZER;
 
 static ebpf_local_maps_t hardirq_maps[] = {
-    {
-        .name = "tbl_hardirq",
-        .internal_input = NETDATA_HARDIRQ_MAX_IRQS,
-        .user_input = 0,
-        .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    {.name = "tbl_hardirq",
+     .internal_input = NETDATA_HARDIRQ_MAX_IRQS,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-        .map_type = BPF_MAP_TYPE_PERCPU_HASH
+     .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
     },
-    {
-        .name = "tbl_hardirq_static",
-        .internal_input = HARDIRQ_EBPF_STATIC_END,
-        .user_input = 0,
-        .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    {.name = "tbl_hardirq_static",
+     .internal_input = HARDIRQ_EBPF_STATIC_END,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_STATIC,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
     },
     /* end */
-    {
-        .name = NULL,
-        .internal_input = 0,
-        .user_input = 0,
-        .type = NETDATA_EBPF_MAP_CONTROLLER,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
-    }
-};
+    }};
 
 #define HARDIRQ_TP_CLASS_IRQ "irq"
 #define HARDIRQ_TP_CLASS_IRQ_VECTORS "irq_vectors"
@@ -67,65 +63,20 @@ static ebpf_tracepoint_t hardirq_tracepoints[] = {
     {.enabled = false, .class = HARDIRQ_TP_CLASS_IRQ_VECTORS, .event = "x86_platform_ipi_entry"},
     {.enabled = false, .class = HARDIRQ_TP_CLASS_IRQ_VECTORS, .event = "x86_platform_ipi_exit"},
     /* end */
-    {.enabled = false, .class = NULL, .event = NULL}
-};
+    {.enabled = false, .class = NULL, .event = NULL}};
 
 static hardirq_static_val_t hardirq_static_vals[] = {
-    {
-        .idx = HARDIRQ_EBPF_STATIC_APIC_THERMAL,
-        .name = "apic_thermal",
-        .latency = 0
-    },
-    {
-        .idx = HARDIRQ_EBPF_STATIC_APIC_THRESHOLD,
-        .name = "apic_threshold",
-        .latency = 0
-    },
-    {
-        .idx = HARDIRQ_EBPF_STATIC_APIC_ERROR,
-        .name = "apic_error",
-        .latency = 0
-    },
-    {
-        .idx = HARDIRQ_EBPF_STATIC_APIC_DEFERRED_ERROR,
-        .name = "apic_deferred_error",
-        .latency = 0
-    },
-    {
-        .idx = HARDIRQ_EBPF_STATIC_APIC_SPURIOUS,
-        .name = "apic_spurious",
-        .latency = 0
-    },
-    {
-        .idx = HARDIRQ_EBPF_STATIC_FUNC_CALL,
-        .name = "func_call",
-        .latency = 0
-    },
-    {
-        .idx = HARDIRQ_EBPF_STATIC_FUNC_CALL_SINGLE,
-        .name = "func_call_single",
-        .latency = 0
-    },
-    {
-        .idx = HARDIRQ_EBPF_STATIC_RESCHEDULE,
-        .name = "reschedule",
-        .latency = 0
-    },
-    {
-        .idx = HARDIRQ_EBPF_STATIC_LOCAL_TIMER,
-        .name = "local_timer",
-        .latency = 0
-    },
-    {
-        .idx = HARDIRQ_EBPF_STATIC_IRQ_WORK,
-        .name = "irq_work",
-        .latency = 0
-    },
-    {
-        .idx = HARDIRQ_EBPF_STATIC_X86_PLATFORM_IPI,
-        .name = "x86_platform_ipi",
-        .latency = 0
-    },
+    {.idx = HARDIRQ_EBPF_STATIC_APIC_THERMAL, .name = "apic_thermal", .latency = 0},
+    {.idx = HARDIRQ_EBPF_STATIC_APIC_THRESHOLD, .name = "apic_threshold", .latency = 0},
+    {.idx = HARDIRQ_EBPF_STATIC_APIC_ERROR, .name = "apic_error", .latency = 0},
+    {.idx = HARDIRQ_EBPF_STATIC_APIC_DEFERRED_ERROR, .name = "apic_deferred_error", .latency = 0},
+    {.idx = HARDIRQ_EBPF_STATIC_APIC_SPURIOUS, .name = "apic_spurious", .latency = 0},
+    {.idx = HARDIRQ_EBPF_STATIC_FUNC_CALL, .name = "func_call", .latency = 0},
+    {.idx = HARDIRQ_EBPF_STATIC_FUNC_CALL_SINGLE, .name = "func_call_single", .latency = 0},
+    {.idx = HARDIRQ_EBPF_STATIC_RESCHEDULE, .name = "reschedule", .latency = 0},
+    {.idx = HARDIRQ_EBPF_STATIC_LOCAL_TIMER, .name = "local_timer", .latency = 0},
+    {.idx = HARDIRQ_EBPF_STATIC_IRQ_WORK, .name = "irq_work", .latency = 0},
+    {.idx = HARDIRQ_EBPF_STATIC_X86_PLATFORM_IPI, .name = "x86_platform_ipi", .latency = 0},
 };
 
 // store for "published" data from the reader thread, which the collector
@@ -220,17 +171,17 @@ void ebpf_hardirq_release(hardirq_val_t *stat)
  */
 static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
 {
-    ebpf_write_chart_obsolete(NETDATA_EBPF_SYSTEM_GROUP,
-                              "hardirq_latency",
-                              "",
-                              "Hardware IRQ latency",
-                              EBPF_COMMON_UNITS_MILLISECONDS,
-                              "interrupts",
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NETDATA_EBPF_SYSTEM_HARDIRQ_LATENCY_CTX,
-                              NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
-                              em->update_every
-    );
+    ebpf_write_chart_obsolete(
+        NETDATA_EBPF_SYSTEM_GROUP,
+        "hardirq_latency",
+        "",
+        "Hardware IRQ latency",
+        EBPF_COMMON_UNITS_MILLISECONDS,
+        "interrupts",
+        NETDATA_EBPF_CHART_TYPE_STACKED,
+        NETDATA_EBPF_SYSTEM_HARDIRQ_LATENCY_CTX,
+        NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
+        em->update_every);
 }
 
 /**
@@ -243,7 +194,8 @@ static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
 static void hardirq_exit(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!em) return;
+    if (!em)
+        return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -291,11 +243,9 @@ static int hardirq_val_cmp(void *a, void *b)
 
     if (ptr1->irq > ptr2->irq) {
         return 1;
-    }
-    else if (ptr1->irq < ptr2->irq) {
+    } else if (ptr1->irq < ptr2->irq) {
         return -1;
-    }
-    else {
+    } else {
         return 0;
     }
 }
@@ -314,37 +264,38 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
 {
     static procfile *ff = NULL;
     static int cpus = -1;
-    if(unlikely(!ff)) {
+    if (unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/interrupts");
         ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
     }
-    if(unlikely(!ff))
+    if (unlikely(!ff))
         return -1;
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if (unlikely(!ff))
         return -1; // we return 0, so that we will retry to open it next time
 
     size_t words = procfile_linewords(ff, 0);
-    if(unlikely(cpus == -1)) {
+    if (unlikely(cpus == -1)) {
         uint32_t w;
         cpus = 0;
-        for(w = 0; w < words ; w++) {
-            if(likely(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0))
+        for (w = 0; w < words; w++) {
+            if (likely(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0))
                 cpus++;
         }
-   }
+    }
 
     size_t lines = procfile_lines(ff), l;
-    if(unlikely(!lines)) {
+    if (unlikely(!lines)) {
         collector_error("Cannot read /proc/interrupts, zero lines reported.");
         return -1;
     }
 
-    for(l = 1; l < lines ;l++) {
+    for (l = 1; l < lines; l++) {
         words = procfile_linewords(ff, l);
-        if(unlikely(!words)) continue;
+        if (unlikely(!words))
+            continue;
         const char *id = procfile_lineword(ff, l, 0);
         if (!isdigit(id[0]))
             continue;
@@ -353,7 +304,7 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
         if (cmp != irq)
             continue;
 
-        if(unlikely((uint32_t)(cpus + 2) < words)) {
+        if (unlikely((uint32_t)(cpus + 2) < words)) {
             const char *name = procfile_lineword(ff, l, words - 1);
             // On some motherboards IRQ can have the same name, so we append IRQ id to differentiate.
             snprintfz(irq_name, NETDATA_HARDIRQ_NAME_LEN - 1, "%d_%s", irq, name);
@@ -425,7 +376,7 @@ static int hardirq_read_latency_map(int mapfd)
         uint64_t total_latency = 0;
         int i;
         for (i = 0; i < ebpf_nprocs; i++) {
-            total_latency += hardirq_ebpf_vals[i].latency/1000;
+            total_latency += hardirq_ebpf_vals[i].latency / 1000;
         }
 
         // can now safely publish latency for existing IRQs.
@@ -468,7 +419,7 @@ static void hardirq_read_latency_static_map(int mapfd)
         int cpu_i;
         int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
-            total_latency += hardirq_ebpf_static_vals[cpu_i].latency/1000;
+            total_latency += hardirq_ebpf_static_vals[cpu_i].latency / 1000;
         }
 
         hardirq_static_vals[i].latency = total_latency;
@@ -501,9 +452,11 @@ static void hardirq_create_charts(int update_every)
         NETDATA_EBPF_SYSTEM_HARDIRQ_LATENCY_CTX,
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
-        NULL, NULL, 0, update_every,
-        NETDATA_EBPF_MODULE_NAME_HARDIRQ
-    );
+        NULL,
+        NULL,
+        0,
+        update_every,
+        NETDATA_EBPF_MODULE_NAME_HARDIRQ);
 
     fflush(stdout);
 }
@@ -513,9 +466,7 @@ static void hardirq_create_static_dims()
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
         ebpf_write_global_dimension(
-            hardirq_static_vals[i].name, hardirq_static_vals[i].name,
-            ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]
-        );
+            hardirq_static_vals[i].name, hardirq_static_vals[i].name, ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
     }
 }
 
@@ -528,10 +479,7 @@ static int hardirq_write_dims(void *entry, void *data)
 
     // IRQs get dynamically added in, so add the dimension if we haven't yet.
     if (!v->dim_exists) {
-        ebpf_write_global_dimension(
-            v->name, v->name,
-            ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]
-        );
+        ebpf_write_global_dimension(v->name, v->name, ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
         v->dim_exists = true;
     }
 
@@ -544,10 +492,7 @@ static inline void hardirq_write_static_dims()
 {
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
-        write_chart_dimension(
-            hardirq_static_vals[i].name,
-            hardirq_static_vals[i].latency
-        );
+        write_chart_dimension(hardirq_static_vals[i].name, hardirq_static_vals[i].latency);
     }
 }
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "streaming/h2o-common.h"
 #include "http_server.h"
 
@@ -70,16 +70,16 @@ static int create_listener(const char *ip, int port)
 
 static int ssl_init()
 {
-    if (!config_get_boolean(HTTPD_CONFIG_SECTION, "ssl", false))
+    if (!inicfg_get_boolean(&netdata_config, HTTPD_CONFIG_SECTION, "ssl", false))
         return 0;
 
     char default_fn[FILENAME_MAX + 1];
 
     snprintfz(default_fn,  FILENAME_MAX, "%s/ssl/key.pem",  netdata_configured_user_config_dir);
-    const char *key_fn  = config_get(HTTPD_CONFIG_SECTION, "ssl key", default_fn);
+    const char *key_fn  = inicfg_get(&netdata_config, HTTPD_CONFIG_SECTION, "ssl key", default_fn);
 
     snprintfz(default_fn, FILENAME_MAX, "%s/ssl/cert.pem", netdata_configured_user_config_dir);
-    const char *cert_fn = config_get(HTTPD_CONFIG_SECTION, "ssl certificate",  default_fn);
+    const char *cert_fn = inicfg_get(&netdata_config, HTTPD_CONFIG_SECTION, "ssl certificate",  default_fn);
 
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
     accept_ctx.ssl_ctx = SSL_CTX_new(SSLv23_server_method());
@@ -145,7 +145,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
         if (!*host)
             *host = rrdhost_find_by_guid(c_host_id);
         if (!*host)
-            *host = find_host_by_node_id(c_host_id);
+            *host = rrdhost_find_by_node_id(c_host_id);
         if (!*host) {
             req->res.status = HTTP_RESP_BAD_REQUEST;
             req->res.reason = "Wrong host id";
@@ -321,7 +321,7 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
         return -1;
 
     BUFFER *buf = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
-    netdata_conf_generate(buf, 0);
+    inicfg_generate(&netdata_config, buf, 0, true);
 
     void *managed = h2o_mem_alloc_shared(&req->pool, buf->len, NULL);
     memcpy(managed, buf->buffer, buf->len);
@@ -370,8 +370,8 @@ void *h2o_main(void *ptr) {
     h2o_pathconf_t *pathconf;
     h2o_hostconf_t *hostconf;
 
-    const char *bind_addr = config_get(HTTPD_CONFIG_SECTION, "bind to", "127.0.0.1");
-    int bind_port = config_get_number(HTTPD_CONFIG_SECTION, "port", 19998);
+    const char *bind_addr = inicfg_get(&netdata_config, HTTPD_CONFIG_SECTION, "bind to", "127.0.0.1");
+    int bind_port = inicfg_get_number(&netdata_config, HTTPD_CONFIG_SECTION, "port", 19998);
 
     h2o_config_init(&config);
     hostconf = h2o_config_register_host(&config, h2o_iovec_init(H2O_STRLIT("default")), bind_port);
@@ -424,5 +424,5 @@ void *h2o_main(void *ptr) {
 }
 
 bool httpd_is_enabled() {
-    return config_get_boolean(HTTPD_CONFIG_SECTION, "enabled", HTTPD_ENABLED_DEFAULT);
+    return inicfg_get_boolean(&netdata_config, HTTPD_CONFIG_SECTION, "enabled", HTTPD_ENABLED_DEFAULT);
 }

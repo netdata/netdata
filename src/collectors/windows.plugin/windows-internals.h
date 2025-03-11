@@ -5,7 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
-static inline ULONGLONG FileTimeToULL(FILETIME ft) {
+static inline ULONGLONG FileTimeToULL(FILETIME ft)
+{
     ULARGE_INTEGER ul;
     ul.LowPart = ft.dwLowDateTime;
     ul.HighPart = ft.dwHighDateTime;

@@ -5,13 +5,16 @@ package k8s_state
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 const precision = 1000
@@ -107,6 +110,8 @@ func (c *Collector) collectKubeState(mx map[string]int64) {
 	}
 	c.collectPodsState(mx)
 	c.collectNodesState(mx)
+	c.collectDeploymentState(mx)
+	c.collectCronJobState(mx)
 }
 
 func (c *Collector) collectPodsState(mx map[string]int64) {
@@ -308,17 +313,141 @@ func (c *Collector) collectNodesState(mx map[string]int64) {
 	}
 }
 
+func (c *Collector) collectDeploymentState(mx map[string]int64) {
+	now := time.Now()
+
+	maps.DeleteFunc(c.state.deployments, func(s string, ds *deploymentState) bool {
+		if ds.deleted {
+			c.removeDeploymentCharts(ds)
+			return true
+		}
+
+		if ds.new {
+			ds.new = false
+			c.addDeploymentCharts(ds)
+		}
+
+		px := fmt.Sprintf("deploy_%s_", ds.id())
+
+		mx[px+"age"] = int64(now.Sub(ds.creationTime).Seconds())
+		mx[px+"desired_replicas"] = ds.replicas
+		mx[px+"current_replicas"] = ds.availableReplicas
+		mx[px+"ready_replicas"] = ds.readyReplicas
+
+		mx[px+"condition_available"] = 0
+		mx[px+"condition_progressing"] = 0
+		mx[px+"condition_replica_failure"] = 0
+
+		for _, cond := range ds.conditions {
+			v := metrix.Bool(cond.Status == corev1.ConditionTrue)
+			switch cond.Type {
+			case appsv1.DeploymentAvailable:
+				// https://github.com/kubernetes/kubernetes/blob/2b3da7dfc846fec7c4044a320f8f38b4a45367a3/pkg/controller/deployment/sync.go#L518-L525
+				mx[px+"condition_available"] = v
+			case appsv1.DeploymentProgressing:
+				mx[px+"condition_progressing"] = v
+			case appsv1.DeploymentReplicaFailure:
+				mx[px+"condition_replica_failure"] = v
+			}
+		}
+
+		return false
+	})
+}
+
+func (c *Collector) collectCronJobState(mx map[string]int64) {
+	now := time.Now()
+
+	maps.DeleteFunc(c.state.jobs, func(s string, st *jobState) bool {
+		return st.deleted
+	})
+
+	maps.DeleteFunc(c.state.cronJobs, func(s string, st *cronJobState) bool {
+		if st.deleted {
+			c.removeCronJobCharts(st)
+			return true
+		}
+		if st.new {
+			c.addCronJobCharts(st)
+			st.new = false
+		}
+
+		px := fmt.Sprintf("cronjob_%s_", st.id())
+
+		mx[px+"age"] = int64(now.Sub(st.creationTime).Seconds())
+		if st.lastScheduleTime != nil {
+			mx[px+"last_schedule_seconds_ago"] = int64(now.Sub(*st.lastScheduleTime).Seconds())
+		}
+		if st.lastSuccessfulTime != nil {
+			mx[px+"last_successful_seconds_ago"] = int64(now.Sub(*st.lastSuccessfulTime).Seconds())
+		}
+
+		mx[px+"running_jobs"] = 0
+		mx[px+"failed_jobs"] = 0
+		mx[px+"complete_jobs"] = 0
+		mx[px+"complete_jobs"] = 0
+		mx[px+"suspended_jobs"] = 0
+
+		mx[px+"failed_jobs_reason_pod_failure_policy"] = 0
+		mx[px+"failed_jobs_reason_backoff_limit_exceeded"] = 0
+		mx[px+"failed_jobs_reason_deadline_exceeded"] = 0
+
+		mx[px+"last_execution_status_succeeded"] = 0
+		mx[px+"last_execution_status_failed"] = 0
+
+		var lastExecutedEndTime time.Time
+		var lastCompleteTime time.Time
+
+		for _, job := range c.state.jobs {
+			if job.controller.kind != "CronJob" || job.controller.uid != st.uid || job.startTime == nil {
+				continue
+			}
+			if job.active > 0 {
+				mx[px+"running_jobs"]++
+				continue
+			}
+
+			for _, cond := range job.conditions {
+				if cond.Status != corev1.ConditionTrue {
+					continue
+				}
+
+				switch cond.Type {
+				case batchv1.JobComplete:
+					mx[px+"complete_jobs"]++
+					if job.completionTime != nil {
+						if job.completionTime.After(lastExecutedEndTime) {
+							lastExecutedEndTime = *job.completionTime
+							mx[px+"last_execution_status_succeeded"] = 1
+							mx[px+"last_execution_status_failed"] = 0
+						}
+						if job.completionTime.After(lastCompleteTime) {
+							lastCompleteTime = *job.completionTime
+							mx[px+"last_completion_duration"] = int64(job.completionTime.Sub(*job.startTime).Seconds())
+						}
+					}
+				case batchv1.JobFailed:
+					mx[px+"failed_jobs"]++
+					mx[px+"failed_jobs_reason_pod_failure_policy"] += metrix.Bool(cond.Reason == batchv1.JobReasonPodFailurePolicy)
+					mx[px+"failed_jobs_reason_backoff_limit_exceeded"] += metrix.Bool(cond.Reason == batchv1.JobReasonBackoffLimitExceeded)
+					mx[px+"failed_jobs_reason_deadline_exceeded"] += metrix.Bool(cond.Reason == batchv1.JobReasonDeadlineExceeded)
+					if cond.LastTransitionTime.Time.After(lastExecutedEndTime) {
+						lastExecutedEndTime = cond.LastTransitionTime.Time
+						mx[px+"last_execution_status_succeeded"] = 0
+						mx[px+"last_execution_status_failed"] = 1
+					}
+				case batchv1.JobSuspended:
+					mx[px+"suspended_jobs"]++
+				}
+			}
+		}
+
+		return false
+	})
+}
+
 func condStatusToInt(cs corev1.ConditionStatus) int64 {
-	switch cs {
-	case corev1.ConditionFalse:
-		return 0
-	case corev1.ConditionTrue:
-		return 1
-	case corev1.ConditionUnknown:
-		return 0
-	default:
-		return 0
-	}
+	return metrix.Bool(cs == corev1.ConditionTrue)
 }
 
 func calcPercentage(value, total int64) int64 {

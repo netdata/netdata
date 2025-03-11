@@ -76,13 +76,13 @@ log() {
 
   [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
-  systemd-cat-native --log-as-netdata --newline="--NEWLINE--" <<EOFLOG
+  systemd-cat-native --log-as-netdata <<EOFLOG
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
 THREAD_TAG=charts.d.plugin
 ND_LOG_SOURCE=collector
-MESSAGE=${MODULE_NAME}: ${*//\\n/--NEWLINE--}
+MESSAGE=${MODULE_NAME}: ${*//$'\n'/\\n}
 
 EOFLOG
   # AN EMPTY LINE IS NEEDED ABOVE

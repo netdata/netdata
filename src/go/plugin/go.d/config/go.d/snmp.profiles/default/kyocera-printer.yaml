@@ -1,0 +1,75 @@
+extends:
+  - _base.yaml
+  # TODO: Extends _generic-if32.yaml when implemented
+  # - _generic-if32.yaml
+sysobjectid: 1.3.6.1.4.1.1347.41
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "kyocera"
+      type:
+        value: "printer"
+metrics:
+  - MIB: KYOCERA-MIB
+    table:
+      OID: 1.3.6.1.4.1.1347.43.18.2
+      name: kcprtAlertStateTable
+    symbols:
+      - OID: 1.3.6.1.4.1.1347.43.18.2.1.3
+        name: kcprtAlertStateCode
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.1347.43.18.2.1.2
+          name: kcprtAlertStateDisplay
+        tag: kcprt_alert_state_display
+  - MIB: KYOCERA-MIB
+    table:
+      OID: 1.3.6.1.4.1.1347.43.20
+      name: kcprtMemoryDeviceTable
+    symbols:
+      - OID: 1.3.6.1.4.1.1347.43.20.1.1.4
+        name: kcprtMemoryDeviceTotalSize
+      - OID: 1.3.6.1.4.1.1347.43.20.1.1.5
+        name: kcprtMemoryDeviceUsedSize
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.1347.43.20.1.1.2
+          name: kcprtMemoryDeviceLocation
+        tag: kcprt_memory_device_location
+        mapping:
+          0: pc_card-a
+          1: pc_card-b
+          2: option_ro_msocket
+          3: resident_font
+          4: download_area
+          5: hard_disk
+          6: memory_card
+          255: others
+      - symbol:
+          OID: 1.3.6.1.4.1.1347.43.20.1.1.3
+          name: kcprtMemoryDeviceType
+        tag: kcprt_memory_device_type
+        mapping:
+          0: rom
+          1: flash
+          2: sram
+          3: dram
+          4: strage
+          255: others
+      - symbol:
+          OID: 1.3.6.1.4.1.1347.43.20.1.1.6
+          name: kcprtMemoryDeviceStatus
+        tag: kcprt_memory_device_status
+        mapping:
+          0: ready_read_write
+          1: ready_read_only
+          2: not_accessible
+          4: low_battery
+metric_tags:
+  - tag: kcprt_general_model_name
+    OID: 1.3.6.1.4.1.1347.43.5.1.1.1.1  # kcprtGeneralModelName.1 (index 1)
+    symbol: kcprtGeneralModelName
+  - tag: kcprt_serial_number
+    OID: 1.3.6.1.4.1.1347.43.5.1.1.28.1  # kcprtSerialNumber.1 (index 1)
+    symbol: kcprtSerialNumber

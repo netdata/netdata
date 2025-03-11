@@ -21,6 +21,7 @@ typedef enum cmd {
     CMD_VERSION,
     CMD_DUMPCONFIG,
     CMD_REMOVE_NODE,
+    CMD_MARK_NODE,
     CMD_TOTAL_COMMANDS
 } cmd_t;
 
@@ -65,6 +66,8 @@ typedef cmd_status_t (command_action_t) (char *args, char **message);
 
 typedef struct command_info {
     char *cmd_str;              // the command string
+    char *params;
+    char *help;
     command_action_t *func;     // the function that executes the command
     cmd_type_t type;            // Concurrency control information for the command
 } command_info_t;

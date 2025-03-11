@@ -231,7 +231,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/rpc/nfsd");
-        ff = procfile_open(config_get("plugin:proc:/proc/net/rpc/nfsd", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 
@@ -239,16 +239,16 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
     if(unlikely(do_rc == -1)) {
-        do_rc = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "read cache", 1);
-        do_fh = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "file handles", 1);
-        do_io = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "I/O", 1);
-        do_th = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "threads", 1);
-        do_net = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "network", 1);
-        do_rpc = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "rpc", 1);
-        do_proc2 = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v2 procedures", 1);
-        do_proc3 = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v3 procedures", 1);
-        do_proc4 = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v4 procedures", 1);
-        do_proc4ops = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v4 operations", 1);
+        do_rc = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "read cache", 1);
+        do_fh = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "file handles", 1);
+        do_io = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "I/O", 1);
+        do_th = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "threads", 1);
+        do_net = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "network", 1);
+        do_rpc = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "rpc", 1);
+        do_proc2 = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "NFS v2 procedures", 1);
+        do_proc3 = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "NFS v3 procedures", 1);
+        do_proc4 = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "NFS v4 procedures", 1);
+        do_proc4ops = inicfg_get_boolean(&netdata_config, "plugin:proc:/proc/net/rpc/nfsd", "NFS v4 operations", 1);
     }
 
     // if they are enabled, reset them to 1

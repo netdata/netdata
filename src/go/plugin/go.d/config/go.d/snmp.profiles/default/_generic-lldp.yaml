@@ -1,0 +1,29 @@
+metrics:
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.4.1
+      name: lldpRemTable
+    symbols:
+      - name: lldpRem
+        constant_value_one: true
+    metric_tags:
+      - symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.6
+          name: lldpRemPortIdSubtype
+        tag: lldp_rem_port_id_subtype
+        mapping:
+          1: interface_alias
+          2: port_component
+          3: mac_address
+          4: network_address
+          5: interface_name
+          6: agent_circuit_id
+          7: local
+      - symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.7
+          name: lldpRemPortId
+        tag: lldp_rem_port_id
+      - symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.9
+          name: lldpRemSysName
+        tag: lldp_rem_sys_name

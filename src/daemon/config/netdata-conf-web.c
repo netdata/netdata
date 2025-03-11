@@ -6,7 +6,7 @@
 size_t netdata_conf_web_query_threads(void) {
     // See https://github.com/netdata/netdata/issues/11081#issuecomment-831998240 for more details
     if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) {
-        config_set_number(CONFIG_SECTION_WEB, "web server threads", 1);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_WEB, "web server threads", 1);
         netdata_log_info("You are running an OpenSSL older than 1.1.0, web server will not enable multithreading.");
         return 1;
     }
@@ -15,17 +15,17 @@ size_t netdata_conf_web_query_threads(void) {
     size_t threads = cpus * (netdata_conf_is_parent() ? 2 : 1);
     threads = MAX(threads, 6);
 
-    threads = config_get_number(CONFIG_SECTION_WEB, "web server threads", threads);
+    threads = inicfg_get_number(&netdata_config, CONFIG_SECTION_WEB, "web server threads", threads);
     if(threads < 1) {
         netdata_log_error("[" CONFIG_SECTION_WEB "].web server threads in netdata.conf needs to be at least 1. Overwriting it.");
         threads = 1;
-        config_set_number(CONFIG_SECTION_WEB, "web server threads", threads);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_WEB, "web server threads", threads);
     }
     return threads;
 }
 
 static int make_dns_decision(const char *section_name, const char *config_name, const char *default_value, SIMPLE_PATTERN *p) {
-    const char *value = config_get(section_name,config_name,default_value);
+    const char *value = inicfg_get(&netdata_config, section_name,config_name,default_value);
 
     if(!strcmp("yes",value))
         return 1;
@@ -42,11 +42,9 @@ static int make_dns_decision(const char *section_name, const char *config_name, 
 
 extern struct netdata_static_thread *static_threads;
 void web_server_threading_selection(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
-    web_server_mode = web_server_mode_id(config_get(CONFIG_SECTION_WEB, "mode", web_server_mode_name(web_server_mode)));
+    web_server_mode = web_server_mode_id(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "mode", web_server_mode_name(web_server_mode)));
 
     int static_threaded = (web_server_mode == WEB_SERVER_MODE_STATIC_THREADED);
 
@@ -58,51 +56,49 @@ void web_server_threading_selection(void) {
 }
 
 void netdata_conf_section_web(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     web_client_timeout =
-        (int)config_get_duration_seconds(CONFIG_SECTION_WEB, "disconnect idle clients after", web_client_timeout);
+        (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_WEB, "disconnect idle clients after", web_client_timeout);
 
     web_client_first_request_timeout =
-        (int)config_get_duration_seconds(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
+        (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
 
     web_client_streaming_rate_t =
-        config_get_duration_seconds(CONFIG_SECTION_WEB, "accept a streaming request every", web_client_streaming_rate_t);
+        inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_WEB, "accept a streaming request every", web_client_streaming_rate_t);
 
     respect_web_browser_do_not_track_policy =
-        config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
-    web_x_frame_options = config_get(CONFIG_SECTION_WEB, "x-frame-options response header", "");
+        inicfg_get_boolean(&netdata_config, CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
+    web_x_frame_options = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "x-frame-options response header", "");
     if(!*web_x_frame_options)
         web_x_frame_options = NULL;
 
     web_allow_connections_from =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"),
+        simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow connections from", "localhost *"),
                               NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_connections_dns  =
         make_dns_decision(CONFIG_SECTION_WEB, "allow connections by dns", "heuristic", web_allow_connections_from);
     web_allow_dashboard_from   =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"),
+        simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"),
                               NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_dashboard_dns    =
         make_dns_decision(CONFIG_SECTION_WEB, "allow dashboard by dns", "heuristic", web_allow_dashboard_from);
     web_allow_badges_from      =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT,
+        simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT,
                               true);
     web_allow_badges_dns       =
         make_dns_decision(CONFIG_SECTION_WEB, "allow badges by dns", "heuristic", web_allow_badges_from);
     web_allow_registry_from    =
-        simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT,
+        simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT,
                               true);
     web_allow_registry_dns     = make_dns_decision(CONFIG_SECTION_REGISTRY, "allow by dns", "heuristic",
                                                web_allow_registry_from);
-    web_allow_streaming_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"),
+    web_allow_streaming_from   = simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow streaming from", "*"),
                                                      NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_streaming_dns    = make_dns_decision(CONFIG_SECTION_WEB, "allow streaming by dns", "heuristic",
                                                 web_allow_streaming_from);
     // Note the default is not heuristic, the wildcards could match DNS but the intent is ip-addresses.
-    web_allow_netdataconf_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow netdata.conf from",
+    web_allow_netdataconf_from = simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow netdata.conf from",
                                                                   "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.*"
                                                                   " 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.*"
                                                                   " 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.*"
@@ -111,14 +107,14 @@ void netdata_conf_section_web(void) {
     web_allow_netdataconf_dns  =
         make_dns_decision(CONFIG_SECTION_WEB, "allow netdata.conf by dns", "no", web_allow_netdataconf_from);
     web_allow_mgmt_from        =
-        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"),
+        simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow management from", "localhost"),
                               NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_mgmt_dns         =
         make_dns_decision(CONFIG_SECTION_WEB, "allow management by dns","heuristic",web_allow_mgmt_from);
 
-    web_enable_gzip = config_get_boolean(CONFIG_SECTION_WEB, "enable gzip compression", web_enable_gzip);
+    web_enable_gzip = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_WEB, "enable gzip compression", web_enable_gzip);
 
-    const char *s = config_get(CONFIG_SECTION_WEB, "gzip compression strategy", "default");
+    const char *s = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "gzip compression strategy", "default");
     if(!strcmp(s, "default"))
         web_gzip_strategy = Z_DEFAULT_STRATEGY;
     else if(!strcmp(s, "filtered"))
@@ -134,7 +130,7 @@ void netdata_conf_section_web(void) {
         web_gzip_strategy = Z_DEFAULT_STRATEGY;
     }
 
-    web_gzip_level = (int)config_get_number(CONFIG_SECTION_WEB, "gzip compression level", 3);
+    web_gzip_level = (int)inicfg_get_number(&netdata_config, CONFIG_SECTION_WEB, "gzip compression level", 3);
     if(web_gzip_level < 1) {
         netdata_log_error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).", web_gzip_level);
         web_gzip_level = 1;
@@ -146,20 +142,16 @@ void netdata_conf_section_web(void) {
 }
 
 void netdata_conf_web_security_init(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
-    netdata_ssl_security_key = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
+    snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem", netdata_configured_user_config_dir);
+    netdata_ssl_security_key = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "ssl key", filename);
 
-    snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
-    netdata_ssl_security_cert = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
+    snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem", netdata_configured_user_config_dir);
+    netdata_ssl_security_cert = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "ssl certificate", filename);
 
-    tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
-    tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
-
-    netdata_ssl_initialize_openssl();
+    tls_version    = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "tls version",  "1.3");
+    tls_ciphers    = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "tls ciphers",  "none");
 }
 

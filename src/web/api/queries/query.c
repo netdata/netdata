@@ -703,7 +703,8 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method)
     }
 }
 
-static ALWAYS_INLINE void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING add_flush) {
+ALWAYS_INLINE_HOT_FLATTEN
+static void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING add_flush) {
     switch(add_flush) {
         case RRDR_GROUPING_AVERAGE:
             tg_average_add(r, value);
@@ -760,7 +761,8 @@ static ALWAYS_INLINE void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const
     }
 }
 
-static ALWAYS_INLINE NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, const RRDR_TIME_GROUPING add_flush) {
+ALWAYS_INLINE_HOT_FLATTEN
+static NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, const RRDR_TIME_GROUPING add_flush) {
     switch(add_flush) {
         case RRDR_GROUPING_AVERAGE:
             return tg_average_flush(r, rrdr_value_options_ptr);
@@ -1577,7 +1579,7 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id
     return ops;
 }
 
-static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops) {
+NOT_INLINE_HOT static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops) {
     QUERY_TARGET *qt = r->internal.qt;
     QUERY_METRIC *qm = ops->qm;
 

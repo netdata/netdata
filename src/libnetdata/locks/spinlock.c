@@ -10,11 +10,11 @@
 
 #ifndef SPINLOCK_IMPL_WITH_MUTEX
 
-void spinlock_init_with_trace(SPINLOCK *spinlock, const char *func __maybe_unused) {
+ALWAYS_INLINE void spinlock_init_with_trace(SPINLOCK *spinlock, const char *func __maybe_unused) {
     memset(spinlock, 0, sizeof(SPINLOCK));
 }
 
-void spinlock_lock_with_trace(SPINLOCK *spinlock, const char *func) {
+ALWAYS_INLINE void spinlock_lock_with_trace(SPINLOCK *spinlock, const char *func) {
     size_t spins = 0;
     usec_t usec = 1;
 
@@ -40,7 +40,7 @@ void spinlock_lock_with_trace(SPINLOCK *spinlock, const char *func) {
     worker_spinlock_contention(func, spins);
 }
 
-void spinlock_unlock_with_trace(SPINLOCK *spinlock, const char *func __maybe_unused) {
+ALWAYS_INLINE void spinlock_unlock_with_trace(SPINLOCK *spinlock, const char *func __maybe_unused) {
 #ifdef NETDATA_INTERNAL_CHECKS
     spinlock->locker_pid = 0;
 #endif
@@ -50,7 +50,7 @@ void spinlock_unlock_with_trace(SPINLOCK *spinlock, const char *func __maybe_unu
     nd_thread_spinlock_unlocked();
 }
 
-bool spinlock_trylock_with_trace(SPINLOCK *spinlock, const char *func __maybe_unused) {
+ALWAYS_INLINE bool spinlock_trylock_with_trace(SPINLOCK *spinlock, const char *func __maybe_unused) {
     if (!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
         !__atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE)) {
         // Acquired the lock

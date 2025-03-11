@@ -3,8 +3,7 @@
 #ifndef NETDATA_ACLK_QUERY_QUEUE_H
 #define NETDATA_ACLK_QUERY_QUEUE_H
 
-#include "libnetdata/libnetdata.h"
-#include "daemon/common.h"
+#include "database/rrd.h"
 #include "schema-wrappers/schema_wrappers.h"
 
 #include "aclk_util.h"

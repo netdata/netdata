@@ -14,6 +14,10 @@
 #cmakedefine OS_MACOS
 #cmakedefine OS_WINDOWS
 
+// required compilation options
+
+#cmakedefine HAVE_FEXCEPTIONS
+
 // checked headers
 
 #cmakedefine HAVE_NETINET_IN_H
@@ -75,6 +79,8 @@
 #cmakedefine HAVE_RAND_S
 #cmakedefine HAVE_GETRANDOM
 #cmakedefine HAVE_SYSINFO
+#cmakedefine HAVE_TIMEGM
+#cmakedefine HAVE_TM_GMTOFF
 
 #cmakedefine HAVE_LIBUNWIND
 #cmakedefine HAVE_BACKTRACE
@@ -112,6 +118,7 @@
 #cmakedefine HAVE_FUNC_ATTRIBUTE_NORETURN
 #cmakedefine HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL
 #cmakedefine HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT
+#cmakedefine HAVE_JEMALLOC_ARENA_API
 
 // enabled features
 
@@ -139,6 +146,8 @@
 #cmakedefine ENABLE_PLUGIN_CUPS
 #cmakedefine ENABLE_PLUGIN_CGROUP_NETWORK
 #cmakedefine ENABLE_PLUGIN_EBPF
+#cmakedefine ENABLE_PLUGIN_SYSTEMD_JOURNAL
+#cmakedefine ENABLE_PLUGIN_NETWORK_VIEWER
 
 // enabled sentry
 
@@ -146,6 +155,7 @@
 #cmakedefine NETDATA_SENTRY_ENVIRONMENT "@NETDATA_SENTRY_ENVIRONMENT@"
 #cmakedefine NETDATA_SENTRY_DIST "@NETDATA_SENTRY_DIST@"
 #cmakedefine NETDATA_SENTRY_DSN "@NETDATA_SENTRY_DSN@"
+
 // enabled bundling
 
 #cmakedefine ENABLE_BUNDLED_JSONC
@@ -155,6 +165,7 @@
 
 // directory paths
 
+#define NETDATA_RUNTIME_PREFIX "@NETDATA_RUNTIME_PREFIX@"
 #cmakedefine CACHE_DIR "@CACHE_DIR@"
 #cmakedefine CONFIG_DIR "@CONFIG_DIR@"
 #cmakedefine LIBCONFIG_DIR "@LIBCONFIG_DIR@"
@@ -166,6 +177,10 @@
 // config command, user and version
 
 #cmakedefine CONFIGURE_COMMAND "@CONFIGURE_COMMAND@"
+
+#cmakedefine BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME "@BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME@"
+#cmakedefine BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH "@BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH@"
+
 #cmakedefine NETDATA_USER "@NETDATA_USER@"
 
 #define NETDATA_VERSION_MAJOR "@NETDATA_VERSION_MAJOR@"
