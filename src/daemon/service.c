@@ -152,6 +152,8 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     }
     rrdset_foreach_done(st);
 
+    dictionary_garbage_collect(host->rrdset_root_index);
+
     if(partial_archives != partial_candidates)
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS);
 

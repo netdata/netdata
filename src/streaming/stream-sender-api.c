@@ -134,6 +134,8 @@ void stream_sender_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHAK
 
     stream_sender_send_opcode(host->sender, msg);
 
-    while(wait && rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_ADDED))
+    while(wait && rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_ADDED)) {
         sleep_usec(10 * USEC_PER_MS);
+        stream_connector_remove_host(host);
+    }
 }

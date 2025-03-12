@@ -70,8 +70,13 @@ STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
         netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
     }
 
-    if(unlikely(mh->rd != rd))
-        fatal("DB_RAM_ALLOC: incorrect pointer returned from index.");
+    if(unlikely(mh->rd != rd)) {
+        // this can happen when the old RRDDIM is being deleted,
+        // but the dictionary has not yet run the destructors
+        netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+        mh->rd = rd;
+        netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+    }
 
     return (STORAGE_METRIC_HANDLE *)mh;
 }
@@ -112,7 +117,7 @@ STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *smh) {
     return smh;
 }
 
-void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh __maybe_unused) {
+void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
 
     if(refcount_release_and_acquire_for_deletion(&mh->refcount)) {

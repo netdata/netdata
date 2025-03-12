@@ -330,12 +330,14 @@ static void dictionary_queue_for_destruction(DICTIONARY *dict) {
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 }
 
-bool cleanup_destroyed_dictionaries(void) {
+size_t cleanup_destroyed_dictionaries(void) {
     netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
     if (!dictionaries_waiting_to_be_destroyed) {
         netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
-        return false;
+        return 0;
     }
+
+    size_t remaining = 0;
 
     DICTIONARY *dict, *last = NULL, *next = NULL;
     for(dict = dictionaries_waiting_to_be_destroyed; dict ; dict = next) {
@@ -353,7 +355,7 @@ bool cleanup_destroyed_dictionaries(void) {
 
             internal_error(
                 true,
-                "DICTIONARY: freed dictionary with delayed destruction, created from %s() %zu@%s pid %d.",
+                "DICTIONARY DELAYED: freed dict created from %s() %zu@%s pid %d.",
                 function, line, file, pid);
 
             if(last) last->next = next;
@@ -363,18 +365,19 @@ bool cleanup_destroyed_dictionaries(void) {
 
             internal_error(
                     true,
-                    "DICTIONARY: cannot free dictionary with delayed destruction, created from %s() %zu@%s pid %d.",
+                    "DICTIONARY DELAYED %zu: %zu referenced in dict created from %s() %zu@%s pid %d.",
+                    remaining + 1, dictionary_referenced_items(dict),
                     function, line, file, pid);
 
             DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
             last = dict;
+            remaining++;
         }
     }
 
-    bool ret = dictionaries_waiting_to_be_destroyed != NULL;
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 
-    return ret;
+    return remaining;
 }
 
 // ----------------------------------------------------------------------------

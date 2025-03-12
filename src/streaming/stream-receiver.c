@@ -441,23 +441,6 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
                "Failed to add receiver socket to nd_poll()",
                sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
 
-    // put the client IP and port into the buffers used by plugins.d
-    {
-        char buf[CONFIG_MAX_NAME];
-        snprintfz(buf, sizeof(buf),  "[%s]:%s", rpt->remote_ip, rpt->remote_port);
-        string_freez(rpt->thread.cd.id);
-        rpt->thread.cd.id = string_strdupz(buf);
-
-        string_freez(rpt->thread.cd.filename);
-        rpt->thread.cd.filename = NULL;
-
-        string_freez(rpt->thread.cd.fullfilename);
-        rpt->thread.cd.fullfilename = NULL;
-
-        string_freez(rpt->thread.cd.cmd);
-        rpt->thread.cd.cmd = NULL;
-    }
-
     rpt->thread.compressed.start = 0;
     rpt->thread.compressed.used = 0;
     rpt->thread.compressed.enabled = stream_decompression_initialize(rpt);
@@ -472,15 +455,25 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
 
     PARSER *parser = NULL;
     {
-        rpt->thread.cd = (struct plugind){
-            .update_every = nd_profile.update_every,
-            .unsafe = {
-                .spinlock = SPINLOCK_INITIALIZER,
-                .running = true,
-                .enabled = true,
-            },
-            .started_t = now_realtime_sec(),
-        };
+        char buf[CONFIG_MAX_NAME];
+        snprintfz(buf, sizeof(buf),  "[%s]:%s", rpt->remote_ip, rpt->remote_port);
+        string_freez(rpt->thread.cd.id);
+        rpt->thread.cd.id = string_strdupz(buf);
+
+        string_freez(rpt->thread.cd.filename);
+        rpt->thread.cd.filename = NULL;
+
+        string_freez(rpt->thread.cd.fullfilename);
+        rpt->thread.cd.fullfilename = NULL;
+
+        string_freez(rpt->thread.cd.cmd);
+        rpt->thread.cd.cmd = NULL;
+
+        rpt->thread.cd.update_every = (int)nd_profile.update_every;
+        spinlock_init(&rpt->thread.cd.unsafe.spinlock);
+        rpt->thread.cd.unsafe.running = true;
+        rpt->thread.cd.unsafe.enabled = true;
+        rpt->thread.cd.started_t = now_realtime_sec();
 
         PARSER_USER_OBJECT user = {
             .enabled = plugin_is_enabled(&rpt->thread.cd),
