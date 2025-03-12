@@ -118,6 +118,12 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         buffer_json_member_add_string_or_empty(wb, "ND_install_type", ds->install_type); // custom
 
+        if(ds->v >= 14) {
+            buffer_json_member_add_string(wb, "ND_db_mode", rrd_memory_mode_name(ds->db_mode)); // custom
+            buffer_json_member_add_uint64(wb, "ND_db_tiers", ds->db_tiers); // custom
+            buffer_json_member_add_boolean(wb, "ND_kubernetes", ds->kubernetes); // custom
+        }
+
         buffer_json_member_add_object(wb, "ND_timings"); // custom
         {
             buffer_json_member_add_time_t(wb, "init", ds->timings.init);
@@ -226,6 +232,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v4 = version >= 4 ? strict : false;
     bool required_v5 = version >= 5 ? strict : false;
     bool required_v10 = version >= 10 ? strict : false;
+    bool required_v14 = version >= 14 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -252,6 +259,17 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
         if(version >= 4)
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ND_restarts", ds->restarts, error, required_v4);
+
+        if(version >= 14) {
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ND_db_mode", rrd_memory_mode_id, ds->db_mode, error, required_v14);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ND_db_tiers", ds->db_tiers, error, required_v14);
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_kubernetes", ds->kubernetes, error, required_v14);
+        }
+        else {
+            ds->db_mode = default_rrd_memory_mode;
+            ds->db_tiers = nd_profile.storage_tiers;
+            ds->kubernetes = false;
+        }
     });
 
     // Parse host object
@@ -383,6 +401,8 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
     session_status.invocation = nd_log_get_invocation_id();
+    session_status.db_mode = default_rrd_memory_mode;
+    session_status.db_tiers = nd_profile.storage_tiers;
 
     session_status.claim_id = claim_id_get_uuid();
 
@@ -470,10 +490,16 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
 // List of fallback directories to try
 static const char *status_file_fallbacks[] = {
+    CACHE_DIR,
     "/tmp",
     "/run",
     "/var/run",
+    ".",
 };
+
+static void set_dynamic_fallbacks(void) {
+    status_file_fallbacks[0] = netdata_configured_cache_dir;
+}
 
 static bool check_status_file(const char *directory, char *filename, size_t filename_size, time_t *mtime) {
     if(!directory || !*directory)
@@ -529,12 +555,13 @@ void daemon_status_file_load(DAEMON_STATUS_FILE *ds) {
     time_t newest_mtime = 0, current_mtime;
 
     // Check the primary directory first
-    if(check_status_file(netdata_configured_cache_dir, current_filename, sizeof(current_filename), &current_mtime)) {
+    if(check_status_file(netdata_configured_varlib_dir, current_filename, sizeof(current_filename), &current_mtime)) {
         strncpyz(newest_filename, current_filename, sizeof(newest_filename) - 1);
         newest_mtime = current_mtime;
     }
 
     // Check each fallback location
+    set_dynamic_fallbacks();
     for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
         if(check_status_file(status_file_fallbacks[i], current_filename, sizeof(current_filename), &current_mtime) &&
             (!*newest_filename || current_mtime > newest_mtime)) {
@@ -655,6 +682,23 @@ static void static_save_buffer_init(void) {
     buffer_flush(static_save_buffer);
 }
 
+static void remove_old_status_files(const char *protected_dir) {
+    FUNCTION_RUN_ONCE();
+
+    char filename[FILENAME_MAX];
+
+    set_dynamic_fallbacks();
+    for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
+        if(strcmp(status_file_fallbacks[i], protected_dir) == 0)
+            continue;
+
+        snprintfz(filename, sizeof(filename), "%s/%s", status_file_fallbacks[i], STATUS_FILENAME);
+        unlink(filename);
+    }
+
+    errno_clear();
+}
+
 static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log) {
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
@@ -666,18 +710,22 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
 
     // Try primary directory first
     bool saved = false;
-    if (save_status_file(netdata_configured_cache_dir, content, content_size))
+    if (save_status_file(netdata_configured_varlib_dir, content, content_size)) {
+        remove_old_status_files(netdata_configured_varlib_dir);
         saved = true;
+    }
     else {
         if(log)
             nd_log(NDLS_DAEMON, NDLP_DEBUG, "Failed to save status file in primary directory %s",
-                   netdata_configured_cache_dir);
+                   netdata_configured_varlib_dir);
 
         // Try each fallback directory until successful
+        set_dynamic_fallbacks();
         for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
             if (save_status_file(status_file_fallbacks[i], content, content_size)) {
                 if(log)
                     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_fallbacks[i]);
+
                 saved = true;
                 break;
             }
