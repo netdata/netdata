@@ -5,6 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include "daemon/config/netdata-conf-profile.h"
+#include "database/rrd-database-mode.h"
 
 typedef enum {
     DAEMON_STATUS_NONE,
