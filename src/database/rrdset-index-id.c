@@ -67,11 +67,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     st->id = string_strdupz(chart_full_id);
 
-    st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->name);
-    if(!st->name)
-        st->name = rrdset_fix_name(host, chart_full_id, ctr->type, NULL, ctr->id);
-    rrdset_index_add_name(host, st);
-
     st->collection_modulo = rrdset_collection_modulo_init();
 
     st->parts.id = string_strdupz(ctr->id);
@@ -137,7 +132,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
 // the destructor - the dictionary is write locked while this runs
 static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost) {
-    RRDHOST *host = rrdhost;
+    RRDHOST *host = rrdhost; (void)host;
     RRDSET *st = rrdset;
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
@@ -146,10 +141,6 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdset_stream_send_chart_slot_release(st);
 
-    // remove it from the name index
-    rrdset_index_del_name(host, st);
-
-    // release the collector info
     dictionary_destroy(st->functions_view);
 
     rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
@@ -202,9 +193,6 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rrdset_isnot_obsolete___safe_from_collector_thread(st);
 
     ctr->react_action = RRDSET_REACT_NONE;
-
-    if (rrdset_reset_name(st, (ctr->name && *ctr->name) ? ctr->name : ctr->id) == 2)
-        ctr->react_action |= RRDSET_REACT_UPDATED;
 
     if (unlikely(st->priority != ctr->priority)) {
         st->priority = ctr->priority;
@@ -430,15 +418,15 @@ RRDSET *rrdset_create_custom(
     // ------------------------------------------------------------------------
     // check if it already exists
 
-    char full_id[RRD_ID_LENGTH_MAX + 1];
-    snprintfz(full_id, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
+    char chart_full_id[RRD_ID_LENGTH_MAX + 1];
+    snprintfz(chart_full_id, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
     // ------------------------------------------------------------------------
     // allocate it
 
     netdata_log_debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
-    struct rrdset_constructor tmp = {
+    struct rrdset_constructor ctr = {
         .host = host,
         .type = type,
         .id = id,
@@ -456,11 +444,33 @@ RRDSET *rrdset_create_custom(
         .history_entries = history_entries,
     };
 
-    RRDSET *st = rrdset_index_add(host, full_id, &tmp);
-    return(st);
+    RRDSET *st = rrdset_index_add(host, chart_full_id, &ctr);
+
+    bool name_updated = false;
+    if(!st->name) {
+        st->name = rrdset_fix_name(host, chart_full_id, ctr.type, NULL, ctr.name);
+        if(!st->name)
+            st->name = rrdset_fix_name(host, chart_full_id, ctr.type, NULL, ctr.id);
+
+        if(st->name) {
+            name_updated = true;
+            rrdset_index_add_name(host, st);
+        }
+    }
+    else if(rrdset_reset_name(st, (name && *name) ? name : id) == 2)
+        name_updated = true;
+
+    if(name_updated) {
+        rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_UPDATE);
+        rrdset_metadata_updated(st);
+    }
+
+    return st;
 }
 
 void rrdset_free(RRDSET *st) {
     if(unlikely(!st)) return;
+    rrdset_index_del_name(st->rrdhost, st);
     rrdset_index_del(st->rrdhost, st);
 }
