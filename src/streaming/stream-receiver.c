@@ -449,13 +449,13 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
         rpt->thread.cd.id = string_strdupz(buf);
 
         string_freez(rpt->thread.cd.filename);
-        rpt->thread.cd.filename = string_strdupz(buf);
+        rpt->thread.cd.filename = NULL;
 
         string_freez(rpt->thread.cd.fullfilename);
-        rpt->thread.cd.fullfilename = string_strdupz(buf);
+        rpt->thread.cd.fullfilename = NULL;
 
         string_freez(rpt->thread.cd.cmd);
-        rpt->thread.cd.cmd = string_strdupz(buf);
+        rpt->thread.cd.cmd = NULL;
     }
 
     rpt->thread.compressed.start = 0;
