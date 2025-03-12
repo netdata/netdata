@@ -214,6 +214,7 @@ jobs:
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             EXTRA_INSTALL_OPTS=${{ needs.file-check.outputs.skip-go }}
             BUILD_VERSION=test
+            BUILD_DATE=${{ github.event.repository.updated_at }}
       - name: Test Image
         id: test
         if: needs.file-check.outputs.run == 'true' && matrix.platform == 'linux/amd64'
@@ -326,6 +327,7 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_VERSION=${{ github.event.inputs.version }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
       - name: Export Digest
         id: export-digest
         if: github.repository == 'netdata/netdata'
@@ -477,6 +479,7 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_VERSION=${{ github.event.inputs.version }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
           outputs: type=image,name=quay.io/netdata/netdata,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
         id: export-digest
@@ -630,6 +633,7 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_VERSION=${{ github.event.inputs.version }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
           outputs: type=image,name=ghcr.io/netdata/netdata,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
         id: export-digest
