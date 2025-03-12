@@ -2089,6 +2089,9 @@ void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {
 }
 
 void pgc_destroy(PGC *cache, bool flush) {
+    if(!cache)
+        return;
+
     if(!flush) {
         cache->config.pgc_save_init_cb = NULL;
         cache->config.pgc_save_dirty_cb = NULL;
