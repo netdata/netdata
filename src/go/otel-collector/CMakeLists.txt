@@ -55,4 +55,4 @@ function(_handle_otel)
   )
 endfunction()
 
-handle_otel()
+_handle_otel()
