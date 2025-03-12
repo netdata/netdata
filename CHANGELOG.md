@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- rrdhost name fix heap-use-after-free [\#19826](https://github.com/netdata/netdata/pull/19826) ([ktsaou](https://github.com/ktsaou))
+- use notice log level for "machine ID found" [\#19825](https://github.com/netdata/netdata/pull/19825) ([ilyam8](https://github.com/ilyam8))
+- build\(otel-collector\): update to v0.121.0 [\#19824](https://github.com/netdata/netdata/pull/19824) ([ilyam8](https://github.com/ilyam8))
+- Finding leaks No 2 [\#19823](https://github.com/netdata/netdata/pull/19823) ([ktsaou](https://github.com/ktsaou))
+- Free all memory on exit [\#19821](https://github.com/netdata/netdata/pull/19821) ([ktsaou](https://github.com/ktsaou))
 - Fix LSAN and memory leaks [\#19819](https://github.com/netdata/netdata/pull/19819) ([ktsaou](https://github.com/ktsaou))
+- Include libucontext in static builds to vendor libunwind even on POWER. [\#19817](https://github.com/netdata/netdata/pull/19817) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#19816](https://github.com/netdata/netdata/pull/19816) ([netdatabot](https://github.com/netdatabot))
 - fix\(go.d/filecheck\): remove dyncfg path validation pattern  [\#19815](https://github.com/netdata/netdata/pull/19815) ([ilyam8](https://github.com/ilyam8))
 - Acquire datafile for deletion before calculating retention [\#19812](https://github.com/netdata/netdata/pull/19812) ([stelfrag](https://github.com/stelfrag))
@@ -104,6 +110,7 @@
 - Add repository priority configuration for DEB package repositories. [\#19705](https://github.com/netdata/netdata/pull/19705) ([Ferroin](https://github.com/Ferroin))
 - add host/os fields to status file [\#19704](https://github.com/netdata/netdata/pull/19704) ([ktsaou](https://github.com/ktsaou))
 - under MSYS2 use stat [\#19703](https://github.com/netdata/netdata/pull/19703) ([ktsaou](https://github.com/ktsaou))
+- Integrate OpenTelemetry collector build into build system. [\#19702](https://github.com/netdata/netdata/pull/19702) ([Ferroin](https://github.com/Ferroin))
 - Document journal v2 index file format. [\#19701](https://github.com/netdata/netdata/pull/19701) ([vkalintiris](https://github.com/vkalintiris))
 - build\(deps\): update go.d packages [\#19700](https://github.com/netdata/netdata/pull/19700) ([ilyam8](https://github.com/ilyam8))
 - ADFS \(windows.plugin\) [\#19699](https://github.com/netdata/netdata/pull/19699) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -294,6 +301,7 @@
 - Active Directory Metrics \(Windows.plugin\) [\#19461](https://github.com/netdata/netdata/pull/19461) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use aral in ACLK [\#19459](https://github.com/netdata/netdata/pull/19459) ([stelfrag](https://github.com/stelfrag))
 - Enable libunwind in native packages and Docker images. [\#19452](https://github.com/netdata/netdata/pull/19452) ([Ferroin](https://github.com/Ferroin))
+- fix rrdset name crash on rrdset obsoletion [\#19449](https://github.com/netdata/netdata/pull/19449) ([ktsaou](https://github.com/ktsaou))
 - Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
 - Start using new GitHub hosted ARM runners for CI when appropriate. [\#19427](https://github.com/netdata/netdata/pull/19427) ([Ferroin](https://github.com/Ferroin))
 - Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
@@ -474,14 +482,6 @@
 - improvement\(go.d/nats\): add basic jetstream metrics [\#19285](https://github.com/netdata/netdata/pull/19285) ([ilyam8](https://github.com/ilyam8))
 - fix go.d/nats tests [\#19284](https://github.com/netdata/netdata/pull/19284) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19283](https://github.com/netdata/netdata/pull/19283) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/nats\): add leafz metrics [\#19282](https://github.com/netdata/netdata/pull/19282) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19281](https://github.com/netdata/netdata/pull/19281) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/nats\): add server\_id label [\#19280](https://github.com/netdata/netdata/pull/19280) ([ilyam8](https://github.com/ilyam8))
-- docs: improve on-prem troubleshooting readability [\#19279](https://github.com/netdata/netdata/pull/19279) ([ilyam8](https://github.com/ilyam8))
-- Fix metric retention check and cleanup [\#19278](https://github.com/netdata/netdata/pull/19278) ([stelfrag](https://github.com/stelfrag))
-- fix\(go.d/rabbitmq\): handle insufficient perms when querying definitions [\#19277](https://github.com/netdata/netdata/pull/19277) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19276](https://github.com/netdata/netdata/pull/19276) ([netdatabot](https://github.com/netdatabot))
-- Updates to onprem docs [\#19275](https://github.com/netdata/netdata/pull/19275) ([M4itee](https://github.com/M4itee))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
