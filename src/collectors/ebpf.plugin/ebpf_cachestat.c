@@ -775,25 +775,20 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core)
 
         cachestat_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-        netdata_publish_cachestat_t *publish = local_pid->cachestat;
-        if (!publish)
-            local_pid->cachestat = publish = ebpf_cachestat_allocate_publish();
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
+        if (!local_pid)
+            continue;
+        netdata_publish_cachestat_t *publish = &local_pid->cachestat;
 
         if (!publish->ct || publish->ct != cv->ct) {
             cachestat_save_pid_values(publish, cv);
-            local_pid->not_updated = 0;
         } else {
-            if (kill(key, 0)) { // No PID found
-                ebpf_reset_specific_pid_data(local_pid);
-            } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(local_pid, fd, key, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-                ebpf_cachestat_release_publish(publish);
-                local_pid->cachestat = NULL;
+            if (kill((pid_t)key, 0)) { // No PID found
+                netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
             }
         }
 
-    end_cachestat_loop:
+end_cachestat_loop:
         // We are cleaning to avoid passing data read from one process to other.
         memset(cv, 0, length);
         key = next_key;
@@ -811,20 +806,22 @@ static void ebpf_update_cachestat_cgroup()
 {
     ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
+    sem_wait(shm_mutex_ebpf_integration);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
-            int pid = pids->pid;
+            uint32_t pid = pids->pid;
             netdata_publish_cachestat_t *out = &pids->cachestat;
 
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-            netdata_publish_cachestat_t *in = local_pid->cachestat;
-            if (!in)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
+            if (!local_pid)
                 continue;
 
+            netdata_publish_cachestat_t *in = &local_pid->cachestat;
             memcpy(&out->current, &in->current, sizeof(netdata_cachestat_t));
         }
     }
+    sem_post(shm_mutex_ebpf_integration);
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
@@ -843,11 +840,11 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
 
     netdata_cachestat_t *dst = &publish->current;
     for (; root; root = root->next) {
-        int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-        netdata_publish_cachestat_t *w = local_pid->cachestat;
-        if (!w)
+        uint32_t pid = root->pid;
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
+        if (!local_pid)
             continue;
+        netdata_publish_cachestat_t *w = &local_pid->cachestat;
 
         netdata_cachestat_t *src = &w->current;
         dst->account_page_dirtied += src->account_page_dirtied;
@@ -901,8 +898,10 @@ void *ebpf_read_cachestat_thread(void *ptr)
             continue;
 
         pthread_mutex_lock(&collect_data_mutex);
+        sem_wait(shm_mutex_ebpf_integration);
         ebpf_read_cachestat_apps_table(maps_per_core);
         ebpf_resume_apps_data();
+        sem_post(shm_mutex_ebpf_integration);
         pthread_mutex_unlock(&collect_data_mutex);
 
         counter = 0;

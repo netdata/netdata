@@ -67,7 +67,6 @@ enum cachestat_indexes {
 enum cachestat_tables { NETDATA_CACHESTAT_GLOBAL_STATS, NETDATA_CACHESTAT_PID_STATS, NETDATA_CACHESTAT_CTRL };
 
 void *ebpf_cachestat_thread(void *ptr);
-void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
 
 extern struct config cachestat_config;
 extern netdata_ebpf_targets_t cachestat_targets[];
