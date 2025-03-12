@@ -515,6 +515,8 @@ func TestCollector_Collect(t *testing.T) {
 		"CronJobs": {
 			create: func(t *testing.T) testCase {
 				cj := prepareCronJob("cronjob01")
+				cjSuspended := prepareCronJob("cronjob02")
+				cjSuspended.Spec.Suspend = ptr(true)
 				jobNotStarted := prepareCronJobNotStartedJob("job-not-started", cj)
 				jobComplete := prepareCronJobCompleteJob("job-complete", cj)
 				jobFailed := prepareCronJobFailedJob("job-failed", cj)
@@ -522,6 +524,7 @@ func TestCollector_Collect(t *testing.T) {
 				jobSuspended := prepareCronJobSuspendedJob("job-suspended", cj)
 
 				client := fake.NewClientset(
+					cjSuspended,
 					cj,
 					jobNotStarted,
 					jobComplete,
@@ -545,7 +548,23 @@ func TestCollector_Collect(t *testing.T) {
 						"cronjob_default_cronjob01_last_schedule_seconds_ago":                 130,
 						"cronjob_default_cronjob01_last_successful_seconds_ago":               70,
 						"cronjob_default_cronjob01_running_jobs":                              1,
+						"cronjob_default_cronjob01_suspend_status_enabled":                    1,
+						"cronjob_default_cronjob01_suspend_status_suspended":                  0,
 						"cronjob_default_cronjob01_suspended_jobs":                            1,
+						"cronjob_default_cronjob02_age":                                       10,
+						"cronjob_default_cronjob02_complete_jobs":                             0,
+						"cronjob_default_cronjob02_failed_jobs":                               0,
+						"cronjob_default_cronjob02_failed_jobs_reason_backoff_limit_exceeded": 0,
+						"cronjob_default_cronjob02_failed_jobs_reason_deadline_exceeded":      0,
+						"cronjob_default_cronjob02_failed_jobs_reason_pod_failure_policy":     0,
+						"cronjob_default_cronjob02_last_execution_status_failed":              0,
+						"cronjob_default_cronjob02_last_execution_status_succeeded":           0,
+						"cronjob_default_cronjob02_last_schedule_seconds_ago":                 130,
+						"cronjob_default_cronjob02_last_successful_seconds_ago":               70,
+						"cronjob_default_cronjob02_running_jobs":                              0,
+						"cronjob_default_cronjob02_suspend_status_enabled":                    0,
+						"cronjob_default_cronjob02_suspend_status_suspended":                  1,
+						"cronjob_default_cronjob02_suspended_jobs":                            0,
 						"discovery_node_discoverer_state":                                     1,
 						"discovery_pod_discoverer_state":                                      1,
 					}
