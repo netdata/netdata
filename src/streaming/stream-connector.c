@@ -629,6 +629,41 @@ static void *stream_connector_thread(void *ptr) {
     return NULL;
 }
 
+void stream_connector_remove_host(RRDHOST *host) {
+    if(!host || !host->sender) return;
+
+    struct connector *sc = stream_connector_get(host->sender);
+
+    spinlock_lock(&sc->queue.spinlock);
+    Word_t idx = 0;
+    for(struct sender_state *s = SENDERS_FIRST(&sc->queue.senders, &idx);
+         s;
+         s = SENDERS_NEXT(&sc->queue.senders, &idx)) {
+
+        if(s != host->sender)
+            continue;
+
+        ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        SENDERS_DEL(&sc->queue.senders, idx);
+        spinlock_unlock(&sc->queue.spinlock);
+
+        // do not have the connector lock when calling these
+        stream_sender_on_disconnect(s);
+        stream_sender_remove(s, s->exit.reason);
+
+        spinlock_lock(&sc->queue.spinlock);
+        break;
+    }
+
+    spinlock_unlock(&sc->queue.spinlock);
+}
+
 bool stream_connector_init(struct sender_state *s) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     if(!s) return false;

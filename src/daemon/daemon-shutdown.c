@@ -330,8 +330,10 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     rrdhost_free_all();
 
     fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
-    if(cleanup_destroyed_dictionaries())
-        fprintf(stderr, "WARNING: There are still dictionaries with references in them, that cannot be destroyed.\n");
+    size_t dictionaries_referenced = cleanup_destroyed_dictionaries();
+    if(dictionaries_referenced)
+        fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
+                dictionaries_referenced);
 
     // destroy the caches in reverse order (extent and open depend on main cache)
     fprintf(stderr, "Destroying extent cache (PGC)...\n");
