@@ -673,6 +673,19 @@ static void static_save_buffer_init(void) {
     buffer_flush(static_save_buffer);
 }
 
+static void remove_old_status_files(const char *protected_dir) {
+    char filename[FILENAME_MAX];
+
+    set_dynamic_fallbacks();
+    for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
+        if(strcmp(status_file_fallbacks[i], protected_dir) == 0)
+            continue;
+
+        snprintfz(filename, sizeof(filename), "%s/%s", status_file_fallbacks[i], STATUS_FILENAME);
+        unlink(filename);
+    }
+}
+
 static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log) {
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
@@ -684,8 +697,10 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
 
     // Try primary directory first
     bool saved = false;
-    if (save_status_file(netdata_configured_varlib_dir, content, content_size))
+    if (save_status_file(netdata_configured_varlib_dir, content, content_size)) {
+        remove_old_status_files(netdata_configured_varlib_dir);
         saved = true;
+    }
     else {
         if(log)
             nd_log(NDLS_DAEMON, NDLP_DEBUG, "Failed to save status file in primary directory %s",
