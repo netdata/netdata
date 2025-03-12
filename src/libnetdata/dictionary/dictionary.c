@@ -355,7 +355,7 @@ size_t cleanup_destroyed_dictionaries(void) {
 
             internal_error(
                 true,
-                "DICTIONARY: freed dictionary with delayed destruction, created from %s() %zu@%s pid %d.",
+                "DICTIONARY DELAYED: freed dict created from %s() %zu@%s pid %d.",
                 function, line, file, pid);
 
             if(last) last->next = next;
@@ -365,7 +365,8 @@ size_t cleanup_destroyed_dictionaries(void) {
 
             internal_error(
                     true,
-                    "DICTIONARY: cannot free dictionary with delayed destruction, created from %s() %zu@%s pid %d.",
+                    "DICTIONARY DELAYED %zu: %zu referenced in dict created from %s() %zu@%s pid %d.",
+                    remaining + 1, dictionary_referenced_items(dict),
                     function, line, file, pid);
 
             DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);

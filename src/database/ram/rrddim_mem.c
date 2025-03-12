@@ -71,22 +71,11 @@ STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     }
 
     if(unlikely(mh->rd != rd)) {
-        char uuid_rd_str[UUID_STR_LEN];
-        ND_UUID uuid_rd = uuidmap_get(mh->rd->uuid);
-        uuid_unparse_lower(uuid_rd.uuid, uuid_rd_str);
-        fatal("DB_RAM_ALLOC: incorrect pointer returned from index. "
-              "NEW RRD: Host '%s', instance '%s', dimension '%s' (uuidmap: %u, uuid: %s). "
-              "OLD RRD: Host '%s', instance '%s', dimension '%s' (uuidmap: %u). "
-              "MH refcount: %d",
-              string2str(rd->rrdset->rrdhost->hostname),
-              string2str(rd->rrdset->name),
-              string2str(rd->name),
-              rd->uuid, uuid_rd_str,
-              string2str(mh->rd->rrdset->rrdhost->hostname),
-              string2str(mh->rd->rrdset->name),
-              string2str(mh->rd->name),
-              mh->rd->uuid,
-              refcount_references(&mh->refcount));
+        // this can happen when the old RRDDIM is being deleted,
+        // but the dictionary has not yet run the destructors
+        netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+        mh->rd = rd;
+        netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
     }
 
     return (STORAGE_METRIC_HANDLE *)mh;
