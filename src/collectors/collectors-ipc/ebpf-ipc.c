@@ -18,11 +18,11 @@ bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_
         ptr->threads &= ~(idx << 1);
         if (!ptr->threads) {
             memset(ptr, 0, sizeof(*ptr));
-            return true;
+            return false;
         }
     }
 
-    return false;
+    return true;
 }
 
 netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum ebpf_pids_index idx) {
