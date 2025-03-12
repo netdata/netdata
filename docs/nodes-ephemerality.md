@@ -2,13 +2,13 @@
 
 ## Overview
 
-Netdata v2.3.0 changes how ephemeral nodes are defined and managed in distributed monitoring environments This update enhances monitoring reliability while providing flexibility for dynamic infrastructure management.
+Netdata v2.3.0 changes how ephemeral nodes are defined and managed in distributed monitoring environments. This update enhances monitoring reliability while providing flexibility for dynamic infrastructure management.
 
 **Key Changes**:
 
-Netdata now defines ephemeral nodes as "nodes that are expected to disconnect without raising alerts," replacing the previous definition of nodes that are forgotten after one day of disconnection. This change provides three major benefits:
+Netdata now defines ephemeral nodes as "nodes that are expected to disconnect without raising alerts," replacing the previous definition of forgotten nodes after one day of disconnection. This change provides three major benefits:
 
-1. **Improved Permanent Node Monitoring**: Disconnection alerts are now triggered only for permanent nodes, reducing alert noise and helping teams focus on genuine operational issues.
+1. **Improved Permanent Node Monitoring**: Disconnection alerts are triggered only for permanent nodes, reducing alert noise and helping teams focus on genuine operational issues.
 2. **Better Support for Dynamic Infrastructure**: Organizations using auto-scaling cloud instances, containers, and other dynamic resources can now designate nodes as ephemeral, preventing unnecessary alerts.
 3. **Automated Node Management**: The system automatically removes ephemeral nodes based on configurable retention periods, maintaining clean and relevant monitoring dashboards.
 
@@ -57,7 +57,7 @@ To investigate alert:
     - Yellow lines: Restreaming issues (when this Parent attempts to stream data to other Parent nodes)
     - Color highlighting applies only to permanent nodes
     - Filter by `Ephemerality` to focus on permanent nodes
-    - Use `InStatus`, `InReason`, and `InAge` columns fto analyze nodes connecting to this parent
+    - Use `InStatus`, `InReason`, and `InAge` columns to analyze node connections to the parent node
     - Use `OutStatus`, `OutReason`, and `OutAge` columns to analyze this Parent's restreaming to other Parent nodes
 
 ## Managing Archived Nodes
