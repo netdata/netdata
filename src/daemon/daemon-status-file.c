@@ -470,10 +470,16 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
 // List of fallback directories to try
 static const char *status_file_fallbacks[] = {
+    CACHE_DIR,
     "/tmp",
     "/run",
     "/var/run",
+    ".",
 };
+
+static void set_dynamic_fallbacks(void) {
+    status_file_fallbacks[0] = netdata_configured_cache_dir;
+}
 
 static bool check_status_file(const char *directory, char *filename, size_t filename_size, time_t *mtime) {
     if(!directory || !*directory)
@@ -529,12 +535,13 @@ void daemon_status_file_load(DAEMON_STATUS_FILE *ds) {
     time_t newest_mtime = 0, current_mtime;
 
     // Check the primary directory first
-    if(check_status_file(netdata_configured_cache_dir, current_filename, sizeof(current_filename), &current_mtime)) {
+    if(check_status_file(netdata_configured_varlib_dir, current_filename, sizeof(current_filename), &current_mtime)) {
         strncpyz(newest_filename, current_filename, sizeof(newest_filename) - 1);
         newest_mtime = current_mtime;
     }
 
     // Check each fallback location
+    set_dynamic_fallbacks();
     for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
         if(check_status_file(status_file_fallbacks[i], current_filename, sizeof(current_filename), &current_mtime) &&
             (!*newest_filename || current_mtime > newest_mtime)) {
@@ -666,18 +673,20 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
 
     // Try primary directory first
     bool saved = false;
-    if (save_status_file(netdata_configured_cache_dir, content, content_size))
+    if (save_status_file(netdata_configured_varlib_dir, content, content_size))
         saved = true;
     else {
         if(log)
             nd_log(NDLS_DAEMON, NDLP_DEBUG, "Failed to save status file in primary directory %s",
-                   netdata_configured_cache_dir);
+                   netdata_configured_varlib_dir);
 
         // Try each fallback directory until successful
+        set_dynamic_fallbacks();
         for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
             if (save_status_file(status_file_fallbacks[i], content, content_size)) {
                 if(log)
                     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_fallbacks[i]);
+
                 saved = true;
                 break;
             }
