@@ -162,7 +162,7 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 }
 
-static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host, time_t mark_obsolete_after, time_t now) {
+static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host, time_t mark_obsolete_after) {
     time_t last_entry_t;
     RRDSET *st;
 
@@ -205,7 +205,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
         if (host == localhost) {
             worker_is_busy(WORKER_JOB_PARENT_CHART_OBSOLETION_CHECK);
-            svc_rrdhost_detect_obsolete_charts(localhost, now_realtime_sec() - default_rrd_history_entries, now);
+            svc_rrdhost_detect_obsolete_charts(localhost, now_realtime_sec() - default_rrd_history_entries);
             worker_is_idle();
             continue;
         }
@@ -218,7 +218,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
              (host->stream.rcv.status.last_connected + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now))) {
 
             worker_is_busy(WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK);
-            svc_rrdhost_detect_obsolete_charts(host, host->stream.rcv.status.last_connected, now);
+            svc_rrdhost_detect_obsolete_charts(host, host->stream.rcv.status.last_connected);
             worker_is_idle();
 
             host->stream.rcv.status.check_obsolete = false;
