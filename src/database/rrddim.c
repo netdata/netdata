@@ -228,6 +228,17 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             STORAGE_ENGINE *eng = host->db[tier].eng;
             eng->api.metric_release(rd->tiers[tier].smh);
             rd->tiers[tier].smh = NULL;
+
+#ifdef FSANITIZE_ADDRESS
+            if((rd->rrd_memory_mode == RRD_DB_MODE_RAM || rd->rrd_memory_mode == RRD_DB_MODE_ALLOC) &&
+                eng->api.metric_get_by_id(host->db[tier].si, rd->uuid)) {
+                fprintf(stderr, "RRDDIM: metric still exists in tier %zu of chart '%s', dimension '%s' of host '%s'",
+                      tier, rrdset_name(st), rrddim_name(rd), rrdhost_hostname(host));
+            }
+            else
+                fprintf(stderr, "RRDDIM '%s' freed from tier %zu of chart '%s' of host '%s'\n",
+                        rrddim_name(rd), tier, rrdset_name(st), rrdhost_hostname(host));
+#endif
         }
         spinlock_unlock(&rd->tiers[tier].spinlock);
     }
