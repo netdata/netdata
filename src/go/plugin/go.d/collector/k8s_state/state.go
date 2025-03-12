@@ -203,6 +203,7 @@ type cronJobState struct {
 	namespace    string
 	creationTime time.Time
 
+	suspend            bool
 	lastScheduleTime   *time.Time
 	lastSuccessfulTime *time.Time
 }

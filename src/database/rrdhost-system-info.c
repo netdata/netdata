@@ -652,5 +652,12 @@ void get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
     if(ri->host_os_id_like)
         strncpyz(ds->os_id_like, ri->host_os_id_like, sizeof(ds->os_id_like) - 1);
 
+    if(ri->is_k8s_node) {
+        if (strcmp(ri->is_k8s_node, "true") == 0)
+            ds->kubernetes = true;
+        else
+            ds->kubernetes = false;
+    }
+
     ds->read_system_info = true;
 }
