@@ -30,9 +30,12 @@
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
         strncpyz(dst, json_object_get_string(_j), sizeof(dst) - 1);                                             \
     }                                                                                                           \
-    else if(required) {                                                                                         \
-        buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                      \
-        return false;                                                                                           \
+    else {                                                                                                      \
+        dst[0] = '\0';                                                                                          \
+        if (required) {                                                                                         \
+            buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                  \
+            return false;                                                                                       \
+        }                                                                                                       \
     }                                                                                                           \
 } while(0)
 

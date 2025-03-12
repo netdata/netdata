@@ -28,10 +28,16 @@ static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_un
 //                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
 }
 
+static void rrd_functions_cleanup(struct rrd_host_function *rdcf) {
+    rrd_collector_release(rdcf->collector);
+    string_freez(rdcf->help);
+    string_freez(rdcf->tags);
+}
+
 static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
                                           void *rrdhost __maybe_unused) {
     struct rrd_host_function *rdcf = func;
-    rrd_collector_release(rdcf->collector);
+    rrd_functions_cleanup(rdcf);
 }
 
 static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
@@ -50,9 +56,8 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
                dictionary_acquired_item_name(item), rrdhost_hostname(host),
                rrd_collector_tid(rdcf->collector), rrd_collector_tid(thread_rrd_collector));
 
-        struct rrd_collector *old_rdc = rdcf->collector;
+        new_rdcf->collector = rdcf->collector;
         rdcf->collector = rrd_collector_acquire_current_thread();
-        rrd_collector_release(old_rdc);
         changed = true;
     }
 
@@ -72,7 +77,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
                "FUNCTIONS: function '%s' of host '%s' changed execute callback",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
-        rdcf->execute_cb = new_rdcf->execute_cb;
+        SWAP(rdcf->execute_cb, new_rdcf->execute_cb);
         changed = true;
     }
 
@@ -81,26 +86,18 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
                "FUNCTIONS: function '%s' of host '%s' changed help text",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
-        STRING *old = rdcf->help;
-        rdcf->help = new_rdcf->help;
-        string_freez(old);
+        SWAP(rdcf->help, new_rdcf->help);
         changed = true;
     }
-    else
-        string_freez(new_rdcf->help);
 
     if(rdcf->tags != new_rdcf->tags) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: function '%s' of host '%s' changed tags",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
-        STRING *old = rdcf->tags;
-        rdcf->tags = new_rdcf->tags;
-        string_freez(old);
+        SWAP(rdcf->tags, new_rdcf->tags);
         changed = true;
     }
-    else
-        string_freez(new_rdcf->tags);
 
     if(rdcf->timeout != new_rdcf->timeout) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -108,7 +105,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
                dictionary_acquired_item_name(item), rrdhost_hostname(host),
                rdcf->timeout, new_rdcf->timeout);
 
-        rdcf->timeout = new_rdcf->timeout;
+        SWAP(rdcf->timeout, new_rdcf->timeout);
         changed = true;
     }
 
@@ -118,7 +115,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
                dictionary_acquired_item_name(item), rrdhost_hostname(host),
                rdcf->version, new_rdcf->version);
 
-        rdcf->version = new_rdcf->version;
+        SWAP(rdcf->version, new_rdcf->version);
         changed = true;
     }
 
@@ -127,7 +124,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
                "FUNCTIONS: function '%s' of host '%s' changed priority",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
-        rdcf->priority = new_rdcf->priority;
+        SWAP(rdcf->priority, new_rdcf->priority);
         changed = true;
     }
 
@@ -136,7 +133,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
                "FUNCTIONS: function '%s' of host '%s' changed access level",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
-        rdcf->access = new_rdcf->access;
+        SWAP(rdcf->access, new_rdcf->access);
         changed = true;
     }
 
@@ -145,7 +142,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
                "FUNCTIONS: function '%s' of host '%s' changed sync/async mode",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
-        rdcf->sync = new_rdcf->sync;
+        SWAP(rdcf->sync, new_rdcf->sync);
         changed = true;
     }
 
@@ -154,13 +151,15 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
                "FUNCTIONS: function '%s' of host '%s' changed execute callback data",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
-        rdcf->execute_cb_data = new_rdcf->execute_cb_data;
+        SWAP(rdcf->execute_cb_data, new_rdcf->execute_cb_data);
         changed = true;
     }
 
 //    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
 //                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
 //                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
+
+    rrd_functions_cleanup(new_rdcf);
 
     return changed;
 }
@@ -232,6 +231,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     rrd_functions_sanitize(key, name, sizeof(key));
 
     struct rrd_host_function tmp = {
+        .collector = NULL,
         .sync = sync,
         .timeout = timeout,
         .version = version,

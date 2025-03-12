@@ -16,11 +16,12 @@ typedef enum {
     SERVICE_ACLK                  = (1 << 7),
     SERVICE_HEALTH                = (1 << 8),
     SERVICE_STREAMING             = (1 << 9),
-    SERVICE_CONTEXT               = (1 << 10),
-    SERVICE_ANALYTICS             = (1 << 11),
-    SERVICE_EXPORTERS             = (1 << 12),
-    SERVICE_HTTPD                 = (1 << 13),
-    SERVICE_SYSTEMD               = (1 << 14),
+    SERVICE_STREAMING_CONNECTOR   = (1 << 10),
+    SERVICE_CONTEXT               = (1 << 11),
+    SERVICE_ANALYTICS             = (1 << 12),
+    SERVICE_EXPORTERS             = (1 << 13),
+    SERVICE_HTTPD                 = (1 << 14),
+    SERVICE_SYSTEMD               = (1 << 15),
 } SERVICE_TYPE;
 
 typedef enum {
