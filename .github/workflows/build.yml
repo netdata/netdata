@@ -284,8 +284,8 @@ jobs:
         id: build
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 360
-          max_attempts: 3
+          timeout_minutes: 150
+          max_attempts: 2
           command: |
             export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
             [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
