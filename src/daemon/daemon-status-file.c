@@ -118,8 +118,11 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         buffer_json_member_add_string_or_empty(wb, "ND_install_type", ds->install_type); // custom
 
-        buffer_json_member_add_string(wb, "ND_db_mode", rrd_memory_mode_name(ds->db_mode)); // custom
-        buffer_json_member_add_uint64(wb, "ND_db_tiers", ds->db_tiers); // custom
+        if(ds->v >= 14) {
+            buffer_json_member_add_string(wb, "ND_db_mode", rrd_memory_mode_name(ds->db_mode)); // custom
+            buffer_json_member_add_uint64(wb, "ND_db_tiers", ds->db_tiers); // custom
+            buffer_json_member_add_boolean(wb, "ND_kubernetes", ds->kubernetes); // custom
+        }
 
         buffer_json_member_add_object(wb, "ND_timings"); // custom
         {
@@ -260,6 +263,12 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 14) {
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ND_db_mode", rrd_memory_mode_id, ds->db_mode, error, required_v14);
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ND_db_tiers", ds->db_tiers, error, required_v14);
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_kubernetes", ds->kubernetes, error, required_v14);
+        }
+        else {
+            ds->db_mode = default_rrd_memory_mode;
+            ds->db_tiers = nd_profile.storage_tiers;
+            ds->kubernetes = false;
         }
     });
 
