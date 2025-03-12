@@ -4171,12 +4171,36 @@ static pid_t ebpf_read_previous_pid(char *filename)
 }
 
 /**
+ * Validate Data Sharing Selection
+ *
+ * Validate user input avoid sigsegv
+ */
+void ebpf_validate_data_sharing_selection() {
+    uint32_t enabled = CONFIG_BOOLEAN_NO;
+    for (uint32_t i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
+        if (ebpf_modules[i].apps_charts || ebpf_modules[i].cgroup_charts) {
+            enabled = CONFIG_BOOLEAN_YES;
+            break;
+        }
+    }
+
+    // TODO: MODIFY IN NEXT PRs THE OPTION TO ALSO USE SOCKET
+    if (enabled && integration_with_collectors != NETDATA_EBPF_INTEGRATION_SHM) {
+    //if (enabled && integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED) {
+        integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
+    }
+}
+
+/**
  * Initialize Data Sharing
  *
  * Start sharing according to user configuration.
  */
 static void ebpf_initialize_data_sharing()
 {
+    ebpf_validate_data_sharing_selection();
+
+    // Initialize
     switch (integration_with_collectors) {
         case NETDATA_EBPF_INTEGRATION_SOCKET: {
             socket_ipc =
