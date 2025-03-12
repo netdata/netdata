@@ -68,6 +68,7 @@ const (
 	prioCronJobLastCompletionDuration
 	prioCronJobLastCompletedTimeAgo
 	prioCronJobLastScheduleTimeAgo
+	prioCronJobSuspendStatus
 	prioCronJobAge
 )
 
@@ -153,6 +154,7 @@ var cronJobChartsTmpl = module.Charts{
 	cronJobLastCompletionDurationChartTmpl.Copy(),
 	cronJobLastCompletedTimeAgoChartTmpl.Copy(),
 	cronJobLastScheduleTimeAgoChartTmpl.Copy(),
+	cronJobSuspendStatusChartTmpl.Copy(),
 	cronJobAgeChartTmpl.Copy(),
 }
 
@@ -927,6 +929,19 @@ var (
 		Priority: prioCronJobLastScheduleTimeAgo,
 		Dims: module.Dims{
 			{ID: "cronjob_%s_last_schedule_seconds_ago", Name: "last_schedule_ago"},
+		},
+	}
+	cronJobSuspendStatusChartTmpl = module.Chart{
+		IDSep:    true,
+		ID:       "cronjob_%s.suspend_status",
+		Title:    "CronJob Suspend Status",
+		Units:    "status",
+		Fam:      "cronjob status",
+		Ctx:      "k8s_state.cronjob_suspend_status",
+		Priority: prioCronJobSuspendStatus,
+		Dims: module.Dims{
+			{ID: "cronjob_%s_suspend_status_enabled", Name: "enabled"},
+			{ID: "cronjob_%s_suspend_status_suspended", Name: "suspended"},
 		},
 	}
 	cronJobAgeChartTmpl = module.Chart{

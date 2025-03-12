@@ -456,6 +456,53 @@ static long unittest_string_entries(void) {
     return entries;
 }
 
+// returns the number of strings that were freed, but were still referenced
+size_t string_destroy(void) {
+    size_t referenced = 0;
+
+    // Traverse all partitions
+    for (size_t partition = 0; partition < STRING_PARTITIONS; partition++) {
+        // Lock the partition to prevent new entries while we're cleaning up
+        rw_spinlock_write_lock(&string_base[partition].spinlock);
+
+        // Since JudyHS doesn't have simple traversal functions,
+        // we'll free the entire array at once.
+        // This is a bit inefficient because we won't be able to
+        // determine exactly how many strings were referenced.
+        if (string_base[partition].JudyHSArray) {
+            // We'll count all entries as "referenced" since we can't check them individually
+            referenced += string_base[partition].entries;
+
+            // Free the JudyHS array
+            JudyHSFreeArray(&string_base[partition].JudyHSArray, PJE0);
+            string_base[partition].JudyHSArray = NULL;
+        }
+
+        // Reset partition statistics
+        string_base[partition].inserts = 0;
+        string_base[partition].deletes = 0;
+        string_base[partition].entries = 0;
+        string_base[partition].memory = 0;
+        string_base[partition].memory_index = 0;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        string_base[partition].atomic.searches = 0;
+        string_base[partition].atomic.releases = 0;
+        string_base[partition].atomic.duplications = 0;
+        string_base[partition].atomic.active_references = 0;
+        string_base[partition].found_deleted_on_search = 0;
+        string_base[partition].found_available_on_search = 0;
+        string_base[partition].found_deleted_on_insert = 0;
+        string_base[partition].found_available_on_insert = 0;
+        string_base[partition].spins = 0;
+#endif
+
+        rw_spinlock_write_unlock(&string_base[partition].spinlock);
+    }
+
+    return referenced;
+}
+
 #ifdef NETDATA_INTERNAL_CHECKS
 
 static size_t unittest_string_found_deleted_on_search(void) {

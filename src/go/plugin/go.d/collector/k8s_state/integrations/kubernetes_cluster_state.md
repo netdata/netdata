@@ -135,6 +135,7 @@ Metrics:
 | k8s_state.cronjob_last_completion_duration | last_completion | seconds |
 | k8s_state.cronjob_last_completed_time_ago | last_completed_ago | seconds |
 | k8s_state.cronjob_last_schedule_time_ago | last_schedule_ago | seconds |
+| k8s_state.cronjob_suspend_status | enabled, suspended | status |
 | k8s_state.cronjob_age | age | seconds |
 
 ### Per pod
