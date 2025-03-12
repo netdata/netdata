@@ -309,6 +309,13 @@ modules:
               chart_type: line
               dimensions:
                 - name: last_schedule_ago
+            - name: k8s_state.cronjob_suspend_status
+              description: CronJob Suspend Status
+              unit: 'status'
+              chart_type: line
+              dimensions:
+                - name: enabled
+                - name: suspended
             - name: k8s_state.cronjob_age
               description: CronJob Age
               unit: 'seconds'

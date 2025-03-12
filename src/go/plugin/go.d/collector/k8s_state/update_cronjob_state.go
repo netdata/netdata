@@ -27,6 +27,11 @@ func (c *Collector) updateCronJobState(r resource) {
 		st.creationTime = cj.CreationTimestamp.Time
 	}
 
+	st.suspend = false
+	if cj.Spec.Suspend != nil {
+		st.suspend = *cj.Spec.Suspend
+	}
+
 	st.lastScheduleTime = nil
 	st.lastSuccessfulTime = nil
 
