@@ -684,6 +684,8 @@ static void remove_old_status_files(const char *protected_dir) {
         snprintfz(filename, sizeof(filename), "%s/%s", status_file_fallbacks[i], STATUS_FILENAME);
         unlink(filename);
     }
+
+    errno_clear();
 }
 
 static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log) {
