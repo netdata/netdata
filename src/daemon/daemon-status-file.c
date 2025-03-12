@@ -683,6 +683,8 @@ static void static_save_buffer_init(void) {
 }
 
 static void remove_old_status_files(const char *protected_dir) {
+    FUNCTION_RUN_ONCE();
+    
     char filename[FILENAME_MAX];
 
     set_dynamic_fallbacks();
