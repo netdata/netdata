@@ -2,9 +2,41 @@
 
 #include "ebpf-ipc.h"
 
-netdata_ebpf_pid_stats_t *integration_shm;
+netdata_ebpf_pid_stats_t *integration_shm = NULL;
 int shm_fd_ebpf_integration = -1;
 sem_t *shm_mutex_ebpf_integration = SEM_FAILED;
+
+bool using_vector = false;
+
+bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_index idx)
+{
+    if (using_vector && integration_shm) {
+        if (idx != NETDATA_EBPF_PIDS_SOCKET_IDX)
+            bpf_map_delete_elem(fd, &pid);
+
+        netdata_ebpf_pid_stats_t *ptr = &integration_shm[pid];
+        ptr->threads &= ~(idx << 1);
+        if (!ptr->threads) {
+            memset(ptr, 0, sizeof(*ptr));
+            return true;
+        }
+    }
+
+    return false;
+}
+
+netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum ebpf_pids_index idx) {
+    if (!integration_shm)
+        return NULL;
+
+    if (using_vector) {
+        netdata_ebpf_pid_stats_t *ptr = &integration_shm[pid];
+        ptr->threads |= idx<<1;
+        return ptr;
+    }
+
+    return NULL;
+}
 
 void netdata_integration_cleanup_shm()
 {
@@ -22,8 +54,16 @@ void netdata_integration_cleanup_shm()
     }
 }
 
+static void netdata_ebpf_select_access_mode(size_t pids)
+{
+    size_t local_max = (size_t)os_get_system_pid_max();
+    using_vector = (pids == local_max);
+}
+
 int netdata_integration_initialize_shm(size_t pids)
 {
+    netdata_ebpf_select_access_mode(pids);
+
     shm_fd_ebpf_integration = shm_open(NETDATA_EBPF_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
     if (shm_fd_ebpf_integration < 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot initialize shared memory. Integration won't happen.");
@@ -36,9 +76,8 @@ int netdata_integration_initialize_shm(size_t pids)
         goto end_shm;
     }
 
-    integration_shm = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd_ebpf_integration, 0);
-    if (unlikely(MAP_FAILED == integration_shm)) {
-        integration_shm = NULL;
+    integration_shm = nd_mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd_ebpf_integration, 0);
+    if (!integration_shm) {
         nd_log(
             NDLS_COLLECTORS,
             NDLP_ERR,
