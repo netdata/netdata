@@ -388,6 +388,9 @@ func (c *Collector) collectCronJobState(mx map[string]int64) {
 		mx[px+"complete_jobs"] = 0
 		mx[px+"suspended_jobs"] = 0
 
+		mx[px+"suspend_status_enabled"] = metrix.Bool(!st.suspend)
+		mx[px+"suspend_status_suspended"] = metrix.Bool(st.suspend)
+
 		mx[px+"failed_jobs_reason_pod_failure_policy"] = 0
 		mx[px+"failed_jobs_reason_backoff_limit_exceeded"] = 0
 		mx[px+"failed_jobs_reason_deadline_exceeded"] = 0
