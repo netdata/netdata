@@ -784,7 +784,8 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core)
             cachestat_save_pid_values(publish, cv);
         } else {
             if (kill((pid_t)key, 0)) { // No PID found
-                netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
+                if (!netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_CACHESTAT_IDX))
+                    memset(publish, 0, sizeof(*publish));
             }
         }
 
