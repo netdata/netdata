@@ -54,7 +54,6 @@ func New() *Collector {
 
 		checkMaxReps:  true,
 		collectIfMib:  true,
-		profileDir:    "/home/fotis/Documents/netdata/src/go/plugin/go.d/collector/profiles",
 		netInterfaces: make(map[string]*netInterface),
 	}
 }
@@ -75,8 +74,6 @@ type Collector struct {
 
 	checkMaxReps bool
 	collectIfMib bool
-
-	profileDir string
 
 	netInterfaces map[string]*netInterface
 

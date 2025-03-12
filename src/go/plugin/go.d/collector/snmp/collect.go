@@ -5,7 +5,6 @@ package snmp
 import (
 	"errors"
 	"fmt"
-	"log"
 	"slices"
 	"strings"
 
@@ -17,34 +16,6 @@ import (
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
-
-	// load the sysobjectid
-	sysObjectID, err := c.getSysObjectID(snmpsd.OidSysObject)
-	if err != nil {
-		return nil, err
-	}
-
-	// Load all profiles
-	profiles, err := LoadAllProfiles(c.profileDir)
-	if err != nil {
-		return nil, err
-	}
-
-	matchingProfiles := FindMatchingProfiles(profiles, sysObjectID)
-	if len(matchingProfiles) == 0 {
-		log.Printf("No matching profile found for sysObjectID: %s", sysObjectID)
-	}
-
-	// metricMap
-	_, err = c.parseMetricsFromProfiles(matchingProfiles)
-	if err != nil {
-		return nil, err
-	}
-
-	// mx := make(map[string]int64)
-
-	// c.makeChartsFromMetricMap(mx, metricMap)
-
 	if c.sysInfo == nil {
 		si, err := snmpsd.GetSysInfo(c.snmpClient)
 		if err != nil {
