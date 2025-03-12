@@ -2,7 +2,7 @@
 
 #include "uuidmap.h"
 
-#define UUIDMAP_REUSE_GAP 1000
+#define UUIDMAP_REUSE_GAP 10000
 
 struct uuidmap_entry {
     nd_uuid_t uuid;
