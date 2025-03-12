@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 13
+#define STATUS_FILE_VERSION 14
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -117,6 +117,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         EXIT_REASON_2json(wb, "ND_exit_reason", ds->exit_reason); // custom
 
         buffer_json_member_add_string_or_empty(wb, "ND_install_type", ds->install_type); // custom
+
+        buffer_json_member_add_string(wb, "ND_db_mode", rrd_memory_mode_name(ds->db_mode)); // custom
+        buffer_json_member_add_uint64(wb, "ND_db_tiers", ds->db_tiers); // custom
 
         buffer_json_member_add_object(wb, "ND_timings"); // custom
         {
@@ -226,6 +229,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v4 = version >= 4 ? strict : false;
     bool required_v5 = version >= 5 ? strict : false;
     bool required_v10 = version >= 10 ? strict : false;
+    bool required_v14 = version >= 14 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -252,6 +256,11 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
         if(version >= 4)
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ND_restarts", ds->restarts, error, required_v4);
+
+        if(version >= 14) {
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ND_db_mode", rrd_memory_mode_id, ds->db_mode, error, required_v14);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ND_db_tiers", ds->db_tiers, error, required_v14);
+        }
     });
 
     // Parse host object
@@ -383,6 +392,8 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
     session_status.invocation = nd_log_get_invocation_id();
+    session_status.db_mode = default_rrd_memory_mode;
+    session_status.db_tiers = nd_profile.storage_tiers;
 
     session_status.claim_id = claim_id_get_uuid();
 

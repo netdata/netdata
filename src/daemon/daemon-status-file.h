@@ -33,6 +33,8 @@ typedef struct daemon_status_file {
     EXIT_REASON exit_reason;    // the exit reason (maybe empty)
     ND_PROFILE profile;         // the profile of the agent
     DAEMON_OS_TYPE os_type;
+    RRD_DB_MODE db_mode;
+    uint32_t db_tiers;
 
     time_t boottime;            // system boottime
     time_t uptime;              // netdata uptime
