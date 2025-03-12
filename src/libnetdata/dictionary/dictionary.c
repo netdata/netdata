@@ -330,11 +330,11 @@ static void dictionary_queue_for_destruction(DICTIONARY *dict) {
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 }
 
-void cleanup_destroyed_dictionaries(void) {
+bool cleanup_destroyed_dictionaries(void) {
     netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
     if (!dictionaries_waiting_to_be_destroyed) {
         netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
-        return;
+        return false;
     }
 
     DICTIONARY *dict, *last = NULL, *next = NULL;
@@ -371,7 +371,10 @@ void cleanup_destroyed_dictionaries(void) {
         }
     }
 
+    bool ret = dictionaries_waiting_to_be_destroyed != NULL;
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+
+    return ret;
 }
 
 // ----------------------------------------------------------------------------
@@ -592,6 +595,8 @@ void dictionary_flush(DICTIONARY *dict) {
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
     DICTIONARY_STATS_DICT_FLUSHES_PLUS1(dict);
+
+    dictionary_garbage_collect(dict);
 }
 
 size_t dictionary_destroy(DICTIONARY *dict) {
@@ -601,7 +606,6 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    dict_flag_set(dict, DICT_FLAG_DESTROYED);
     DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(dict);
 
     size_t referenced_items = dictionary_referenced_items(dict);

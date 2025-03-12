@@ -344,7 +344,11 @@ struct nd_log nd_log = {
             .method = NDLM_DEFAULT,
             .format = NDLF_LOGFMT,
             .filename = LOG_DIR "/collector.log",
+#if defined(FSANITIZE_ADDRESS)
+            .fd = -1,
+#else
             .fd = STDERR_FILENO,
+#endif
             .fp = NULL,
             .min_priority = NDLP_INFO,
             .limits = ND_LOG_LIMITS_DEFAULT,
@@ -354,7 +358,11 @@ struct nd_log nd_log = {
             .method = NDLM_DISABLED,
             .format = NDLF_LOGFMT,
             .filename = LOG_DIR "/debug.log",
+#if defined(FSANITIZE_ADDRESS)
+            .fd = -1,
+#else
             .fd = STDOUT_FILENO,
+#endif
             .fp = NULL,
             .min_priority = NDLP_DEBUG,
             .limits = ND_LOG_LIMITS_UNLIMITED,

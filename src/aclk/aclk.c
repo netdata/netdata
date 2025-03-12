@@ -872,7 +872,7 @@ void *aclk_main(void *ptr)
 
         if (schedule_node_update) {
             worker_is_busy(WORKER_ACLK_NODE_UPDATE);
-            schedule_node_state_update(localhost, 0);
+            schedule_node_state_update(localhost, 10);
             schedule_node_update = false;
         }
 

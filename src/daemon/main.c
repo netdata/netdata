@@ -742,11 +742,16 @@ int netdata_main(int argc, char **argv) {
         }
     }
 
+#if !defined(FSANITIZE_ADDRESS)
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
         os_close_all_non_std_open_fds_except(NULL, 0, 0);
     }
+#else
+    fprintf(stderr, "Running with a Sanitizer, custom allocators are disabled.\n");
+    fprintf(stderr, "Running with a Sanitizer, not closing open fds.\n");
+#endif
 
     if(!config_loaded) {
         netdata_conf_load(NULL, 0, &user);
@@ -759,22 +764,30 @@ int netdata_main(int argc, char **argv) {
 
     netdata_conf_section_logs();
     nd_log_limits_unlimited();
-
-    // initialize the log files
     nd_log_initialize();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // this MUST be before anything else - to load the old status file before saving a new one
+
+    daemon_status_file_init(); // this loads the old file
     nd_log_register_fatal_data_cb(daemon_status_file_register_fatal);
     nd_log_register_fatal_final_cb(fatal_status_file_save);
+    exit_initiated_init();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("signals");
+
+    signals_block_all_except_deadly();
+    nd_initialize_signals(); // catches deadly signals and stores them in the status file
+
+    // ----------------------------------------------------------------------------------------------------------------
 
     netdata_conf_section_global(); // get hostname, host prefix, profile, etc
     registry_init(); // for machine_guid, must be after netdata_conf_section_global()
 
-    // initialize thread - this is required before the first nd_thread_create()
-    default_stacksize = netdata_threads_init();
-    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
-    if (default_stacksize < 1 * 1024 * 1024)
-        default_stacksize = 1 * 1024 * 1024;
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("run dir");
 
-    // make sure we are the only instance running
     {
         const char *run_dir = os_run_dir(true);
         if(!run_dir) {
@@ -794,18 +807,25 @@ int netdata_main(int argc, char **argv) {
 
     nd_profile_setup();
 
-    // status and crash/update/exit detection
-    signals_block_all_except_deadly();
-    exit_initiated_reset();
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("stack size");
+
+    // initialize thread - this is required before the first nd_thread_create()
+    default_stacksize = netdata_threads_init();
+
+    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
+    if (default_stacksize < 1 * 1024 * 1024)
+        default_stacksize = 1 * 1024 * 1024;
+
+    netdata_threads_set_stack_size(default_stacksize);
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("crash reports");
+
     daemon_status_file_check_crash();
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("signals");
-
-    nd_initialize_signals();
-
-    // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("temporary spawn server");
+    delta_startup_time("temp spawn server");
 
     netdata_main_spawn_server_init("init", argc, (const char **)argv);
 
@@ -813,12 +833,6 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("ssl");
 
     netdata_conf_ssl();
-
-    // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("execution path");
-
-    // Get the execution path before switching user to avoid permission issues
-    get_netdata_execution_path();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("environment for plugins");
@@ -989,7 +1003,8 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("threads after fork");
 
-    netdata_threads_init_after_fork((size_t)inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
+    netdata_threads_set_stack_size(
+        (size_t)inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("registry");
@@ -1011,20 +1026,19 @@ int netdata_main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = rrdhost_system_info_create();
     rrdhost_system_info_detect(system_info);
 
-    // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("install type");
-
     get_install_type(system_info);
+
+    set_late_analytics_variables(system_info);
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("RRD structures");
 
     abort_on_fatal_disable();
-    if(rrd_init(netdata_configured_hostname, system_info, false)) {
-        set_late_analytics_variables(system_info);
+    if (rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
-    }
+
     abort_on_fatal_enable();
+    system_info = NULL; // system_info is now freed by rrd_init
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("localhost labels");
@@ -1049,7 +1063,6 @@ int netdata_main(int argc, char **argv) {
 
     netdata_conf_section_web();
 
-    set_late_analytics_variables(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
@@ -1130,6 +1143,11 @@ int main(int argc, char *argv[])
     int rc = netdata_main(argc, argv);
     if (rc != 10)
         return rc;
+
+#if defined(FSANITIZE_ADDRESS)
+    fprintf(stdout, "STDOUT: Sanitizers mode enabled...\n");
+    fprintf(stderr, "STDERR: Sanitizers mode enabled...\n");
+#endif
 
     nd_process_signals();
     return 1;

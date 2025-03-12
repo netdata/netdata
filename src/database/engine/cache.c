@@ -1843,7 +1843,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
 
         // call the callback to save them
         // it may take some time, so let's release the lock
-        cache->config.pgc_save_dirty_cb(cache, array, pages, pages_added);
+        if(cache->config.pgc_save_dirty_cb)
+            cache->config.pgc_save_dirty_cb(cache, array, pages, pages_added);
+
         flushes_so_far++;
 
         __atomic_add_fetch(&cache->stats.flushes_completed, pages_added, __ATOMIC_RELAXED);
@@ -2086,7 +2088,12 @@ void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {
     flush_pages(cache, 0, section, true, true);
 }
 
-void pgc_destroy(PGC *cache) {
+void pgc_destroy(PGC *cache, bool flush) {
+    if(!flush) {
+        cache->config.pgc_save_init_cb = NULL;
+        cache->config.pgc_save_dirty_cb = NULL;
+    }
+
     // convert all hot pages to dirty
     all_hot_pages_to_dirty(cache, PGC_SECTION_ALL);
 
@@ -3064,7 +3071,7 @@ int pgc_unittest(void) {
     pgc_page_hot_set_end_time_s(cache, page3, 2001, 0);
     pgc_page_hot_to_dirty_and_release(cache, page3, false);
 
-    pgc_destroy(cache);
+    pgc_destroy(cache, true);
 
 #ifdef PGC_STRESS_TEST
     unittest_stress_test();

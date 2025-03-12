@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -23,7 +22,7 @@ func init() {
 	module.Register("pihole", module.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: module.Defaults{
-			UpdateEvery: 5,
+			UpdateEvery: 1,
 		},
 		Create: func() module.Module { return New() },
 		Config: func() any { return &Config{} },
@@ -35,18 +34,15 @@ func New() *Collector {
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
-					URL: "http://127.0.0.1",
+					URL:      "http://127.0.0.1",
+					Password: "",
 				},
 				ClientConfig: web.ClientConfig{
-					Timeout: confopt.Duration(time.Second * 5),
+					Timeout: confopt.Duration(time.Second * 1),
 				},
 			},
-			SetupVarsPath: "/etc/pihole/setupVars.conf",
 		},
-		checkVersion:           true,
-		charts:                 baseCharts.Copy(),
-		addQueriesTypesOnce:    &sync.Once{},
-		addFwsDestinationsOnce: &sync.Once{},
+		charts: summaryCharts.Copy(),
 	}
 }
 
@@ -54,20 +50,16 @@ type Config struct {
 	Vnode          string `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery    int    `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTPConfig `yaml:",inline" json:""`
-	SetupVarsPath  string `yaml:"setup_vars_path" json:"setup_vars_path"`
 }
 
 type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
-	charts                 *module.Charts
-	addQueriesTypesOnce    *sync.Once
-	addFwsDestinationsOnce *sync.Once
+	charts *module.Charts
 
 	httpClient *http.Client
-
-	checkVersion bool
+	auth       *ftlAPIAuthResponse
 }
 
 func (c *Collector) Configuration() any {
@@ -75,22 +67,18 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Init(context.Context) error {
-	if err := c.validateConfig(); err != nil {
-		return fmt.Errorf("config validation: %v", err)
+	if c.URL == "" {
+		return errors.New("url not set")
+	}
+	if c.Password == "" {
+		return errors.New("password not set")
 	}
 
-	httpClient, err := c.initHTTPClient()
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init http client: %v", err)
 	}
 	c.httpClient = httpClient
-
-	c.Password = c.getWebPassword()
-	if c.Password == "" {
-		c.Warning("no web password, not all metrics available")
-	} else {
-		c.Debugf("web password: %s", c.Password)
-	}
 
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -139,14 +140,28 @@ func (d *kubeDiscovery) setupDiscoverers(ctx context.Context) []discoverer {
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) { return deploy.Watch(ctx, options) },
 	}
 
+	cj := d.client.BatchV1().CronJobs(corev1.NamespaceAll)
+	cjWatcher := &cache.ListWatch{
+		ListFunc:  func(options metav1.ListOptions) (runtime.Object, error) { return cj.List(ctx, options) },
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) { return cj.Watch(ctx, options) },
+	}
+
+	jobs := d.client.BatchV1().Jobs(corev1.NamespaceAll)
+	jobsWatcher := &cache.ListWatch{
+		ListFunc:  func(options metav1.ListOptions) (runtime.Object, error) { return jobs.List(ctx, options) },
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) { return jobs.Watch(ctx, options) },
+	}
+
 	return []discoverer{
 		newNodeDiscoverer(cache.NewSharedInformer(nodeWatcher, &corev1.Node{}, resyncPeriod), d.Logger),
 		newPodDiscoverer(cache.NewSharedInformer(podWatcher, &corev1.Pod{}, resyncPeriod), d.Logger),
 		newDeploymentDiscoverer(cache.NewSharedInformer(deployWatcher, &appsv1.Deployment{}, resyncPeriod), d.Logger),
+		newCronJobDiscoverer(cache.NewSharedInformer(cjWatcher, &batchv1.CronJob{}, resyncPeriod), d.Logger),
+		newJobDiscoverer(cache.NewSharedInformer(jobsWatcher, &batchv1.Job{}, resyncPeriod), d.Logger),
 	}
 }
 
-func enqueue(queue *workqueue.Typed[any], obj any) {
+func enqueue(queue *workqueue.Typed[string], obj any) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return

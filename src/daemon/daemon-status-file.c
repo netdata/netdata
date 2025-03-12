@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 11
+#define STATUS_FILE_VERSION 13
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -835,15 +835,13 @@ static enum crash_report_t check_crash_reports_config(void) {
     return rc;
 }
 
-void daemon_status_file_check_crash(void) {
-    FUNCTION_RUN_ONCE();
-
+void daemon_status_file_init(void) {
     static_save_buffer_init();
-
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
-
     daemon_status_file_load(&last_session_status);
-    daemon_status_file_startup_step("startup(read status file)");
+}
+
+void daemon_status_file_check_crash(void) {
     struct log_priority pri = PRI_ALL_NORMAL;
 
     bool new_version = strcmp(last_session_status.version, session_status.version) != 0;
@@ -1051,8 +1049,6 @@ void daemon_status_file_check_crash(void) {
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause))
 
         ) {
-        daemon_status_file_startup_step("startup(post status file)");
-
         netdata_conf_ssl();
 
         struct post_status_file_thread_data d = {
@@ -1123,7 +1119,7 @@ void daemon_status_file_update_status(DAEMON_STATUS status) {
 static void daemon_status_file_out_of_memory(void) {
     FUNCTION_RUN_ONCE();
 
-    // DO NOT LOCK OR ALLOCATE IN THIS FUNCTION - WE DON'T HAVE ANY MEMORY AVAILABLE - IT HAPPENED ALREADY!
+    // DO NOT ALLOCATE IN THIS FUNCTION - WE DON'T HAVE ANY MEMORY AVAILABLE!
 
     exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
 
@@ -1146,7 +1142,7 @@ void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
 
     session_status.exit_reason |= reason;
     if(!session_status.fatal.thread[0])
-        strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
+        strncpyz(session_status.fatal.thread, nd_thread_tag_async_safe(), sizeof(session_status.fatal.thread) - 1);
 
     dsf_release(session_status);
 
@@ -1156,8 +1152,9 @@ void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
     // save what we know already
     daemon_status_file_save(static_save_buffer, &session_status, false);
 
-    // we cannot get a stack trace on SIGABRT - it may deadlock forever
-    if(reason != EXIT_REASON_SIGABRT && !session_status.fatal.stack_trace[0]) {
+    bool can_safely_capture_stack_trace = reason != EXIT_REASON_SIGABRT || capture_stack_trace_is_async_signal_safe();
+
+    if(can_safely_capture_stack_trace && !session_status.fatal.stack_trace[0]) {
         buffer_flush(static_save_buffer);
         capture_stack_trace(static_save_buffer);
         strncpyz(session_status.fatal.stack_trace, buffer_tostring(static_save_buffer), sizeof(session_status.fatal.stack_trace) - 1);

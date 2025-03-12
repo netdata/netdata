@@ -174,6 +174,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         system_info,
         1);
 
+    rrdhost_system_info_free(system_info);
+
     if (likely(host)) {
         if (is_ephemeral)
             rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
@@ -905,6 +907,15 @@ void create_aclk_config(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __may
     wc->stream_alerts = false;
     time_t now = now_realtime_sec();
     wc->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
+}
+
+void destroy_aclk_config(RRDHOST *host)
+{
+    if (!host || !host->aclk_config)
+        return;
+
+    freez(host->aclk_config);
+    host->aclk_config = NULL;
 }
 
 #define SQL_FETCH_ALL_HOSTS                                                                                            \

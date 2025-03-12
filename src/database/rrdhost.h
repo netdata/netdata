@@ -94,17 +94,13 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 #define rrdhost_flag_set_and_clear(host, set, clear)   atomic_flags_set_and_clear(&((host)->flags), set, clear)
 
 typedef enum __attribute__ ((__packed__)) {
-    // Indexing
-    RRDHOST_OPTION_INDEXED_MACHINE_GUID     = (1 << 0), // when set, we have indexed its machine guid
-    RRDHOST_OPTION_INDEXED_HOSTNAME         = (1 << 1), // when set, we have indexed its hostname
-
     // Streaming configuration
-    RRDHOST_OPTION_SENDER_ENABLED           = (1 << 2), // set when the host is configured to send metrics to a parent
-    RRDHOST_OPTION_REPLICATION              = (1 << 3), // when set, we support replication for this host
+    RRDHOST_OPTION_SENDER_ENABLED           = (1 << 0), // set when the host is configured to send metrics to a parent
+    RRDHOST_OPTION_REPLICATION              = (1 << 1), // when set, we support replication for this host
 
     // Other options
-    RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 4), // when set, this host is a virtual one
-    RRDHOST_OPTION_EPHEMERAL_HOST           = (1 << 5), // when set, this host is an ephemeral one
+    RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 2), // when set, this host is a virtual one
+    RRDHOST_OPTION_EPHEMERAL_HOST           = (1 << 3), // when set, this host is an ephemeral one
 } RRDHOST_OPTIONS;
 
 #define rrdhost_option_check(host, flag) ((host)->options & (flag))
@@ -388,7 +384,7 @@ void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha);
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 RRDHOST *rrdhost_find_by_guid(const char *guid);
-RRDHOST *find_host_by_node_id(char *node_id);
+RRDHOST *rrdhost_find_by_node_id(char *node_id);
 
 #ifdef RRDHOST_INTERNALS
 RRDHOST *rrdhost_create(

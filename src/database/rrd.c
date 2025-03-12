@@ -142,6 +142,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         , 1
         , 0
     );
+    rrdhost_system_info_free(system_info);
 
     if (unlikely(!localhost))
         return 1;

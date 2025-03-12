@@ -410,7 +410,7 @@ static cmd_status_t cmd_remove_stale_node_internal(char *args, char **message, b
     RRDHOST *host = NULL;
     host = rrdhost_find_by_guid(args);
     if (!host)
-        host = find_host_by_node_id(args);
+        host = rrdhost_find_by_node_id(args);
 
     if (!host) {
         sqlite3_stmt *res = NULL;

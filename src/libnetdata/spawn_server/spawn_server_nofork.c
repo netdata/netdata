@@ -119,7 +119,7 @@ static const char** argv_decode(const char *buffer, size_t size) {
 // --------------------------------------------------------------------------------------------------------------------
 // status reports
 
-typedef enum __attribute__((packed)) {
+typedef enum {
     STATUS_REPORT_NONE = 0,
     STATUS_REPORT_STARTED,
     STATUS_REPORT_FAILED,
@@ -1081,6 +1081,10 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         os_setproctitle(buf, server->argc, server->argv);
 
         replace_stdio_with_dev_null();
+
+        if(nd_log_collectors_fd() != STDERR_FILENO)
+            dup2(nd_log_collectors_fd(), STDERR_FILENO);
+
         int fds_to_keep[] = {
             server->sock,
             server->pipe[1],

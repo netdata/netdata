@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
 	"github.com/stretchr/testify/assert"
@@ -497,6 +500,61 @@ func TestCollector_Collect(t *testing.T) {
 							len(podChartsTmpl)+
 							len(containerChartsTmpl)*len(pod.Spec.Containers)+
 							len(deploymentChartsTmpl)+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1},
+				}
+			},
+		},
+		"CronJobs": {
+			create: func(t *testing.T) testCase {
+				cj := prepareCronJob("cronjob01")
+				jobNotStarted := prepareCronJobNotStartedJob("job-not-started", cj)
+				jobComplete := prepareCronJobCompleteJob("job-complete", cj)
+				jobFailed := prepareCronJobFailedJob("job-failed", cj)
+				jobRunning := prepareCronJobRunningJob("job-running", cj)
+				jobSuspended := prepareCronJobSuspendedJob("job-suspended", cj)
+
+				client := fake.NewClientset(
+					cj,
+					jobNotStarted,
+					jobComplete,
+					jobFailed,
+					jobRunning,
+					jobSuspended,
+				)
+
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+					expected := map[string]int64{
+						"cronjob_default_cronjob01_age":                                       10,
+						"cronjob_default_cronjob01_complete_jobs":                             1,
+						"cronjob_default_cronjob01_failed_jobs":                               1,
+						"cronjob_default_cronjob01_failed_jobs_reason_backoff_limit_exceeded": 0,
+						"cronjob_default_cronjob01_failed_jobs_reason_deadline_exceeded":      1,
+						"cronjob_default_cronjob01_failed_jobs_reason_pod_failure_policy":     0,
+						"cronjob_default_cronjob01_last_completion_duration":                  60,
+						"cronjob_default_cronjob01_last_execution_status_failed":              0,
+						"cronjob_default_cronjob01_last_execution_status_succeeded":           1,
+						"cronjob_default_cronjob01_last_schedule_seconds_ago":                 130,
+						"cronjob_default_cronjob01_last_successful_seconds_ago":               70,
+						"cronjob_default_cronjob01_running_jobs":                              1,
+						"cronjob_default_cronjob01_suspended_jobs":                            1,
+						"discovery_node_discoverer_state":                                     1,
+						"discovery_pod_discoverer_state":                                      1,
+					}
+
+					copyIfSuffix(expected, mx, "age", "ago")
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(cronJobChartsTmpl)+
 							len(baseCharts),
 						len(*collr.Charts()),
 					)
@@ -1010,6 +1068,84 @@ func newDeployment(name string) *appsv1.Deployment {
 	}
 }
 
+func prepareCronJob(name string) *batchv1.CronJob {
+	return &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			Namespace:         corev1.NamespaceDefault,
+			UID:               types.UID(name),
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+		},
+		Status: batchv1.CronJobStatus{
+			LastScheduleTime:   &metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
+			LastSuccessfulTime: &metav1.Time{Time: time.Now().Add(-1 * time.Minute)},
+		},
+	}
+}
+
+func prepareCronJobNotStartedJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	return prepareCronJobJob(name, cj)
+}
+
+func prepareCronJobRunningJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	job := prepareCronJobJob(name, cj)
+	job.Status.StartTime = &metav1.Time{Time: time.Now()}
+	job.Status.Active = 1
+	return job
+}
+
+func prepareCronJobCompleteJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	job := prepareCronJobJob(name, cj)
+	job.Status.StartTime = &metav1.Time{Time: time.Now().Add(-1 * time.Minute)}
+	job.Status.CompletionTime = &metav1.Time{Time: time.Now()}
+	job.Status.Conditions = []batchv1.JobCondition{
+		{Type: batchv1.JobComplete, Status: corev1.ConditionTrue},
+	}
+	return job
+}
+
+func prepareCronJobFailedJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	job := prepareCronJobJob(name, cj)
+	job.Status.StartTime = &metav1.Time{Time: time.Now()}
+	job.Status.Conditions = []batchv1.JobCondition{
+		{
+			Type:               batchv1.JobFailed,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+			Reason:             batchv1.JobReasonDeadlineExceeded,
+		},
+	}
+	return job
+}
+
+func prepareCronJobSuspendedJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	job := prepareCronJobJob(name, cj)
+	job.Status.StartTime = &metav1.Time{Time: time.Now()}
+	job.Status.Conditions = []batchv1.JobCondition{
+		{Type: batchv1.JobSuspended, Status: corev1.ConditionTrue},
+	}
+	return job
+}
+
+func prepareCronJobJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			Namespace:         corev1.NamespaceDefault,
+			UID:               types.UID(name),
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Controller: ptr(true),
+					Kind:       "CronJob",
+					UID:        cj.UID,
+					Name:       cj.Name,
+				},
+			},
+		},
+	}
+}
+
 type brokenInfoKubeClient struct {
 	kubernetes.Interface
 }
@@ -1043,15 +1179,20 @@ func mustQuantity(s string) apiresource.Quantity {
 	return q
 }
 
-func copyAge(dst, src map[string]int64) {
+func copyIfSuffix(dst, src map[string]int64, suffixes ...string) {
 	for k, v := range src {
-		if !strings.HasSuffix(k, "_age") {
-			continue
-		}
-		if _, ok := dst[k]; ok {
-			dst[k] = v
+		for _, suffix := range suffixes {
+			if strings.HasSuffix(k, suffix) {
+				if _, ok := dst[k]; ok {
+					dst[k] = v
+				}
+			}
 		}
 	}
+}
+
+func copyAge(dst, src map[string]int64) {
+	copyIfSuffix(dst, src, "_age")
 }
 
 func isLabelValueSet(c *module.Chart, name string) bool {

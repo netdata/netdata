@@ -194,6 +194,8 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     if(!parser->user.host_define.parsing_host)
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
 
+    struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(parser->user.host_define.rrdlabels);
+
     RRDHOST *host = rrdhost_find_or_create(
         string2str(parser->user.host_define.hostname),
         string2str(parser->user.host_define.hostname),
@@ -215,8 +217,10 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         stream_receive.replication.enabled,
         stream_receive.replication.period,
         stream_receive.replication.step,
-        rrdhost_system_info_from_host_labels(parser->user.host_define.rrdlabels),
+        system_info,
         false);
+
+    rrdhost_system_info_free(system_info);
 
     rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
     rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);

@@ -214,7 +214,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
         return;
     }
 
-    RRDHOST *host = find_host_by_node_id(cmd->node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
     if(!host) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', "
@@ -286,7 +286,7 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
         return;
     }
 
-    RRDHOST *host = find_host_by_node_id(cmd->node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
     if(!host) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', "

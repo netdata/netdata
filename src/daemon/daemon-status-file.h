@@ -100,6 +100,7 @@ bool daemon_status_file_was_incomplete_shutdown(void);
 void daemon_status_file_startup_step(const char *step);
 void daemon_status_file_shutdown_step(const char *step);
 
+void daemon_status_file_init(void);
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
 
 #endif //NETDATA_DAEMON_STATUS_FILE_H

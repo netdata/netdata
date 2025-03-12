@@ -16,7 +16,7 @@ func newDeploymentDiscoverer(si cache.SharedInformer, l *logger.Logger) *deploym
 		panic("nil deployment& shared informer")
 	}
 
-	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{Name: "replicaset"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "replicaset"})
 
 	_, _ = si.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { enqueue(queue, obj) },
@@ -45,7 +45,7 @@ func (r deployResource) value() any             { return r.val }
 type deploymentDiscoverer struct {
 	*logger.Logger
 	informer cache.SharedInformer
-	queue    *workqueue.Typed[any]
+	queue    *workqueue.Typed[string]
 	readyCh  chan struct{}
 	stopCh   chan struct{}
 }
@@ -74,15 +74,14 @@ func (d *deploymentDiscoverer) stopped() bool { return isChanClosed(d.stopCh) }
 
 func (d *deploymentDiscoverer) runDiscover(ctx context.Context, in chan<- resource) {
 	for {
-		item, shutdown := d.queue.Get()
+		key, shutdown := d.queue.Get()
 		if shutdown {
 			return
 		}
 
 		func() {
-			defer d.queue.Done(item)
+			defer d.queue.Done(key)
 
-			key := item.(string)
 			ns, name, err := cache.SplitMetaNamespaceKey(key)
 			if err != nil {
 				return

@@ -119,7 +119,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 
     if(wait_collectors) {
         size_t running = 1;
-        size_t count = 10;
+        size_t count = 50;
         while (running && count) {
             running = 0;
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
@@ -220,7 +220,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 #ifdef ENABLE_DBENGINE
     if(!ret && dbengine_enabled)
         // flush all dirty pages now that all collectors and streaming completed
-        rrdeng_flush_everything_and_wait(false, false, false);
+        rrdeng_flush_everything_and_wait(false, false, true);
 #endif
 
     service_wait_exit(SERVICE_REPLICATION, 3 * USEC_PER_SEC);
@@ -272,7 +272,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
                 th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_JOINABLE, rrdeng_exit_background, multidb_ctx[tier]);
 
             // flush anything remaining again - just in case
-            rrdeng_flush_everything_and_wait(true, false, false);
+            rrdeng_flush_everything_and_wait(true, true, false);
 
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 nd_thread_join(th[tier]);
@@ -318,12 +318,49 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 
     watcher_shutdown_end();
     watcher_thread_stop();
-    curl_global_cleanup();
 
     daemon_status_file_shutdown_step(NULL);
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
 
+#if defined(FSANITIZE_ADDRESS)
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "Freeing all RRDHOSTs...\n");
+    rrdhost_free_all();
+
+    fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
+    if(cleanup_destroyed_dictionaries())
+        fprintf(stderr, "WARNING: There are still dictionaries with references in them, that cannot be destroyed.\n");
+
+    // destroy the caches in reverse order (extent and open depend on main cache)
+    fprintf(stderr, "Destroying extent cache (PGC)...\n");
+    pgc_destroy(extent_cache, false);
+    fprintf(stderr, "Destroying open cache (PGC)...\n");
+    pgc_destroy(open_cache, false);
+    fprintf(stderr, "Destroying main cache (PGC)...\n");
+    pgc_destroy(main_cache, false);
+
+    fprintf(stderr, "Destroying metrics registry (MRG)...\n");
+    size_t metrics_referenced = mrg_destroy(main_mrg);
+    if(metrics_referenced)
+        fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
+            metrics_referenced);
+
+    fprintf(stderr, "Destroying UUIDMap...\n");
+    size_t uuid_referenced = uuidmap_destroy();
+    if(uuid_referenced)
+        fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
+            uuid_referenced);
+
+    // strings_destroy();
+    // functions_destroy();
+    // dyncfg_destroy();
+
+    fprintf(stderr, "All done, exiting...\n");
+#endif
+
 #ifdef OS_WINDOWS
+    curl_global_cleanup();
     return;
 #endif
 
@@ -335,12 +372,15 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
         abort();
     } else {
         nd_sentry_fini();
+        curl_global_cleanup();
         exit(ret);
     }
 #else
     if(ret)
         _exit(ret);
-    else
+    else {
+        curl_global_cleanup();
         exit(ret);
+    }
 #endif
 }

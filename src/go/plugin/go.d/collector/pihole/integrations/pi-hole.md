@@ -21,10 +21,11 @@ Module: pihole
 
 ## Overview
 
-This collector monitors Pi-hole instances using [PHP API](https://github.com/pi-hole/AdminLTE).
+This collector monitors Pi-hole instances using [Pi-hole API 6.0](https://ftl.pi-hole.net/master/docs/).
 
-The data provided by the API is for the last 24 hours. All collected values refer to this time period and not to the
-module's collection interval.
+It collects DNS query statistics including total queries, blocked domains, query types, resolution status, and client information.
+
+**Note**: This collector is not compatible with Pi-hole versions earlier than v6.0.
 
 
 
@@ -38,7 +39,14 @@ This collector supports collecting metrics from multiple instances of this integ
 
 #### Auto-Detection
 
-This integration doesn't support auto-detection.
+By default, it detects Pi-hole instances running on:
+
+- localhost that are listening on port 80
+- within Docker containers
+
+> **Note that the Pi-hole API 6.0 requires a password**. 
+> While Netdata can automatically detect Pi-hole instances and create data collection jobs, these jobs will fail unless you provide the necessary credentials.
+
 
 #### Limits
 
@@ -67,15 +75,15 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| pihole.dns_queries_total | queries | queries |
-| pihole.dns_queries | cached, blocked, forwarded | queries |
-| pihole.dns_queries_percentage | cached, blocked, forwarded | percentage |
-| pihole.unique_clients | unique | clients |
-| pihole.domains_on_blocklist | blocklist | domains |
-| pihole.blocklist_last_update | ago | seconds |
-| pihole.unwanted_domains_blocking_status | enabled, disabled | status |
-| pihole.dns_queries_types | a, aaaa, any, ptr, soa, srv, txt | percentage |
-| pihole.dns_queries_forwarded_destination | cached, blocked, other | percentage |
+| pihole.dns_queries_total | queries | queries/s |
+| pihole.dns_queries_blocked_percent | blocked | percent |
+| pihole.dns_queries_by_destination | cached, blocked, forwarded | queries/s |
+| pihole.dns_queries_by_type | A, AAA, ANY, SRV, SOA, PTR, TXT, NAPTR, MX, DS, RRSIG, DNSKEY, NS, SVCB, HTTPS, OTHER | queries/s |
+| pihole.dns_queries_by_status | UNKNOWN, GRAVITY, FORWARDED, CACHE, REGEX, DENYLIST, EXTERNAL_BLOCKED_IP, EXTERNAL_BLOCKED_NULL, EXTERNAL_BLOCKED_NXRA, GRAVITY_CNAME, REGEX_CNAME, DENYLIST_CNAME, RETRIED, RETRIED_DNSSEC, IN_PROGRESS, DBBUSY, SPECIAL_DOMAIN, CACHE_STALE, EXTERNAL_BLOCKED_EDE15 | queries/s |
+| pihole.dns_replies_by_status | UNKNOWN, NODATA, NXDOMAIN, CNAME, IP, DOMAIN, RRNAME, SERVFAIL, REFUSED, NOTIMP, DNSSEC, NONE, OTHER | replies/s |
+| pihole.active_clients | active | clients |
+| pihole.gravity_list_blocked_domains | blocked | domains |
+| pihole.gravity_list_last_update_time_ago | last_update_ago | seconds |
 
 
 
@@ -86,15 +94,23 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ pihole_blocklist_last_update ](https://github.com/netdata/netdata/blob/master/src/health/health.d/pihole.conf) | pihole.blocklist_last_update | gravity.list (blocklist) file last update time |
-| [ pihole_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/pihole.conf) | pihole.unwanted_domains_blocking_status | unwanted domains blocking is disabled |
+| [ pihole_gravity_list_last_update ](https://github.com/netdata/netdata/blob/master/src/health/health.d/pihole.conf) | pihole.gravity_list_last_update_time_ago | gravity.list (blocklist) file last update time |
 
 
 ## Setup
 
 ### Prerequisites
 
-No action required.
+#### Pi-hole v6.0 or newer
+
+This collector requires Pi-hole v6.0 or newer as it uses the [Pi-hole API 6.0](https://ftl.pi-hole.net/master/docs/).
+
+
+#### Authentication credentials
+
+Pi-hole administrator password is required for API authentication. Make sure to configure this in the collector settings even when using auto-detection.
+
+
 
 ### Configuration
 
@@ -119,13 +135,12 @@ The following options can be defined globally: update_every, autodetection_retry
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 5 | no |
+| update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | url | Server URL. | http://127.0.0.1 | yes |
-| setup_vars_path | Path to setupVars.conf. This file is used to get the web password. | /etc/pihole/setupVars.conf | no |
-| timeout | HTTP request timeout. | 5 | no |
+| timeout | HTTP request timeout. | 1 | no |
 | username | Username for basic HTTP authentication. |  | no |
-| password | Password for basic HTTP authentication. |  | no |
+| password | Password for basic HTTP authentication. |  | yes |
 | proxy_url | Proxy URL. |  | no |
 | proxy_username | Username for proxy basic HTTP authentication. |  | no |
 | proxy_password | Password for proxy basic HTTP authentication. |  | no |
@@ -152,6 +167,7 @@ A basic example configuration.
 jobs:
   - name: local
     url: http://127.0.0.1
+    password: Gv7#pQm9Xy
 
 ```
 </details>
@@ -167,7 +183,7 @@ jobs:
   - name: local
     url: https://203.0.113.11
     tls_skip_verify: yes
-    password: 1ebd33f882f9aa5fac26a7cb74704742f91100228eb322e41b7bd6e6aeb8f74b
+    password: bT4@zK1wVr
 
 ```
 </details>
@@ -185,10 +201,11 @@ Collecting metrics from local and remote instances.
 jobs:
   - name: local
     url: http://127.0.0.1
+    password: Gv7#pQm9Xy
 
   - name: remote
     url: http://203.0.113.10
-    password: 1ebd33f882f9aa5fac26a7cb74704742f91100228eb322e41b7bd6e6aeb8f74b
+    password: bT4@zK1wVr
 
 ```
 </details>
