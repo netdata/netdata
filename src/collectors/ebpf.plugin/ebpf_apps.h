@@ -72,22 +72,6 @@ enum ebpf_main_index {
 };
 
 // ----------------------------------------------------------------------------
-// Structures used to read information from kernel ring
-
-typedef struct __attribute__((packed)) ebpf_publish_process {
-    uint64_t ct;
-
-    //Counter
-    uint32_t exit_call;
-    uint32_t release_call;
-    uint32_t create_process;
-    uint32_t create_thread;
-
-    //Counter
-    uint32_t task_err;
-} ebpf_publish_process_t;
-
-// ----------------------------------------------------------------------------
 // pid_stat
 //
 struct ebpf_target {
