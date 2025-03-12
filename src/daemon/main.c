@@ -185,7 +185,7 @@ int help(int exitcode) {
 */
 
 #if defined(FSANITIZE_ADDRESS)
-#define LOG_TO_STDERR(...) fprintf(stderr, __VA_ARGS__)
+#define LOG_TO_STDERR(...) fprintf(stdout, __VA_ARGS__)
 #else
 #define LOG_TO_STDERR(...)
 #endif

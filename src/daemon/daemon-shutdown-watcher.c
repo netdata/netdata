@@ -35,7 +35,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
                      watcher_steps[step_id].msg);
 
 #if defined(FSANITIZE_ADDRESS)
-    fprintf(stderr, " > shutdown step: [%d/%d] - {at %s} started '%s'...\n",
+    fprintf(stdout, " > shutdown step: [%d/%d] - {at %s} started '%s'...\n",
             (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
             watcher_steps[step_id].msg);
 #endif
@@ -69,7 +69,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
                          watcher_steps[step_id].msg, step_duration_txt);
 
 #if defined(FSANITIZE_ADDRESS)
-        fprintf(stderr, " > shutdown step: [%d/%d] - {at %s} finished '%s' in %s\n",
+        fprintf(stdout, " > shutdown step: [%d/%d] - {at %s} finished '%s' in %s\n",
                 (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
                 watcher_steps[step_id].msg, step_duration_txt);
 #endif
@@ -81,7 +81,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
                           watcher_steps[step_id].msg, step_duration_txt);
 
 #if defined(FSANITIZE_ADDRESS)
-        fprintf(stderr, "shutdown step: [%d/%d] - {at %s} timeout '%s' takes too long (%s) - giving up...\n",
+        fprintf(stdout, "shutdown step: [%d/%d] - {at %s} timeout '%s' takes too long (%s) - giving up...\n",
                 (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
                 watcher_steps[step_id].msg, step_duration_txt);
 #endif
