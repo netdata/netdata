@@ -49,8 +49,8 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
 
     if(st->name) {
         rrdset_index_del_name(host, st);
-        string_freez(st->name);
-        st->name = name_string;
+        SWAP(name_string, st->name);
+        string_freez(name_string);
     }
     else
         st->name = name_string;
