@@ -585,7 +585,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
             publish->curr.cache_access = cv[0].cache_access;
         } else {
             if (kill((pid_t)key, 0)) { // No PID found
-                if (!netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_DCSTAT_IDX))
+                if (netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_DCSTAT_IDX))
                     memset(publish, 0, sizeof(*publish));
             }
         }
