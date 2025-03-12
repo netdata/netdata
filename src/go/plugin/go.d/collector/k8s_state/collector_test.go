@@ -573,11 +573,13 @@ func TestCollector_Collect(t *testing.T) {
 
 					assert.Equal(t, expected, mx)
 					assert.Equal(t,
-						len(cronJobChartsTmpl)+
+						len(cronJobChartsTmpl)*2+
 							len(baseCharts),
 						len(*collr.Charts()),
 					)
-					module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+					module.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, dim *module.Dim) bool {
+						return strings.Contains(chart.ID, cjSuspended.Name) && strings.HasSuffix(chart.ID, "last_completion_duration")
+					})
 				}
 
 				return testCase{
