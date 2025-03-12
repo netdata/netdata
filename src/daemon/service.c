@@ -9,12 +9,13 @@
 #define ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT 60
 
 #define WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK     1
-#define WORKER_JOB_CLEANUP_OBSOLETE_CHARTS          2
-#define WORKER_JOB_ARCHIVE_CHART                    3
-#define WORKER_JOB_ARCHIVE_CHART_DIMENSIONS         4
-#define WORKER_JOB_ARCHIVE_DIMENSION                5
-#define WORKER_JOB_CLEANUP_ORPHAN_HOSTS             6
-#define WORKER_JOB_CLEANUP_OBSOLETE_CHARTS_ON_HOSTS 7
+#define WORKER_JOB_PARENT_CHART_OBSOLETION_CHECK    2
+#define WORKER_JOB_CLEANUP_OBSOLETE_CHARTS          3
+#define WORKER_JOB_ARCHIVE_CHART                    4
+#define WORKER_JOB_ARCHIVE_CHART_DIMENSIONS         5
+#define WORKER_JOB_ARCHIVE_DIMENSION                6
+#define WORKER_JOB_CLEANUP_ORPHAN_HOSTS             7
+#define WORKER_JOB_CLEANUP_OBSOLETE_CHARTS_ON_HOSTS 8
 #define WORKER_JOB_FREE_HOST                        9
 #define WORKER_JOB_FREE_CHART                       12
 #define WORKER_JOB_FREE_DIMENSION                   15
@@ -161,27 +162,25 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 }
 
-static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host) {
-    worker_is_busy(WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK);
-
-    time_t now = now_realtime_sec();
+static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host, time_t mark_obsolete_after, time_t now) {
     time_t last_entry_t;
     RRDSET *st;
-
-    time_t child_connect_time = host->stream.rcv.status.last_connected;
 
     rrdset_foreach_read(st, host) {
         if(rrdset_is_replicating(st))
             continue;
 
         last_entry_t = rrdset_last_entry_s(st);
+        if (!last_entry_t)
+            continue;
 
-        if (last_entry_t && last_entry_t < child_connect_time &&
-            child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT +
-                    (ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every) <
-                now)
+        time_t chart_obsoletion_tolerance_time_s =
+            TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + (ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every);
 
+        if (last_entry_t < mark_obsolete_after &&
+            (mark_obsolete_after - last_entry_t) > chart_obsoletion_tolerance_time_s) {
             rrdset_is_obsolete___safe_from_collector_thread(st);
+        }
     }
     rrdset_foreach_done(st);
 }
@@ -202,18 +201,26 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
         svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
-        if (host == localhost)
+        time_t now = now_realtime_sec();
+
+        if (host == localhost) {
+            worker_is_busy(WORKER_JOB_PARENT_CHART_OBSOLETION_CHECK);
+            svc_rrdhost_detect_obsolete_charts(localhost, now_realtime_sec() - default_rrd_history_entries, now);
+            worker_is_idle();
             continue;
+        }
 
         rrdhost_receiver_lock(host);
-
-        time_t now = now_realtime_sec();
 
         if (host->stream.rcv.status.check_obsolete &&
             ((host->stream.rcv.status.last_chart &&
               host->stream.rcv.status.last_chart + host->health.delay_up_to < now) ||
              (host->stream.rcv.status.last_connected + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now))) {
-            svc_rrdhost_detect_obsolete_charts(host);
+
+            worker_is_busy(WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK);
+            svc_rrdhost_detect_obsolete_charts(host, host->stream.rcv.status.last_connected, now);
+            worker_is_idle();
+
             host->stream.rcv.status.check_obsolete = false;
         }
 
@@ -285,6 +292,7 @@ static void service_main_cleanup(void *pptr)
 void *service_main(void *ptr)
 {
     worker_register("SERVICE");
+    worker_register_job_name(WORKER_JOB_PARENT_CHART_OBSOLETION_CHECK, "parent chart obsoletion check");
     worker_register_job_name(WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK, "child chart obsoletion check");
     worker_register_job_name(WORKER_JOB_CLEANUP_OBSOLETE_CHARTS, "cleanup obsolete charts");
     worker_register_job_name(WORKER_JOB_ARCHIVE_CHART, "archive chart");
