@@ -358,7 +358,7 @@ struct aral_statistics *mrg_aral_stats(void) {
 }
 
 size_t mrg_destroy(MRG *mrg) {
-    if (unlikely(!mrg))
+    if (!mrg)
         return 0;
 
     size_t referenced = 0;
