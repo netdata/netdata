@@ -99,6 +99,15 @@ void stream_receiver_free(struct receiver_state *rpt) {
     stream_circular_buffer_destroy(rpt->thread.send_to_child.scb);
     rpt->thread.send_to_child.scb = NULL;
 
+    string_freez(rpt->thread.cd.id);
+    string_freez(rpt->thread.cd.filename);
+    string_freez(rpt->thread.cd.fullfilename);
+    string_freez(rpt->thread.cd.cmd);
+    rpt->thread.cd.id = NULL;
+    rpt->thread.cd.filename = NULL;
+    rpt->thread.cd.fullfilename = NULL;
+    rpt->thread.cd.cmd = NULL;
+
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     if(rpt->log.fp)
         fclose(rpt->log.fp);

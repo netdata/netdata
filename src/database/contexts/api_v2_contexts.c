@@ -638,14 +638,14 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
             ;
         else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
             // keep new
-            string_freez(o->family);
-            o->family = string_dup(n->family);
+            SWAP(o->family, n->family);
         }
         else {
             // merge
             STRING *old_family = o->family;
             o->family = string_2way_merge(o->family, n->family);
             string_freez(old_family);
+            // n->family will be freed below
         }
     }
 
@@ -655,8 +655,7 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
             ;
         else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
             // keep new
-            string_freez(o->units);
-            o->units = string_dup(n->units);
+            SWAP(o->units, n->units);
         }
         else {
             // keep old
@@ -689,6 +688,7 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     o->flags |= n->flags;
     o->match = MIN(o->match, n->match);
 
+    string_freez(n->units);
     string_freez(n->family);
 
     return true;
