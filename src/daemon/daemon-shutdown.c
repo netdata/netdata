@@ -214,7 +214,8 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     watcher_step_complete(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
 
     stream_threads_cancel();
-    service_wait_exit(SERVICE_COLLECTORS | SERVICE_STREAMING, 3 * USEC_PER_SEC);
+    service_wait_exit(SERVICE_COLLECTORS | SERVICE_STREAMING, 20 * USEC_PER_SEC);
+    service_signal_exit(SERVICE_STREAMING_CONNECTOR);
     watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
 
 #ifdef ENABLE_DBENGINE
@@ -351,6 +352,11 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
     if(uuid_referenced)
         fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
             uuid_referenced);
+
+    size_t strings_referenced = string_destroy();
+    if(strings_referenced)
+        fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
+                strings_referenced);
 
     // strings_destroy();
     // functions_destroy();

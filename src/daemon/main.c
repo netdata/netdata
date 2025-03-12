@@ -184,13 +184,23 @@ int help(int exitcode) {
    be set in this procedure to be called in all the relevant code paths.
 */
 
+#if defined(FSANITIZE_ADDRESS)
+#define LOG_TO_STDERR(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define LOG_TO_STDERR(...)
+#endif
+
 #define delta_startup_time(msg)                                     \
     do {                                                            \
         usec_t now_ut = now_monotonic_usec();                       \
-        if(prev_msg)                                                \
+        if(prev_msg) {                                              \
             netdata_log_info("NETDATA STARTUP: in %7llu ms, %s - next: %s", (now_ut - last_ut) / USEC_PER_MS, prev_msg, msg); \
-        else                                                        \
+            LOG_TO_STDERR(" > startup: in %7llu ms, %s - next: %s\n", (now_ut - last_ut) / USEC_PER_MS, prev_msg, msg); \
+        }                                                           \
+        else {                                                      \
             netdata_log_info("NETDATA STARTUP: next: %s", msg);     \
+            LOG_TO_STDERR(" > startup: next: %s\n", msg);           \
+        }                                                           \
         last_ut = now_ut;                                           \
         prev_msg = msg;                                             \
         daemon_status_file_startup_step("startup(" msg ")");        \
