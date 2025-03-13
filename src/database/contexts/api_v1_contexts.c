@@ -131,13 +131,18 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     if(before && (!ri->first_time_s || before < ri->first_time_s))
         return 0;
 
-    if(t_parent->chart_label_key && rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, t_parent->chart_label_key,
-                                                                           '\0', NULL) != SP_MATCHED_POSITIVE)
+    RRDLABELS *labels = rrdinstance_labels(ri);
+
+    if(t_parent->chart_label_key && rrdlabels_match_simple_pattern_parsed(
+                                         labels,
+                                         t_parent->chart_label_key,
+                                         '\0', NULL) != SP_MATCHED_POSITIVE)
         return 0;
 
-    if(t_parent->chart_labels_filter && rrdlabels_match_simple_pattern_parsed(ri->rrdlabels,
-                                                                               t_parent->chart_labels_filter, ':',
-                                                                               NULL) != SP_MATCHED_POSITIVE)
+    if(t_parent->chart_labels_filter && rrdlabels_match_simple_pattern_parsed(
+                                             labels,
+                                             t_parent->chart_labels_filter, ':',
+                                             NULL) != SP_MATCHED_POSITIVE)
         return 0;
 
     time_t first_time_s = ri->first_time_s;
@@ -213,9 +218,9 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
         buffer_json_array_close(wb);
     }
 
-    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && ri->rrdlabels && rrdlabels_entries(ri->rrdlabels)) {
+    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && rrdlabels_entries(labels)) {
         buffer_json_member_add_object(wb, "labels");
-        rrdlabels_to_buffer_json_members(ri->rrdlabels, wb);
+        rrdlabels_to_buffer_json_members(labels, wb);
         buffer_json_object_close(wb);
     }
 
