@@ -7,9 +7,7 @@ bool nd_log_forked = false;
 #define NO_STACK_TRACE_PREFIX "stack trace not available: "
 
 #if defined(HAVE_LIBUNWIND)
-#if defined(STATIC_BUILD)
-#warning "disabling UNW_LOCAL_ONLY for static builds"
-#else
+#if !defined(STATIC_BUILD)
 #define UNW_LOCAL_ONLY
 #endif
 #include <libunwind.h>
