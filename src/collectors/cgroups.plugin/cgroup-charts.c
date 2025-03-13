@@ -449,7 +449,7 @@ void update_mem_pgfaults_chart(struct cgroup *cg) {
 }
 
 void update_mem_usage_limit_chart(struct cgroup *cg, unsigned long long memory_limit) {
-    if (is_cgroup_systemd_service(cg))
+    if (is_cgroup_systemd_service(cg) || !memory_limit)
         return;
 
     RRDSET *chart = cg->st_mem_usage_limit;
@@ -488,7 +488,7 @@ void update_mem_usage_limit_chart(struct cgroup *cg, unsigned long long memory_l
 }
 
 void update_mem_utilization_chart(struct cgroup *cg, unsigned long long memory_limit) {
-    if (is_cgroup_systemd_service(cg))
+    if (is_cgroup_systemd_service(cg) || !memory_limit)
         return;
 
     RRDSET *chart = cg->st_mem_utilization;

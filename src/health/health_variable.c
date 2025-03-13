@@ -36,7 +36,7 @@ struct variable_lookup_job {
 };
 
 static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, RRDSET *st, const char *source __maybe_unused) {
-    if(vbd->score.last_rrdset != st) {
+    if(vbd->score.last_rrdset != st && vbd->rc->rrdset) {
         vbd->score.last_rrdset = st;
         vbd->score.last_score = rrdlabels_common_count(vbd->rc->rrdset->rrdlabels, st->rrdlabels);
     }
