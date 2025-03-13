@@ -46,12 +46,12 @@ jobs:
       - name: Generate Nightly Changleog
         id: nightly-changelog
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly'
-        uses: Wandalen/wretry.action@master
+        uses: Wandalen/wretry.action@v3
         with:
           action: heinrichreimer/github-changelog-generator-action@v2.4
           attempt_limit: 3
           attempt_delay: 60
-          with:
+          with: |
             bugLabels: IGNOREBUGS
             excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
             issues: false
@@ -63,12 +63,12 @@ jobs:
       - name: Generate Release Changelog
         id: release-changelog
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type != 'nightly'
-        uses: Wandalen/wretry.action@master
+        uses: Wandalen/wretry.action@v3
         with:
           action: heinrichreimer/github-changelog-generator-action@v2.4
           attempt_limit: 3
           attempt_delay: 60
-          with:
+          with: |
             bugLabels: IGNOREBUGS
             excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
             futureRelease: ${{ github.event.inputs.version }}
