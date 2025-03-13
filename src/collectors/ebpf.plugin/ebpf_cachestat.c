@@ -883,6 +883,9 @@ void ebpf_resume_apps_data()
 void *ebpf_read_cachestat_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    int collect_pid = (em->apps_charts || em->cgroup_charts);
+    if (!collect_pid)
+        return NULL;
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
