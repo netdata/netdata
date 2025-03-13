@@ -6,7 +6,17 @@
 
 **Merged pull requests:**
 
+- docs: fix typos in nodes-ephemerality.md [\#19840](https://github.com/netdata/netdata/pull/19840) ([ilyam8](https://github.com/ilyam8))
+- fix rrdset name crash on cleanup [\#19838](https://github.com/netdata/netdata/pull/19838) ([ktsaou](https://github.com/ktsaou))
+- when destroying pgc, check if the cache is null [\#19837](https://github.com/netdata/netdata/pull/19837) ([ktsaou](https://github.com/ktsaou))
+- Fix for building with protobuf 30.0 [\#19835](https://github.com/netdata/netdata/pull/19835) ([vkalintiris](https://github.com/vkalintiris))
+- Regenerate integrations docs [\#19833](https://github.com/netdata/netdata/pull/19833) ([netdatabot](https://github.com/netdatabot))
+- Fix typo in otel collector build infra. [\#19832](https://github.com/netdata/netdata/pull/19832) ([Ferroin](https://github.com/Ferroin))
+- store status file in /var/lib/netdata, not in /var/cache/netdata [\#19831](https://github.com/netdata/netdata/pull/19831) ([ktsaou](https://github.com/ktsaou))
+- Fix RRDDIM\_MEM storage engine index [\#19830](https://github.com/netdata/netdata/pull/19830) ([ktsaou](https://github.com/ktsaou))
+- improvement\(go.d/k8state\): add CronJob suspend status [\#19829](https://github.com/netdata/netdata/pull/19829) ([ilyam8](https://github.com/ilyam8))
 - Revert "fix rrdset name crash on rrdset obsoletion" [\#19828](https://github.com/netdata/netdata/pull/19828) ([ktsaou](https://github.com/ktsaou))
+- free strings judy arrays to show leaked strings [\#19827](https://github.com/netdata/netdata/pull/19827) ([ktsaou](https://github.com/ktsaou))
 - rrdhost name fix heap-use-after-free [\#19826](https://github.com/netdata/netdata/pull/19826) ([ktsaou](https://github.com/ktsaou))
 - use notice log level for "machine ID found" [\#19825](https://github.com/netdata/netdata/pull/19825) ([ilyam8](https://github.com/ilyam8))
 - build\(otel-collector\): update to v0.121.0 [\#19824](https://github.com/netdata/netdata/pull/19824) ([ilyam8](https://github.com/ilyam8))
@@ -472,16 +482,6 @@
 - Streaming improvements No 12 [\#19299](https://github.com/netdata/netdata/pull/19299) ([ktsaou](https://github.com/ktsaou))
 - nd\_poll\(\) fairness [\#19298](https://github.com/netdata/netdata/pull/19298) ([ktsaou](https://github.com/ktsaou))
 - more descriptive alert transition logs [\#19297](https://github.com/netdata/netdata/pull/19297) ([ktsaou](https://github.com/ktsaou))
-- fix\(debugfs/sensors\): correct driver label value [\#19294](https://github.com/netdata/netdata/pull/19294) ([ilyam8](https://github.com/ilyam8))
-- fix\(netdata-updater.sh\): use explicit paths for temp dir creation [\#19293](https://github.com/netdata/netdata/pull/19293) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): add bison and flex [\#19292](https://github.com/netdata/netdata/pull/19292) ([ilyam8](https://github.com/ilyam8))
-- remove go.d/windows [\#19290](https://github.com/netdata/netdata/pull/19290) ([ilyam8](https://github.com/ilyam8))
-- fix\(netdata-updater.sh\): ensure tmpdir-path argument is always passed [\#19289](https://github.com/netdata/netdata/pull/19289) ([ilyam8](https://github.com/ilyam8))
-- fix\(netdata-updater.sh\): remove commit\_check\_file directory [\#19288](https://github.com/netdata/netdata/pull/19288) ([ilyam8](https://github.com/ilyam8))
-- bump dag req jinja version [\#19287](https://github.com/netdata/netdata/pull/19287) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19286](https://github.com/netdata/netdata/pull/19286) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/nats\): add basic jetstream metrics [\#19285](https://github.com/netdata/netdata/pull/19285) ([ilyam8](https://github.com/ilyam8))
-- fix go.d/nats tests [\#19284](https://github.com/netdata/netdata/pull/19284) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
