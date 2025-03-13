@@ -190,15 +190,6 @@ static void *pluginsd_worker_thread(void *arg) {
     POPEN_INSTANCE *pi = cd->unsafe.pi;
     cd->unsafe.pi = NULL;
 
-    string_freez(cd->id);
-    string_freez(cd->cmd);
-    string_freez(cd->filename);
-    string_freez(cd->fullfilename);
-    cd->id = NULL;
-    cd->cmd = NULL;
-    cd->filename = NULL;
-    cd->fullfilename = NULL;
-
     spinlock_unlock(&cd->unsafe.spinlock);
 
     if (pi)
