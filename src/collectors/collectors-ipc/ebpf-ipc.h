@@ -321,7 +321,7 @@ typedef struct netdata_ebpf_pid_stats {
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
     netdata_publish_fd_stat_t fd;
-    netdata_publish_shm_t  shm;
+    netdata_publish_shm_t shm;
 } netdata_ebpf_pid_stats_t;
 
 // ----------------------------------------------------------------------------

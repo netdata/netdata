@@ -247,7 +247,8 @@ static void ebpf_update_process_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
             ebpf_publish_process_t *out = &pids->ps;
-            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
             if (!local_pid)
                 continue;
 
@@ -1316,7 +1317,8 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 
             ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
 
-            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_PROCESS_IDX);
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_PROCESS_IDX);
             if (!local_pid)
                 continue;
 
@@ -1337,20 +1339,20 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
                 }
             }
 
-            end_process_loop:
+        end_process_loop:
             memset(process_stat_vector, 0, length);
             key = next_key;
         }
     }
 
     struct ebpf_target *w;
-        for (w = apps_groups_root_target; w; w = w->next) {
-            if (unlikely(!(w->processes)))
-                continue;
+    for (w = apps_groups_root_target; w; w = w->next) {
+        if (unlikely(!(w->processes)))
+            continue;
 
-            ebpf_process_sum_values_for_pids(&w->process, w->root_pid);
-        }
+        ebpf_process_sum_values_for_pids(&w->process, w->root_pid);
     }
+}
 
 /**
  * Main loop for this collector.

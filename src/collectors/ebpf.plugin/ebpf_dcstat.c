@@ -590,7 +590,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
             }
         }
 
-end_dc_loop:
+    end_dc_loop:
         // We are cleaning to avoid passing data read from one process to other.
         memset(cv, 0, length);
         key = next_key;
@@ -803,7 +803,8 @@ static void ebpf_update_dc_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_DCSTAT_IDX);
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_DCSTAT_IDX);
             if (!local_pid)
                 continue;
             netdata_publish_dcstat_t *in = &local_pid->directory_cache;
