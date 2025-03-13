@@ -866,13 +866,15 @@ enum crash_report_t {
 };
 
 static enum crash_report_t check_crash_reports_config(void) {
-    bool analytics = analytics_check_enabled();
+    bool default_enabled = analytics_check_enabled() ||
+                           !UUIDiszero(session_status.node_id) || !UUIDiszero(last_session_status.node_id) ||
+                           !UUIDiszero(session_status.claim_id) || !UUIDiszero(last_session_status.claim_id);
 
-    const char *t = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "crash reports", analytics ? "all" : "off");
+    const char *t = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "crash reports", default_enabled ? "all" : "off");
 
     enum crash_report_t rc;
     if(!t || !*t)
-        rc = analytics ? DSF_REPORT_ALL : DSF_REPORT_DISABLED;
+        rc = default_enabled ? DSF_REPORT_ALL : DSF_REPORT_DISABLED;
     else if(strcmp(t, "all") == 0)
         rc = DSF_REPORT_ALL;
     else if(strcmp(t, "crashes") == 0)

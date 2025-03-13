@@ -1329,7 +1329,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     int fd_v2;
     uint8_t *data_start = nd_mmap_advanced(path, total_file_size, MAP_SHARED, 0, false, true, &fd_v2);
     if(!data_start)
-        fatal("DBENGINE: failed to memory map file '%s' of size %zu.", path, total_file_size);
+        out_of_memory(__FUNCTION__, total_file_size, path);
 
     memset(data_start, 0, extent_offset);
 

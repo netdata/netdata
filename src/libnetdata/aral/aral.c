@@ -544,8 +544,7 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
         page->data =
             nd_mmap_advanced(page->filename, size, MAP_SHARED, 0, false, ar->config.options & ARAL_DONT_DUMP, NULL);
         if (unlikely(!page->data))
-            fatal("ARAL: '%s' cannot allocate aral buffer of size %zu on filename '%s'",
-                  ar->config.name, size, page->filename);
+            out_of_memory(__FUNCTION__, size, page->filename);
 
         total_size = size + sizeof(ARAL_PAGE);
         stats = &ar->stats->mmap;
