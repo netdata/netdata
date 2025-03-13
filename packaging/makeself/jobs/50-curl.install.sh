@@ -9,11 +9,10 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building cURL" || true
 
-if [ -d "${NETDATA_MAKESELF_PATH}/tmp/curl" ]; then
-  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/curl"
-fi
+cache_key="curl"
+build_dir="${CURL_VERSION}"
 
-fetch_git curl "${CURL_SOURCE}" "${CURL_VERSION}" "${CURL_VERSION}"
+fetch_git "${build_dir}" "${CURL_SOURCE}" "${CURL_VERSION}" "${cache_key}"
 
 export CFLAGS="${TUNING_FLAGS} -I/openssl-static/include -pipe"
 export CXXFLAGS="${CFLAGS}"
@@ -58,7 +57,7 @@ fi
 
 run make install
 
-store_cache curl "${NETDATA_MAKESELF_PATH}/tmp/curl"
+store_cache "${cache_key}" "${build_dir}"
 
 cp /curl-local/bin/curl "${NETDATA_INSTALL_PATH}"/bin/curl
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
