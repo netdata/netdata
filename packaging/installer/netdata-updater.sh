@@ -1042,6 +1042,12 @@ update_binpkg() {
       cloudlinux|almalinux|centos-stream|rocky|rhel)
         DISTRO_COMPAT_NAME="centos"
         ;;
+      raspbian)
+        SYSARCH="$(uname -m)"
+        if [ "$SYSARCH" = "armv7l" ] || [ "$SYSARCH" = "aarch64" ]; then
+          DISTRO_COMPAT_NAME="debian"
+        fi
+        ;;
       *)
         DISTRO_COMPAT_NAME="unknown"
         ;;
