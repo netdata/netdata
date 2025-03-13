@@ -268,8 +268,11 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
     // set the common fields that are automatically set by the logging subsystem
 
-    if(likely(!thread_log_fields[NDF_STACK_TRACE].entry.set) && priority <= NDLP_WARNING)
+#if 0
+    // getting stack traces is crashing on some architectures, so we get them only for daemon status file
+    if(likely(!thread_log_fields[NDF_STACK_TRACE].entry.set) && priority <= NDLP_ALERT) // only on fatal errors
         thread_log_fields[NDF_STACK_TRACE].entry = ND_LOG_FIELD_CB(NDF_STACK_TRACE, stack_trace_formatter, NULL);
+#endif
 
     if(likely(!thread_log_fields[NDF_INVOCATION_ID].entry.set))
         thread_log_fields[NDF_INVOCATION_ID].entry = ND_LOG_FIELD_UUID(NDF_INVOCATION_ID, &nd_log.invocation_id);

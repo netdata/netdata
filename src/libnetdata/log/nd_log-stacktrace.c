@@ -7,7 +7,9 @@ bool nd_log_forked = false;
 #define NO_STACK_TRACE_PREFIX "stack trace not available: "
 
 #if defined(HAVE_LIBUNWIND)
+#if !defined(STATIC_BUILD)
 #define UNW_LOCAL_ONLY
+#endif
 #include <libunwind.h>
 
 void capture_stack_trace_init(void) {
@@ -19,7 +21,11 @@ void capture_stack_trace_flush(void) {
 }
 
 bool capture_stack_trace_is_async_signal_safe(void) {
+#if defined(STATIC_BUILD)
+    return false;
+#else
     return true;
+#endif
 }
 
 void capture_stack_trace(BUFFER *wb) {
