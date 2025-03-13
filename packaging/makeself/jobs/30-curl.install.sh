@@ -7,7 +7,7 @@
 . "$(dirname "${0}")/../bundled-packages.version"
 
 # shellcheck disable=SC2015
-[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building cURL" || true
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building curl" || true
 
 cache_key="curl"
 build_dir="${CURL_VERSION}"
