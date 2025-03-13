@@ -25,13 +25,14 @@ bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_
     return true;
 }
 
-netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum ebpf_pids_index idx) {
+netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum ebpf_pids_index idx)
+{
     if (!integration_shm)
         return NULL;
 
     if (using_vector) {
         netdata_ebpf_pid_stats_t *ptr = &integration_shm[pid];
-        ptr->threads |= idx<<1;
+        ptr->threads |= idx << 1;
         return ptr;
     }
 

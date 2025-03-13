@@ -789,7 +789,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core)
             }
         }
 
-end_cachestat_loop:
+    end_cachestat_loop:
         // We are cleaning to avoid passing data read from one process to other.
         memset(cv, 0, length);
         key = next_key;
@@ -814,7 +814,8 @@ static void ebpf_update_cachestat_cgroup()
             uint32_t pid = pids->pid;
             netdata_publish_cachestat_t *out = &pids->cachestat;
 
-            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
             if (!local_pid)
                 continue;
 
