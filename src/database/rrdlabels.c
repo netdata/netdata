@@ -183,8 +183,7 @@ static void delete_label(RRDLABEL *label)
 // ----------------------------------------------------------------------------
 // rrdlabels_destroy()
 
-void rrdlabels_destroy(RRDLABELS *labels)
-{
+void rrdlabels_flush(RRDLABELS *labels) {
     if (unlikely(!labels))
         return;
 
@@ -199,6 +198,14 @@ void rrdlabels_destroy(RRDLABELS *labels)
     size_t memory_freed = JudyLFreeArray(&labels->JudyL, PJE0);
     STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, memory_freed + sizeof(RRDLABELS), 0);
     spinlock_unlock(&labels->spinlock);
+}
+
+void rrdlabels_destroy(RRDLABELS *labels)
+{
+    if (unlikely(!labels))
+        return;
+
+    rrdlabels_flush(labels);
     freez(labels);
 }
 

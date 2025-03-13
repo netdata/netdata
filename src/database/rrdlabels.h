@@ -35,6 +35,7 @@ typedef struct rrdlabels RRDLABELS;
 
 RRDLABELS *rrdlabels_create(void);
 void rrdlabels_destroy(RRDLABELS *labels_dict);
+void rrdlabels_flush(RRDLABELS *labels);
 void rrdlabels_add(RRDLABELS *labels, const char *name, const char *value, RRDLABEL_SRC ls);
 void rrdlabels_add_pair(RRDLABELS *labels, const char *string, RRDLABEL_SRC ls);
 void rrdlabels_value_to_buffer_array_item_or_null(RRDLABELS *labels, BUFFER *wb, const char *key);

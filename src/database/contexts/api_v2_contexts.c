@@ -118,8 +118,9 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
         dfe_done(rm);
 
         size_t label_searches = 0;
-        if(unlikely(ri->rrdlabels && rrdlabels_entries(ri->rrdlabels) &&
-                    rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, q, ':', &label_searches) == SP_MATCHED_POSITIVE)) {
+        RRDLABELS *labels = rrdinstance_labels(ri);
+        if(unlikely(rrdlabels_entries(labels) &&
+                    rrdlabels_match_simple_pattern_parsed(labels, q, ':', &label_searches) == SP_MATCHED_POSITIVE)) {
             ctl->q.fts.searches += label_searches;
             ctl->q.fts.char_searches += label_searches;
             matched = FTS_MATCHED_LABEL;
