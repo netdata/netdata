@@ -8,7 +8,7 @@ void mallocz_register_out_of_memory_cb(out_of_memory_cb cb) {
 }
 
 ALWAYS_INLINE NORETURN
-static void out_of_memory(const char *call, size_t size) {
+void out_of_memory(const char *call, size_t size, const char *details) {
     exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
 
     if(out_of_memory_callback)
@@ -33,10 +33,12 @@ static void out_of_memory(const char *call, size_t size) {
 
     fatal("Out of memory on %s(%zu bytes)!\n"
           "System memory available: %s, while our max RSS usage is: %s\n"
-          "O/S mmap limit: %llu, while our mmap count is: %zu",
+          "O/S mmap limit: %llu, while our mmap count is: %zu\n"
+          "Additional details: %s",
           call, size,
           mem_available, rss_used,
-          os_mmap_limit(), __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED));
+          os_mmap_limit(), __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED),
+          details ? details : "none");
 }
 
 // ----------------------------------------------------------------------------
@@ -429,7 +431,7 @@ char *strdupz(const char *s) {
 
     char *t = strdup(s);
     if (unlikely(!t))
-        out_of_memory(__FUNCTION__ , strlen(s) + 1);
+        out_of_memory(__FUNCTION__ , strlen(s) + 1, NULL);
 
     return t;
 }
@@ -440,7 +442,7 @@ char *strndupz(const char *s, size_t len) {
 
     char *t = strndup(s, len);
     if (unlikely(!t))
-        out_of_memory(__FUNCTION__ , len + 1);
+        out_of_memory(__FUNCTION__ , len + 1, NULL);
 
     return t;
 }
@@ -459,7 +461,7 @@ void *mallocz(size_t size) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_MALLOC);
     void *p = malloc(size);
     if (unlikely(!p))
-        out_of_memory(__FUNCTION__, size);
+        out_of_memory(__FUNCTION__, size, NULL);
 
     return p;
 }
@@ -469,7 +471,7 @@ void *callocz(size_t nmemb, size_t size) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_CALLOC);
     void *p = calloc(nmemb, size);
     if (unlikely(!p))
-        out_of_memory(__FUNCTION__, nmemb * size);
+        out_of_memory(__FUNCTION__, nmemb * size, NULL);
 
     return p;
 }
@@ -479,7 +481,7 @@ void *reallocz(void *ptr, size_t size) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_REALLOC);
     void *p = realloc(ptr, size);
     if (unlikely(!p))
-        out_of_memory(__FUNCTION__, size);
+        out_of_memory(__FUNCTION__, size, NULL);
 
     return p;
 }
@@ -489,7 +491,7 @@ int posix_memalignz(void **memptr, size_t alignment, size_t size) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN);
     int rc = posix_memalign(memptr, alignment, size);
     if(unlikely(rc))
-        out_of_memory(__FUNCTION__, size);
+        out_of_memory(__FUNCTION__, size, NULL);
 
     return rc;
 }

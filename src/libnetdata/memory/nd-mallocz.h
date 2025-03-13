@@ -67,4 +67,7 @@ void posix_memalign_freez(void *ptr);
 typedef void (*out_of_memory_cb)(void);
 void mallocz_register_out_of_memory_cb(out_of_memory_cb cb);
 
+NORETURN
+void out_of_memory(const char *call, size_t size, const char *details);
+
 #endif //NETDATA_ND_MALLOCZ_H
