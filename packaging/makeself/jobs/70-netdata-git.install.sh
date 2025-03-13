@@ -23,6 +23,8 @@ export EBPF_LIBC="static"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/libunwind-static/lib/pkgconfig:/openssl-static/lib64/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig:/curl-local/lib/pkgconfig"
 
+export NETDATA_BUILD_DIR="$(build_path netdata)"
+
 # Set correct CMake flags for building against non-System OpenSSL
 # See: https://github.com/warmcat/libwebsockets/blob/master/READMEs/README.build.md
 export CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=/openssl-static -DOPENSSL_LIBRARIES=/openssl-static/lib64 -DCMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE=/openssl-static -DLWS_OPENSSL_INCLUDE_DIRS=/openssl-static/include -DLWS_OPENSSL_LIBRARIES=/openssl-static/lib64/libssl.a;/openssl-static/lib64/libcrypto.a"
@@ -56,9 +58,9 @@ cat > "${NETDATA_INSTALL_PATH}/etc/netdata/.install-type" <<-EOF
 run rm -f "${NETDATA_INSTALL_PATH}/etc/netdata/netdata.conf"
 
 # Ensure the netdata binary is in fact statically linked
-if run readelf -l "${NETDATA_INSTALL_PATH}"/bin/netdata | grep 'INTERP'; then
-  printf >&2 "Ooops. %s is not a statically linked binary!\n" "${NETDATA_INSTALL_PATH}"/bin/netdata
-  ldd "${NETDATA_INSTALL_PATH}"/bin/netdata
+if run readelf -l "${NETDATA_INSTALL_PATH}/bin/netdata" | grep 'INTERP'; then
+  printf >&2 "Ooops. %s is not a statically linked binary!\n" "${NETDATA_INSTALL_PATH}/bin/netdata"
+  ldd "${NETDATA_INSTALL_PATH}/bin/netdata"
   exit 1
 fi
 

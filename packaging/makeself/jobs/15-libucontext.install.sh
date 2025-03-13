@@ -19,11 +19,10 @@ export CFLAGS="${TUNING_FLAGS} -pipe"
 export CXXFLAGS="${CFLAGS}"
 export LDFLAGS=""
 
-if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libucontext" ]; then
-  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libucontext"
-fi
+cache_key="libucontext"
+build_dir="${LIBUCONTEXT_VERSION}"
 
-fetch_git libucontext "${LIBUCONTEXT_SOURCE}" "${LIBUCONTEXT_VERSION}" "${LIBUCONTEXT_VERSION}"
+fetch_git "${build_dir}" "${LIBUCONTEXT_SOURCE}" "${LIBUCONTEXT_VERSION}" "${cache_key}"
 
 case "${BUILDARCH}" in
     armv6l|armv7l) arch=arm ;;
@@ -37,7 +36,7 @@ fi
 
 run make ARCH="${arch}" EXPORT_UNPREFIXED="yes" DESTDIR="/libucontext-static" -j "$(nproc)" install
 
-store_cache libucontext "${NETDATA_MAKESELF_PATH}/tmp/libucontext"
+store_cache "${cache_key}" "${build_dir}"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

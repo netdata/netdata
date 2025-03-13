@@ -19,11 +19,10 @@ export CXXFLAGS="${CFLAGS}"
 export LDFLAGS="-static -L/libucontext-static/usr/lib/ -lucontext"
 export PKG_CONFIG="pkg-config --static"
 
-if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libunwind" ]; then
-  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
-fi
+cache_key="libunwind"
+build_dir="libunwind-${LIBUNWIND_VERSION}"
 
-fetch_git libunwind "${LIBUNWIND_SOURCE}" "${LIBUNWIND_VERSION}" "libunwind-${LIBUNWIND_VERSION}" fetch-via-checkout
+fetch_git "${build_dir}" "${LIBUNWIND_SOURCE}" "${LIBUNWIND_VERSION}" "${cache_key}" fetch-via-checkout
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
   run autoreconf -ivf
@@ -43,7 +42,7 @@ fi
 
 run make -j "$(nproc)" install
 
-store_cache libunwind "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
+store_cache "${cache_key}" "${build_dir}"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

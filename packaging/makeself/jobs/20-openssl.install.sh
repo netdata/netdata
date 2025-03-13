@@ -13,15 +13,10 @@ export CXXFLAGS="${CFLAGS}"
 export LDFLAGS="-static"
 export PKG_CONFIG="pkg-config --static"
 
-if [ -d "${NETDATA_MAKESELF_PATH}/tmp/openssl" ]; then
-  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/openssl"
-fi
+cache_key="openssl"
+build_dir="${OPENSSL_VERSION}"
 
-if [ -d "${NETDATA_MAKESELF_PATH}/tmp/openssl" ]; then
-  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/openssl"
-fi
-
-fetch_git openssl "${OPENSSL_SOURCE}" "${OPENSSL_VERSION}" "${OPENSSL_VERSION}"
+fetch_git "${build_dir}" "${OPENSSL_SOURCE}" "${OPENSSL_VERSION}" "${cache_key}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
   COMMON_CONFIG="-static threads no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl"
@@ -45,7 +40,7 @@ if [ -d "/openssl-static/lib" ]; then
   cd - || exit 1
 fi
 
-store_cache openssl "${NETDATA_MAKESELF_PATH}/tmp/openssl"
+store_cache "${cache_key}" "${build_dir}"
 
 perl configdata.pm --dump
 
