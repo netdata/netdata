@@ -13,6 +13,7 @@
 #cmakedefine OS_LINUX
 #cmakedefine OS_MACOS
 #cmakedefine OS_WINDOWS
+#cmakedefine STATIC_BUILD
 
 // required compilation options
 
