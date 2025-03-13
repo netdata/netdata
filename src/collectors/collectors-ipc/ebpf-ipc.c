@@ -103,7 +103,7 @@ void netdata_integration_cleanup_shm()
     }
 
     if (integration_shm) {
-        size_t length = os_get_system_pid_max() * sizeof(netdata_ebpf_pid_stats_t);
+        size_t length = last_idx * sizeof(netdata_ebpf_pid_stats_t);
         munmap(integration_shm, length);
     }
 
@@ -120,6 +120,9 @@ static void netdata_ebpf_select_access_mode(size_t pids)
 
 int netdata_integration_initialize_shm(size_t pids)
 {
+    if (!pids)
+        return -1;
+
     netdata_ebpf_select_access_mode(pids);
 
     shm_fd_ebpf_integration = shm_open(NETDATA_EBPF_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
@@ -128,6 +131,7 @@ int netdata_integration_initialize_shm(size_t pids)
         return -1;
     }
 
+    last_idx = pids;
     size_t length = pids * sizeof(netdata_ebpf_pid_stats_t);
     if (ftruncate(shm_fd_ebpf_integration, (off_t)length)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot set size for shared memory.");
