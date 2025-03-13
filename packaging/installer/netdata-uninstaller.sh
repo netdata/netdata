@@ -115,7 +115,7 @@ user_input() {
       case "$yn" in
          [Yy]*) return 0;;
          [Nn]*) return 1;;
-         *) echo "Please answer yes or no.";;
+         *) echo "Please answer y[es] or n[o]";;
        esac
      done
   fi
