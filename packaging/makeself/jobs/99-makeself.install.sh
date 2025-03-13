@@ -103,18 +103,19 @@ run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 
 FILE="netdata-${BUILDARCH}-${VERSION}.gz.run"
 
-run mkdir -p artifacts
-run mv "${NETDATA_INSTALL_PATH}.gz.run" "artifacts/${FILE}"
+run mv "${NETDATA_INSTALL_PATH}.gz.run" "${NETDATA_SOURCE_PATH}/artifacts/${FILE}"
 
 [ -f "netdata-${BUILDARCH}-latest.gz.run" ] && rm "netdata-${BUILDARCH}-latest.gz.run"
-run cp "artifacts/${FILE}" "netdata-${BUILDARCH}-latest.gz.run"
+run cp "${NETDATA_SOURCE_PATH}/artifacts/${FILE}" "netdata-${BUILDARCH}-latest.gz.run"
 
 if [ "${BUILDARCH}" = "x86_64" ]; then
   [ -f "netdata-latest.gz.run" ] && rm "netdata-latest.gz.run"
-  run cp "artifacts/${FILE}" "netdata-latest.gz.run"
-  [ -f "artifacts/netdata-${VERSION}.gz.run" ] && rm "netdata-${VERSION}.gz.run"
-  run cp "artifacts/${FILE}" "artifacts/netdata-${VERSION}.gz.run"
+  run cp "${NETDATA_SOURCE_PATH}/artifacts/${FILE}" "netdata-latest.gz.run"
+  [ -f "${NETDATA_SOURCE_PATH}/artifacts/netdata-${VERSION}.gz.run" ] && rm "netdata-${VERSION}.gz.run"
+  run cp "${NETDATA_SOURCE_PATH}/artifacts/${FILE}" "${NETDATA_SOURCE_PATH}/artifacts/netdata-${VERSION}.gz.run"
 fi
+
+chown -R "$(stat -c '%u:%g' "${NETDATA_SOURCE_PATH}")" "${NETDATA_SOURCE_PATH}/artifacts"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

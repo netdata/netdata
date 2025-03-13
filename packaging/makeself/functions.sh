@@ -45,55 +45,23 @@ cache_path() {
   echo "${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
 }
 
+build_path() {
+  local dir="${1}"
+  local prefix="/build"
+
+  mkdir -p "${prefix}"
+
+  echo "${prefix}/${dir}"
+}
+
 fetch() {
   local dir="${1}" url="${2}" sha256="${3}" key="${4}"
   local tar
   tar="$(basename "${2}")"
   local cache
   cache="$(cache_path "${key}")"
-
-  if [ -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]; then
-    rm -rf "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
-  fi
-
-  if [ -d "${cache}/${dir}" ]; then
-    echo "Found cached copy of build directory for ${key}, using it."
-    cp -a "${cache}/${dir}" "${NETDATA_MAKESELF_PATH}/tmp/"
-    CACHE_HIT=1
-  else
-    echo "No cached copy of build directory for ${key} found, fetching sources instead."
-
-    if [ ! -f "${NETDATA_MAKESELF_PATH}/tmp/${tar}" ]; then
-      run wget -O "${NETDATA_MAKESELF_PATH}/tmp/${tar}" "${url}"
-    fi
-
-    # Check SHA256 of gzip'd tar file (apparently alpine's sha256sum requires
-    # two empty spaces between the checksum and the file's path)
-    set +e
-    echo "${sha256}  ${NETDATA_MAKESELF_PATH}/tmp/${tar}" | sha256sum --c --status
-    local rc=$?
-    if [ ${rc} -ne 0 ]; then
-        echo >&2 "SHA256 verification of tar file ${tar} failed (rc=${rc})"
-        echo >&2 "expected: ${sha256}, got $(sha256sum "${NETDATA_MAKESELF_PATH}/tmp/${tar}")"
-        exit 1
-    fi
-
-    set -e
-    cd "${NETDATA_MAKESELF_PATH}/tmp"
-    run tar -axpf "${tar}"
-    cd -
-
-    CACHE_HIT=0
-  fi
-
-  run cd "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
-}
-
-fetch_git() {
-  local dir="${1}" url="${2}" tag="${3}" key="${4}" fetch_via_checkout="${5:-""}"
-  local cache
-  cache="$(cache_path "${key}")"
-  local path="${NETDATA_MAKESELF_PATH}/tmp/${dir}"
+  local path
+  path="$(build_path "${dir}")"
 
   if [ -d "${path}" ]; then
     rm -rf "${path}"
@@ -101,7 +69,49 @@ fetch_git() {
 
   if [ -d "${cache}/${dir}" ]; then
     echo "Found cached copy of build directory for ${key}, using it."
-    cp -a "${cache}/${dir}" "${NETDATA_MAKESELF_PATH}/tmp/"
+    cp -a "${cache}/${dir}" "${path}"
+    CACHE_HIT=1
+  else
+    echo "No cached copy of build directory for ${key} found, fetching sources instead."
+
+    if [ ! -f "/tmp/${tar}" ]; then
+      run wget -O "/tmp/${tar}" "${url}"
+    fi
+
+    # Check SHA256 of gzip'd tar file (apparently alpine's sha256sum requires
+    # two empty spaces between the checksum and the file's path)
+    set +e
+    echo "${sha256} /tmp/${tar}" | sha256sum --c --status
+    local rc=$?
+    if [ ${rc} -ne 0 ]; then
+        echo >&2 "SHA256 verification of tar file ${tar} failed (rc=${rc})"
+        echo >&2 "expected: ${sha256}, got $(sha256sum "/tmp/${tar}")"
+        exit 1
+    fi
+
+    set -e
+    run tar -axpf "/tmp/${tar}" -C "/build"
+
+    CACHE_HIT=0
+  fi
+
+  run cd "${path}"
+}
+
+fetch_git() {
+  local dir="${1}" url="${2}" tag="${3}" key="${4}" fetch_via_checkout="${5:-""}"
+  local cache
+  cache="$(cache_path "${key}")"
+  local path
+  path="$(build_path "${dir}")"
+
+  if [ -d "${path}" ]; then
+    rm -rf "${path}"
+  fi
+
+  if [ -d "${cache}/${dir}" ]; then
+    echo "Found cached copy of build directory for ${key}, using it."
+    cp -a "${cache}/${dir}" "${path}"
     CACHE_HIT=1
   else
     echo "No cached copy of build directory for ${key} found, fetching sources instead."
@@ -114,12 +124,14 @@ fetch_git() {
     CACHE_HIT=0
   fi
 
-  run cd "${path}" || exit 1
+  run cd "${path}"
 }
 
 store_cache() {
   local key="${1}"
-  local src="${2}"
+  local dir="${2}"
+  local src
+  src="$(build_path "${dir}")"
 
   local cache
   cache="$(cache_path "${key}")"
@@ -132,6 +144,7 @@ store_cache() {
     mkdir -p "${cache}"
 
     cp -a "${src}" "${cache}"
+    chown -R "$(stat -c '%u:%g' "${NETDATA_SOURCE_PATH}")" "${cache}"
   fi
 }
 
