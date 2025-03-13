@@ -334,7 +334,8 @@ static inline void pgc_size_histogram_del(PGC *cache, struct pgc_size_histogram 
 // ----------------------------------------------------------------------------
 // evictions control
 
-static ALWAYS_INLINE int64_t pgc_threshold(ssize_t threshold, int64_t wanted, int64_t current, int64_t clean) {
+ALWAYS_INLINE
+static int64_t pgc_threshold(ssize_t threshold, int64_t wanted, int64_t current, int64_t clean) {
     if(current < clean)
         current = clean;
 
@@ -346,6 +347,18 @@ static ALWAYS_INLINE int64_t pgc_threshold(ssize_t threshold, int64_t wanted, in
         ret = current - clean;
 
     return ret;
+}
+
+ALWAYS_INLINE
+static int64_t pgc_wanted_size(const int64_t hot, const int64_t hot_max, const int64_t dirty_max, const int64_t index) {
+    // our promise to users
+    const int64_t max_size1 = MAX(hot_max, hot) * 2;
+
+    // protection against slow flushing
+    const int64_t max_size2 = hot_max + MAX(dirty_max * 2, hot_max * 2 / 3) + index;
+
+    // the final wanted cache size
+    return MIN(max_size1, max_size2);
 }
 
 static ssize_t cache_usage_per1000(PGC *cache, int64_t *size_to_evict) {
@@ -372,20 +385,15 @@ static ssize_t cache_usage_per1000(PGC *cache, int64_t *size_to_evict) {
         const int64_t dirty_max = __atomic_load_n(&cache->dirty.stats->max_size, __ATOMIC_RELAXED);
         const int64_t hot_max = __atomic_load_n(&cache->hot.stats->max_size, __ATOMIC_RELAXED);
 
-        // our promise to users
-        const int64_t max_size1 = MAX(hot_max, hot) * 2;
-
-        // protection against slow flushing
-        const int64_t max_size2 = hot_max + ((dirty_max * 2 < hot_max * 2 / 3) ? hot_max * 2 / 3 : dirty_max * 2) + index;
-
-        // the final wanted cache size
-        wanted_cache_size = MIN(max_size1, max_size2);
-
         if(cache->config.dynamic_target_size_cb) {
+            wanted_cache_size = pgc_wanted_size(hot, hot, dirty, index);
+
             const int64_t wanted_cache_size_cb = cache->config.dynamic_target_size_cb();
             if(wanted_cache_size_cb > wanted_cache_size)
                 wanted_cache_size = wanted_cache_size_cb;
         }
+        else
+            wanted_cache_size = pgc_wanted_size(hot, hot_max, dirty_max, index);
 
         if (wanted_cache_size < hot + dirty + index + cache->config.clean_size)
             wanted_cache_size = hot + dirty + index + cache->config.clean_size;
