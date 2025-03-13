@@ -2628,11 +2628,6 @@ static void metadata_event_loop(void *arg)
         } while (opcode != METADATA_DATABASE_NOOP);
     }
 
-//    if (!uv_timer_stop(&wc->timer_req))
-//        uv_close((uv_handle_t *)&wc->timer_req, NULL);
-//
-//    uv_close((uv_handle_t *)&wc->async, NULL);
-
     uv_walk(loop, (uv_walk_cb) close_callback, NULL);
     uv_run(loop, UV_RUN_NOWAIT);
 
@@ -2642,7 +2637,6 @@ static void metadata_event_loop(void *arg)
     } while (rc != UV_EBUSY);
 
     buffer_free(work_buffer);
-//    freez(loop);
     worker_unregister();
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down metadata thread");
