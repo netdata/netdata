@@ -7,7 +7,7 @@
 . "$(dirname "${0}")/../bundled-packages.version"
 
 # shellcheck disable=SC2015
-[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building bash" || true
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building bash" || true
 
 cache_key="bash"
 build_dir="bash-${BASH_VERSION}"

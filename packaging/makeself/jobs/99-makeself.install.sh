@@ -119,5 +119,3 @@ chown -R "$(stat -c '%u:%g' "${NETDATA_SOURCE_PATH}")" "${NETDATA_SOURCE_PATH}/a
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true
-
-echo >&2 "Self-extracting installer moved to 'artifacts/${FILE}'"

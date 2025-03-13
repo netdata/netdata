@@ -10,7 +10,7 @@
 . "$(dirname "${0}")/../bundled-packages.version" || exit 1
 
 # shellcheck disable=SC2015
-[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building libnetfilter_acct" || true
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building libnetfilter_acct" || true
 
 export CFLAGS="${TUNING_FLAGS} -static -I/usr/include/libmnl -pipe"
 export CXXFLAGS="${CFLAGS}"
