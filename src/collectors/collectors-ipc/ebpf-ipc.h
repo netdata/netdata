@@ -313,6 +313,7 @@ typedef struct netdata_ebpf_shm {
 
 typedef struct netdata_ebpf_pid_stats {
     uint32_t threads;
+    uint32_t pid;
 
     ebpf_publish_process_t process;
     ebpf_socket_publish_apps_t socket;
