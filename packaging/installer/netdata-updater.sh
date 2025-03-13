@@ -1036,11 +1036,19 @@ update_binpkg() {
     DISTRO_COMPAT_NAME="${DISTRO}"
   else
     case "${DISTRO}" in
+      raspbian)
+        if [ "$SYSARCH" = "armv7l" ] || [ "$SYSARCH" = "aarch64" ]; then
+          DISTRO_COMPAT_NAME="debian"
+        fi
+        ;;
       opensuse-leap|opensuse-tumbleweed)
         DISTRO_COMPAT_NAME="opensuse"
         ;;
       cloudlinux|almalinux|centos-stream|rocky|rhel)
         DISTRO_COMPAT_NAME="centos"
+        ;;
+      artix|manjaro|obarun)
+        DISTRO_COMPAT_NAME="arch"
         ;;
       *)
         DISTRO_COMPAT_NAME="unknown"
