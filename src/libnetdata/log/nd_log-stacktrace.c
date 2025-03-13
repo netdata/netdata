@@ -23,7 +23,11 @@ void capture_stack_trace_flush(void) {
 }
 
 bool capture_stack_trace_is_async_signal_safe(void) {
+#if defined(STATIC_BUILD)
+    return false;
+#else
     return true;
+#endif
 }
 
 void capture_stack_trace(BUFFER *wb) {
