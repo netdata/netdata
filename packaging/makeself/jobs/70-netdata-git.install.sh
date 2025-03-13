@@ -23,11 +23,8 @@ export EBPF_LIBC="static"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/libunwind-static/lib/pkgconfig:/openssl-static/lib64/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig:/curl-local/lib/pkgconfig"
 
-export NETDATA_BUILD_DIR="$(build_path netdata)"
-
-# Set correct CMake flags for building against non-System OpenSSL
-# See: https://github.com/warmcat/libwebsockets/blob/master/READMEs/README.build.md
-export CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=/openssl-static -DOPENSSL_LIBRARIES=/openssl-static/lib64 -DCMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE=/openssl-static -DLWS_OPENSSL_INCLUDE_DIRS=/openssl-static/include -DLWS_OPENSSL_LIBRARIES=/openssl-static/lib64/libssl.a;/openssl-static/lib64/libcrypto.a"
+NETDATA_BUILD_DIR="$(build_path netdata)"
+export NETDATA_BUILD_DIR
 
 case "${BUILDARCH}" in
     armv7l|armv6l) export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=OFF -DENABLE_LIBUNWIND=ON" ;;
