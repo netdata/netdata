@@ -1849,17 +1849,18 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         rw_spinlock_write_unlock(&pid_ptr->socket_stats.rw_spinlock);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    end_socket_loop:; // the empty statement is here to allow code to be compiled by old compilers
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key.pid, 0, values[0].name, EBPF_MODULE_SOCKET_IDX);
-        ebpf_socket_publish_apps_t *curr = local_pid->socket;
-        if (!curr)
-            local_pid->socket = curr = ebpf_socket_allocate_publish();
+end_socket_loop: // the empty statement is here to allow code to be compiled by old compilers
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key.pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
+        if (!local_pid)
+            continue;
+        ebpf_socket_publish_apps_t *curr = &local_pid->socket;
 
         if (!deleted)
             ebpf_socket_fill_publish_apps(curr, values);
         else {
-            ebpf_release_pid_data(local_pid, fd, key.pid, EBPF_MODULE_SOCKET_IDX);
-            ebpf_socket_release_publish(curr);
+            netdata_ebpf_reset_shm_pointer_unsafe(fd, key.pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
+            memset(curr, 0, sizeof(*curr));
+            bpf_map_delete_elem(fd, &key);
         }
         memset(values, 0, length);
         memcpy(&key, &next_key, sizeof(key));
@@ -1881,11 +1882,12 @@ void ebpf_socket_resume_apps_data()
         ebpf_socket_publish_apps_t *values = &w->socket;
         memset(&w->socket, 0, sizeof(ebpf_socket_publish_apps_t));
         for (; move; move = move->next) {
-            int32_t pid = move->pid;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SOCKET_IDX);
-            ebpf_socket_publish_apps_t *ws = local_pid->socket;
-            if (!ws)
+            uint32_t pid = move->pid;
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
+            if (!local_pid)
                 continue;
+
+            ebpf_socket_publish_apps_t *ws = &local_pid->socket;
 
             values->call_tcp_v4_connection = ws->call_tcp_v4_connection;
             values->call_tcp_v6_connection = ws->call_tcp_v6_connection;
@@ -1931,8 +1933,10 @@ void *ebpf_read_socket_thread(void *ptr)
             continue;
 
         pthread_mutex_lock(&collect_data_mutex);
+        sem_wait(shm_mutex_ebpf_integration);
         ebpf_update_array_vectors(em);
         ebpf_socket_resume_apps_data();
+        sem_post(shm_mutex_ebpf_integration);
         pthread_mutex_unlock(&collect_data_mutex);
 
         counter = 0;
@@ -2111,15 +2115,17 @@ static void ebpf_update_socket_cgroup()
     ebpf_cgroup_target_t *ect;
 
     pthread_mutex_lock(&mutex_cgroup_shm);
+    sem_wait(shm_mutex_ebpf_integration);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
-            int pid = pids->pid;
+            uint32_t pid = pids->pid;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SOCKET_IDX);
-            ebpf_socket_publish_apps_t *in = local_pid->socket;
-            if (!in)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
+            if (!local_pid)
                 continue;
+
+            ebpf_socket_publish_apps_t *in = &local_pid->socket;
 
             publish->bytes_sent = in->bytes_sent;
             publish->bytes_received = in->bytes_received;
@@ -2133,6 +2139,7 @@ static void ebpf_update_socket_cgroup()
             publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
         }
     }
+    sem_post(shm_mutex_ebpf_integration);
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
