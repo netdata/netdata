@@ -454,6 +454,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrddim_add(st, "used", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "reserved_for_root", "reserved for root", mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                         rrdlabels_add(st->rrdlabels, "mount_point", mntbuf[i].f_mntonname, RRDLABEL_SRC_AUTO);
+                        rrdlabels_add(st->rrdlabels, "filesystem", mntbuf[i].f_fstypename, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set(st, "avail", (collected_number) mntbuf[i].f_bavail);
@@ -486,6 +487,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrddim_add(st, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrdlabels_add(st->rrdlabels, "mount_point", mntbuf[i].f_mntonname, RRDLABEL_SRC_AUTO);
+                        rrdlabels_add(st->rrdlabels, "filesystem", mntbuf[i].f_fstypename, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set(st, "avail", (collected_number) mntbuf[i].f_ffree);
