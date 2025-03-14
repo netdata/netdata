@@ -426,7 +426,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                         ifm->st_bandwidth = rrdset_create_localhost("net",
                                                                     ifa->ifa_name,
                                                                     NULL,
-                                                                    ifa->ifa_name,
+                                                                    "traffik",
                                                                     "net.net",
                                                                     "Bandwidth",
                                                                     "kilobits/s",
@@ -439,6 +439,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                         ifm->rd_bandwidth_in  = rrddim_add(ifm->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                         ifm->rd_bandwidth_out = rrddim_add(ifm->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                        rrdlabels_add(ifm->st_bandwidth->rrdlabels, "device", ifa->ifa_name, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set_by_pointer(ifm->st_bandwidth, ifm->rd_bandwidth_in,  IFA_DATA(ibytes));
@@ -451,7 +452,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                         ifm->st_packets = rrdset_create_localhost("net_packets",
                                                                   ifa->ifa_name,
                                                                   NULL,
-                                                                  ifa->ifa_name,
+                                                                  "packets",
                                                                   "net.packets",
                                                                   "Packets",
                                                                   "packets/s",
@@ -470,6 +471,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                            RRD_ALGORITHM_INCREMENTAL);
                         ifm->rd_packets_m_out = rrddim_add(ifm->st_packets, "multicast_sent",     NULL, -1, 1,
                                                            RRD_ALGORITHM_INCREMENTAL);
+                        rrdlabels_add(ifm->st_packets->rrdlabels, "device", ifa->ifa_name, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set_by_pointer(ifm->st_packets, ifm->rd_packets_in,    IFA_DATA(ipackets));
@@ -484,7 +486,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                         ifm->st_errors = rrdset_create_localhost("net_errors",
                                                                  ifa->ifa_name,
                                                                  NULL,
-                                                                 ifa->ifa_name,
+                                                                 "errors",
                                                                  "net.errors",
                                                                  "Interface Errors",
                                                                  "errors/s",
@@ -497,6 +499,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                         ifm->rd_errors_in  = rrddim_add(ifm->st_errors, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                         ifm->rd_errors_out = rrddim_add(ifm->st_errors, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                        rrdlabels_add(ifm->st_errors->rrdlabels, "device", ifa->ifa_name, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set_by_pointer(ifm->st_errors, ifm->rd_errors_in,  IFA_DATA(ierrors));
@@ -509,7 +512,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                         ifm->st_drops = rrdset_create_localhost("net_drops",
                                                                 ifa->ifa_name,
                                                                 NULL,
-                                                                ifa->ifa_name,
+                                                                "drops",
                                                                 "net.drops",
                                                                 "Interface Drops",
                                                                 "drops/s",
@@ -524,6 +527,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
 #if __FreeBSD__ >= 11
                         ifm->rd_drops_out = rrddim_add(ifm->st_drops, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 #endif
+                        rrdlabels_add(ifm->st_drops->rrdlabels, "device", ifa->ifa_name, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set_by_pointer(ifm->st_drops, ifm->rd_drops_in,  IFA_DATA(iqdrops));
@@ -538,7 +542,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                         ifm->st_events = rrdset_create_localhost("net_events",
                                                                  ifa->ifa_name,
                                                                  NULL,
-                                                                 ifa->ifa_name,
+                                                                 "errors",
                                                                  "net.events",
                                                                  "Network Interface Events",
                                                                  "events/s",
@@ -551,6 +555,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                         ifm->rd_events_coll = rrddim_add(ifm->st_events, "collisions", NULL, -1, 1,
                                                          RRD_ALGORITHM_INCREMENTAL);
+                        rrdlabels_add(ifm->st_events->rrdlabels, "device", ifa->ifa_name, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set_by_pointer(ifm->st_events, ifm->rd_events_coll, IFA_DATA(collisions));

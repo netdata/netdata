@@ -352,7 +352,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->st_io = rrdset_create_localhost("disk",
                                                                     disk,
                                                                     NULL,
-                                                                    disk,
+                                                                    "io",
                                                                     "disk.io",
                                                                     "Disk I/O Bandwidth",
                                                                     "KiB/s",
@@ -369,6 +369,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                            RRD_ALGORITHM_INCREMENTAL);
                                 dm->rd_io_free = rrddim_add(dm->st_io, "frees", NULL, -1, KILO_FACTOR,
                                                            RRD_ALGORITHM_INCREMENTAL);
+                                rrdlabels_add(dm->st_io->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                             }
 
                             rrddim_set_by_pointer(dm->st_io, dm->rd_io_in,   dstat[i].bytes[DEVSTAT_READ]);
@@ -382,7 +383,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->st_ops = rrdset_create_localhost("disk_ops",
                                                                      disk,
                                                                      NULL,
-                                                                     disk,
+                                                                     "ops",
                                                                      "disk.ops",
                                                                      "Disk Completed I/O Operations",
                                                                      "operations/s",
@@ -401,6 +402,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                              RRD_ALGORITHM_INCREMENTAL);
                                 dm->rd_ops_free = rrddim_add(dm->st_ops, "frees",  NULL, -1, 1,
                                                              RRD_ALGORITHM_INCREMENTAL);
+                                rrdlabels_add(dm->st_ops->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                             }
 
                             rrddim_set_by_pointer(dm->st_ops, dm->rd_ops_in,    dstat[i].operations[DEVSTAT_READ]);
@@ -415,7 +417,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->st_qops = rrdset_create_localhost("disk_qops",
                                                                       disk,
                                                                       NULL,
-                                                                      disk,
+                                                                      "ops",
                                                                       "disk.qops",
                                                                       "Disk Current I/O Operations",
                                                                       "operations",
@@ -427,6 +429,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 );
 
                                 dm->rd_qops = rrddim_add(dm->st_qops, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                                rrdlabels_add(dm->st_qops->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                             }
 
                             rrddim_set_by_pointer(dm->st_qops, dm->rd_qops, dstat[i].start_count - dstat[i].end_count);
@@ -438,7 +441,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->st_util = rrdset_create_localhost("disk_util",
                                                                       disk,
                                                                       NULL,
-                                                                      disk,
+                                                                      "utilization",
                                                                       "disk.util",
                                                                       "Disk Utilization Time",
                                                                       "% of time working",
@@ -451,6 +454,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                                 dm->rd_util = rrddim_add(dm->st_util, "utilization", NULL, 1, 10,
                                                          RRD_ALGORITHM_INCREMENTAL);
+                                rrdlabels_add(dm->st_util->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                             }
 
                             rrddim_set_by_pointer(dm->st_util, dm->rd_util, cur_dstat.busy_time_ms);
@@ -462,7 +466,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->st_iotime = rrdset_create_localhost("disk_iotime",
                                                                         disk,
                                                                         NULL,
-                                                                        disk,
+                                                                        "io",
                                                                         "disk.iotime",
                                                                         "Disk Total I/O Time",
                                                                         "milliseconds/s",
@@ -481,6 +485,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                 RRD_ALGORITHM_INCREMENTAL);
                                 dm->rd_iotime_free  = rrddim_add(dm->st_iotime, "frees",  NULL, -1, 1,
                                                                 RRD_ALGORITHM_INCREMENTAL);
+                                rrdlabels_add(dm->st_iotime->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                             }
 
                             rrddim_set_by_pointer(dm->st_iotime, dm->rd_iotime_in,    cur_dstat.duration_read_ms);
@@ -499,7 +504,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                     dm->st_await = rrdset_create_localhost("disk_await",
                                                                            disk,
                                                                            NULL,
-                                                                           disk,
+                                                                           "io",
                                                                            "disk.await",
                                                                            "Average Completed I/O Operation Time",
                                                                            "milliseconds/operation",
@@ -518,6 +523,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                   RRD_ALGORITHM_ABSOLUTE);
                                     dm->rd_await_free  = rrddim_add(dm->st_await, "frees",  NULL, -1, 1,
                                                                   RRD_ALGORITHM_ABSOLUTE);
+                                    rrdlabels_add(dm->st_await->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                                 }
 
                                 rrddim_set_by_pointer(dm->st_await, dm->rd_await_in,
@@ -556,7 +562,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                     dm->st_avagsz = rrdset_create_localhost("disk_avgsz",
                                                                             disk,
                                                                             NULL,
-                                                                            disk,
+                                                                            "io",
                                                                             "disk.avgsz",
                                                                             "Average Completed I/O Operation Bandwidth",
                                                                             "KiB/operation",
@@ -573,6 +579,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                      RRD_ALGORITHM_ABSOLUTE);
                                     dm->rd_avagsz_free  = rrddim_add(dm->st_avagsz, "frees",  NULL, -1, KILO_FACTOR,
                                                                      RRD_ALGORITHM_ABSOLUTE);
+                                    rrdlabels_add(dm->st_avagsz->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                                 }
 
                                 rrddim_set_by_pointer(dm->st_avagsz, dm->rd_avagsz_in,
@@ -604,7 +611,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                     dm->st_svctm = rrdset_create_localhost("disk_svctm",
                                                                            disk,
                                                                            NULL,
-                                                                           disk,
+                                                                           "ops",
                                                                            "disk.svctm",
                                                                            "Average Service Time",
                                                                            "milliseconds/operation",
@@ -617,6 +624,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                                     dm->rd_svctm = rrddim_add(dm->st_svctm, "svctm", NULL, 1, 1,
                                                               RRD_ALGORITHM_ABSOLUTE);
+                                    rrdlabels_add(dm->st_svctm->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                                 }
 
                                 rrddim_set_by_pointer(dm->st_svctm, dm->rd_svctm,

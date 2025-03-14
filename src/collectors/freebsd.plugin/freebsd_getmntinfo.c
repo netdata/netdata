@@ -174,8 +174,6 @@ int do_getmntinfo(int update_every, usec_t dt) {
             mount_points_found = 0;
 
             for (i = 0; i < mntsize; i++) {
-                char title[4096 + 1];
-
                 struct mount_point *m = get_mount_point(mntbuf[i].f_mntonname);
                 m->updated = 1;
                 mount_points_found++;
@@ -214,14 +212,12 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
                 if (m->do_space == CONFIG_BOOLEAN_YES || m->do_space == CONFIG_BOOLEAN_AUTO) {
                     if (unlikely(!m->st_space)) {
-                        snprintfz(title, sizeof(title) - 1, "Disk Space Usage for %s [%s]",
-                                  mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         m->st_space = rrdset_create_localhost("disk_space",
                                                               mntbuf[i].f_mntonname,
                                                               NULL,
-                                                              mntbuf[i].f_mntonname,
+                                                              "used space",
                                                               "disk.space",
-                                                              title,
+                                                              "Disk Space Usage",
                                                               "GiB",
                                                               "freebsd.plugin",
                                                               "getmntinfo",
@@ -236,6 +232,8 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                           mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                         m->rd_space_reserved = rrddim_add(m->st_space, "reserved_for_root", "reserved for root",
                                                           mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                        rrdlabels_add(m->st_space->rrdlabels, "mount_point", mntbuf[i].f_mntonname, RRDLABEL_SRC_AUTO);
+                        rrdlabels_add(m->st_space->rrdlabels, "filesystem", mntbuf[i].f_fstypename, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set_by_pointer(m->st_space, m->rd_space_avail,    (collected_number) mntbuf[i].f_bavail);
@@ -250,14 +248,12 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
                 if (m->do_inodes == CONFIG_BOOLEAN_YES || m->do_inodes == CONFIG_BOOLEAN_AUTO) {
                     if (unlikely(!m->st_inodes)) {
-                        snprintfz(title, sizeof(title) - 1, "Disk Files (inodes) Usage for %s [%s]",
-                                  mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         m->st_inodes = rrdset_create_localhost("disk_inodes",
                                                                mntbuf[i].f_mntonname,
                                                                NULL,
-                                                               mntbuf[i].f_mntonname,
+                                                               "used inodes",
                                                                "disk.inodes",
-                                                               title,
+                                                               "Disk Files (inodes) Usage",
                                                                "inodes",
                                                                "freebsd.plugin",
                                                                "getmntinfo",
@@ -268,6 +264,8 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
                         m->rd_inodes_avail = rrddim_add(m->st_inodes, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         m->rd_inodes_used  = rrddim_add(m->st_inodes, "used",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                        rrdlabels_add(m->st_inodes->rrdlabels, "mount_point", mntbuf[i].f_mntonname, RRDLABEL_SRC_AUTO);
+                        rrdlabels_add(m->st_inodes->rrdlabels, "filesystem", mntbuf[i].f_fstypename, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set_by_pointer(m->st_inodes, m->rd_inodes_avail, (collected_number) mntbuf[i].f_ffree);
