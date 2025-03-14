@@ -37,6 +37,7 @@ typedef struct daemon_status_file {
     RRD_DB_MODE db_mode;
     uint8_t db_tiers;
     bool kubernetes;
+    bool sentry;
 
     time_t boottime;            // system boottime
     time_t uptime;              // netdata uptime

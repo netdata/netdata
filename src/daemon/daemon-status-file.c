@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 15
+#define STATUS_FILE_VERSION 16
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -124,6 +124,10 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_boolean(wb, "ND_kubernetes", ds->kubernetes); // custom
         }
 
+        if(ds->v >= 16) {
+            buffer_json_member_add_boolean(wb, "ND_sentry", ds->sentry); // custom
+        }
+
         buffer_json_member_add_object(wb, "ND_timings"); // custom
         {
             buffer_json_member_add_time_t(wb, "init", ds->timings.init);
@@ -233,6 +237,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v5 = version >= 5 ? strict : false;
     bool required_v10 = version >= 10 ? strict : false;
     bool required_v14 = version >= 14 ? strict : false;
+    bool required_v16 = version >= 16 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -269,6 +274,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             ds->db_mode = default_rrd_memory_mode;
             ds->db_tiers = nd_profile.storage_tiers;
             ds->kubernetes = false;
+        }
+
+        if(version >= 16) {
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry", ds->sentry, error, required_v16);
         }
     });
 
@@ -403,6 +412,12 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
+
+#if defined(ENABLE_SENTRY)
+    session_status.sentry = true;
+#else
+    session_status.sentry = false;
+#endif
 
     session_status.claim_id = claim_id_get_uuid();
 
