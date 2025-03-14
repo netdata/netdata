@@ -38,7 +38,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
         excluded_mountpoints = simple_pattern_create(
             inicfg_get(
                 &netdata_config,
-                "plugin:macos:sysctl",
+                "plugin:macos:iokit",
                 "exclude mountpoints by path",
                 "/System/Volumes/* /private/var/folders/* /Volumes/Recovery"),
             NULL,
@@ -47,7 +47,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
         disabled_net_interfaces = simple_pattern_create(
             inicfg_get(
                 &netdata_config,
-                "plugin:macos:sysctl",
+                "plugin:macos:iokit",
                 "disable by default network interfaces matching",
                 "lo* awdl* llw* anpi* gif* bridge* ap*"),
             NULL,
