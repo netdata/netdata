@@ -3,6 +3,9 @@
 #include "common.h"
 #include "daemon/daemon-status-file.h"
 
+static void (*original_handlers[NSIG])(int) = {0};
+static void (*original_sigactions[NSIG])(int, siginfo_t *, void *) = {0};
+
 typedef enum signal_action {
     NETDATA_SIGNAL_IGNORE,
     NETDATA_SIGNAL_EXIT_CLEANLY,
@@ -81,8 +84,18 @@ void signal_handler_with_info(int signo, siginfo_t *info, void *context __maybe_
                 ;
             }
 
-            // Reset the signal's disposition to the default handler.
+            // Chain to the original handler if it exists
+            if (original_sigactions[signo] && info) {
+                original_sigactions[signo](signo, info, context);
+                return; // Original handler should handle the signal
+            }
 
+            if (original_handlers[signo] && original_handlers[signo] != SIG_IGN && original_handlers[signo] != SIG_DFL) {
+                original_handlers[signo](signo);
+                return; // Original handler should handle the signal
+            }
+
+            // If there's no original handler or we can't chain, reset to default and re-raise
             struct sigaction sa;
             sa.sa_handler = SIG_DFL;
             sigemptyset(&sa.sa_mask);
@@ -114,7 +127,7 @@ static void posix_unmask_my_signals(void) {
         netdata_log_error("SIGNAL: cannot unmask netdata signals");
 }
 
-void nd_initialize_signals(void) {
+void nd_initialize_signals(bool chain_existing) {
     signals_block_all_except_deadly();
 
     struct sigaction act;
@@ -123,22 +136,37 @@ void nd_initialize_signals(void) {
     // ignore all signals while we run in a signal handler
     sigfillset(&act.sa_mask);
 
-    for (size_t i = 0; i < _countof(signals_waiting) ; i++) {
+    for (size_t i = 0; i < _countof(signals_waiting); i++) {
+        int signo = signals_waiting[i].signo;
+
+        // If chaining is requested, get the current handler first
+        struct sigaction old_act;
+        if (chain_existing &&
+            sigaction(signo, NULL, &old_act) == 0 &&
+            (uintptr_t)old_act.sa_handler != (uintptr_t)signal_handler &&
+            (uintptr_t)old_act.sa_handler != (uintptr_t)signal_handler_with_info) {
+            // Save the original handlers for chaining
+            if (old_act.sa_flags & SA_SIGINFO)
+                original_sigactions[signo] = old_act.sa_sigaction;
+            else
+                original_handlers[signo] = old_act.sa_handler;
+        }
+
         act.sa_flags = signals_waiting[i].flags;
 
         switch (signals_waiting[i].action) {
-        case NETDATA_SIGNAL_IGNORE:
-            act.sa_handler = SIG_IGN;
-            break;
-        default:
-            if(act.sa_flags == SA_SIGINFO)
-                act.sa_sigaction = signal_handler_with_info;
-            else
-                act.sa_handler = signal_handler;
-            break;
+            case NETDATA_SIGNAL_IGNORE:
+                act.sa_handler = SIG_IGN;
+                break;
+            default:
+                if (act.sa_flags == SA_SIGINFO)
+                    act.sa_sigaction = signal_handler_with_info;
+                else
+                    act.sa_handler = signal_handler;
+                break;
         }
 
-        if(sigaction(signals_waiting[i].signo, &act, NULL) == -1)
+        if (sigaction(signals_waiting[i].signo, &act, NULL) == -1)
             netdata_log_error("SIGNAL: Failed to change signal handler for: %s", signals_waiting[i].name);
     }
 }

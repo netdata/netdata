@@ -425,7 +425,7 @@ int become_daemon(int dont_fork, const char *user) {
 
         // the child
         gettid_uncached();
-        nd_initialize_signals();
+        nd_initialize_signals(false);
         capture_stack_trace_flush();
 
         // become session leader
@@ -448,7 +448,7 @@ int become_daemon(int dont_fork, const char *user) {
 
         // the child
         gettid_uncached();
-        nd_initialize_signals();
+        nd_initialize_signals(false);
         capture_stack_trace_flush();
     }
 
