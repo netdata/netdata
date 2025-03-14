@@ -15,36 +15,69 @@ typedef enum {
     EXIT_REASON_SIGFPE              = (1 << 2),
     EXIT_REASON_SIGILL              = (1 << 3),
     EXIT_REASON_SIGABRT             = (1 << 4),
-    EXIT_REASON_OUT_OF_MEMORY       = (1 << 5),
-    EXIT_REASON_ALREADY_RUNNING     = (1 << 6),
+    EXIT_REASON_SIGSYS              = (1 << 5),  // Bad system call
+    EXIT_REASON_SIGEMT              = (1 << 6),  // Emulator trap
+    EXIT_REASON_SIGXCPU             = (1 << 7),  // CPU time limit exceeded
+    EXIT_REASON_SIGXFSZ             = (1 << 8),  // File size limit exceeded
+    EXIT_REASON_OUT_OF_MEMORY       = (1 << 9),
+    EXIT_REASON_ALREADY_RUNNING     = (1 << 10),
 
     // abnormal termination via a fatal message
-    EXIT_REASON_FATAL               = (1 << 7),     // a fatal message
+    EXIT_REASON_FATAL               = (1 << 11),     // a fatal message
 
     // normal termination via APIs
-    EXIT_REASON_API_QUIT            = (1 << 8),     // developer only
-    EXIT_REASON_CMD_EXIT            = (1 << 9),     // netdatacli
+    EXIT_REASON_API_QUIT            = (1 << 12),     // developer only
+    EXIT_REASON_CMD_EXIT            = (1 << 13),     // netdatacli
 
     // signals - normal termination
-    EXIT_REASON_SIGQUIT             = (1 << 10),     // rare, but graceful
-    EXIT_REASON_SIGTERM             = (1 << 11),     // received on Linux, FreeBSD, MacOS
-    EXIT_REASON_SIGINT              = (1 << 12),    // received on Windows on normal termination
+    EXIT_REASON_SIGQUIT             = (1 << 14),     // rare, but graceful
+    EXIT_REASON_SIGTERM             = (1 << 15),     // received on Linux, FreeBSD, MacOS
+    EXIT_REASON_SIGINT              = (1 << 16),    // received on Windows on normal termination
 
     // windows specific, service stop
-    EXIT_REASON_SERVICE_STOP        = (1 << 13),
+    EXIT_REASON_SERVICE_STOP        = (1 << 17),
 
     // automatically detect when exit_initiated_set() is called
     // supports Linux, FreeBSD, MacOS, Windows
-    EXIT_REASON_SYSTEM_SHUTDOWN     = (1 << 14),
+    EXIT_REASON_SYSTEM_SHUTDOWN     = (1 << 18),
 
     // netdata update
-    EXIT_REASON_UPDATE              = (1 << 15),
+    EXIT_REASON_UPDATE              = (1 << 19),
 } EXIT_REASON;
 
-#define EXIT_REASON_NORMAL (EXIT_REASON_SIGINT|EXIT_REASON_SIGTERM|EXIT_REASON_SIGQUIT|EXIT_REASON_API_QUIT|EXIT_REASON_CMD_EXIT|EXIT_REASON_SERVICE_STOP|EXIT_REASON_SYSTEM_SHUTDOWN|EXIT_REASON_UPDATE)
-#define EXIT_REASON_ABNORMAL (EXIT_REASON_SIGBUS|EXIT_REASON_SIGSEGV|EXIT_REASON_SIGFPE|EXIT_REASON_SIGILL|EXIT_REASON_SIGABRT|EXIT_REASON_FATAL|EXIT_REASON_OUT_OF_MEMORY)
+#define EXIT_REASON_NORMAL              \
+    (                                   \
+          EXIT_REASON_SIGINT            \
+        | EXIT_REASON_SIGTERM           \
+        | EXIT_REASON_SIGQUIT           \
+        | EXIT_REASON_API_QUIT          \
+        | EXIT_REASON_CMD_EXIT          \
+        | EXIT_REASON_SERVICE_STOP      \
+        | EXIT_REASON_SYSTEM_SHUTDOWN   \
+        | EXIT_REASON_UPDATE            \
+    )
 
-#define is_deadly_signal(reason) ((reason) & (EXIT_REASON_SIGBUS|EXIT_REASON_SIGSEGV|EXIT_REASON_SIGFPE|EXIT_REASON_SIGILL|EXIT_REASON_SIGABRT))
+#define EXIT_REASON_DEADLY_SIGNAL       \
+    (                                   \
+          EXIT_REASON_SIGBUS            \
+        | EXIT_REASON_SIGSEGV           \
+        | EXIT_REASON_SIGFPE            \
+        | EXIT_REASON_SIGILL            \
+        | EXIT_REASON_SIGABRT           \
+        | EXIT_REASON_SIGSYS            \
+        | EXIT_REASON_SIGEMT            \
+        | EXIT_REASON_SIGXCPU           \
+        | EXIT_REASON_SIGXFSZ           \
+    )
+
+#define EXIT_REASON_ABNORMAL            \
+    (                                   \
+          EXIT_REASON_DEADLY_SIGNAL     \
+        | EXIT_REASON_FATAL             \
+        | EXIT_REASON_OUT_OF_MEMORY     \
+    )
+
+#define is_deadly_signal(reason) ((reason) & (EXIT_REASON_DEADLY_SIGNAL))
 #define is_exit_reason_normal(reason) (((reason) & EXIT_REASON_NORMAL) && !((reason) & EXIT_REASON_ABNORMAL))
 
 typedef struct web_buffer BUFFER;
