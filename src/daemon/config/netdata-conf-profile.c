@@ -102,9 +102,10 @@ void nd_profile_setup(void) {
         nd_profile.storage_tiers = 3;       // MUST BE 1
         nd_profile.update_every = 1;        // MUST BE 2
         nd_profile.malloc_arenas = 1;
-        nd_profile.malloc_trim = 32 * 1024;
+        nd_profile.malloc_trim = 16 * 1024;
         nd_profile.stream_sender_compression = ND_COMPRESSION_FASTEST;
         nd_profile.dbengine_journal_v2_unmount_time = 120;
+        nd_profile.max_page_size = 16 * 1024;
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -122,6 +123,7 @@ void nd_profile_setup(void) {
         nd_profile.malloc_trim = 128 * 1024;
         nd_profile.stream_sender_compression = ND_COMPRESSION_FASTEST;
         nd_profile.dbengine_journal_v2_unmount_time = 0;
+        nd_profile.max_page_size = 2 * 1024 * 1024; // 2MB for THP
         // web server threads = dynamic
         // aclk query threads = dynamic
         // backfill threads = dynamic
@@ -136,6 +138,7 @@ void nd_profile_setup(void) {
         nd_profile.malloc_trim = 32 * 1024;
         nd_profile.stream_sender_compression = ND_COMPRESSION_DEFAULT;
         nd_profile.dbengine_journal_v2_unmount_time = 120;
+        nd_profile.max_page_size = 32 * 1024;
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -150,6 +153,7 @@ void nd_profile_setup(void) {
         nd_profile.malloc_trim = 64 * 1024;
         nd_profile.stream_sender_compression = ND_COMPRESSION_DEFAULT;
         nd_profile.dbengine_journal_v2_unmount_time = 120;
+        nd_profile.max_page_size = 64 * 1024;
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -158,6 +162,7 @@ void nd_profile_setup(void) {
         // health enabled = true
     }
 
+    aral_optimal_malloc_page_size_set(nd_profile.max_page_size);
     netdata_conf_glibc_malloc_initialize(nd_profile.malloc_arenas, nd_profile.malloc_trim);
     stream_conf_set_sender_compression_levels(nd_profile.stream_sender_compression);
 }

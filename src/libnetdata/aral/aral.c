@@ -17,14 +17,14 @@
 // max malloc size
 // optimal at current versions of libc is up to 256k
 // ideal to have the same overhead as libc is 4k
-#define ARAL_MAX_PAGE_SIZE_MALLOC (2ULL * 1024 * 1024) // 2MiB to use THP
+#define ARAL_MAX_PAGE_SIZE_MALLOC (64ULL * 1024)
 
 // in malloc mode, when the page is bigger than this
 // use anonymous private mmap pages
-#define ARAL_MALLOC_USE_MMAP_ABOVE (4096ULL * 4)
+#define ARAL_MALLOC_USE_MMAP_ABOVE (16ULL * 1024)
 
 // do not allocate pages smaller than this
-#define ARAL_MIN_PAGE_SIZE (4096ULL * 4)
+#define ARAL_MIN_PAGE_SIZE (16ULL * 1024)
 
 #define ARAL_PAGE_INCOMING_PARTITIONS 4 // up to 32 (32-bits bitmap)
 
@@ -114,13 +114,14 @@ struct aral {
         ARAL_OPTIONS options;
 
         size_t element_size;            // calculated to take into account ARAL overheads
-        size_t max_allocation_size;     // calculated in bytes
         size_t element_ptr_offset;      // calculated
         size_t system_page_size;        // calculated
 
         size_t initial_page_elements;
         size_t requested_element_size;
         size_t requested_max_page_size;
+
+        size_t min_required_page_size;
 
         struct {
             bool enabled;
@@ -142,6 +143,8 @@ struct aral {
 #define mark_to_idx(marked) (marked ? 1 : 0)
 #define aral_pages_head_free(ar, marked) (marked ? &ar->aral_lock.pages_marked_free : &ar->aral_lock.pages_free)
 #define aral_pages_head_full(ar, marked) (marked ? &ar->aral_lock.pages_marked_full : &ar->aral_lock.pages_full)
+
+static size_t aral_max_allocation_size(ARAL *ar);
 
 static inline bool aral_malloc_use_mmap(ARAL *ar __maybe_unused, size_t size) {
     unsigned long long mmap_limit = os_mmap_limit();
@@ -335,7 +338,7 @@ struct free_space {
 static inline struct free_space check_free_space___aral_lock_needed(ARAL *ar, ARAL_PAGE *my_page, bool marked) {
     struct free_space f = { 0 };
 
-    f.max_page_elements = ar->config.max_allocation_size / ar->config.element_size;
+    f.max_page_elements = aral_max_allocation_size(ar) / ar->config.element_size;
     for(f.p = *aral_pages_head_free(ar, marked); f.p ; f.lp = f.p, f.p = f.p->aral_lock.next) {
         f.pages++;
         internal_fatal(!f.p->aral_lock.free_elements, "page is in the free list, but does not have any elements free");
@@ -485,10 +488,6 @@ static ALWAYS_INLINE size_t aral_element_slot_size(size_t requested_element_size
     return element_size;
 }
 
-size_t aral_optimal_malloc_page_size(void) {
-    return ARAL_MAX_PAGE_SIZE_MALLOC;
-}
-
 static ALWAYS_INLINE size_t aral_elements_in_page_size(ARAL *ar, size_t page_size) {
     if(ar->config.mmap.enabled)
         return page_size / ar->config.element_size;
@@ -507,8 +506,10 @@ static ALWAYS_INLINE size_t aral_next_allocation_size___adders_lock_needed(ARAL 
         // we are growing, double the size
 
         size *= 2;
-        if(size > ar->config.max_allocation_size)
-            size = ar->config.max_allocation_size;
+
+        size_t max = aral_max_allocation_size(ar);
+        if(size > max)
+            size = max;
         ar->ops[idx].adders.allocation_size = size;
     }
 
@@ -1133,6 +1134,30 @@ size_t aral_actual_element_size(ARAL *ar) {
     return ar->config.element_size;
 }
 
+static size_t aral_max_page_size_malloc = ARAL_MAX_PAGE_SIZE_MALLOC;
+size_t aral_optimal_malloc_page_size(void) {
+    return aral_max_page_size_malloc;
+}
+
+void aral_optimal_malloc_page_size_set(size_t size) {
+    aral_max_page_size_malloc = size < ARAL_MIN_PAGE_SIZE ? ARAL_MIN_PAGE_SIZE : size;
+}
+
+static size_t aral_requested_max_page_size(ARAL *ar) {
+    if(!ar->config.requested_max_page_size)
+        return ar->config.mmap.enabled ? ARAL_MAX_PAGE_SIZE_MMAP : aral_optimal_malloc_page_size();
+    else
+        return ar->config.requested_max_page_size;
+}
+
+static size_t aral_max_allocation_size(ARAL *ar) {
+    size_t size = memory_alignment(aral_requested_max_page_size(ar), ar->config.system_page_size);
+    if(size < ar->config.min_required_page_size)
+        size = ar->config.min_required_page_size;
+
+    return size;
+}
+
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
                   struct aral_statistics *stats, const char *filename, const char **cache_dir,
                   bool mmap, bool lockless, bool dont_dump) {
@@ -1191,27 +1216,16 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     if (ar->config.initial_page_elements < 2)
         ar->config.initial_page_elements = 2;
 
-    if(!ar->config.requested_max_page_size)
-        ar->config.requested_max_page_size = ar->config.mmap.enabled ? ARAL_MAX_PAGE_SIZE_MMAP : ARAL_MAX_PAGE_SIZE_MALLOC;
-
-    // calculate the maximum allocation size we will do
-    ar->config.max_allocation_size =
-        memory_alignment(ar->config.requested_max_page_size, ar->config.system_page_size);
-
     // find the minimum page size we will use
-    size_t min_required_page_size = memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT) + 2 * ar->config.element_size;
+    ar->config.min_required_page_size = memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT) + 2 * ar->config.element_size;
 
-    if(min_required_page_size < ARAL_MIN_PAGE_SIZE)
-        min_required_page_size = ARAL_MIN_PAGE_SIZE;
+    if(ar->config.min_required_page_size < ARAL_MIN_PAGE_SIZE)
+        ar->config.min_required_page_size = ARAL_MIN_PAGE_SIZE;
 
-    min_required_page_size = memory_alignment(min_required_page_size, ar->config.system_page_size);
-
-    // make sure the maximum is enough
-    if(ar->config.max_allocation_size < min_required_page_size)
-        ar->config.max_allocation_size = min_required_page_size;
+    ar->config.min_required_page_size = memory_alignment(ar->config.min_required_page_size, ar->config.system_page_size);
 
     // set the starting allocation size for both marked and unmarked partitions
-    ar->ops[0].adders.allocation_size = ar->ops[1].adders.allocation_size = min_required_page_size;
+    ar->ops[0].adders.allocation_size = ar->ops[1].adders.allocation_size = ar->config.min_required_page_size;
 
     // ----------------------------------------------------------------------------------------------------------------
 
@@ -1243,8 +1257,8 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
                    , ar->config.name
                    , ar->config.element_size, ar->config.requested_element_size
                    , ar->ops[0].adders.allocation_size / ar->config.element_size, ar->config.initial_page_elements
-                   , ar->config.max_allocation_size / ar->config.element_size
-                   , ar->config.max_allocation_size,  ar->config.requested_max_page_size
+                   , aral_max_allocation_size(ar) / ar->config.element_size
+                   , aral_max_allocation_size(ar),  ar->config.requested_max_page_size
     );
 
     __atomic_add_fetch(&ar->stats->structures.allocations, 1, __ATOMIC_RELAXED);
@@ -1443,7 +1457,7 @@ static void *aral_test_thread(void *ptr) {
             pointers[i] = unittest_aral_malloc(ar, marked);
         }
 
-        size_t max_page_elements = aral_elements_in_page_size(ar, ar->config.max_allocation_size);
+        size_t max_page_elements = aral_elements_in_page_size(ar, aral_max_allocation_size(ar));
         size_t increment = elements / max_page_elements;
         for (size_t all = increment; all <= elements / 2; all += increment) {
 
