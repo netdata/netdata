@@ -55,6 +55,7 @@ struct nd_profile_t {
     size_t max_page_size;
     time_t dbengine_journal_v2_unmount_time;
     ND_COMPRESSION_PROFILE stream_sender_compression;
+    int ml_enabled;
 };
 
 extern struct nd_profile_t nd_profile;
