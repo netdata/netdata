@@ -194,6 +194,12 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "errno", ds->fatal.errno_str);
         buffer_json_member_add_string_or_empty(wb, "thread", ds->fatal.thread);
         buffer_json_member_add_string_or_empty(wb, "stack_trace", ds->fatal.stack_trace);
+
+        if(ds->v >= 16) {
+            char signal_code[UINT64_MAX_LENGTH];
+            SIGNAL_CODE_2str_h(ds->fatal.signal_code, signal_code, sizeof(signal_code));
+            buffer_json_member_add_string_or_empty(wb, "signal_code", signal_code);
+        }
     }
     buffer_json_object_close(wb);
 
@@ -332,6 +338,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "line", ds->fatal.line, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "errno", ds->fatal.errno_str, error, required_v3);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "thread", ds->fatal.thread, error, required_v5);
+
+        if(version >= 16) {
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "signal_code", SIGNAL_CODE_2id_h, ds->fatal.signal_code, error, required_v16);
+        }
     });
 
     // Parse the last posted object
@@ -1217,7 +1227,7 @@ static void daemon_status_file_out_of_memory(void) {
     daemon_status_file_save_again_if_we_can_get_stack_trace();
 }
 
-void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
+void daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code) {
     FUNCTION_RUN_ONCE();
 
     // DO NOT LOCK OR ALLOCATE IN THIS FUNCTION - WE CRASHED ALREADY AND WE ARE INSIDE THE SIGNAL HANDLER!
@@ -1225,6 +1235,10 @@ void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
     dsf_acquire(session_status);
 
     session_status.exit_reason |= reason;
+
+    if(code)
+        session_status.fatal.signal_code = code;
+
     if(!session_status.fatal.thread[0])
         strncpyz(session_status.fatal.thread, nd_thread_tag_async_safe(), sizeof(session_status.fatal.thread) - 1);
 

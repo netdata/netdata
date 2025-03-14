@@ -81,6 +81,7 @@ typedef struct daemon_status_file {
         char message[512];
         char stack_trace[2048];
         char thread[ND_THREAD_TAG_MAX + 1];
+        SIGNAL_CODE signal_code;
     } fatal;
 
     struct {
@@ -94,7 +95,7 @@ typedef struct daemon_status_file {
 
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);
-void daemon_status_file_deadly_signal_received(EXIT_REASON reason);
+void daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code);
 
 // check for a crash
 void daemon_status_file_check_crash(void);

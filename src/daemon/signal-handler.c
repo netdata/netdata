@@ -16,34 +16,35 @@ typedef enum signal_action {
 
 static struct {
     int signo;              // the signal
+    int flags;              // the sigaction flags to use
     const char *name;       // the name of the signal
     size_t count;           // the number of signals received
     SIGNAL_ACTION action;   // the action to take
     EXIT_REASON reason;
 } signals_waiting[] = {
-    { SIGPIPE, "SIGPIPE", 0, NETDATA_SIGNAL_IGNORE, EXIT_REASON_NONE },
-    { SIGINT , "SIGINT",  0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGINT },
-    { SIGQUIT, "SIGQUIT", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGQUIT },
-    { SIGTERM, "SIGTERM", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGTERM },
-    { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS, EXIT_REASON_NONE },
+    { SIGPIPE, 0, "SIGPIPE", 0, NETDATA_SIGNAL_IGNORE, EXIT_REASON_NONE },
+    { SIGINT , 0, "SIGINT",  0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGINT },
+    { SIGQUIT, 0, "SIGQUIT", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGQUIT },
+    { SIGTERM, 0, "SIGTERM", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGTERM },
+    { SIGHUP,  0, "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS, EXIT_REASON_NONE },
 #if defined(FSANITIZE_ADDRESS)
-    { SIGUSR1, "SIGUSR1", 0, NETDATA_SIGNAL_EXIT_NOW, EXIT_REASON_NONE },
+    { SIGUSR1, 0, "SIGUSR1", 0, NETDATA_SIGNAL_EXIT_NOW, EXIT_REASON_NONE },
 #endif
-    { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH, EXIT_REASON_NONE },
-    { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGBUS },
-    { SIGSEGV, "SIGSEGV", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSEGV },
-    { SIGFPE,  "SIGFPE",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGFPE },
-    { SIGILL,  "SIGILL",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGILL },
-    { SIGABRT, "SIGABRT", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGABRT },
-    { SIGSYS,  "SIGSYS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSYS },
-    { SIGXCPU, "SIGXCPU", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXCPU },
-    { SIGXFSZ, "SIGXFSZ", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXFSZ },
+    { SIGUSR2, 0, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH, EXIT_REASON_NONE },
+    { SIGBUS,  SA_SIGINFO, "SIGBUS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGBUS },
+    { SIGSEGV, SA_SIGINFO, "SIGSEGV", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSEGV },
+    { SIGFPE,  SA_SIGINFO, "SIGFPE",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGFPE },
+    { SIGILL,  SA_SIGINFO, "SIGILL",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGILL },
+    { SIGABRT, 0, "SIGABRT", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGABRT },
+    { SIGSYS,  0, "SIGSYS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSYS },
+    { SIGXCPU, 0, "SIGXCPU", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXCPU },
+    { SIGXFSZ, 0, "SIGXFSZ", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXFSZ },
 #ifdef SIGEMT
     { SIGEMT,  "SIGEMT",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGEMT },
 #endif
 };
 
-static void signal_handler(int signo) {
+void signal_handler_with_info(int signo, siginfo_t *info, void *context __maybe_unused) {
     for(size_t i = 0; i < _countof(signals_waiting) ; i++) {
         if(signals_waiting[i].signo != signo)
             continue;
@@ -57,12 +58,18 @@ static void signal_handler(int signo) {
 
         if(signals_waiting[i].action == NETDATA_SIGNAL_DEADLY) {
             // Update the status file
-            daemon_status_file_deadly_signal_received(signals_waiting[i].reason);
+            SIGNAL_CODE sc = info ? signal_code(signo, info->si_code) : 0;
+            daemon_status_file_deadly_signal_received(signals_waiting[i].reason, sc);
 
             // log it
             char b[512];
             strncpyz(b, "SIGNAL HANDLER: received deadly signal: ", sizeof(b) - 1);
             strcat(b, signals_waiting[i].name);
+            if(sc) {
+                strcat(b, " (");
+                strcat(b, SIGNAL_CODE_2str(sc));
+                strcat(b, ")");
+            }
             strcat(b, " in thread ");
             print_uint64(&b[strlen(b)], gettid_cached());
             strcat(b, " ");
@@ -90,6 +97,10 @@ static void signal_handler(int signo) {
     }
 }
 
+static void signal_handler(int signo) {
+    signal_handler_with_info(signo, NULL, NULL);
+}
+
 // Unmask all signals the netdata main signal handler uses.
 // All other signals remain masked.
 static void posix_unmask_my_signals(void) {
@@ -106,24 +117,28 @@ static void posix_unmask_my_signals(void) {
 void nd_initialize_signals(void) {
     signals_block_all_except_deadly();
 
-    // Catch signals which we want to use
-    struct sigaction sa;
-    sa.sa_flags = 0;
+    struct sigaction act;
+    memset(&act, 0, sizeof(struct sigaction));
 
     // ignore all signals while we run in a signal handler
-    sigfillset(&sa.sa_mask);
+    sigfillset(&act.sa_mask);
 
     for (size_t i = 0; i < _countof(signals_waiting) ; i++) {
+        act.sa_flags = signals_waiting[i].flags;
+
         switch (signals_waiting[i].action) {
         case NETDATA_SIGNAL_IGNORE:
-            sa.sa_handler = SIG_IGN;
+            act.sa_handler = SIG_IGN;
             break;
         default:
-            sa.sa_handler = signal_handler;
+            if(act.sa_flags == SA_SIGINFO)
+                act.sa_sigaction = signal_handler_with_info;
+            else
+                act.sa_handler = signal_handler;
             break;
         }
 
-        if(sigaction(signals_waiting[i].signo, &sa, NULL) == -1)
+        if(sigaction(signals_waiting[i].signo, &act, NULL) == -1)
             netdata_log_error("SIGNAL: Failed to change signal handler for: %s", signals_waiting[i].name);
     }
 }
@@ -165,7 +180,7 @@ static void process_triggered_signals(void) {
 
                 case NETDATA_SIGNAL_DEADLY:
                     nd_log_limits_unlimited();
-                    daemon_status_file_deadly_signal_received(signals_waiting[i].reason);
+                    daemon_status_file_deadly_signal_received(signals_waiting[i].reason, 0);
                     _exit(1);
                     break;
 
