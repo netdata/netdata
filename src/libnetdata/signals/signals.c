@@ -44,9 +44,6 @@ void signals_unblock_deadly(void) {
         SIGSYS,
         SIGXCPU,
         SIGXFSZ,
-#ifdef SIGEMT
-        SIGEMT,
-#endif
     };
     signals_unblock(deadly_signals, _countof(deadly_signals));
 }

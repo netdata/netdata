@@ -16,33 +16,32 @@ typedef enum {
     EXIT_REASON_SIGILL              = (1 << 3),
     EXIT_REASON_SIGABRT             = (1 << 4),
     EXIT_REASON_SIGSYS              = (1 << 5),  // Bad system call
-    EXIT_REASON_SIGEMT              = (1 << 6),  // Emulator trap
-    EXIT_REASON_SIGXCPU             = (1 << 7),  // CPU time limit exceeded
-    EXIT_REASON_SIGXFSZ             = (1 << 8),  // File size limit exceeded
-    EXIT_REASON_OUT_OF_MEMORY       = (1 << 9),
-    EXIT_REASON_ALREADY_RUNNING     = (1 << 10),
+    EXIT_REASON_SIGXCPU             = (1 << 6),  // CPU time limit exceeded
+    EXIT_REASON_SIGXFSZ             = (1 << 7),  // File size limit exceeded
+    EXIT_REASON_OUT_OF_MEMORY       = (1 << 8),
+    EXIT_REASON_ALREADY_RUNNING     = (1 << 9),
 
     // abnormal termination via a fatal message
-    EXIT_REASON_FATAL               = (1 << 11),     // a fatal message
+    EXIT_REASON_FATAL               = (1 << 10),     // a fatal message
 
     // normal termination via APIs
-    EXIT_REASON_API_QUIT            = (1 << 12),     // developer only
-    EXIT_REASON_CMD_EXIT            = (1 << 13),     // netdatacli
+    EXIT_REASON_API_QUIT            = (1 << 11),     // developer only
+    EXIT_REASON_CMD_EXIT            = (1 << 12),     // netdatacli
 
     // signals - normal termination
-    EXIT_REASON_SIGQUIT             = (1 << 14),     // rare, but graceful
-    EXIT_REASON_SIGTERM             = (1 << 15),     // received on Linux, FreeBSD, MacOS
-    EXIT_REASON_SIGINT              = (1 << 16),    // received on Windows on normal termination
+    EXIT_REASON_SIGQUIT             = (1 << 13),     // rare, but graceful
+    EXIT_REASON_SIGTERM             = (1 << 14),     // received on Linux, FreeBSD, MacOS
+    EXIT_REASON_SIGINT              = (1 << 15),    // received on Windows on normal termination
 
     // windows specific, service stop
-    EXIT_REASON_SERVICE_STOP        = (1 << 17),
+    EXIT_REASON_SERVICE_STOP        = (1 << 16),
 
     // automatically detect when exit_initiated_set() is called
     // supports Linux, FreeBSD, MacOS, Windows
-    EXIT_REASON_SYSTEM_SHUTDOWN     = (1 << 18),
+    EXIT_REASON_SYSTEM_SHUTDOWN     = (1 << 17),
 
     // netdata update
-    EXIT_REASON_UPDATE              = (1 << 19),
+    EXIT_REASON_UPDATE              = (1 << 18),
 } EXIT_REASON;
 
 #define EXIT_REASON_NORMAL              \
@@ -65,7 +64,6 @@ typedef enum {
         | EXIT_REASON_SIGILL            \
         | EXIT_REASON_SIGABRT           \
         | EXIT_REASON_SIGSYS            \
-        | EXIT_REASON_SIGEMT            \
         | EXIT_REASON_SIGXCPU           \
         | EXIT_REASON_SIGXFSZ           \
     )

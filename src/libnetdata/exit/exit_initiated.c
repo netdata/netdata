@@ -11,7 +11,6 @@ ENUM_STR_MAP_DEFINE(EXIT_REASON) = {
     { EXIT_REASON_SIGILL, "signal-illegal-instruction"},
     { EXIT_REASON_SIGABRT, "signal-abort"},
     { EXIT_REASON_SIGSYS, "signal-bad-system-call"},
-    { EXIT_REASON_SIGEMT, "signal-emulator-trap"},
     { EXIT_REASON_SIGXCPU, "signal-cpu-time-limit-exceeded"},
     { EXIT_REASON_SIGXFSZ, "signal-file-size-limit-exceeded"},
 
