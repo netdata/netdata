@@ -33,10 +33,10 @@ void nd_sentry_init(void)
     sentry_options_set_database_path(options, path);
     sentry_options_set_environment(options, NETDATA_SENTRY_ENVIRONMENT);
 
-    char release[64];
-    snprintfz(release, 64 - 1, "%s.%s.%s",
-              NETDATA_VERSION_MINOR, NETDATA_VERSION_PATCH, NETDATA_VERSION_TWEAK);
-    sentry_options_set_release(options, release);
+    if(NETDATA_VERSION[0] == 'v')
+        sentry_options_set_release(options, &NETDATA_VERSION[1]);
+    else
+        sentry_options_set_release(options, NETDATA_VERSION);
 
     sentry_options_set_dist(options, NETDATA_SENTRY_DIST);
 #ifdef NETDATA_INTERNAL_CHECKS
