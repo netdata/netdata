@@ -3,9 +3,6 @@
 #include "common.h"
 #include "daemon/daemon-status-file.h"
 
-static void (*original_handlers[NSIG])(int) = {0};
-static void (*original_sigactions[NSIG])(int, siginfo_t *, void *) = {0};
-
 typedef enum signal_action {
     NETDATA_SIGNAL_IGNORE,
     NETDATA_SIGNAL_EXIT_CLEANLY,
@@ -19,35 +16,38 @@ typedef enum signal_action {
 
 static struct {
     int signo;              // the signal
-    int flags;              // the sigaction flags to use
     const char *name;       // the name of the signal
     size_t count;           // the number of signals received
     SIGNAL_ACTION action;   // the action to take
     EXIT_REASON reason;
 } signals_waiting[] = {
-    { SIGPIPE, 0, "SIGPIPE", 0, NETDATA_SIGNAL_IGNORE, EXIT_REASON_NONE },
-    { SIGINT , 0, "SIGINT",  0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGINT },
-    { SIGQUIT, 0, "SIGQUIT", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGQUIT },
-    { SIGTERM, 0, "SIGTERM", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGTERM },
-    { SIGHUP,  0, "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS, EXIT_REASON_NONE },
+    { SIGPIPE, "SIGPIPE", 0, NETDATA_SIGNAL_IGNORE, EXIT_REASON_NONE },
+    { SIGINT , "SIGINT",  0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGINT },
+    { SIGQUIT, "SIGQUIT", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGQUIT },
+    { SIGTERM, "SIGTERM", 0, NETDATA_SIGNAL_EXIT_CLEANLY, EXIT_REASON_SIGTERM },
+    { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS, EXIT_REASON_NONE },
 #if defined(FSANITIZE_ADDRESS)
-    { SIGUSR1, 0, "SIGUSR1", 0, NETDATA_SIGNAL_EXIT_NOW, EXIT_REASON_NONE },
+    { SIGUSR1, "SIGUSR1", 0, NETDATA_SIGNAL_EXIT_NOW, EXIT_REASON_NONE },
 #endif
-    { SIGUSR2, 0, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH, EXIT_REASON_NONE },
-    { SIGBUS,  SA_SIGINFO, "SIGBUS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGBUS },
-    { SIGSEGV, SA_SIGINFO, "SIGSEGV", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSEGV },
-    { SIGFPE,  SA_SIGINFO, "SIGFPE",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGFPE },
-    { SIGILL,  SA_SIGINFO, "SIGILL",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGILL },
-    { SIGABRT, 0, "SIGABRT", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGABRT },
-    { SIGSYS,  0, "SIGSYS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSYS },
-    { SIGXCPU, 0, "SIGXCPU", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXCPU },
-    { SIGXFSZ, 0, "SIGXFSZ", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXFSZ },
+    { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH, EXIT_REASON_NONE },
+    { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGBUS },
+    { SIGSEGV, "SIGSEGV", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSEGV },
+    { SIGFPE,  "SIGFPE",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGFPE },
+    { SIGILL,  "SIGILL",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGILL },
+    { SIGABRT, "SIGABRT", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGABRT },
+    { SIGSYS,  "SIGSYS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSYS },
+    { SIGXCPU, "SIGXCPU", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXCPU },
+    { SIGXFSZ, "SIGXFSZ", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXFSZ },
 #ifdef SIGEMT
-    { SIGEMT,  "SIGEMT",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGEMT },
+    { SIGEMT,  "SIGEMT",  SA_SIGINFO, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGEMT },
 #endif
 };
 
-void signal_handler_with_info(int signo, siginfo_t *info, void *context __maybe_unused) {
+static void (*original_handlers[NSIG])(int) = {0};
+static void (*original_sigactions[NSIG])(int, siginfo_t *, void *) = {0};
+
+void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused) {
+
     for(size_t i = 0; i < _countof(signals_waiting) ; i++) {
         if(signals_waiting[i].signo != signo)
             continue;
@@ -60,9 +60,13 @@ void signal_handler_with_info(int signo, siginfo_t *info, void *context __maybe_
 #endif
 
         if(signals_waiting[i].action == NETDATA_SIGNAL_DEADLY) {
+            bool chained_handler = original_sigactions[signo] || (original_handlers[signo] && original_handlers[signo] != SIG_IGN && original_handlers[signo] != SIG_DFL);
+
             // Update the status file
             SIGNAL_CODE sc = info ? signal_code(signo, info->si_code) : 0;
-            daemon_status_file_deadly_signal_received(signals_waiting[i].reason, sc);
+            if(daemon_status_file_deadly_signal_received(signals_waiting[i].reason, sc, chained_handler))
+                // this is a duplicate event, do not send it to sentry
+                chained_handler = false;
 
             // log it
             char b[512];
@@ -85,14 +89,16 @@ void signal_handler_with_info(int signo, siginfo_t *info, void *context __maybe_
             }
 
             // Chain to the original handler if it exists
-            if (original_sigactions[signo] && info) {
-                original_sigactions[signo](signo, info, context);
-                return; // Original handler should handle the signal
-            }
+            if(chained_handler) {
+                if (original_sigactions[signo]) {
+                    original_sigactions[signo](signo, info, context);
+                    return; // Original handler should handle the signal
+                }
 
-            if (original_handlers[signo] && original_handlers[signo] != SIG_IGN && original_handlers[signo] != SIG_DFL) {
-                original_handlers[signo](signo);
-                return; // Original handler should handle the signal
+                if (original_handlers[signo]) {
+                    original_handlers[signo](signo);
+                    return; // Original handler should handle the signal
+                }
             }
 
             // If there's no original handler or we can't chain, reset to default and re-raise
@@ -108,10 +114,6 @@ void signal_handler_with_info(int signo, siginfo_t *info, void *context __maybe_
 
         break;
     }
-}
-
-static void signal_handler(int signo) {
-    signal_handler_with_info(signo, NULL, NULL);
 }
 
 // Unmask all signals the netdata main signal handler uses.
@@ -143,8 +145,7 @@ void nd_initialize_signals(bool chain_existing) {
         struct sigaction old_act;
         if (chain_existing &&
             sigaction(signo, NULL, &old_act) == 0 &&
-            (uintptr_t)old_act.sa_handler != (uintptr_t)signal_handler &&
-            (uintptr_t)old_act.sa_handler != (uintptr_t)signal_handler_with_info) {
+            (uintptr_t)old_act.sa_handler != (uintptr_t)nd_signal_handler) {
             // Save the original handlers for chaining
             if (old_act.sa_flags & SA_SIGINFO)
                 original_sigactions[signo] = old_act.sa_sigaction;
@@ -152,17 +153,14 @@ void nd_initialize_signals(bool chain_existing) {
                 original_handlers[signo] = old_act.sa_handler;
         }
 
-        act.sa_flags = signals_waiting[i].flags;
-
         switch (signals_waiting[i].action) {
             case NETDATA_SIGNAL_IGNORE:
+                act.sa_flags = 0;
                 act.sa_handler = SIG_IGN;
                 break;
             default:
-                if (act.sa_flags == SA_SIGINFO)
-                    act.sa_sigaction = signal_handler_with_info;
-                else
-                    act.sa_handler = signal_handler;
+                act.sa_flags = SA_SIGINFO;
+                act.sa_sigaction = nd_signal_handler;
                 break;
         }
 
@@ -207,8 +205,6 @@ static void process_triggered_signals(void) {
                     break;
 
                 case NETDATA_SIGNAL_DEADLY:
-                    nd_log_limits_unlimited();
-                    daemon_status_file_deadly_signal_received(signals_waiting[i].reason, 0);
                     _exit(1);
                     break;
 

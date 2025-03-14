@@ -85,9 +85,8 @@ typedef struct daemon_status_file {
     } fatal;
 
     struct {
-        SPINLOCK spinlock;
         struct {
-            XXH64_hash_t hash;
+            uint64_t hash;
             usec_t timestamp_ut;
         } slot[10];
     } dedup;
@@ -95,7 +94,9 @@ typedef struct daemon_status_file {
 
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);
-void daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code);
+
+// returns true when the event is duplicate and should not be reported again
+bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, bool chained_handler);
 
 // check for a crash
 void daemon_status_file_check_crash(void);
