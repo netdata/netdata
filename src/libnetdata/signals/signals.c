@@ -35,7 +35,16 @@ void signals_unblock(int signals[], size_t count) {
 }
 
 void signals_unblock_deadly(void) {
-    int deadly_signals[] = {SIGBUS, SIGSEGV, SIGFPE, SIGILL, SIGABRT};
+    int deadly_signals[] = {
+        SIGBUS,
+        SIGSEGV,
+        SIGFPE,
+        SIGILL,
+        SIGABRT,
+        SIGSYS,
+        SIGXCPU,
+        SIGXFSZ,
+    };
     signals_unblock(deadly_signals, _countof(deadly_signals));
 }
 

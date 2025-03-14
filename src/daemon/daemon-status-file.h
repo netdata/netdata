@@ -37,6 +37,7 @@ typedef struct daemon_status_file {
     RRD_DB_MODE db_mode;
     uint8_t db_tiers;
     bool kubernetes;
+    bool sentry;
 
     time_t boottime;            // system boottime
     time_t uptime;              // netdata uptime
@@ -80,12 +81,12 @@ typedef struct daemon_status_file {
         char message[512];
         char stack_trace[2048];
         char thread[ND_THREAD_TAG_MAX + 1];
+        SIGNAL_CODE signal_code;
     } fatal;
 
     struct {
-        SPINLOCK spinlock;
         struct {
-            XXH64_hash_t hash;
+            uint64_t hash;
             usec_t timestamp_ut;
         } slot[10];
     } dedup;
@@ -93,7 +94,9 @@ typedef struct daemon_status_file {
 
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);
-void daemon_status_file_deadly_signal_received(EXIT_REASON reason);
+
+// returns true when the event is duplicate and should not be reported again
+bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, bool chained_handler);
 
 // check for a crash
 void daemon_status_file_check_crash(void);

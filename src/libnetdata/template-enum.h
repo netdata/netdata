@@ -51,9 +51,9 @@
         if (!str || !*str)                                                                                          \
             return def;                                                                                             \
                                                                                                                     \
-        for (size_t i = 0; type ## _names[i].name; i++) {                                                           \
-            if (strcmp(type ## _names[i].name, str) == 0)                                                           \
-                return type ## _names[i].id;                                                                        \
+        for (size_t i = 0; type##_names[i].name; i++) {                                                             \
+            if (strcmp(type##_names[i].name, str) == 0)                                                             \
+                return type##_names[i].id;                                                                          \
         }                                                                                                           \
                                                                                                                     \
         return def;                                                                                                 \
@@ -61,9 +61,9 @@
                                                                                                                     \
     const char *type##_2str_one(type id)                                                                            \
     {                                                                                                               \
-        for (size_t i = 0; type ## _names[i].name; i++) {                                                           \
-            if (id == type ## _names[i].id)                                                                         \
-                return type ## _names[i].name;                                                                      \
+        for (size_t i = 0; type##_names[i].name; i++) {                                                             \
+            if (id == type##_names[i].id)                                                                           \
+                return type##_names[i].name;                                                                        \
         }                                                                                                           \
                                                                                                                     \
         return def_str;                                                                                             \
@@ -72,9 +72,11 @@
     void type##_2json(BUFFER *wb, const char *key, type id)                                                         \
     {                                                                                                               \
         buffer_json_member_add_array(wb, key);                                                                      \
-        for (size_t i = 0; type ## _names[i].name; i++) {                                                           \
-            if ((id & type ## _names[i].id) == type ## _names[i].id)                                                \
-                buffer_json_add_array_item_string(wb, type ## _names[i].name);                                      \
+        for (size_t i = 0; id && type##_names[i].name; i++) {                                                       \
+            if ((id & type##_names[i].id) == type##_names[i].id) {                                                  \
+                buffer_json_add_array_item_string(wb, type##_names[i].name);                                        \
+                id &= ~(type##_names[i].id);                                                                        \
+            }                                                                                                       \
         }                                                                                                           \
         buffer_json_array_close(wb);                                                                                \
     }                                                                                                               \
@@ -82,10 +84,11 @@
     void type##_2buffer(BUFFER *wb, type id, const char *separator)                                                 \
     {                                                                                                               \
         size_t added = 0;                                                                                           \
-        for (size_t i = 0; type ## _names[i].name; i++) {                                                           \
-            if ((id & type ## _names[i].id) == type ## _names[i].id) {                                              \
+        for (size_t i = 0; id && type##_names[i].name; i++) {                                                       \
+            if ((id & type##_names[i].id) == type##_names[i].id) {                                                  \
                 if(added++) buffer_strcat(wb, separator);                                                           \
                 buffer_strcat(wb, type##_names[i].name);                                                            \
+                id &= ~(type##_names[i].id);                                                                        \
            }                                                                                                        \
         }                                                                                                           \
     }

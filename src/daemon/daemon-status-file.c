@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 15
+#define STATUS_FILE_VERSION 16
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -43,18 +43,12 @@ static DAEMON_STATUS_FILE last_session_status = {
     .fatal = {
         .spinlock = SPINLOCK_INITIALIZER,
     },
-    .dedup = {
-        .spinlock = SPINLOCK_INITIALIZER,
-    },
 };
 
 static DAEMON_STATUS_FILE session_status = {
     .v = STATUS_FILE_VERSION,
     .spinlock = SPINLOCK_INITIALIZER,
     .fatal = {
-        .spinlock = SPINLOCK_INITIALIZER,
-    },
-    .dedup = {
         .spinlock = SPINLOCK_INITIALIZER,
     },
 };
@@ -68,29 +62,59 @@ static void daemon_status_file_out_of_memory(void);
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
 
-static XXH64_hash_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const char *cause) {
+static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const char *cause) {
     dsf_acquire(*ds);
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-    buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
-    buffer_json_member_add_uint64(wb, "version_saved", ds->v);
-    buffer_json_member_add_uuid(wb, "host_id", ds->host_id.uuid);
-    buffer_json_member_add_uuid(wb, "node_id", ds->node_id.uuid);
-    buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
-    buffer_json_member_add_string(wb, "agent_version", ds->version);
-    buffer_json_member_add_uint64(wb, "fatal_line", ds->fatal.line);
-    buffer_json_member_add_string_or_empty(wb, "fatal_filename", ds->fatal.filename);
-    buffer_json_member_add_string_or_empty(wb, "fatal_errno", ds->fatal.errno_str);
-    buffer_json_member_add_string_or_empty(wb, "fatal_function", ds->fatal.function);
-    buffer_json_member_add_string_or_empty(wb, "fatal_stack_trace", ds->fatal.stack_trace);
-    buffer_json_member_add_string(wb, "message", msg);
-    buffer_json_member_add_string(wb, "cause", cause);
-    buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
-    EXIT_REASON_2json(wb, "exit_reason", ds->exit_reason);
-    ND_PROFILE_2json(wb, "profile", ds->profile);
+
+    struct {
+        uint32_t v;
+        DAEMON_STATUS status;
+        EXIT_REASON exit_reason;
+        SIGNAL_CODE signal_code;
+        ND_PROFILE profile;
+        RRD_DB_MODE db_mode;
+        uint8_t db_tiers;
+        bool kubernetes;
+        bool sentry;
+        ND_UUID host_id;
+        ND_UUID machine_id;
+        long line;
+        char version[sizeof(ds->version)];
+        char filename[sizeof(ds->fatal.filename)];
+        char function[sizeof(ds->fatal.function)];
+        char errno_str[sizeof(ds->fatal.errno_str)];
+        char stack_trace[sizeof(ds->fatal.stack_trace)];
+        char thread[sizeof(ds->fatal.thread)];
+        char msg[128];
+        char cause[32];
+    } to_hash = {
+        .v = ds->v,
+        .status = ds->status,
+        .signal_code = ds->fatal.signal_code,
+        .exit_reason = ds->exit_reason,
+        .profile = ds->profile,
+        .db_mode = ds->db_mode,
+        .db_tiers = ds->db_tiers,
+        .kubernetes = ds->kubernetes,
+        .sentry = ds->sentry,
+        .host_id = ds->host_id,
+        .machine_id = ds->machine_id,
+    };
+    memcpy(to_hash.version, ds->version, sizeof(ds->version));
+    memcpy(to_hash.filename, ds->fatal.filename, sizeof(ds->fatal.filename));
+    memcpy(to_hash.filename, ds->fatal.function, sizeof(ds->fatal.function));
+    memcpy(to_hash.errno_str, ds->fatal.errno_str, sizeof(ds->fatal.errno_str));
+    memcpy(to_hash.stack_trace, ds->fatal.stack_trace, sizeof(ds->fatal.stack_trace));
+    memcpy(to_hash.thread, ds->fatal.thread, sizeof(ds->fatal.thread));
+
+    if(msg)
+        strncpyz(to_hash.msg, msg, sizeof(to_hash.msg) - 1);
+
+    if(cause)
+        strncpyz(to_hash.cause, cause, sizeof(to_hash.cause) - 1);
+
+    uint64_t hash = fnv1a_hash_bin64(&to_hash, sizeof(to_hash));
+
     dsf_release(*ds);
-    buffer_json_finalize(wb);
-    XXH64_hash_t hash = XXH3_64bits((const void *)buffer_tostring(wb), buffer_strlen(wb));
     return hash;
 }
 
@@ -122,6 +146,10 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string(wb, "ND_db_mode", rrd_memory_mode_name(ds->db_mode)); // custom
             buffer_json_member_add_uint64(wb, "ND_db_tiers", ds->db_tiers); // custom
             buffer_json_member_add_boolean(wb, "ND_kubernetes", ds->kubernetes); // custom
+        }
+
+        if(ds->v >= 16) {
+            buffer_json_member_add_boolean(wb, "ND_sentry", ds->sentry); // custom
         }
 
         buffer_json_member_add_object(wb, "ND_timings"); // custom
@@ -190,6 +218,12 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "errno", ds->fatal.errno_str);
         buffer_json_member_add_string_or_empty(wb, "thread", ds->fatal.thread);
         buffer_json_member_add_string_or_empty(wb, "stack_trace", ds->fatal.stack_trace);
+
+        if(ds->v >= 16) {
+            char signal_code[UINT64_MAX_LENGTH];
+            SIGNAL_CODE_2str_h(ds->fatal.signal_code, signal_code, sizeof(signal_code));
+            buffer_json_member_add_string_or_empty(wb, "signal_code", signal_code);
+        }
     }
     buffer_json_object_close(wb);
 
@@ -233,6 +267,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v5 = version >= 5 ? strict : false;
     bool required_v10 = version >= 10 ? strict : false;
     bool required_v14 = version >= 14 ? strict : false;
+    bool required_v16 = version >= 16 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -269,6 +304,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             ds->db_mode = default_rrd_memory_mode;
             ds->db_tiers = nd_profile.storage_tiers;
             ds->kubernetes = false;
+        }
+
+        if(version >= 16) {
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry", ds->sentry, error, required_v16);
         }
     });
 
@@ -323,6 +362,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "line", ds->fatal.line, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "errno", ds->fatal.errno_str, error, required_v3);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "thread", ds->fatal.thread, error, required_v5);
+
+        if(version >= 16) {
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "signal_code", SIGNAL_CODE_2id_h, ds->fatal.signal_code, error, required_v16);
+        }
     });
 
     // Parse the last posted object
@@ -403,6 +446,12 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
+
+#if defined(ENABLE_SENTRY)
+    session_status.sentry = true;
+#else
+    session_status.sentry = false;
+#endif
 
     session_status.claim_id = claim_id_get_uuid();
 
@@ -739,9 +788,7 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
 // --------------------------------------------------------------------------------------------------------------------
 // deduplication hashes management
 
-static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, XXH64_hash_t hash) {
-    spinlock_lock(&ds->dedup.spinlock);
-
+static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash) {
     usec_t now_ut = now_realtime_usec();
 
     for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
@@ -751,24 +798,19 @@ static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, XXH64_hash_t hash) {
         if(hash == ds->dedup.slot[i].hash &&
             now_ut - ds->dedup.slot[i].timestamp_ut < 86400 * USEC_PER_SEC) {
             // we have already posted this crash
-            spinlock_unlock(&ds->dedup.spinlock);
             return true;
         }
     }
 
-    spinlock_unlock(&ds->dedup.spinlock);
     return false;
 }
 
-static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, XXH64_hash_t hash) {
-    spinlock_lock(&ds->dedup.spinlock);
-
+static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash) {
     // find the same hash
     for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
         if(ds->dedup.slot[i].hash == hash) {
             ds->dedup.slot[i].hash = hash;
             ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
-            spinlock_unlock(&ds->dedup.spinlock);
             return;
         }
     }
@@ -778,7 +820,6 @@ static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, XXH64_hash_t hash) {
         if(!ds->dedup.slot[i].hash) {
             ds->dedup.slot[i].hash = hash;
             ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
-            spinlock_unlock(&ds->dedup.spinlock);
             return;
         }
     }
@@ -792,8 +833,6 @@ static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, XXH64_hash_t hash) {
 
     ds->dedup.slot[store_at_slot].hash = hash;
     ds->dedup.slot[store_at_slot].timestamp_ut = now_realtime_usec();
-
-    spinlock_unlock(&ds->dedup.spinlock);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -832,7 +871,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
-        XXH64_hash_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
+        uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash);
         daemon_status_file_save(wb, &session_status, true);
     }
@@ -1202,14 +1241,19 @@ static void daemon_status_file_out_of_memory(void) {
     daemon_status_file_save_again_if_we_can_get_stack_trace();
 }
 
-void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
-    FUNCTION_RUN_ONCE();
+bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, bool chained_handler) {
+    FUNCTION_RUN_ONCE_RET(true);
 
     // DO NOT LOCK OR ALLOCATE IN THIS FUNCTION - WE CRASHED ALREADY AND WE ARE INSIDE THE SIGNAL HANDLER!
 
     dsf_acquire(session_status);
 
     session_status.exit_reason |= reason;
+    session_status.sentry = chained_handler;
+
+    if(code)
+        session_status.fatal.signal_code = code;
+
     if(!session_status.fatal.thread[0])
         strncpyz(session_status.fatal.thread, nd_thread_tag_async_safe(), sizeof(session_status.fatal.thread) - 1);
 
@@ -1221,8 +1265,24 @@ void daemon_status_file_deadly_signal_received(EXIT_REASON reason) {
     // save what we know already
     daemon_status_file_save(static_save_buffer, &session_status, false);
 
-    if(reason != EXIT_REASON_SIGABRT || capture_stack_trace_is_async_signal_safe())
+    // deduplicate the crash for sentry
+    bool duplicate = false;
+    if(chained_handler) {
+        uint64_t hash = daemon_status_file_hash(&session_status, NULL, NULL);
+        duplicate = !dedup_already_posted(&session_status, hash);
+        if (!duplicate) {
+            // save this hash, so that we won't post it again to sentry
+            dedup_keep_hash(&session_status, hash);
+            daemon_status_file_save(static_save_buffer, &session_status, false);
+        }
+    }
+
+    if((!chained_handler || duplicate) && (reason != EXIT_REASON_SIGABRT || capture_stack_trace_is_async_signal_safe())) {
+        // no sentry, try to get the stack trace
         daemon_status_file_save_again_if_we_can_get_stack_trace();
+    }
+
+    return duplicate;
 }
 
 bool daemon_status_file_has_last_crashed(void) {

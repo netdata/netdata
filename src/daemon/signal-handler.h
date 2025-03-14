@@ -3,7 +3,7 @@
 #ifndef NETDATA_SIGNAL_HANDLER_H
 #define NETDATA_SIGNAL_HANDLER_H 1
 
-void nd_initialize_signals(void);
+void nd_initialize_signals(bool chain_existing);
 void nd_process_signals(void) NORETURN;
 
 #endif //NETDATA_SIGNAL_HANDLER_H

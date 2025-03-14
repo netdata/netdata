@@ -84,6 +84,16 @@ static inline uint32_t fnv1a_uhash32(const char *name) {
 #define simple_hash(s) fnv1a_hash32(s)
 #define simple_uhash(s) fnv1a_uhash32(s)
 
+static inline uint64_t fnv1a_hash_bin64(const void *data, size_t len) {
+    const uint8_t *bytes = (const uint8_t *)data;
+    uint64_t hash = 14695981039346656037ULL; // FNV offset basis for 64-bit
+    for (size_t i = 0; i < len; i++) {
+        hash ^= (uint64_t)bytes[i];
+        hash *= 1099511628211ULL; // FNV prime for 64-bit
+    }
+    return hash;
+}
+
 static uint32_t murmur32(uint32_t k) __attribute__((const));
 static inline uint32_t murmur32(uint32_t k) {
     k ^= k >> 16;

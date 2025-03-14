@@ -788,7 +788,7 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("signals");
 
     signals_block_all_except_deadly();
-    nd_initialize_signals(); // catches deadly signals and stores them in the status file
+    nd_initialize_signals(false); // catches deadly signals and stores them in the status file
 
     // ----------------------------------------------------------------------------------------------------------------
 
@@ -990,6 +990,7 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("sentry");
 
     nd_sentry_init();
+    nd_initialize_signals(true);
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
