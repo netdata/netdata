@@ -14,8 +14,11 @@ bool using_vector = false;
 
 static uint32_t *ebpf_shm_find_index_unsafe(uint32_t pid)
 {
+    uint32_t *ret = NULL;
     Pvoid_t *Pvalue = JudyLGet(ebpf_ipc_JudyL, (Word_t)pid, PJE0);
-    return (uint32_t *)*Pvalue;
+    if (Pvalue)
+        ret = *Pvalue;
+    return ret;
 }
 
 static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index idx)
