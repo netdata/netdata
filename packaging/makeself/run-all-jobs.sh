@@ -43,7 +43,7 @@ cd "${NETDATA_MAKESELF_PATH}" || exit 1
 # shellcheck source=packaging/makeself/functions.sh
 . ./functions.sh "${@}" || exit 1
 
-for x in jobs/*.install.sh; do
+for x in jobs/*.sh; do
   progress "running ${x}"
   "${x}" "${NETDATA_INSTALL_PATH}"
 done
