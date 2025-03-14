@@ -530,6 +530,7 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_i
         struct journal_page_header *page_list_header = (struct journal_page_header *) ((uint8_t *) j2_header + uuid_entry->page_offset);
         struct journal_page_list *page_list = (struct journal_page_list *)((uint8_t *) page_list_header + sizeof(*page_list_header));
         struct journal_extent_list *extent_list = (void *)((uint8_t *)j2_header + j2_header->extent_offset);
+        uint32_t extent_entries = j2_header->extent_count;
         uint32_t uuid_page_entries = page_list_header->entries;
 
         for (uint32_t index = 0; index < uuid_page_entries; index++) {
@@ -544,6 +545,13 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_i
 
             if(prc == PAGE_IS_IN_THE_FUTURE)
                 break;
+
+            // Make sure index is valid for this file
+            if (page_entry_in_journal->extent_index > extent_entries) {
+                nd_log_limit_static_thread_var(erl, 60, 0);
+                nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Invalid extent index in journalfile %u", datafile->fileno);
+                break;
+            }
 
             uint32_t page_update_every_s = page_entry_in_journal->update_every_s;
             size_t page_length = page_entry_in_journal->page_length;

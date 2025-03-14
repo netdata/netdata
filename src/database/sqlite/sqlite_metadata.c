@@ -2417,6 +2417,15 @@ static void start_metadata_hosts(uv_work_t *req)
     worker_is_idle();
 }
 
+static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
+{
+    if (handle->type == UV_TIMER) {
+        uv_timer_stop((uv_timer_t *)handle);
+    }
+
+    uv_close(handle, NULL);  // Automatically close and free the handle
+}
+
 static void metadata_event_loop(void *arg)
 {
     worker_register("METASYNC");
@@ -2430,7 +2439,6 @@ static void metadata_event_loop(void *arg)
     worker_register_job_name(METADATA_DEL_HOST_AE, "delete host alert entry");
 
     int ret;
-    uv_loop_t *loop;
     unsigned cmd_batch_size;
     struct metadata_wc *wc = arg;
     enum metadata_opcode opcode;
@@ -2438,12 +2446,13 @@ static void metadata_event_loop(void *arg)
     wc->ar = aral_by_size_acquire(sizeof(struct metadata_cmd));
 
     uv_thread_set_name_np("METASYNC");
-    loop = wc->loop = mallocz(sizeof(uv_loop_t));
+    uv_loop_t *loop = wc->loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
     if (ret) {
         netdata_log_error("uv_loop_init(): %s", uv_strerror(ret));
         goto error_after_loop_init;
     }
+
     loop->data = wc;
 
     ret = uv_async_init(wc->loop, &wc->async, async_cb);
@@ -2619,17 +2628,15 @@ static void metadata_event_loop(void *arg)
         } while (opcode != METADATA_DATABASE_NOOP);
     }
 
-    if (!uv_timer_stop(&wc->timer_req))
-        uv_close((uv_handle_t *)&wc->timer_req, NULL);
+    uv_walk(loop, (uv_walk_cb) close_callback, NULL);
+    uv_run(loop, UV_RUN_NOWAIT);
 
-    uv_close((uv_handle_t *)&wc->async, NULL);
     int rc;
     do {
         rc = uv_loop_close(loop);
     } while (rc != UV_EBUSY);
 
     buffer_free(work_buffer);
-    freez(loop);
     worker_unregister();
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down metadata thread");
