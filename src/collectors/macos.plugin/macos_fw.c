@@ -24,6 +24,9 @@
 int do_macos_iokit(int update_every, usec_t dt) {
     (void)dt;
 
+    static SIMPLE_PATTERN *excluded_mountpoints = NULL;
+    static SIMPLE_PATTERN *disabled_net_interfaces = NULL;
+
     static int do_io = -1, do_space = -1, do_inodes = -1, do_bandwidth = -1;
 
     if (unlikely(do_io == -1)) {
@@ -31,6 +34,25 @@ int do_macos_iokit(int update_every, usec_t dt) {
         do_space                = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "space usage for all disks", 1);
         do_inodes               = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "inodes usage for all disks", 1);
         do_bandwidth            = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "bandwidth", 1);
+
+        excluded_mountpoints = simple_pattern_create(
+            inicfg_get(
+                &netdata_config,
+                "plugin:macos:iokit",
+                "exclude mountpoints by path",
+                "/System/Volumes/* /private/var/folders/* /Volumes/Recovery"),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
+        disabled_net_interfaces = simple_pattern_create(
+            inicfg_get(
+                &netdata_config,
+                "plugin:macos:iokit",
+                "disable by default network interfaces matching",
+                "lo* awdl* llw* anpi* gif* bridge* ap*"),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
     }
 
     RRDSET *st;
@@ -430,6 +452,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         strcmp(mntbuf[i].f_fstypename, "none") == 0)
                     continue;
 
+                if (simple_pattern_matches(excluded_mountpoints, mntbuf[i].f_mntonname)) {
+                    continue;
+                }
+
                 // --------------------------------------------------------------------------
 
                 if (likely(do_space)) {
@@ -509,6 +535,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
             for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
                 if (ifa->ifa_addr->sa_family != AF_LINK)
                         continue;
+
+                if (simple_pattern_matches(disabled_net_interfaces, ifa->ifa_name)) {
+                    continue;
+                }
 
                 st = rrdset_find_active_bytype_localhost("net", ifa->ifa_name);
                 if (unlikely(!st)) {
