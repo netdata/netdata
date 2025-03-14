@@ -51,6 +51,33 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
+func (c *Collector) getSysObjectID(oid string) (string, error) {
+	resp, err := c.snmpClient.Get([]string{oid})
+	if err != nil {
+		return "", err
+	}
+
+	return strings.Replace(resp.Variables[0].Value.(string), ".", "", 1), nil
+}
+
+func (c *Collector) makeChartsFromMetricMap(mx map[string]int64, metricMap map[string]processedMetric) error {
+
+	for _, metric := range metricMap {
+		if metric.tableName == "" {
+			switch s := metric.value.(type) {
+			case int:
+
+				// log.Println(metric)
+
+				// c.addSNMPChart(metric)
+				mx[metric.name] = int64(s)
+
+			}
+		}
+	}
+	return nil
+}
+
 func (c *Collector) collectSysUptime(mx map[string]int64) error {
 	resp, err := c.snmpClient.Get([]string{snmpsd.OidSysUptime})
 	if err != nil {
