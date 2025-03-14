@@ -24,6 +24,8 @@
 int do_macos_iokit(int update_every, usec_t dt) {
     (void)dt;
 
+    static SIMPLE_PATTERN *excluded_mountpoints = NULL;
+
     static int do_io = -1, do_space = -1, do_inodes = -1, do_bandwidth = -1;
 
     if (unlikely(do_io == -1)) {
@@ -31,6 +33,12 @@ int do_macos_iokit(int update_every, usec_t dt) {
         do_space                = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "space usage for all disks", 1);
         do_inodes               = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "inodes usage for all disks", 1);
         do_bandwidth            = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "bandwidth", 1);
+
+        excluded_mountpoints = simple_pattern_create(
+            inicfg_get(&netdata_config, "plugin:macos:sysctl", "exclude mountpoints by path", "!*"),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
     }
 
     RRDSET *st;
@@ -429,6 +437,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         strcmp(mntbuf[i].f_fstypename, "devfs") == 0 ||
                         strcmp(mntbuf[i].f_fstypename, "none") == 0)
                     continue;
+
+                if (simple_pattern_matches(excluded_mountpoints, mntbuf[i].f_mntonname)) {
+                    continue;
+                }
 
                 // --------------------------------------------------------------------------
 
