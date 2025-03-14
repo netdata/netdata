@@ -354,6 +354,8 @@ static void *nd_thread_starting_point(void *ptr) {
 
     CLEANUP_FUNCTION_REGISTER(nd_thread_exit) cleanup_ptr = nti;
 
+    signals_block_all_except_deadly();
+
     // run the thread code
     nti->ret = nti->start_routine(nti->arg);
 
