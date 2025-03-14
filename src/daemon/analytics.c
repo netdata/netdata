@@ -869,7 +869,16 @@ bool analytics_check_enabled(void) {
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, sizeof(filename), "%s/.opt-out-from-anonymous-statistics", netdata_configured_user_config_dir);
-    netdata_anonymous_statistics_enabled = access(filename, R_OK) != 0;
+
+    if(access(filename, R_OK) != 0) {
+        // the file is not there, check the environment variable
+        const char *s = getenv("DISABLE_TELEMETRY");
+        netdata_anonymous_statistics_enabled = !s || !*s;
+    }
+    else
+        // the file is there, disable telemetry
+        netdata_anonymous_statistics_enabled = false;
+
     return netdata_anonymous_statistics_enabled;
 }
 

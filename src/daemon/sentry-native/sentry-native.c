@@ -5,28 +5,14 @@
 
 #include "sentry.h"
 
-static bool sentry_telemetry_disabled(void)
-{
-    char path[FILENAME_MAX + 1];
-    sprintf(path, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
-
-    struct stat buffer;
-    bool opt_out_file_exists = (stat(path, &buffer) == 0);
-
-    if (opt_out_file_exists)
-        return true;
-
-    return getenv("DISABLE_TELEMETRY") != NULL;
-}
-
 void nd_sentry_init(void)
 {
-    if (sentry_telemetry_disabled())
+    if (!analytics_check_enabled())
         return;
 
     // path where sentry should save stuff
     char path[FILENAME_MAX];
-    snprintfz(path, FILENAME_MAX - 1, "%s/%s", netdata_configured_cache_dir, ".sentry-native");
+    snprintfz(path, FILENAME_MAX - 1, "%s/.sentry-native", netdata_configured_cache_dir);
 
     sentry_options_t *options = sentry_options_new();
     sentry_options_set_dsn(options, NETDATA_SENTRY_DSN);
@@ -48,7 +34,7 @@ void nd_sentry_init(void)
 
 void nd_sentry_fini(void)
 {
-    if (sentry_telemetry_disabled())
+    if (!analytics_check_enabled())
         return;
 
     sentry_close();
@@ -63,7 +49,7 @@ void nd_sentry_set_user(const char *guid)
 
 void nd_sentry_add_breadcrumb(const char *message)
 {
-    if (sentry_telemetry_disabled())
+    if (!analytics_check_enabled())
         return;
 
     sentry_value_t crumb = sentry_value_new_breadcrumb("fatal", message);

@@ -61,9 +61,10 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
 
             // Update the status file
             SIGNAL_CODE sc = info ? signal_code(signo, info->si_code) : 0;
-            if(daemon_status_file_deadly_signal_received(signals_waiting[i].reason, sc, chained_handler))
+            if(daemon_status_file_deadly_signal_received(signals_waiting[i].reason, sc, chained_handler)) {
                 // this is a duplicate event, do not send it to sentry
                 chained_handler = false;
+            }
 
             // log it
             char b[1024];

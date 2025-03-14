@@ -1269,7 +1269,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     bool duplicate = false;
     if(chained_handler) {
         uint64_t hash = daemon_status_file_hash(&session_status, NULL, NULL);
-        duplicate = !dedup_already_posted(&session_status, hash);
+        duplicate = dedup_already_posted(&session_status, hash);
         if (!duplicate) {
             // save this hash, so that we won't post it again to sentry
             dedup_keep_hash(&session_status, hash);
