@@ -38,7 +38,7 @@ static struct {
     { SIGSYS,  "SIGSYS",  0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGSYS },
     { SIGXCPU, "SIGXCPU", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXCPU },
     { SIGXFSZ, "SIGXFSZ", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXFSZ },
-#ifdef SIGEMT
+#if defined(OS_FREEBSD) && defined(SIGEMT)
     { SIGEMT,  "SIGEMT",  SA_SIGINFO, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGEMT },
 #endif
 };
@@ -69,7 +69,7 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
                 chained_handler = false;
 
             // log it
-            char b[512];
+            char b[1024];
             strncpyz(b, "SIGNAL HANDLER: received deadly signal: ", sizeof(b) - 1);
             strcat(b, signals_waiting[i].name);
             if(sc) {

@@ -130,15 +130,18 @@ void SIGNAL_CODE_2str_h(SIGNAL_CODE code, char *buf, size_t len) {
         return;
     }
 
-    const char *s = SIGNAL_CODE_2str(code);
-    if (!s || !*s) {
-        char b[UINT64_MAX_LENGTH + 2];
-        strcpy(b, "0x");
-        print_uint64_hex(&b[2], code);
-        strncpyz(buf, b, len - 1);
+    if(code) {
+        const char *s = SIGNAL_CODE_2str(code);
+        if (!*s) {
+            char b[UINT64_MAX_LENGTH + 2];
+            print_uint64_hex(b, code);
+            strncpyz(buf, b, len - 1);
+        }
+        else
+            strncpyz(buf, s, len - 1);
     }
     else
-        strncpyz(buf, s, len - 1);
+        buf[0] = '\0';
 }
 
 SIGNAL_CODE SIGNAL_CODE_2id_h(const char *str) {
