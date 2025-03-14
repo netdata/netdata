@@ -2675,8 +2675,8 @@ error_after_timer_init:
     uv_close((uv_handle_t *)&wc->async, NULL);
 error_after_async_init:
     fatal_assert(0 == uv_loop_close(loop));
-    freez(loop);
 error_after_loop_init:
+    freez(loop);
     aral_by_size_release(wc->ar);
     worker_unregister();
 }
