@@ -12,6 +12,9 @@ extern __thread bool is_health_thread;
 #define SQLITE3_BIND_STRING_OR_NULL(res, param, key)                                                                   \
     ((key) ? sqlite3_bind_text((res), (param), string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null((res), (param)))
 
+#define SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, param, key)                                                                   \
+    ((key) ? sqlite3_bind_text((res), (param), string2str(key), -1, SQLITE_TRANSIENT) : sqlite3_bind_null((res), (param)))
+
 #define SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, param)                                                                   \
     ({                                                                                                                 \
         int _param = (param);                                                                                          \
@@ -814,37 +817,37 @@ done:
 
 void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
     int param = 0;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_STORE_ALERT_CONFIG_HASH, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_STORE_ALERT_CONFIG_HASH, &res))
         return;
 
     CLEAN_BUFFER *buf = buffer_create(128, NULL);
 
     SQLITE_BIND_FAIL(
-        done, sqlite3_bind_blob(res, ++param, &ap->config.hash_id, sizeof(ap->config.hash_id), SQLITE_STATIC));
+        done, sqlite3_bind_blob(res, ++param, &ap->config.hash_id, sizeof(ap->config.hash_id), SQLITE_TRANSIENT));
 
     if (ap->match.is_template) {
-        SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, NULL));
-        SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.name));
-        SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->match.on.context));
+        SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, NULL));
+        SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.name));
+        SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->match.on.context));
     }
     else {
-        SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.name));
-        SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, NULL));
-        SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->match.on.chart));
+        SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.name));
+        SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, NULL));
+        SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->match.on.chart));
     }
 
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.classification));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.component));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.type));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, NULL)); // lookup
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.classification));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.component));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.type));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, NULL)); // lookup
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res,  ++param, ap->config.update_every));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.units));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.units));
 
     if (ap->config.calculation)
-        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, expression_source(ap->config.calculation), -1, SQLITE_STATIC));
+        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, expression_source(ap->config.calculation), -1, SQLITE_TRANSIENT));
     else
         SQLITE_BIND_FAIL(done,sqlite3_bind_null(res, ++param));
 
@@ -853,18 +856,18 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
     SQLITE_BIND_FAIL(done, sqlite3_bind_double(res, ++param, nan_value));
 
     if (ap->config.warning)
-        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, expression_source(ap->config.warning), -1, SQLITE_STATIC));
+        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, expression_source(ap->config.warning), -1, SQLITE_TRANSIENT));
     else
         SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
 
     if (ap->config.critical)
-        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, expression_source(ap->config.critical), -1, SQLITE_STATIC));
+        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, expression_source(ap->config.critical), -1, SQLITE_TRANSIENT));
     else
         SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
 
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.exec));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.recipient));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.info));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.exec));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.recipient));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.info));
 
     if (ap->config.delay_up_duration)
         buffer_sprintf(buf, "up %ds ", ap->config.delay_up_duration);
@@ -879,10 +882,10 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
         buffer_sprintf(buf, "max %ds", ap->config.delay_max_duration);
 
     // delay
-    SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, buffer_tostring(buf), -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, buffer_tostring(buf), -1, SQLITE_TRANSIENT));
 
     if (ap->config.alert_action_options & ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION)
-        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, "no-clear-notification", -1, SQLITE_STATIC));
+        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, "no-clear-notification", -1, SQLITE_TRANSIENT));
     else
         SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
 
@@ -891,14 +894,14 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
         SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
     else {
         snprintfz(repeat, sizeof(repeat) - 1, "warning %us critical %us", ap->config.warn_repeat_every, ap->config.crit_repeat_every);
-        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, repeat, -1, SQLITE_STATIC));
+        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, repeat, -1, SQLITE_TRANSIENT));
     }
 
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->match.host_labels));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->match.host_labels));
 
     if (ap->config.after) {
-        SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.dimensions));
-        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, time_grouping_id2txt(ap->config.time_group), -1, SQLITE_STATIC));
+        SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.dimensions));
+        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, time_grouping_id2txt(ap->config.time_group), -1, SQLITE_TRANSIENT));
         SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, (int) RRDR_OPTIONS_REMOVE_OVERLAPPING(ap->config.options)));
         SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (int) ap->config.after));
         SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (int) ap->config.before));
@@ -911,23 +914,20 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
     }
 
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.update_every));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.source));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->match.chart_labels));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.summary));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.source));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->match.chart_labels));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.summary));
 
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.time_group_condition));
     SQLITE_BIND_FAIL(done, sqlite3_bind_double(res, ++param, ap->config.time_group_value));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.dims_group));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.data_source));
 
-    param = 0;
-    int rc = sqlite3_step_monitored(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to store alert config, rc = %d", rc);
-
+    metadata_execute_store_statement(res);
+    return;
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT                                                                          \
