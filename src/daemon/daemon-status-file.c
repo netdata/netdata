@@ -9,7 +9,9 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 17
+#ifdef ENABLE_SENTRY
+#include "sentry-native/sentry-native.h"
+#endif
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -98,7 +100,8 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
         RRD_DB_MODE db_mode;
         uint8_t db_tiers;
         bool kubernetes;
-        bool sentry;
+        bool sentry_available;
+        bool sentry_fatal;
         ND_UUID host_id;
         ND_UUID machine_id;
         long line;
@@ -119,7 +122,8 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
         .db_mode = ds->db_mode,
         .db_tiers = ds->db_tiers,
         .kubernetes = ds->kubernetes,
-        .sentry = ds->sentry,
+        .sentry_available = ds->sentry_available,
+        .sentry_fatal = ds->fatal.sentry,
         .host_id = ds->host_id,
         .machine_id = ds->machine_id,
     };
@@ -172,9 +176,8 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_boolean(wb, "ND_kubernetes", ds->kubernetes); // custom
         }
 
-        if(ds->v >= 16) {
-            buffer_json_member_add_boolean(wb, "ND_sentry", ds->sentry); // custom
-        }
+        if(ds->v >= 16)
+            buffer_json_member_add_boolean(wb, "ND_sentry_available", ds->sentry_available); // custom
 
         buffer_json_member_add_object(wb, "ND_timings"); // custom
         {
@@ -248,6 +251,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             SIGNAL_CODE_2str_h(ds->fatal.signal_code, signal_code, sizeof(signal_code));
             buffer_json_member_add_string_or_empty(wb, "signal_code", signal_code);
         }
+
+        if(ds->v >= 17)
+            buffer_json_member_add_boolean(wb, "sentry", ds->fatal.sentry);
     }
     buffer_json_object_close(wb);
 
@@ -332,9 +338,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             ds->kubernetes = false;
         }
 
-        if(version >= 16) {
-            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry", ds->sentry, error, required_v16);
-        }
+        if(version >= 17)
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry_available", ds->sentry_available, error, required_v17);
+        else if(version == 16)
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry", ds->sentry_available, error, required_v16);
     });
 
     // Parse host object
@@ -391,6 +398,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
         if(version >= 16) {
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "signal_code", SIGNAL_CODE_2id_h, ds->fatal.signal_code, error, required_v16);
+        }
+        if(version >= 17) {
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "sentry", SIGNAL_CODE_2id_h, ds->fatal.sentry, error, required_v17);
         }
     });
 
@@ -474,9 +484,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.db_tiers = nd_profile.storage_tiers;
 
 #if defined(ENABLE_SENTRY)
-    session_status.sentry = true;
+    session_status.sentry_available = true;
 #else
-    session_status.sentry = false;
+    session_status.sentry_available = false;
 #endif
 
     session_status.claim_id = claim_id_get_uuid();
@@ -1222,22 +1232,22 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
 
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag());
 
-    if(!session_status.fatal.filename[0] && filename)
+    if(filename && *filename)
         strncpyz(session_status.fatal.filename, filename, sizeof(session_status.fatal.filename) - 1);
 
-    if(!session_status.fatal.function[0] && function)
+    if(function && *function)
         strncpyz(session_status.fatal.function, function, sizeof(session_status.fatal.function) - 1);
 
-    if(!session_status.fatal.message[0] && message)
+    if(message && *message)
         strncpyz(session_status.fatal.message, message, sizeof(session_status.fatal.message) - 1);
 
-    if(!session_status.fatal.errno_str[0] && errno_str)
+    if(errno_str && *errno_str)
         strncpyz(session_status.fatal.errno_str, errno_str, sizeof(session_status.fatal.errno_str) - 1);
 
-    if(stack_trace_is_empty(&session_status) && stack_trace)
+    if(stack_trace && *stack_trace && stack_trace_is_empty(&session_status))
         strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
 
-    if(!session_status.fatal.line)
+    if(line)
         session_status.fatal.line = line;
 
     spinlock_unlock(&session_status.fatal.spinlock);
@@ -1251,6 +1261,10 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     freez((void *)message);
     freez((void *)errno_str);
     freez((void *)stack_trace);
+
+#ifdef ENABLE_SENTRY
+    nd_sentry_add_fatal_message_as_breadcrumb();
+#endif
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1287,7 +1301,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     dsf_acquire(session_status);
 
     session_status.exit_reason |= reason;
-    session_status.sentry = chained_handler;
+    session_status.fatal.sentry = chained_handler;
 
     if(code)
         session_status.fatal.signal_code = code;
@@ -1364,3 +1378,67 @@ void daemon_status_file_shutdown_step(const char *step) {
 
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// public API to get values
+
+const char *daemon_status_file_get_install_type(void) {
+    return session_status.install_type;
+}
+
+const char *daemon_status_file_get_architecture(void) {
+    return session_status.architecture;
+}
+
+const char *daemon_status_file_get_virtualization(void) {
+    return session_status.virtualization;
+}
+
+const char *daemon_status_file_get_container(void) {
+    return session_status.container;
+}
+
+const char *daemon_status_file_get_os_name(void) {
+    return session_status.os_name;
+}
+
+const char *daemon_status_file_get_os_version(void) {
+    return session_status.os_version;
+}
+
+const char *daemon_status_file_get_os_id(void) {
+    return session_status.os_id;
+}
+
+const char *daemon_status_file_get_os_id_like(void) {
+    return session_status.os_id_like;
+}
+
+const char *daemon_status_file_get_fatal_filename(void) {
+    return session_status.fatal.filename;
+}
+
+const char *daemon_status_file_get_fatal_function(void) {
+    return session_status.fatal.function;
+}
+
+const char *daemon_status_file_get_fatal_message(void) {
+    return session_status.fatal.message;
+}
+
+const char *daemon_status_file_get_fatal_errno(void) {
+    return session_status.fatal.errno_str;
+}
+
+const char *daemon_status_file_get_fatal_stack_trace(void) {
+    return session_status.fatal.stack_trace;
+}
+
+const char *daemon_status_file_get_fatal_thread(void) {
+    return session_status.fatal.thread;
+}
+
+long daemon_status_file_get_fatal_line(void) {
+    return session_status.fatal.line;
+}
+

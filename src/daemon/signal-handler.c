@@ -155,6 +155,9 @@ void nd_cleanup_fatal_signals(void) {
         if (sigaction(signals_waiting[i].signo, &act, NULL) == -1)
             netdata_log_error("SIGNAL: Failed to cleanup signal handler for: %s", signals_waiting[i].name);
     }
+
+    memset(original_handlers, 0, sizeof(original_handlers));
+    memset(original_sigactions, 0, sizeof(original_sigactions));
 }
 
 void nd_initialize_signals(bool chain_existing) {
