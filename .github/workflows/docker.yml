@@ -26,98 +26,6 @@ concurrency:
   group: docker-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
-  file-check: # Check what files changed if we’re being run in a PR or on a push.
-    name: Check Modified Files
-    runs-on: ubuntu-latest
-    outputs:
-      run: ${{ steps.check-run.outputs.run }}
-      skip-go: ${{ steps.check-go.outputs.skip-go }}
-    steps:
-      - name: Checkout
-        id: checkout
-        if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-      - name: Check source files
-        id: check-source-files
-        if: github.event_name != 'workflow_dispatch'
-        uses: tj-actions/changed-files@v45
-        with:
-          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
-          files: |
-            **/*.c
-            **/*.cc
-            **/*.h
-            **/*.hh
-            **/*.in
-            **/*.patch
-            src/aclk/aclk-schemas/
-            src/ml/dlib/
-            src/fluent-bit/
-            src/web/server/h2o/libh2o/
-          files_ignore: |
-            netdata.spec.in
-            **/*.md
-      - name: Check build system files
-        id: check-build-files
-        if: github.event_name != 'workflow_dispatch'
-        uses: tj-actions/changed-files@v45
-        with:
-          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
-          files: |
-            .dockerignore
-            CMakeLists.txt
-            netdata-installer.sh
-            .github/data/distros.yml
-            .github/workflows/docker.yml
-            .github/scripts/docker-test.sh
-            .github/scripts/gen-matrix-docker.py
-            .github/scripts/gen-docker-tags.py
-            .github/scripts/gen-docker-imagetool-args.py
-            packaging/cmake/
-            packaging/docker/
-            packaging/installer/
-            packaging/runtime-check.sh
-            packaging/*.version
-            packaging/*.checksums
-          files_ignore: |
-            **/*.md
-            packaging/repoconfig/
-      - name: List all changed files in pattern
-        continue-on-error: true
-        if: github.event_name != 'workflow_dispatch'
-        env:
-          CHANGED_SOURCE_FILES: ${{ steps.check-source-files.outputs.all_changed_files }}
-          CHANGED_BUILD_FILES: ${{ steps.check-build-files.outputs.all_changed_files }}
-        run: |
-          for file in ${CHANGED_SOURCE_FILES} ${CHANGED_BUILD_FILES} ; do
-            echo "$file was changed"
-          done
-      - name: Check Run
-        id: check-run
-        run: |
-          if [ "${{ steps.check-source-files.outputs.any_modified }}" == "true" ] || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo 'run=true' >> "${GITHUB_OUTPUT}"
-          else
-            echo 'run=false' >> "${GITHUB_OUTPUT}"
-          fi
-      - name: Check Go
-        id: check-go
-        env:
-          OTHER_CHANGED_FILES: ${{ steps.check-source-files.outputs.other_changed_files }}
-        run: |
-          if [ '${{ github.event_name }}' == 'pull_request' ]; then
-            if echo "${OTHER_CHANGED_FILES}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
-              echo 'skip-go=' >> "${GITHUB_OUTPUT}"
-            else
-              echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
-            fi
-          else
-            echo 'skip-go=' >> "${GITHUB_OUTPUT}"
-          fi
-
   matrix:
     name: Generate Docker Build Matrix
     runs-on: ubuntu-latest
@@ -163,7 +71,6 @@ jobs:
   build-images:
     name: Build Docker Images
     needs:
-      - file-check
       - matrix
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -171,39 +78,32 @@ jobs:
       # Fail fast on releases, but run everything to completion on other triggers.
       fail-fast: false
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Generate Artifact Name
         id: artifact-name
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        if: github.repository == 'netdata/netdata' && github.event_name == 'workflow_dispatch'
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
       - name: Mark image as official
         id: env
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        if: github.repository == 'netdata/netdata' && github.event_name == 'workflow_dispatch'
         run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
-        if: matrix.qemu && needs.file-check.outputs.run == 'true'
+        if: matrix.qemu
         run: |
           sudo apt-get update
           sudo apt-get upgrade -y
           sudo apt-get install -y qemu-user-static
       - name: Setup Buildx
         id: prepare
-        if: needs.file-check.outputs.run == 'true'
         uses: docker/setup-buildx-action@v3
       - name: Build Image
         id: build
-        if: needs.file-check.outputs.run == 'true'
         uses: docker/build-push-action@v6
         with:
           platforms: ${{ matrix.platform }}
@@ -212,16 +112,15 @@ jobs:
           cache-to: type=local,dest=/tmp/build-cache,mode=max
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
-            EXTRA_INSTALL_OPTS=${{ needs.file-check.outputs.skip-go }}
             BUILD_VERSION=test
             BUILD_DATE=${{ github.event.repository.updated_at }}
       - name: Test Image
         id: test
-        if: needs.file-check.outputs.run == 'true' && matrix.platform == 'linux/amd64'
+        if: matrix.platform == 'linux/amd64'
         run: .github/scripts/docker-test.sh
       - name: Upload Cache
         id: upload-cache
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        if: github.repository == 'netdata/netdata' && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4.6.1
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
@@ -251,7 +150,6 @@ jobs:
             failure()
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
-            && needs.file-check.outputs.run == 'true'
           }}
 
   gen-tags:

@@ -27,65 +27,6 @@ concurrency:
   group: packages-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
-  file-check: # Check what files changed if we’re being run in a PR or on a push.
-    name: Check Modified Files
-    runs-on: ubuntu-latest
-    outputs:
-      run: ${{ steps.check-run.outputs.run }}
-    steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-      - name: Check files
-        id: check-files
-        uses: tj-actions/changed-files@v45
-        with:
-          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
-          files: |
-            **/*.c
-            **/*.cc
-            **/*.h
-            **/*.hh
-            **/*.in
-            **/*.patch
-            **/*.cmake
-            netdata.spec.in
-            CMakeLists.txt
-            .github/data/distros.yml
-            .github/workflows/packaging.yml
-            .github/scripts/gen-matrix-packaging.py
-            .github/scripts/pkg-test.sh
-            packaging/cmake/
-            packaging/*.sh
-            packaging/*.version
-            packaging/*.checksums
-            src/aclk/aclk-schemas/
-            src/ml/dlib/
-            src/fluent-bit/
-            src/web/server/h2o/libh2o/
-          files_ignore: |
-            **/*.md
-            packaging/repoconfig/
-      - name: List all changed files in pattern
-        continue-on-error: true
-        env:
-          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
-        run: |
-          for file in ${ALL_CHANGED_FILES}; do
-            echo "$file was changed"
-          done
-      - name: Check Run
-        id: check-run
-        run: |
-          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo 'run=true' >> "${GITHUB_OUTPUT}"
-          else
-            echo 'run=false' >> "${GITHUB_OUTPUT}"
-          fi
-
   matrix:
     name: Prepare Build Matrix
     runs-on: ubuntu-latest
@@ -196,7 +137,6 @@ jobs:
     needs:
       - matrix
       - version-check
-      - file-check
     strategy:
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
       # We intentiaonally disable the fail-fast behavior so that a
@@ -205,13 +145,8 @@ jobs:
       fail-fast: false
       max-parallel: 8
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # We need full history for versioning
@@ -230,14 +165,13 @@ jobs:
           fi
       - name: Setup QEMU
         id: qemu
-        if: matrix.qemu && needs.file-check.outputs.run == 'true'
+        if: matrix.qemu
         run: |
           sudo apt-get update
           sudo apt-get upgrade -y
           sudo apt-get install -y qemu-user-static
       - name: Fetch images
         id: fetch-images
-        if: needs.file-check.outputs.run == 'true'
         uses: nick-invision/retry@v3
         with:
           max_attempts: 3
@@ -248,7 +182,6 @@ jobs:
             docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
       - name: Build Packages
         id: build
-        if: needs.file-check.outputs.run == 'true'
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
@@ -259,7 +192,6 @@ jobs:
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
       - name: Save Packages
         id: artifacts
-        if: needs.file-check.outputs.run == 'true'
         continue-on-error: true
         uses: actions/upload-artifact@v4.6.1
         with:
@@ -267,7 +199,6 @@ jobs:
           path: ${{ github.workspace }}/artifacts/*
       - name: Test Packages
         id: test
-        if: needs.file-check.outputs.run == 'true'
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e DISTRO=${{ matrix.distro }} \
@@ -276,18 +207,18 @@ jobs:
                      /netdata/.github/scripts/pkg-test.sh
       - name: Import GPG Keys
         id: import-keys
-        if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
+        if: matrix.format == 'deb' && github.event_name != 'pull_request'
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
       - name: Sign DEB Packages
         id: sign-deb
-        if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
+        if: matrix.format == 'deb' && github.event_name != 'pull_request'
         shell: bash
         run: .github/scripts/deb-sign.sh artifacts ${{ steps.import-keys.outputs.fingerprint }}
       - name: SSH setup
         id: ssh-setup
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
@@ -296,7 +227,7 @@ jobs:
       - name: Upload to packages.netdata.cloud
         id: package-upload
         continue-on-error: true
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
         run: |
           .github/scripts/package-upload.sh \
           packages.netdata.cloud \
@@ -306,7 +237,7 @@ jobs:
           ${{ needs.version-check.outputs.repo }}
       - name: Upload to packages2.netdata.cloud
         id: package2-upload
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
         run: |
           .github/scripts/package-upload.sh \
           packages2.netdata.cloud \
@@ -340,5 +271,4 @@ jobs:
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
             && github.repository == 'netdata/netdata'
-            && needs.file-check.outputs.run == 'true'
           }}
