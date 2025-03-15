@@ -4171,12 +4171,36 @@ static pid_t ebpf_read_previous_pid(char *filename)
 }
 
 /**
+ * Validate Data Sharing Selection
+ *
+ * Validate user input avoid sigsegv
+ */
+void ebpf_validate_data_sharing_selection() {
+    uint32_t enabled = CONFIG_BOOLEAN_NO;
+    for (uint32_t i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
+        if (ebpf_modules[i].apps_charts || ebpf_modules[i].cgroup_charts) {
+            enabled = CONFIG_BOOLEAN_YES;
+            break;
+        }
+    }
+
+    // TODO: MODIFY IN NEXT PRs THE OPTION TO ALSO USE SOCKET
+    if (enabled && integration_with_collectors != NETDATA_EBPF_INTEGRATION_SHM) {
+    //if (enabled && integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED) {
+        integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
+    }
+}
+
+/**
  * Initialize Data Sharing
  *
  * Start sharing according to user configuration.
  */
 static void ebpf_initialize_data_sharing()
 {
+    ebpf_validate_data_sharing_selection();
+
+    // Initialize
     switch (integration_with_collectors) {
         case NETDATA_EBPF_INTEGRATION_SOCKET: {
             socket_ipc =
@@ -4350,7 +4374,6 @@ int main(int argc, char **argv)
     heartbeat_init(&hb, USEC_PER_SEC);
     int update_apps_every = (int)EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
     int update_apps_list = update_apps_every - 1;
-    int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal
     for (; !ebpf_plugin_stop(); global_iterations_counter++) {
         (void)heartbeat_next(&hb);
@@ -4370,10 +4393,6 @@ int main(int argc, char **argv)
             if (collect_pids) {
                 pthread_mutex_lock(&collect_data_mutex);
                 ebpf_parse_proc_files();
-                if (collect_pids & (1 << EBPF_MODULE_PROCESS_IDX)) {
-                    collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
-                }
-
                 ebpf_create_apps_charts(apps_groups_root_target);
                 pthread_mutex_unlock(&collect_data_mutex);
             }

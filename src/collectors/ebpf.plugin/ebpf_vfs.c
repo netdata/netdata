@@ -1166,11 +1166,12 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_tar
     memset(vfs, 0, sizeof(netdata_publish_vfs_t));
 
     for (; root; root = root->next) {
-        int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_VFS_IDX);
-        netdata_publish_vfs_t *w = local_pid->vfs;
-        if (!w)
+        uint32_t pid = root->pid;
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_VFS_IDX);
+        if (!local_pid)
             continue;
+
+        netdata_publish_vfs_t *w = &local_pid->vfs;
 
         vfs_aggregate_publish_vfs(vfs, w);
     }
@@ -1298,7 +1299,7 @@ static void vfs_apps_accumulator(netdata_ebpf_vfs_t *out, int maps_per_core)
 /**
  * Read the hash table and store data to allocated vectors.
  */
-static void ebpf_vfs_read_apps(int maps_per_core, uint32_t max_period)
+static void ebpf_vfs_read_apps(int maps_per_core)
 {
     netdata_ebpf_vfs_t *vv = vfs_vector;
     int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
@@ -1314,21 +1315,17 @@ static void ebpf_vfs_read_apps(int maps_per_core, uint32_t max_period)
 
         vfs_apps_accumulator(vv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, vv->tgid, vv->name, NETDATA_EBPF_PIDS_VFS_IDX);
-        netdata_publish_vfs_t *publish = local_pid->vfs;
-        if (!publish)
-            local_pid->vfs = publish = ebpf_vfs_allocate_publish();
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_VFS_IDX);
+        if (!local_pid)
+            continue;
+        netdata_publish_vfs_t *publish = &local_pid->vfs;
 
         if (!publish->ct || publish->ct != vv->ct) {
             vfs_aggregate_set_vfs(publish, vv);
-            local_pid->not_updated = 0;
-        } else if (++local_pid->not_updated >= max_period) {
-            if (kill(key, 0)) { // No PID found
-                ebpf_reset_specific_pid_data(local_pid);
-            } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(local_pid, fd, key, NETDATA_EBPF_PIDS_VFS_IDX);
-                ebpf_vfs_release_publish(publish);
-                local_pid->vfs = NULL;
+        } else {
+            if (kill((pid_t)key, 0)) { // No PID found
+                if (netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_VFS_IDX))
+                    memset(publish, 0, sizeof(*publish));
             }
         }
 
@@ -1350,21 +1347,23 @@ static void read_update_vfs_cgroup()
 {
     ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
+    sem_wait(shm_mutex_ebpf_integration);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
-            int pid = pids->pid;
+            uint32_t pid = pids->pid;
             netdata_publish_vfs_t *out = &pids->vfs;
             memset(out, 0, sizeof(netdata_publish_vfs_t));
 
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_VFS_IDX);
-            netdata_publish_vfs_t *in = local_pid->vfs;
-            if (!in)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_VFS_IDX);
+            if (!local_pid)
                 continue;
+            netdata_publish_vfs_t *in = &local_pid->vfs;
 
             vfs_aggregate_publish_vfs(out, in);
         }
     }
+    sem_post(shm_mutex_ebpf_integration);
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
@@ -2319,7 +2318,6 @@ void *ebpf_read_vfs_thread(void *ptr)
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
-    uint32_t max_period = EBPF_CLEANUP_FACTOR;
     pids_fd[NETDATA_EBPF_PIDS_VFS_IDX] = vfs_maps[NETDATA_VFS_PID].map_fd;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
@@ -2329,8 +2327,10 @@ void *ebpf_read_vfs_thread(void *ptr)
             continue;
 
         pthread_mutex_lock(&collect_data_mutex);
-        ebpf_vfs_read_apps(maps_per_core, max_period);
+        sem_wait(shm_mutex_ebpf_integration);
+        ebpf_vfs_read_apps(maps_per_core);
         ebpf_vfs_resume_apps_data();
+        sem_post(shm_mutex_ebpf_integration);
         pthread_mutex_unlock(&collect_data_mutex);
 
         counter = 0;
