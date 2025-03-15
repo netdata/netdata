@@ -5,7 +5,7 @@
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
 # shellcheck disable=SC2015
-[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Preparing build environment" || true
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Preparing install path" || true
 
 [ -d "${NETDATA_INSTALL_PATH}.old" ] && run rm -rf "${NETDATA_INSTALL_PATH}.old"
 [ -d "${NETDATA_INSTALL_PATH}" ] && run mv -f "${NETDATA_INSTALL_PATH}" "${NETDATA_INSTALL_PATH}.old"

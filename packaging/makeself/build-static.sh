@@ -85,6 +85,7 @@ fi
 if [ -t 1 ]; then
   run ${docker} run --rm -e BUILDARCH="${BUILDARCH}" -a stdin -a stdout -a stderr -i -t -v "$(pwd)":/netdata:rw \
     --platform "${platform}" ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
+    ${DEBUG_BUILD_INFRA:+-e DEBUG_BUILD_INFRA=1} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
     -e TUNING_FLAGS="${TUNING_FLAGS}" \
     ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \

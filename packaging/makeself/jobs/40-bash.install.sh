@@ -7,10 +7,13 @@
 . "$(dirname "${0}")/../bundled-packages.version"
 
 # shellcheck disable=SC2015
-[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building bash" || true
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building bash" || true
 
-fetch "bash-${BASH_VERSION}" "${BASH_ARTIFACT_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
-    "${BASH_ARTIFACT_SHA256}" bash
+cache_key="bash"
+build_dir="bash-${BASH_VERSION}"
+
+fetch "${build_dir}" "${BASH_ARTIFACT_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
+    "${BASH_ARTIFACT_SHA256}" "${cache_key}"
 
 export CFLAGS="${TUNING_FLAGS} -pipe"
 export CXXFLAGS="${CFLAGS}"
@@ -40,7 +43,7 @@ fi
 
 run make install
 
-store_cache bash "${NETDATA_MAKESELF_PATH}/tmp/bash-${BASH_VERSION}"
+store_cache "${cache_key}" "${build_dir}"
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/bash
