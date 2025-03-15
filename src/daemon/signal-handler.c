@@ -79,8 +79,11 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
             strncpyz(b, "SIGNAL HANDLER: received deadly signal: ", sizeof(b) - 1);
             strcat(b, signals_waiting[i].name);
             if(sc) {
+                char buf[128];
+                SIGNAL_CODE_2str_h(sc, buf, sizeof(buf));
+
                 strcat(b, " (");
-                strcat(b, SIGNAL_CODE_2str(sc));
+                strcat(b, buf);
                 strcat(b, ")");
             }
             strcat(b, " in thread ");
