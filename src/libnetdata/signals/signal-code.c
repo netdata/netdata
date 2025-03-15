@@ -25,7 +25,9 @@ ENUM_STR_MAP_DEFINE(SIGNAL_NUM) = {
     { SIGPIPE, "SIGPIPE" },     // 13 Broken pipe.
     { SIGALRM, "SIGALRM" },     // 14 Alarm clock.
     { SIGTERM, "SIGTERM" },     // 15 Termination request.
+#ifdef SIGSTKFLT
     { SIGSTKFLT, "SIGSTKFLT" }, // 16 Stack fault (obsolete).
+#endif
     { SIGCHLD, "SIGCHLD" },     // 17 Child terminated or stopped.
     { SIGCONT, "SIGCONT" },     // 18 Continue.
     { SIGSTOP, "SIGSTOP" },     // 19 Stop, unblockable.
@@ -38,8 +40,12 @@ ENUM_STR_MAP_DEFINE(SIGNAL_NUM) = {
     { SIGVTALRM, "SIGVTALRM" }, // 26 Virtual timer expired.
     { SIGPROF, "SIGPROF" },     // 27 Profiling timer expired.
     { SIGWINCH, "SIGWINCH" },   // 28 Window size change (4.3 BSD, Sun).
+#ifdef SIGPOLL
     { SIGPOLL, "SIGPOLL" },     // 29 Pollable event occurred (System V).
+#endif
+#ifdef SIGPWR
     { SIGPWR, "SIGPWR" },       // 30 Power failure imminent.
+#endif
     { SIGSYS, "SIGSYS" },       // 31 Bad system call.
 
     // Terminator
@@ -54,10 +60,18 @@ ENUM_STR_DEFINE_FUNCTIONS(SIGNAL_NUM, SIG_NOT_FOUND, NULL);
 typedef int SI_CODE;
 
 ENUM_STR_MAP_DEFINE(SI_CODE) = {
+#ifdef SI_ASYNCNL
     { SI_ASYNCNL, "SI_ASYNCNL" },
+#endif
+#ifdef SI_DETHREAD
     { SI_DETHREAD, "SI_DETHREAD" },
+#endif
+#ifdef SI_TKILL
     { SI_TKILL, "SI_TKILL" },
+#endif
+#ifdef SI_SIGIO
     { SI_SIGIO, "SI_SIGIO" },
+#endif
     { SI_ASYNCIO, "SI_ASYNCIO" },
     { SI_MESGQ, "SI_MESGQ" },
     { SI_TIMER, "SI_TIMER" },
