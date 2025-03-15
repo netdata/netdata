@@ -136,8 +136,12 @@ void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     if(!function || !*function)
         function = "unknown";
 
+    // Set the transaction name to the function where the error occurred
+    // this should be low cardinality
     sentry_set_transaction(function);
-    // sentry_set_fingerprint("{{ default }}", function, NULL);
+
+    // Set the fingerprint to the function where the error occurred
+    sentry_set_fingerprint("{{ default }}", function, NULL);
 
     sentry_value_t crumb = sentry_value_new_breadcrumb("fatal", "fatal() event details");
 
