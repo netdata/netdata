@@ -59,7 +59,10 @@ static void daemon_status_file_out_of_memory(void);
 #define dsf_acquire(ds) __atomic_load_n(&(ds).v, __ATOMIC_ACQUIRE)
 #define dsf_release(ds) __atomic_store_n(&(ds).v, (ds).v, __ATOMIC_RELEASE)
 
-static void copy_and_clean_thread_name(DAEMON_STATUS_FILE *ds, const char *name) {
+static void copy_and_clean_thread_name_if_empty(DAEMON_STATUS_FILE *ds, const char *name) {
+    if(ds->fatal.thread[0] && strcmp(ds->fatal.thread, "NO_NAME") != 0)
+        return;
+    
     if(!name || !*name) name = "NO_NAME";
 
     strncpyz(ds->fatal.thread, name, sizeof(ds->fatal.thread) - 1);
@@ -258,6 +261,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             {
                 buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup.slot[i].timestamp_ut, true); // custom
                 buffer_json_member_add_uint64(wb, "hash", ds->dedup.slot[i].hash); // custom
+                buffer_json_member_add_boolean(wb, "sentry", ds->dedup.slot[i].sentry); // custom
             }
             buffer_json_object_close(wb);
         }
@@ -289,6 +293,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v10 = version >= 10 ? strict : false;
     bool required_v14 = version >= 14 ? strict : false;
     bool required_v16 = version >= 16 ? strict : false;
+    bool required_v17 = version >= 17 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -411,8 +416,8 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
                     if (datetime[0])
                         ds->dedup.slot[i].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
 
-                    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(
-                        jobj, path, "hash", ds->dedup.slot[i].hash, error, required_v4);
+                    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[i].hash, error, required_v4);
+                    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "sentry", ds->dedup.slot[0].sentry, error, required_v17);
                 }
             });
         });
@@ -809,7 +814,7 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
 // --------------------------------------------------------------------------------------------------------------------
 // deduplication hashes management
 
-static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash) {
+static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
     usec_t now_ut = now_realtime_usec();
 
     for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
@@ -817,6 +822,7 @@ static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash) {
             continue;
 
         if(hash == ds->dedup.slot[i].hash &&
+            ds->dedup.slot[i].sentry == sentry &&
             now_ut - ds->dedup.slot[i].timestamp_ut < 86400 * USEC_PER_SEC) {
             // we have already posted this crash
             return true;
@@ -826,10 +832,10 @@ static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash) {
     return false;
 }
 
-static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash) {
+static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
     // find the same hash
     for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
-        if(ds->dedup.slot[i].hash == hash) {
+        if(ds->dedup.slot[i].hash == hash && ds->dedup.slot[i].sentry == sentry) {
             ds->dedup.slot[i].hash = hash;
             ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
             return;
@@ -854,6 +860,7 @@ static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash) {
 
     ds->dedup.slot[store_at_slot].hash = hash;
     ds->dedup.slot[store_at_slot].timestamp_ut = now_realtime_usec();
+    ds->dedup.slot[store_at_slot].sentry = sentry;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -893,7 +900,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
-        dedup_keep_hash(&session_status, hash);
+        dedup_keep_hash(&session_status, hash, false);
         daemon_status_file_save(wb, &session_status, true);
     }
 
@@ -1156,7 +1163,7 @@ void daemon_status_file_check_crash(void) {
         (last_session_status.restarts >= 10 || !is_ci()) &&
 
         // we have not already reported this
-        !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause))
+        !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
 
         ) {
         netdata_conf_ssl();
@@ -1202,8 +1209,7 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
 
     exit_initiated_add(EXIT_REASON_FATAL);
 
-    if(!session_status.fatal.thread[0])
-        copy_and_clean_thread_name(&session_status, nd_thread_tag());
+    copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag());
 
     if(!session_status.fatal.filename[0] && filename)
         strncpyz(session_status.fatal.filename, filename, sizeof(session_status.fatal.filename) - 1);
@@ -1288,8 +1294,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     if(code)
         session_status.fatal.signal_code = code;
 
-    if(!session_status.fatal.thread[0])
-        copy_and_clean_thread_name(&session_status, nd_thread_tag_async_safe());
+    copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag_async_safe());
 
     dsf_release(session_status);
 
@@ -1300,10 +1305,10 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     bool duplicate = false;
     if(chained_handler) {
         uint64_t hash = daemon_status_file_hash(&session_status, NULL, NULL);
-        duplicate = dedup_already_posted(&session_status, hash);
+        duplicate = dedup_already_posted(&session_status, hash, true);
         if (!duplicate) {
             // save this hash, so that we won't post it again to sentry
-            dedup_keep_hash(&session_status, hash);
+            dedup_keep_hash(&session_status, hash, true);
         }
     }
 

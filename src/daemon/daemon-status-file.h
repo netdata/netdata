@@ -86,9 +86,10 @@ typedef struct daemon_status_file {
 
     struct {
         struct {
+            bool sentry;
             uint64_t hash;
             usec_t timestamp_ut;
-        } slot[10];
+        } slot[15];
     } dedup;
 } DAEMON_STATUS_FILE;
 
