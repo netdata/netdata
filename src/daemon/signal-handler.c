@@ -3,6 +3,10 @@
 #include "common.h"
 #include "daemon/daemon-status-file.h"
 
+#ifdef ENABLE_SENTRY
+#include "sentry-native/sentry-native.h"
+#endif
+
 typedef enum signal_action {
     NETDATA_SIGNAL_IGNORE,
     NETDATA_SIGNAL_EXIT_CLEANLY,
@@ -65,6 +69,10 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
                 // this is a duplicate event, do not send it to sentry
                 chained_handler = false;
             }
+
+#ifdef ENABLE_SENTRY
+            nd_sentry_crash_report(chained_handler);
+#endif
 
             // log it
             char b[1024];
