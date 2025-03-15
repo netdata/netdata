@@ -7,6 +7,8 @@
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
 
+#define STATUS_FILE_VERSION 17
+
 typedef enum {
     DAEMON_STATUS_NONE,
     DAEMON_STATUS_INITIALIZING,
@@ -111,5 +113,21 @@ void daemon_status_file_shutdown_step(const char *step);
 
 void daemon_status_file_init(void);
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
+
+const char *daemon_status_file_get_install_type(void);
+const char *daemon_status_file_get_architecture(void);
+const char *daemon_status_file_get_virtualization(void);
+const char *daemon_status_file_get_container(void);
+const char *daemon_status_file_get_os_name(void);
+const char *daemon_status_file_get_os_version(void);
+const char *daemon_status_file_get_os_id(void);
+const char *daemon_status_file_get_os_id_like(void);
+
+const char *daemon_status_file_get_fatal_filename(void);
+const char *daemon_status_file_get_fatal_function(void);
+const char *daemon_status_file_get_fatal_message(void);
+const char *daemon_status_file_get_fatal_errno(void);
+const char *daemon_status_file_get_fatal_stack_trace(void);
+long daemon_status_file_get_fatal_line(void);
 
 #endif //NETDATA_DAEMON_STATUS_FILE_H

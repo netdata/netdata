@@ -9,7 +9,9 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 17
+#ifdef ENABLE_SENTRY
+#include "sentry-native/sentry-native.h"
+#endif
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -1259,6 +1261,10 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     freez((void *)message);
     freez((void *)errno_str);
     freez((void *)stack_trace);
+
+#ifdef ENABLE_SENTRY
+    nd_sentry_add_fatal_message_as_breadcrumb();
+#endif
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1372,3 +1378,63 @@ void daemon_status_file_shutdown_step(const char *step) {
 
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// public API to get values
+
+const char *daemon_status_file_get_install_type(void) {
+    return session_status.install_type;
+}
+
+const char *daemon_status_file_get_architecture(void) {
+    return session_status.architecture;
+}
+
+const char *daemon_status_file_get_virtualization(void) {
+    return session_status.virtualization;
+}
+
+const char *daemon_status_file_get_container(void) {
+    return session_status.container;
+}
+
+const char *daemon_status_file_get_os_name(void) {
+    return session_status.os_name;
+}
+
+const char *daemon_status_file_get_os_version(void) {
+    return session_status.os_version;
+}
+
+const char *daemon_status_file_get_os_id(void) {
+    return session_status.os_id;
+}
+
+const char *daemon_status_file_get_os_id_like(void) {
+    return session_status.os_id_like;
+}
+
+const char *daemon_status_file_get_fatal_filename(void) {
+    return session_status.fatal.filename;
+}
+
+const char *daemon_status_file_get_fatal_function(void) {
+    return session_status.fatal.function;
+}
+
+const char *daemon_status_file_get_fatal_message(void) {
+    return session_status.fatal.message;
+}
+
+const char *daemon_status_file_get_fatal_errno(void) {
+    return session_status.fatal.errno_str;
+}
+
+const char *daemon_status_file_get_fatal_stack_trace(void) {
+    return session_status.fatal.stack_trace;
+}
+
+long daemon_status_file_get_fatal_line(void) {
+    return session_status.fatal.line;
+}
+
