@@ -178,8 +178,8 @@ jobs:
         id: build
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 360
-          max_attempts: 3
+          timeout_minutes: 150
+          max_attempts: 2
           command: |
             [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
             .github/scripts/build-static.sh ${{ matrix.arch }}
