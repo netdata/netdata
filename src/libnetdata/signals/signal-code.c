@@ -77,7 +77,9 @@ ENUM_STR_MAP_DEFINE(SI_CODE) = {
     { SI_TIMER, "SI_TIMER" },
     { SI_QUEUE, "SI_QUEUE" },
     { SI_USER, "SI_USER" },
+#ifdef SI_KERNEL
     { SI_KERNEL, "SI_KERNEL" },
+#endif
 
     // Terminator
     {0, NULL},
