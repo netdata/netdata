@@ -9,6 +9,8 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
+#define REPORT_EVENTS_EVERY (86400 - 3600) // -1 hour to tolerate cron randomness
+
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
 #endif
@@ -115,7 +117,7 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
         char msg[128];
         char cause[32];
     } to_hash;
-    
+
     // this is important to remove any random bytes from the structure
     memset(&to_hash, 0, sizeof(to_hash));
 
@@ -852,7 +854,7 @@ static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sen
 
         if(hash == ds->dedup.slot[i].hash &&
             sentry == ds->dedup.slot[i].sentry &&
-            now_ut - ds->dedup.slot[i].timestamp_ut < 86400 * USEC_PER_SEC) {
+            now_ut - ds->dedup.slot[i].timestamp_ut < REPORT_EVENTS_EVERY * USEC_PER_SEC) {
             // we have already posted this crash
             return true;
         }
