@@ -5,32 +5,36 @@
 
 #include "sentry.h"
 
-bool nd_sentry_crash_report_enabled = false;
+bool nd_sentry_crash_report_enabled = true;
 
 void nd_sentry_crash_report(bool enable) {
     nd_sentry_crash_report_enabled = enable;
 }
 
 static sentry_value_t nd_sentry_on_crash(
-    const sentry_ucontext_t *uctx __maybe_unused, // provides the user-space context of the crash
-    sentry_value_t event __maybe_unused,          // used the same way as in `before_send`
-    void *closure __maybe_unused                  // user-data that you can provide at configuration time
+    const sentry_ucontext_t *uctx __maybe_unused,   // provides the user-space context of the crash
+    sentry_value_t event,                           // used the same way as in `before_send`
+    void *closure __maybe_unused                    // user-data that you can provide at configuration time
 ) {
     // IMPORTANT: this function is called from a signal handler
 
-    if (!nd_sentry_crash_report_enabled)
+    if (!nd_sentry_crash_report_enabled) {
+        sentry_value_decref(event);
         return sentry_value_new_null();
+    }
 
     return event;
 }
 
 static sentry_value_t nd_sentry_before_send(
-    sentry_value_t event __maybe_unused,
+    sentry_value_t event,
     void *hint __maybe_unused,
     void *closure __maybe_unused) {
 
-    if (!nd_sentry_crash_report_enabled)
+    if (!nd_sentry_crash_report_enabled) {
+        sentry_value_decref(event);
         return sentry_value_new_null();
+    }
 
     return event;
 }
