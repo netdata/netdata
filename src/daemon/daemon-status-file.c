@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 16
+#define STATUS_FILE_VERSION 17
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -58,6 +58,30 @@ static void daemon_status_file_out_of_memory(void);
 // these are used instead of locks when locks cannot be used (signal handler, out of memory, etc)
 #define dsf_acquire(ds) __atomic_load_n(&(ds).v, __ATOMIC_ACQUIRE)
 #define dsf_release(ds) __atomic_store_n(&(ds).v, (ds).v, __ATOMIC_RELEASE)
+
+static void copy_and_clean_thread_name_if_empty(DAEMON_STATUS_FILE *ds, const char *name) {
+    if(ds->fatal.thread[0] && strcmp(ds->fatal.thread, "NO_NAME") != 0)
+        return;
+
+    if(!name || !*name) name = "NO_NAME";
+
+    strncpyz(ds->fatal.thread, name, sizeof(ds->fatal.thread) - 1);
+
+    // remove the variable part from the thread by removing [XXX] from it
+    unsigned char *p = (unsigned char *)strchr(ds->fatal.thread, '[');
+    if(p && isdigit(p[1]) && (isdigit(p[2]) || p[2] == ']'))
+        *p = '\0';
+}
+
+#define STACK_TRACE_INFO_PREFIX "info: "
+static bool stack_trace_is_empty(DAEMON_STATUS_FILE *ds) {
+    return !ds->fatal.stack_trace[0] || strncmp(ds->fatal.stack_trace, STACK_TRACE_INFO_PREFIX, strlen(STACK_TRACE_INFO_PREFIX)) == 0;
+}
+
+static void set_stack_trace_message_if_empty(DAEMON_STATUS_FILE *ds, const char *msg) {
+    if(stack_trace_is_empty(ds))
+        strncpyz(ds->fatal.stack_trace, msg, sizeof(ds->fatal.stack_trace) - 1);
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
@@ -237,6 +261,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             {
                 buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup.slot[i].timestamp_ut, true); // custom
                 buffer_json_member_add_uint64(wb, "hash", ds->dedup.slot[i].hash); // custom
+                buffer_json_member_add_boolean(wb, "sentry", ds->dedup.slot[i].sentry); // custom
             }
             buffer_json_object_close(wb);
         }
@@ -268,6 +293,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v10 = version >= 10 ? strict : false;
     bool required_v14 = version >= 14 ? strict : false;
     bool required_v16 = version >= 16 ? strict : false;
+    bool required_v17 = version >= 17 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -390,8 +416,8 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
                     if (datetime[0])
                         ds->dedup.slot[i].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
 
-                    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(
-                        jobj, path, "hash", ds->dedup.slot[i].hash, error, required_v4);
+                    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[i].hash, error, required_v4);
+                    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "sentry", ds->dedup.slot[i].sentry, error, required_v17);
                 }
             });
         });
@@ -788,7 +814,7 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
 // --------------------------------------------------------------------------------------------------------------------
 // deduplication hashes management
 
-static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash) {
+static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
     usec_t now_ut = now_realtime_usec();
 
     for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
@@ -796,6 +822,7 @@ static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash) {
             continue;
 
         if(hash == ds->dedup.slot[i].hash &&
+            sentry == ds->dedup.slot[i].sentry &&
             now_ut - ds->dedup.slot[i].timestamp_ut < 86400 * USEC_PER_SEC) {
             // we have already posted this crash
             return true;
@@ -805,11 +832,12 @@ static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash) {
     return false;
 }
 
-static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash) {
+static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
     // find the same hash
     for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
-        if(ds->dedup.slot[i].hash == hash) {
+        if(ds->dedup.slot[i].hash == hash && ds->dedup.slot[i].sentry == sentry) {
             ds->dedup.slot[i].hash = hash;
+            ds->dedup.slot[i].sentry = sentry;
             ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
             return;
         }
@@ -819,6 +847,7 @@ static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash) {
     for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
         if(!ds->dedup.slot[i].hash) {
             ds->dedup.slot[i].hash = hash;
+            ds->dedup.slot[i].sentry = sentry;
             ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
             return;
         }
@@ -832,6 +861,7 @@ static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash) {
     }
 
     ds->dedup.slot[store_at_slot].hash = hash;
+    ds->dedup.slot[store_at_slot].sentry = sentry;
     ds->dedup.slot[store_at_slot].timestamp_ut = now_realtime_usec();
 }
 
@@ -872,7 +902,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
-        dedup_keep_hash(&session_status, hash);
+        dedup_keep_hash(&session_status, hash, false);
         daemon_status_file_save(wb, &session_status, true);
     }
 
@@ -1135,7 +1165,7 @@ void daemon_status_file_check_crash(void) {
         (last_session_status.restarts >= 10 || !is_ci()) &&
 
         // we have not already reported this
-        !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause))
+        !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
 
         ) {
         netdata_conf_ssl();
@@ -1154,19 +1184,28 @@ void daemon_status_file_check_crash(void) {
     }
 }
 
-static void daemon_status_file_save_again_if_we_can_get_stack_trace(void) {
-    if(!session_status.fatal.stack_trace[0]) {
-        buffer_flush(static_save_buffer);
-        capture_stack_trace(static_save_buffer);
+static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool force) {
+    if(capture_stack_trace_available())
+        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "will now attempt to get stack trace - if you see this message, we couldn't get it.");
+    else
+        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
 
-        if(buffer_strlen(static_save_buffer) > 0) {
-            strncpyz(
-                session_status.fatal.stack_trace,
-                buffer_tostring(static_save_buffer),
-                sizeof(session_status.fatal.stack_trace) - 1);
+    // save it without a stack trace to be sure we will have the event
+    daemon_status_file_save(wb, ds, false);
 
-            daemon_status_file_save(static_save_buffer, &session_status, false);
-        }
+    if(!stack_trace_is_empty(ds) && !force)
+        return;
+
+    buffer_flush(wb);
+    capture_stack_trace(wb);
+
+    if(buffer_strlen(wb) > 0) {
+        strncpyz(
+            ds->fatal.stack_trace,
+            buffer_tostring(wb),
+            sizeof(ds->fatal.stack_trace) - 1);
+
+        daemon_status_file_save(wb, ds, false);
     }
 }
 
@@ -1180,7 +1219,8 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     spinlock_lock(&session_status.fatal.spinlock);
 
     exit_initiated_add(EXIT_REASON_FATAL);
-    strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
+
+    copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag());
 
     if(!session_status.fatal.filename[0] && filename)
         strncpyz(session_status.fatal.filename, filename, sizeof(session_status.fatal.filename) - 1);
@@ -1194,7 +1234,7 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     if(!session_status.fatal.errno_str[0] && errno_str)
         strncpyz(session_status.fatal.errno_str, errno_str, sizeof(session_status.fatal.errno_str) - 1);
 
-    if(!session_status.fatal.stack_trace[0] && stack_trace)
+    if(stack_trace_is_empty(&session_status) && stack_trace)
         strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
 
     if(!session_status.fatal.line)
@@ -1204,15 +1244,13 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     dsf_release(session_status);
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    daemon_status_file_save(wb, &session_status, false);
+    daemon_status_file_save_twice_if_we_can_get_stack_trace(wb, &session_status, false);
 
     freez((void *)filename);
     freez((void *)function);
     freez((void *)message);
     freez((void *)errno_str);
     freez((void *)stack_trace);
-
-    daemon_status_file_save_again_if_we_can_get_stack_trace();
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1235,10 +1273,10 @@ static void daemon_status_file_out_of_memory(void) {
 
     dsf_acquire(session_status);
     session_status.exit_reason = exit_initiated;
+
     dsf_release(session_status);
 
-    daemon_status_file_save(static_save_buffer, &session_status, false);
-    daemon_status_file_save_again_if_we_can_get_stack_trace();
+    daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
 }
 
 bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, bool chained_handler) {
@@ -1254,32 +1292,37 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     if(code)
         session_status.fatal.signal_code = code;
 
-    if(!session_status.fatal.thread[0])
-        strncpyz(session_status.fatal.thread, nd_thread_tag_async_safe(), sizeof(session_status.fatal.thread) - 1);
+    copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag_async_safe());
 
     dsf_release(session_status);
 
     // the buffer should already be allocated, so this should normally do nothing
     static_save_buffer_init();
 
-    // save what we know already
-    daemon_status_file_save(static_save_buffer, &session_status, false);
-
     // deduplicate the crash for sentry
     bool duplicate = false;
     if(chained_handler) {
         uint64_t hash = daemon_status_file_hash(&session_status, NULL, NULL);
-        duplicate = dedup_already_posted(&session_status, hash);
+        duplicate = dedup_already_posted(&session_status, hash, true);
         if (!duplicate) {
             // save this hash, so that we won't post it again to sentry
-            dedup_keep_hash(&session_status, hash);
-            daemon_status_file_save(static_save_buffer, &session_status, false);
+            dedup_keep_hash(&session_status, hash, true);
         }
     }
 
-    if((!chained_handler || duplicate) && (reason != EXIT_REASON_SIGABRT || capture_stack_trace_is_async_signal_safe())) {
-        // no sentry, try to get the stack trace
-        daemon_status_file_save_again_if_we_can_get_stack_trace();
+    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT || capture_stack_trace_is_async_signal_safe();
+    bool get_stack_trace = capture_stack_trace_available() && safe_to_get_stack_trace && stack_trace_is_empty(&session_status);
+
+    // save it
+    if(get_stack_trace)
+        daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
+    else {
+        if (!capture_stack_trace_available())
+            set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
+        else
+            set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
+
+        daemon_status_file_save(static_save_buffer, &session_status, false);
     }
 
     return duplicate;

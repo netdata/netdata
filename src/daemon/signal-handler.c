@@ -3,6 +3,10 @@
 #include "common.h"
 #include "daemon/daemon-status-file.h"
 
+#ifdef ENABLE_SENTRY
+#include "sentry-native/sentry-native.h"
+#endif
+
 typedef enum signal_action {
     NETDATA_SIGNAL_IGNORE,
     NETDATA_SIGNAL_EXIT_CLEANLY,
@@ -63,7 +67,11 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
             SIGNAL_CODE sc = info ? signal_code(signo, info->si_code) : 0;
             if(daemon_status_file_deadly_signal_received(signals_waiting[i].reason, sc, chained_handler)) {
                 // this is a duplicate event, do not send it to sentry
+#ifdef ENABLE_SENTRY
+                nd_sentry_crash_report(false);
+#else
                 chained_handler = false;
+#endif
             }
 
             // log it
@@ -71,8 +79,11 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
             strncpyz(b, "SIGNAL HANDLER: received deadly signal: ", sizeof(b) - 1);
             strcat(b, signals_waiting[i].name);
             if(sc) {
+                char buf[128];
+                SIGNAL_CODE_2str_h(sc, buf, sizeof(buf));
+
                 strcat(b, " (");
-                strcat(b, SIGNAL_CODE_2str(sc));
+                strcat(b, buf);
                 strcat(b, ")");
             }
             strcat(b, " in thread ");
@@ -125,6 +136,25 @@ static void posix_unmask_my_signals(void) {
 
     if (pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
         netdata_log_error("SIGNAL: cannot unmask netdata signals");
+}
+
+void nd_cleanup_fatal_signals(void) {
+    struct sigaction act;
+    memset(&act, 0, sizeof(struct sigaction));
+
+    // ignore all signals while we run in a signal handler
+    sigfillset(&act.sa_mask);
+
+    for (size_t i = 0; i < _countof(signals_waiting); i++) {
+        if(signals_waiting[i].action != NETDATA_SIGNAL_DEADLY)
+            continue;
+
+        act.sa_flags = 0;
+        act.sa_handler = SIG_DFL;
+
+        if (sigaction(signals_waiting[i].signo, &act, NULL) == -1)
+            netdata_log_error("SIGNAL: Failed to cleanup signal handler for: %s", signals_waiting[i].name);
+    }
 }
 
 void nd_initialize_signals(bool chain_existing) {

@@ -28,6 +28,10 @@ bool capture_stack_trace_is_async_signal_safe(void) {
 #endif
 }
 
+bool capture_stack_trace_available(void) {
+    return true;
+}
+
 void capture_stack_trace(BUFFER *wb) {
     // this function is async-signal-safe, if the buffer has enough space to hold the stack trace
 
@@ -75,6 +79,10 @@ void capture_stack_trace(BUFFER *wb) {
 }
 
 #elif defined(HAVE_BACKTRACE)
+
+bool capture_stack_trace_available(void) {
+    return true;
+}
 
 void capture_stack_trace_init(void) {
     ;
@@ -142,6 +150,10 @@ void capture_stack_trace(BUFFER *wb) {
 }
 
 #else
+
+bool capture_stack_trace_available(void) {
+    return false;
+}
 
 void capture_stack_trace_init(void) {
     ;
