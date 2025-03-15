@@ -37,7 +37,7 @@ typedef struct daemon_status_file {
     RRD_DB_MODE db_mode;
     uint8_t db_tiers;
     bool kubernetes;
-    bool sentry;
+    bool sentry_available;      // true when sentry support is compiled in
 
     time_t boottime;            // system boottime
     time_t uptime;              // netdata uptime
@@ -82,6 +82,7 @@ typedef struct daemon_status_file {
         char stack_trace[2048];
         char thread[ND_THREAD_TAG_MAX + 1];
         SIGNAL_CODE signal_code;
+        bool sentry;        // true when the error was also reported to sentry
     } fatal;
 
     struct {

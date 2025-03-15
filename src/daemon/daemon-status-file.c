@@ -98,7 +98,8 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
         RRD_DB_MODE db_mode;
         uint8_t db_tiers;
         bool kubernetes;
-        bool sentry;
+        bool sentry_available;
+        bool sentry_fatal;
         ND_UUID host_id;
         ND_UUID machine_id;
         long line;
@@ -119,7 +120,8 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
         .db_mode = ds->db_mode,
         .db_tiers = ds->db_tiers,
         .kubernetes = ds->kubernetes,
-        .sentry = ds->sentry,
+        .sentry_available = ds->sentry_available,
+        .sentry_fatal = ds->fatal.sentry,
         .host_id = ds->host_id,
         .machine_id = ds->machine_id,
     };
@@ -172,9 +174,8 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_boolean(wb, "ND_kubernetes", ds->kubernetes); // custom
         }
 
-        if(ds->v >= 16) {
-            buffer_json_member_add_boolean(wb, "ND_sentry", ds->sentry); // custom
-        }
+        if(ds->v >= 16)
+            buffer_json_member_add_boolean(wb, "ND_sentry_available", ds->sentry_available); // custom
 
         buffer_json_member_add_object(wb, "ND_timings"); // custom
         {
@@ -248,6 +249,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             SIGNAL_CODE_2str_h(ds->fatal.signal_code, signal_code, sizeof(signal_code));
             buffer_json_member_add_string_or_empty(wb, "signal_code", signal_code);
         }
+
+        if(ds->v >= 17)
+            buffer_json_member_add_boolean(wb, "sentry", ds->fatal.sentry);
     }
     buffer_json_object_close(wb);
 
@@ -332,9 +336,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             ds->kubernetes = false;
         }
 
-        if(version >= 16) {
-            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry", ds->sentry, error, required_v16);
-        }
+        if(version >= 17)
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry_available", ds->sentry_available, error, required_v17);
+        else if(version == 16)
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry", ds->sentry_available, error, required_v16);
     });
 
     // Parse host object
@@ -391,6 +396,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
         if(version >= 16) {
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "signal_code", SIGNAL_CODE_2id_h, ds->fatal.signal_code, error, required_v16);
+        }
+        if(version >= 17) {
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "sentry", SIGNAL_CODE_2id_h, ds->fatal.sentry, error, required_v17);
         }
     });
 
@@ -474,9 +482,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.db_tiers = nd_profile.storage_tiers;
 
 #if defined(ENABLE_SENTRY)
-    session_status.sentry = true;
+    session_status.sentry_available = true;
 #else
-    session_status.sentry = false;
+    session_status.sentry_available = false;
 #endif
 
     session_status.claim_id = claim_id_get_uuid();
@@ -1287,7 +1295,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     dsf_acquire(session_status);
 
     session_status.exit_reason |= reason;
-    session_status.sentry = chained_handler;
+    session_status.fatal.sentry = chained_handler;
 
     if(code)
         session_status.fatal.signal_code = code;
