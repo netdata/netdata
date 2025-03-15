@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- fixed sentry version [\#19868](https://github.com/netdata/netdata/pull/19868) ([ktsaou](https://github.com/ktsaou))
+- fixed sentry dedup [\#19867](https://github.com/netdata/netdata/pull/19867) ([ktsaou](https://github.com/ktsaou))
+- fix\(freebsd.plugin\): correct disks/network devices charts [\#19866](https://github.com/netdata/netdata/pull/19866) ([ilyam8](https://github.com/ilyam8))
+- improvement\(macos.plugin\): add options to filter net ifaces and mountpoints [\#19865](https://github.com/netdata/netdata/pull/19865) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/prometheus/common from 0.62.0 to 0.63.0 in /src/go [\#19864](https://github.com/netdata/netdata/pull/19864) ([dependabot[bot]](https://github.com/apps/dependabot))
+- daemon status file 16 [\#19863](https://github.com/netdata/netdata/pull/19863) ([ktsaou](https://github.com/ktsaou))
+- Release memory on shutdown - detect invalid extent in journal files [\#19861](https://github.com/netdata/netdata/pull/19861) ([stelfrag](https://github.com/stelfrag))
 - restore needed variables for pluginsd [\#19860](https://github.com/netdata/netdata/pull/19860) ([ktsaou](https://github.com/ktsaou))
 - fix\(macos.plugin\): correct disks/network devices charts [\#19859](https://github.com/netdata/netdata/pull/19859) ([ilyam8](https://github.com/ilyam8))
 - disable UNW\_LOCAL\_ONLY on static builds [\#19858](https://github.com/netdata/netdata/pull/19858) ([ktsaou](https://github.com/ktsaou))
@@ -39,6 +46,7 @@
 - Include libucontext in static builds to vendor libunwind even on POWER. [\#19817](https://github.com/netdata/netdata/pull/19817) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#19816](https://github.com/netdata/netdata/pull/19816) ([netdatabot](https://github.com/netdatabot))
 - fix\(go.d/filecheck\): remove dyncfg path validation pattern  [\#19815](https://github.com/netdata/netdata/pull/19815) ([ilyam8](https://github.com/ilyam8))
+- Initial commit with snmp profile code [\#19813](https://github.com/netdata/netdata/pull/19813) ([Ancairon](https://github.com/Ancairon))
 - Acquire datafile for deletion before calculating retention [\#19812](https://github.com/netdata/netdata/pull/19812) ([stelfrag](https://github.com/stelfrag))
 - Detect memory leaks [\#19811](https://github.com/netdata/netdata/pull/19811) ([ktsaou](https://github.com/ktsaou))
 - Avoid zero timeout in libuv timers [\#19810](https://github.com/netdata/netdata/pull/19810) ([stelfrag](https://github.com/stelfrag))
@@ -471,15 +479,6 @@
 - FD Leaks Fix [\#19327](https://github.com/netdata/netdata/pull/19327) ([ktsaou](https://github.com/ktsaou))
 - feat\(go.d.plugin\): add YugabyteDB collector [\#19325](https://github.com/netdata/netdata/pull/19325) ([ilyam8](https://github.com/ilyam8))
 - fix\(kickstart.sh\): correct wrong function name in perpare\_offline\_install [\#19323](https://github.com/netdata/netdata/pull/19323) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/vmware/govmomi from 0.46.3 to 0.47.0 in /src/go [\#19322](https://github.com/netdata/netdata/pull/19322) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Improve context load time during startup [\#19321](https://github.com/netdata/netdata/pull/19321) ([stelfrag](https://github.com/stelfrag))
-- fix\(cgroup-rename\): prevent leading comma in Docker LABELS when IMAGE empty [\#19318](https://github.com/netdata/netdata/pull/19318) ([ilyam8](https://github.com/ilyam8))
-- Fix coverity issues [\#19317](https://github.com/netdata/netdata/pull/19317) ([stelfrag](https://github.com/stelfrag))
-- CGROUP labels [\#19316](https://github.com/netdata/netdata/pull/19316) ([ktsaou](https://github.com/ktsaou))
-- feat\(cgroup-name.sh\): Add support for `netdata.cloud/*` container labels [\#19315](https://github.com/netdata/netdata/pull/19315) ([ilyam8](https://github.com/ilyam8))
-- Locks Improvements [\#19314](https://github.com/netdata/netdata/pull/19314) ([ktsaou](https://github.com/ktsaou))
-- add yugabytedb docker manager [\#19313](https://github.com/netdata/netdata/pull/19313) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/sd\): correctly adding tags in classify [\#19312](https://github.com/netdata/netdata/pull/19312) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
