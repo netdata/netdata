@@ -142,7 +142,7 @@ Netdata monitors all the following:
 |                              **Cloud Provider Infrastructure**<small><br/>AWS, GCP, Azure, and more</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
 |                       **Custom Applications**<small><br/>OpenMetrics, StatsD and soon OpenTelemetry</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
 
-When the Netdata Agent runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies and offers full **enterprise hardware** coverage, monitoring all components that provide hardware error reporting, like PCI AER, RAM EDAC, IPMI, S.M.A.R.T., NVMe, Fans, Power, Voltages, and more.
+When operating on Linux, the Netdata Agent continuously monitors every available kernel feature and all hardware sensors for errors. This covers Intel, AMD, and Nvidia GPUs, PCI Advanced Error Reporting (PCI AER), RAM Error Detection and Correction (RAM EDAC), Intelligent Platform Management Interface (IPMI), S.M.A.R.T. for disks, Intel Running Average Power Limit (Intel RAPL), NVMe disks, as well as fans, power supplies, voltage readings, and more.
 
 ---
 
