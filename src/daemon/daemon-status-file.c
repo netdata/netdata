@@ -70,6 +70,16 @@ static void copy_and_clean_thread_name(DAEMON_STATUS_FILE *ds, const char *name)
         *p = '\0';
 }
 
+#define STACK_TRACE_INFO_PREFIX "info: "
+static bool stack_trace_is_empty(DAEMON_STATUS_FILE *ds) {
+    return !ds->fatal.stack_trace[0] || strncmp(ds->fatal.stack_trace, STACK_TRACE_INFO_PREFIX, strlen(STACK_TRACE_INFO_PREFIX)) == 0;
+}
+
+static void set_stack_trace_message_if_empty(DAEMON_STATUS_FILE *ds, const char *msg) {
+    if(stack_trace_is_empty(ds))
+        strncpyz(ds->fatal.stack_trace, msg, sizeof(ds->fatal.stack_trace) - 1);
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
 
@@ -1165,8 +1175,8 @@ void daemon_status_file_check_crash(void) {
     }
 }
 
-static void daemon_status_file_save_again_if_we_can_get_stack_trace(void) {
-    if(!session_status.fatal.stack_trace[0]) {
+static void daemon_status_file_save_again_if_we_can_get_stack_trace(bool force) {
+    if(force || stack_trace_is_empty(&session_status)) {
         buffer_flush(static_save_buffer);
         capture_stack_trace(static_save_buffer);
 
@@ -1207,11 +1217,16 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     if(!session_status.fatal.errno_str[0] && errno_str)
         strncpyz(session_status.fatal.errno_str, errno_str, sizeof(session_status.fatal.errno_str) - 1);
 
-    if(!session_status.fatal.stack_trace[0] && stack_trace)
+    if(stack_trace_is_empty(&session_status) && stack_trace)
         strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
 
     if(!session_status.fatal.line)
         session_status.fatal.line = line;
+
+    if(capture_stack_trace_available())
+        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "will now attempt to get stack trace - if you see this message, we couldn't get it.");
+    else
+        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
 
     spinlock_unlock(&session_status.fatal.spinlock);
     dsf_release(session_status);
@@ -1225,7 +1240,7 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     freez((void *)errno_str);
     freez((void *)stack_trace);
 
-    daemon_status_file_save_again_if_we_can_get_stack_trace();
+    daemon_status_file_save_again_if_we_can_get_stack_trace(false);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1248,10 +1263,16 @@ static void daemon_status_file_out_of_memory(void) {
 
     dsf_acquire(session_status);
     session_status.exit_reason = exit_initiated;
+
+    if(capture_stack_trace_available())
+        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "will now attempt to get stack trace - if you see this message, we couldn't get it.");
+    else
+        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
+
     dsf_release(session_status);
 
     daemon_status_file_save(static_save_buffer, &session_status, false);
-    daemon_status_file_save_again_if_we_can_get_stack_trace();
+    daemon_status_file_save_again_if_we_can_get_stack_trace(false);
 }
 
 bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, bool chained_handler) {
@@ -1275,9 +1296,6 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     // the buffer should already be allocated, so this should normally do nothing
     static_save_buffer_init();
 
-    // save what we know already
-    daemon_status_file_save(static_save_buffer, &session_status, false);
-
     // deduplicate the crash for sentry
     bool duplicate = false;
     if(chained_handler) {
@@ -1286,14 +1304,27 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         if (!duplicate) {
             // save this hash, so that we won't post it again to sentry
             dedup_keep_hash(&session_status, hash);
-            daemon_status_file_save(static_save_buffer, &session_status, false);
         }
     }
 
-    if((!chained_handler || duplicate) && (reason != EXIT_REASON_SIGABRT || capture_stack_trace_is_async_signal_safe())) {
-        // no sentry, try to get the stack trace
-        daemon_status_file_save_again_if_we_can_get_stack_trace();
-    }
+    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT || capture_stack_trace_is_async_signal_safe();
+    bool sentry_will_get_stack_trace = chained_handler && !duplicate;
+    bool get_stack_trace = capture_stack_trace_available() && safe_to_get_stack_trace && !sentry_will_get_stack_trace && stack_trace_is_empty(&session_status);
+
+    if (get_stack_trace)
+        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "will now attempt to get stack trace - if you see this message, we couldn't get it.");
+    else if (sentry_will_get_stack_trace)
+        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "not getting a stack trace to let sentry do it");
+    else if (!capture_stack_trace_available())
+        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
+    else
+        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "cannot get a stack trace for this signal using this backend");
+
+    // save it
+    daemon_status_file_save(static_save_buffer, &session_status, false);
+
+    if(get_stack_trace)
+        daemon_status_file_save_again_if_we_can_get_stack_trace(true);
 
     return duplicate;
 }

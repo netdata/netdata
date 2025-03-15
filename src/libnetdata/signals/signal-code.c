@@ -6,11 +6,6 @@
 // Helper macro to create a SIGNAL_CODE value
 #define SIGNAL_CODE_CREATE(signo, si_code) (((uint64_t)(signo) << 32) | (uint32_t)(si_code))
 
-// Function to create a SIGNAL_CODE from signal number and signal code
-SIGNAL_CODE signal_code(int signo, int si_code) {
-    return SIGNAL_CODE_CREATE(signo, si_code);
-}
-
 // Define mapping from SIGNAL_CODE to string representation
 ENUM_STR_MAP_DEFINE(SIGNAL_CODE) = {
     // SIGILL codes
@@ -149,4 +144,9 @@ SIGNAL_CODE SIGNAL_CODE_2id_h(const char *str) {
         return strtoull(str + 2, NULL, 16);
 
     return SIGNAL_CODE_2id(str);
+}
+
+// Function to create a SIGNAL_CODE from signal number and signal code
+SIGNAL_CODE signal_code(int signo, int si_code) {
+    return SIGNAL_CODE_CREATE(signo, si_code);
 }

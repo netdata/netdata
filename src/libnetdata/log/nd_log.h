@@ -36,6 +36,7 @@ ND_UUID nd_log_get_invocation_id(void);
 void capture_stack_trace(BUFFER *wb);
 void capture_stack_trace_init(void);
 void capture_stack_trace_flush(void);
+bool capture_stack_trace_available(void);
 bool capture_stack_trace_is_async_signal_safe(void);
 
 typedef void (*log_event_t)(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
