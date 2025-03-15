@@ -128,6 +128,7 @@ const char *daemon_status_file_get_fatal_function(void);
 const char *daemon_status_file_get_fatal_message(void);
 const char *daemon_status_file_get_fatal_errno(void);
 const char *daemon_status_file_get_fatal_stack_trace(void);
+const char *daemon_status_file_get_fatal_thread(void);
 long daemon_status_file_get_fatal_line(void);
 
 #endif //NETDATA_DAEMON_STATUS_FILE_H

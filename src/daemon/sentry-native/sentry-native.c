@@ -145,6 +145,7 @@ void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     sentry_value_set_by_key(data, "message", sentry_value_new_string(daemon_status_file_get_fatal_message()));
     sentry_value_set_by_key(data, "function", sentry_value_new_string(daemon_status_file_get_fatal_function()));
     sentry_value_set_by_key(data, "filename", sentry_value_new_string(daemon_status_file_get_fatal_filename()));
+    sentry_value_set_by_key(data, "thread", sentry_value_new_string(daemon_status_file_get_fatal_thread()));
 
     char line[UINT64_MAX_LENGTH];
     print_uint64(line, daemon_status_file_get_fatal_line());

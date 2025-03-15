@@ -1434,6 +1434,10 @@ const char *daemon_status_file_get_fatal_stack_trace(void) {
     return session_status.fatal.stack_trace;
 }
 
+const char *daemon_status_file_get_fatal_thread(void) {
+    return session_status.fatal.thread;
+}
+
 long daemon_status_file_get_fatal_line(void) {
     return session_status.fatal.line;
 }
