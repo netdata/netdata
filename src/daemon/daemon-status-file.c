@@ -1240,11 +1240,6 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     if(!session_status.fatal.line)
         session_status.fatal.line = line;
 
-    if(capture_stack_trace_available())
-        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "will now attempt to get stack trace - if you see this message, we couldn't get it.");
-    else
-        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
-
     spinlock_unlock(&session_status.fatal.spinlock);
     dsf_release(session_status);
 
@@ -1325,7 +1320,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         if (!capture_stack_trace_available())
             set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
         else
-            set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "cannot get a stack trace for this signal using this backend");
+            set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
 
         daemon_status_file_save(static_save_buffer, &session_status, false);
     }
