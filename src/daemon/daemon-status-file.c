@@ -9,6 +9,8 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
+#define REPORT_EVENTS_EVERY (86400 - 3600) // -1 hour to tolerate cron randomness
+
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
 #endif
@@ -89,14 +91,15 @@ static void set_stack_trace_message_if_empty(DAEMON_STATUS_FILE *ds, const char 
 // json generation
 
 static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const char *cause) {
-    dsf_acquire(*ds);
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
     struct {
         uint32_t v;
         DAEMON_STATUS status;
-        EXIT_REASON exit_reason;
         SIGNAL_CODE signal_code;
         ND_PROFILE profile;
+        EXIT_REASON exit_reason;
         RRD_DB_MODE db_mode;
         uint8_t db_tiers;
         bool kubernetes;
@@ -113,26 +116,32 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
         char thread[sizeof(ds->fatal.thread)];
         char msg[128];
         char cause[32];
-    } to_hash = {
-        .v = ds->v,
-        .status = ds->status,
-        .signal_code = ds->fatal.signal_code,
-        .exit_reason = ds->exit_reason,
-        .profile = ds->profile,
-        .db_mode = ds->db_mode,
-        .db_tiers = ds->db_tiers,
-        .kubernetes = ds->kubernetes,
-        .sentry_available = ds->sentry_available,
-        .sentry_fatal = ds->fatal.sentry,
-        .host_id = ds->host_id,
-        .machine_id = ds->machine_id,
-    };
-    memcpy(to_hash.version, ds->version, sizeof(ds->version));
-    memcpy(to_hash.filename, ds->fatal.filename, sizeof(ds->fatal.filename));
-    memcpy(to_hash.filename, ds->fatal.function, sizeof(ds->fatal.function));
-    memcpy(to_hash.errno_str, ds->fatal.errno_str, sizeof(ds->fatal.errno_str));
-    memcpy(to_hash.stack_trace, ds->fatal.stack_trace, sizeof(ds->fatal.stack_trace));
-    memcpy(to_hash.thread, ds->fatal.thread, sizeof(ds->fatal.thread));
+    } to_hash;
+
+    // this is important to remove any random bytes from the structure
+    memset(&to_hash, 0, sizeof(to_hash));
+
+    dsf_acquire(*ds);
+
+    to_hash.v = ds->v,
+    to_hash.status = ds->status,
+    to_hash.signal_code = ds->fatal.signal_code,
+    to_hash.profile = ds->profile,
+    to_hash.exit_reason = ds->exit_reason,
+    to_hash.db_mode = ds->db_mode,
+    to_hash.db_tiers = ds->db_tiers,
+    to_hash.kubernetes = ds->kubernetes,
+    to_hash.sentry_available = ds->sentry_available,
+    to_hash.sentry_fatal = ds->fatal.sentry,
+    to_hash.host_id = ds->host_id,
+    to_hash.machine_id = ds->machine_id,
+
+    strncpyz(to_hash.version, ds->version, sizeof(to_hash.version) - 1);
+    strncpyz(to_hash.filename, ds->fatal.filename, sizeof(to_hash.filename) - 1);
+    strncpyz(to_hash.filename, ds->fatal.function, sizeof(to_hash.function) - 1);
+    strncpyz(to_hash.errno_str, ds->fatal.errno_str, sizeof(to_hash.errno_str) - 1);
+    strncpyz(to_hash.stack_trace, ds->fatal.stack_trace, sizeof(to_hash.stack_trace) - 1);
+    strncpyz(to_hash.thread, ds->fatal.thread, sizeof(to_hash.thread) - 1);
 
     if(msg)
         strncpyz(to_hash.msg, msg, sizeof(to_hash.msg) - 1);
@@ -147,6 +156,9 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
 }
 
 static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
     dsf_acquire(*ds);
 
     buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->timestamp_ut, true); // ECS
@@ -668,7 +680,8 @@ void daemon_status_file_load(DAEMON_STATUS_FILE *ds) {
 // save the current status
 
 static bool save_status_file(const char *directory, const char *content, size_t content_size) {
-    // THIS FUNCTION MUST USE ONLY ASYNC-SAFE OPERATIONS
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
     // Linux: https://man7.org/linux/man-pages/man7/signal-safety.7.html
     // memcpy(), strlen(), open(), write(), fsync(), close(), chmod(), rename(), unlink()
@@ -785,6 +798,11 @@ static void remove_old_status_files(const char *protected_dir) {
 }
 
 static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
+    // wb should have enough space to hold the JSON content, to avoid any allocations
+
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     daemon_status_file_to_json(wb, ds);
@@ -825,6 +843,9 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
 // deduplication hashes management
 
 static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
     usec_t now_ut = now_realtime_usec();
 
     for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
@@ -833,7 +854,7 @@ static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sen
 
         if(hash == ds->dedup.slot[i].hash &&
             sentry == ds->dedup.slot[i].sentry &&
-            now_ut - ds->dedup.slot[i].timestamp_ut < 86400 * USEC_PER_SEC) {
+            now_ut - ds->dedup.slot[i].timestamp_ut < REPORT_EVENTS_EVERY * USEC_PER_SEC) {
             // we have already posted this crash
             return true;
         }
@@ -843,6 +864,9 @@ static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sen
 }
 
 static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
     // find the same hash
     for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
         if(ds->dedup.slot[i].hash == hash && ds->dedup.slot[i].sentry == sentry) {
@@ -1195,6 +1219,9 @@ void daemon_status_file_check_crash(void) {
 }
 
 static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool force) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
     if(capture_stack_trace_available())
         set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "will now attempt to get stack trace - if you see this message, we couldn't get it.");
     else
@@ -1297,7 +1324,8 @@ static void daemon_status_file_out_of_memory(void) {
 bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, bool chained_handler) {
     FUNCTION_RUN_ONCE_RET(true);
 
-    // DO NOT LOCK OR ALLOCATE IN THIS FUNCTION - WE CRASHED ALREADY AND WE ARE INSIDE THE SIGNAL HANDLER!
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
     dsf_acquire(session_status);
 
