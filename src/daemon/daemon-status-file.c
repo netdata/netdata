@@ -9,7 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define STATUS_FILE_VERSION 16
+#define STATUS_FILE_VERSION 17
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -58,6 +58,17 @@ static void daemon_status_file_out_of_memory(void);
 // these are used instead of locks when locks cannot be used (signal handler, out of memory, etc)
 #define dsf_acquire(ds) __atomic_load_n(&(ds).v, __ATOMIC_ACQUIRE)
 #define dsf_release(ds) __atomic_store_n(&(ds).v, (ds).v, __ATOMIC_RELEASE)
+
+static void copy_and_clean_thread_name(DAEMON_STATUS_FILE *ds, const char *name) {
+    if(!name || !*name) name = "NO_NAME";
+
+    strncpyz(ds->fatal.thread, name, sizeof(ds->fatal.thread) - 1);
+
+    // remove the variable part from the thread by removing [XXX] from it
+    unsigned char *p = (unsigned char *)strchr(ds->fatal.thread, '[');
+    if(p && isdigit(p[1]) && (isdigit(p[2]) || p[2] == ']'))
+        *p = '\0';
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
@@ -1180,7 +1191,9 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     spinlock_lock(&session_status.fatal.spinlock);
 
     exit_initiated_add(EXIT_REASON_FATAL);
-    strncpyz(session_status.fatal.thread, nd_thread_tag(), sizeof(session_status.fatal.thread) - 1);
+
+    if(!session_status.fatal.thread[0])
+        copy_and_clean_thread_name(&session_status, nd_thread_tag());
 
     if(!session_status.fatal.filename[0] && filename)
         strncpyz(session_status.fatal.filename, filename, sizeof(session_status.fatal.filename) - 1);
@@ -1255,7 +1268,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         session_status.fatal.signal_code = code;
 
     if(!session_status.fatal.thread[0])
-        strncpyz(session_status.fatal.thread, nd_thread_tag_async_safe(), sizeof(session_status.fatal.thread) - 1);
+        copy_and_clean_thread_name(&session_status, nd_thread_tag_async_safe());
 
     dsf_release(session_status);
 
