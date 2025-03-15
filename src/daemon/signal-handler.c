@@ -138,6 +138,25 @@ static void posix_unmask_my_signals(void) {
         netdata_log_error("SIGNAL: cannot unmask netdata signals");
 }
 
+void nd_cleanup_fatal_signals(void) {
+    struct sigaction act;
+    memset(&act, 0, sizeof(struct sigaction));
+
+    // ignore all signals while we run in a signal handler
+    sigfillset(&act.sa_mask);
+
+    for (size_t i = 0; i < _countof(signals_waiting); i++) {
+        if(signals_waiting[i].action != NETDATA_SIGNAL_DEADLY)
+            continue;
+
+        act.sa_flags = 0;
+        act.sa_handler = SIG_DFL;
+
+        if (sigaction(signals_waiting[i].signo, &act, NULL) == -1)
+            netdata_log_error("SIGNAL: Failed to cleanup signal handler for: %s", signals_waiting[i].name);
+    }
+}
+
 void nd_initialize_signals(bool chain_existing) {
     signals_block_all_except_deadly();
 

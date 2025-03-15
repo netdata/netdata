@@ -989,6 +989,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("sentry");
 
+    nd_cleanup_fatal_signals(); // avoid sentry looping deadly signals back to us
     nd_sentry_init();
     nd_initialize_signals(true);
 #endif
