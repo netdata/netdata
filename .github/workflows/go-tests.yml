@@ -10,50 +10,6 @@ concurrency: # This keeps multiple instances of the job from running concurrentl
   group: go-test-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
-  file-check: # Check what files changed if we’re being run in a PR or on a push.
-    name: Check Modified Files
-    runs-on: ubuntu-latest
-    outputs:
-      run: ${{ steps.check-run.outputs.run }}
-    steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-      - name: Check files
-        id: check-files
-        uses: tj-actions/changed-files@v45
-        with:
-          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
-          files: |
-            **/*.cmake
-            CMakeLists.txt
-            .github/workflows/go-tests.yml
-            packaging/cmake/
-            src/go/**
-          files_ignore: |
-            **/*.md
-            src/go/**/metadata.yaml
-            packaging/repoconfig/
-      - name: List all changed files in pattern
-        continue-on-error: true
-        env:
-          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
-        run: |
-          for file in ${ALL_CHANGED_FILES}; do
-            echo "$file was changed"
-          done
-      - name: Check Run
-        id: check-run
-        run: |
-          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo 'run=true' >> "${GITHUB_OUTPUT}"
-          else
-            echo 'run=false' >> "${GITHUB_OUTPUT}"
-          fi
-
   matrix:
     name: Generate Build Matrix
     runs-on: ubuntu-latest
@@ -74,54 +30,42 @@ jobs:
     name: Go toolchain tests
     runs-on: ubuntu-latest
     needs:
-      - file-check
       - matrix
     strategy:
       fail-fast: false
       matrix:
         include: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Install Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.version }}
       - name: Checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Go mod download
-        if: needs.file-check.outputs.run == 'true'
         run: go mod download
         working-directory: ${{ matrix.module }}
       - name: Compile
-        if: needs.file-check.outputs.run == 'true'
         run: |
           CGO_ENABLED=0 go build -o /tmp/go-test-build ${{ matrix.build_target }}
           /tmp/go-test-build --help || true
         working-directory: ${{ matrix.module }}
       - name: Go fmt
-        if: needs.file-check.outputs.run == 'true'
         run: |
           go fmt ./... | tee modified-files
           [ "$(wc -l modified-files | cut -f 1 -d ' ')" -eq 0 ] || exit 1
         working-directory: ${{ matrix.module }}
       - name: Go vet
-        if: needs.file-check.outputs.run == 'true'
         run: go vet ./...
         working-directory: ${{ matrix.module }}
       - name: Set up gotestfmt
-        if: needs.file-check.outputs.run == 'true'
         uses: GoTestTools/gotestfmt-action@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.0.0
       - name: Go test
-        if: needs.file-check.outputs.run == 'true'
         run: |
           set -euo pipefail
           go test -json ./... -race -count=1 2>&1 | gotestfmt -hide all
@@ -131,7 +75,6 @@ jobs:
     name: Go build tests
     runs-on: ubuntu-latest
     needs:
-      - file-check
       - matrix
     strategy:
       fail-fast: false
@@ -147,14 +90,12 @@ jobs:
     steps:
       - name: Skip Check
         id: skip
-        if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
       - name: Install Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.version }}
       - name: Checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -163,11 +104,9 @@ jobs:
           echo "GOOS=$(echo "${{ matrix.platform }}" | cut -f 1 -d '/')" >> "${GITHUB_ENV}"
           echo "GOARCH=$(echo "${{ matrix.platform }}" | cut -f 2 -d '/')" >> "${GITHUB_ENV}"
       - name: Go mod download
-        if: needs.file-check.outputs.run == 'true'
         run: go mod download
         working-directory: ${{ matrix.module }}
       - name: Compile
-        if: needs.file-check.outputs.run == 'true'
         run: |
           CGO_ENABLED=0 go build -o /tmp/go-test-build ${{ matrix.build_target }}
         working-directory: ${{ matrix.module }}
