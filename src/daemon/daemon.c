@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "sentry-native/sentry-native.h"
 #include <sched.h>
 
 char *pidfile = NULL;
@@ -32,8 +33,9 @@ static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t
     closedir(dir);
 }
 
-static void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool recursive)
-{
+static void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool recursive) {
+    if(!dir || !*dir) return;
+
     if (chown(dir, uid, gid) == -1)
         netdata_log_error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
 

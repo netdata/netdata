@@ -5,7 +5,13 @@
 
 #include "sentry.h"
 
+static char sentry_path[FILENAME_MAX] = "";
+
 bool nd_sentry_crash_report_enabled = true;
+
+const char *nd_sentry_path(void) {
+    return sentry_path;
+}
 
 void nd_sentry_crash_report(bool enable) {
     nd_sentry_crash_report_enabled = enable;
@@ -45,12 +51,11 @@ void nd_sentry_init(void)
         return;
 
     // path where sentry should save stuff
-    char path[FILENAME_MAX];
-    snprintfz(path, FILENAME_MAX - 1, "%s/.sentry-native", netdata_configured_cache_dir);
+    snprintfz(sentry_path, FILENAME_MAX - 1, "%s/.sentry-native", netdata_configured_cache_dir);
 
     sentry_options_t *options = sentry_options_new();
     sentry_options_set_dsn(options, NETDATA_SENTRY_DSN);
-    sentry_options_set_database_path(options, path);
+    sentry_options_set_database_path(options, sentry_path);
     sentry_options_set_environment(options, NETDATA_SENTRY_ENVIRONMENT);
 
     if(NETDATA_VERSION[0] == 'v')
@@ -76,7 +81,9 @@ void nd_sentry_init(void)
     sentry_options_set_on_crash(options, nd_sentry_on_crash, NULL);
     sentry_options_set_before_send(options, nd_sentry_before_send, NULL);
 
+    nd_cleanup_fatal_signals();
     sentry_init(options);
+    nd_initialize_signals(true);
 }
 
 void nd_sentry_fini(void)

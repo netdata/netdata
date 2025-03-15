@@ -1230,22 +1230,22 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
 
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag());
 
-    if(!session_status.fatal.filename[0] && filename)
+    if(filename && *filename)
         strncpyz(session_status.fatal.filename, filename, sizeof(session_status.fatal.filename) - 1);
 
-    if(!session_status.fatal.function[0] && function)
+    if(function && *function)
         strncpyz(session_status.fatal.function, function, sizeof(session_status.fatal.function) - 1);
 
-    if(!session_status.fatal.message[0] && message)
+    if(message && *message)
         strncpyz(session_status.fatal.message, message, sizeof(session_status.fatal.message) - 1);
 
-    if(!session_status.fatal.errno_str[0] && errno_str)
+    if(errno_str && *errno_str)
         strncpyz(session_status.fatal.errno_str, errno_str, sizeof(session_status.fatal.errno_str) - 1);
 
-    if(stack_trace_is_empty(&session_status) && stack_trace)
+    if(stack_trace && *stack_trace && stack_trace_is_empty(&session_status))
         strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
 
-    if(!session_status.fatal.line)
+    if(line)
         session_status.fatal.line = line;
 
     spinlock_unlock(&session_status.fatal.spinlock);

@@ -8,6 +8,8 @@
 void nd_sentry_init(void);
 void nd_sentry_fini(void);
 
+const char *nd_sentry_path(void);
+
 void nd_sentry_set_user(const char *guid);
 void nd_sentry_add_breadcrumb(const char *message);
 
