@@ -209,11 +209,11 @@ void SIGNAL_CODE_2str_h(SIGNAL_CODE code, char *buf, size_t size) {
     strncpyz(buf, signo_str, size - 1);
     size_t len = strlen(buf);
 
-    if(size - len - 1 > 0)
+    if(size - 1 > len)
         buf[len++] = '/';
 
-    if(size - len - 1 > 0)
-        strncpyz(&buf[len], si_code_str, size - len - 1);
+    if(size -1 > len)
+        strncpyz(&buf[len], si_code_str, size - 1 - len);
 
     buf[size - 1] = '\0';
 }
