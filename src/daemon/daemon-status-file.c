@@ -1229,6 +1229,7 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     spinlock_lock(&session_status.fatal.spinlock);
 
     exit_initiated_add(EXIT_REASON_FATAL);
+    session_status.exit_reason |= EXIT_REASON_FATAL;
 
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag());
 
