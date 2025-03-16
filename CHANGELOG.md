@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- make sure the daemon status hash does not depend on random bytes [\#19874](https://github.com/netdata/netdata/pull/19874) ([ktsaou](https://github.com/ktsaou))
+- add the fatal to the exit reasons [\#19873](https://github.com/netdata/netdata/pull/19873) ([ktsaou](https://github.com/ktsaou))
+- sentry events annotations [\#19872](https://github.com/netdata/netdata/pull/19872) ([ktsaou](https://github.com/ktsaou))
+- Remove tj-actions/changed-files from CI jobs. [\#19870](https://github.com/netdata/netdata/pull/19870) ([Ferroin](https://github.com/Ferroin))
+- daemon status file 17 [\#19869](https://github.com/netdata/netdata/pull/19869) ([ktsaou](https://github.com/ktsaou))
 - fixed sentry version [\#19868](https://github.com/netdata/netdata/pull/19868) ([ktsaou](https://github.com/ktsaou))
 - fixed sentry dedup [\#19867](https://github.com/netdata/netdata/pull/19867) ([ktsaou](https://github.com/ktsaou))
 - fix\(freebsd.plugin\): correct disks/network devices charts [\#19866](https://github.com/netdata/netdata/pull/19866) ([ilyam8](https://github.com/ilyam8))
@@ -476,9 +481,6 @@
 - Abort on fatal and report system available bytes on allocation failures. [\#19332](https://github.com/netdata/netdata/pull/19332) ([vkalintiris](https://github.com/vkalintiris))
 - Add instructions for Docker Compose [\#19331](https://github.com/netdata/netdata/pull/19331) ([enoch85](https://github.com/enoch85))
 - build\(deps\): bump golang.org/x/net from 0.33.0 to 0.34.0 in /src/go [\#19330](https://github.com/netdata/netdata/pull/19330) ([dependabot[bot]](https://github.com/apps/dependabot))
-- FD Leaks Fix [\#19327](https://github.com/netdata/netdata/pull/19327) ([ktsaou](https://github.com/ktsaou))
-- feat\(go.d.plugin\): add YugabyteDB collector [\#19325](https://github.com/netdata/netdata/pull/19325) ([ilyam8](https://github.com/ilyam8))
-- fix\(kickstart.sh\): correct wrong function name in perpare\_offline\_install [\#19323](https://github.com/netdata/netdata/pull/19323) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
