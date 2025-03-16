@@ -1308,14 +1308,12 @@ static void daemon_status_file_out_of_memory(void) {
 
     // DO NOT ALLOCATE IN THIS FUNCTION - WE DON'T HAVE ANY MEMORY AVAILABLE!
 
-    exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
-
     // the buffer should already be allocated, so this should normally do nothing
     static_save_buffer_init();
 
     dsf_acquire(session_status);
-    session_status.exit_reason = exit_initiated;
-
+    exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
+    session_status.exit_reason |= EXIT_REASON_OUT_OF_MEMORY;
     dsf_release(session_status);
 
     daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
@@ -1329,6 +1327,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
     dsf_acquire(session_status);
 
+    exit_initiated_add(reason);
     session_status.exit_reason |= reason;
     session_status.fatal.sentry = chained_handler;
 
