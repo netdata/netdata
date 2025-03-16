@@ -62,7 +62,6 @@ typedef enum {
         | EXIT_REASON_SIGSEGV           \
         | EXIT_REASON_SIGFPE            \
         | EXIT_REASON_SIGILL            \
-        | EXIT_REASON_SIGABRT           \
         | EXIT_REASON_SIGSYS            \
         | EXIT_REASON_SIGXCPU           \
         | EXIT_REASON_SIGXFSZ           \
@@ -71,7 +70,9 @@ typedef enum {
 #define EXIT_REASON_ABNORMAL            \
     (                                   \
           EXIT_REASON_DEADLY_SIGNAL     \
+        | EXIT_REASON_SIGABRT           \
         | EXIT_REASON_FATAL             \
+        | EXIT_REASON_ALREADY_RUNNING   \
         | EXIT_REASON_OUT_OF_MEMORY     \
     )
 
