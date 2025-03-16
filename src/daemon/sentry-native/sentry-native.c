@@ -17,33 +17,82 @@ void nd_sentry_crash_report(bool enable) {
     nd_sentry_crash_report_enabled = enable;
 }
 
-static sentry_value_t nd_sentry_on_crash(
-    const sentry_ucontext_t *uctx __maybe_unused,   // provides the user-space context of the crash
-    sentry_value_t event,                           // used the same way as in `before_send`
-    void *closure __maybe_unused                    // user-data that you can provide at configuration time
-) {
+// --------------------------------------------------------------------------------------------------------------------
+// helpers
+
+static void nd_sentry_set_tag(const char *key, const char *value) {
+    if (!value || !*value)
+        return;
+
+    sentry_set_tag(key, value);
+}
+
+static void nd_sentry_set_tag_int64(const char *key, int64_t value) {
+    if(!value)
+        return;
+
+    char buf[UINT64_MAX_LENGTH];
+    print_int64(buf, value);
+    nd_sentry_set_tag(key, buf);
+}
+
+static void nd_sentry_set_tag_uuid(const char *key, const ND_UUID uuid) {
+    if(UUIDiszero(uuid))
+        return;
+
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower(uuid.uuid, uuid_str);
+    nd_sentry_set_tag(key, uuid_str);
+}
+
+static void nd_sentry_set_tag_uuid_compact(const char *key, const ND_UUID uuid) {
+    if(UUIDiszero(uuid))
+        return;
+
+    char uuid_str[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(uuid.uuid, uuid_str);
+    nd_sentry_set_tag(key, uuid_str);
+}
+
+static void nd_sentry_set_tag_uptime(void) {
+    nd_sentry_set_tag_int64("uptime", now_realtime_sec() - netdata_start_time);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// sentry hooks
+
+static sentry_value_t nd_sentry_on_hook(sentry_value_t event) {
     // IMPORTANT: this function is called from a signal handler
+
+    // sentry enables a custom allocator for their use,
+    // that is async signal safe, so the sentry API is available here.
 
     if (!nd_sentry_crash_report_enabled) {
         sentry_value_decref(event);
         return sentry_value_new_null();
     }
 
+    nd_sentry_set_tag_uptime();
+
     return event;
+}
+
+static sentry_value_t nd_sentry_on_crash(
+    const sentry_ucontext_t *uctx __maybe_unused,   // provides the user-space context of the crash
+    sentry_value_t event,                           // used the same way as in `before_send`
+    void *closure __maybe_unused) {                 // user-data that you can provide at configuration time
+    return nd_sentry_on_hook(event);
 }
 
 static sentry_value_t nd_sentry_before_send(
     sentry_value_t event,
     void *hint __maybe_unused,
     void *closure __maybe_unused) {
-
-    if (!nd_sentry_crash_report_enabled) {
-        sentry_value_decref(event);
-        return sentry_value_new_null();
-    }
-
-    return event;
+    return nd_sentry_on_hook(event);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// sentry initialization
 
 void nd_sentry_init(void) {
     if (!analytics_check_enabled())
@@ -76,40 +125,35 @@ void nd_sentry_init(void) {
     // ----------------------------------------------------------------------------------------------------------------
     // initialization
 
-    nd_cleanup_fatal_signals();
+    nd_cleanup_deadly_signals(); // remove our signal handlers, so that sentry will not hook back to us
     sentry_init(options);
-    nd_initialize_signals(true);
+    nd_initialize_signals(true); // add our signal handlers, we will hook back to sentry
 
     // ----------------------------------------------------------------------------------------------------------------
     // tags
 
-    sentry_set_tag("install_type", daemon_status_file_get_install_type());
-    sentry_set_tag("architecture", daemon_status_file_get_architecture());
-    sentry_set_tag("virtualization", daemon_status_file_get_virtualization());
-    sentry_set_tag("container", daemon_status_file_get_container());
-    sentry_set_tag("os_name", daemon_status_file_get_os_name());
-    sentry_set_tag("os_version", daemon_status_file_get_os_version());
-    sentry_set_tag("os_id", daemon_status_file_get_os_id());
-    sentry_set_tag("os_id_like", daemon_status_file_get_os_id_like());
+    nd_sentry_set_tag("install_type", daemon_status_file_get_install_type());
+    nd_sentry_set_tag("architecture", daemon_status_file_get_architecture());
+    nd_sentry_set_tag("virtualization", daemon_status_file_get_virtualization());
+    nd_sentry_set_tag("container", daemon_status_file_get_container());
+    nd_sentry_set_tag("os_name", daemon_status_file_get_os_name());
+    nd_sentry_set_tag("os_version", daemon_status_file_get_os_version());
+    nd_sentry_set_tag("os_id", daemon_status_file_get_os_id());
+    nd_sentry_set_tag("os_id_like", daemon_status_file_get_os_id_like());
 
     // profile
     CLEAN_BUFFER *profile = buffer_create(0, NULL);
     ND_PROFILE_2buffer(profile, nd_profile_detect_and_configure(false), " ");
-    sentry_set_tag("profile", buffer_tostring(profile));
+    nd_sentry_set_tag("profile", buffer_tostring(profile));
 
     // db_mode
-    sentry_set_tag("db_mode", rrd_memory_mode_name(default_rrd_memory_mode));
+    nd_sentry_set_tag("db_mode", rrd_memory_mode_name(default_rrd_memory_mode));
 
     // db_tiers
-    char tiers[UINT64_MAX_LENGTH];
-    print_uint64(tiers, nd_profile.storage_tiers);
-    sentry_set_tag("db_tiers", tiers);
+    nd_sentry_set_tag_int64("db_tiers", (int64_t)nd_profile.storage_tiers);
 
-    // invocation_id
-    ND_UUID invocation_id = nd_log_get_invocation_id();
-    char invocation_str[UUID_STR_LEN];
-    uuid_unparse_lower(invocation_id.uuid, invocation_str);
-    sentry_set_tag("invocation_id", invocation_str);
+    // ephemeral_id
+    nd_sentry_set_tag_uuid_compact("ephemeral_id", nd_log_get_invocation_id());
 
     // agent_events_version
     sentry_set_tag("agent_events_version", TOSTRING(STATUS_FILE_VERSION));
@@ -128,6 +172,26 @@ void nd_sentry_set_user(const char *guid) {
     sentry_set_user(user);
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// sentry breadcrumbs
+
+static void nd_sentry_add_key_value_charp(sentry_value_t data, const char *key, const char *value) {
+    if (!value || !*value)
+        return;
+
+    sentry_value_set_by_key(data, key, sentry_value_new_string(value));
+}
+
+static void nd_sentry_add_key_value_int64(sentry_value_t data, const char *key, int64_t value) {
+    if (!value)
+        return;
+
+    char buf[UINT64_MAX_LENGTH];
+    print_int64(buf, value);
+
+    sentry_value_set_by_key(data, key, sentry_value_new_string(buf));
+}
+
 void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     if (!analytics_check_enabled())
         return;
@@ -135,6 +199,8 @@ void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     const char *function = daemon_status_file_get_fatal_function();
     if(!function || !*function)
         function = "unknown";
+
+    nd_sentry_set_tag_uptime();
 
     // Set the transaction name to the function where the error occurred
     // this should be low cardinality
@@ -146,16 +212,13 @@ void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     sentry_value_t crumb = sentry_value_new_breadcrumb("fatal", "fatal() event details");
 
     sentry_value_t data = sentry_value_new_object();
-    sentry_value_set_by_key(data, "message", sentry_value_new_string(daemon_status_file_get_fatal_message()));
-    sentry_value_set_by_key(data, "function", sentry_value_new_string(daemon_status_file_get_fatal_function()));
-    sentry_value_set_by_key(data, "filename", sentry_value_new_string(daemon_status_file_get_fatal_filename()));
-    sentry_value_set_by_key(data, "thread", sentry_value_new_string(daemon_status_file_get_fatal_thread()));
-
-    char line[UINT64_MAX_LENGTH];
-    print_uint64(line, daemon_status_file_get_fatal_line());
-    sentry_value_set_by_key(data, "line", sentry_value_new_string(line));
-    sentry_value_set_by_key(data, "errno", sentry_value_new_string(daemon_status_file_get_fatal_errno()));
-    sentry_value_set_by_key(data, "stack_trace", sentry_value_new_string(daemon_status_file_get_fatal_stack_trace()));
+    nd_sentry_add_key_value_charp(data, "message", daemon_status_file_get_fatal_message());
+    nd_sentry_add_key_value_charp(data, "function", daemon_status_file_get_fatal_function());
+    nd_sentry_add_key_value_charp(data, "filename", daemon_status_file_get_fatal_filename());
+    nd_sentry_add_key_value_charp(data, "thread", daemon_status_file_get_fatal_thread());
+    nd_sentry_add_key_value_int64(data, "line", daemon_status_file_get_fatal_line());
+    nd_sentry_add_key_value_charp(data, "errno", daemon_status_file_get_fatal_errno());
+    nd_sentry_add_key_value_charp(data, "stack_trace", daemon_status_file_get_fatal_stack_trace());
 
     sentry_value_set_by_key(crumb, "data", data);
     sentry_add_breadcrumb(crumb);

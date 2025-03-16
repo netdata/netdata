@@ -7,7 +7,7 @@
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
 
-#define STATUS_FILE_VERSION 17
+#define STATUS_FILE_VERSION 18
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -44,7 +44,8 @@ typedef struct daemon_status_file {
     time_t boottime;            // system boottime
     time_t uptime;              // netdata uptime
     usec_t timestamp_ut;        // the timestamp of the status file
-    size_t restarts;            // the number of times this agent has restarted
+    size_t restarts;            // the number of times this agent has restarted (ever)
+    ssize_t reliability;        // consecutive restarts: > 0 reliable, < 0 crashing
 
     ND_UUID boot_id;            // the boot id of the system
     ND_UUID invocation;         // the netdata invocation id generated the file

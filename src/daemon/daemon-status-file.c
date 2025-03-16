@@ -191,6 +191,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         if(ds->v >= 16)
             buffer_json_member_add_boolean(wb, "ND_sentry_available", ds->sentry_available); // custom
 
+        if(ds->v >= 18)
+            buffer_json_member_add_int64(wb, "ND_reliability", ds->reliability); // custom
+
         buffer_json_member_add_object(wb, "ND_timings"); // custom
         {
             buffer_json_member_add_time_t(wb, "init", ds->timings.init);
@@ -312,6 +315,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v14 = version >= 14 ? strict : false;
     bool required_v16 = version >= 16 ? strict : false;
     bool required_v17 = version >= 17 ? strict : false;
+    bool required_v18 = version >= 18 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -354,6 +358,8 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry_available", ds->sentry_available, error, required_v17);
         else if(version == 16)
             JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry", ds->sentry_available, error, required_v16);
+        if(version >= 18)
+            JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "ND_reliability", ds->reliability, error, required_v18);
     });
 
     // Parse host object
@@ -451,6 +457,83 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 // --------------------------------------------------------------------------------------------------------------------
 // get the current status
 
+static void daemon_status_file_migrate_once(void) {
+    FUNCTION_RUN_ONCE();
+
+    dsf_acquire(last_session_status);
+    dsf_acquire(session_status);
+
+    strncpyz(session_status.version, NETDATA_VERSION, sizeof(session_status.version) - 1);
+    session_status.machine_id = os_machine_id();
+
+    {
+        char *install_type = NULL, *prebuilt_arch = NULL, *prebuilt_dist = NULL;
+        get_install_type_internal(&install_type, &prebuilt_arch, &prebuilt_dist);
+
+        if(install_type)
+            strncpyz(session_status.install_type, install_type, sizeof(session_status.install_type) - 1);
+
+        freez(prebuilt_arch);
+        freez(prebuilt_dist);
+        freez(install_type);
+    }
+
+#if defined(ENABLE_SENTRY)
+    session_status.sentry_available = true;
+#else
+    session_status.sentry_available = false;
+#endif
+
+    session_status.boot_id = os_boot_id();
+    if(!UUIDeq(session_status.boot_id, last_session_status.boot_id) && os_boot_ids_match(session_status.boot_id, last_session_status.boot_id)) {
+        // there is a slight difference in boot_id, but it is still the same boot
+        // copy the last boot_id
+        session_status.boot_id = last_session_status.boot_id;
+    }
+
+    session_status.claim_id = last_session_status.claim_id;
+    session_status.node_id = last_session_status.node_id;
+    session_status.host_id = last_session_status.host_id;
+    if(UUIDiszero(session_status.host_id)) {
+        const char *machine_guid = registry_get_this_machine_guid(false);
+        if(machine_guid && *machine_guid) {
+            if (uuid_parse_flexi(machine_guid, session_status.host_id.uuid) != 0)
+                session_status.host_id = UUID_ZERO;
+        }
+    }
+
+    strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
+    strncpyz(session_status.virtualization, last_session_status.virtualization, sizeof(session_status.virtualization) - 1);
+    strncpyz(session_status.container, last_session_status.container, sizeof(session_status.container) - 1);
+    strncpyz(session_status.kernel_version, last_session_status.kernel_version, sizeof(session_status.kernel_version) - 1);
+    strncpyz(session_status.os_name, last_session_status.os_name, sizeof(session_status.os_name) - 1);
+    strncpyz(session_status.os_version, last_session_status.os_version, sizeof(session_status.os_version) - 1);
+    strncpyz(session_status.os_id, last_session_status.os_id, sizeof(session_status.os_id) - 1);
+    strncpyz(session_status.os_id_like, last_session_status.os_id_like, sizeof(session_status.os_id_like) - 1);
+
+    session_status.restarts = last_session_status.restarts + 1;
+    session_status.reliability = last_session_status.reliability;
+
+    bool crashed = last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED;
+    bool exited_with_fatal = last_session_status.status == DAEMON_STATUS_EXITED && last_session_status.exit_reason != EXIT_REASON_NONE && !is_exit_reason_normal(last_session_status.exit_reason);
+    if(crashed || exited_with_fatal) {
+        if(session_status.reliability > 0) session_status.reliability = 0;
+        session_status.reliability--;
+    }
+    else {
+        if(session_status.reliability < 0) session_status.reliability = 0;
+        session_status.reliability++;
+    }
+
+    if(last_session_status.v == STATUS_FILE_VERSION) {
+        for (size_t i = 0; i < _countof(session_status.dedup.slot); i++)
+            session_status.dedup.slot[i] = last_session_status.dedup.slot[i];
+    }
+
+    dsf_release(last_session_status);
+    dsf_release(session_status);
+}
+
 static void daemon_status_file_refresh(DAEMON_STATUS status) {
     usec_t now_ut = now_realtime_usec();
 
@@ -479,15 +562,6 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(session_status.status == DAEMON_STATUS_EXITING)
         session_status.timings.exit = (time_t)((now_ut - session_status.timings.exit_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
-    strncpyz(session_status.version, NETDATA_VERSION, sizeof(session_status.version) - 1);
-
-    session_status.boot_id = os_boot_id();
-    if(!UUIDeq(session_status.boot_id, last_session_status.boot_id) && os_boot_ids_match(session_status.boot_id, last_session_status.boot_id)) {
-        // there is a slight difference in boot_id, but it is still the same boot
-        // copy the last boot_id
-        session_status.boot_id = last_session_status.boot_id;
-    }
-
     session_status.boottime = now_boottime_sec();
     session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
@@ -495,76 +569,14 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
 
-#if defined(ENABLE_SENTRY)
-    session_status.sentry_available = true;
-#else
-    session_status.sentry_available = false;
-#endif
-
     session_status.claim_id = claim_id_get_uuid();
 
     if(localhost) {
-        session_status.host_id = localhost->host_id;
-        session_status.node_id = localhost->node_id;
-    }
-    else if(!UUIDiszero(last_session_status.host_id))
-        session_status.host_id = last_session_status.host_id;
-    else {
-        const char *machine_guid = registry_get_this_machine_guid(false);
-        if(machine_guid && *machine_guid) {
-            if (uuid_parse_flexi(machine_guid, session_status.host_id.uuid) != 0)
-                session_status.host_id = UUID_ZERO;
-        }
-        else
-            session_status.host_id = UUID_ZERO;
-    }
+        if(!UUIDiszero(localhost->host_id))
+            session_status.host_id = localhost->host_id;
 
-    if(UUIDiszero(session_status.machine_id))
-        session_status.machine_id = os_machine_id();
-
-    // copy items from the old status if they are not set
-    if(UUIDiszero(session_status.claim_id))
-        session_status.claim_id = last_session_status.claim_id;
-    if(UUIDiszero(session_status.node_id))
-        session_status.node_id = last_session_status.node_id;
-    if(UUIDiszero(session_status.host_id))
-        session_status.host_id = last_session_status.host_id;
-    if(!session_status.architecture[0] && last_session_status.architecture[0])
-        strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
-    if(!session_status.virtualization[0] && last_session_status.virtualization[0])
-        strncpyz(session_status.virtualization, last_session_status.virtualization, sizeof(session_status.virtualization) - 1);
-    if(!session_status.container[0] && last_session_status.container[0])
-        strncpyz(session_status.container, last_session_status.container, sizeof(session_status.container) - 1);
-    if(!session_status.kernel_version[0] && last_session_status.kernel_version[0])
-        strncpyz(session_status.kernel_version, last_session_status.kernel_version, sizeof(session_status.kernel_version) - 1);
-    if(!session_status.os_name[0] && last_session_status.os_name[0])
-        strncpyz(session_status.os_name, last_session_status.os_name, sizeof(session_status.os_name) - 1);
-    if(!session_status.os_version[0] && last_session_status.os_version[0])
-        strncpyz(session_status.os_version, last_session_status.os_version, sizeof(session_status.os_version) - 1);
-    if(!session_status.os_id[0] && last_session_status.os_id[0])
-        strncpyz(session_status.os_id, last_session_status.os_id, sizeof(session_status.os_id) - 1);
-    if(!session_status.os_id_like[0] && last_session_status.os_id_like[0])
-        strncpyz(session_status.os_id_like, last_session_status.os_id_like, sizeof(session_status.os_id_like) - 1);
-    if(!session_status.restarts)
-        session_status.restarts = last_session_status.restarts + 1;
-
-    if(last_session_status.v == STATUS_FILE_VERSION) {
-        if (!session_status.dedup.slot[0].timestamp_ut || !session_status.dedup.slot[0].hash) {
-            for (size_t i = 0; i < _countof(session_status.dedup.slot); i++)
-                session_status.dedup.slot[i] = last_session_status.dedup.slot[i];
-        }
-    }
-
-    if(!session_status.install_type[0]) {
-        char *install_type = NULL, *prebuilt_arch = NULL, *prebuilt_dist = NULL;
-        get_install_type_internal(&install_type, &prebuilt_arch, &prebuilt_dist);
-
-        if(install_type)
-            strncpyz(session_status.install_type, install_type, sizeof(session_status.install_type) - 1);
-
-        freez(prebuilt_arch);
-        freez(prebuilt_dist);
-        freez(install_type);
+        if(!UUIDiszero(localhost->node_id))
+            session_status.node_id = localhost->node_id;
     }
 
     get_daemon_status_fields_from_system_info(&session_status);
@@ -992,6 +1004,7 @@ void daemon_status_file_init(void) {
     static_save_buffer_init();
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
     daemon_status_file_load(&last_session_status);
+    daemon_status_file_migrate_once();
 }
 
 void daemon_status_file_check_crash(void) {
@@ -1308,14 +1321,12 @@ static void daemon_status_file_out_of_memory(void) {
 
     // DO NOT ALLOCATE IN THIS FUNCTION - WE DON'T HAVE ANY MEMORY AVAILABLE!
 
-    exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
-
     // the buffer should already be allocated, so this should normally do nothing
     static_save_buffer_init();
 
     dsf_acquire(session_status);
-    session_status.exit_reason = exit_initiated;
-
+    exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
+    session_status.exit_reason |= EXIT_REASON_OUT_OF_MEMORY;
     dsf_release(session_status);
 
     daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
@@ -1329,6 +1340,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
     dsf_acquire(session_status);
 
+    exit_initiated_add(reason);
     session_status.exit_reason |= reason;
     session_status.fatal.sentry = chained_handler;
 
