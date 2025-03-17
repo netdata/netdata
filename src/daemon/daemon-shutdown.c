@@ -304,6 +304,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
         metadata_sync_shutdown_background_wait();
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
+    health_shutdown();
 
     // Don't register a shutdown event if we crashed
     if (!ret)

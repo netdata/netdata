@@ -45,14 +45,6 @@ const char *database_config[] = {
 
     "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created)",
 
-    "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
-    "on_key text, class text, component text, type text, os text, hosts text, lookup text, "
-    "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
-    "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
-    "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
-    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text, "
-    "summary text, time_group_condition INT, time_group_value DOUBLE, dims_group INT, data_source INT)",
-
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key))",
 
@@ -62,40 +54,11 @@ const char *database_config[] = {
     "CREATE TRIGGER IF NOT EXISTS ins_host AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created)"
     " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END",
 
-    "CREATE TABLE IF NOT EXISTS health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, "
-    "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "
-    "chart_context text, last_transition_id blob, chart_name text, UNIQUE (host_id, alarm_id))",
-
-    "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, "
-    "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
-    "flags int, exec_run_timestamp int, delay_up_to_timestamp int, "
-    "info text, exec_code int, new_status real, old_status real, delay int, "
-    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text)",
-
     "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id)",
     "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_9 ON health_log_detail (unique_id DESC, health_log_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_6 on health_log_detail (health_log_id, when_key)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
 
     "CREATE TABLE IF NOT EXISTS agent_event_log (id INTEGER PRIMARY KEY, version TEXT, event_type INT, value, date_created INT)",
     "CREATE INDEX IF NOT EXISTS idx_agent_event_log1 on agent_event_log (event_type)",
-
-    "CREATE TABLE IF NOT EXISTS alert_queue "
-    " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
-    " UNIQUE(host_id, health_log_id, alarm_id))",
-
-    "CREATE INDEX IF NOT EXISTS ind_alert_queue1 ON alert_queue(host_id, date_scheduled)",
-
-    "CREATE TABLE IF NOT EXISTS alert_version (health_log_id INTEGER PRIMARY KEY, unique_id INT, status INT, "
-    "version INT, date_submitted INT)",
-
-    "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
-    "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
 
     "CREATE TABLE IF NOT EXISTS ctx_metadata_cleanup (id INTEGER PRIMARY KEY, host_id BLOB, context TEXT NOT NULL, date_created INT NOT NULL, "
     "UNIQUE (host_id, context))",
@@ -177,7 +140,6 @@ sqlite3 *db_meta = NULL;
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_REPEAT (60)            // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_MAINTENANCE_CTX_CLEAN_REPEAT (300) // Repeat if last run for dimensions, charts, labels needs more work
-#define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
 #define METADATA_LABEL_CHECK_INTERVAL (3600)        // Repeat maintenance for labels
 #define METADATA_RUNTIME_THRESHOLD (5)              // Run time threshold for cleanup task
 
@@ -196,8 +158,6 @@ enum metadata_opcode {
     METADATA_SCAN_HOSTS,
     METADATA_LOAD_HOST_CONTEXT,
     METADATA_DELETE_HOST_CHART_LABELS,
-    METADATA_ADD_HOST_AE,
-    METADATA_DEL_HOST_AE,
     METADATA_ADD_CTX_CLEANUP,
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
@@ -226,7 +186,6 @@ struct metadata_wc {
     uv_async_t async;
     uv_timer_t timer_req;
     time_t metadata_check_after;
-    Pvoid_t ae_DelJudyL;
     METADATA_FLAG flags;
     struct completion start_stop_complete;
     struct completion *scan_complete;
@@ -661,49 +620,6 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
         (void) sqlite3_close(database);
 }
 
-
-static void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
-{
-    nd_uuid_t  uuid;
-
-    if ( argc != 1 ){
-        sqlite3_result_null(context);
-        return ;
-    }
-    int rc = uuid_parse((const char *) sqlite3_value_text(argv[0]), uuid);
-    if (rc == -1)  {
-        sqlite3_result_null(context);
-        return ;
-    }
-
-    sqlite3_result_blob(context, &uuid, sizeof(nd_uuid_t), SQLITE_TRANSIENT);
-}
-
-void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv)
-{
-    if (argc != 1 ){
-        sqlite3_result_null(context);
-        return ;
-    }
-
-    if (sqlite3_value_int(argv[0]) != 0) {
-        struct timespec req = {.tv_sec = 0, .tv_nsec = 1};
-        nanosleep(&req, NULL);
-    }
-
-    sqlite3_result_int64(context, (sqlite_int64) now_realtime_usec());
-}
-
-void sqlite_uuid_random(sqlite3_context *context, int argc, sqlite3_value **argv)
-{
-    (void)argc;
-    (void)argv;
-
-    nd_uuid_t uuid;
-    uuid_generate_random(uuid);
-    sqlite3_result_blob(context, &uuid, sizeof(nd_uuid_t), SQLITE_TRANSIENT);
-}
-
 static int64_t sql_get_wal_size(const char *database_file)
 {
     char filename[FILENAME_MAX + 1];
@@ -810,17 +726,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     errno_clear();
     netdata_log_info("SQLite database %s initialization", sqlite_database);
 
-    rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to register internal u2h function");
-
-    rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to register internal now_usec function");
-
-    rc = sqlite3_create_function(db_meta, "uuid_random", 0, SQLITE_ANY, 0, sqlite_uuid_random, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to register internal uuid_random function");
+    create_user_database_functions(db_meta);
 
     int target_version = DB_METADATA_VERSION;
 
@@ -1522,42 +1428,6 @@ static bool check_label_metadata(struct metadata_wc *wc)
     return false;
 }
 
-static void cleanup_health_log(struct metadata_wc *wc)
-{
-    static time_t next_execution_t = 0;
-
-    time_t now = now_realtime_sec();
-
-    if (!next_execution_t)
-        next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
-
-    if (next_execution_t && next_execution_t > now)
-        return;
-
-    next_execution_t = now + METADATA_HEALTH_LOG_INTERVAL;
-
-    RRDHOST *host;
-    worker_is_busy(UV_EVENT_HEALTH_LOG_CLEANUP);
-
-    dfe_start_reentrant(rrdhost_root_index, host)
-    {
-        sql_health_alarm_log_cleanup(host);
-        if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
-            break;
-    }
-    dfe_done(host);
-
-    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))) {
-        worker_is_idle();
-        return;
-    }
-
-    (void) db_execute(db_meta,"DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)");
-    (void) db_execute(db_meta,"DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
-    (void) db_execute(db_meta,"DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
-    worker_is_idle();
-}
-
 //
 // EVENT LOOP STARTS HERE
 //
@@ -1805,8 +1675,6 @@ void run_metadata_cleanup(struct metadata_wc *wc)
         if (check_chart_metadata(wc))
             check_label_metadata(wc);
 
-    cleanup_health_log(wc);
-
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
        return;
 
@@ -1818,7 +1686,6 @@ void run_metadata_cleanup(struct metadata_wc *wc)
 struct scan_metadata_payload {
     uv_work_t request;
     struct metadata_wc *wc;
-    void *pending_alert_list;
     void *pending_ctx_cleanup_list;
     void *pending_uuid_deletion;
     BUFFER *work_buffer;
@@ -2029,19 +1896,6 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     struct scan_metadata_payload *data = req->data;
     struct metadata_wc *wc = data->wc;
 
-    bool first = true;
-    Word_t Index = 0;
-    Pvoid_t *Pvalue;
-    while ((Pvalue = JudyLFirstThenNext(wc->ae_DelJudyL, &Index, &first))) {
-        ALARM_ENTRY *ae = (ALARM_ENTRY *) Index;
-        if(!__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED)) {
-            health_alarm_log_free_one_nochecks_nounlink(ae);
-            (void) JudyLDel(&wc->ae_DelJudyL, Index, PJE0);
-            first = true;
-            Index = 0;
-        }
-    }
-
     metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
 
     if (unlikely(wc->scan_complete))
@@ -2169,11 +2023,6 @@ static void store_host_and_system_info(RRDHOST *host, size_t *query_counter)
     }
 }
 
-struct judy_list_t {
-    Pvoid_t JudyL;
-    Word_t count;
-};
-
 static void do_pending_uuid_deletion(struct metadata_wc *wc, struct judy_list_t *pending_uuid_deletion)
 {
     if (!pending_uuid_deletion)
@@ -2247,44 +2096,6 @@ static void store_ctx_cleanup_list(struct metadata_wc *wc, struct judy_list_t *p
     nd_log_daemon(
         NDLP_DEBUG,
         "Stored %zu host context cleanup items in %0.2f ms",
-        entries,
-        (double)(ended_ut - started_ut) / USEC_PER_MS);
-
-    worker_is_idle();
-}
-
-static void store_alert_transitions(struct judy_list_t *pending_alert_list)
-{
-    if (!pending_alert_list)
-        return;
-
-    worker_is_busy(UV_EVENT_STORE_ALERT_TRANSITIONS);
-
-    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
-
-    size_t entries = pending_alert_list->count;
-    Word_t Index = 0;
-    bool first = true;
-    Pvoid_t *Pvalue;
-    while ((Pvalue = JudyLFirstThenNext(pending_alert_list->JudyL, &Index, &first))) {
-        RRDHOST *host = *Pvalue;
-
-        Pvalue = JudyLGet(pending_alert_list->JudyL, ++Index, PJE0);
-        ALARM_ENTRY *ae = *Pvalue;
-
-        sql_health_alarm_log_save(host, ae);
-
-        __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&host->health.pending_transitions, -1, __ATOMIC_RELAXED);
-    }
-    (void) JudyLFreeArray(&pending_alert_list->JudyL, PJE0);
-    freez(pending_alert_list);
-
-    usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
-    nd_log(
-        NDLS_DAEMON,
-        NDLP_DEBUG,
-        "Stored and processed %zu alert transitions in %0.2f ms",
         entries,
         (double)(ended_ut - started_ut) / USEC_PER_MS);
 
@@ -2370,7 +2181,6 @@ static void start_metadata_hosts(uv_work_t *req)
     BUFFER *work_buffer = data->work_buffer;
     usec_t all_started_ut = now_monotonic_usec();
 
-    store_alert_transitions((struct judy_list_t *)data->pending_alert_list);
     store_ctx_cleanup_list(wc, (struct judy_list_t *)data->pending_ctx_cleanup_list);
 
     worker_is_busy(UV_EVENT_METADATA_STORE);
@@ -2435,8 +2245,6 @@ static void metadata_event_loop(void *arg)
     worker_register_job_name(METADATA_ADD_CTX_CLEANUP, "host ctx cleanup");
     worker_register_job_name(METADATA_SCAN_HOSTS, "host metadata store");
     worker_register_job_name(METADATA_LOAD_HOST_CONTEXT, "host load context");
-    worker_register_job_name(METADATA_ADD_HOST_AE, "add host alert entry");
-    worker_register_job_name(METADATA_DEL_HOST_AE, "delete host alert entry");
 
     int ret;
     unsigned cmd_batch_size;
@@ -2483,14 +2291,11 @@ static void metadata_event_loop(void *arg)
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     struct scan_metadata_payload *data;
     Pvoid_t *Pvalue;
-    struct judy_list_t *pending_ae_list = NULL;
     struct judy_list_t *pending_ctx_cleanup_list = NULL;
     struct judy_list_t *pending_uuid_deletion = NULL;
 
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
         nd_uuid_t  *uuid;
-        RRDHOST *host = NULL;
-        ALARM_ENTRY *ae = NULL;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -2562,12 +2367,10 @@ static void metadata_event_loop(void *arg)
                     data = mallocz(sizeof(*data));
                     data->request.data = data;
                     data->wc = wc;
-                    data->pending_alert_list = pending_ae_list;
                     data->pending_ctx_cleanup_list = pending_ctx_cleanup_list;
                     data->pending_uuid_deletion = pending_uuid_deletion;
 
                     data->work_buffer = work_buffer;
-                    pending_ae_list = NULL;
                     pending_ctx_cleanup_list = NULL;
                     pending_uuid_deletion = NULL;
 
@@ -2578,7 +2381,6 @@ static void metadata_event_loop(void *arg)
                     if (uv_queue_work(loop, &data->request, start_metadata_hosts, after_metadata_hosts)) {
                         // Failed to launch worker -- let the event loop handle completion
                         cmd.completion = wc->scan_complete;
-                        pending_ae_list = data->pending_alert_list;
                         pending_ctx_cleanup_list = data->pending_ctx_cleanup_list;
                         pending_uuid_deletion = data->pending_uuid_deletion;
                         freez(data);
@@ -2595,24 +2397,6 @@ static void metadata_event_loop(void *arg)
                     if (uv_queue_work(loop, &data->request, start_all_host_load_context, after_start_host_load_context)) {
                         freez(data);
                     }
-                    break;
-                case METADATA_ADD_HOST_AE:
-                    host = (RRDHOST *) cmd.param[0];
-                    ae = (ALARM_ENTRY *) cmd.param[1];
-
-                    if (!pending_ae_list)
-                        pending_ae_list = callocz(1, sizeof(*pending_ae_list));
-
-                    Pvalue = JudyLIns(&pending_ae_list->JudyL, ++pending_ae_list->count, PJE0);
-                    if (Pvalue)
-                        *Pvalue = (void *)host;
-
-                    Pvalue = JudyLIns(&pending_ae_list->JudyL, ++pending_ae_list->count, PJE0);
-                    if (Pvalue)
-                        *Pvalue = (void *)ae;
-                    break;
-                case METADATA_DEL_HOST_AE:
-                    (void) JudyLIns(&wc->ae_DelJudyL, (Word_t) (void *) cmd.param[0], PJE0);
                     break;
                 case METADATA_UNITTEST:;
                     struct thread_unittest *tu = (struct thread_unittest *) cmd.param[0];
@@ -2648,11 +2432,6 @@ static void metadata_event_loop(void *arg)
 
     Word_t Index;
     bool first;
-
-    if (pending_ae_list) {
-        (void)JudyLFreeArray(&pending_ae_list->JudyL, PJE0);
-        freez(pending_ae_list);
-    }
 
     if (pending_ctx_cleanup_list) {
         Index = 0;
@@ -2828,23 +2607,6 @@ void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context)
     ctx_cleanup->context = string_strdupz(context);
 
     queue_metadata_cmd(METADATA_ADD_CTX_CLEANUP, ctx_cleanup, NULL);
-}
-
-void metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae)
-{
-    if (unlikely(!metasync_worker.loop))
-        return;
-    __atomic_add_fetch(&host->health.pending_transitions, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
-    queue_metadata_cmd(METADATA_ADD_HOST_AE, host, ae);
-}
-
-void metadata_queue_ae_deletion(ALARM_ENTRY *ae)
-{
-    if (unlikely(!metasync_worker.loop))
-        return;
-
-    queue_metadata_cmd(METADATA_DEL_HOST_AE, ae, NULL);
 }
 
 void commit_alert_transitions(RRDHOST *host __maybe_unused)
