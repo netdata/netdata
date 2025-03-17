@@ -86,6 +86,9 @@ static void register_libuv_worker_jobs_internal(void) {
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
 
+    // make sure we have the right thread id
+    gettid_uncached();
+
     static int workers = 0;
     int worker_id = __atomic_add_fetch(&workers, 1, __ATOMIC_RELAXED);
 

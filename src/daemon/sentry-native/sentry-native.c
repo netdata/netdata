@@ -36,6 +36,15 @@ static void nd_sentry_set_tag_int64(const char *key, int64_t value) {
     nd_sentry_set_tag(key, buf);
 }
 
+static void nd_sentry_set_tag_uint64(const char *key, uint64_t value) {
+    if(!value)
+        return;
+
+    char buf[UINT64_MAX_LENGTH];
+    print_uint64(buf, value);
+    nd_sentry_set_tag(key, buf);
+}
+
 static void nd_sentry_set_tag_uuid(const char *key, const ND_UUID uuid) {
     if(UUIDiszero(uuid))
         return;
@@ -58,6 +67,10 @@ static void nd_sentry_set_tag_uptime(void) {
     nd_sentry_set_tag_int64("uptime", now_realtime_sec() - netdata_start_time);
 }
 
+static void nd_sentry_set_tag_status(void) {
+    nd_sentry_set_tag("status", DAEMON_STATUS_2str(daemon_status_file_get_status()));
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // sentry hooks
 
@@ -72,7 +85,10 @@ static sentry_value_t nd_sentry_on_hook(sentry_value_t event) {
         return sentry_value_new_null();
     }
 
+    nd_sentry_set_tag_status();
     nd_sentry_set_tag_uptime();
+    nd_sentry_set_tag("thread", daemon_status_file_get_fatal_thread());
+    nd_sentry_set_tag_uint64("thread_id", daemon_status_file_get_fatal_thread_id());
 
     return event;
 }
@@ -156,7 +172,10 @@ void nd_sentry_init(void) {
     nd_sentry_set_tag_uuid_compact("ephemeral_id", nd_log_get_invocation_id());
 
     // agent_events_version
-    sentry_set_tag("agent_events_version", TOSTRING(STATUS_FILE_VERSION));
+    nd_sentry_set_tag("agent_events_version", TOSTRING(STATUS_FILE_VERSION));
+
+    nd_sentry_set_tag_uint64("restarts", daemon_status_file_get_restarts());
+    nd_sentry_set_tag_int64("reliability", daemon_status_file_get_reliability());
 }
 
 void nd_sentry_fini(void) {
@@ -192,6 +211,16 @@ static void nd_sentry_add_key_value_int64(sentry_value_t data, const char *key, 
     sentry_value_set_by_key(data, key, sentry_value_new_string(buf));
 }
 
+static void nd_sentry_add_key_value_uint64(sentry_value_t data, const char *key, uint64_t value) {
+    if (!value)
+        return;
+
+    char buf[UINT64_MAX_LENGTH];
+    print_uint64(buf, value);
+
+    sentry_value_set_by_key(data, key, sentry_value_new_string(buf));
+}
+
 void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     if (!analytics_check_enabled())
         return;
@@ -216,9 +245,11 @@ void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     nd_sentry_add_key_value_charp(data, "function", daemon_status_file_get_fatal_function());
     nd_sentry_add_key_value_charp(data, "filename", daemon_status_file_get_fatal_filename());
     nd_sentry_add_key_value_charp(data, "thread", daemon_status_file_get_fatal_thread());
+    nd_sentry_add_key_value_uint64(data, "thread_id", daemon_status_file_get_fatal_thread_id());
     nd_sentry_add_key_value_int64(data, "line", daemon_status_file_get_fatal_line());
     nd_sentry_add_key_value_charp(data, "errno", daemon_status_file_get_fatal_errno());
     nd_sentry_add_key_value_charp(data, "stack_trace", daemon_status_file_get_fatal_stack_trace());
+    nd_sentry_add_key_value_charp(data, "status", DAEMON_STATUS_2str(daemon_status_file_get_status()));
 
     sentry_value_set_by_key(crumb, "data", data);
     sentry_add_breadcrumb(crumb);

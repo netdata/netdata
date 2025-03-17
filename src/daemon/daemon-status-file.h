@@ -84,6 +84,7 @@ typedef struct daemon_status_file {
         char message[512];
         char stack_trace[2048];
         char thread[ND_THREAD_TAG_MAX + 1];
+        pid_t thread_id;
         SIGNAL_CODE signal_code;
         bool sentry;        // true when the error was also reported to sentry
     } fatal;
@@ -130,6 +131,10 @@ const char *daemon_status_file_get_fatal_message(void);
 const char *daemon_status_file_get_fatal_errno(void);
 const char *daemon_status_file_get_fatal_stack_trace(void);
 const char *daemon_status_file_get_fatal_thread(void);
+pid_t daemon_status_file_get_fatal_thread_id(void);
 long daemon_status_file_get_fatal_line(void);
+DAEMON_STATUS daemon_status_file_get_status(void);
+size_t daemon_status_file_get_restarts(void);
+ssize_t daemon_status_file_get_reliability(void);
 
 #endif //NETDATA_DAEMON_STATUS_FILE_H

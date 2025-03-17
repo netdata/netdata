@@ -259,6 +259,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "message", ds->fatal.message);
         buffer_json_member_add_string_or_empty(wb, "errno", ds->fatal.errno_str);
         buffer_json_member_add_string_or_empty(wb, "thread", ds->fatal.thread);
+        buffer_json_member_add_uint64(wb, "thread_id", ds->fatal.thread_id);
         buffer_json_member_add_string_or_empty(wb, "stack_trace", ds->fatal.stack_trace);
 
         if(ds->v >= 16) {
@@ -414,12 +415,14 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "errno", ds->fatal.errno_str, error, required_v3);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "thread", ds->fatal.thread, error, required_v5);
 
-        if(version >= 16) {
+        if(version >= 16)
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "signal_code", SIGNAL_CODE_2id_h, ds->fatal.signal_code, error, required_v16);
-        }
-        if(version >= 17) {
+
+        if(version >= 17)
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "sentry", SIGNAL_CODE_2id_h, ds->fatal.sentry, error, required_v17);
-        }
+
+        if(version >= 18)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "thread_id", ds->fatal.thread_id, error, required_v18);
     });
 
     // Parse the last posted object
@@ -928,6 +931,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_string(wb, "message", d->msg); // ECS
     buffer_json_member_add_uint64(wb, "priority", d->priority); // custom
     buffer_json_member_add_uint64(wb, "version_saved", d->status->v); // custom
+    buffer_json_member_add_string(wb, "stack_traces", capture_stack_trace_backend()); // custom
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
@@ -1274,6 +1278,9 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     exit_initiated_add(EXIT_REASON_FATAL);
     session_status.exit_reason |= EXIT_REASON_FATAL;
 
+    if(!session_status.fatal.thread_id)
+        session_status.fatal.thread_id = gettid_cached();
+
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag());
 
     if(filename && *filename)
@@ -1349,6 +1356,9 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
     if(code)
         session_status.fatal.signal_code = code;
+
+    if(!session_status.fatal.thread_id)
+        session_status.fatal.thread_id = gettid_cached();
 
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag_async_safe());
 
@@ -1482,7 +1492,22 @@ const char *daemon_status_file_get_fatal_thread(void) {
     return session_status.fatal.thread;
 }
 
+pid_t daemon_status_file_get_fatal_thread_id(void) {
+    return session_status.fatal.thread_id;
+}
+
 long daemon_status_file_get_fatal_line(void) {
     return session_status.fatal.line;
 }
 
+DAEMON_STATUS daemon_status_file_get_status(void) {
+    return session_status.status;
+}
+
+size_t daemon_status_file_get_restarts(void) {
+    return session_status.restarts;
+}
+
+ssize_t daemon_status_file_get_reliability(void) {
+    return session_status.reliability;
+}
