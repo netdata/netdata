@@ -614,7 +614,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
     get_daemon_status_fields_from_system_info(&session_status);
 
-    session_status.exit_reason = exit_initiated;
+    session_status.exit_reason = exit_initiated_get();
     session_status.profile = nd_profile_detect_and_configure(false);
 
     if(status != DAEMON_STATUS_NONE)

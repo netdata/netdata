@@ -2,7 +2,7 @@
 
 #include "../libnetdata.h"
 
-volatile EXIT_REASON exit_initiated = EXIT_REASON_NONE;
+static volatile sig_atomic_t exit_initiated = EXIT_REASON_NONE;
 
 ENUM_STR_MAP_DEFINE(EXIT_REASON) = {
     { EXIT_REASON_SIGBUS, "signal-bus-error"},
@@ -108,15 +108,22 @@ void exit_initiated_init(void) {
         self = os_get_file_metadata(self_path);
 }
 
+ALWAYS_INLINE
+EXIT_REASON exit_initiated_get(void) {
+    return (EXIT_REASON)exit_initiated;
+}
+
 void exit_initiated_add(EXIT_REASON reason) {
-    exit_initiated |= reason;
+    exit_initiated |= (sig_atomic_t)reason;
 }
 
 void exit_initiated_set(EXIT_REASON reason) {
-    if(exit_initiated == EXIT_REASON_NONE && !(reason & EXIT_REASON_SYSTEM_SHUTDOWN) && is_system_shutdown())
+    EXIT_REASON old = exit_initiated_get();
+
+    if(old == EXIT_REASON_NONE && !(reason & EXIT_REASON_SYSTEM_SHUTDOWN) && is_system_shutdown())
         reason |= EXIT_REASON_SYSTEM_SHUTDOWN;
 
-    if(exit_initiated == EXIT_REASON_NONE && self_path && OS_FILE_METADATA_OK(self)) {
+    if(old == EXIT_REASON_NONE && self_path && OS_FILE_METADATA_OK(self)) {
         OS_FILE_METADATA self_now = os_get_file_metadata(self_path);
         if(OS_FILE_METADATA_OK(self_now) && (self_now.modified_time != self.modified_time || self_now.size_bytes != self.size_bytes))
             reason |= EXIT_REASON_UPDATE;
@@ -127,4 +134,3 @@ void exit_initiated_set(EXIT_REASON reason) {
     // we will have all of them
     exit_initiated_add(reason);
 }
-

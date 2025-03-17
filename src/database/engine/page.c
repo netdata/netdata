@@ -897,14 +897,14 @@ size_t pgd_append_point(
     uint32_t expected_slot)
 {
     if (pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING) {
-        if(exit_initiated == EXIT_REASON_NONE)
+        if(exit_initiated_get() == EXIT_REASON_NONE)
             pgd_fatal(pg, "Data collection on page already scheduled for flushing");
         else
             return 0;
     }
 
     if (!(pg->states & PGD_STATE_CREATED_FROM_COLLECTOR)) {
-        if(exit_initiated == EXIT_REASON_NONE)
+        if(exit_initiated_get() == EXIT_REASON_NONE)
             pgd_fatal(pg, "DBENGINE: collection on page not created from a collector");
         else
             return 0;

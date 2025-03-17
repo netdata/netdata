@@ -1185,7 +1185,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             w->response.data->content_type = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
 
-            if(!exit_initiated)
+            if(!exit_initiated_get())
                 buffer_strcat(w->response.data, "ok, will do...");
             else
                 buffer_strcat(w->response.data, "I am doing it already");

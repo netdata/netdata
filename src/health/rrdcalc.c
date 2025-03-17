@@ -250,7 +250,7 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
 static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
     RRDSET *st = rc->rrdset;
 
-    if (!exit_initiated) {
+    if (!exit_initiated_get()) {
         RRDHOST *host = st->rrdhost;
 
         time_t now = now_realtime_sec();

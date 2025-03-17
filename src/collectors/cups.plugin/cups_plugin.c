@@ -243,7 +243,7 @@ int main(int argc, char **argv) {
     for (iteration = 0; 1; iteration++) {
         heartbeat_next(&hb);
 
-        if (unlikely(exit_initiated))
+        if (unlikely(exit_initiated_get()))
             break;
 
         reset_metrics();
@@ -315,7 +315,7 @@ int main(int argc, char **argv) {
         }
         cupsFreeDests(num_dest_total, dests);
 
-        if (unlikely(exit_initiated))
+        if (unlikely(exit_initiated_get()))
             break;
 
         cups_job_t *jobs, *curr_job;
@@ -410,7 +410,7 @@ int main(int argc, char **argv) {
 
         fflush(stdout);
 
-        if (unlikely(exit_initiated))
+        if (unlikely(exit_initiated_get()))
             break;
 
         // restart check (14400 seconds)

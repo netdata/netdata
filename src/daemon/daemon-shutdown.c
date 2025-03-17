@@ -38,7 +38,7 @@ extern struct netdata_static_thread *static_threads;
 
 void netdata_log_exit_reason(void) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    EXIT_REASON_2buffer(wb, exit_initiated, ", ");
+    EXIT_REASON_2buffer(wb, exit_initiated_get(), ", ");
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_exit_msgid),
@@ -46,7 +46,7 @@ void netdata_log_exit_reason(void) {
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    nd_log(NDLS_DAEMON, is_exit_reason_normal(exit_initiated) ? NDLP_NOTICE : NDLP_CRIT,
+    nd_log(NDLS_DAEMON, is_exit_reason_normal(exit_initiated_get()) ? NDLP_NOTICE : NDLP_CRIT,
            "NETDATA SHUTDOWN: initializing shutdown with code due to: %s",
            buffer_tostring(wb));
 }
@@ -176,7 +176,7 @@ NORETURN
 #endif
 static void netdata_cleanup_and_exit(EXIT_REASON reason) {
     exit_initiated_set(reason);
-    int ret = is_exit_reason_normal(exit_initiated) ? 0 : 1;
+    int ret = is_exit_reason_normal(exit_initiated_get()) ? 0 : 1;
 
     // don't recurse (due to a fatal, while exiting)
     static bool run = false;
