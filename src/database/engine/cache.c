@@ -2468,7 +2468,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
         size_t current_extent_index_id;
         Pvoid_t *PValue = JudyLIns(&JudyL_extents_pos, xio->pos, PJE0);
-        if(!PValue || *PValue == PJERR)
+        if(!PValue || PValue == PJERR)
             fatal("Corrupted JudyL extents pos");
 
         struct jv2_extents_info *ei;
@@ -2492,7 +2492,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         // update the metrics JudyL
 
         PValue = JudyLIns(&JudyL_metrics, page->metric_id, PJE0);
-        if(!PValue || *PValue == PJERR)
+        if(!PValue || PValue == PJERR)
             fatal("Corrupted JudyL metrics");
 
         struct jv2_metrics_info *mi;
@@ -2518,7 +2518,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         }
 
         PValue = JudyLIns(&mi->JudyL_pages_by_start_time, page->start_time_s, PJE0);
-        if(!PValue || *PValue == PJERR)
+        if(!PValue || PValue == PJERR)
             fatal("Corrupted JudyL metric pages");
 
         if(!*PValue) {

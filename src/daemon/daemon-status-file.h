@@ -7,7 +7,7 @@
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
 
-#define STATUS_FILE_VERSION 17
+#define STATUS_FILE_VERSION 18
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -44,7 +44,8 @@ typedef struct daemon_status_file {
     time_t boottime;            // system boottime
     time_t uptime;              // netdata uptime
     usec_t timestamp_ut;        // the timestamp of the status file
-    size_t restarts;            // the number of times this agent has restarted
+    size_t restarts;            // the number of times this agent has restarted (ever)
+    ssize_t reliability;        // consecutive restarts: > 0 reliable, < 0 crashing
 
     ND_UUID boot_id;            // the boot id of the system
     ND_UUID invocation;         // the netdata invocation id generated the file
@@ -74,6 +75,8 @@ typedef struct daemon_status_file {
     char os_id_like[64];     // ECS: os.platform
     bool read_system_info;
 
+    char stack_traces[15];   // the backend for capturing stack traces
+
     struct {
         SPINLOCK spinlock;
         long line;
@@ -83,6 +86,7 @@ typedef struct daemon_status_file {
         char message[512];
         char stack_trace[2048];
         char thread[ND_THREAD_TAG_MAX + 1];
+        pid_t thread_id;
         SIGNAL_CODE signal_code;
         bool sentry;        // true when the error was also reported to sentry
     } fatal;
@@ -129,6 +133,11 @@ const char *daemon_status_file_get_fatal_message(void);
 const char *daemon_status_file_get_fatal_errno(void);
 const char *daemon_status_file_get_fatal_stack_trace(void);
 const char *daemon_status_file_get_fatal_thread(void);
+const char *daemon_status_file_get_stack_trace_backend(void);
+pid_t daemon_status_file_get_fatal_thread_id(void);
 long daemon_status_file_get_fatal_line(void);
+DAEMON_STATUS daemon_status_file_get_status(void);
+size_t daemon_status_file_get_restarts(void);
+ssize_t daemon_status_file_get_reliability(void);
 
 #endif //NETDATA_DAEMON_STATUS_FILE_H

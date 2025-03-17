@@ -150,9 +150,11 @@ void nd_thread_tag_set(const char *tag) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static __thread bool libuv_name_set = false;
-void uv_thread_set_name_np(const char* name) {
-    if(libuv_name_set) return;
+void uv_thread_set_name_np(const char *name) {
+    static __thread bool libuv_name_set = false;
+
+    if(!name || !*name || (libuv_name_set && _nd_thread_os_name[0]))
+        return;
 
     strncpyz(_nd_thread_os_name, name, sizeof(_nd_thread_os_name) - 1);
     os_set_thread_name(_nd_thread_os_name);

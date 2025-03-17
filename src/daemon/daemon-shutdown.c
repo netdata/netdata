@@ -378,11 +378,12 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 #endif
 
 #ifdef ENABLE_SENTRY
-    if (!ret || !shutdown_on_fatal()) {
-        nd_sentry_fini();
-        curl_global_cleanup();
-        exit(ret);
-    }
+    if(ret)
+        shutdown_on_fatal();
+
+    nd_sentry_fini();
+    curl_global_cleanup();
+    exit(ret);
 #else
     if(ret)
         _exit(ret);
