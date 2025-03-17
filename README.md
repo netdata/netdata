@@ -6,7 +6,7 @@
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
-<h3 align="center">X-Ray Vision for your intfrastructure!</h3>
+<h3 align="center">X-Ray Vision for your infrastructure!</h3>
 <h4 align="center">Every Metric, Every Second. No BS.</h4>
 
 <br />
