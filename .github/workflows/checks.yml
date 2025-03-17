@@ -11,15 +11,89 @@ concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  libressl-checks:
-    name: LibreSSL
+  file-check: # Check what files changed if we’re being run in a PR or on a push.
+    name: Check Modified Files
     runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check-run.outputs.run }}
     steps:
       - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Check source files
+        id: check-source-files
+        uses: step-security/changed-files@v45
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            **/*.c
+            **/*.cc
+            **/*.h
+            **/*.hh
+            **/*.in
+            **/*.patch
+            src/aclk/aclk-schemas/
+            src/ml/dlib/
+            src/fluent-bit/
+            src/web/server/h2o/libh2o/
+          files_ignore: |
+            netdata.spec.in
+            **/*.md
+      - name: Check build files
+        id: check-build-files
+        uses: step-security/changed-files@v45
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            **/*.cmake
+            CMakeLists.txt
+            .gitignore
+            .github/data/distros.yml
+            .github/workflows/build.yml
+            packaging/cmake/
+            packaging/*.version
+            packaging/*.checksums
+          files_ignore: |
+            **/*.md
+            packaging/repoconfig/
+      - name: List all changed files in pattern
+        continue-on-error: true
+        env:
+          CHANGED_SOURCE_FILES: ${{ steps.check-source-files.outputs.all_changed_files }}
+          CHANGED_BUILD_FILES: ${{ steps.check-build-files.outputs.all_changed_files }}
+        run: |
+          for file in ${CHANGED_SOURCE_FILES} ${CHANGED_BUILD_FILES} ; do
+            echo "$file was changed"
+          done
+      - name: Check Run
+        id: check-run
+        run: |
+          if [ "${{ steps.check-source-files.outputs.any_modified }}" == "true" ] || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'run=false' >> "${GITHUB_OUTPUT}"
+          fi
+
+  libressl-checks:
+    name: LibreSSL
+    needs:
+      - file-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Build
+        if: needs.file-check.outputs.run == 'true'
         run: >
           docker run -v "$PWD":/netdata -w /netdata alpine:latest /bin/sh -c
           'apk add bash;
@@ -30,11 +104,19 @@ jobs:
 
   clang-checks:
     name: Clang
+    needs:
+      - file-check
     runs-on: ubuntu-latest
     steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
       - name: Checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Build
+        if: needs.file-check.outputs.run == 'true'
         run: docker build -f .github/dockerfiles/Dockerfile.clang .
