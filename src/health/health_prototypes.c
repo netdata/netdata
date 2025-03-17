@@ -682,10 +682,11 @@ void health_apply_prototypes_to_host(RRDHOST *host) {
 
     // apply all the prototypes for the charts of the host
     RRDSET *st;
-    rrdset_foreach_read(st, host) {
+    rrdset_foreach_reentrant(st, host) {
         health_prototype_reset_alerts_for_rrdset(st);
     }
     rrdset_foreach_done(st);
+    dictionary_garbage_collect(host->rrdcalc_root_index);
 }
 
 void health_apply_prototypes_to_all_hosts(void) {
