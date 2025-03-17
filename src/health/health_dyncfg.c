@@ -526,6 +526,9 @@ static size_t dyncfg_health_remove_all_rrdcalc_of_prototype(STRING *alert_name) 
 
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host) {
+        if(!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
+            continue;
+
         RRDCALC *rc;
         foreach_rrdcalc_in_rrdhost_reentrant(host, rc) {
             if(rc->config.name != alert_name)
@@ -543,7 +546,6 @@ static size_t dyncfg_health_remove_all_rrdcalc_of_prototype(STRING *alert_name) 
 }
 
 static void dyncfg_health_prototype_reapply(RRD_ALERT_PROTOTYPE *ap) {
-    dyncfg_health_remove_all_rrdcalc_of_prototype(ap->config.name);
     health_prototype_apply_to_all_hosts(ap);
 }
 

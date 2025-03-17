@@ -641,7 +641,7 @@ void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
     if(!ap->_internal.enabled)
         return;
 
-    if(unlikely(!host->health.enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
+    if(unlikely(!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
         return;
 
     RRDSET *st;
@@ -652,12 +652,23 @@ void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
 }
 
 void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap) {
-    if(!ap->_internal.enabled)
-        return;
-
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host){
-        health_apply_prototype_to_host(host, ap);
+        if(unlikely(!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
+            continue;
+
+        RRDCALC *rc;
+        foreach_rrdcalc_in_rrdhost_reentrant(host, rc) {
+            if(rc->config.name != ap->config.name)
+                continue;
+
+            rrdcalc_unlink_and_delete(host, rc, false);
+        }
+        foreach_rrdcalc_in_rrdhost_done(rc);
+        dictionary_garbage_collect(host->rrdcalc_root_index);
+
+        if(ap->_internal.enabled)
+            health_apply_prototype_to_host(host, ap);
     }
     dfe_done(host);
 }
@@ -665,7 +676,7 @@ void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap) {
 // ---------------------------------------------------------------------------------------------------------------------
 
 void health_apply_prototypes_to_host(RRDHOST *host) {
-    if(unlikely(!host->health.enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
+    if(unlikely(!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
         return;
 
     // free all running alarms
