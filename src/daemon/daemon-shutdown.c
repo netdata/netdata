@@ -23,6 +23,15 @@ void abort_on_fatal_enable(void) {
     abort_on_fatal = true;
 }
 
+NEVER_INLINE
+static bool shutdown_on_fatal(void) {
+    // keep this as a separate function, to have it logged like this in sentry
+    if(abort_on_fatal)
+        abort();
+    else
+        return false;
+}
+
 void web_client_cache_destroy(void);
 
 extern struct netdata_static_thread *static_threads;
@@ -360,10 +369,6 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
         fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
                 strings_referenced);
 
-    // strings_destroy();
-    // functions_destroy();
-    // dyncfg_destroy();
-
     fprintf(stderr, "All done, exiting...\n");
 #endif
 
@@ -373,10 +378,7 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
 #endif
 
 #ifdef ENABLE_SENTRY
-    if (ret && abort_on_fatal) {
-        abort();
-    }
-    else {
+    if (!ret || !shutdown_on_fatal()) {
         nd_sentry_fini();
         curl_global_cleanup();
         exit(ret);
