@@ -75,6 +75,8 @@ typedef struct daemon_status_file {
     char os_id_like[64];     // ECS: os.platform
     bool read_system_info;
 
+    char stack_traces[15];   // the backend for capturing stack traces
+
     struct {
         SPINLOCK spinlock;
         long line;
@@ -131,6 +133,7 @@ const char *daemon_status_file_get_fatal_message(void);
 const char *daemon_status_file_get_fatal_errno(void);
 const char *daemon_status_file_get_fatal_stack_trace(void);
 const char *daemon_status_file_get_fatal_thread(void);
+const char *daemon_status_file_get_stack_trace_backend(void);
 pid_t daemon_status_file_get_fatal_thread_id(void);
 long daemon_status_file_get_fatal_line(void);
 DAEMON_STATUS daemon_status_file_get_status(void);

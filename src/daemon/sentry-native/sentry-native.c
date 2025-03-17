@@ -176,6 +176,7 @@ void nd_sentry_init(void) {
 
     nd_sentry_set_tag_uint64("restarts", daemon_status_file_get_restarts());
     nd_sentry_set_tag_int64("reliability", daemon_status_file_get_reliability());
+    nd_sentry_set_tag("stack_traces", daemon_status_file_get_stack_trace_backend());
 }
 
 void nd_sentry_fini(void) {
