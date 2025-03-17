@@ -21,6 +21,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
 	"github.com/mattn/go-isatty"
 )

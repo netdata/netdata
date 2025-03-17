@@ -3,20 +3,10 @@
 package ddsnmp
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
-
-func TestMain(m *testing.M) {
-	dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
-	_ = os.Setenv("NETDATA_STOCK_CONFIG_DIR", dir)
-	code := m.Run()
-	_ = os.Unsetenv("NETDATA_STOCK_CONFIG_DIR")
-	os.Exit(code)
-}
 
 func Test_Find(t *testing.T) {
 	test := map[string]struct {
