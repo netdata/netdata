@@ -9,7 +9,11 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v2"
+
+	"github.com/netdata/netdata/go/plugins/logger"
 )
+
+var log = logger.New().With("component", "snmp/ddsnmp")
 
 func load(dirpath string) ([]*Profile, error) {
 	var profiles []*Profile
@@ -18,10 +22,18 @@ func load(dirpath string) ([]*Profile, error) {
 		if !(strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
 			return nil
 		}
-		profile, err := loadYAML(path)
+
+		profile, err := loadProfile(path)
 		if err != nil {
-			return err
+			log.Warningf("invalid profile '%s': %v", path, err)
+			return nil
 		}
+
+		if err := profile.validate(); err != nil {
+			log.Warningf("invalid profile '%s': %v", path, err)
+			return nil
+		}
+
 		profiles = append(profiles, profile)
 		return nil
 	}); err != nil {
@@ -31,14 +43,14 @@ func load(dirpath string) ([]*Profile, error) {
 	return profiles, nil
 }
 
-func loadYAML(filename string) (*Profile, error) {
+func loadProfile(filename string) (*Profile, error) {
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 
 	var prof Profile
-	if err := yaml.Unmarshal(content, &prof); err != nil {
+	if err := yaml.Unmarshal(content, &prof.Definition); err != nil {
 		return nil, err
 	}
 
@@ -48,30 +60,14 @@ func loadYAML(filename string) (*Profile, error) {
 
 	dir := filepath.Dir(filename)
 
-	for _, name := range prof.Extends {
-		baseProf, err := loadYAML(filepath.Join(dir, name))
+	for _, name := range prof.Definition.Extends {
+		baseProf, err := loadProfile(filepath.Join(dir, name))
 		if err != nil {
 			return nil, err
 		}
-		mergeProfiles(&prof, baseProf)
+
+		prof.merge(baseProf)
 	}
 
 	return &prof, nil
-}
-
-func mergeProfiles(child, parent *Profile) {
-	child.Metrics = append(parent.Metrics, child.Metrics...)
-	//
-	//if child.Metadata == nil || len(child.Metadata.Device) == 0 {
-	//	return
-	//}
-	//if child.Metadata.Device.Fields == nil {
-	//	child.Metadata.Device.Fields = make(map[string]Symbol)
-	//}
-	//
-	//for key, value := range parent.Metadata.Device.Fields {
-	//	if _, exists := child.Metadata.Device.Fields[key]; !exists {
-	//		child.Metadata.Device.Fields[key] = value
-	//	}
-	//}
 }
