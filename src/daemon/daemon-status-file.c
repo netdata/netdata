@@ -964,10 +964,11 @@ struct log_priority {
     ND_LOG_FIELD_PRIORITY post;
 };
 
-struct log_priority PRI_ALL_NORMAL          = { NDLP_NOTICE, NDLP_DEBUG };
-struct log_priority PRI_USER_SHOULD_FIX     = { NDLP_WARNING, NDLP_INFO };
-struct log_priority PRI_NETDATA_BUG         = { NDLP_CRIT, NDLP_ERR };
-struct log_priority PRI_BAD_BUT_NO_REASON   = { NDLP_ERR, NDLP_WARNING };
+struct log_priority PRI_ALL_NORMAL      = { NDLP_NOTICE, NDLP_DEBUG };
+struct log_priority PRI_USER_SHOULD_FIX = { NDLP_WARNING, NDLP_INFO };
+struct log_priority PRI_FATAL           = { NDLP_ERR, NDLP_ERR };
+struct log_priority PRI_DEADLY_SIGNAL   = { NDLP_CRIT, NDLP_CRIT };
+struct log_priority PRI_KILLED_HARD     = { NDLP_ERR, NDLP_WARNING };
 
 static bool is_ci(void) {
     const char *ci = getenv("CI");
@@ -1034,14 +1035,14 @@ void daemon_status_file_check_crash(void) {
             else if(is_deadly_signal(last_session_status.exit_reason)) {
                 cause = "deadly signal and exit";
                 msg = "Netdata was last stopped gracefully after receiving a deadly signal";
-                pri = PRI_NETDATA_BUG;
+                pri = PRI_DEADLY_SIGNAL;
                 this_is_a_crash = true;
             }
             else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
                      !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal and exit";
                 msg = "Netdata was last stopped gracefully after it encountered a fatal error";
-                pri = PRI_NETDATA_BUG;
+                pri = PRI_FATAL;
                 this_is_a_crash = true;
             }
             else if(last_session_status.exit_reason & EXIT_REASON_SYSTEM_SHUTDOWN) {
@@ -1075,7 +1076,7 @@ void daemon_status_file_check_crash(void) {
             else if(is_deadly_signal(last_session_status.exit_reason)) {
                 cause = "deadly signal on start";
                 msg = "Netdata was last crashed while starting after receiving a deadly signal";
-                pri = PRI_NETDATA_BUG;
+                pri = PRI_DEADLY_SIGNAL;
                 this_is_a_crash = true;
             }
             else if (last_session_status.exit_reason & EXIT_REASON_OUT_OF_MEMORY) {
@@ -1110,12 +1111,12 @@ void daemon_status_file_check_crash(void) {
                      !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal on start";
                 msg = "Netdata was last crashed while starting, because of a fatal error";
-                pri = PRI_NETDATA_BUG;
+                pri = PRI_FATAL;
             }
             else {
                 cause = "killed hard on start";
                 msg = "Netdata was last killed/crashed while starting";
-                pri = PRI_BAD_BUT_NO_REASON;
+                pri = PRI_KILLED_HARD;
             }
             this_is_a_crash = true;
             break;
@@ -1124,27 +1125,29 @@ void daemon_status_file_check_crash(void) {
             if(is_deadly_signal(last_session_status.exit_reason)) {
                 cause = "deadly signal on exit";
                 msg = "Netdata was last crashed while exiting after receiving a deadly signal";
-                pri = PRI_NETDATA_BUG;
-                this_is_a_crash = true;
+                pri = PRI_DEADLY_SIGNAL;
             }
             else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
                 !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal on exit";
                 msg = "Netdata was last killed/crashed while exiting after encountering an error";
+                pri = PRI_FATAL;
             }
             else if(last_session_status.exit_reason & EXIT_REASON_SYSTEM_SHUTDOWN) {
                 cause = "killed hard on shutdown";
                 msg = "Netdata was last killed/crashed while exiting due to system shutdown";
+                pri = PRI_KILLED_HARD;
             }
             else if(new_version || (last_session_status.exit_reason & EXIT_REASON_UPDATE)) {
                 cause = "killed hard on update";
                 msg = "Netdata was last killed/crashed while exiting to update to a new version";
+                pri = PRI_KILLED_HARD;
             }
             else {
                 cause = "killed hard on exit";
                 msg = "Netdata was last killed/crashed while it was instructed to exit";
+                pri = PRI_KILLED_HARD;
             }
-            pri = PRI_NETDATA_BUG;
             this_is_a_crash = true;
             break;
 
@@ -1165,19 +1168,19 @@ void daemon_status_file_check_crash(void) {
             else if(is_deadly_signal(last_session_status.exit_reason)) {
                 cause = "deadly signal";
                 msg = "Netdata was last crashed after receiving a deadly signal";
-                pri = PRI_NETDATA_BUG;
+                pri = PRI_DEADLY_SIGNAL;
                 this_is_a_crash = true;
             }
             else if (last_session_status.exit_reason != EXIT_REASON_NONE &&
                      !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "killed fatal";
                 msg = "Netdata was last crashed due to a fatal error";
-                pri = PRI_NETDATA_BUG;
+                pri = PRI_FATAL;
             }
             else {
                 cause = "killed hard";
                 msg = "Netdata was last killed/crashed while operating normally";
-                pri = PRI_BAD_BUT_NO_REASON;
+                pri = PRI_KILLED_HARD;
                 this_is_a_crash = true;
             }
             break;

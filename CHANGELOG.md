@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- add stack trace information to the compiler and linker [\#19879](https://github.com/netdata/netdata/pull/19879) ([ktsaou](https://github.com/ktsaou))
+- SIGABRT and already running are fatal conditions [\#19878](https://github.com/netdata/netdata/pull/19878) ([ktsaou](https://github.com/ktsaou))
+- do not lose exit reasons [\#19875](https://github.com/netdata/netdata/pull/19875) ([ktsaou](https://github.com/ktsaou))
 - make sure the daemon status hash does not depend on random bytes [\#19874](https://github.com/netdata/netdata/pull/19874) ([ktsaou](https://github.com/ktsaou))
 - add the fatal to the exit reasons [\#19873](https://github.com/netdata/netdata/pull/19873) ([ktsaou](https://github.com/ktsaou))
 - sentry events annotations [\#19872](https://github.com/netdata/netdata/pull/19872) ([ktsaou](https://github.com/ktsaou))
@@ -478,9 +481,6 @@
 - Add alert version to aclk-state [\#19335](https://github.com/netdata/netdata/pull/19335) ([stelfrag](https://github.com/stelfrag))
 - annotate logs with stack trace when libunwind is available [\#19334](https://github.com/netdata/netdata/pull/19334) ([ktsaou](https://github.com/ktsaou))
 - convert invalid utf8 sequences to hex characters [\#19333](https://github.com/netdata/netdata/pull/19333) ([ktsaou](https://github.com/ktsaou))
-- Abort on fatal and report system available bytes on allocation failures. [\#19332](https://github.com/netdata/netdata/pull/19332) ([vkalintiris](https://github.com/vkalintiris))
-- Add instructions for Docker Compose [\#19331](https://github.com/netdata/netdata/pull/19331) ([enoch85](https://github.com/enoch85))
-- build\(deps\): bump golang.org/x/net from 0.33.0 to 0.34.0 in /src/go [\#19330](https://github.com/netdata/netdata/pull/19330) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 

@@ -458,6 +458,22 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
     erl->count = 0;
 }
 
+NEVER_INLINE NORETURN
+static void recursive_fatal_abort(void) {
+    // keep this as a separate function, to have it logged like this in sentry
+#ifdef ENABLE_SENTRY
+    abort();
+#endif
+    _exit(1);
+}
+
+NEVER_INLINE NORETURN
+static void fatal_abort_internal_checks(void) {
+    // keep this as a separate function, to have it logged like this in sentry
+    abort();
+    _exit(1);
+}
+
 void netdata_logger_fatal(const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     static size_t already_in_fatal = 0;
 
@@ -468,12 +484,7 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         fprintf(stderr, "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
                 function, line, file);
         fflush(stderr);
-
-#ifdef ENABLE_SENTRY
-        abort();
-#else
-        _exit(1);
-#endif
+        recursive_fatal_abort();
     }
 
     // send this event to deamon_status_file
@@ -521,7 +532,7 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     snprintfz(action_result, 60, "%s:%s:%s", program_name, tag_to_send, function);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    abort();
+    fatal_abort_internal_checks();
 #endif
 
     if(nd_log.fatal_final_cb)

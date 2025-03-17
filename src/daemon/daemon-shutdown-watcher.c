@@ -9,6 +9,12 @@ static struct completion shutdown_begin_completion;
 static struct completion shutdown_end_completion;
 static ND_THREAD *watcher_thread;
 
+NEVER_INLINE
+static void shutdown_timed_out(void) {
+    // keep this as a separate function, to have it logged like this in sentry
+    abort();
+}
+
 void watcher_shutdown_begin(void) {
     completion_mark_complete(&shutdown_begin_completion);
 }
@@ -87,7 +93,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
 #endif
 
         daemon_status_file_shutdown_step("sentry timeout");
-        abort();
+        shutdown_timed_out();
     }
 }
 
