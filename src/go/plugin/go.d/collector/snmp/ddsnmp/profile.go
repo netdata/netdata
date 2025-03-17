@@ -3,131 +3,114 @@
 package ddsnmp
 
 import (
-	"fmt"
+	"errors"
+	"os"
+	"path/filepath"
+	"sync"
+
+	"github.com/DataDog/datadog-agent/pkg/networkdevice/profile/profiledefinition"
+
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
-const (
-	MetricTypeGauge                 = "gauge"
-	MetricTypeRate                  = "rate"
-	MetricTypePercent               = "percent"
-	MetricTypeMonotonicCount        = "monotonic_count"
-	MetricTypeMonotonicCountAndRate = "monotonic_count_and_rate"
-	MetricTypeFlagStream            = "flag_stream" // https://datadoghq.dev/integrations-core/tutorials/snmp/profile-format/#flag-stream
-)
+var once sync.Once
+var ddProfiles []*Profile
 
-// Profile is Datadog SNMP profile (format: https://datadoghq.dev/integrations-core/tutorials/snmp/profile-format/)
+func Find(sysObjId string) []*Profile {
+	once.Do(func() {
+		dir := os.Getenv("NETDATA_STOCK_CONFIG_DIR")
+		if dir == "" {
+			dir = filepath.Join(executable.Directory, "../../../../usr/lib/netdata/conf.d/go.d/snmp.profiles/default/")
+		}
+
+		profiles, err := load(dir)
+		if err != nil {
+			log.Errorf("failed to load dd snmp profiles: %v", err)
+			return
+		}
+		if len(profiles) == 0 {
+			log.Warningf("no dd snmp profiles found in '%s'", dir)
+			return
+		}
+
+		ddProfiles = profiles
+	})
+
+	var profiles []*Profile
+
+	for _, prof := range ddProfiles {
+		for _, id := range prof.Definition.SysObjectIDs {
+			m, err := matcher.NewRegExpMatcher(id)
+			if err != nil {
+				log.Warningf("failed to compile regular expression from '%s': %v", id, err)
+				continue
+			}
+			if m.MatchString(sysObjId) {
+				profiles = append(profiles, prof.clone())
+			}
+		}
+	}
+
+	return profiles
+}
+
 type Profile struct {
-	SourceFile string
-
-	Extends     []string          `yaml:"extends"`     // +done
-	SysObjectID SysObjectIDs      `yaml:"sysobjectid"` // +done
-	Metrics     []Metric          `yaml:"metrics"`
-	Metadata    *Metadata         `yaml:"metadata"`    // +done
-	MetricTags  []GlobalMetricTag `yaml:"metric_tags"` // +done
+	SourceFile string                               `yaml:"-"`
+	Definition *profiledefinition.ProfileDefinition `yaml:",inline"`
 }
 
-type SysObjectIDs []string
-
-type (
-	// Metric defines which metrics will be collected by the profile.
-	// Can reference either a single OID (a.k.a symbol), or an SNMP table.
-	// https://datadoghq.dev/integrations-core/tutorials/snmp/profile-format/#metrics
-	Metric struct {
-		Name string `yaml:"name"`
-		OID  string `yaml:"OID"`
-
-		// Typically a symbol will be inferred from the SNMP type
-		// https://datadoghq.dev/integrations-core/tutorials/snmp/profile-format/#metric-type-inference
-		// Can be overwritten using "metric_type"
-		// https://datadoghq.dev/integrations-core/tutorials/snmp/profile-format/#forced-metric-types
-		MetricType string `yaml:"metric_type"`
-
-		Options map[string]string
-
-		MIB string `yaml:"MIB"`
-
-		// Symbol metric
-		// https://datadoghq.dev/integrations-core/tutorials/snmp/profile-format/#symbol-metrics
-		Symbol *Symbol `yaml:"symbol"`
-
-		// Table metric
-		// https://datadoghq.dev/integrations-core/tutorials/snmp/profile-format/#table-metrics
-		Table   *MetricTable `yaml:"table"`
-		Symbols []Symbol     `yaml:"symbols"`
-
-		MetricTags []MetricTag `yaml:"metric_tags"` //TODO check for only name existing in metric tag, as there is some case for that
+func (p *Profile) clone() *Profile {
+	return &Profile{
+		SourceFile: p.SourceFile,
+		Definition: p.Definition.Clone(),
 	}
-	MetricTable struct {
-		OID  string `yaml:"OID"`
-		Name string `yaml:"name"`
-	}
-	// MetricTag used for Table metrics to identify each row's metric.
-	// https://datadoghq.dev/integrations-core/tutorials/snmp/profile-format/#table-metrics-tagging
-	MetricTag struct {
-		MIB            string       `yaml:"mib"`
-		Table          string       `yaml:"table"`
-		Tag            string       `yaml:"tag"`
-		Symbol         Symbol       `yaml:"symbol"`
-		IndexTransform []IndexSlice `yaml:"index_transform"`
-
-		Mapping map[int]string `yaml:"mapping"`
-		Index   int            `yaml:"index"`
-	}
-	Symbol struct {
-		OID          string  `yaml:"OID"`
-		Name         string  `yaml:"name"`
-		ExtractValue string  `yaml:"extract_value"`
-		MatchPattern string  `yaml:"match_pattern"`
-		MatchValue   string  `yaml:"match_value"`
-		Format       string  `yaml:"format"`
-		ScaleFactor  float64 `yaml:"scale_factor"`
-	}
-	IndexSlice struct {
-		Start int `yaml:"start"`
-		End   int `yaml:"end"`
-	}
-)
-
-type (
-	// Metadata used to declare where and how metadata should be collected
-	// https://datadoghq.dev/integrations-core/tutorials/snmp/profile-format/#metadata
-	Metadata struct {
-		Device DeviceMetadata `yaml:"device"`
-	}
-	DeviceMetadata struct {
-		Fields map[string]MetadataField `yaml:"fields"`
-	}
-	MetadataField struct {
-		Value   *string  `yaml:"value"`
-		Symbol  *Symbol  `yaml:"symbol"`
-		Symbols []Symbol `yaml:"symbols"`
-	}
-)
-
-// GlobalMetricTag used to apply tags to all metrics collected by the profile
-// https://datadoghq.dev/integrations-core/tutorials/snmp/profile-format/#metric_tags
-type GlobalMetricTag struct {
-	OID    string `yaml:"OID"`
-	Symbol string `yaml:"symbol"`
-	Tag    string `yaml:"tag"`
-
-	Match   string            `yaml:"match"`
-	Tags    map[string]string `yaml:"tags"`
-	Mapping map[int]string    `yaml:"mapping"`
 }
 
-func (s *SysObjectIDs) UnmarshalYAML(unmarshal func(any) error) error {
-	var single string
-	if err := unmarshal(&single); err == nil {
-		*s = []string{single}
-		return nil
+func (p *Profile) merge(base *Profile) {
+	p.Definition.Metrics = append(p.Definition.Metrics, base.Definition.Metrics...)
+	p.Definition.MetricTags = append(p.Definition.MetricTags, base.Definition.MetricTags...)
+	p.Definition.StaticTags = append(p.Definition.StaticTags, base.Definition.StaticTags...)
+
+	if p.Definition.Metadata == nil {
+		p.Definition.Metadata = make(profiledefinition.MetadataConfig)
 	}
 
-	var multiple []string
-	if err := unmarshal(&multiple); err == nil {
-		*s = multiple
-		return nil
+	for resName, baseRes := range base.Definition.Metadata {
+		targetRes, exists := p.Definition.Metadata[resName]
+		if !exists {
+			targetRes = profiledefinition.NewMetadataResourceConfig()
+		}
+
+		targetRes.IDTags = append(targetRes.IDTags, baseRes.IDTags...)
+
+		if targetRes.Fields == nil && len(baseRes.Fields) > 0 {
+			targetRes.Fields = make(map[string]profiledefinition.MetadataField, len(baseRes.Fields))
+		}
+
+		for field, symbol := range baseRes.Fields {
+			if _, ok := targetRes.Fields[field]; !ok {
+				targetRes.Fields[field] = symbol
+			}
+		}
+
+		p.Definition.Metadata[resName] = targetRes
+	}
+}
+
+func (p *Profile) validate() error {
+	profiledefinition.NormalizeMetrics(p.Definition.Metrics)
+
+	errs := profiledefinition.ValidateEnrichMetadata(p.Definition.Metadata)
+	errs = append(errs, profiledefinition.ValidateEnrichMetrics(p.Definition.Metrics)...)
+	errs = append(errs, profiledefinition.ValidateEnrichMetricTags(p.Definition.MetricTags)...)
+	if len(errs) > 0 {
+		errList := make([]error, 0, len(errs))
+		for _, s := range errs {
+			errList = append(errList, errors.New(s))
+		}
+		return errors.Join(errList...)
 	}
 
-	return fmt.Errorf("invalid sysobjectid format")
+	return nil
 }
