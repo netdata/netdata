@@ -6,6 +6,7 @@
 #include "sentry.h"
 
 static char sentry_path[FILENAME_MAX] = "";
+static char g_sentry_event_message[512] = {0};
 
 bool nd_sentry_crash_report_enabled = true;
 
@@ -89,6 +90,10 @@ static sentry_value_t nd_sentry_on_hook(sentry_value_t event) {
     nd_sentry_set_tag_uptime();
     nd_sentry_set_tag("thread", daemon_status_file_get_fatal_thread());
     nd_sentry_set_tag_uint64("thread_id", daemon_status_file_get_fatal_thread_id());
+
+    // set the title of the event
+    if(g_sentry_event_message[0])
+        sentry_value_set_by_key(event, "message", sentry_value_new_string(g_sentry_event_message));
 
     return event;
 }
@@ -229,6 +234,8 @@ void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     const char *function = daemon_status_file_get_fatal_function();
     if(!function || !*function)
         function = "unknown";
+    else
+        strncpyz(g_sentry_event_message, function, sizeof(g_sentry_event_message) - 1);
 
     nd_sentry_set_tag_uptime();
 
