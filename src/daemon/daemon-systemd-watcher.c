@@ -28,7 +28,7 @@ static int shutdown_event_handler(sd_bus_message *m, void *userdata __maybe_unus
            shutdown ? "true" : "false");
 
     if(shutdown)
-        netdata_cleanup_and_exit(EXIT_REASON_SYSTEM_SHUTDOWN, NULL, NULL, NULL);
+        netdata_cleanup_and_exit_gracefully(EXIT_REASON_SYSTEM_SHUTDOWN);
 
     return 0;
 }
