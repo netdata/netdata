@@ -4,6 +4,7 @@ baseurl=https://repository.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/@DIST_VERSI
 repo_gpgcheck=1
 gpgcheck=1
 gpgkey=https://repository.netdata.cloud/netdatabot.gpg.key
+       https://repository.netdata.cloud/netdatabot.old.gpg.key
 enabled=1
 sslverify=1
 priority=50
@@ -14,6 +15,7 @@ baseurl=https://repository.netdata.cloud/repos/repoconfig/@DIST_NAME@/@DIST_VERS
 repo_gpgcheck=1
 gpgcheck=1
 gpgkey=https://repository.netdata.cloud/netdatabot.gpg.key
+       https://repository.netdata.cloud/netdatabot.old.gpg.key
 enabled=1
 sslverify=1
 priority=50

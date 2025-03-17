@@ -42,7 +42,7 @@ For example, for stable release packages for RHEL 9 on 64-bit x86, the full URL 
 <https://repository.netdata.cloud/repos/stable/el/9/x86_64/>
 
 Our RPM packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
-current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from
+current key fingerprint is `6E155DC153906B73765A74A99DD4A74CECFA8F4F`. The associated public key can be fetched from
 `https://repository.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
@@ -99,7 +99,7 @@ Enabled: Yes
 Note the `/` at the end of the codename, this is required for the repository to be processed correctly.
 
 Our DEB packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
-current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from
+current key fingerprint is `6E155DC153906B73765A74A99DD4A74CECFA8F4F`. The associated public key can be fetched from
 `https://repository.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
