@@ -4,39 +4,13 @@ package ddsnmp
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
-	"sync"
 
 	"github.com/DataDog/datadog-agent/pkg/networkdevice/profile/profiledefinition"
 
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
-var once sync.Once
-var ddProfiles []*Profile
-
 func Find(sysObjId string) []*Profile {
-	once.Do(func() {
-		dir := os.Getenv("NETDATA_STOCK_CONFIG_DIR")
-		if dir == "" {
-			dir = filepath.Join(executable.Directory, "../../../../usr/lib/netdata/conf.d/go.d/snmp.profiles/default/")
-		}
-
-		profiles, err := load(dir)
-		if err != nil {
-			log.Errorf("failed to load dd snmp profiles: %v", err)
-			return
-		}
-		if len(profiles) == 0 {
-			log.Warningf("no dd snmp profiles found in '%s'", dir)
-			return
-		}
-
-		ddProfiles = profiles
-	})
-
 	var profiles []*Profile
 
 	for _, prof := range ddProfiles {

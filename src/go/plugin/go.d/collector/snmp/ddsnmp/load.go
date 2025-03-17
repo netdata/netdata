@@ -3,6 +3,7 @@
 package ddsnmp
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -11,15 +12,44 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
 var log = logger.New().With("component", "snmp/ddsnmp")
+
+var ddProfiles []*Profile
+
+func init() {
+	dir := os.Getenv("NETDATA_STOCK_CONFIG_DIR")
+	if dir != "" {
+		dir = filepath.Join(dir, "go.d/snmp.profiles/default")
+	} else {
+		if dir, _ = filepath.Abs("../../../config/go.d/snmp.profiles/default"); !isDirExists(dir) {
+			dir = filepath.Join(executable.Directory, "../../../../usr/lib/netdata/conf.d/go.d/snmp.profiles/default")
+		}
+	}
+	profiles, err := load(dir)
+	if err != nil {
+		log.Errorf("failed to load dd snmp profiles: %v", err)
+		return
+	}
+	if len(profiles) == 0 {
+		log.Warningf("no dd snmp profiles found in '%s'", dir)
+		return
+	}
+
+	log.Infof("found %d profiles in '%s'", len(profiles), dir)
+	ddProfiles = profiles
+}
 
 func load(dirpath string) ([]*Profile, error) {
 	var profiles []*Profile
 
 	if err := filepath.WalkDir(dirpath, func(path string, d fs.DirEntry, err error) error {
-		if !(strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
+		if err != nil {
+			return err
+		}
+		if !(strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
 			return nil
 		}
 
@@ -70,4 +100,12 @@ func loadProfile(filename string) (*Profile, error) {
 	}
 
 	return &prof, nil
+}
+
+func isDirExists(dir string) bool {
+	fi, err := os.Stat(dir)
+	if err != nil {
+		return !errors.Is(err, fs.ErrNotExist)
+	}
+	return fi.Mode().IsDir()
 }
