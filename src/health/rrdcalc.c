@@ -405,6 +405,7 @@ void rrdcalc_rrdhost_index_init(RRDHOST *host) {
 }
 
 void rrdcalc_rrdhost_index_destroy(RRDHOST *host) {
+    rrdcalc_delete_all(host);
     dictionary_destroy(host->rrdcalc_root_index);
     host->rrdcalc_root_index = NULL;
 }
@@ -458,7 +459,12 @@ void rrdcalc_unlink_and_delete_all_rrdset_alerts(RRDSET *st) {
 }
 
 void rrdcalc_delete_all(RRDHOST *host) {
-    dictionary_flush(host->rrdcalc_root_index);
+    RRDCALC *rc;
+    foreach_rrdcalc_in_rrdhost_write(host, rc) {
+        rrdcalc_unlink_and_delete(host, rc, false);
+    }
+    foreach_rrdcalc_in_rrdhost_done(rc);
+    dictionary_garbage_collect(host->rrdcalc_root_index);
 }
 
 void rrdcalc_child_disconnected(RRDHOST *host) {
