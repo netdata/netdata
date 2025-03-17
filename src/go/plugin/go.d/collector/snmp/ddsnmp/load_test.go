@@ -4,14 +4,14 @@ package ddsnmp
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_loadDDSnmpProfiles(t *testing.T) {
-	dir := "../../../config/go.d/snmp.profiles/default"
+	dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
 
 	f, err := os.Open(dir)
 	require.NoError(t, err)
@@ -23,5 +23,5 @@ func Test_loadDDSnmpProfiles(t *testing.T) {
 	names, err := f.Readdirnames(-1)
 	require.NoError(t, err)
 
-	assert.Equal(t, len(names)-1 /*README.md*/, len(profiles))
+	require.Equal(t, len(names)-1 /*README.md*/, len(profiles))
 }

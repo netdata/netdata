@@ -6,8 +6,16 @@
 
 **Merged pull requests:**
 
+- Update DEB/RPM package signing key info. [\#19888](https://github.com/netdata/netdata/pull/19888) ([Ferroin](https://github.com/Ferroin))
+- chore\(go.d/snmp/ddsnmp\): use dd profile definition [\#19886](https://github.com/netdata/netdata/pull/19886) ([ilyam8](https://github.com/ilyam8))
+- daemon status 18b [\#19884](https://github.com/netdata/netdata/pull/19884) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#19883](https://github.com/netdata/netdata/pull/19883) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/snmp\): improve auto-detection section [\#19882](https://github.com/netdata/netdata/pull/19882) ([ilyam8](https://github.com/ilyam8))
+- ci: use step-security/changed-files [\#19881](https://github.com/netdata/netdata/pull/19881) ([ilyam8](https://github.com/ilyam8))
+- change log priorities on agent-events [\#19880](https://github.com/netdata/netdata/pull/19880) ([ktsaou](https://github.com/ktsaou))
 - add stack trace information to the compiler and linker [\#19879](https://github.com/netdata/netdata/pull/19879) ([ktsaou](https://github.com/ktsaou))
 - SIGABRT and already running are fatal conditions [\#19878](https://github.com/netdata/netdata/pull/19878) ([ktsaou](https://github.com/ktsaou))
+- daemon-status-18 [\#19876](https://github.com/netdata/netdata/pull/19876) ([ktsaou](https://github.com/ktsaou))
 - do not lose exit reasons [\#19875](https://github.com/netdata/netdata/pull/19875) ([ktsaou](https://github.com/ktsaou))
 - make sure the daemon status hash does not depend on random bytes [\#19874](https://github.com/netdata/netdata/pull/19874) ([ktsaou](https://github.com/ktsaou))
 - add the fatal to the exit reasons [\#19873](https://github.com/netdata/netdata/pull/19873) ([ktsaou](https://github.com/ktsaou))
@@ -474,13 +482,6 @@
 - Regenerate integrations docs [\#19344](https://github.com/netdata/netdata/pull/19344) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/k8sstate\): respect ignore annotation [\#19342](https://github.com/netdata/netdata/pull/19342) ([ilyam8](https://github.com/ilyam8))
 - improvement\(go.d/docker\): respect ignore label [\#19341](https://github.com/netdata/netdata/pull/19341) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19340](https://github.com/netdata/netdata/pull/19340) ([netdatabot](https://github.com/netdatabot))
-- docs\(go.d/docker\): fix syntax error in meta [\#19339](https://github.com/netdata/netdata/pull/19339) ([ilyam8](https://github.com/ilyam8))
-- improvement\(go.d/docker\): add option to filter containers [\#19337](https://github.com/netdata/netdata/pull/19337) ([ilyam8](https://github.com/ilyam8))
-- Contexts Loading [\#19336](https://github.com/netdata/netdata/pull/19336) ([ktsaou](https://github.com/ktsaou))
-- Add alert version to aclk-state [\#19335](https://github.com/netdata/netdata/pull/19335) ([stelfrag](https://github.com/stelfrag))
-- annotate logs with stack trace when libunwind is available [\#19334](https://github.com/netdata/netdata/pull/19334) ([ktsaou](https://github.com/ktsaou))
-- convert invalid utf8 sequences to hex characters [\#19333](https://github.com/netdata/netdata/pull/19333) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
