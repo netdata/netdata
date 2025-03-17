@@ -109,7 +109,7 @@ static void *call_netdata_cleanup(void *arg)
             reason = EXIT_REASON_SERVICE_STOP;
             break;
     }
-    netdata_cleanup_and_exit(reason, NULL, NULL, NULL);
+    netdata_cleanup_and_exit_gracefully(reason);
 
     // Close event handle
     netdata_service_log("Closing stop event handle...");
