@@ -272,6 +272,12 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         if(ds->v >= 17)
             buffer_json_member_add_boolean(wb, "sentry", ds->fatal.sentry);
+
+        if(ds->v >= 18) {
+            char buf[UINT64_HEX_MAX_LENGTH];
+            print_uint64_hex(buf, ds->fatal.fault_address);
+            buffer_json_member_add_string(wb, "fault_address", buf);
+        }
     }
     buffer_json_object_close(wb);
 
@@ -378,6 +384,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 18) {
             JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "reliability", ds->reliability, error, required_v18);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "stack_traces", ds->stack_traces, error, required_v18);
+
+            char buf[UINT64_HEX_MAX_LENGTH];
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
+            ds->fatal.fault_address = str2ull_encoded(buf);
         }
     });
 
@@ -1361,7 +1371,7 @@ static void daemon_status_file_out_of_memory(void) {
     daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
 }
 
-bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, bool chained_handler) {
+bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, void *fault_address, bool chained_handler) {
     FUNCTION_RUN_ONCE_RET(true);
 
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
@@ -1375,6 +1385,9 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
     if(code)
         session_status.fatal.signal_code = code;
+
+    if(fault_address)
+        session_status.fatal.fault_address = (uintptr_t)fault_address;
 
     if(!session_status.fatal.thread_id)
         session_status.fatal.thread_id = gettid_cached();
