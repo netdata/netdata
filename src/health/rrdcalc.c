@@ -243,7 +243,7 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
         rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
     health_log_alert(host, ae);
-    health_alarm_log_add_entry(host, ae, false);
+    health_alarm_log_add_entry(host, ae, true);
     rrdset_flag_set(st, RRDSET_FLAG_HAS_RRDCALC_LINKED);
 }
 
