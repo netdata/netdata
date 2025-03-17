@@ -38,7 +38,7 @@ extern struct netdata_static_thread *static_threads;
 
 void netdata_log_exit_reason(void) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    EXIT_REASON_2buffer(wb, exit_initiated, ", ");
+    EXIT_REASON_2buffer(wb, exit_initiated_get(), ", ");
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &netdata_exit_msgid),
@@ -46,7 +46,7 @@ void netdata_log_exit_reason(void) {
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    nd_log(NDLS_DAEMON, is_exit_reason_normal(exit_initiated) ? NDLP_NOTICE : NDLP_CRIT,
+    nd_log(NDLS_DAEMON, is_exit_reason_normal(exit_initiated_get()) ? NDLP_NOTICE : NDLP_CRIT,
            "NETDATA SHUTDOWN: initializing shutdown with code due to: %s",
            buffer_tostring(wb));
 }
@@ -109,8 +109,7 @@ static void *rrdeng_exit_background(void *ptr) {
 }
 
 #ifdef ENABLE_DBENGINE
-static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only)
-{
+static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
     static size_t starting_size_to_flush = 0;
 
     if(!pgc_hot_and_dirty_entries(main_cache))
@@ -172,9 +171,12 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
-void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char *action_result, const char *action_data) {
+#if !defined(OS_WINDOWS)
+NORETURN
+#endif
+static void netdata_cleanup_and_exit(EXIT_REASON reason) {
     exit_initiated_set(reason);
-    int ret = is_exit_reason_normal(exit_initiated) ? 0 : 1;
+    int ret = is_exit_reason_normal(exit_initiated_get()) ? 0 : 1;
 
     // don't recurse (due to a fatal, while exiting)
     static bool run = false;
@@ -198,13 +200,9 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
         rrdeng_flush_everything_and_wait(false, false, true);
 #endif
 
-    // send the stat from our caller
-    analytics_statistic_t statistic = { action, action_result, action_data };
-    analytics_statistic_send(&statistic);
-
     // notify we are exiting
-    statistic = (analytics_statistic_t) {"EXIT", ret?"ERROR":"OK","-"};
-    analytics_statistic_send(&statistic);
+    //analytics_statistic_t statistic = (analytics_statistic_t) {"EXIT", ret?"ERROR":"OK","-"};
+    //analytics_statistic_send(&statistic);
 
     netdata_main_spawn_server_cleanup();
     watcher_step_complete(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
@@ -392,4 +390,14 @@ void netdata_cleanup_and_exit(EXIT_REASON reason, const char *action, const char
         exit(ret);
     }
 #endif
+}
+
+void netdata_cleanup_and_exit_gracefully(EXIT_REASON reason) {
+    exit_initiated_add(reason);
+    FUNCTION_RUN_ONCE();
+    netdata_cleanup_and_exit(reason);
+}
+
+void netdata_cleanup_and_exit_fatal(EXIT_REASON reason) {
+    netdata_cleanup_and_exit(reason);
 }

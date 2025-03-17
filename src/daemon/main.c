@@ -240,7 +240,7 @@ int unittest_prepare_rrd(const char **user) {
 }
 
 static void fatal_cleanup_and_exit_cb(void) {
-    netdata_cleanup_and_exit(EXIT_REASON_FATAL, "fatal error", "exiting", NULL);
+    netdata_cleanup_and_exit_fatal(EXIT_REASON_FATAL);
     exit(1);
 }
 

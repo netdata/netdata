@@ -1325,7 +1325,7 @@ int main(int argc, char **argv) {
     for(iteration = 0; 1; iteration++) {
         usec_t dt = heartbeat_next(&hb);
 
-        if (unlikely(exit_initiated))
+        if (unlikely(exit_initiated_get()))
             break;
 
         if (unlikely(debug && iteration))

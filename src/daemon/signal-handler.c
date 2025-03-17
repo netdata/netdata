@@ -237,7 +237,7 @@ static void process_triggered_signals(void) {
                     nd_log_limits_unlimited();
                     netdata_log_info("SIGNAL: Received %s. Cleaning up to exit...", name);
                     commands_exit();
-                    netdata_cleanup_and_exit(signals_waiting[i].reason, NULL, NULL, NULL);
+                    netdata_cleanup_and_exit_gracefully(signals_waiting[i].reason);
                     exit(0);
                     break;
 
