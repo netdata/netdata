@@ -107,9 +107,9 @@ void nd_sentry_init(void) {
 
     // invocation_id
     ND_UUID invocation_id = nd_log_get_invocation_id();
-    char invocation_str[UUID_STR_LEN];
-    uuid_unparse_lower(invocation_id.uuid, invocation_str);
-    sentry_set_tag("invocation_id", invocation_str);
+    char invocation_str[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(invocation_id.uuid, invocation_str);
+    sentry_set_tag("ephemeral_id", invocation_str);
 
     // agent_events_version
     sentry_set_tag("agent_events_version", TOSTRING(STATUS_FILE_VERSION));
