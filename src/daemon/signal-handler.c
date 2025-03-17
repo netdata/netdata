@@ -138,7 +138,7 @@ static void posix_unmask_my_signals(void) {
         netdata_log_error("SIGNAL: cannot unmask netdata signals");
 }
 
-void nd_cleanup_fatal_signals(void) {
+void nd_cleanup_deadly_signals(void) {
     struct sigaction act;
     memset(&act, 0, sizeof(struct sigaction));
 

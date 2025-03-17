@@ -20,11 +20,12 @@ concurrency: # This keeps multiple instances of the job from running concurrentl
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
-  build-dist: # Build the distribution tarball and store it as an artifact.
-    name: Build Distribution Tarball
+  file-check: # Check what files changed if we’re being run in a PR or on a push.
+    name: Check Modified Files
     runs-on: ubuntu-latest
     outputs:
-      distfile: ${{ steps.build.outputs.distfile }}
+      run: ${{ steps.check-run.outputs.run }}
+      skip-go: ${{ steps.check-go.outputs.skip-go }}
     steps:
       - name: Checkout
         id: checkout
@@ -32,18 +33,114 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      - name: Check source files
+        id: check-source-files
+        uses: step-security/changed-files@v45
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            **/*.c
+            **/*.cc
+            **/*.h
+            **/*.hh
+            **/*.in
+            **/*.patch
+            src/aclk/aclk-schemas/
+            src/ml/dlib/
+            src/fluent-bit/
+            src/web/server/h2o/libh2o/
+          files_ignore: |
+            netdata.spec.in
+            **/*.md
+      - name: Check build files
+        id: check-build-files
+        uses: step-security/changed-files@v45
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            **/*.cmake
+            CMakeLists.txt
+            netdata-installer.sh
+            .github/data/distros.yml
+            .github/workflows/build.yml
+            .github/scripts/build-static.sh
+            .github/scripts/get-static-cache-key.sh
+            .github/scripts/gen-matrix-static.py
+            .github/scripts/gen-matrix-build.py
+            .github/scripts/run-updater-check.sh
+            packaging/cmake/
+            packaging/makeself/
+            packaging/installer/
+            packaging/windows/
+            packaging/*.sh
+            packaging/*.version
+            packaging/*.checksums
+          files_ignore: |
+            **/*.md
+            packaging/repoconfig/
+      - name: List all changed files in pattern
+        continue-on-error: true
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          CHANGED_SOURCE_FILES: ${{ steps.check-source-files.outputs.all_changed_files }}
+          CHANGED_BUILD_FILES: ${{ steps.check-build-files.outputs.all_changed_files }}
+        run: |
+          for file in ${CHANGED_SOURCE_FILES} ${CHANGED_BUILD_FILES} ; do
+            echo "$file was changed"
+          done
+      - name: Check Run
+        id: check-run
+        run: |
+          if [ "${{ steps.check-source-files.outputs.any_modified }}" == "true" ] || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'run=false' >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Check Go
+        id: check-go
+        run: |
+          if [ '${{ github.event_name }}' == 'pull_request' ]; then
+            if echo "${{ steps.check-source-files.outputs.other_changed_files }}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
+              echo 'skip-go=' >> "${GITHUB_OUTPUT}"
+            else
+              echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
+            fi
+          else
+            echo 'skip-go=' >> "${GITHUB_OUTPUT}"
+          fi
+
+  build-dist: # Build the distribution tarball and store it as an artifact.
+    name: Build Distribution Tarball
+    runs-on: ubuntu-latest
+    needs:
+      - file-check
+    outputs:
+      distfile: ${{ steps.build.outputs.distfile }}
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
       - name: Fix tags
         id: fix-tags
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' && needs.file-check.outputs.run == 'true'
         run: |
           git fetch --tags --force
       - name: Mark Stable
         id: channel
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly' && needs.file-check.outputs.run == 'true'
         run: |
           sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh
       - name: Build
         id: build
+        if: needs.file-check.outputs.run == 'true'
         run: |
           mkdir -p artifacts/
           tar --create --file "artifacts/netdata-$(git describe).tar.gz" \
@@ -54,6 +151,7 @@ jobs:
           echo "distfile=$(find . -name 'netdata-*.tar.gz')" >> "${GITHUB_OUTPUT}"
       - name: Store
         id: store
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/upload-artifact@v4.6.1
         with:
           name: dist-tarball
@@ -81,6 +179,7 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   static-matrix: # Generate the static build matrix.
@@ -128,34 +227,40 @@ jobs:
   build-static: # Build the static binary archives, and store them as artifacts.
     name: Build Static
     needs:
+      - file-check
       - static-matrix
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.static-matrix.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Fix tags
         id: fix-tags
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' && needs.file-check.outputs.run == 'true'
         run: |
           git fetch --tags --force
       - name: Mark Stable
         id: channel
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly' && needs.file-check.outputs.run == 'true'
         run: |
           sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh packaging/makeself/install-or-update.sh
       - name: Get Cache Key
-        if: (github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache'))
+        if: (github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')) && needs.file-check.outputs.run == 'true'
         id: cache-key
         run: .github/scripts/get-static-cache-key.sh ${{ matrix.arch }} "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache') }}"
       - name: Cache
-        if: (github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache'))
+        if: (github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')) && needs.file-check.outputs.run == 'true'
         id: cache
         uses: actions/cache@v4
         with:
@@ -163,28 +268,31 @@ jobs:
           key: ${{ steps.cache-key.outputs.key }}
       - name: Set up QEMU
         id: qemu
-        if: matrix.qemu
+        if: matrix.qemu && needs.file-check.outputs.run == 'true'
         run: |
           sudo apt-get update
           sudo apt-get upgrade -y
           sudo apt-get install -y qemu-user-static
       - name: Build
-        if: github.event_name != 'workflow_dispatch' # Don’t use retries on PRs.
+        if: github.event_name != 'workflow_dispatch' && needs.file-check.outputs.run == 'true' # Don’t use retries on PRs.
         run: |
+          export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
           [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
           .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Build
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && needs.file-check.outputs.run == 'true'
         id: build
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 360
           max_attempts: 3
           command: |
+            export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
             [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
             .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Store
         id: store
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/upload-artifact@v4.6.1
         with:
           name: dist-static-${{ matrix.arch }}
@@ -213,34 +321,45 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   windows-build: # Test building on Windows
     name: Test building on Windows
     runs-on: windows-latest
+    needs:
+      - file-check
     steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: Write-Output "SKIPPED"
       - name: Checkout
         uses: actions/checkout@v4
         id: checkout
+        if: needs.file-check.outputs.run == 'true'
         with:
           submodules: recursive
           lfs: true
       - name: Set Up Go
         id: golang
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/setup-go@v5
         with:
           go-version: "^1.23"
       - name: Set Up Dependencies
         id: deps
+        if: needs.file-check.outputs.run == 'true'
         run: ./packaging/windows/install-dependencies.ps1
       - name: Build Netdata
         id: build
+        if: needs.file-check.outputs.run == 'true'
         env:
           BUILD_DIR: ${{ github.workspace }}\build
         run: ./packaging/windows/build.ps1
       - name: Sign Agent Code
         id: sign-agent
-        if: github.event_name != 'pull_request'
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
         uses: azure/trusted-signing-action@v0.5.1
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
@@ -257,12 +376,13 @@ jobs:
           timestamp-digest: SHA256
       - name: Package Netdata
         id: package
+        if: needs.file-check.outputs.run == 'true'
         env:
           BUILD_DIR: ${{ github.workspace }}\build
         run: ./packaging/windows/package.ps1
       - name: Sign Installer
         id: sign-installer
-        if: github.event_name != 'pull_request'
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
         uses: azure/trusted-signing-action@v0.5.1
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
@@ -307,6 +427,7 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   prepare-upload: # Consolidate the artifacts for uploading or releasing.
@@ -316,15 +437,23 @@ jobs:
       - build-dist
       - build-static
       - windows-build
+      - file-check
     steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
       - name: Prepare Environment
         id: prepare
+        if: needs.file-check.outputs.run == 'true'
         run: mkdir -p artifacts
       - name: Retrieve Build Artifacts
         id: fetch-dist
+        if: needs.file-check.outputs.run == 'true'
         uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
@@ -336,6 +465,7 @@ jobs:
           attempt_delay: 2000
       - name: Retrieve Windows Artifacts
         id: fetch-windows
+        if: needs.file-check.outputs.run == 'true'
         uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
@@ -347,6 +477,7 @@ jobs:
           attempt_delay: 2000
       - name: Prepare Artifacts
         id: consolidate
+        if: needs.file-check.outputs.run == 'true'
         working-directory: ./artifacts/
         run: |
           mv ../dist-artifacts/* . || exit 1
@@ -356,6 +487,7 @@ jobs:
           cat sha256sums.txt
       - name: Store Artifacts
         id: store
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/upload-artifact@v4.6.1
         with:
           name: final-artifacts
@@ -384,6 +516,7 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   artifact-verification-dist: # Verify the regular installer works with the consolidated artifacts.
@@ -391,6 +524,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - prepare-upload
+      - file-check
     services:
       apache: # This gets used to serve the dist tarball for the updater script.
         image: httpd:2.4
@@ -399,11 +533,17 @@ jobs:
         volumes:
           - ${{ github.workspace }}:/usr/local/apache2/htdocs/
     steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
       - name: Fetch artifacts
         id: fetch
+        if: needs.file-check.outputs.run == 'true'
         uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
@@ -414,12 +554,14 @@ jobs:
           attempt_delay: 2000
       - name: Prepare artifacts directory
         id: prepare
+        if: needs.file-check.outputs.run == 'true'
         run: |
           mkdir -p download/latest
           mv artifacts/* download/latest
           ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
+        if: needs.file-check.outputs.run == 'true'
         env:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/
         run: sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
@@ -443,6 +585,7 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   artifact-verification-static: # Verify the static installer works with the consolidated artifacts.
@@ -450,6 +593,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - prepare-upload
+      - file-check
     services:
       apache: # This gets used to serve the static archives.
         image: httpd:2.4
@@ -458,11 +602,17 @@ jobs:
         volumes:
           - ${{ github.workspace }}:/usr/local/apache2/htdocs/
     steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
       - name: Fetch artifacts
         id: fetch-artifacts
+        if: needs.file-check.outputs.run == 'true'
         uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
@@ -473,12 +623,14 @@ jobs:
           attempt_delay: 2000
       - name: Prepare artifacts directory
         id: prepare
+        if: needs.file-check.outputs.run == 'true'
         run: |
           mkdir -p download/latest
           mv artifacts/* download/latest
           ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
+        if: needs.file-check.outputs.run == 'true'
         env:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/
         run: sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
@@ -502,6 +654,7 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   artifact-verification-updater: # Test the generated dist archive using the updater code.
@@ -509,6 +662,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - prepare-upload
+      - file-check
     services:
       apache: # This gets used to serve the dist tarball for the updater script.
         image: httpd:2.4
@@ -519,12 +673,15 @@ jobs:
     steps:
       - name: Skip Check
         id: skip
+        if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
       - name: Checkout
         id: checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
       - name: Fetch artifacts
         id: fetch-artifacts
+        if: needs.file-check.outputs.run == 'true'
         uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
@@ -535,12 +692,14 @@ jobs:
           attempt_delay: 2000
       - name: Prepare artifacts directory
         id: prepare
+        if: needs.file-check.outputs.run == 'true'
         run: |
           mkdir -p download/latest
           mv artifacts/* download/latest
           ls -al download/latest
       - name: Run Updater Check
         id: check
+        if: needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host \
                  -v $PWD:/netdata -w /netdata \
@@ -566,6 +725,7 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   create-nightly: # Create a nightly build release in netdata/netdata-nightlies
@@ -820,6 +980,7 @@ jobs:
     if: github.event_name != 'workflow_dispatch'
     needs:
       - src-matrix
+      - file-check
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -827,9 +988,11 @@ jobs:
     steps:
       - name: Skip Check
         id: skip
+        if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
       - name: Checkout
         id: checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -854,9 +1017,10 @@ jobs:
           attempt_delay: 15000
       - name: netdata-installer on ${{ matrix.distro }}
         id: build-cloud
+        if: needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --one-time-build'
+              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -878,12 +1042,15 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   macos-build: # Test building on macOS
     name: Test building on macOS
     runs-on: ${{ matrix.runner }}
     if: github.event_name != 'workflow_dispatch'
+    needs:
+      - file-check
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -896,24 +1063,33 @@ jobs:
           - name: macos-15-M1
             runner: macos-15
     steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
       - uses: actions/checkout@v4
         id: checkout
+        if: needs.file-check.outputs.run == 'true'
         with:
           submodules: recursive
       - name: Install latest bash
         id: install-bash
+        if: needs.file-check.outputs.run == 'true'
         run: |
           brew install bash
       - name: Install netdata dependencies
         id: install-nd-dep
+        if: needs.file-check.outputs.run == 'true'
         run: |
           bash ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
       - name: Build from source
         id: build-source
+        if: needs.file-check.outputs.run == 'true'
         run: |
           sudo bash ./netdata-installer.sh --install-no-prefix /usr/local/netdata --dont-wait --dont-start-it --one-time-build
       - name: Test Agent start up
         id: test-agent
+        if: needs.file-check.outputs.run == 'true'
         run: |
           /usr/local/netdata/usr/sbin/netdata -D > ./netdata.log 2>&1 &
           ./packaging/runtime-check.sh

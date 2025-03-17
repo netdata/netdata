@@ -161,37 +161,42 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
     dsf_acquire(*ds);
 
-    buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->timestamp_ut, true); // ECS
-    buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION); // custom
+    buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->timestamp_ut, true);
+    buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
 
-    buffer_json_member_add_object(wb, "agent"); // ECS
+    buffer_json_member_add_object(wb, "agent");
     {
-        buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid); // ECS
-        buffer_json_member_add_uuid_compact(wb, "ephemeral_id", ds->invocation.uuid); // ECS
-        buffer_json_member_add_string(wb, "version", ds->version); // ECS
+        buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid);
+        buffer_json_member_add_uuid_compact(wb, "ephemeral_id", ds->invocation.uuid);
+        buffer_json_member_add_string(wb, "version", ds->version);
 
-        buffer_json_member_add_time_t(wb, "uptime", ds->uptime); // custom
+        buffer_json_member_add_time_t(wb, "uptime", ds->uptime);
 
-        buffer_json_member_add_uuid(wb, "ND_node_id", ds->node_id.uuid); // custom
-        buffer_json_member_add_uuid(wb, "ND_claim_id", ds->claim_id.uuid); // custom
-        buffer_json_member_add_uint64(wb, "ND_restarts", ds->restarts); // custom
+        buffer_json_member_add_uuid(wb, "node_id", ds->node_id.uuid);
+        buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
+        buffer_json_member_add_uint64(wb, "restarts", ds->restarts);
 
-        ND_PROFILE_2json(wb, "ND_profile", ds->profile); // custom
-        buffer_json_member_add_string(wb, "ND_status", DAEMON_STATUS_2str(ds->status)); // custom
-        EXIT_REASON_2json(wb, "ND_exit_reason", ds->exit_reason); // custom
+        ND_PROFILE_2json(wb, "profile", ds->profile);
+        buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
+        EXIT_REASON_2json(wb, "exit_reason", ds->exit_reason);
 
-        buffer_json_member_add_string_or_empty(wb, "ND_install_type", ds->install_type); // custom
+        buffer_json_member_add_string_or_empty(wb, "install_type", ds->install_type);
 
         if(ds->v >= 14) {
-            buffer_json_member_add_string(wb, "ND_db_mode", rrd_memory_mode_name(ds->db_mode)); // custom
-            buffer_json_member_add_uint64(wb, "ND_db_tiers", ds->db_tiers); // custom
-            buffer_json_member_add_boolean(wb, "ND_kubernetes", ds->kubernetes); // custom
+            buffer_json_member_add_string(wb, "db_mode", rrd_memory_mode_name(ds->db_mode));
+            buffer_json_member_add_uint64(wb, "db_tiers", ds->db_tiers);
+            buffer_json_member_add_boolean(wb, "kubernetes", ds->kubernetes);
         }
 
         if(ds->v >= 16)
-            buffer_json_member_add_boolean(wb, "ND_sentry_available", ds->sentry_available); // custom
+            buffer_json_member_add_boolean(wb, "sentry_available", ds->sentry_available);
 
-        buffer_json_member_add_object(wb, "ND_timings"); // custom
+        if(ds->v >= 18) {
+            buffer_json_member_add_int64(wb, "reliability", ds->reliability);
+            buffer_json_member_add_string(wb, "stack_traces", ds->stack_traces);
+        }
+
+        buffer_json_member_add_object(wb, "timings");
         {
             buffer_json_member_add_time_t(wb, "init", ds->timings.init);
             buffer_json_member_add_time_t(wb, "exit", ds->timings.exit);
@@ -200,28 +205,28 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_object(wb, "host"); // ECS
+    buffer_json_member_add_object(wb, "host");
     {
         buffer_json_member_add_uuid_compact(wb, "id", ds->machine_id.uuid);
-        buffer_json_member_add_string_or_empty(wb, "architecture", ds->architecture); // ECS
-        buffer_json_member_add_string_or_empty(wb, "virtualization", ds->virtualization); // custom
-        buffer_json_member_add_string_or_empty(wb, "container", ds->container); // custom
-        buffer_json_member_add_time_t(wb, "uptime", ds->boottime); // ECS
+        buffer_json_member_add_string_or_empty(wb, "architecture", ds->architecture);
+        buffer_json_member_add_string_or_empty(wb, "virtualization", ds->virtualization);
+        buffer_json_member_add_string_or_empty(wb, "container", ds->container);
+        buffer_json_member_add_time_t(wb, "uptime", ds->boottime);
 
-        buffer_json_member_add_object(wb, "boot"); // ECS
+        buffer_json_member_add_object(wb, "boot");
         {
-            buffer_json_member_add_uuid_compact(wb, "id", ds->boot_id.uuid); // ECS
+            buffer_json_member_add_uuid_compact(wb, "id", ds->boot_id.uuid);
         }
         buffer_json_object_close(wb);
 
-        buffer_json_member_add_object(wb, "memory"); // custom
+        buffer_json_member_add_object(wb, "memory");
         if(OS_SYSTEM_MEMORY_OK(ds->memory)) {
             buffer_json_member_add_uint64(wb, "total", ds->memory.ram_total_bytes);
             buffer_json_member_add_uint64(wb, "free", ds->memory.ram_available_bytes);
         }
         buffer_json_object_close(wb);
 
-        buffer_json_member_add_object(wb, "disk"); // ECS
+        buffer_json_member_add_object(wb, "disk");
         {
             buffer_json_member_add_object(wb, "db");
             if (OS_SYSTEM_DISK_SPACE_OK(ds->var_cache)) {
@@ -237,18 +242,18 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_object(wb, "os"); // ECS
+    buffer_json_member_add_object(wb, "os");
     {
-        buffer_json_member_add_string(wb, "type", DAEMON_OS_TYPE_2str(ds->os_type)); // ECS
-        buffer_json_member_add_string_or_empty(wb, "kernel", ds->kernel_version); // ECS
-        buffer_json_member_add_string_or_empty(wb, "name", ds->os_name); // ECS
-        buffer_json_member_add_string_or_empty(wb, "version", ds->os_version); // ECS
-        buffer_json_member_add_string_or_empty(wb, "family", ds->os_id); // ECS
-        buffer_json_member_add_string_or_empty(wb, "platform", ds->os_id_like); // ECS
+        buffer_json_member_add_string(wb, "type", DAEMON_OS_TYPE_2str(ds->os_type));
+        buffer_json_member_add_string_or_empty(wb, "kernel", ds->kernel_version);
+        buffer_json_member_add_string_or_empty(wb, "name", ds->os_name);
+        buffer_json_member_add_string_or_empty(wb, "version", ds->os_version);
+        buffer_json_member_add_string_or_empty(wb, "family", ds->os_id);
+        buffer_json_member_add_string_or_empty(wb, "platform", ds->os_id_like);
     }
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_object(wb, "fatal"); // custom
+    buffer_json_member_add_object(wb, "fatal");
     {
         buffer_json_member_add_uint64(wb, "line", ds->fatal.line);
         buffer_json_member_add_string_or_empty(wb, "filename", ds->fatal.filename);
@@ -256,6 +261,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "message", ds->fatal.message);
         buffer_json_member_add_string_or_empty(wb, "errno", ds->fatal.errno_str);
         buffer_json_member_add_string_or_empty(wb, "thread", ds->fatal.thread);
+        buffer_json_member_add_uint64(wb, "thread_id", ds->fatal.thread_id);
         buffer_json_member_add_string_or_empty(wb, "stack_trace", ds->fatal.stack_trace);
 
         if(ds->v >= 16) {
@@ -269,17 +275,17 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_array(wb, "dedup"); // custom
+    buffer_json_member_add_array(wb, "dedup");
     {
         for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
             if (ds->dedup.slot[i].timestamp_ut == 0)
                 continue;
 
-            buffer_json_add_array_item_object(wb); // custom
+            buffer_json_add_array_item_object(wb);
             {
-                buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup.slot[i].timestamp_ut, true); // custom
-                buffer_json_member_add_uint64(wb, "hash", ds->dedup.slot[i].hash); // custom
-                buffer_json_member_add_boolean(wb, "sentry", ds->dedup.slot[i].sentry); // custom
+                buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup.slot[i].timestamp_ut, true);
+                buffer_json_member_add_uint64(wb, "hash", ds->dedup.slot[i].hash);
+                buffer_json_member_add_boolean(wb, "sentry", ds->dedup.slot[i].sentry);
             }
             buffer_json_object_close(wb);
         }
@@ -312,11 +318,25 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v14 = version >= 14 ? strict : false;
     bool required_v16 = version >= 16 ? strict : false;
     bool required_v17 = version >= 17 ? strict : false;
+    bool required_v18 = version >= 18 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
     if(datetime[0])
         ds->timestamp_ut = rfc3339_parse_ut(datetime, NULL);
+
+    const char *profile_key = version >= 18 ? "profile" : "ND_profile";
+    const char *status_key = version >= 18 ? "status" : "ND_status";
+    const char *exit_reason_key = version >= 18 ? "exit_reason" : "ND_exit_reason";
+    const char *node_id_key = version >= 18 ? "node_id" : "ND_node_id";
+    const char *claim_id_key = version >= 18 ? "claim_id" : "ND_claim_id";
+    const char *install_type_key = version >= 18 ? "install_type" : "ND_install_type";
+    const char *timings_key = version >= 18 ? "timings" : "ND_timings";
+    const char *restarts_key = version >= 18 ? "restarts" : "ND_restarts";
+    const char *db_mode_key = version >= 18 ? "db_mode" : "ND_db_mode";
+    const char *db_tiers_key = version >= 18 ? "db_tiers" : "ND_db_tiers";
+    const char *kubernetes_key = version >= 18 ? "kubernetes" : "ND_kubernetes";
+    const char *sentry_available_key = version >= 18 ? "sentry_available" : "ND_sentry_available";
 
     // Parse agent object
     JSONC_PARSE_SUBOBJECT(jobj, path, "agent", error, required_v1, {
@@ -324,25 +344,26 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ephemeral_id", ds->invocation.uuid, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->version, error, required_v1);
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->uptime, error, required_v1);
-        JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "ND_profile", ND_PROFILE_2id_one, ds->profile, error, required_v1);
-        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ND_status", DAEMON_STATUS_2id, ds->status, error, required_v1);
-        JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "ND_exit_reason", EXIT_REASON_2id_one, ds->exit_reason, error, required_v1);
-        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ND_node_id", ds->node_id.uuid, error, required_v1);
-        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ND_claim_id", ds->claim_id.uuid, error, required_v1);
-        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "ND_install_type", ds->install_type, error, required_v3);
 
-        JSONC_PARSE_SUBOBJECT(jobj, path, "ND_timings", error, required_v1, {
+        JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, profile_key, ND_PROFILE_2id_one, ds->profile, error, required_v1);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, status_key, DAEMON_STATUS_2id, ds->status, error, required_v1);
+        JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, exit_reason_key, EXIT_REASON_2id_one, ds->exit_reason, error, required_v1);
+        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, node_id_key, ds->node_id.uuid, error, required_v1);
+        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, claim_id_key, ds->claim_id.uuid, error, required_v1);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, install_type_key, ds->install_type, error, required_v3);
+
+        JSONC_PARSE_SUBOBJECT(jobj, path, timings_key, error, required_v1, {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init", ds->timings.init, error, required_v1);
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit", ds->timings.exit, error, required_v1);
         });
 
         if(version >= 4)
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ND_restarts", ds->restarts, error, required_v4);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, restarts_key, ds->restarts, error, required_v4);
 
         if(version >= 14) {
-            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ND_db_mode", rrd_memory_mode_id, ds->db_mode, error, required_v14);
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "ND_db_tiers", ds->db_tiers, error, required_v14);
-            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_kubernetes", ds->kubernetes, error, required_v14);
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, db_mode_key, rrd_memory_mode_id, ds->db_mode, error, required_v14);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, db_tiers_key, ds->db_tiers, error, required_v14);
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, kubernetes_key, ds->kubernetes, error, required_v14);
         }
         else {
             ds->db_mode = default_rrd_memory_mode;
@@ -351,9 +372,13 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         }
 
         if(version >= 17)
-            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry_available", ds->sentry_available, error, required_v17);
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, sentry_available_key, ds->sentry_available, error, required_v17);
         else if(version == 16)
             JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "ND_sentry", ds->sentry_available, error, required_v16);
+        if(version >= 18) {
+            JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "reliability", ds->reliability, error, required_v18);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "stack_traces", ds->stack_traces, error, required_v18);
+        }
     });
 
     // Parse host object
@@ -408,12 +433,14 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "errno", ds->fatal.errno_str, error, required_v3);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "thread", ds->fatal.thread, error, required_v5);
 
-        if(version >= 16) {
+        if(version >= 16)
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "signal_code", SIGNAL_CODE_2id_h, ds->fatal.signal_code, error, required_v16);
-        }
-        if(version >= 17) {
+
+        if(version >= 17)
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "sentry", SIGNAL_CODE_2id_h, ds->fatal.sentry, error, required_v17);
-        }
+
+        if(version >= 18)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "thread_id", ds->fatal.thread_id, error, required_v18);
     });
 
     // Parse the last posted object
@@ -451,6 +478,85 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 // --------------------------------------------------------------------------------------------------------------------
 // get the current status
 
+static void daemon_status_file_migrate_once(void) {
+    FUNCTION_RUN_ONCE();
+
+    dsf_acquire(last_session_status);
+    dsf_acquire(session_status);
+
+    strncpyz(session_status.version, NETDATA_VERSION, sizeof(session_status.version) - 1);
+    session_status.machine_id = os_machine_id();
+
+    {
+        char *install_type = NULL, *prebuilt_arch = NULL, *prebuilt_dist = NULL;
+        get_install_type_internal(&install_type, &prebuilt_arch, &prebuilt_dist);
+
+        if(install_type)
+            strncpyz(session_status.install_type, install_type, sizeof(session_status.install_type) - 1);
+
+        freez(prebuilt_arch);
+        freez(prebuilt_dist);
+        freez(install_type);
+    }
+
+#if defined(ENABLE_SENTRY)
+    session_status.sentry_available = true;
+#else
+    session_status.sentry_available = false;
+#endif
+
+    session_status.boot_id = os_boot_id();
+    if(!UUIDeq(session_status.boot_id, last_session_status.boot_id) && os_boot_ids_match(session_status.boot_id, last_session_status.boot_id)) {
+        // there is a slight difference in boot_id, but it is still the same boot
+        // copy the last boot_id
+        session_status.boot_id = last_session_status.boot_id;
+    }
+
+    session_status.claim_id = last_session_status.claim_id;
+    session_status.node_id = last_session_status.node_id;
+    session_status.host_id = last_session_status.host_id;
+    if(UUIDiszero(session_status.host_id)) {
+        const char *machine_guid = registry_get_this_machine_guid(false);
+        if(machine_guid && *machine_guid) {
+            if (uuid_parse_flexi(machine_guid, session_status.host_id.uuid) != 0)
+                session_status.host_id = UUID_ZERO;
+        }
+    }
+
+    strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
+    strncpyz(session_status.virtualization, last_session_status.virtualization, sizeof(session_status.virtualization) - 1);
+    strncpyz(session_status.container, last_session_status.container, sizeof(session_status.container) - 1);
+    strncpyz(session_status.kernel_version, last_session_status.kernel_version, sizeof(session_status.kernel_version) - 1);
+    strncpyz(session_status.os_name, last_session_status.os_name, sizeof(session_status.os_name) - 1);
+    strncpyz(session_status.os_version, last_session_status.os_version, sizeof(session_status.os_version) - 1);
+    strncpyz(session_status.os_id, last_session_status.os_id, sizeof(session_status.os_id) - 1);
+    strncpyz(session_status.os_id_like, last_session_status.os_id_like, sizeof(session_status.os_id_like) - 1);
+
+    session_status.restarts = last_session_status.restarts + 1;
+    session_status.reliability = last_session_status.reliability;
+
+    bool crashed = last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED;
+    bool exited_with_fatal = last_session_status.status == DAEMON_STATUS_EXITED && last_session_status.exit_reason != EXIT_REASON_NONE && !is_exit_reason_normal(last_session_status.exit_reason);
+    if(crashed || exited_with_fatal) {
+        if(session_status.reliability > 0) session_status.reliability = 0;
+        session_status.reliability--;
+    }
+    else {
+        if(session_status.reliability < 0) session_status.reliability = 0;
+        session_status.reliability++;
+    }
+
+    if(last_session_status.v == STATUS_FILE_VERSION) {
+        for (size_t i = 0; i < _countof(session_status.dedup.slot); i++)
+            session_status.dedup.slot[i] = last_session_status.dedup.slot[i];
+    }
+
+    strncpyz(session_status.stack_traces, capture_stack_trace_backend(), sizeof(session_status.stack_traces) - 1);
+
+    dsf_release(last_session_status);
+    dsf_release(session_status);
+}
+
 static void daemon_status_file_refresh(DAEMON_STATUS status) {
     usec_t now_ut = now_realtime_usec();
 
@@ -479,15 +585,6 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(session_status.status == DAEMON_STATUS_EXITING)
         session_status.timings.exit = (time_t)((now_ut - session_status.timings.exit_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
-    strncpyz(session_status.version, NETDATA_VERSION, sizeof(session_status.version) - 1);
-
-    session_status.boot_id = os_boot_id();
-    if(!UUIDeq(session_status.boot_id, last_session_status.boot_id) && os_boot_ids_match(session_status.boot_id, last_session_status.boot_id)) {
-        // there is a slight difference in boot_id, but it is still the same boot
-        // copy the last boot_id
-        session_status.boot_id = last_session_status.boot_id;
-    }
-
     session_status.boottime = now_boottime_sec();
     session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
@@ -495,76 +592,14 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
 
-#if defined(ENABLE_SENTRY)
-    session_status.sentry_available = true;
-#else
-    session_status.sentry_available = false;
-#endif
-
     session_status.claim_id = claim_id_get_uuid();
 
     if(localhost) {
-        session_status.host_id = localhost->host_id;
-        session_status.node_id = localhost->node_id;
-    }
-    else if(!UUIDiszero(last_session_status.host_id))
-        session_status.host_id = last_session_status.host_id;
-    else {
-        const char *machine_guid = registry_get_this_machine_guid(false);
-        if(machine_guid && *machine_guid) {
-            if (uuid_parse_flexi(machine_guid, session_status.host_id.uuid) != 0)
-                session_status.host_id = UUID_ZERO;
-        }
-        else
-            session_status.host_id = UUID_ZERO;
-    }
+        if(!UUIDiszero(localhost->host_id))
+            session_status.host_id = localhost->host_id;
 
-    if(UUIDiszero(session_status.machine_id))
-        session_status.machine_id = os_machine_id();
-
-    // copy items from the old status if they are not set
-    if(UUIDiszero(session_status.claim_id))
-        session_status.claim_id = last_session_status.claim_id;
-    if(UUIDiszero(session_status.node_id))
-        session_status.node_id = last_session_status.node_id;
-    if(UUIDiszero(session_status.host_id))
-        session_status.host_id = last_session_status.host_id;
-    if(!session_status.architecture[0] && last_session_status.architecture[0])
-        strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
-    if(!session_status.virtualization[0] && last_session_status.virtualization[0])
-        strncpyz(session_status.virtualization, last_session_status.virtualization, sizeof(session_status.virtualization) - 1);
-    if(!session_status.container[0] && last_session_status.container[0])
-        strncpyz(session_status.container, last_session_status.container, sizeof(session_status.container) - 1);
-    if(!session_status.kernel_version[0] && last_session_status.kernel_version[0])
-        strncpyz(session_status.kernel_version, last_session_status.kernel_version, sizeof(session_status.kernel_version) - 1);
-    if(!session_status.os_name[0] && last_session_status.os_name[0])
-        strncpyz(session_status.os_name, last_session_status.os_name, sizeof(session_status.os_name) - 1);
-    if(!session_status.os_version[0] && last_session_status.os_version[0])
-        strncpyz(session_status.os_version, last_session_status.os_version, sizeof(session_status.os_version) - 1);
-    if(!session_status.os_id[0] && last_session_status.os_id[0])
-        strncpyz(session_status.os_id, last_session_status.os_id, sizeof(session_status.os_id) - 1);
-    if(!session_status.os_id_like[0] && last_session_status.os_id_like[0])
-        strncpyz(session_status.os_id_like, last_session_status.os_id_like, sizeof(session_status.os_id_like) - 1);
-    if(!session_status.restarts)
-        session_status.restarts = last_session_status.restarts + 1;
-
-    if(last_session_status.v == STATUS_FILE_VERSION) {
-        if (!session_status.dedup.slot[0].timestamp_ut || !session_status.dedup.slot[0].hash) {
-            for (size_t i = 0; i < _countof(session_status.dedup.slot); i++)
-                session_status.dedup.slot[i] = last_session_status.dedup.slot[i];
-        }
-    }
-
-    if(!session_status.install_type[0]) {
-        char *install_type = NULL, *prebuilt_arch = NULL, *prebuilt_dist = NULL;
-        get_install_type_internal(&install_type, &prebuilt_arch, &prebuilt_dist);
-
-        if(install_type)
-            strncpyz(session_status.install_type, install_type, sizeof(session_status.install_type) - 1);
-
-        freez(prebuilt_arch);
-        freez(prebuilt_dist);
-        freez(install_type);
+        if(!UUIDiszero(localhost->node_id))
+            session_status.node_id = localhost->node_id;
     }
 
     get_daemon_status_fields_from_system_info(&session_status);
@@ -993,6 +1028,7 @@ void daemon_status_file_init(void) {
     static_save_buffer_init();
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
     daemon_status_file_load(&last_session_status);
+    daemon_status_file_migrate_once();
 }
 
 void daemon_status_file_check_crash(void) {
@@ -1261,6 +1297,9 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     exit_initiated_add(EXIT_REASON_FATAL);
     session_status.exit_reason |= EXIT_REASON_FATAL;
 
+    if(!session_status.fatal.thread_id)
+        session_status.fatal.thread_id = gettid_cached();
+
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag());
 
     if(filename && *filename)
@@ -1336,6 +1375,9 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
     if(code)
         session_status.fatal.signal_code = code;
+
+    if(!session_status.fatal.thread_id)
+        session_status.fatal.thread_id = gettid_cached();
 
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag_async_safe());
 
@@ -1465,11 +1507,30 @@ const char *daemon_status_file_get_fatal_stack_trace(void) {
     return session_status.fatal.stack_trace;
 }
 
+const char *daemon_status_file_get_stack_trace_backend(void) {
+    return session_status.stack_traces;
+}
+
 const char *daemon_status_file_get_fatal_thread(void) {
     return session_status.fatal.thread;
+}
+
+pid_t daemon_status_file_get_fatal_thread_id(void) {
+    return session_status.fatal.thread_id;
 }
 
 long daemon_status_file_get_fatal_line(void) {
     return session_status.fatal.line;
 }
 
+DAEMON_STATUS daemon_status_file_get_status(void) {
+    return session_status.status;
+}
+
+size_t daemon_status_file_get_restarts(void) {
+    return session_status.restarts;
+}
+
+ssize_t daemon_status_file_get_reliability(void) {
+    return session_status.reliability;
+}
