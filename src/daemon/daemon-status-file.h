@@ -88,6 +88,7 @@ typedef struct daemon_status_file {
         char thread[ND_THREAD_TAG_MAX + 1];
         pid_t thread_id;
         SIGNAL_CODE signal_code;
+        uintptr_t fault_address;
         bool sentry;        // true when the error was also reported to sentry
     } fatal;
 
@@ -104,7 +105,7 @@ typedef struct daemon_status_file {
 void daemon_status_file_update_status(DAEMON_STATUS status);
 
 // returns true when the event is duplicate and should not be reported again
-bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, bool chained_handler);
+bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, void *fault_address, bool chained_handler);
 
 // check for a crash
 void daemon_status_file_check_crash(void);
