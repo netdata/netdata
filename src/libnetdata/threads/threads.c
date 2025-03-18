@@ -440,7 +440,9 @@ int nd_thread_join(ND_THREAD *nti) {
 
     int ret = pthread_join(nti->thread, NULL);
     if(ret != 0) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot join thread. pthread_join() failed with code %d. (tag=%s)", ret, nti->tag);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "cannot join thread. pthread_join() failed with code %d. (tag=%s), thread pointer: %p",
+               ret, nti->tag, nti->thread);
     }
     else {
         nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);

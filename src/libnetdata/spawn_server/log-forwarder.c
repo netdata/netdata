@@ -73,6 +73,8 @@ LOG_FORWARDER *log_forwarder_start(void) {
     lf->running = true;
     lf->thread = nd_thread_create("log-fw", NETDATA_THREAD_OPTION_JOINABLE, log_forwarder_thread_func, lf);
 
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Log forwarder: created thread pointer: %p", lf->thread);
+
     return lf;
 }
 
@@ -93,22 +95,20 @@ void log_forwarder_stop(LOG_FORWARDER *lf) {
     }
 
     lf->running = false;
-
-    // mark them all for deletion
     mark_all_entries_for_deletion_unsafe(lf);
 
     // Send a byte to the pipe to wake up the thread
-    char ch = 0;
-    if(write(lf->pipe_fds[PIPE_WRITE], &ch, 1) <= 0) { ; }
+//    char ch = 0;
+//    if(write(lf->pipe_fds[PIPE_WRITE], &ch, 1) <= 0) { ; }
+    close(lf->pipe_fds[PIPE_WRITE]); // force it to quit
     spinlock_unlock(&lf->spinlock);
 
     // Wait for the thread to finish
-    close(lf->pipe_fds[PIPE_WRITE]); // force it to quit
-    bool free_lf = nd_thread_join(lf->thread) == 0;
-    close(lf->pipe_fds[PIPE_READ]);
-
-    if(free_lf)
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Log forwarder: stopping thread pointer: %p", lf->thread);
+    if(nd_thread_join(lf->thread) == 0) {
+        lf->thread = NULL;
         freez(lf);
+    }
     else
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: not freeing lf due to nd_thread_join() error.");
 }
@@ -236,8 +236,6 @@ static void *log_forwarder_thread_func(void *arg) {
     while (1) {
         spinlock_lock(&lf->spinlock);
         if (!lf->running) {
-            mark_all_entries_for_deletion_unsafe(lf);
-            log_forwarder_remove_deleted_unsafe(lf);
             spinlock_unlock(&lf->spinlock);
             break;
         }
@@ -329,6 +327,12 @@ static void *log_forwarder_thread_func(void *arg) {
     }
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: exiting...");
+
+    spinlock_lock(&lf->spinlock);
+    mark_all_entries_for_deletion_unsafe(lf);
+    log_forwarder_remove_deleted_unsafe(lf);
+    spinlock_unlock(&lf->spinlock);
+    close(lf->pipe_fds[PIPE_READ]);
 
     return NULL;
 }
