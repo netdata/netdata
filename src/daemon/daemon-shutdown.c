@@ -171,18 +171,15 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
-#if !defined(OS_WINDOWS)
-NORETURN
-#endif
-static void netdata_cleanup_and_exit(EXIT_REASON reason) {
+ND_EXIT_NORETURN
+static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal) {
     exit_initiated_set(reason);
-    int ret = is_exit_reason_normal(exit_initiated_get()) ? 0 : 1;
 
     // don't recurse (due to a fatal, while exiting)
     static bool run = false;
     if(run) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "EXIT: Recursion detected. Exiting immediately.");
-        exit(ret);
+        exit(1);
     }
     run = true;
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
@@ -195,13 +192,13 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason) {
     watcher_shutdown_begin();
 
 #ifdef ENABLE_DBENGINE
-    if(!ret && dbengine_enabled)
+    if(!abnormal && dbengine_enabled)
         // flush all dirty pages asap
         rrdeng_flush_everything_and_wait(false, false, true);
 #endif
 
     // notify we are exiting
-    //analytics_statistic_t statistic = (analytics_statistic_t) {"EXIT", ret?"ERROR":"OK","-"};
+    //analytics_statistic_t statistic = (analytics_statistic_t) {"EXIT", abnormal?"ERROR":"OK","-"};
     //analytics_statistic_send(&statistic);
 
     netdata_main_spawn_server_cleanup();
@@ -226,7 +223,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason) {
     watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
 
 #ifdef ENABLE_DBENGINE
-    if(!ret && dbengine_enabled)
+    if(!abnormal && dbengine_enabled)
         // flush all dirty pages now that all collectors and streaming completed
         rrdeng_flush_everything_and_wait(false, false, true);
 #endif
@@ -256,8 +253,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason) {
     metadata_sync_shutdown_background();
     watcher_step_complete(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
 
-    if (ret)
-    {
+    if (abnormal) {
         watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
         watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
         watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
@@ -304,8 +300,9 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason) {
     }
 
     // Don't register a shutdown event if we crashed
-    if (!ret)
+    if (!abnormal)
         add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
+
     sqlite_close_databases();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
@@ -376,28 +373,30 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason) {
 #endif
 
 #ifdef ENABLE_SENTRY
-    if(ret)
+    if(abnormal)
         shutdown_on_fatal();
 
     nd_sentry_fini();
     curl_global_cleanup();
-    exit(ret);
+    exit(abnormal ? 1 : 0);
 #else
-    if(ret)
-        _exit(ret);
+    if(abnormal)
+        _exit(1);
     else {
         curl_global_cleanup();
-        exit(ret);
+        exit(0);
     }
 #endif
 }
 
-void netdata_cleanup_and_exit_gracefully(EXIT_REASON reason) {
+void netdata_exit_gracefully(EXIT_REASON reason) {
     exit_initiated_add(reason);
     FUNCTION_RUN_ONCE();
-    netdata_cleanup_and_exit(reason);
+    netdata_cleanup_and_exit(reason, false);
 }
 
-void netdata_cleanup_and_exit_fatal(EXIT_REASON reason) {
-    netdata_cleanup_and_exit(reason);
+// the final callback for the fatal() function
+void netdata_exit_fatal(void) {
+    netdata_cleanup_and_exit(EXIT_REASON_FATAL, true);
+    exit(1);
 }

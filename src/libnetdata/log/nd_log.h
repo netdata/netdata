@@ -41,7 +41,7 @@ bool capture_stack_trace_is_async_signal_safe(void);
 const char *capture_stack_trace_backend(void);
 
 typedef void (*log_event_t)(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
-void nd_log_register_fatal_data_cb(log_event_t cb);
+void nd_log_register_fatal_hook_cb(log_event_t cb);
 
 typedef void (*fatal_event_t)(void);
 void nd_log_register_fatal_final_cb(fatal_event_t cb);
