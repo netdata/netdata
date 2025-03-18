@@ -82,21 +82,21 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
 
             // log it
             char b[1024];
-            strncpyz(b, "SIGNAL HANDLER: received deadly signal: ", sizeof(b) - 1);
-            strcat(b, signals_waiting[i].name);
+            size_t len = 0;
+            len = strcatz(b, len, sizeof(b), "SIGNAL HANDLER: received deadly signal: ");
+            len = strcatz(b, len, sizeof(b), signals_waiting[i].name);
             if(sc) {
                 char buf[128];
                 SIGNAL_CODE_2str_h(sc, buf, sizeof(buf));
-
-                strcat(b, " (");
-                strcat(b, buf);
-                strcat(b, ")");
+                len = strcatz(b, len, sizeof(b), " (");
+                len = strcatz(b, len, sizeof(b), buf);
+                len = strcatz(b, len, sizeof(b), ")");
             }
-            strcat(b, " in thread ");
-            print_uint64(&b[strlen(b)], gettid_cached());
-            strcat(b, " ");
-            strcat(b, nd_thread_tag_async_safe());
-            strcat(b, "!\n");
+            len = strcatz(b, len, sizeof(b), " in thread ");
+            print_uint64(&b[len], gettid_cached());
+            len = strcatz(b, len, sizeof(b), " ");
+            len = strcatz(b, len, sizeof(b), nd_thread_tag_async_safe());
+            len = strcatz(b, len, sizeof(b), "!\n");
 
             if(write(STDERR_FILENO, b, strlen(b)) == -1) {
                 // nothing to do - we cannot write but there is no way to complain about it
