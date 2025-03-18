@@ -678,7 +678,7 @@ static bool load_status_file(const char *filename, DAEMON_STATUS_FILE *status) {
 
     // Read the file
     buffer_need_bytes(wb, file_size + 1);
-    size_t read_bytes = fread(wb->buffer, 1, file_size, fp);
+    ssize_t read_bytes = fread(wb->buffer, 1, file_size, fp);
     fclose(fp);
 
     if (read_bytes == 0)
