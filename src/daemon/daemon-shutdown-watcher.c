@@ -109,7 +109,6 @@ void *watcher_main(void *arg)
 
     usec_t shutdown_start_time = now_monotonic_usec();
 
-    watcher_wait_for_step(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD, shutdown_start_time);
@@ -144,8 +143,6 @@ void *watcher_main(void *arg)
 void watcher_thread_start() {
     watcher_steps = callocz(WATCHER_STEP_ID_MAX, sizeof(watcher_step_t));
 
-    watcher_steps[WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER].msg =
-        "destroy main spawn server";
     watcher_steps[WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS].msg =
         "close webrtc connections";
     watcher_steps[WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK].msg =

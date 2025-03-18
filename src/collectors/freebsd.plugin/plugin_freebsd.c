@@ -91,7 +91,7 @@ void *freebsd_main(void *ptr)
 
     // initialize FreeBSD plugin
     if (freebsd_plugin_init())
-        netdata_exit_fatal(EXIT_REASON_FATAL);
+        netdata_exit_fatal();
 
     // check the enabled status for each module
     int i;
