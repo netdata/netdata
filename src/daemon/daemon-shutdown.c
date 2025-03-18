@@ -172,7 +172,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 #endif
 
 ND_EXIT_NORETURN
-static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal) {
+static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exit_when_done) {
     exit_initiated_set(reason);
 
     // don't recurse (due to a fatal, while exiting)
@@ -367,10 +367,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal) {
     fprintf(stderr, "All done, exiting...\n");
 #endif
 
-#ifdef OS_WINDOWS
-    curl_global_cleanup();
-    return;
-#endif
+    if(!exit_when_done) {
+        curl_global_cleanup();
+        return;
+    }
 
 #ifdef ENABLE_SENTRY
     if(abnormal)
@@ -389,14 +389,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal) {
 #endif
 }
 
-void netdata_exit_gracefully(EXIT_REASON reason) {
+void netdata_exit_gracefully(EXIT_REASON reason, bool exit_when_done) {
     exit_initiated_add(reason);
     FUNCTION_RUN_ONCE();
-    netdata_cleanup_and_exit(reason, false);
+    netdata_cleanup_and_exit(reason, false, exit_when_done);
 }
 
 // the final callback for the fatal() function
 void netdata_exit_fatal(void) {
-    netdata_cleanup_and_exit(EXIT_REASON_FATAL, true);
+    netdata_cleanup_and_exit(EXIT_REASON_FATAL, true, true);
     exit(1);
 }

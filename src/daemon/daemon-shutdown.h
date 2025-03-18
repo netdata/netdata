@@ -16,7 +16,7 @@ void abort_on_fatal_enable(void);
 #define ND_EXIT_NORETURN
 #endif
 
-void netdata_exit_gracefully(EXIT_REASON reason);
+void netdata_exit_gracefully(EXIT_REASON reason, bool exit_when_done);
 void netdata_exit_fatal(void);
 
 #endif //NETDATA_DAEMON_SHUTDOWN_H
