@@ -239,11 +239,6 @@ int unittest_prepare_rrd(const char **user) {
     return 0;
 }
 
-static void fatal_cleanup_and_exit_cb(void) {
-    netdata_cleanup_and_exit_fatal(EXIT_REASON_FATAL);
-    exit(1);
-}
-
 static void fatal_status_file_save(void) {
     daemon_status_file_update_status(DAEMON_STATUS_NONE);
     exit(1);
@@ -780,7 +775,7 @@ int netdata_main(int argc, char **argv) {
     // this MUST be before anything else - to load the old status file before saving a new one
 
     daemon_status_file_init(); // this loads the old file
-    nd_log_register_fatal_data_cb(daemon_status_file_register_fatal);
+    nd_log_register_fatal_hook_cb(daemon_status_file_register_fatal);
     nd_log_register_fatal_final_cb(fatal_status_file_save);
     exit_initiated_init();
 
@@ -1141,7 +1136,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("done");
 
-    nd_log_register_fatal_final_cb(fatal_cleanup_and_exit_cb);
+    nd_log_register_fatal_final_cb(netdata_exit_fatal);
     daemon_status_file_startup_step(NULL);
     daemon_status_file_update_status(DAEMON_STATUS_RUNNING);
     return 10;
