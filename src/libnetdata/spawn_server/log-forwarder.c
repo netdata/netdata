@@ -86,6 +86,12 @@ void log_forwarder_stop(LOG_FORWARDER *lf) {
 
     // Signal the thread to stop
     spinlock_lock(&lf->spinlock);
+
+    if(!lf->running) {
+        spinlock_unlock(&lf->spinlock);
+        return;
+    }
+
     lf->running = false;
 
     // mark them all for deletion
