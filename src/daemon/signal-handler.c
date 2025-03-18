@@ -264,7 +264,9 @@ void nd_process_signals(void) {
             last_update_mt += save_every_ut;
         }
 
-        poll(NULL, 0, 13 * MSEC_PER_SEC + 379);
+        if(poll(NULL, 0, 13 * MSEC_PER_SEC + 379) < 0)
+            sleep(13);
+
         process_triggered_signals();
     }
 }
