@@ -368,14 +368,13 @@ size_t mrg_destroy(MRG *mrg) {
         // Lock the partition to prevent new entries while we're cleaning up
         mrg_index_write_lock(mrg, partition);
 
-        Pvoid_t uuid_judy = mrg->index[partition].uuid_judy;
         Word_t uuid_index = 0;
         Pvoid_t *uuid_pvalue;
 
         // Traverse all UUIDs in this partition
-        for (uuid_pvalue = JudyLFirst(uuid_judy, &uuid_index, PJE0);
+        for (uuid_pvalue = JudyLFirst(mrg->index[partition].uuid_judy, &uuid_index, PJE0);
              uuid_pvalue != NULL && uuid_pvalue != PJERR;
-             uuid_pvalue = JudyLNext(uuid_judy, &uuid_index, PJE0)) {
+             uuid_pvalue = JudyLNext(mrg->index[partition].uuid_judy, &uuid_index, PJE0)) {
 
             if (!(*uuid_pvalue))
                 continue;
@@ -407,10 +406,7 @@ size_t mrg_destroy(MRG *mrg) {
             JudyLFreeArray(&sections_judy, PJE0);
         }
 
-        JudyLFreeArray(&uuid_judy, PJE0);
-
-        // Update the main Judy array reference
-        mrg->index[partition].uuid_judy = uuid_judy;
+        JudyLFreeArray(&mrg->index[partition].uuid_judy, PJE0);
 
         // Unlock the partition
         mrg_index_write_unlock(mrg, partition);
