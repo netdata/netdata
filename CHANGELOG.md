@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- do not recurse cleanup on shutdown [\#19894](https://github.com/netdata/netdata/pull/19894) ([ktsaou](https://github.com/ktsaou))
+- make sure all rrdcalcs are unlinked the moment they are deleted [\#19893](https://github.com/netdata/netdata/pull/19893) ([ktsaou](https://github.com/ktsaou))
+- Fix typo in README title [\#19891](https://github.com/netdata/netdata/pull/19891) ([felipecrs](https://github.com/felipecrs))
+- remove deadlock from dyncfg health [\#19890](https://github.com/netdata/netdata/pull/19890) ([ktsaou](https://github.com/ktsaou))
 - Update DEB/RPM package signing key info. [\#19888](https://github.com/netdata/netdata/pull/19888) ([Ferroin](https://github.com/Ferroin))
+- fix\(go.d/snmp/ddsnmp\): correct profile directory path [\#19887](https://github.com/netdata/netdata/pull/19887) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp/ddsnmp\): use dd profile definition [\#19886](https://github.com/netdata/netdata/pull/19886) ([ilyam8](https://github.com/ilyam8))
 - daemon status 18b [\#19884](https://github.com/netdata/netdata/pull/19884) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations docs [\#19883](https://github.com/netdata/netdata/pull/19883) ([netdatabot](https://github.com/netdatabot))
@@ -476,12 +481,6 @@
 - lower compression level to lower cpu resources on parents [\#19350](https://github.com/netdata/netdata/pull/19350) ([ktsaou](https://github.com/ktsaou))
 - PGC wanted size [\#19349](https://github.com/netdata/netdata/pull/19349) ([ktsaou](https://github.com/ktsaou))
 - log a summary of metadata ignored contexts [\#19348](https://github.com/netdata/netdata/pull/19348) ([ktsaou](https://github.com/ktsaou))
-- use sqlite3\_status64\(\) [\#19347](https://github.com/netdata/netdata/pull/19347) ([ktsaou](https://github.com/ktsaou))
-- Query systemd for unit file paths on install/uninstall. [\#19346](https://github.com/netdata/netdata/pull/19346) ([Ferroin](https://github.com/Ferroin))
-- Assorted systemd detection fixes [\#19345](https://github.com/netdata/netdata/pull/19345) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations docs [\#19344](https://github.com/netdata/netdata/pull/19344) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/k8sstate\): respect ignore annotation [\#19342](https://github.com/netdata/netdata/pull/19342) ([ilyam8](https://github.com/ilyam8))
-- improvement\(go.d/docker\): respect ignore label [\#19341](https://github.com/netdata/netdata/pull/19341) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 

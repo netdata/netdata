@@ -285,7 +285,7 @@ int nd_log_systemd_journal_fd(void) {
 
 void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     nd_log_forked = true;
-    nd_log.fatal_data_cb = NULL;
+    nd_log.fatal_hook_cb = NULL;
     nd_log.fatal_final_cb = NULL;
 
     gettid_uncached();
