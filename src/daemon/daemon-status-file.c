@@ -111,7 +111,6 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
         char version[sizeof(ds->version)];
         char filename[sizeof(ds->fatal.filename)];
         char function[sizeof(ds->fatal.function)];
-        char errno_str[sizeof(ds->fatal.errno_str)];
         char stack_trace[sizeof(ds->fatal.stack_trace)];
         char thread[sizeof(ds->fatal.thread)];
         char msg[128];
@@ -139,7 +138,6 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
     strncpyz(to_hash.version, ds->version, sizeof(to_hash.version) - 1);
     strncpyz(to_hash.filename, ds->fatal.filename, sizeof(to_hash.filename) - 1);
     strncpyz(to_hash.filename, ds->fatal.function, sizeof(to_hash.function) - 1);
-    strncpyz(to_hash.errno_str, ds->fatal.errno_str, sizeof(to_hash.errno_str) - 1);
     strncpyz(to_hash.stack_trace, ds->fatal.stack_trace, sizeof(to_hash.stack_trace) - 1);
     strncpyz(to_hash.thread, ds->fatal.thread, sizeof(to_hash.thread) - 1);
 
