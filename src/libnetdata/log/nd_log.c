@@ -26,6 +26,10 @@ ALWAYS_INLINE void errno_clear(void) {
 
 static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, SPINLOCK **spinlock) {
     *spinlock = NULL;
+
+    if(source >= _NDLS_MAX)
+        source = NDLS_DAEMON;
+    
     ND_LOG_METHOD output = nd_log.sources[source].method;
 
     switch(output) {
