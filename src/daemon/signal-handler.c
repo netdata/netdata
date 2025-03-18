@@ -121,7 +121,7 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
             sa.sa_handler = SIG_DFL;
             sigemptyset(&sa.sa_mask);
             sa.sa_flags = 0;
-            sigaction(signo, &sa, NULL);
+            if(sigaction(signo, &sa, NULL) < 0) { ; }
 
             // Re-raise the signal, which now uses the default action.
             raise(signo);
