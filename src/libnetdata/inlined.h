@@ -420,6 +420,35 @@ static inline char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1
     return p;
 }
 
+// append src to dst, but only if there is space for it
+// dst is always null terminated
+static inline size_t strcatz(char *dst, size_t len, size_t size, const char *src) {
+    // If starting offset is out of bounds, do nothing.
+    if (len >= size) {
+        dst[size - 1] = '\0';
+        return len;
+    }
+
+    // Move pointer to the end of the current string.
+    char *dest = dst + len;
+
+    // Reserve one byte for the null terminator.
+    size_t space = size - len - 1;
+    size_t initial_space = space;
+
+    // Append src into dst using pointer operations.
+    while (*src && space > 0) {
+        *dest++ = *src++;
+        space--;
+    }
+
+    // Null-terminate the string.
+    *dest = '\0';
+
+    // Return the new length.
+    return len + (initial_space - space);
+}
+
 static inline void sanitize_json_string(char *dst, const char *src, size_t dst_size) {
     while (*src != '\0' && dst_size > 1) {
         if (*src < 0x1F) {

@@ -38,6 +38,8 @@ static inline LOG_FORWARDER_ENTRY *log_forwarder_find_entry_unsafe(LOG_FORWARDER
 }
 
 static inline void log_forwarder_del_entry_unsafe(LOG_FORWARDER *lf, LOG_FORWARDER_ENTRY *entry) {
+    if(!entry) return;
+
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(lf->entries, entry, prev, next);
     buffer_free(entry->wb);
     freez(entry->cmd);
@@ -71,6 +73,8 @@ LOG_FORWARDER *log_forwarder_start(void) {
     lf->running = true;
     lf->thread = nd_thread_create("log-fw", NETDATA_THREAD_OPTION_JOINABLE, log_forwarder_thread_func, lf);
 
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Log forwarder: created thread pointer: %p", lf->thread);
+
     return lf;
 }
 
@@ -84,22 +88,29 @@ void log_forwarder_stop(LOG_FORWARDER *lf) {
 
     // Signal the thread to stop
     spinlock_lock(&lf->spinlock);
-    lf->running = false;
 
-    // mark them all for deletion
+    if(!lf->running) {
+        spinlock_unlock(&lf->spinlock);
+        return;
+    }
+
+    lf->running = false;
     mark_all_entries_for_deletion_unsafe(lf);
 
     // Send a byte to the pipe to wake up the thread
-    char ch = 0;
-    if(write(lf->pipe_fds[PIPE_WRITE], &ch, 1) <= 0) { ; }
+//    char ch = 0;
+//    if(write(lf->pipe_fds[PIPE_WRITE], &ch, 1) <= 0) { ; }
+    close(lf->pipe_fds[PIPE_WRITE]); // force it to quit
     spinlock_unlock(&lf->spinlock);
 
     // Wait for the thread to finish
-    close(lf->pipe_fds[PIPE_WRITE]); // force it to quit
-    nd_thread_join(lf->thread);
-    close(lf->pipe_fds[PIPE_READ]);
-
-    freez(lf);
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Log forwarder: stopping thread pointer: %p", lf->thread);
+    if(nd_thread_join(lf->thread) == 0) {
+        lf->thread = NULL;
+        freez(lf);
+    }
+    else
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: not freeing lf due to nd_thread_join() error.");
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -179,6 +190,8 @@ void log_forwarder_annotate_fd_pid(LOG_FORWARDER *lf, int fd, pid_t pid) {
 // log forwarder thread
 
 static inline void log_forwarder_log(LOG_FORWARDER *lf __maybe_unused, LOG_FORWARDER_ENTRY *entry, const char *msg) {
+    if(!msg || !*msg || !entry || !lf) return;
+
     const char *s = msg;
     while(*s && isspace((uint8_t)*s)) s++;
     if(*s == '\0') return; // do not log empty lines
@@ -202,7 +215,7 @@ static inline size_t log_forwarder_remove_deleted_unsafe(LOG_FORWARDER *lf) {
         LOG_FORWARDER_ENTRY *next = entry->next;
 
         if(entry->delete) {
-            if (buffer_strlen(entry->wb))
+            if (entry->wb && buffer_strlen(entry->wb))
                 // there is something not logged in it - log it
                 log_forwarder_log(lf, entry, buffer_tostring(entry->wb));
 
@@ -223,8 +236,6 @@ static void *log_forwarder_thread_func(void *arg) {
     while (1) {
         spinlock_lock(&lf->spinlock);
         if (!lf->running) {
-            mark_all_entries_for_deletion_unsafe(lf);
-            log_forwarder_remove_deleted_unsafe(lf);
             spinlock_unlock(&lf->spinlock);
             break;
         }
@@ -260,20 +271,17 @@ static void *log_forwarder_thread_func(void *arg) {
                 if (bytes_read == -1) {
                     if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
                         // Handle read error if necessary
-                        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to read from notification pipe");
-                        return NULL;
+                        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to read from notification pipe");
+                        break;
                     }
                 }
             }
 
-            // Now check the other fds
             spinlock_lock(&lf->spinlock);
-
-            size_t to_remove = 0;
 
             // read or mark them for deletion
             for(LOG_FORWARDER_ENTRY *entry = lf->entries; entry ; entry = entry->next) {
-                if (entry->pfds_idx < 1 || entry->pfds_idx >= nfds || !(pfds[entry->pfds_idx].revents & POLLIN))
+                if (entry->pfds_idx < 1 || entry->pfds_idx >= nfds || !(pfds[entry->pfds_idx].revents & POLLIN) || entry->delete || !entry->wb)
                     continue;
 
                 BUFFER *wb = entry->wb;
@@ -285,7 +293,6 @@ static void *log_forwarder_thread_func(void *arg) {
                 else if(bytes_read == 0 || (bytes_read == -1 && errno != EINTR && errno != EAGAIN)) {
                     // EOF or error
                     entry->delete = true;
-                    to_remove++;
                 }
 
                 // log as many lines are they have been received
@@ -318,6 +325,14 @@ static void *log_forwarder_thread_func(void *arg) {
         else
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: poll() error");
     }
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: exiting...");
+
+    spinlock_lock(&lf->spinlock);
+    mark_all_entries_for_deletion_unsafe(lf);
+    log_forwarder_remove_deleted_unsafe(lf);
+    spinlock_unlock(&lf->spinlock);
+    close(lf->pipe_fds[PIPE_READ]);
 
     return NULL;
 }

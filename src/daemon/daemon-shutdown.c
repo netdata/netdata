@@ -171,8 +171,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
-ND_EXIT_NORETURN
-static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal) {
+static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exit_when_done) {
     exit_initiated_set(reason);
 
     // don't recurse (due to a fatal, while exiting)
@@ -200,9 +199,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal) {
     // notify we are exiting
     //analytics_statistic_t statistic = (analytics_statistic_t) {"EXIT", abnormal?"ERROR":"OK","-"};
     //analytics_statistic_send(&statistic);
-
-    netdata_main_spawn_server_cleanup();
-    watcher_step_complete(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
 
     webrtc_close_all_connections();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
@@ -330,6 +326,9 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal) {
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\n");
 
+    fprintf(stderr, "Stopping spawn server...\n");
+    netdata_main_spawn_server_cleanup();
+
     fprintf(stderr, "Freeing all RRDHOSTs...\n");
     rrdhost_free_all();
 
@@ -367,10 +366,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal) {
     fprintf(stderr, "All done, exiting...\n");
 #endif
 
-#ifdef OS_WINDOWS
-    curl_global_cleanup();
-    return;
-#endif
+    if(!exit_when_done) {
+        curl_global_cleanup();
+        return;
+    }
 
 #ifdef ENABLE_SENTRY
     if(abnormal)
@@ -389,14 +388,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal) {
 #endif
 }
 
-void netdata_exit_gracefully(EXIT_REASON reason) {
+void netdata_exit_gracefully(EXIT_REASON reason, bool exit_when_done) {
     exit_initiated_add(reason);
     FUNCTION_RUN_ONCE();
-    netdata_cleanup_and_exit(reason, false);
+    netdata_cleanup_and_exit(reason, false, exit_when_done);
 }
 
 // the final callback for the fatal() function
 void netdata_exit_fatal(void) {
-    netdata_cleanup_and_exit(EXIT_REASON_FATAL, true);
+    netdata_cleanup_and_exit(EXIT_REASON_FATAL, true, true);
     exit(1);
 }

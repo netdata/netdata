@@ -678,7 +678,7 @@ static bool load_status_file(const char *filename, DAEMON_STATUS_FILE *status) {
 
     // Read the file
     buffer_need_bytes(wb, file_size + 1);
-    size_t read_bytes = fread(wb->buffer, 1, file_size, fp);
+    ssize_t read_bytes = fread(wb->buffer, 1, file_size, fp);
     fclose(fp);
 
     if (read_bytes == 0)
@@ -771,13 +771,12 @@ static bool save_status_file(const char *directory, const char *content, size_t 
         return false;
 
     /* Write content to file using write() */
-    ssize_t bytes_written = 0;
     size_t total_written = 0;
 
     while (total_written < content_size) {
-        bytes_written = write(fd, content + total_written, content_size - total_written);
+        ssize_t bytes_written = write(fd, content + total_written, content_size - total_written);
 
-        if (bytes_written == -1) {
+        if (bytes_written <= 0) {
             if (errno == EINTR)
                 continue; /* Retry if interrupted by signal */
 
