@@ -771,13 +771,12 @@ static bool save_status_file(const char *directory, const char *content, size_t 
         return false;
 
     /* Write content to file using write() */
-    ssize_t bytes_written = 0;
     size_t total_written = 0;
 
     while (total_written < content_size) {
-        bytes_written = write(fd, content + total_written, content_size - total_written);
+        ssize_t bytes_written = write(fd, content + total_written, content_size - total_written);
 
-        if (bytes_written == -1) {
+        if (bytes_written <= 0) {
             if (errno == EINTR)
                 continue; /* Retry if interrupted by signal */
 
