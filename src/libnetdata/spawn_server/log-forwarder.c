@@ -98,10 +98,13 @@ void log_forwarder_stop(LOG_FORWARDER *lf) {
 
     // Wait for the thread to finish
     close(lf->pipe_fds[PIPE_WRITE]); // force it to quit
-    nd_thread_join(lf->thread);
+    bool free_lf = nd_thread_join(lf->thread) == 0;
     close(lf->pipe_fds[PIPE_READ]);
 
-    freez(lf);
+    if(free_lf)
+        freez(lf);
+    else
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: not freeing lf due to nd_thread_join() error.");
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -264,8 +267,8 @@ static void *log_forwarder_thread_func(void *arg) {
                 if (bytes_read == -1) {
                     if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
                         // Handle read error if necessary
-                        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to read from notification pipe");
-                        return NULL;
+                        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to read from notification pipe");
+                        break;
                     }
                 }
             }
@@ -318,6 +321,8 @@ static void *log_forwarder_thread_func(void *arg) {
         else
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: poll() error");
     }
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: exiting...");
 
     return NULL;
 }
