@@ -171,7 +171,6 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
-ND_EXIT_NORETURN
 static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exit_when_done) {
     exit_initiated_set(reason);
 
