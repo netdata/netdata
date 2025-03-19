@@ -7,13 +7,11 @@ This document details how to install Netdata on an existing Kubernetes (k8s) clu
 
 Read our [Kubernetes visualizations](/docs/dashboards-and-charts/kubernetes-tab.md) documentation, to see what you will get.
 
-The [Netdata Helm chart](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) installs one `parent` pod for storing metrics and managing alert notifications, plus an additional `child` pod for every node in the cluster, responsible for collecting metrics from the node, Kubernetes control planes,
-pods/containers, and [supported application-specific
-metrics](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
+The [Netdata Helm chart](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) installs one `parent` pod for storing metrics and managing alert notifications, plus an additional `child` pod for every node in the cluster, responsible for collecting metrics from the node, Kubernetes control planes, pods/containers, and [supported application-specific metrics](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
 
 ## Prerequisites
 
-To deploy Kubernetes monitoring with Netdata, you need:
+To deploy Kubernetes monitoring with Netdata, you'll need:
 
 - A working cluster running Kubernetes v1.9 or newer.
 - The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version
@@ -190,5 +188,5 @@ helm repo update
 helm upgrade netdata netdata/netdata
 ```
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE1NTE2NTIzNzYsLTM3NzUxMDQ1MF19
+eyJoaXN0b3J5IjpbMjEwOTg2MjU4NywtMzc3NTEwNDUwXX0=
 -->
