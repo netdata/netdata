@@ -339,6 +339,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
                 dictionaries_referenced);
 
+#ifdef ENABLE_DBENGINE
     // destroy the caches in reverse order (extent and open depend on main cache)
     fprintf(stderr, "Destroying extent cache (PGC)...\n");
     pgc_destroy(extent_cache, false);
@@ -352,6 +353,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if(metrics_referenced)
         fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
             metrics_referenced);
+#endif    
 
     fprintf(stderr, "Destroying UUIDMap...\n");
     size_t uuid_referenced = uuidmap_destroy();
