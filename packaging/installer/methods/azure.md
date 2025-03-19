@@ -2,7 +2,7 @@
 
 Netdata is fully compatible with Azure.
 You can install Netdata on cloud instances to monitor the apps/services running there, or use
-multiple instances in a [parent-child streaming](/src/streaming/README.md) configuration.
+ multiple instances in a [parent-child streaming](/src/streaming/README.md) configuration.
 
 ## Recommended installation method
 
@@ -55,3 +55,6 @@ Name: Netdata
 ```
 
 Click **Add** to apply your new inbound security rule.
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbMTQwOTAxODU1MF19
+-->
