@@ -73,6 +73,7 @@ typedef struct daemon_status_file {
     char os_version[32];     // ECS: os.version
     char os_id[64];          // ECS: os.family
     char os_id_like[64];     // ECS: os.platform
+    char timezone[32];
     bool read_system_info;
 
     char stack_traces[15];   // the backend for capturing stack traces

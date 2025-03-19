@@ -211,6 +211,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "container", ds->container);
         buffer_json_member_add_time_t(wb, "uptime", ds->boottime);
 
+        if(ds->v >= 20)
+            buffer_json_member_add_string_or_empty(wb, "timezone", ds->timezone);
+
         buffer_json_member_add_object(wb, "boot");
         {
             buffer_json_member_add_uuid_compact(wb, "id", ds->boot_id.uuid);
@@ -323,6 +326,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v16 = version >= 16 ? strict : false;
     bool required_v17 = version >= 17 ? strict : false;
     bool required_v18 = version >= 18 ? strict : false;
+    bool required_v20 = version >= 20 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -419,6 +423,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
                     ds->var_cache = OS_SYSTEM_DISK_SPACE_EMPTY;
             });
         });
+
+        if(version >= 20)
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "timezone", ds->timezone, error, required_v20);
     });
 
     // Parse os object
@@ -539,6 +546,7 @@ static void daemon_status_file_migrate_once(void) {
     strncpyz(session_status.os_version, last_session_status.os_version, sizeof(session_status.os_version) - 1);
     strncpyz(session_status.os_id, last_session_status.os_id, sizeof(session_status.os_id) - 1);
     strncpyz(session_status.os_id_like, last_session_status.os_id_like, sizeof(session_status.os_id_like) - 1);
+    strncpyz(session_status.timezone, last_session_status.timezone, sizeof(session_status.timezone) - 1);
 
     session_status.restarts = last_session_status.restarts + 1;
     session_status.reliability = last_session_status.reliability;
@@ -611,6 +619,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     }
 
     get_daemon_status_fields_from_system_info(&session_status);
+
+    if(netdata_configured_timezone)
+        strncpyz(session_status.timezone, netdata_configured_timezone, sizeof(session_status.timezone) - 1);
 
     session_status.exit_reason = exit_initiated_get();
     session_status.profile = nd_profile_detect_and_configure(false);
