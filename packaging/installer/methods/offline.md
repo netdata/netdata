@@ -9,8 +9,7 @@ Users who wish to use native packages on offline systems may be able to do so us
 
 ## Preparing the offline installation source
 
-The first step to installing Netdata on an offline system is to prepare the offline installation source. This can
-be as a regular user from any internet connected system that has the following tools available:
+The first step to installing Netdata on an offline system is to prepare the offline installation source. This can be as a regular user from any internet connected system that has the following tools available:
 
 - cURL or wget
 - sha256sum or shasum
@@ -45,5 +44,6 @@ offline install source directory. It accepts all the [same options as the kickst
 customization of the installation, though it will default to not enabling automatic updates (as they are not
 supported on offline installs).
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTQ0MzU3OTM2NiwtMTY0MzEzNTUxNF19
+eyJoaXN0b3J5IjpbLTI1MjYzNjQ1OCwxNDQzNTc5MzY2LC0xNj
+QzMTM1NTE0XX0=
 -->
