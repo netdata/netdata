@@ -597,5 +597,5 @@ At Netdata, we provide multiple ways of testing your Docker images using your ow
 
 You may either use the command line tools available or take advantage of our GitHub Actions infrastructure.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTEwODA4MDkzMCwxMTI3NjIwMzM3XX0=
+eyJoaXN0b3J5IjpbMTEwODA4MDkzMF19
 -->
