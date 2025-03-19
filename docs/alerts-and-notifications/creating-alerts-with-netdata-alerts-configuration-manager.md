@@ -42,3 +42,6 @@ You can read more about the different options in the [Alerts reference documenta
 
 - **Alert Template Name**: Provide a unique name for the Alert.
 - **Alert Template Description**: Offer a brief explanation of what the Alert
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbLTIxNDAzODUwMTRdfQ==
+-->
