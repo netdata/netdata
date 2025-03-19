@@ -1,6 +1,6 @@
 # Netdata Agent Installation
 
-Netdata is very flexible and can be used to monitor all kinds of infrastructure. Read more about possible [Deployment guides](/docs/deployment-guides/README.md) to understand what better suites your needs.
+Netdata is very flexible and can be used to monitor all kinds of infrastructure. Read more about possible [Deployment guides](/docs/deployment-guides/README.md) to understand what better suits your needs.
 
 ## Install through Netdata Cloud
 
@@ -19,5 +19,5 @@ Netdata collects anonymous usage information by default and sends it to a self-h
 The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
 _actively_ contributing to Netdata's future.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTQ0NjcyMDg4XX0=
+eyJoaXN0b3J5IjpbMTkxMjc5NDU0M119
 -->
