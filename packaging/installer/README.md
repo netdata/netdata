@@ -16,8 +16,7 @@ Once Netdata is installed, you can see the node live in your Netdata Space and c
 
 Netdata collects anonymous usage information by default and sends it to a self-hosted PostHog instance within the Netdata infrastructure. Read about the information collected on our [anonymous statistics](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) documentation page.
 
-The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
-_actively_ contributing to Netdata's future.
+The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for _actively_ contributing to Netdata's future.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTkxMjc5NDU0M119
+eyJoaXN0b3J5IjpbOTQ5OTE5NzA3LDE5MTI3OTQ1NDNdfQ==
 -->
