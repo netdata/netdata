@@ -43,21 +43,19 @@ The associated public key can be fetched from
 `https://repository.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the appropriate repository configuration package from <https://repository.netdata.cloud/repos/repoconfig/index.html>
-and install it directly on the target system using the system package manager. This will ensure any packages
-needed to use the repository are also installed, and will help enable a seamless transition if we ever need to
+and install it directly on the target system using the system package manager. This will ensure any packages needed to use the repository are also installed, and will help enable a seamless transition if we ever need to
 change our infrastructure.
 
 > **Note**
 >
-> On RHEL and other systems that use the `el` repositories, some of the dependencies for Netdata can only be found
-> in the EPEL repository, which is not enabled or installed by default on most of these systems. This additional
-> repository _should_ be pulled in automatically by our repository config packages, but if it is not you may need
-> to manually install `epel-release` to be able to successfully install the Netdata packages.
+> On RHEL and other systems that use the `el` repositories, some of the dependencies for Netdata can only be found in the EPEL repository, which is not enabled or installed by default on most of these systems. 
+> 
+> This additional repository _should_ be pulled in automatically by our repository config packages, but if it is not you may need to manually install `epel-release` to be able to successfully install the Netdata packages.
 
 ## Manual setup of DEB packages
 
-Netdata’s official DEB repositories are hosted at <https://repository.netdata.cloud/repos/index.html>. We provide four groups of
-repositories at that top level:
+Netdata’s official DEB repositories are hosted at <https://repository.netdata.cloud/repos/index.html>. 
+We provide four groups of repositories at that top level:
 
 - `stable`: Contains packages for stable releases of the Netdata Agent.
 - `edge`: Contains packages for nightly builds of the Netdata Agent.
@@ -137,8 +135,7 @@ We do not provide official support for mirroring our repositories, but we do hav
 
 There are no official public mirrors of our repositories.
 
-If you wish to provide a public mirror of our official repositories, you are free to do so, but we kindly ask that
-you make it clear to your users that your mirror is not an official mirror of our repositories.
+If you wish to provide a public mirror of our official repositories, you are free to do so, but we kindly ask that you make it clear to your users that your mirror is not an official mirror of our repositories.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbODM1NTYzOTU3XX0=
+eyJoaXN0b3J5IjpbODM3NDgzMTk5XX0=
 -->
