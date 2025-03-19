@@ -10,7 +10,7 @@ bool nd_log_forked = false;
 #include "backtrace-supported.h"
 #endif
 
-#if defined(HAVE_LIBBACKTRACE) && BACKTRACE_SUPPORTED == 1
+#if defined(HAVE_LIBBACKTRACE) && BACKTRACE_SUPPORTED == 1 && BACKTRACE_SUPPORTS_THREADS == 1
 #include "backtrace.h"
 
 static struct backtrace_state *backtrace_state = NULL;
@@ -110,7 +110,25 @@ static int bt_full_handler(void *data, uintptr_t pc,
 }
 
 const char *capture_stack_trace_backend(void) {
-    return "libbacktrace";
+#if BACKTRACE_SUPPORTS_DATA
+#define BACKTRACE_DATA "data"
+#else
+#define BACKTRACE_DATA "no-data"
+#endif
+
+#if BACKTRACE_USES_MALLOC
+#define BACKTRACE_MEMORY "malloc"
+#else
+#define BACKTRACE_MEMORY "mmap"
+#endif
+
+#if BACKTRACE_SUPPORTS_THREADS
+#define BACKTRACE_THREADS "threads"
+#else
+#define BACKTRACE_THREADS "no-threads"
+#endif
+
+    return "libbacktrace (" BACKTRACE_MEMORY ", " BACKTRACE_THREADS ", " BACKTRACE_DATA ")";
 }
 
 void capture_stack_trace_init(void) {
