@@ -81,7 +81,7 @@ typedef enum {
     )
 
 #define is_deadly_signal(reason) ((reason) & (EXIT_REASON_DEADLY_SIGNAL))
-#define is_exit_reason_normal(reason) (((reason) & EXIT_REASON_NORMAL) && !((reason) & EXIT_REASON_ABNORMAL))
+#define is_exit_reason_normal(reason) (((reason == EXIT_REASON_NONE) || ((reason) & EXIT_REASON_NORMAL)) && !((reason) & EXIT_REASON_ABNORMAL))
 
 typedef struct web_buffer BUFFER;
 BITMAP_STR_DEFINE_FUNCTIONS_EXTERN(EXIT_REASON);
