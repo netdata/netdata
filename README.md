@@ -260,7 +260,7 @@ Netdata can be installed on all Linux, macOS, FreeBSD and Windows systems. We pr
 
 Check also the [Netdata Deployment Guides](https://learn.netdata.cloud/docs/deployment-guides/) to decide how to deploy it in your infrastructure.
 
-By default, you will have immediately available a local dashboard. Netdata starts a web server for its dashboard at port `19999`. Open up your web browser of choice and navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your Agent. If installed on localhost, you can access it through `http://localhost:19999`.
+By default, Netdata starts a local dashboard on port `19999`. To access it, open your browser and go to `http://NODE:19999`, replacing `NODE` with your Agent’s IP or hostname. For localhost, use `http://localhost:19999`.
 
 _Note: the binary packages we provide, install Netdata UI automatically. Netdata UI is closed-source, but free to use with Netdata Agents and Netdata Cloud._
 
@@ -293,8 +293,8 @@ Netdata Parents provide:
 
 - **Increased retention for all metrics of all your nodes.**<br/>
 
-  Each Netdata Agent maintains each own database of metrics. But Parents can be given additional resources to maintain a much longer database than
-  individual Netdata Agents.
+  Each Netdata Agent maintains each own database of metrics. 
+  But Parents can be given additional resources to maintain a much longer database than individual Netdata Agents.
 
 - **Central configuration of alerts and dispatch of notifications.**<br/>
 
@@ -866,5 +866,5 @@ The Netdata ecosystem consists of three key parts:
 
 The binary installation packages provided by Netdata include the Netdata Agent and the Netdata UI. Since the Netdata Agent is open-source, it is frequently packaged by third parties (e.g., Linux Distributions) excluding the closed-source components (Netdata UI is not included). While their packages can still be useful in providing the necessary back-ends and the APIs of a fully functional monitoring solution, we recommend using the installation packages we provide to experience the full feature set of Netdata.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTU1ODYxNzk4OSw0NDIzNTA2NTNdfQ==
+eyJoaXN0b3J5IjpbMTE2NzAxNjE1LDQ0MjM1MDY1M119
 -->
