@@ -9,8 +9,7 @@ multiple instances in a [parent-child streaming](/src/streaming/README.md) confi
 The best installation method depends on the instance's operating system, distribution, and version. For Linux instances,
 we recommend the [`kickstart.sh` automatic installation script](/packaging/installer/methods/kickstart.md).
 
-If you have issues with Netdata after installation, look to the sections below to find the issue you're experiencing,
-followed by the solution for your provider.
+If you have issues with Netdata after installation, look to the sections below to find the issue you're experiencing, followed by the solution for your provider.
 
 ## Post-installation configuration
 
@@ -20,10 +19,7 @@ If you cannot access Netdata's dashboard on your cloud instance via `http://HOST
 from your browser that says, "This site can't be reached" (Chrome) or "Unable to connect" (Firefox), you may need to
 configure your cloud provider's firewall.
 
-Cloud providers often create network-level firewalls that run separately from the instance itself. Both AWS and Google
-Cloud Platform calls them Virtual Private Cloud (VPC) networks. These firewalls can apply even if you've disabled
-firewalls on the instance itself. Because you can modify these firewalls only via the cloud provider's web interface,
-it's easy to overlook them when trying to configure and access Netdata's dashboard.
+Cloud providers often create network-level firewalls that run separately from the instance itself. Both AWS and Google Cloud Platform calls them Virtual Private Cloud (VPC) networks. These firewalls can apply even if you've disabled firewalls on the instance itself. Because you can modify these firewalls only via the cloud provider's web interface, it's easy to overlook them when trying to configure and access Netdata's dashboard.
 
 You can often confirm a firewall issue by querying the dashboard while connected to the instance via SSH: `curl
 http://localhost:19999/api/v1/info`. If you see JSON output, Netdata is running properly. If you try the same `curl`
@@ -57,5 +53,5 @@ You can also choose **My IP** as the source if you prefer.
 
 Click **Save** to apply your new inbound firewall rule.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTI3MDQ0NjEwMF19
+eyJoaXN0b3J5IjpbMTI0ODk2OTQ1OF19
 -->
