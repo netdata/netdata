@@ -454,9 +454,8 @@ other services that require access.
 
 Netdata can be run successfully in a non-root environment, such as [rootless Docker](https://docs.docker.com/engine/security/rootless/).
 
-However, it should be noted that Netdata's data collection capabilities are considerably restricted in rootless Docker
-due to its inherent limitations. While Netdata can function in a rootless environment, it can’t access certain
-resources that require elevated privileges. The following components don’t work:
+Netdata can run in a rootless Docker environment, but its data collection is limited due to restricted access to resources requiring elevated privileges. 
+The following components won't work:
 
 - container network interfaces monitoring (cgroup-network helper)
 - disk I/O and file descriptors of applications and processes (apps.plugin)
@@ -468,8 +467,7 @@ resources that require elevated privileges. The following components don’t wor
 
 This method creates a [volume](https://docs.docker.com/storage/volumes/) for Netdata's configuration files
 _within the container_ at `/etc/netdata`.
-See the [configure section](#configure-agent-containers) for details. If you want to access the configuration files from
-your _host_ machine, see [host-editable configuration](#with-host-editable-configuration).
+See the [configure section](#configure-agent-containers) for details. If you want to access the configuration files from your _host_ machine, see [host-editable configuration](#with-host-editable-configuration).
 
 <Tabs>
 <TabItem value="docker_run" label="docker run">
@@ -525,9 +523,7 @@ if `v1.40.1` were to be published, the `v1.40` tag would be updated to it instea
 
 ## Configure Agent containers
 
-If you started an Agent container using one of the [recommended methods](#create-a-new-netdata-agent-container), and you
-want to edit Netdata's configuration, you must first use `docker exec` to attach to the container. Replace `netdata`
-with the name of your container.
+If you started an Agent container using one of the [recommended methods](#create-a-new-netdata-agent-container), and you want to edit Netdata's configuration, you must first use `docker exec` to attach to the container. Replace `netdata` with the name of your container.
 
 ```bash
 docker exec -it netdata bash
@@ -539,9 +535,8 @@ You need to restart the Agent to apply changes. Exit the container if you haven'
 to restart the container: `docker restart netdata`.
 
 ### Change the default hostname
-
-You can change the hostname of a Docker container, and thus the name that appears in the local dashboard and in Netdata
-Cloud, when creating a new container. If you want to change the hostname of a Netdata container _after_ you started it,
+You can change a Docker container's hostname, which will reflect in the local dashboard and Netdata Cloud when the container is created.
+ If you want to change the hostname of a Netdata container _after_ you started it,
 you can safely stop and remove it. Your configuration and metrics data reside in persistent volumes and are reattached
 to the recreated container.
 
@@ -607,5 +602,5 @@ configuration for health checks to work.
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
 You may either use the command line tools available or take advantage of our GitHub Actions infrastructure.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMzI5MzU4MDE0XX0=
+eyJoaXN0b3J5IjpbMTY5NjYwOTI5NV19
 -->
