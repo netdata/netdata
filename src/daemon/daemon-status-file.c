@@ -1157,6 +1157,11 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last crashed while exiting after receiving a deadly signal";
                 pri = PRI_DEADLY_SIGNAL;
             }
+            else if(last_session_status.exit_reason & EXIT_REASON_SHUTDOWN_TIMEOUT) {
+                cause = "exit timeout";
+                msg = "Netdata was last killed because it couldn't shutdown on time";
+                pri = PRI_FATAL;
+            }
             else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
                 !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal on exit";
