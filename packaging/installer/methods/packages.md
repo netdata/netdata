@@ -9,8 +9,6 @@ When using the kickstart script, you can force usage of native DEB or RPM packag
 and fail if it cannot do so.
 
 > **Note**
->
-
 > 
 > Until late 2024 we continued to provide packages via Package Cloud, but we have since then switched to only  providing packages via our repositories.
 
@@ -137,5 +135,5 @@ There are no official public mirrors of our repositories.
 
 If you wish to provide a public mirror of our official repositories, you are free to do so, but we kindly ask that you make it clear to your users that your mirror is not an official mirror of our repositories.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbODM3NDgzMTk5XX0=
+eyJoaXN0b3J5IjpbNzgzMzQ2NjMxXX0=
 -->
