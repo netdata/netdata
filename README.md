@@ -497,13 +497,10 @@ Yes, you can!
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-The Netdata Agent has been designed to spread disk writes across time. Each metric is flushed to disk every 17 minutes (1000 seconds), but metrics are flushed evenly across time, at an almost constant rate. Also, metrics are packed into bigger blocks we call `extents` and are compressed with ZSTD before saving them, to minimize the number of I/O operations made.
 
-The Netdata Agent also employs direct I/O for all its database operations. By managing its own caches, Netdata avoids overburdening system caches, facilitating a harmonious coexistence with other applications.
+The Netdata Agent spreads disk writes over time, flushing metrics every 17 minutes at a constant rate. Metrics are packed into compressed "extents" to minimize I/O operations. It uses direct I/O and manages its own caches to avoid burdening system caches, ensuring smooth coexistence with other applications.
 
-Single node Agents (not Parents), should have a constant write rate of about 50 KiB/s or less, with some spikes above that every minute (flushing of tier 1) and higher spikes every hour (flushing of tier 2).
-
-Health Alerts and Machine-Learning run queries to evaluate their expressions and learn from the metrics' patterns. These are also spread over time, so there should be an almost constant read rate too.
+For single-node Agents (not Parents), the write rate is around 50 KiB/s, with occasional spikes every minute (tier 1) and hour (tier 2). Health alerts and machine learning queries also run periodically, resulting in a steady read rate.
 
 To make Netdata not use the disks at all, we suggest the following:
 
@@ -866,5 +863,5 @@ The Netdata ecosystem consists of three key parts:
 
 The binary installation packages provided by Netdata include the Netdata Agent and the Netdata UI. Since the Netdata Agent is open-source, it is frequently packaged by third parties (e.g., Linux Distributions) excluding the closed-source components (Netdata UI is not included). While their packages can still be useful in providing the necessary back-ends and the APIs of a fully functional monitoring solution, we recommend using the installation packages we provide to experience the full feature set of Netdata.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTg1MDA4NjA1Nyw0NDIzNTA2NTNdfQ==
+eyJoaXN0b3J5IjpbLTIwNzcyODA0NTcsNDQyMzUwNjUzXX0=
 -->
