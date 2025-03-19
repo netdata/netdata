@@ -82,3 +82,6 @@ The Netdata Agents (Standalone, Children and Parents) **share the dashboard** of
 1. **Access to Sensitive Data**: Some data, like systemd-journal logs and several [Top Monitoring](/docs/top-monitoring-netdata-functions.md) features expose sensitive data, like IPs, ports, process command lines and more. To access all these when the dashboard is served directly from an Agent, Netdata Cloud is required to verify that the user accessing the dashboard has the required permissions.
 
 2. **Dynamic Configuration**: Netdata Agents are configured via configuration files, manually or through some provisioning system. The latest Netdata includes a feature to allow users to change some configurations (collectors, alerts) via the dashboard. This feature is only available to users of paid Netdata Cloud plan.
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbLTExOTQzNzIwMTldfQ==
+-->
