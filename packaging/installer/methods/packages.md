@@ -1,20 +1,22 @@
 # Install Netdata using native DEB/RPM packages
 
 For most common Linux distributions that use either DEB or RPM packages, Netdata provides pre-built native packages
-for current releases in-line with
+ for current releases in-line with
 our [official platform support policy](/docs/netdata-agent/versions-and-platforms.md).
+
 These packages will be used by default when attempting to install on a supported platform using our
 [kickstart.sh installer script](/packaging/installer/methods/kickstart.md).
 
 When using the kickstart script, you can force usage of native DEB or RPM packages by passing the option
-`--native-only` when invoking the script. This will cause it to only attempt to use native packages for the install,
+ `--native-only` when invoking the script. This will cause it to only attempt to use native packages for the install,
 and fail if it cannot do so.
 
 > **Note**
 >
 > In July 2022, we switched hosting of our native packages from Package Cloud to self-hosted repositories.
+> 
 > Until late 2024 we continued to provide packages via Package Cloud, but we have since then switched to only
-> providing packages via our repositories.
+>  providing packages via our repositories.
 
 ## Manual setup of RPM packages
 
@@ -143,3 +145,6 @@ There are no official public mirrors of our repositories.
 
 If you wish to provide a public mirror of our official repositories, you are free to do so, but we kindly ask that
 you make it clear to your users that your mirror is not an official mirror of our repositories.
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbMTMzNjkwNjYzNl19
+-->
