@@ -12,8 +12,7 @@ code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations
 those operations over standard and secure SSH connections. There's no Agent to install on the remote system, so all you
 have to worry about is your application and your monitoring software.
 
-Ansible has some competition from the likes of [Puppet](https://puppet.com/) or [Chef](https://www.chef.io/), but the
-most valuable feature about Ansible is **idempotent**. From the [Ansible
+What does **idempotent** mean? From the [Ansible
 glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
 
 > An operation is idempotent if the result of performing it once is exactly the same as the result of performing it
@@ -143,5 +142,5 @@ task results in a changed, failure, or was skipped entirely.
 The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the connect to Cloud
 task, your nodes start populating your Space in Netdata Cloud.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE0MTgyMjA4OCwtMjQ1MDEwOTk2XX0=
+eyJoaXN0b3J5IjpbLTEyOTgzMjUyOTcsLTI0NTAxMDk5Nl19
 -->
