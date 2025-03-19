@@ -36,14 +36,11 @@ appropriate option for the kickstart script.
 
 ## Installing on the target system
 
-Once you have prepared the offline install source, you need to copy the offline install source directory to the
-target system. This can be done in any manner you like, as long as filenames are not changed.
+Once you have prepared the offline install source, you need to copy the offline install source directory to the target system. This can be done in any manner you like, as long as filenames are not changed.
 
 After copying the files, simply run the `install.sh` script located in the
-offline install source directory. It accepts all the [same options as the kickstart script](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further
-customization of the installation, though it will default to not enabling automatic updates (as they are not
-supported on offline installs).
+offline install source directory. It accepts all the [same options as the kickstart script](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further customization of the installation, though it will default to not enabling automatic updates (as they are not supported on offline installs).
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTQ5Njg0MzY0OCwtMjUyNjM2NDU4LDE0ND
-M1NzkzNjYsLTE2NDMxMzU1MTRdfQ==
+eyJoaXN0b3J5IjpbLTE5NTYxMjU4OTYsLTQ5Njg0MzY0OCwtMj
+UyNjM2NDU4LDE0NDM1NzkzNjYsLTE2NDMxMzU1MTRdfQ==
 -->
