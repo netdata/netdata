@@ -527,9 +527,8 @@ First, we have to say that Prometheus as a time-series database and Grafana as a
 
 However, we believe that such a setup is missing a key element: A Prometheus and Grafana setup assumes that you know everything about the metrics you collect, and you understand deeply how they’re structured, they should be queried and visualized.
 
-In reality, this setup has a lot of problems. The vast number of technologies, operating systems, and applications we use in our modern stacks makes it impossible for any single person to know and understand everything about anything. We get testimonials regularly from Netdata users across the biggest enterprises, that Netdata manages to reveal issues, anomalies and problems they weren’t aware of, and they didn't even have the means to find or troubleshoot.
 
-So, the biggest difference of Netdata to Prometheus, and Grafana, is that we decided that the tool needs to have a much better understanding of the components, the applications, and the metrics it monitors.
+The complexity of modern tech stacks makes it impossible for anyone to know everything. Netdata helps users across large enterprises uncover issues and anomalies they couldn’t identify or troubleshoot before. Unlike Prometheus and Grafana, Netdata focuses on a deeper understanding of the components, applications, and metrics it monitors.
 
 - When compared to Prometheus, Netdata needs for each metric much more than just a name, some labels, and a value over time. A metric in Netdata is a structured entity that correlates with other metrics in a certain way and has specific attributes that depict how it should be organized, treated, queried, and visualized. We call this the NIDL (Nodes, Instances, Dimensions, Labels) framework.
 
@@ -863,5 +862,6 @@ The Netdata ecosystem consists of three key parts:
 
 The binary installation packages provided by Netdata include the Netdata Agent and the Netdata UI. Since the Netdata Agent is open-source, it is frequently packaged by third parties (e.g., Linux Distributions) excluding the closed-source components (Netdata UI is not included). While their packages can still be useful in providing the necessary back-ends and the APIs of a fully functional monitoring solution, we recommend using the installation packages we provide to experience the full feature set of Netdata.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTIwNzcyODA0NTcsNDQyMzUwNjUzXX0=
+eyJoaXN0b3J5IjpbLTM0MTg4OTkwOCwtMjA3NzI4MDQ1Nyw0ND
+IzNTA2NTNdfQ==
 -->
