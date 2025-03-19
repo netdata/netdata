@@ -212,6 +212,7 @@ mark_as_advanced(ENABLE_SENTRY)
 
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
+option(ENABLE_LIBBACKTRACE "Include libbacktrace for stack trace capture" True)
 
 option(ENABLE_LIBUNWIND "Include stack traces in log output" False)
 
@@ -389,6 +390,7 @@ endif()
 
 include(NetdataJSONC)
 include(NetdataYAML)
+include(NetdataBacktrace)
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         include(NetdataEBPFLegacy)
@@ -494,6 +496,10 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
     add_link_options(-rdynamic)
     message(STATUS "Added compiler and linker flags for better stack trace support")
+endif()
+
+if(ENABLE_LIBBACKTRACE)
+    netdata_bundle_libbacktrace()
 endif()
 
 #
@@ -2172,6 +2178,10 @@ target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
+
+if(HAVE_LIBBACKTRACE)
+    netdata_add_libbacktrace_to_target(libnetdata)
+endif()
 
 if(OS_WINDOWS)
         set(HAVE_ETW True)
