@@ -10,7 +10,7 @@ bool nd_log_forked = false;
 #include "backtrace-supported.h"
 #endif
 
-#if defined(HAVE_LIBBACKTRACE) && BACKTRACE_SUPPORTED == 1 && BACKTRACE_SUPPORTS_THREADS == 1
+#if defined(HAVE_LIBBACKTRACE) && BACKTRACE_SUPPORTED == 1 /* && BACKTRACE_SUPPORTS_THREADS == 1 */
 #include "backtrace.h"
 
 static struct backtrace_state *backtrace_state = NULL;
