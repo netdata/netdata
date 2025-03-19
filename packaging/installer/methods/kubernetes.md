@@ -188,3 +188,6 @@ To update Netdata's Helm chart to the latest version, run `helm repo update`, th
 helm repo update
 helm upgrade netdata netdata/netdata
 ```
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbLTM3NzUxMDQ1MF19
+-->
