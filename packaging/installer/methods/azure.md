@@ -16,7 +16,7 @@ If you have issues with Netdata after installation, look to the sections below t
 If you cannot access Netdata's dashboard on your cloud instance via `http://HOST:19999`, and instead get an error page
 from your browser that says, "This site can't be reached" (Chrome) or "Unable to connect" (Firefox), you may need to configure your cloud provider's firewall.
 
-Cloud providers often create network-level firewalls that run separately from the instance itself. Both AWS and Google Cloud Platform calls them Virtual Private Cloud (VPC) networks. These firewalls can apply even if you've disabled firewalls on the instance itself. Because you can modify these firewalls only via the cloud provider's web interface, it's easy to overlook them when trying to configure and access Netdata's dashboard.
+Cloud providers like AWS and Google Cloud use network-level firewalls called Virtual Private Cloud (VPC) networks, which apply even if the instance's firewall is disabled. Since these firewalls can only be modified through the cloud provider's web interface, they can be easily overlooked when configuring or accessing Netdata's dashboard.
 
 You can often confirm a firewall issue by querying the dashboard while connected to the instance via SSH: `curl
 http://localhost:19999/api/v1/info`. If you see JSON output, Netdata is running properly. If you try the same `curl`
@@ -49,5 +49,5 @@ Name: Netdata
 
 Click **Add** to apply your new inbound security rule.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTIxNTM3ODc4Ml19
+eyJoaXN0b3J5IjpbMTg5MzU4NzAyMF19
 -->
