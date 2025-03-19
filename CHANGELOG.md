@@ -1,11 +1,15 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v2.3.0](https://github.com/netdata/netdata/tree/v2.3.0) (2025-03-19)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.6...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.2.6...v2.3.0)
 
 **Merged pull requests:**
 
+- Remove auto-retry on changelog generation. [\#19908](https://github.com/netdata/netdata/pull/19908) ([Ferroin](https://github.com/Ferroin))
+- Bump repoconfig version used in kickstart script to 5-1. [\#19906](https://github.com/netdata/netdata/pull/19906) ([Ferroin](https://github.com/Ferroin))
+- Revert "Fix compile without dbengine" [\#19905](https://github.com/netdata/netdata/pull/19905) ([stelfrag](https://github.com/stelfrag))
+- Fix compile without dbengine [\#19902](https://github.com/netdata/netdata/pull/19902) ([stelfrag](https://github.com/stelfrag))
 - do not use errno when hashing status events [\#19900](https://github.com/netdata/netdata/pull/19900) ([ktsaou](https://github.com/ktsaou))
 - more compilation flags for stack traces [\#19899](https://github.com/netdata/netdata/pull/19899) ([ktsaou](https://github.com/ktsaou))
 - more strict checks on log-fw [\#19898](https://github.com/netdata/netdata/pull/19898) ([ktsaou](https://github.com/ktsaou))
@@ -56,6 +60,7 @@
 - fix rrdset name crash on cleanup [\#19838](https://github.com/netdata/netdata/pull/19838) ([ktsaou](https://github.com/ktsaou))
 - when destroying pgc, check if the cache is null [\#19837](https://github.com/netdata/netdata/pull/19837) ([ktsaou](https://github.com/ktsaou))
 - Fix for building with protobuf 30.0 [\#19835](https://github.com/netdata/netdata/pull/19835) ([vkalintiris](https://github.com/vkalintiris))
+- Improve CI reliability by allowing for better retry behavior. [\#19834](https://github.com/netdata/netdata/pull/19834) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#19833](https://github.com/netdata/netdata/pull/19833) ([netdatabot](https://github.com/netdatabot))
 - Fix typo in otel collector build infra. [\#19832](https://github.com/netdata/netdata/pull/19832) ([Ferroin](https://github.com/Ferroin))
 - store status file in /var/lib/netdata, not in /var/cache/netdata [\#19831](https://github.com/netdata/netdata/pull/19831) ([ktsaou](https://github.com/ktsaou))
@@ -474,13 +479,6 @@
 - metrics-cardinality function [\#19362](https://github.com/netdata/netdata/pull/19362) ([ktsaou](https://github.com/ktsaou))
 - avoid checking replication status all the time [\#19361](https://github.com/netdata/netdata/pull/19361) ([ktsaou](https://github.com/ktsaou))
 - respect flood protection configuration for daemon [\#19360](https://github.com/netdata/netdata/pull/19360) ([ktsaou](https://github.com/ktsaou))
-- fix os\_system\_memory\(\) for concurrent use and call it from pulse [\#19359](https://github.com/netdata/netdata/pull/19359) ([ktsaou](https://github.com/ktsaou))
-- fix flood protection [\#19358](https://github.com/netdata/netdata/pull/19358) ([ktsaou](https://github.com/ktsaou))
-- allow compiling with FSANITIZE\_ADDRESS [\#19357](https://github.com/netdata/netdata/pull/19357) ([ktsaou](https://github.com/ktsaou))
-- Check cluster centers size in copy constructor of inlined kmeans [\#19356](https://github.com/netdata/netdata/pull/19356) ([vkalintiris](https://github.com/vkalintiris))
-- Stream Compression Fix [\#19355](https://github.com/netdata/netdata/pull/19355) ([ktsaou](https://github.com/ktsaou))
-- fix compilation on windows [\#19354](https://github.com/netdata/netdata/pull/19354) ([ktsaou](https://github.com/ktsaou))
-- Minor fixes [\#19353](https://github.com/netdata/netdata/pull/19353) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
