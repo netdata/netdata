@@ -1,11 +1,9 @@
 # Install Netdata on offline systems
 
-Our kickstart install script provides support for installing the Netdata Agent on air-gapped systems which do not have a usable internet connection by prefetching all of the required files so that they can be copied to the target system.
 
-Currently, we only support using static installs with this method. There are tentative plans to support building locally on offline systems as well, but there is currently no estimate of when this functionality may be implemented.
+Our kickstart install script supports installing the Netdata Agent on air-gapped systems by prefetching all required files for offline installation. Currently, only static installs are supported, though we may add support for local builds in the future, with no ETA.
 
-Users who wish to use native packages on offline systems may be able to do so using whatever tooling their distribution already provides for offline package management (such as `apt-offline` on Debian or Ubuntu systems),
-but this is not officially supported.
+For offline systems, users may use their distribution’s offline package management tools (e.g., `apt-offline` on Debian/Ubuntu), but this is not officially supported.
 
 ## Preparing the offline installation source
 
@@ -41,6 +39,6 @@ Once you have prepared the offline install source, you need to copy the offline 
 After copying the files, simply run the `install.sh` script located in the
 offline install source directory. It accepts all the [same options as the kickstart script](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further customization of the installation, though it will default to not enabling automatic updates (as they are not supported on offline installs).
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE5NTYxMjU4OTYsLTQ5Njg0MzY0OCwtMj
-UyNjM2NDU4LDE0NDM1NzkzNjYsLTE2NDMxMzU1MTRdfQ==
+eyJoaXN0b3J5IjpbNDUzNzAxODg2LC00OTY4NDM2NDgsLTI1Mj
+YzNjQ1OCwxNDQzNTc5MzY2LC0xNjQzMTM1NTE0XX0=
 -->
