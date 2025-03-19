@@ -562,9 +562,7 @@ static void daemon_status_file_migrate_once(void) {
     session_status.restarts = last_session_status.restarts + 1;
     session_status.reliability = last_session_status.reliability;
 
-    bool crashed = last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED;
-    bool exited_with_fatal = last_session_status.status == DAEMON_STATUS_EXITED && last_session_status.exit_reason != EXIT_REASON_NONE && !is_exit_reason_normal(last_session_status.exit_reason);
-    if(crashed || exited_with_fatal) {
+    if(daemon_status_file_has_last_crashed())  {
         if(session_status.reliability > 0) session_status.reliability = 0;
         session_status.reliability--;
     }
@@ -1494,7 +1492,8 @@ void daemon_status_file_shutdown_step(const char *step) {
 // --------------------------------------------------------------------------------------------------------------------
 
 bool daemon_status_file_has_last_crashed(void) {
-    return last_session_status.status != DAEMON_STATUS_EXITED || !is_exit_reason_normal(last_session_status.exit_reason);
+    return (last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED) ||
+           !is_exit_reason_normal(last_session_status.exit_reason);
 }
 
 bool daemon_status_file_was_incomplete_shutdown(void) {
