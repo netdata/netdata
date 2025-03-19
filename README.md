@@ -560,7 +560,7 @@ Most commercial monitoring providers face a significant challenge: they centrali
 
 As a result, they try to find a balance: collect the least possible data, but collect enough to have something useful out of it.
 
-We, at Netdata, see monitoring in a completely different way: **monitoring systems should be built bottom-up and be rich in insights**, so we focus on each component individually to collect, store, check and visualize everything related to each of them, and we make sure that all components are monitored. Each metric is important.
+At Netdata, we believe **monitoring should be built bottom-up and provide rich insights**. We focus on each component individually to collect, store, check, and visualize all related metrics, ensuring every component is monitored. Every metric matters.
 
 This is why Netdata trains multiple machine-learning models per metric, based exclusively on their own past (no sampling of data, no sharing of trained models) to detect anomalies based on the specific use case and workload each component is used.
 
@@ -862,6 +862,6 @@ The Netdata ecosystem consists of three key parts:
 
 The binary installation packages provided by Netdata include the Netdata Agent and the Netdata UI. Since the Netdata Agent is open-source, it is frequently packaged by third parties (e.g., Linux Distributions) excluding the closed-source components (Netdata UI is not included). While their packages can still be useful in providing the necessary back-ends and the APIs of a fully functional monitoring solution, we recommend using the installation packages we provide to experience the full feature set of Netdata.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTM0MTg4OTkwOCwtMjA3NzI4MDQ1Nyw0ND
-IzNTA2NTNdfQ==
+eyJoaXN0b3J5IjpbLTQzNTA1MjM0MywtMzQxODg5OTA4LC0yMD
+c3MjgwNDU3LDQ0MjM1MDY1M119
 -->
