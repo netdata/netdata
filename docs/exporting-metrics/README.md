@@ -1,8 +1,11 @@
 # Export metrics to external time-series databases
 
-Netdata natively supports long term retention of metrics. Its tiered database design typically provides significantly longer retention (months to years) and faster queries (typically 20+ times faster), compared to other common time-series databases.
 
-For integration with other observability tools, Netdata provides a number of exporters allow you to copy metrics to third party time-series databases for additional analysis or integration with other tools.
+Netdata natively supports long -term metric retention of metrics. I, with its tiered database design typically providesoffering significantly longer retention (months to years) and faster queries (typically 20+ times faster), compared to other common time-series databases.
+
+For than other time-series databases.
+
+It also provides exporters to integratione with other observability tools, Netdata provides a number of exportersird-party tools, allowing you to copy metrics to third party time-series databases for additionalfor further analysis or integration with other tools.
 
 Exporters enable connections to [more than thirty](#supported-databases) supported databases, including InfluxDB, Prometheus, Graphite, ElasticSearch, and much more.
 
@@ -53,3 +56,6 @@ documentation and the [enabling a connector](/docs/exporting-metrics/enable-an-e
 - **Wavefront**: [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md).
 
 Can't find your preferred external time-series database? Ask our [community](https://community.netdata.cloud/) for solutions, or file an [issue on GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbLTE2Mjc5NjE1NzNdfQ==
+-->
