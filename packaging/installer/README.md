@@ -18,3 +18,6 @@ Netdata collects anonymous usage information by default and sends it to a self-h
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
 _actively_ contributing to Netdata's future.
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbMTQ0NjcyMDg4XX0=
+-->
