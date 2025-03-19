@@ -20,9 +20,10 @@ There are 3 components to structure your Netdata ecosystem:
 
 3. **Netdata Cloud**
 
-   Our SaaS, combining all your infrastructure, all your Netdata Agents and Parents, into one uniform, distributed, scalable, monitoring database, offering advanced data slicing and dicing capabilities, custom dashboards, advanced troubleshooting tools, user management, centralized management of alerts, and more.
+   
+Our SaaS unifies all your infrastructure, Netdata Agents, and Parents into a single, scalable, distributed monitoring database. It offers advanced data analysis, custom dashboards, troubleshooting tools, user and alert management, and more.
 
-The Netdata Agent is a highly modular software piece, providing data collection via numerous plugins, an in-house crafted time-series database, a query engine, health monitoring and alerts, machine learning and anomaly detection, metrics exporting to third party systems.
+The Netdata Agent is a modular software solution that collects data through various plugins, includes a custom time-series database, query engine, health monitoring and alerts, machine learning for anomaly detection, and supports metric export to third-party systems.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTczOTcxMzg4N119
+eyJoaXN0b3J5IjpbNjI2OTY0NjA3LC03Mzk3MTM4ODddfQ==
 -->
