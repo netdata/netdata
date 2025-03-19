@@ -1,10 +1,8 @@
 # Deploy Netdata with Ansible
 
-Netdata's [one-line kickstart](/packaging/installer/README.md) is zero-configuration, highly adaptable, and compatible with tons
-of different operating systems and Linux distributions. You can use it on bare metal, VMs, containers, and everything
-in-between.
 
-But what if you're trying to bootstrap an infrastructure monitoring solution as quickly as possible? What if you need to
+
+What if you're trying to bootstrap an infrastructure monitoring solution as quickly as possible? What if you need to
 deploy Netdata across an entire infrastructure with many nodes? What if you want to make this deployment reliable,
 repeatable, and idempotent? What if you want to write and deploy your infrastructure or cloud monitoring system like
 code?
@@ -145,5 +143,5 @@ task results in a changed, failure, or was skipped entirely.
 The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the connect to Cloud
 task, your nodes start populating your Space in Netdata Cloud.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTI0NTAxMDk5Nl19
+eyJoaXN0b3J5IjpbLTE0MTgyMjA4OCwtMjQ1MDEwOTk2XX0=
 -->
