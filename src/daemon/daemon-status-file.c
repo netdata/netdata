@@ -562,7 +562,7 @@ static void daemon_status_file_migrate_once(void) {
     session_status.restarts = last_session_status.restarts + 1;
     session_status.reliability = last_session_status.reliability;
 
-    bool crashed = last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED;
+    bool crashed = last_session_status.status != DAEMON_STATUS_NONE && !(last_session_status.status & DAEMON_STATUS_EXITED);
     bool exited_with_fatal = last_session_status.status == DAEMON_STATUS_EXITED && last_session_status.exit_reason != EXIT_REASON_NONE && !is_exit_reason_normal(last_session_status.exit_reason);
     if(crashed || exited_with_fatal) {
         if(session_status.reliability > 0) session_status.reliability = 0;
