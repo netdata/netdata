@@ -37,7 +37,9 @@ MENU: **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)*
 
 **TL;DR**
 
-Netdata is an open-source, real-time infrastructure monitoring platform designed for instant visibility and proactive troubleshooting across your entire IT environment. It captures every metric, every second, providing detailed insights into systems, containers, applications, and logs without compromising performance or requiring complex setup.
+Netdata is an open-source, real-time infrastructure monitoring platform designed for instant visibility and proactive troubleshooting across your entire IT environment. 
+
+It captures every metric, every second, providing detailed insights into systems, containers, applications, and logs without compromising performance or requiring complex setup.
 
 Key Advantages:
 
@@ -863,3 +865,6 @@ The Netdata ecosystem consists of three key parts:
 - **Netdata UI**: The Netdata UI is closed-source, and handles all visualization and dashboard functionalities related to metrics, logs and other collected data, as well as the central configuration and management of the Netdata ecosystem. It serves both the Netdata Agent and Netdata Cloud. The Netdata UI is distributed in binary form with the Netdata Agent and is publicly accessible via a CDN, licensed under the [Netdata Cloud UI License 1 (NCUL1)](https://app.netdata.cloud/LICENSE.txt). It integrates third-party open-source components, detailed in the [Netdata UI third-party licenses](https://app.netdata.cloud/3D_PARTY_LICENSES.txt).
 
 The binary installation packages provided by Netdata include the Netdata Agent and the Netdata UI. Since the Netdata Agent is open-source, it is frequently packaged by third parties (e.g., Linux Distributions) excluding the closed-source components (Netdata UI is not included). While their packages can still be useful in providing the necessary back-ends and the APIs of a fully functional monitoring solution, we recommend using the installation packages we provide to experience the full feature set of Netdata.
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbNDQyMzUwNjUzXX0=
+-->
