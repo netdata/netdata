@@ -251,6 +251,7 @@ Netdata can be installed on all Linux, macOS, FreeBSD and Windows systems. We pr
 - Install on [Ubuntu, Debian CentOS, Fedora, Suse, Red Hat, Arch, Alpine, Gentoo, even BusyBox](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
 - Install with [Docker](/packaging/docker/README.md).<br/>
   Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
+  
 - Install on [macOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
 - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
 - Install on [Windows](https://learn.netdata.cloud/docs/netdata-agent/installation/windows).
@@ -866,5 +867,5 @@ The Netdata ecosystem consists of three key parts:
 
 The binary installation packages provided by Netdata include the Netdata Agent and the Netdata UI. Since the Netdata Agent is open-source, it is frequently packaged by third parties (e.g., Linux Distributions) excluding the closed-source components (Netdata UI is not included). While their packages can still be useful in providing the necessary back-ends and the APIs of a fully functional monitoring solution, we recommend using the installation packages we provide to experience the full feature set of Netdata.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbNDQyMzUwNjUzXX0=
+eyJoaXN0b3J5IjpbLTE2ODIxMDMwODksNDQyMzUwNjUzXX0=
 -->
