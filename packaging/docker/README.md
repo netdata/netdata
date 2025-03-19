@@ -18,9 +18,7 @@ and unfortunately, not something we can realistically work around.
 You can create a new Agent container using either `docker run` or `docker-compose`. After using any method, you can
 visit the Agent dashboard `http://NODE:19999`.
 
-The Netdata container requires different privileges and mounts to provide functionality similar to that provided by
-Netdata installed on the host. Below you can find a list of Netdata components that need these privileges and mounts,
-along with their descriptions.
+The Netdata container requires specific privileges and mounts to function like a host installation. Below is a list of components that need these privileges and mounts, along with descriptions.
 
 <details open>
 <summary>Privileges</summary>
@@ -57,8 +55,7 @@ along with their descriptions.
 
 Both methods create a [volume](https://docs.docker.com/storage/volumes/) for Netdata's configuration files
 _within the container_ at `/etc/netdata`.
-See the [configure section](#configure-agent-containers) for details. If you want to access the configuration files from
-your _host_ machine, see [host-editable configuration](#with-host-editable-configuration).
+See the [configure section](#configure-agent-containers) for details. If you want to access the configuration files from your _host_ machine, see [host-editable configuration](#with-host-editable-configuration).
 
 <Tabs>
 <TabItem value="docker_run" label="docker run">
@@ -610,5 +607,5 @@ configuration for health checks to work.
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
 You may either use the command line tools available or take advantage of our GitHub Actions infrastructure.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTkzMDM4MDk2XX0=
+eyJoaXN0b3J5IjpbMzI5MzU4MDE0XX0=
 -->
