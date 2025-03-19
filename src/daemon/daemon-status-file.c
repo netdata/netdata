@@ -1425,6 +1425,46 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     return duplicate;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// shutdown related functions
+
+static SPINLOCK shutdown_timeout_spinlock = SPINLOCK_INITIALIZER;
+
+void daemon_status_file_shutdown_timeout(void) {
+    FUNCTION_RUN_ONCE();
+
+    spinlock_lock(&shutdown_timeout_spinlock);
+
+    dsf_acquire(session_status);
+    exit_initiated_add(EXIT_REASON_SHUTDOWN_TIMEOUT);
+    session_status.exit_reason |= EXIT_REASON_SHUTDOWN_TIMEOUT;
+    dsf_release(session_status);
+
+    strncpyz(session_status.fatal.function, "shutdown_timeout", sizeof(session_status.fatal.function) - 1);
+
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    daemon_status_file_save(wb, &session_status, false);
+
+    // keep the spinlock locked, to prevent further steps updating the status
+}
+
+void daemon_status_file_shutdown_step(const char *step) {
+    if(session_status.fatal.filename[0] || !spinlock_trylock(&shutdown_timeout_spinlock))
+        // we have a fatal logged
+        return;
+
+    if(step != NULL)
+        snprintfz(session_status.fatal.function, sizeof(session_status.fatal.function), "shutdown(%s)", step);
+    else
+        session_status.fatal.function[0] = '\0';
+
+    daemon_status_file_update_status(DAEMON_STATUS_EXITING);
+
+    spinlock_unlock(&shutdown_timeout_spinlock);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 bool daemon_status_file_has_last_crashed(void) {
     return last_session_status.status != DAEMON_STATUS_EXITED || !is_exit_reason_normal(last_session_status.exit_reason);
 }
@@ -1447,19 +1487,6 @@ void daemon_status_file_startup_step(const char *step) {
         session_status.fatal.function[0] = '\0';
 
     daemon_status_file_update_status(DAEMON_STATUS_INITIALIZING);
-}
-
-void daemon_status_file_shutdown_step(const char *step) {
-    if(session_status.fatal.filename[0])
-        // we have a fatal logged
-        return;
-
-    if(step != NULL)
-        snprintfz(session_status.fatal.function, sizeof(session_status.fatal.function), "shutdown(%s)", step);
-    else
-        session_status.fatal.function[0] = '\0';
-
-    daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

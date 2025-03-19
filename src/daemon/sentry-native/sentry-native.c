@@ -262,3 +262,31 @@ void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     sentry_value_set_by_key(crumb, "data", data);
     sentry_add_breadcrumb(crumb);
 }
+
+void nd_sentry_add_shutdown_timeout_as_breadcrumb(void) {
+    if (!analytics_check_enabled())
+        return;
+
+    const char *function = "shutdown_timeout";
+    strncpyz(g_sentry_event_message, function, sizeof(g_sentry_event_message) - 1);
+
+    nd_sentry_set_tag_uptime();
+
+    // Set the transaction name to the function where the error occurred
+    // this should be low cardinality
+    sentry_set_transaction(function);
+
+    // Set the fingerprint to the function where the error occurred
+    sentry_set_fingerprint("{{ default }}", function, NULL);
+
+    sentry_value_t crumb = sentry_value_new_breadcrumb("fatal", "shutdown_timeout() event details");
+
+    sentry_value_t data = sentry_value_new_object();
+    nd_sentry_add_key_value_charp(data, "function", function);
+    nd_sentry_add_key_value_charp(data, "thread", nd_thread_tag());
+    nd_sentry_add_key_value_uint64(data, "thread_id", gettid_cached());
+    nd_sentry_add_key_value_charp(data, "status", DAEMON_STATUS_2str(daemon_status_file_get_status()));
+
+    sentry_value_set_by_key(crumb, "data", data);
+    sentry_add_breadcrumb(crumb);
+}

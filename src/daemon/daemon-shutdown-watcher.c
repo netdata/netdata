@@ -3,6 +3,10 @@
 #include "daemon-shutdown-watcher.h"
 #include "daemon-status-file.h"
 
+#ifdef ENABLE_SENTRY
+#include "sentry-native/sentry-native.h"
+#endif
+
 watcher_step_t *watcher_steps;
 
 static struct completion shutdown_begin_completion;
@@ -12,6 +16,10 @@ static ND_THREAD *watcher_thread;
 NEVER_INLINE
 static void shutdown_timed_out(void) {
     // keep this as a separate function, to have it logged like this in sentry
+    daemon_status_file_shutdown_timeout();
+#ifdef ENABLE_SENTRY
+    nd_sentry_add_shutdown_timeout_as_breadcrumb();
+#endif
     abort();
 }
 
