@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- do not use errno when hashing status events [\#19900](https://github.com/netdata/netdata/pull/19900) ([ktsaou](https://github.com/ktsaou))
+- more compilation flags for stack traces [\#19899](https://github.com/netdata/netdata/pull/19899) ([ktsaou](https://github.com/ktsaou))
+- more strict checks on log-fw [\#19898](https://github.com/netdata/netdata/pull/19898) ([ktsaou](https://github.com/ktsaou))
+- fix for system shutdown [\#19897](https://github.com/netdata/netdata/pull/19897) ([ktsaou](https://github.com/ktsaou))
+- build: update otel deps to v0.122.0 [\#19895](https://github.com/netdata/netdata/pull/19895) ([ilyam8](https://github.com/ilyam8))
 - do not recurse cleanup on shutdown [\#19894](https://github.com/netdata/netdata/pull/19894) ([ktsaou](https://github.com/ktsaou))
 - make sure all rrdcalcs are unlinked the moment they are deleted [\#19893](https://github.com/netdata/netdata/pull/19893) ([ktsaou](https://github.com/ktsaou))
 - Fix typo in README title [\#19891](https://github.com/netdata/netdata/pull/19891) ([felipecrs](https://github.com/felipecrs))
@@ -476,11 +481,6 @@
 - Stream Compression Fix [\#19355](https://github.com/netdata/netdata/pull/19355) ([ktsaou](https://github.com/ktsaou))
 - fix compilation on windows [\#19354](https://github.com/netdata/netdata/pull/19354) ([ktsaou](https://github.com/ktsaou))
 - Minor fixes [\#19353](https://github.com/netdata/netdata/pull/19353) ([ktsaou](https://github.com/ktsaou))
-- Stream receiver/sender compress BEGIN-SET-END performance [\#19352](https://github.com/netdata/netdata/pull/19352) ([ktsaou](https://github.com/ktsaou))
-- RRDCONTEXTS: loading report [\#19351](https://github.com/netdata/netdata/pull/19351) ([ktsaou](https://github.com/ktsaou))
-- lower compression level to lower cpu resources on parents [\#19350](https://github.com/netdata/netdata/pull/19350) ([ktsaou](https://github.com/ktsaou))
-- PGC wanted size [\#19349](https://github.com/netdata/netdata/pull/19349) ([ktsaou](https://github.com/ktsaou))
-- log a summary of metadata ignored contexts [\#19348](https://github.com/netdata/netdata/pull/19348) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
