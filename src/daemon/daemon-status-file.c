@@ -1492,7 +1492,8 @@ void daemon_status_file_shutdown_step(const char *step) {
 // --------------------------------------------------------------------------------------------------------------------
 
 bool daemon_status_file_has_last_crashed(void) {
-    return last_session_status.status != DAEMON_STATUS_EXITED || !is_exit_reason_normal(last_session_status.exit_reason);
+    return (last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED) ||
+           !is_exit_reason_normal(last_session_status.exit_reason);
 }
 
 bool daemon_status_file_was_incomplete_shutdown(void) {
