@@ -9,11 +9,10 @@ It also provides exporters to integratione with other observability tools, Netda
 
 Exporters enable connections to [more than thirty](#supported-databases) supported databases, including InfluxDB, Prometheus, Graphite, ElasticSearch, and much more.
 
-The exporting engine is able to downsample Netdata's per-second metrics at a user-configurable interval (e.g per minute), and can export metrics to multiple time-series databases simultaneously.
 
-Based on your needs and resources you allocated to your external time-series database, you can configure the interval
-that metrics are exported or export only certain charts with filtering. You can also choose whether metrics are exported
-as-collected, a normalized average, or the sum/volume of metrics values over the configured interval.
+The exporting engine can downsample Netdata's per-second metrics at a configurable interval (e.g., per minute) and export to multiple time-series databases simultaneously.
+
+You can configure export intervals, filter specific charts, and choose to export metrics as-collected, as a normalized average, or as the sum/volume over the interval.
 
 ## Supported databases
 
@@ -57,5 +56,5 @@ documentation and the [enabling a connector](/docs/exporting-metrics/enable-an-e
 
 Can't find your preferred external time-series database? Ask our [community](https://community.netdata.cloud/) for solutions, or file an [issue on GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE2Mjc5NjE1NzNdfQ==
+eyJoaXN0b3J5IjpbLTMwNTMyOTAyNCwtMTYyNzk2MTU3M119
 -->
