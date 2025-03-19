@@ -5,13 +5,9 @@ import TabItem from '@theme/TabItem';
 
 ## Limitations running the Agent in Docker
 
-We don’t officially support running our Docker images with the Docker CLI `--user` option or the Docker Compose
-`user:` parameter. Such usage will usually still in Docker Compose. While it may work, but some features will noon’t be available when run this
-way. Note that t. The Agent will drops privileges appropriately inside the container during startup, meaning that even
-when ruduring startup, so even without these options, almost nothing in the container will actually run with an effective UID ofprocesses inside the container won’t run with UID 0.
+We don’t officially support running our Docker images with the Docker CLI `--user` option or the Docker Compose `user:` parameter. While these configurations may work, some features may not be available. The Agent drops privileges during startup, so even without these options, most processes inside the container will not run with UID 0.
 
-Our POWER8+ Docker images don’t support our FreeIPMI collector. This is a technical limitation in FreeIPMI itself,
-and unfortunately, not something we can realistically work around.
+Our POWER8+ Docker images don’t support our FreeIPMI collector. This is a technical limitation in FreeIPMI itself, and unfortunately, not something we can realistically work around.
 
 ## Create a new Netdata Agent container
 
@@ -601,5 +597,5 @@ At Netdata, we provide multiple ways of testing your Docker images using your ow
 
 You may either use the command line tools available or take advantage of our GitHub Actions infrastructure.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTEyNzYyMDMzN119
+eyJoaXN0b3J5IjpbMTEwODA4MDkzMCwxMTI3NjIwMzM3XX0=
 -->
