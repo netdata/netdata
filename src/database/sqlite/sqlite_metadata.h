@@ -60,7 +60,7 @@ void commit_alert_transitions(RRDHOST *host);
 void metadata_sync_shutdown_background(void);
 void metadata_sync_shutdown_background_wait(void);
 void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context);
-void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter);
+void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer);
 void metadata_execute_store_statement(sqlite3_stmt *stmt);
 
 // UNIT TEST

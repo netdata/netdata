@@ -883,7 +883,7 @@ static int chart_label_store_to_sql_callback(const char *name, const char *value
     return 1;
 }
 
-static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t *query_counter)
+static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer)
 {
     size_t old_version = st->rrdlabels_last_saved_version;
     size_t new_version = rrdlabels_version(st->rrdlabels);
@@ -896,10 +896,8 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t
     rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
     buffer_strcat(work_buffer, " ON CONFLICT (chart_id, label_key) DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()");
     int rc = db_execute(db_meta, buffer_tostring(work_buffer));
-    if (likely(!rc)) {
+    if (likely(!rc))
         st->rrdlabels_last_saved_version = new_version;
-        (*query_counter)++;
-    }
 
     return rc;
 }
@@ -2058,7 +2056,7 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     freez(data);
 }
 
-static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter, bool shutting_down)
+static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool shutting_down)
 {
     static bool skip_models = false;
     RRDSET *st;
@@ -2074,18 +2072,15 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, size_t *query
     rrdset_foreach_reentrant(st, host) {
 
         if(rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE)) {
-            (*query_counter)++;
 
             rrdset_flag_clear(st, RRDSET_FLAG_METADATA_UPDATE);
 
             buffer_flush(work_buffer);
 
             worker_is_busy(UV_EVENT_STORE_CHART);
-            rc = check_and_update_chart_labels(st, work_buffer, query_counter);
+            rc = check_and_update_chart_labels(st, work_buffer);
             if (unlikely(rc))
                 error_report("METADATA: 'host:%s': Failed to update labels for chart %s", rrdhost_hostname(host), rrdset_name(st));
-            else
-                (*query_counter)++;
 
             rc = store_chart_metadata(st, &store_chart);
             if (unlikely(rc)) {
@@ -2096,8 +2091,6 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, size_t *query
                     rrdhost_hostname(host),
                     rrdset_name(st));
             }
-            else
-                (*query_counter)++;
             worker_is_idle();
         }
 
@@ -2133,8 +2126,7 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, size_t *query
                     rrdhost_hostname(host),
                     rrdset_name(st),
                     rrddim_name(rd));
-            } else
-                (*query_counter)++;
+            }
 
             worker_is_idle();
         }
@@ -2154,7 +2146,7 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, size_t *query
 }
 
 
-static void store_host_and_system_info(RRDHOST *host, size_t *query_counter)
+static void store_host_and_system_info(RRDHOST *host)
 {
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_INFO);
 
@@ -2162,18 +2154,10 @@ static void store_host_and_system_info(RRDHOST *host, size_t *query_counter)
         error_report("METADATA: 'host:%s': Failed to store host updated system information in the database", rrdhost_hostname(host));
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
     }
-    else {
-        if (likely(query_counter))
-            (*query_counter)++;
-    }
 
     if (unlikely(store_host_metadata(host))) {
         error_report("METADATA: 'host:%s': Failed to store host info in the database", rrdhost_hostname(host));
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
-    }
-    else {
-        if (likely(query_counter))
-            (*query_counter)++;
     }
 }
 
@@ -2333,7 +2317,7 @@ static void store_sql_statements(struct judy_list_t *pending_sql_statement)
     worker_is_idle();
 }
 
-static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter)
+static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer)
 {
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
 
@@ -2344,7 +2328,6 @@ static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer, size_t *q
         return;
     }
 
-    (*query_counter)++;
     buffer_flush(work_buffer);
 
     struct query_build tmp = {.sql = work_buffer, .count = 0};
@@ -2358,11 +2341,10 @@ static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer, size_t *q
     if (unlikely(rc)) {
         error_report("METADATA: 'host:%s': failed to update metadata host labels", rrdhost_hostname(host));
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
-    } else
-        (*query_counter)++;
+    }
 }
 
-static void store_host_claim_id(RRDHOST *host, size_t *query_counter)
+static void store_host_claim_id(RRDHOST *host)
 {
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_CLAIMID);
     int rc;
@@ -2374,23 +2356,23 @@ static void store_host_claim_id(RRDHOST *host, size_t *query_counter)
 
     if (unlikely(rc))
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);
-    else
-        (*query_counter)++;
 }
 
-void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter)
+
+
+void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer)
 {
     // Store labels (if needed)
     if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS)))
-        meta_store_host_labels(host, work_buffer, query_counter);
+        meta_store_host_labels(host, work_buffer);
 
     // Store claim id (if needed)
     if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID)))
-        store_host_claim_id(host, query_counter);
+        store_host_claim_id(host);
 
     // Store host and system info (if needed);
     if (rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_INFO))
-        store_host_and_system_info(host, query_counter);
+        store_host_and_system_info(host);
 }
 
 // Worker thread to scan hosts for pending metadata to store
@@ -2419,26 +2401,17 @@ static void start_metadata_hosts(uv_work_t *req)
             continue;
 
         usec_t started_ut = now_monotonic_usec();
-        size_t query_counter = 0;
-
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
-
         worker_is_busy(UV_EVENT_STORE_HOST);
 
         // store labels, claim_id, host and system info (if needed)
-        store_host_info_and_metadata(host, work_buffer, &query_counter);
-
+        store_host_info_and_metadata(host, work_buffer);
         worker_is_idle();
 
-        metadata_scan_host(host, work_buffer, &query_counter, shutting_down);
+        metadata_scan_host(host, work_buffer, shutting_down);
 
         COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
-        nd_log_daemon(
-            NDLP_DEBUG,
-            "Host %s saved metadata with %zu SQL statements, in %s",
-            rrdhost_hostname(host),
-            query_counter,
-            report_duration);
+        nd_log_daemon(NDLP_DEBUG, "Host %s saved metadata in %s", rrdhost_hostname(host), report_duration);
     }
     dfe_done(host);
 
