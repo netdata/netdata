@@ -965,10 +965,11 @@ struct post_status_file_thread_data {
 void post_status_file(struct post_status_file_thread_data *d) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-    buffer_json_member_add_string(wb, "exit_cause", d->cause); // custom
-    buffer_json_member_add_string(wb, "message", d->msg); // ECS
-    buffer_json_member_add_uint64(wb, "priority", d->priority); // custom
-    buffer_json_member_add_uint64(wb, "version_saved", d->status->v); // custom
+    buffer_json_member_add_string(wb, "exit_cause", d->cause);
+    buffer_json_member_add_string(wb, "message", d->msg);
+    buffer_json_member_add_uint64(wb, "priority", d->priority);
+    buffer_json_member_add_uint64(wb, "version_saved", d->status->v);
+    buffer_json_member_add_string(wb, "agent_version_now", NETDATA_VERSION);
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
