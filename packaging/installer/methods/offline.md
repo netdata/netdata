@@ -5,7 +5,7 @@ Our kickstart install script provides support for installing the Netdata Agent o
 Currently, we only support using static installs with this method. There are tentative plans to support building locally on offline systems as well, but there is currently no estimate of when this functionality may be implemented.
 
 Users who wish to use native packages on offline systems may be able to do so using whatever tooling their distribution already provides for offline package management (such as `apt-offline` on Debian or Ubuntu systems),
- but this is not officially supported.
+but this is not officially supported.
 
 ## Preparing the offline installation source
 
@@ -44,6 +44,6 @@ offline install source directory. It accepts all the [same options as the kickst
 customization of the installation, though it will default to not enabling automatic updates (as they are not
 supported on offline installs).
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTI1MjYzNjQ1OCwxNDQzNTc5MzY2LC0xNj
-QzMTM1NTE0XX0=
+eyJoaXN0b3J5IjpbLTQ5Njg0MzY0OCwtMjUyNjM2NDU4LDE0ND
+M1NzkzNjYsLTE2NDMxMzU1MTRdfQ==
 -->
