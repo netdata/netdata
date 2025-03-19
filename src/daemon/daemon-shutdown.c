@@ -102,13 +102,14 @@ void cancel_main_threads(void) {
     static_threads = NULL;
 }
 
+#ifdef ENABLE_DBENGINE
 static void *rrdeng_exit_background(void *ptr) {
     struct rrdengine_instance *ctx = ptr;
     rrdeng_exit(ctx);
     return NULL;
 }
 
-#ifdef ENABLE_DBENGINE
+
 static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
     static size_t starting_size_to_flush = 0;
 
