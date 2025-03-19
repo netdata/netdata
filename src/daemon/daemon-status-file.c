@@ -1089,7 +1089,8 @@ void daemon_status_file_check_crash(void) {
                 pri = PRI_DEADLY_SIGNAL;
                 this_is_a_crash = true;
             }
-            else if(!is_exit_reason_normal(last_session_status.exit_reason)) {
+            else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
+                     !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal and exit";
                 msg = "Netdata was last stopped gracefully after it encountered a fatal error";
                 pri = PRI_FATAL;
@@ -1157,7 +1158,8 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata couldn't start while the disk is almost full";
                 pri = PRI_USER_SHOULD_FIX;
             }
-            else if (!is_exit_reason_normal(last_session_status.exit_reason)) {
+            else if (last_session_status.exit_reason != EXIT_REASON_NONE &&
+                     !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal on start";
                 msg = "Netdata was last crashed while starting, because of a fatal error";
                 pri = PRI_FATAL;
@@ -1181,7 +1183,8 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last killed because it couldn't shutdown on time";
                 pri = PRI_FATAL;
             }
-            else if(!is_exit_reason_normal(last_session_status.exit_reason)) {
+            else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
+                !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal on exit";
                 msg = "Netdata was last killed/crashed while exiting after encountering an error";
                 pri = PRI_FATAL;
@@ -1224,7 +1227,8 @@ void daemon_status_file_check_crash(void) {
                 pri = PRI_DEADLY_SIGNAL;
                 this_is_a_crash = true;
             }
-            else if (!is_exit_reason_normal(last_session_status.exit_reason)) {
+            else if (last_session_status.exit_reason != EXIT_REASON_NONE &&
+                     !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "killed fatal";
                 msg = "Netdata was last crashed due to a fatal error";
                 pri = PRI_FATAL;
@@ -1488,8 +1492,7 @@ void daemon_status_file_shutdown_step(const char *step) {
 // --------------------------------------------------------------------------------------------------------------------
 
 bool daemon_status_file_has_last_crashed(void) {
-    return (last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED) ||
-           !is_exit_reason_normal(last_session_status.exit_reason);
+    return last_session_status.status != DAEMON_STATUS_EXITED || !is_exit_reason_normal(last_session_status.exit_reason);
 }
 
 bool daemon_status_file_was_incomplete_shutdown(void) {
