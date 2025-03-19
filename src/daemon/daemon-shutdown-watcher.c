@@ -56,7 +56,6 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
 
     daemon_status_file_shutdown_step(watcher_steps[step_id].msg);
 
-#ifdef ENABLE_SENTRY
     // Wait with a timeout
     time_t timeout = 135; // systemd gives us 150, we timeout at 135
 
@@ -65,11 +64,6 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
         remaining_seconds = 0;
 
     bool ok = completion_timedwait_for(&watcher_steps[step_id].p, remaining_seconds);
-#else
-    // Wait indefinitely
-    bool ok = true;
-    completion_wait_for(&watcher_steps[step_id].p);
-#endif
 
     usec_t step_duration = now_monotonic_usec() - step_start_time;
 
@@ -199,7 +193,7 @@ void watcher_thread_start() {
     completion_init(&shutdown_begin_completion);
     completion_init(&shutdown_end_completion);
 
-    watcher_thread = nd_thread_create("P[WATCHER]", NETDATA_THREAD_OPTION_JOINABLE, watcher_main, NULL);
+    watcher_thread = nd_thread_create("EXIT_WATCHER", NETDATA_THREAD_OPTION_JOINABLE, watcher_main, NULL);
 }
 
 void watcher_thread_stop() {
