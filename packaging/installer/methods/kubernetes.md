@@ -120,8 +120,7 @@ The cluster terminates the old pods and creates new ones with the proper persist
 ![Netdata's Kubernetes monitoring
 visualizations](https://user-images.githubusercontent.com/1153921/107801491-5dcb0f00-6d1d-11eb-9ab1-876c39f556e2.png)
 
-If you don't need to configure your Netdata deployment, [skip down](#whats-next) to see how Kubernetes monitoring works
-in Netdata, in addition to more guides and resources.
+If you don't need to configure your Netdata deployment, [skip down](#whats-next) to see how Kubernetes monitoring works in Netdata, in addition to more guides and resources.
 
 ## Configure your Netdata monitoring deployment
 
@@ -188,5 +187,5 @@ helm repo update
 helm upgrade netdata netdata/netdata
 ```
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMjEwOTg2MjU4NywtMzc3NTEwNDUwXX0=
+eyJoaXN0b3J5IjpbLTE5MjYwMzg5MTUsLTM3NzUxMDQ1MF19
 -->
