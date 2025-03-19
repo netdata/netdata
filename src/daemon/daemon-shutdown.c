@@ -23,6 +23,7 @@ void abort_on_fatal_enable(void) {
     abort_on_fatal = true;
 }
 
+#ifdef ENABLE_SENTRY
 NEVER_INLINE
 static bool shutdown_on_fatal(void) {
     // keep this as a separate function, to have it logged like this in sentry
@@ -31,6 +32,7 @@ static bool shutdown_on_fatal(void) {
     else
         return false;
 }
+#endif
 
 void web_client_cache_destroy(void);
 
