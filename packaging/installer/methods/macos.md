@@ -1,9 +1,5 @@
 # Install Netdata on macOS
 
-Netdata works on macOS, albeit with some limitations.
-The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](/src/plugins.d/README.md) to monitor any services you might have installed on your macOS system.
-You could also use a macOS system as the parent node in a [streaming configuration](/src/streaming/README.md).
-
 You can install Netdata in one of the three following ways:
 
 - **[Install Netdata with the our automatic one-line installation script (recommended)](#install-netdata-with-our-automatic-one-line-installation-script)**,
@@ -110,6 +106,9 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
 > Your stock configuration directory will be at `/usr/local/lib/netdata/conf.d/`.
 > The installer will also install a startup plist to start Netdata when your macOS system boots.
 
+Netdata works on macOS, albeit with some limitations.
+The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](/src/plugins.d/README.md) to monitor any services you might have installed on your macOS system.
+You could also use a macOS system as the parent node in a [streaming configuration](/src/streaming/README.md).
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbODU3ODY5MjI4XX0=
+eyJoaXN0b3J5IjpbLTIxMjA3NjY2MjZdfQ==
 -->
