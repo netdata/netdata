@@ -23,7 +23,6 @@ void abort_on_fatal_enable(void) {
     abort_on_fatal = true;
 }
 
-#ifdef ENABLE_SENTRY
 NEVER_INLINE
 static bool shutdown_on_fatal(void) {
     // keep this as a separate function, to have it logged like this in sentry
@@ -32,7 +31,6 @@ static bool shutdown_on_fatal(void) {
     else
         return false;
 }
-#endif
 
 void web_client_cache_destroy(void);
 
@@ -104,14 +102,13 @@ void cancel_main_threads(void) {
     static_threads = NULL;
 }
 
-#ifdef ENABLE_DBENGINE
 static void *rrdeng_exit_background(void *ptr) {
     struct rrdengine_instance *ctx = ptr;
     rrdeng_exit(ctx);
     return NULL;
 }
 
-
+#ifdef ENABLE_DBENGINE
 static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
     static size_t starting_size_to_flush = 0;
 
@@ -341,7 +338,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
                 dictionaries_referenced);
 
-#ifdef ENABLE_DBENGINE
     // destroy the caches in reverse order (extent and open depend on main cache)
     fprintf(stderr, "Destroying extent cache (PGC)...\n");
     pgc_destroy(extent_cache, false);
@@ -355,7 +351,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if(metrics_referenced)
         fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
             metrics_referenced);
-#endif    
 
     fprintf(stderr, "Destroying UUIDMap...\n");
     size_t uuid_referenced = uuidmap_destroy();
