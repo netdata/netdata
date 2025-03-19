@@ -1,6 +1,6 @@
 # Deployment Guides
 
-Netdata can be used to monitor all kinds of infrastructure, from tiny stand-alone IoT devices to complex hybrid setups combining on-premise and cloud infrastructure, mixing bare-metal servers, virtual machines and containers.
+Netdata can monitor all types of infrastructure, from small IoT devices to complex hybrid environments that combine on-premise and cloud setups, including bare-metal servers, virtual machines, and containers.
 
 There are 3 components to structure your Netdata ecosystem:
 
@@ -24,5 +24,5 @@ There are 3 components to structure your Netdata ecosystem:
 
 The Netdata Agent is a highly modular software piece, providing data collection via numerous plugins, an in-house crafted time-series database, a query engine, health monitoring and alerts, machine learning and anomaly detection, metrics exporting to third party systems.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTEwNjkyODM3NDldfQ==
+eyJoaXN0b3J5IjpbLTczOTcxMzg4N119
 -->
