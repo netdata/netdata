@@ -46,38 +46,30 @@ jobs:
       - name: Generate Nightly Changleog
         id: nightly-changelog
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly'
-        uses: Wandalen/wretry.action@v3
+        uses: heinrichreimer/github-changelog-generator-action@v2.4
         with:
-          action: heinrichreimer/github-changelog-generator-action@v2.4
-          attempt_limit: 3
-          attempt_delay: 60
-          with: |
-            bugLabels: IGNOREBUGS
-            excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
-            issues: false
-            sinceTag: v1.10.0
-            token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
-            unreleasedLabel: "**Next release**"
-            verbose: true
-            maxIssues: 500
+          bugLabels: IGNOREBUGS
+          excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
+          issues: false
+          sinceTag: v1.10.0
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          unreleasedLabel: "**Next release**"
+          verbose: true
+          maxIssues: 500
       - name: Generate Release Changelog
         id: release-changelog
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type != 'nightly'
-        uses: Wandalen/wretry.action@v3
+        uses: heinrichreimer/github-changelog-generator-action@v2.4
         with:
-          action: heinrichreimer/github-changelog-generator-action@v2.4
-          attempt_limit: 3
-          attempt_delay: 60
-          with: |
-            bugLabels: IGNOREBUGS
-            excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
-            futureRelease: ${{ github.event.inputs.version }}
-            issues: false
-            sinceTag: v1.10.0
-            token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
-            unreleasedLabel: "**Next release**"
-            verbose: true
-            maxIssues: 500
+          bugLabels: IGNOREBUGS
+          excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
+          futureRelease: ${{ github.event.inputs.version }}
+          issues: false
+          sinceTag: v1.10.0
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          unreleasedLabel: "**Next release**"
+          verbose: true
+          maxIssues: 500
       - name: Commit Changes
         id: commit
         if: steps.target.outputs.run == 'true'
