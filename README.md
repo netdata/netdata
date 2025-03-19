@@ -340,7 +340,7 @@ Each Netdata Agent can perform the following functions:
 1. **`COLLECT` metrics from their sources**<br/>
    Uses [internal](https://github.com/netdata/netdata/tree/master/src/collectors) and [external](https://github.com/netdata/go.d.plugin/tree/master/modules) plugins to collect data from their sources.
 
-   Netdata auto-detects and collects almost everything from the operating system: including CPU, Interrupts, Memory, Disks, Mount Points, Filesystems, Network Stack, Network Interfaces, Containers, VMs, Processes, `systemd` units, Linux Performance Metrics, Linux eBPF, Hardware Sensors, IPMI, and more.
+   Netdata automatically detects and collects data from the operating system, including CPU, memory, disks, network, containers, VMs, processes, systemd units, Linux metrics, eBPF, hardware sensors, IPMI, and more.
 
    It collects application metrics from applications: PostgreSQL, MySQL/MariaDB, Redis, MongoDB, Nginx, Apache, and hundreds more.
 
@@ -866,5 +866,5 @@ The Netdata ecosystem consists of three key parts:
 
 The binary installation packages provided by Netdata include the Netdata Agent and the Netdata UI. Since the Netdata Agent is open-source, it is frequently packaged by third parties (e.g., Linux Distributions) excluding the closed-source components (Netdata UI is not included). While their packages can still be useful in providing the necessary back-ends and the APIs of a fully functional monitoring solution, we recommend using the installation packages we provide to experience the full feature set of Netdata.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTE2NzAxNjE1LDQ0MjM1MDY1M119
+eyJoaXN0b3J5IjpbLTg1MDA4NjA1Nyw0NDIzNTA2NTNdfQ==
 -->
