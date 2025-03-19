@@ -211,8 +211,12 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "container", ds->container);
         buffer_json_member_add_time_t(wb, "uptime", ds->boottime);
 
-        if(ds->v >= 20)
+        if(ds->v >= 20) {
             buffer_json_member_add_string_or_empty(wb, "timezone", ds->timezone);
+            buffer_json_member_add_string_or_empty(wb, "cloud_provider", ds->cloud_provider_type);
+            buffer_json_member_add_string_or_empty(wb, "cloud_instance", ds->cloud_instance_type);
+            buffer_json_member_add_string_or_empty(wb, "cloud_region", ds->cloud_instance_region);
+        }
 
         buffer_json_member_add_object(wb, "boot");
         {
@@ -424,8 +428,12 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             });
         });
 
-        if(version >= 20)
+        if(version >= 20) {
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "timezone", ds->timezone, error, required_v20);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "cloud_provider", ds->cloud_provider_type, error, required_v20);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "cloud_instance", ds->cloud_instance_type, error, required_v20);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "cloud_region", ds->cloud_instance_region, error, required_v20);
+        }
     });
 
     // Parse os object
@@ -547,6 +555,9 @@ static void daemon_status_file_migrate_once(void) {
     strncpyz(session_status.os_id, last_session_status.os_id, sizeof(session_status.os_id) - 1);
     strncpyz(session_status.os_id_like, last_session_status.os_id_like, sizeof(session_status.os_id_like) - 1);
     strncpyz(session_status.timezone, last_session_status.timezone, sizeof(session_status.timezone) - 1);
+    strncpyz(session_status.cloud_provider_type, last_session_status.cloud_provider_type, sizeof(session_status.cloud_provider_type) - 1);
+    strncpyz(session_status.cloud_instance_type, last_session_status.cloud_instance_type, sizeof(session_status.cloud_instance_type) - 1);
+    strncpyz(session_status.cloud_instance_region, last_session_status.cloud_instance_region, sizeof(session_status.cloud_instance_region) - 1);
 
     session_status.restarts = last_session_status.restarts + 1;
     session_status.reliability = last_session_status.reliability;
@@ -1539,6 +1550,22 @@ const char *daemon_status_file_get_os_id(void) {
 
 const char *daemon_status_file_get_os_id_like(void) {
     return session_status.os_id_like;
+}
+
+const char *daemon_status_file_get_cloud_provider_type(void) {
+    return session_status.cloud_provider_type;
+}
+
+const char *daemon_status_file_get_cloud_instance_type(void) {
+    return session_status.cloud_instance_type;
+}
+
+const char *daemon_status_file_get_cloud_instance_region(void) {
+    return session_status.cloud_instance_region;
+}
+
+const char *daemon_status_file_get_timezone(void) {
+    return session_status.timezone;
 }
 
 const char *daemon_status_file_get_fatal_filename(void) {

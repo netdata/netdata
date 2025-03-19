@@ -74,6 +74,9 @@ typedef struct daemon_status_file {
     char os_id[64];          // ECS: os.family
     char os_id_like[64];     // ECS: os.platform
     char timezone[32];
+    char cloud_provider_type[32];
+    char cloud_instance_type[32];
+    char cloud_instance_region[32];
     bool read_system_info;
 
     char stack_traces[15];   // the backend for capturing stack traces
@@ -129,8 +132,12 @@ const char *daemon_status_file_get_os_name(void);
 const char *daemon_status_file_get_os_version(void);
 const char *daemon_status_file_get_os_id(void);
 const char *daemon_status_file_get_os_id_like(void);
+const char *daemon_status_file_get_timezone(void);
+const char *daemon_status_file_get_cloud_provider_type(void);
+const char *daemon_status_file_get_cloud_instance_type(void);
+const char *daemon_status_file_get_cloud_instance_region(void);
 
-const char *daemon_status_file_get_fatal_filename(void);
+    const char *daemon_status_file_get_fatal_filename(void);
 const char *daemon_status_file_get_fatal_function(void);
 const char *daemon_status_file_get_fatal_message(void);
 const char *daemon_status_file_get_fatal_errno(void);
