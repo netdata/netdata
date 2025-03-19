@@ -536,9 +536,8 @@ to restart the container: `docker restart netdata`.
 
 ### Change the default hostname
 You can change a Docker container's hostname, which will reflect in the local dashboard and Netdata Cloud when the container is created.
- If you want to change the hostname of a Netdata container _after_ you started it,
-you can safely stop and remove it. Your configuration and metrics data reside in persistent volumes and are reattached
-to the recreated container.
+
+If you want to change the hostname of a Netdata container _after_ you started it, you can safely stop and remove it. Your configuration and metrics data reside in persistent volumes and are reattached to the recreated container.
 
 If you use `docker-run`, use the `--hostname` option with `docker run`.
 
@@ -593,14 +592,14 @@ You can control how the health checks run by using the environment variable `NET
 - If set to anything else, the health check will treat the value as a URL to check for a 200 status code on. In most
   cases, this should start with `http://localhost:19999/` to check the Agent running in the container.
 
-In most cases, the default behavior of checking the `/api/v1/info` endpoint will be enough. If you’re using a
-configuration which disables the web server or restricts access to certain APIs, you will need to use a non-default
+In most cases, the default behavior of checking the `/api/v1/info` endpoint will be enough. If you’re using a configuration which disables the web server or restricts access to certain APIs, you will need to use a non-default
 configuration for health checks to work.
 
 ## Publish a test image to your own repository
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
+
 You may either use the command line tools available or take advantage of our GitHub Actions infrastructure.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTY5NjYwOTI5NV19
+eyJoaXN0b3J5IjpbMTEyNzYyMDMzN119
 -->
