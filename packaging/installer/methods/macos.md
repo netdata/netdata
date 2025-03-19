@@ -109,6 +109,7 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
 > Your Netdata configuration directory will be at `/usr/local/netdata/`.
 > Your stock configuration directory will be at `/usr/local/lib/netdata/conf.d/`.
 > The installer will also install a startup plist to start Netdata when your macOS system boots.
+
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTU1MDk0MzQ5MF19
+eyJoaXN0b3J5IjpbODU3ODY5MjI4XX0=
 -->
