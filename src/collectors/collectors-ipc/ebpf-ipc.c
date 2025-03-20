@@ -47,18 +47,19 @@ static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index idx)
     return false;
 }
 
-static uint32_t *ebpf_find_or_create_index_pid(uint32_t pid)
+static uint32_t ebpf_find_or_create_index_pid(uint32_t pid)
 {
     uint32_t *idx = ebpf_shm_find_index_unsafe(pid);
     if (!idx) {
         Pvoid_t *Pvalue = JudyLIns(&ebpf_ipc_JudyL, (Word_t)pid, PJE0);
         internal_fatal(!Pvalue || Pvalue == PJERR, "EBPF: pid judy index");
-        if (likely(!*Pvalue))
+        if (likely(!*Pvalue)) {
             *Pvalue = idx = callocz(1, sizeof(*idx));
-        else
+            *idx = last_idx++;
+        } else
             idx = *Pvalue;
     }
-    return idx;
+    return *idx;
 }
 
 bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_index idx)
@@ -86,12 +87,12 @@ netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum
         return NULL;
 
     if (!using_vector) {
-        uint32_t *pidx = ebpf_find_or_create_index_pid(pid);
-        if (*pidx == 0) {
-            *pidx = last_idx++;
-        }
-        pid = *pidx;
+        pid = ebpf_find_or_create_index_pid(pid);
     }
+
+    if (pid >= max_idx)
+        return NULL;
+
     netdata_ebpf_pid_stats_t *ptr = &integration_shm[pid];
     ptr->pid = pid;
     ptr->threads |= idx << 1;
@@ -107,7 +108,7 @@ void netdata_integration_cleanup_shm()
 
     if (integration_shm) {
         size_t length = max_idx * sizeof(netdata_ebpf_pid_stats_t);
-        munmap(integration_shm, length);
+        nd_munmap(integration_shm, length);
     }
 
     if (shm_fd_ebpf_integration > 0) {
@@ -117,7 +118,7 @@ void netdata_integration_cleanup_shm()
 
 static void netdata_ebpf_select_access_mode(size_t pids)
 {
-    size_t local_max = (size_t)os_get_system_pid_max();
+    size_t local_max = os_get_system_pid_max();
     using_vector = (pids == local_max);
 }
 
@@ -157,7 +158,7 @@ int netdata_integration_initialize_shm(size_t pids)
     }
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create semaphore, integration between won't happen");
-    munmap(integration_shm, length);
+    nd_munmap(integration_shm, length);
     integration_shm = NULL;
 
 end_shm:
