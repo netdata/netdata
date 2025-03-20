@@ -246,16 +246,6 @@ static struct web_api_command api_commands_v3[] = {
         .allow_subpaths = 0
     },
 
-    // Netdata branding APIs
-    {
-        .api = "ilove.svg",
-        .hash = 0,
-        .acl = HTTP_ACL_NOCHECK,
-        .access = HTTP_ACCESS_NONE,
-        .callback = api_v2_ilove,
-        .allow_subpaths = 0
-    },
-
     {// terminator
      .api = NULL,
      .hash = 0,
