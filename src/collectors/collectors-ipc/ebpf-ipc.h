@@ -27,6 +27,11 @@ extern "C" {
 #include <linux/btf.h>
 #endif
 
+typedef struct ebpf_user_mem_stat {
+    uint32_t total;
+    uint32_t current;
+} ebpf_user_mem_stat_t;
+
 // ----------------------------------------------------------------------------
 // Enumeration used to identify threads with eBPF PIDs
 enum ebpf_pids_index {
@@ -335,6 +340,7 @@ int netdata_integration_initialize_shm(size_t pids);
 void netdata_integration_cleanup_shm();
 netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum ebpf_pids_index idx);
 bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_index idx);
+void netdata_integration_current_ipc_data(ebpf_user_mem_stat_t *values);
 
 extern sem_t *shm_mutex_ebpf_integration;
 extern netdata_ebpf_pid_stats_t *integration_shm;
