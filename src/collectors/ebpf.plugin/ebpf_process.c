@@ -1391,15 +1391,16 @@ static void process_collector(ebpf_module_t *em)
             ebpf_read_process_hash_global_tables(stats, maps_per_core);
 
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
-            pthread_mutex_lock(&collect_data_mutex);
 
             if (ebpf_all_pids_count > 0) {
                 sem_wait(shm_mutex_ebpf_integration);
+                pthread_mutex_lock(&collect_data_mutex);
                 collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
                 if (cgroups && shm_ebpf_cgroup.header) {
                     ebpf_update_process_cgroup();
                 }
+                pthread_mutex_unlock(&collect_data_mutex);
                 sem_post(shm_mutex_ebpf_integration);
             }
 
@@ -1409,6 +1410,7 @@ static void process_collector(ebpf_module_t *em)
                 ebpf_process_send_data(em);
             }
 
+            pthread_mutex_lock(&collect_data_mutex);
             if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
                 ebpf_process_send_apps_data(apps_groups_root_target, em);
             }
@@ -1417,8 +1419,8 @@ static void process_collector(ebpf_module_t *em)
                 ebpf_process_send_cgroup_data(em);
             }
 
-            pthread_mutex_unlock(&lock);
             pthread_mutex_unlock(&collect_data_mutex);
+            pthread_mutex_unlock(&lock);
 
             pthread_mutex_lock(&ebpf_exit_cleanup);
             if (running_time && !em->running_time)

@@ -1874,6 +1874,7 @@ void ebpf_socket_resume_apps_data()
 {
     struct ebpf_target *w;
 
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX))))
             continue;
@@ -1902,6 +1903,7 @@ void ebpf_socket_resume_apps_data()
             values->call_udp_received = ws->call_udp_received;
         }
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -1934,12 +1936,10 @@ void *ebpf_read_socket_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        pthread_mutex_lock(&collect_data_mutex);
         sem_wait(shm_mutex_ebpf_integration);
         ebpf_update_array_vectors(em);
         ebpf_socket_resume_apps_data();
         sem_post(shm_mutex_ebpf_integration);
-        pthread_mutex_unlock(&collect_data_mutex);
 
         counter = 0;
     }
