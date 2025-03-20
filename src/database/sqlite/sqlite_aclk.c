@@ -48,6 +48,7 @@ struct aclk_sync_config_s {
     bool aclk_batch_job_is_running;
     SPINLOCK cmd_queue_lock;
     uint32_t aclk_jobs_pending;
+    struct completion start_stop_complete;
     struct aclk_database_cmd *cmd_base;
     ARAL *ar;
 } aclk_sync_config = { 0 };
@@ -642,6 +643,8 @@ static void aclk_synchronization(void *arg)
     struct aclk_query_payload *payload;
 
     unsigned cmd_batch_size;
+
+    completion_mark_complete(&config->start_stop_complete);
     while (likely(service_running(SERVICE_ACLK))) {
         enum aclk_database_opcode opcode;
         worker_is_idle();
@@ -886,7 +889,10 @@ static void aclk_synchronization(void *arg)
 static void aclk_synchronization_init(void)
 {
     memset(&aclk_sync_config, 0, sizeof(aclk_sync_config));
+    completion_init(&aclk_sync_config.start_stop_complete);
     fatal_assert(0 == uv_thread_create(&aclk_sync_config.thread, aclk_synchronization, &aclk_sync_config));
+    completion_wait_for(&aclk_sync_config.start_stop_complete);
+    completion_destroy(&aclk_sync_config.start_stop_complete);
 }
 
 // -------------------------------------------------------------
@@ -980,7 +986,7 @@ static inline void queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const v
 // Public
 void aclk_push_alert_config(const char *node_id, const char *config_hash)
 {
-    if (unlikely(!aclk_sync_config.initialized))
+    if (unlikely(!node_id || !config_hash))
         return;
 
     queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_CONFIG, strdupz(node_id), strdupz(config_hash));
@@ -988,7 +994,7 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash)
 
 void aclk_execute_query(aclk_query_t query)
 {
-    if (unlikely(!aclk_sync_config.initialized))
+    if (unlikely(!query))
         return;
 
     queue_aclk_sync_cmd(ACLK_QUERY_EXECUTE, query, NULL);
@@ -996,20 +1002,20 @@ void aclk_execute_query(aclk_query_t query)
 
 void aclk_add_job(aclk_query_t query)
 {
-    if (unlikely(!aclk_sync_config.initialized))
+    if (unlikely(!query))
         return;
 
     queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
 }
 
-void aclk_query_init(mqtt_wss_client client) {
-
+void aclk_query_init(mqtt_wss_client client)
+{
     queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT, client, NULL);
 }
 
 void schedule_node_state_update(RRDHOST *host, uint64_t delay)
 {
-    if (unlikely(!aclk_sync_config.initialized || !host))
+    if (unlikely(!host))
         return;
 
     queue_aclk_sync_cmd(ACLK_DATABASE_NODE_STATE, host, (void *)(uintptr_t)delay);
