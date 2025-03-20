@@ -2287,12 +2287,14 @@ static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
 void ebpf_vfs_resume_apps_data()
 {
     struct ebpf_target *w;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_VFS_IDX))))
             continue;
 
         ebpf_vfs_sum_pids(&w->vfs, w->root_pid);
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -2326,12 +2328,10 @@ void *ebpf_read_vfs_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        pthread_mutex_lock(&collect_data_mutex);
         sem_wait(shm_mutex_ebpf_integration);
         ebpf_vfs_read_apps(maps_per_core);
         ebpf_vfs_resume_apps_data();
         sem_post(shm_mutex_ebpf_integration);
-        pthread_mutex_unlock(&collect_data_mutex);
 
         counter = 0;
 

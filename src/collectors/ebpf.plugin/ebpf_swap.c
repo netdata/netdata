@@ -534,12 +534,14 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_
 void ebpf_swap_resume_apps_data()
 {
     struct ebpf_target *w;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SWAP_IDX))))
             continue;
 
         ebpf_swap_sum_pids(&w->swap, w->root_pid);
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -618,12 +620,10 @@ void *ebpf_read_swap_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        pthread_mutex_lock(&collect_data_mutex);
         sem_wait(shm_mutex_ebpf_integration);
         ebpf_read_swap_apps_table(maps_per_core);
         ebpf_swap_resume_apps_data();
         sem_post(shm_mutex_ebpf_integration);
-        pthread_mutex_unlock(&collect_data_mutex);
 
         counter = 0;
 
