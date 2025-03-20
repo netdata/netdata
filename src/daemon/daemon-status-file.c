@@ -747,11 +747,11 @@ static bool save_status_file(const char *directory, const char *content, size_t 
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
     // Linux: https://man7.org/linux/man-pages/man7/signal-safety.7.html
-    // memcpy(), strlen(), open(), write(), fsync(), close(), chmod(), rename(), unlink()
+    // memcpy(), strlen(), open(), write(), fsync(), close(), fchmod(), rename(), unlink()
 
     // MacOS: https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/sigaction.2.html#//apple_ref/doc/man/2/sigaction
-    // open(), write(), fsync(), close(), chmod(), rename(), unlink()
-    // does not explicitly mention memcpy() and strlen(), but they are safe
+    // open(), write(), fsync(), close(), rename(), unlink()
+    // does not explicitly mention fchmod, memcpy(), and strlen(), but they are safe
 
     if(!directory || !*directory)
         return false;
@@ -813,14 +813,15 @@ static bool save_status_file(const char *directory, const char *content, size_t 
         return false;
     }
 
-    /* Close file */
-    if (close(fd) == -1) {
+    /* Set permissions using chmod() */
+    if (fchmod(fd, 0664) != 0) {
+        close(fd);
         unlink(temp_filename);
         return false;
     }
 
-    /* Set permissions using chmod() */
-    if (chmod(temp_filename, 0664) != 0) {
+    /* Close file */
+    if (close(fd) == -1) {
         unlink(temp_filename);
         return false;
     }
