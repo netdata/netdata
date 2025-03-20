@@ -4175,7 +4175,8 @@ static pid_t ebpf_read_previous_pid(char *filename)
  *
  * Validate user input avoid sigsegv
  */
-void ebpf_validate_data_sharing_selection() {
+void ebpf_validate_data_sharing_selection()
+{
     uint32_t enabled = CONFIG_BOOLEAN_NO;
     for (uint32_t i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         if (ebpf_modules[i].apps_charts || ebpf_modules[i].cgroup_charts) {
@@ -4186,7 +4187,7 @@ void ebpf_validate_data_sharing_selection() {
 
     // TODO: MODIFY IN NEXT PRs THE OPTION TO ALSO USE SOCKET
     if (enabled && integration_with_collectors != NETDATA_EBPF_INTEGRATION_SHM) {
-    //if (enabled && integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED) {
+        //if (enabled && integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED) {
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
     }
 }
@@ -4209,7 +4210,10 @@ static void ebpf_initialize_data_sharing()
         }
         case NETDATA_EBPF_INTEGRATION_SHM:
             // All pid_map_size have the same value
-            netdata_integration_initialize_shm(ebpf_modules[EBPF_MODULE_PROCESS_IDX].pid_map_size);
+            if (netdata_integration_initialize_shm(ebpf_modules[EBPF_MODULE_PROCESS_IDX].pid_map_size)) {
+                ebpf_set_apps_mode(NETDATA_EBPF_APPS_FLAG_NO);
+                ebpf_disable_cgroups();
+            }
         case NETDATA_EBPF_INTEGRATION_DISABLED:
         default:
             break;
