@@ -986,7 +986,7 @@ static inline void queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const v
 // Public
 void aclk_push_alert_config(const char *node_id, const char *config_hash)
 {
-    if (unlikely(!aclk_sync_config.initialized))
+    if (unlikely(!node_id || !config_hash))
         return;
 
     queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_CONFIG, strdupz(node_id), strdupz(config_hash));
@@ -994,7 +994,7 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash)
 
 void aclk_execute_query(aclk_query_t query)
 {
-    if (unlikely(!aclk_sync_config.initialized))
+    if (unlikely(!query))
         return;
 
     queue_aclk_sync_cmd(ACLK_QUERY_EXECUTE, query, NULL);
@@ -1002,20 +1002,20 @@ void aclk_execute_query(aclk_query_t query)
 
 void aclk_add_job(aclk_query_t query)
 {
-    if (unlikely(!aclk_sync_config.initialized))
+    if (unlikely(!query))
         return;
 
     queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
 }
 
-void aclk_query_init(mqtt_wss_client client) {
-
+void aclk_query_init(mqtt_wss_client client)
+{
     queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT, client, NULL);
 }
 
 void schedule_node_state_update(RRDHOST *host, uint64_t delay)
 {
-    if (unlikely(!aclk_sync_config.initialized || !host))
+    if (unlikely(!host))
         return;
 
     queue_aclk_sync_cmd(ACLK_DATABASE_NODE_STATE, host, (void *)(uintptr_t)delay);
