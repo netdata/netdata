@@ -48,6 +48,7 @@ struct aclk_sync_config_s {
     bool aclk_batch_job_is_running;
     SPINLOCK cmd_queue_lock;
     uint32_t aclk_jobs_pending;
+    struct completion start_stop_complete;
     struct aclk_database_cmd *cmd_base;
     ARAL *ar;
 } aclk_sync_config = { 0 };
@@ -642,6 +643,8 @@ static void aclk_synchronization(void *arg)
     struct aclk_query_payload *payload;
 
     unsigned cmd_batch_size;
+
+    completion_mark_complete(&config->start_stop_complete);
     while (likely(service_running(SERVICE_ACLK))) {
         enum aclk_database_opcode opcode;
         worker_is_idle();
@@ -886,7 +889,10 @@ static void aclk_synchronization(void *arg)
 static void aclk_synchronization_init(void)
 {
     memset(&aclk_sync_config, 0, sizeof(aclk_sync_config));
+    completion_init(&aclk_sync_config.start_stop_complete);
     fatal_assert(0 == uv_thread_create(&aclk_sync_config.thread, aclk_synchronization, &aclk_sync_config));
+    completion_wait_for(&aclk_sync_config.start_stop_complete);
+    completion_destroy(&aclk_sync_config.start_stop_complete);
 }
 
 // -------------------------------------------------------------
