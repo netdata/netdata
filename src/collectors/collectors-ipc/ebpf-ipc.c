@@ -164,3 +164,9 @@ int netdata_integration_initialize_shm(size_t pids)
 end_shm:
     return -1;
 }
+
+void netdata_integration_current_ipc_data(ebpf_user_mem_stat_t *values)
+{
+    values->current = last_idx;
+    values->total = max_idx;
+}

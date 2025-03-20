@@ -3697,6 +3697,15 @@ void ebpf_send_statistic_data()
     write_chart_dimension(memlock_stat, (long long)plugin_statistics.memlock_kern);
     ebpf_write_end_chart();
 
+    ebpf_user_mem_stat_t ipc_data;
+    netdata_integration_current_ipc_data(&ipc_data);
+    NETDATA_DOUBLE ipc_value = 0.0;
+    if (ipc_data.total > 0 )
+        ipc_value = ( (NETDATA_DOUBLE)ipc_data.current/(NETDATA_DOUBLE)ipc_data.total )*100.0;
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_IPC_USAGE, "");
+    write_chart_dimension("mem", (long long)ipc_value);
+    ebpf_write_end_chart();
+
     ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_LOADED, "");
     write_chart_dimension(hash_table_stat, (long long)plugin_statistics.hash_tables);
     ebpf_write_end_chart();
@@ -3821,6 +3830,34 @@ ebpf_create_thread_chart(char *name, char *title, char *units, int order, int up
         ebpf_write_global_dimension(
             (char *)em->info.thread_name, (char *)em->info.thread_name, ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
     }
+}
+
+/**
+ * Create chart for Load Thread
+ *
+ * Write to standard output current values for load mode.
+ *
+ * @param update_every time used to update charts
+ */
+static inline void ebpf_create_statistic_ipc_usage(int update_every)
+{
+    ebpf_write_chart_cmd(
+        NETDATA_MONITORING_FAMILY,
+        NETDATA_EBPF_IPC_USAGE,
+        "",
+        "IPC memory address",
+        "%",
+        NETDATA_EBPF_FAMILY,
+        NETDATA_EBPF_CHART_TYPE_LINE,
+        NULL,
+        NETDATA_EBPF_ORDER_PIDS_IPC,
+        update_every,
+        NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(
+        "mem",
+        "mem",
+        ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 }
 
 /**
@@ -4055,6 +4092,8 @@ static void ebpf_create_statistic_charts(int update_every)
         em->functions.fcnt_thread_lifetime_name = strdupz(name);
         ebpf_create_thread_chart(name, "Time remaining for thread.", "seconds", j++, update_every, em);
     }
+
+    ebpf_create_statistic_ipc_usage(update_every);
 
     ebpf_create_statistic_load_chart(update_every);
 
