@@ -22,8 +22,8 @@ function(netdata_bundle_libbacktrace)
                 SOURCE_DIR "${libbacktrace_SOURCE_DIR}"
                 BINARY_DIR "${libbacktrace_BINARY_DIR}"
                 CONFIGURE_COMMAND "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static
-                BUILD_COMMAND make
-                INSTALL_COMMAND make install
+                BUILD_COMMAND make install
+                INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS "${libbacktrace_LIBRARY}"
                 EXCLUDE_FROM_ALL 1
         )
