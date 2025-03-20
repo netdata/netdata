@@ -356,7 +356,12 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         env:
           BUILD_DIR: ${{ github.workspace }}\build
-        run: ./packaging/windows/build.ps1
+        run: |
+          ./packaging/windows/build.ps1
+          Write-Host "::group::Netdata buildinfo"
+          $netdata = "$env:BUILD_DIR\netdata.exe"
+          & $netdata -W buildinfo
+          Write-Host "::endgroup::"
       - name: Sign Agent Code
         id: sign-agent
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
@@ -1091,6 +1096,9 @@ jobs:
         id: test-agent
         if: needs.file-check.outputs.run == 'true'
         run: |
+          echo "::group::Netdata buildinfo"
+          /usr/local/netdata/usr/sbin/netdata -W buildinfo
+          echo "::endgroup::"
           /usr/local/netdata/usr/sbin/netdata -D > ./netdata.log 2>&1 &
           ./packaging/runtime-check.sh
       - name: Failure Notification

@@ -8,6 +8,10 @@ if [ -z "$(command -v nc 2>/dev/null)" ] && [ -z "$(command -v netcat 2>/dev/nul
     sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y netcat
 fi
 
+echo "::group::Netdata buildinfo"
+docker run -i --rm netdata/netdata:test -W buildinfo
+echo "::endgroup::"
+
 docker run -d --name=netdata \
            -p 19999:19999 \
            -v netdataconfig:/etc/netdata \
