@@ -75,6 +75,9 @@ static struct aclk_database_cmd aclk_database_deq_cmd(void)
 
 static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
 {
+    if(unlikely(!aclk_sync_config.initialized))
+        return;
+
     struct aclk_database_cmd *t = aral_mallocz(aclk_sync_config.ar);
     *t = *cmd;
     t->prev = t->next = NULL;
