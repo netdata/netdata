@@ -112,6 +112,13 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
         }
 
         datafile = *PValue;
+
+        if (!datafile || !datafile->journalfile) {
+            datafile = NULL;
+            PValue = NULL;
+            continue;
+        }
+
         TIME_RANGE_COMPARE rc = is_page_in_time_range(datafile->journalfile->v2.first_time_s,
                                                       datafile->journalfile->v2.last_time_s,
                                                       s->wanted_start_time_s,
