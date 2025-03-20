@@ -8,6 +8,12 @@
 
 #define DB_METADATA_VERSION 18
 
+#define COMPUTE_DURATION(var_name, unit, start, end)      \
+    char var_name[64];                                    \
+    duration_snprintf(var_name, sizeof(var_name),         \
+                      (int64_t)((end) - (start)), unit, true)
+
+
 extern long long def_journal_size_limit;
 
 const char *database_config[] = {
@@ -199,6 +205,7 @@ enum metadata_opcode {
     METADATA_ADD_HOST_AE,
     METADATA_DEL_HOST_AE,
     METADATA_ADD_CTX_CLEANUP,
+    METADATA_EXECUTE_STORE_STATEMENT,
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
     METADATA_UNITTEST,
@@ -1821,6 +1828,7 @@ struct scan_metadata_payload {
     void *pending_alert_list;
     void *pending_ctx_cleanup_list;
     void *pending_uuid_deletion;
+    void *pending_sql_statement;
     BUFFER *work_buffer;
 };
 
@@ -2291,6 +2299,40 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list)
     worker_is_idle();
 }
 
+static void store_sql_statements(struct judy_list_t *pending_sql_statement)
+{
+    if (!pending_sql_statement)
+        return;
+
+    worker_is_busy(METADATA_EXECUTE_STORE_STATEMENT);
+
+    usec_t started_ut = now_monotonic_usec();
+
+    size_t entries = pending_sql_statement->count;
+    Word_t Index = 0;
+    bool first = true;
+    Pvoid_t *Pvalue;
+    while ((Pvalue = JudyLFirstThenNext(pending_sql_statement->JudyL, &Index, &first))) {
+        sqlite3_stmt *stmt = *Pvalue;
+
+        if (unlikely(!stmt))
+            continue;
+
+        int rc = sqlite3_step_monitored(stmt);
+        if (unlikely(rc != SQLITE_DONE))
+            nd_log_daemon(NDLP_ERR, "Failed to execute sql statement, rc = %d", rc);
+
+        SQLITE_FINALIZE(stmt);
+    }
+    (void) JudyLFreeArray(&pending_sql_statement->JudyL, PJE0);
+    freez(pending_sql_statement);
+
+    COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
+    nd_log_daemon(NDLP_DEBUG, "Stored and processed %zu sql statements in %s", entries, report_duration);
+
+    worker_is_idle();
+}
+
 static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter)
 {
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
@@ -2336,12 +2378,6 @@ static void store_host_claim_id(RRDHOST *host, size_t *query_counter)
         (*query_counter)++;
 }
 
-#define COMPUTE_DURATION(var_name, unit, start, end)      \
-    char var_name[64];                                    \
-    duration_snprintf(var_name, sizeof(var_name),         \
-                      (int64_t)((end) - (start)), unit, true)
-
-
 void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter)
 {
     // Store labels (if needed)
@@ -2370,6 +2406,7 @@ static void start_metadata_hosts(uv_work_t *req)
     BUFFER *work_buffer = data->work_buffer;
     usec_t all_started_ut = now_monotonic_usec();
 
+    store_sql_statements((struct judy_list_t *)data->pending_sql_statement);
     store_alert_transitions((struct judy_list_t *)data->pending_alert_list);
     store_ctx_cleanup_list(wc, (struct judy_list_t *)data->pending_ctx_cleanup_list);
 
@@ -2437,6 +2474,7 @@ static void metadata_event_loop(void *arg)
     worker_register_job_name(METADATA_LOAD_HOST_CONTEXT, "host load context");
     worker_register_job_name(METADATA_ADD_HOST_AE, "add host alert entry");
     worker_register_job_name(METADATA_DEL_HOST_AE, "delete host alert entry");
+    worker_register_job_name(METADATA_EXECUTE_STORE_STATEMENT, "add sql statement");
 
     int ret;
     unsigned cmd_batch_size;
@@ -2486,11 +2524,13 @@ static void metadata_event_loop(void *arg)
     struct judy_list_t *pending_ae_list = NULL;
     struct judy_list_t *pending_ctx_cleanup_list = NULL;
     struct judy_list_t *pending_uuid_deletion = NULL;
+    struct judy_list_t *pending_sql_statement = NULL;
 
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
         nd_uuid_t  *uuid;
         RRDHOST *host = NULL;
         ALARM_ENTRY *ae = NULL;
+        sqlite3_stmt *stmt;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -2565,11 +2605,13 @@ static void metadata_event_loop(void *arg)
                     data->pending_alert_list = pending_ae_list;
                     data->pending_ctx_cleanup_list = pending_ctx_cleanup_list;
                     data->pending_uuid_deletion = pending_uuid_deletion;
+                    data->pending_sql_statement = pending_sql_statement;
 
                     data->work_buffer = work_buffer;
                     pending_ae_list = NULL;
                     pending_ctx_cleanup_list = NULL;
                     pending_uuid_deletion = NULL;
+                    pending_sql_statement = NULL;
 
                     if (unlikely(cmd.completion))
                         cmd.completion = NULL;          // Do not complete after launching worker (worker will do)
@@ -2581,6 +2623,7 @@ static void metadata_event_loop(void *arg)
                         pending_ae_list = data->pending_alert_list;
                         pending_ctx_cleanup_list = data->pending_ctx_cleanup_list;
                         pending_uuid_deletion = data->pending_uuid_deletion;
+                        pending_sql_statement = data->pending_sql_statement;
                         freez(data);
                         metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
                     }
@@ -2613,6 +2656,15 @@ static void metadata_event_loop(void *arg)
                     break;
                 case METADATA_DEL_HOST_AE:
                     (void) JudyLIns(&wc->ae_DelJudyL, (Word_t) (void *) cmd.param[0], PJE0);
+                    break;
+                case METADATA_EXECUTE_STORE_STATEMENT:
+                    stmt = (sqlite3_stmt *) cmd.param[0];
+                    if (!pending_sql_statement)
+                        pending_sql_statement = callocz(1, sizeof(*pending_sql_statement));
+
+                    Pvalue = JudyLIns(&pending_sql_statement->JudyL, ++pending_sql_statement->count, PJE0);
+                    if (Pvalue)
+                        *Pvalue = (void *)stmt;
                     break;
                 case METADATA_UNITTEST:;
                     struct thread_unittest *tu = (struct thread_unittest *) cmd.param[0];
@@ -2845,6 +2897,13 @@ void metadata_queue_ae_deletion(ALARM_ENTRY *ae)
         return;
 
     queue_metadata_cmd(METADATA_DEL_HOST_AE, ae, NULL);
+}
+
+void metadata_execute_store_statement(sqlite3_stmt *stmt)
+{
+    if (unlikely(!metasync_worker.loop))
+        return;
+    queue_metadata_cmd(METADATA_EXECUTE_STORE_STATEMENT, stmt, NULL);
 }
 
 void commit_alert_transitions(RRDHOST *host __maybe_unused)
