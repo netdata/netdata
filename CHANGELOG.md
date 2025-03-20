@@ -1,5 +1,14 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.3.0...HEAD)
+
+**Merged pull requests:**
+
+- fix reliability calculation [\#19909](https://github.com/netdata/netdata/pull/19909) ([ktsaou](https://github.com/ktsaou))
+- new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
+
 ## [v2.3.0](https://github.com/netdata/netdata/tree/v2.3.0) (2025-03-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.2.6...v2.3.0)
@@ -477,8 +486,6 @@
 - Revert "prevent memory corruption in dbengine" [\#19364](https://github.com/netdata/netdata/pull/19364) ([ktsaou](https://github.com/ktsaou))
 - prevent memory corruption in dbengine [\#19363](https://github.com/netdata/netdata/pull/19363) ([ktsaou](https://github.com/ktsaou))
 - metrics-cardinality function [\#19362](https://github.com/netdata/netdata/pull/19362) ([ktsaou](https://github.com/ktsaou))
-- avoid checking replication status all the time [\#19361](https://github.com/netdata/netdata/pull/19361) ([ktsaou](https://github.com/ktsaou))
-- respect flood protection configuration for daemon [\#19360](https://github.com/netdata/netdata/pull/19360) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
