@@ -859,6 +859,7 @@ static void remove_old_status_files(const char *protected_dir) {
     errno_clear();
 }
 
+static bool daemon_status_file_saved = false;
 static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
@@ -899,6 +900,9 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
 
     if (!saved && log)
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to save status file in any location");
+
+    if (saved)
+        daemon_status_file_saved = true;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1064,7 +1068,7 @@ void daemon_status_file_check_crash(void) {
 
     bool new_version = strcmp(last_session_status.version, session_status.version) != 0;
     bool this_is_a_crash = false;
-    bool crash_report_ignore = false;
+    bool no_previous_status = false;
     bool dump_json = true;
     const char *msg = "", *cause = "";
     switch(last_session_status.status) {
@@ -1072,8 +1076,8 @@ void daemon_status_file_check_crash(void) {
         case DAEMON_STATUS_NONE:
             // probably a previous version of netdata was running
             cause = "no last status";
-            msg = "No status found for the previous Netdata session";
-            crash_report_ignore = true;
+            msg = "No status found for the previous Netdata session (new Netdata, or older version)";
+            no_previous_status = true;
             break;
 
         case DAEMON_STATUS_EXITED:
@@ -1264,8 +1268,8 @@ void daemon_status_file_check_crash(void) {
     if( // must be first for netdata.conf option to be used
         (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
 
-        // not a useful report (no previous status file)
-        !crash_report_ignore &&
+        // we have a previous status, or we managed to save the current one
+        (!no_previous_status || daemon_status_file_saved) &&
 
         // we are not running in CI
         (last_session_status.restarts >= 10 || !is_ci()) &&
@@ -1275,6 +1279,11 @@ void daemon_status_file_check_crash(void) {
 
         ) {
         netdata_conf_ssl();
+
+        if(no_previous_status) {
+            last_session_status = session_status;
+            strncpyz(last_session_status.fatal.function, "no_status", sizeof(last_session_status.fatal.function) - 1);
+        }
 
         struct post_status_file_thread_data d = {
             .cause = cause,
