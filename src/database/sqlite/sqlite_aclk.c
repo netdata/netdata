@@ -958,7 +958,7 @@ void sql_aclk_sync_init(void)
 
     netdata_log_info("Created %d archived hosts", number_of_children);
     // Trigger host context load for hosts that have been created
-    metadata_queue_load_host_context(NULL);
+    metadata_queue_load_host_context();
 
     if (!number_of_children)
         aclk_queue_node_info(localhost, true);
