@@ -7,8 +7,7 @@ int shm_fd_ebpf_integration = -1;
 sem_t *shm_mutex_ebpf_integration = SEM_FAILED;
 
 static Pvoid_t ebpf_ipc_JudyL = NULL;
-static uint32_t last_idx = 0;
-static uint32_t max_idx = 0;
+ebpf_user_mem_stat_t ebpf_stat_values;
 
 bool using_vector = false;
 
@@ -24,7 +23,7 @@ static uint32_t *ebpf_shm_find_index_unsafe(uint32_t pid)
 static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index idx)
 {
     uint32_t *lpid = ebpf_shm_find_index_unsafe(pid);
-    if (!lpid)
+    if (!lpid || !ebpf_stat_values.current)
         return false;
 
     netdata_ebpf_pid_stats_t *ptr = &integration_shm[*lpid];
@@ -35,11 +34,11 @@ static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index idx)
 
     (void)JudyLDel(&ebpf_ipc_JudyL, (Word_t)pid, PJE0);
 
-    last_idx--;
-    if (!last_idx)
+    ebpf_stat_values.current--;
+    if (!ebpf_stat_values.current)
         return false;
 
-    netdata_ebpf_pid_stats_t *newValue = &integration_shm[last_idx];
+    netdata_ebpf_pid_stats_t *newValue = &integration_shm[ebpf_stat_values.current];
     uint32_t *move = ebpf_shm_find_index_unsafe(newValue->pid);
     if (move) {
         *move = *lpid;
@@ -57,10 +56,9 @@ static uint32_t ebpf_find_or_create_index_pid(uint32_t pid)
         internal_fatal(!Pvalue || Pvalue == PJERR, "EBPF: pid judy index");
         if (likely(!*Pvalue)) {
             *Pvalue = idx = callocz(1, sizeof(*idx));
-            *idx = last_idx++;
+            *idx = ebpf_stat_values.current++;
         } else
             idx = *Pvalue;
-
     }
     return *idx;
 }
@@ -74,6 +72,7 @@ bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_
         netdata_ebpf_pid_stats_t *ptr = &integration_shm[pid];
         ptr->threads &= ~(idx << 1);
         if (!ptr->threads) {
+            ebpf_stat_values.current--;
             memset(ptr, 0, sizeof(*ptr));
             return false;
         }
@@ -86,17 +85,21 @@ bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_
 
 netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum ebpf_pids_index idx)
 {
-    if (!integration_shm || (last_idx + 1) == max_idx)
+    if (!integration_shm || (ebpf_stat_values.current + 1) == ebpf_stat_values.total)
         return NULL;
 
     if (!using_vector) {
         pid = ebpf_find_or_create_index_pid(pid);
     }
 
-    if (pid >= max_idx)
+    if (pid >= ebpf_stat_values.total)
         return NULL;
 
     netdata_ebpf_pid_stats_t *ptr = &integration_shm[pid];
+    if (using_vector && !ptr->threads) {
+        ebpf_stat_values.current++;
+    }
+
     ptr->pid = pid;
     ptr->threads |= idx << 1;
 
@@ -110,7 +113,7 @@ void netdata_integration_cleanup_shm()
     }
 
     if (integration_shm) {
-        size_t length = max_idx * sizeof(netdata_ebpf_pid_stats_t);
+        size_t length = ebpf_stat_values.total * sizeof(netdata_ebpf_pid_stats_t);
         nd_munmap(integration_shm, length);
     }
 
@@ -138,7 +141,8 @@ int netdata_integration_initialize_shm(size_t pids)
         return -1;
     }
 
-    max_idx = pids;
+    ebpf_stat_values.current = 0;
+    ebpf_stat_values.total = pids;
     size_t length = pids * sizeof(netdata_ebpf_pid_stats_t);
     if (ftruncate(shm_fd_ebpf_integration, (off_t)length)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot set size for shared memory.");
@@ -170,7 +174,5 @@ end_shm:
 
 void netdata_integration_current_ipc_data(ebpf_user_mem_stat_t *values)
 {
-    values->current = last_idx;
-    values->total = max_idx;
+    memcpy(values, &ebpf_stat_values, sizeof(*values));
 }
-
