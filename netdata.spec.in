@@ -565,6 +565,13 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/cloud.d
 
+# For some unknown reason openSUSE decides that some files in the build
+# directory were ‘installed’ when they very much were not. Explicitly
+# ignore that path to avoid build failures.
+%if 0%{?suse_version}
+%exclude /usr/src/packages/BUILD/build
+%endif
+
 # Dashboard belongs to a different sub-package
 %exclude %{_datadir}/%{name}/web
 
@@ -1006,6 +1013,8 @@ fi
 %{_datadir}/%{name}/web
 
 %changelog
+* Fri Mar 21 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-31
+- Exclude build directory from install to make openSUSE happy
 * Tue Jan 28 2025 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-30
 - Removed lm_sensors dependency for plugin-go package
 * Thu Aug 29 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-29
