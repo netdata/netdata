@@ -1339,7 +1339,6 @@ set(API_PLUGIN_FILES
         src/web/api/v2/api_v2_functions.c
         src/web/api/v2/api_v2_alerts.c
         src/web/api/v2/api_v2_alert_transitions.c
-        src/web/api/v2/api_v2_ilove/ilove.c
         src/web/api/v2/api_v2_bearer.c
         src/web/api/v2/api_v2_calls.h
         src/web/api/v2/api_v2_data.c
@@ -3689,7 +3688,6 @@ if(ENABLE_DASHBOARD)
   bundle_dashboard()
 
   install(FILES
-          src/web/gui/ilove.html
           COMPONENT dashboard
           DESTINATION ${WEB_DEST})
 

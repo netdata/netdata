@@ -1,2 +1,4 @@
 paths-ignore:
+  - build/*
   - httpd/h2o
+  - src/collectors/debugfs.plugin/libsensors/vendored
