@@ -276,6 +276,8 @@ const char *registry_get_this_machine_guid(bool create_it) {
     if(likely(guid[0]))
         return guid;
 
+    netdata_conf_section_registry();
+
     // read it from disk
     int fd = open(registry.machine_guid_filename, O_RDONLY | O_CLOEXEC);
     if(fd != -1) {

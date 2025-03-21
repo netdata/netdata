@@ -55,6 +55,7 @@
 
 // initialize the registry
 // should only happen when netdata starts
+void netdata_conf_section_registry(void);
 void registry_init(void);
 bool registry_load(void);
 

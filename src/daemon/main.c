@@ -767,6 +767,7 @@ int netdata_main(int argc, char **argv) {
     // initialize the logging system
     // IMPORTANT: KEEP THIS FIRST SO THAT THE REST OF NETDATA WILL LOG PROPERLY
 
+    netdata_conf_section_directories();
     netdata_conf_section_logs();
     nd_log_limits_unlimited();
     nd_log_initialize();
@@ -774,6 +775,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     // this MUST be before anything else - to load the old status file before saving a new one
 
+    netdata_conf_section_registry();
     daemon_status_file_init(); // this loads the old file
     nd_log_register_fatal_hook_cb(daemon_status_file_register_fatal);
     nd_log_register_fatal_final_cb(fatal_status_file_save);
