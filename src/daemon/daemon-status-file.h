@@ -79,7 +79,7 @@ typedef struct daemon_status_file {
     char cloud_instance_region[32];
     bool read_system_info;
 
-    char stack_traces[15];   // the backend for capturing stack traces
+    char stack_traces[63];   // the backend for capturing stack traces
 
     struct {
         SPINLOCK spinlock;
