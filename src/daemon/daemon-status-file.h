@@ -149,5 +149,6 @@ long daemon_status_file_get_fatal_line(void);
 DAEMON_STATUS daemon_status_file_get_status(void);
 size_t daemon_status_file_get_restarts(void);
 ssize_t daemon_status_file_get_reliability(void);
+ND_UUID daemon_status_file_get_host_id(void);
 
 #endif //NETDATA_DAEMON_STATUS_FILE_H

@@ -539,11 +539,10 @@ static void daemon_status_file_migrate_once(void) {
     session_status.node_id = last_session_status.node_id;
     session_status.host_id = last_session_status.host_id;
     if(UUIDiszero(session_status.host_id)) {
-        const char *machine_guid = registry_get_this_machine_guid(false);
-        if(machine_guid && *machine_guid) {
-            if (uuid_parse_flexi(machine_guid, session_status.host_id.uuid) != 0)
-                session_status.host_id = UUID_ZERO;
-        }
+        if(!UUIDiszero(last_session_status.host_id))
+            session_status.host_id = last_session_status.host_id;
+        else
+            session_status.host_id = machine_guid_get()->uuid;
     }
 
     strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
@@ -610,6 +609,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(session_status.status == DAEMON_STATUS_EXITING)
         session_status.timings.exit = (time_t)((now_ut - session_status.timings.exit_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
+    session_status.host_id = machine_guid_get()->uuid;
     session_status.boottime = now_boottime_sec();
     session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
@@ -1643,4 +1643,11 @@ size_t daemon_status_file_get_restarts(void) {
 
 ssize_t daemon_status_file_get_reliability(void) {
     return session_status.reliability;
+}
+
+ND_UUID daemon_status_file_get_host_id(void) {
+    if(!UUIDiszero(session_status.host_id))
+        return session_status.host_id;
+    else
+        return last_session_status.host_id;
 }

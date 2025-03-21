@@ -775,8 +775,8 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     // this MUST be before anything else - to load the old status file before saving a new one
 
-    netdata_conf_section_registry();
     daemon_status_file_init(); // this loads the old file
+    machine_guid_get(); // after loading the old daemon status file - we may need the machine guid from it
     nd_log_register_fatal_hook_cb(daemon_status_file_register_fatal);
     nd_log_register_fatal_final_cb(fatal_status_file_save);
     exit_initiated_init();
@@ -1020,11 +1020,8 @@ int netdata_main(int argc, char **argv) {
     cloud_conf_init_after_registry();
     netdata_random_session_id_generate();
 
-    const char *guid = registry_get_this_machine_guid(true);
 #ifdef ENABLE_SENTRY
-    nd_sentry_set_user(guid);
-#else
-    UNUSED(guid);
+    nd_sentry_set_user(machine_guid_get_txt());
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------

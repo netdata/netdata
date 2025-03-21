@@ -1268,6 +1268,8 @@ set(DAEMON_FILES
         src/daemon/config/netdata-conf-ssl.h
         src/daemon/daemon-systemd-watcher.c
         src/daemon/daemon-systemd-watcher.h
+        src/daemon/machine-guid.c
+        src/daemon/machine-guid.h
 )
 
 set(H2O_FILES
