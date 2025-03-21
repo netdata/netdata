@@ -31,6 +31,7 @@ ENUM_STR_MAP_DEFINE(EXIT_REASON) = {
     { EXIT_REASON_SYSTEM_SHUTDOWN, "system-shutdown"},
 
     { EXIT_REASON_UPDATE, "update"},
+    { EXIT_REASON_SHUTDOWN_TIMEOUT, "shutdown-timeout"},
 
     // terminator
     {0, NULL},

@@ -22,8 +22,6 @@ int api_v2_q(RRDHOST *host, struct web_client *w, char *url);
 int api_v2_nodes(RRDHOST *host, struct web_client *w, char *url);
 int api_v2_node_instances(RRDHOST *host, struct web_client *w, char *url);
 
-int api_v2_ilove(RRDHOST *host, struct web_client *w, char *url);
-
 int api_v2_claim(RRDHOST *host, struct web_client *w, char *url);
 int api_v3_claim(RRDHOST *host, struct web_client *w, char *url);
 

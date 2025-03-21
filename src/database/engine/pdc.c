@@ -842,7 +842,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
     // If gorilla can not compress the data we might end up needing slightly more
     // than 4KiB. However, gorilla pages extend the page length by increments of
     // 512 bytes.
-    max_page_length += ((page_type == RRDENG_PAGE_TYPE_GORILLA_32BIT) * RRDENG_GORILLA_32BIT_BUFFER_SIZE);
+    max_page_length += ((page_type == RRDENG_PAGE_TYPE_GORILLA_32BIT) * (2 * RRDENG_GORILLA_32BIT_BUFFER_SIZE));
 
     if (!known_page_type                                        ||
         have_read_error                                         ||

@@ -457,7 +457,7 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, w, &is_dir)) {
         w->response.data->content_type = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
-        buffer_strcat_htmlescape(w->response.data, web_filename);
+        buffer_strcat_htmlescape(w->response.data, filename);
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -488,14 +488,14 @@ static int web_server_static_file(struct web_client *w, char *filename) {
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
             buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
-            buffer_strcat_htmlescape(w->response.data, web_filename);
+            buffer_strcat_htmlescape(w->response.data, filename);
             return HTTP_RESP_REDIR_TEMP;
         }
         else {
             netdata_log_error("%llu: Cannot open file '%s'.", w->id, web_filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Cannot open file: ");
-            buffer_strcat_htmlescape(w->response.data, web_filename);
+            buffer_strcat_htmlescape(w->response.data, filename);
             return HTTP_RESP_NOT_FOUND;
         }
     }

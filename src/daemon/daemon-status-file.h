@@ -7,7 +7,7 @@
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
 
-#define STATUS_FILE_VERSION 19
+#define STATUS_FILE_VERSION 20
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -73,6 +73,10 @@ typedef struct daemon_status_file {
     char os_version[32];     // ECS: os.version
     char os_id[64];          // ECS: os.family
     char os_id_like[64];     // ECS: os.platform
+    char timezone[32];
+    char cloud_provider_type[32];
+    char cloud_instance_type[32];
+    char cloud_instance_region[32];
     bool read_system_info;
 
     char stack_traces[15];   // the backend for capturing stack traces
@@ -115,6 +119,7 @@ bool daemon_status_file_was_incomplete_shutdown(void);
 
 void daemon_status_file_startup_step(const char *step);
 void daemon_status_file_shutdown_step(const char *step);
+void daemon_status_file_shutdown_timeout(void);
 
 void daemon_status_file_init(void);
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
@@ -127,8 +132,12 @@ const char *daemon_status_file_get_os_name(void);
 const char *daemon_status_file_get_os_version(void);
 const char *daemon_status_file_get_os_id(void);
 const char *daemon_status_file_get_os_id_like(void);
+const char *daemon_status_file_get_timezone(void);
+const char *daemon_status_file_get_cloud_provider_type(void);
+const char *daemon_status_file_get_cloud_instance_type(void);
+const char *daemon_status_file_get_cloud_instance_region(void);
 
-const char *daemon_status_file_get_fatal_filename(void);
+    const char *daemon_status_file_get_fatal_filename(void);
 const char *daemon_status_file_get_fatal_function(void);
 const char *daemon_status_file_get_fatal_message(void);
 const char *daemon_status_file_get_fatal_errno(void);

@@ -443,7 +443,7 @@ static bool spawn_server_is_running(const char *path) {
     size_t dummy_size = 0;
     SPAWN_INSTANCE_TYPE dummy_type = 0;
     ND_UUID magic = UUID_ZERO;
-    char cmsgbuf[CMSG_SPACE(sizeof(int))];
+    char cmsgbuf[CMSG_SPACE(sizeof(int))] __attribute__((aligned(sizeof(size_t))));
 
     iov[0].iov_base = &msg_type;
     iov[0].iov_len = sizeof(msg_type);
@@ -506,7 +506,7 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     struct msghdr msg = {0};
     struct cmsghdr *cmsg;
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_REQUEST;
-    char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)];
+    char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)] __attribute__((aligned(sizeof(size_t))));
     struct iovec iov[11];
 
     // We send 1 request with 10 iovec in it
@@ -587,7 +587,7 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     size_t data_size;
     ND_UUID magic = UUID_ZERO;
     SPAWN_INSTANCE_TYPE type;
-    char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)];
+    char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)] __attribute__((aligned(sizeof(size_t))));
     char *envp_encoded = NULL, *argv_encoded = NULL, *data = NULL;
     int stdin_fd = -1, stdout_fd = -1, stderr_fd = -1, custom_fd = -1;
 

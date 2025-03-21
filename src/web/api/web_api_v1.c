@@ -192,6 +192,7 @@ static struct web_api_command api_commands_v1[] = {
         .callback = api_v1_aclk,
         .allow_subpaths = 0
     },
+#ifdef ENABLE_DBENGINE
     {
         // deprecated - use /api/v2/info
         .api = "dbengine_stats",
@@ -201,6 +202,7 @@ static struct web_api_command api_commands_v1[] = {
         .callback = api_v1_dbengine_stats,
         .allow_subpaths = 0
     },
+#endif
     {
         .api = "ml_info",
         .hash = 0,

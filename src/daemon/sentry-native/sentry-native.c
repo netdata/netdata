@@ -161,6 +161,10 @@ void nd_sentry_init(void) {
     nd_sentry_set_tag("os_version", daemon_status_file_get_os_version());
     nd_sentry_set_tag("os_id", daemon_status_file_get_os_id());
     nd_sentry_set_tag("os_id_like", daemon_status_file_get_os_id_like());
+    nd_sentry_set_tag("cloud_provider", daemon_status_file_get_cloud_provider_type());
+    nd_sentry_set_tag("cloud_type", daemon_status_file_get_cloud_instance_type());
+    nd_sentry_set_tag("cloud_region", daemon_status_file_get_cloud_instance_region());
+    nd_sentry_set_tag("timezone", daemon_status_file_get_timezone());
 
     // profile
     CLEAN_BUFFER *profile = buffer_create(0, NULL);
@@ -257,6 +261,34 @@ void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     nd_sentry_add_key_value_int64(data, "line", daemon_status_file_get_fatal_line());
     nd_sentry_add_key_value_charp(data, "errno", daemon_status_file_get_fatal_errno());
     nd_sentry_add_key_value_charp(data, "stack_trace", daemon_status_file_get_fatal_stack_trace());
+    nd_sentry_add_key_value_charp(data, "status", DAEMON_STATUS_2str(daemon_status_file_get_status()));
+
+    sentry_value_set_by_key(crumb, "data", data);
+    sentry_add_breadcrumb(crumb);
+}
+
+void nd_sentry_add_shutdown_timeout_as_breadcrumb(void) {
+    if (!analytics_check_enabled())
+        return;
+
+    const char *function = "shutdown_timeout";
+    strncpyz(g_sentry_event_message, function, sizeof(g_sentry_event_message) - 1);
+
+    nd_sentry_set_tag_uptime();
+
+    // Set the transaction name to the function where the error occurred
+    // this should be low cardinality
+    sentry_set_transaction(function);
+
+    // Set the fingerprint to the function where the error occurred
+    sentry_set_fingerprint("{{ default }}", function, NULL);
+
+    sentry_value_t crumb = sentry_value_new_breadcrumb("fatal", "shutdown_timeout() event details");
+
+    sentry_value_t data = sentry_value_new_object();
+    nd_sentry_add_key_value_charp(data, "function", function);
+    nd_sentry_add_key_value_charp(data, "thread", nd_thread_tag());
+    nd_sentry_add_key_value_uint64(data, "thread_id", gettid_cached());
     nd_sentry_add_key_value_charp(data, "status", DAEMON_STATUS_2str(daemon_status_file_get_status()));
 
     sentry_value_set_by_key(crumb, "data", data);

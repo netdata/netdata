@@ -244,7 +244,9 @@ void netdata_conf_backwards_compatibility(void) {
             found_old_config = true;
     }
 
+#ifdef ENABLE_DBENGINE
     legacy_multihost_db_space = found_old_config;
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
 

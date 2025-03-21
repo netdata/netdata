@@ -274,6 +274,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
+#ifdef ENABLE_DBENGINE
     OS_SYSTEM_MEMORY sm = os_system_memory(true);
     if (OS_SYSTEM_MEMORY_OK(sm) && dbengine_out_of_memory_protection) {
         static RRDSET *st_memory_available = NULL;
@@ -304,6 +305,6 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
 
         rrdset_done(st_memory_available);
     }
-
+#endif
     // ----------------------------------------------------------------------------------------------------------------
 }

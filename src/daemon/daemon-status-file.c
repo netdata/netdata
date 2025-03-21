@@ -211,6 +211,13 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "container", ds->container);
         buffer_json_member_add_time_t(wb, "uptime", ds->boottime);
 
+        if(ds->v >= 20) {
+            buffer_json_member_add_string_or_empty(wb, "timezone", ds->timezone);
+            buffer_json_member_add_string_or_empty(wb, "cloud_provider", ds->cloud_provider_type);
+            buffer_json_member_add_string_or_empty(wb, "cloud_instance", ds->cloud_instance_type);
+            buffer_json_member_add_string_or_empty(wb, "cloud_region", ds->cloud_instance_region);
+        }
+
         buffer_json_member_add_object(wb, "boot");
         {
             buffer_json_member_add_uuid_compact(wb, "id", ds->boot_id.uuid);
@@ -323,6 +330,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v16 = version >= 16 ? strict : false;
     bool required_v17 = version >= 17 ? strict : false;
     bool required_v18 = version >= 18 ? strict : false;
+    bool required_v20 = version >= 20 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -419,6 +427,13 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
                     ds->var_cache = OS_SYSTEM_DISK_SPACE_EMPTY;
             });
         });
+
+        if(version >= 20) {
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "timezone", ds->timezone, error, required_v20);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "cloud_provider", ds->cloud_provider_type, error, required_v20);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "cloud_instance", ds->cloud_instance_type, error, required_v20);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "cloud_region", ds->cloud_instance_region, error, required_v20);
+        }
     });
 
     // Parse os object
@@ -539,13 +554,15 @@ static void daemon_status_file_migrate_once(void) {
     strncpyz(session_status.os_version, last_session_status.os_version, sizeof(session_status.os_version) - 1);
     strncpyz(session_status.os_id, last_session_status.os_id, sizeof(session_status.os_id) - 1);
     strncpyz(session_status.os_id_like, last_session_status.os_id_like, sizeof(session_status.os_id_like) - 1);
+    strncpyz(session_status.timezone, last_session_status.timezone, sizeof(session_status.timezone) - 1);
+    strncpyz(session_status.cloud_provider_type, last_session_status.cloud_provider_type, sizeof(session_status.cloud_provider_type) - 1);
+    strncpyz(session_status.cloud_instance_type, last_session_status.cloud_instance_type, sizeof(session_status.cloud_instance_type) - 1);
+    strncpyz(session_status.cloud_instance_region, last_session_status.cloud_instance_region, sizeof(session_status.cloud_instance_region) - 1);
 
     session_status.restarts = last_session_status.restarts + 1;
     session_status.reliability = last_session_status.reliability;
 
-    bool crashed = last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED;
-    bool exited_with_fatal = last_session_status.status == DAEMON_STATUS_EXITED && last_session_status.exit_reason != EXIT_REASON_NONE && !is_exit_reason_normal(last_session_status.exit_reason);
-    if(crashed || exited_with_fatal) {
+    if(daemon_status_file_has_last_crashed())  {
         if(session_status.reliability > 0) session_status.reliability = 0;
         session_status.reliability--;
     }
@@ -611,6 +628,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     }
 
     get_daemon_status_fields_from_system_info(&session_status);
+
+    if(netdata_configured_timezone)
+        strncpyz(session_status.timezone, netdata_configured_timezone, sizeof(session_status.timezone) - 1);
 
     session_status.exit_reason = exit_initiated_get();
     session_status.profile = nd_profile_detect_and_configure(false);
@@ -727,11 +747,11 @@ static bool save_status_file(const char *directory, const char *content, size_t 
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
     // Linux: https://man7.org/linux/man-pages/man7/signal-safety.7.html
-    // memcpy(), strlen(), open(), write(), fsync(), close(), chmod(), rename(), unlink()
+    // memcpy(), strlen(), open(), write(), fsync(), close(), fchmod(), rename(), unlink()
 
     // MacOS: https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/sigaction.2.html#//apple_ref/doc/man/2/sigaction
-    // open(), write(), fsync(), close(), chmod(), rename(), unlink()
-    // does not explicitly mention memcpy() and strlen(), but they are safe
+    // open(), write(), fsync(), close(), rename(), unlink()
+    // does not explicitly mention fchmod, memcpy(), and strlen(), but they are safe
 
     if(!directory || !*directory)
         return false;
@@ -793,14 +813,15 @@ static bool save_status_file(const char *directory, const char *content, size_t 
         return false;
     }
 
-    /* Close file */
-    if (close(fd) == -1) {
+    /* Set permissions using chmod() */
+    if (fchmod(fd, 0664) != 0) {
+        close(fd);
         unlink(temp_filename);
         return false;
     }
 
-    /* Set permissions using chmod() */
-    if (chmod(temp_filename, 0664) != 0) {
+    /* Close file */
+    if (close(fd) == -1) {
         unlink(temp_filename);
         return false;
     }
@@ -839,6 +860,7 @@ static void remove_old_status_files(const char *protected_dir) {
     errno_clear();
 }
 
+static bool daemon_status_file_saved = false;
 static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
@@ -879,6 +901,9 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
 
     if (!saved && log)
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to save status file in any location");
+
+    if (saved)
+        daemon_status_file_saved = true;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -954,10 +979,11 @@ struct post_status_file_thread_data {
 void post_status_file(struct post_status_file_thread_data *d) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-    buffer_json_member_add_string(wb, "exit_cause", d->cause); // custom
-    buffer_json_member_add_string(wb, "message", d->msg); // ECS
-    buffer_json_member_add_uint64(wb, "priority", d->priority); // custom
-    buffer_json_member_add_uint64(wb, "version_saved", d->status->v); // custom
+    buffer_json_member_add_string(wb, "exit_cause", d->cause);
+    buffer_json_member_add_string(wb, "message", d->msg);
+    buffer_json_member_add_uint64(wb, "priority", d->priority);
+    buffer_json_member_add_uint64(wb, "version_saved", d->status->v);
+    buffer_json_member_add_string(wb, "agent_version_now", NETDATA_VERSION);
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
@@ -1043,7 +1069,7 @@ void daemon_status_file_check_crash(void) {
 
     bool new_version = strcmp(last_session_status.version, session_status.version) != 0;
     bool this_is_a_crash = false;
-    bool crash_report_ignore = false;
+    bool no_previous_status = false;
     bool dump_json = true;
     const char *msg = "", *cause = "";
     switch(last_session_status.status) {
@@ -1051,8 +1077,8 @@ void daemon_status_file_check_crash(void) {
         case DAEMON_STATUS_NONE:
             // probably a previous version of netdata was running
             cause = "no last status";
-            msg = "No status found for the previous Netdata session";
-            crash_report_ignore = true;
+            msg = "No status found for the previous Netdata session (new Netdata, or older version)";
+            no_previous_status = true;
             break;
 
         case DAEMON_STATUS_EXITED:
@@ -1157,6 +1183,11 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last crashed while exiting after receiving a deadly signal";
                 pri = PRI_DEADLY_SIGNAL;
             }
+            else if(last_session_status.exit_reason & EXIT_REASON_SHUTDOWN_TIMEOUT) {
+                cause = "exit timeout";
+                msg = "Netdata was last killed because it couldn't shutdown on time";
+                pri = PRI_FATAL;
+            }
             else if(last_session_status.exit_reason != EXIT_REASON_NONE &&
                 !is_exit_reason_normal(last_session_status.exit_reason)) {
                 cause = "fatal on exit";
@@ -1238,8 +1269,8 @@ void daemon_status_file_check_crash(void) {
     if( // must be first for netdata.conf option to be used
         (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
 
-        // not a useful report (no previous status file)
-        !crash_report_ignore &&
+        // we have a previous status, or we managed to save the current one
+        (!no_previous_status || daemon_status_file_saved) &&
 
         // we are not running in CI
         (last_session_status.restarts >= 10 || !is_ci()) &&
@@ -1249,6 +1280,11 @@ void daemon_status_file_check_crash(void) {
 
         ) {
         netdata_conf_ssl();
+
+        if(no_previous_status) {
+            last_session_status = session_status;
+            strncpyz(last_session_status.fatal.function, "no_status", sizeof(last_session_status.fatal.function) - 1);
+        }
 
         struct post_status_file_thread_data d = {
             .cause = cause,
@@ -1425,8 +1461,49 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     return duplicate;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// shutdown related functions
+
+static SPINLOCK shutdown_timeout_spinlock = SPINLOCK_INITIALIZER;
+
+void daemon_status_file_shutdown_timeout(void) {
+    FUNCTION_RUN_ONCE();
+
+    spinlock_lock(&shutdown_timeout_spinlock);
+
+    dsf_acquire(session_status);
+    exit_initiated_add(EXIT_REASON_SHUTDOWN_TIMEOUT);
+    session_status.exit_reason |= EXIT_REASON_SHUTDOWN_TIMEOUT;
+    dsf_release(session_status);
+
+    strncpyz(session_status.fatal.function, "shutdown_timeout", sizeof(session_status.fatal.function) - 1);
+
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    daemon_status_file_save(wb, &session_status, false);
+
+    // keep the spinlock locked, to prevent further steps updating the status
+}
+
+void daemon_status_file_shutdown_step(const char *step) {
+    if(session_status.fatal.filename[0] || !spinlock_trylock(&shutdown_timeout_spinlock))
+        // we have a fatal logged
+        return;
+
+    if(step != NULL)
+        snprintfz(session_status.fatal.function, sizeof(session_status.fatal.function), "shutdown(%s)", step);
+    else
+        session_status.fatal.function[0] = '\0';
+
+    daemon_status_file_update_status(DAEMON_STATUS_EXITING);
+
+    spinlock_unlock(&shutdown_timeout_spinlock);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 bool daemon_status_file_has_last_crashed(void) {
-    return last_session_status.status != DAEMON_STATUS_EXITED || !is_exit_reason_normal(last_session_status.exit_reason);
+    return (last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED) ||
+           !is_exit_reason_normal(last_session_status.exit_reason);
 }
 
 bool daemon_status_file_was_incomplete_shutdown(void) {
@@ -1447,19 +1524,6 @@ void daemon_status_file_startup_step(const char *step) {
         session_status.fatal.function[0] = '\0';
 
     daemon_status_file_update_status(DAEMON_STATUS_INITIALIZING);
-}
-
-void daemon_status_file_shutdown_step(const char *step) {
-    if(session_status.fatal.filename[0])
-        // we have a fatal logged
-        return;
-
-    if(step != NULL)
-        snprintfz(session_status.fatal.function, sizeof(session_status.fatal.function), "shutdown(%s)", step);
-    else
-        session_status.fatal.function[0] = '\0';
-
-    daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1495,6 +1559,22 @@ const char *daemon_status_file_get_os_id(void) {
 
 const char *daemon_status_file_get_os_id_like(void) {
     return session_status.os_id_like;
+}
+
+const char *daemon_status_file_get_cloud_provider_type(void) {
+    return session_status.cloud_provider_type;
+}
+
+const char *daemon_status_file_get_cloud_instance_type(void) {
+    return session_status.cloud_instance_type;
+}
+
+const char *daemon_status_file_get_cloud_instance_region(void) {
+    return session_status.cloud_instance_region;
+}
+
+const char *daemon_status_file_get_timezone(void) {
+    return session_status.timezone;
 }
 
 const char *daemon_status_file_get_fatal_filename(void) {
