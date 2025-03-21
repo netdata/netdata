@@ -6,8 +6,19 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.1 to 9.7.3 in /src/go [\#19926](https://github.com/netdata/netdata/pull/19926) ([dependabot[bot]](https://github.com/apps/dependabot))
+- do not expose web server filenames [\#19925](https://github.com/netdata/netdata/pull/19925) ([ktsaou](https://github.com/ktsaou))
+- Fix TOCTOU race in daemon status file handling. [\#19924](https://github.com/netdata/netdata/pull/19924) ([Ferroin](https://github.com/Ferroin))
+- Exclude external code from CodeQL scanning. [\#19923](https://github.com/netdata/netdata/pull/19923) ([Ferroin](https://github.com/Ferroin))
+- remove ilove endpoint [\#19919](https://github.com/netdata/netdata/pull/19919) ([ilyam8](https://github.com/ilyam8))
+- Align cmsgbuf to size\_t to avoid unaligned memory access. [\#19917](https://github.com/netdata/netdata/pull/19917) ([vkalintiris](https://github.com/vkalintiris))
+- Make sure ACLK sync thread completes initialization [\#19916](https://github.com/netdata/netdata/pull/19916) ([stelfrag](https://github.com/stelfrag))
+- do not enqueue command if aclk is not initialized [\#19914](https://github.com/netdata/netdata/pull/19914) ([ktsaou](https://github.com/ktsaou))
+- detect null datafile while finding datafiles in range [\#19913](https://github.com/netdata/netdata/pull/19913) ([ktsaou](https://github.com/ktsaou))
+- post the first status when there is no last status [\#19912](https://github.com/netdata/netdata/pull/19912) ([ktsaou](https://github.com/ktsaou))
 - fix reliability calculation [\#19909](https://github.com/netdata/netdata/pull/19909) ([ktsaou](https://github.com/ktsaou))
 - new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
+- Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.3.0](https://github.com/netdata/netdata/tree/v2.3.0) (2025-03-19)
 
@@ -376,7 +387,6 @@
 - fix rrdset name crash on rrdset obsoletion [\#19449](https://github.com/netdata/netdata/pull/19449) ([ktsaou](https://github.com/ktsaou))
 - Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
 - Start using new GitHub hosted ARM runners for CI when appropriate. [\#19427](https://github.com/netdata/netdata/pull/19427) ([Ferroin](https://github.com/Ferroin))
-- Fix up libsensors vendoring. [\#19369](https://github.com/netdata/netdata/pull/19369) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
@@ -475,17 +485,6 @@
 - build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.2 to 0.2.3 in /src/go [\#19378](https://github.com/netdata/netdata/pull/19378) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump go.mongodb.org/mongo-driver from 1.17.1 to 1.17.2 in /src/go [\#19377](https://github.com/netdata/netdata/pull/19377) ([dependabot[bot]](https://github.com/apps/dependabot))
 - ARAL: fast path to quickly allocate elements on a new page [\#19376](https://github.com/netdata/netdata/pull/19376) ([ktsaou](https://github.com/ktsaou))
-- disable libunwind on forked children [\#19374](https://github.com/netdata/netdata/pull/19374) ([ktsaou](https://github.com/ktsaou))
-- Fix alert entry traversal when doing cleanup [\#19373](https://github.com/netdata/netdata/pull/19373) ([stelfrag](https://github.com/stelfrag))
-- Fix issues with $PATH and netdatacli detection. [\#19371](https://github.com/netdata/netdata/pull/19371) ([Ferroin](https://github.com/Ferroin))
-- fix for PGC wanted\_cache\_size getting to zero [\#19370](https://github.com/netdata/netdata/pull/19370) ([ktsaou](https://github.com/ktsaou))
-- metrics cardinality - more statistics and groupings [\#19368](https://github.com/netdata/netdata/pull/19368) ([ktsaou](https://github.com/ktsaou))
-- stream-thread fix memory corruption [\#19367](https://github.com/netdata/netdata/pull/19367) ([ktsaou](https://github.com/ktsaou))
-- metrics cardinality improvements [\#19366](https://github.com/netdata/netdata/pull/19366) ([ktsaou](https://github.com/ktsaou))
-- prevent memory corruption in dbengine [\#19365](https://github.com/netdata/netdata/pull/19365) ([ktsaou](https://github.com/ktsaou))
-- Revert "prevent memory corruption in dbengine" [\#19364](https://github.com/netdata/netdata/pull/19364) ([ktsaou](https://github.com/ktsaou))
-- prevent memory corruption in dbengine [\#19363](https://github.com/netdata/netdata/pull/19363) ([ktsaou](https://github.com/ktsaou))
-- metrics-cardinality function [\#19362](https://github.com/netdata/netdata/pull/19362) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
