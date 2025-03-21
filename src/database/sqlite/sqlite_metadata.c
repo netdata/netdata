@@ -2813,12 +2813,9 @@ void metaqueue_ml_load_models(RRDDIM *rd)
     rrddim_flag_set(rd, RRDDIM_FLAG_ML_MODEL_LOAD);
 }
 
-void metadata_queue_load_host_context(RRDHOST *host)
+void metadata_queue_load_host_context()
 {
-    if (unlikely(!host))
-        return;
-
-    queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, host, NULL);
+    queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, NULL, NULL);
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Queued command to load host contexts");
 }
 
