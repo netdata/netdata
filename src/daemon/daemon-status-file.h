@@ -61,6 +61,8 @@ typedef struct daemon_status_file {
         time_t exit;
     } timings;
 
+    uint64_t oom_protection;
+    uint64_t netdata_max_rss;
     OS_SYSTEM_MEMORY memory;
     OS_SYSTEM_DISK_SPACE var_cache;
 

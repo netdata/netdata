@@ -69,5 +69,6 @@ void mallocz_register_out_of_memory_cb(out_of_memory_cb cb);
 
 NORETURN
 void out_of_memory(const char *call, size_t size, const char *details);
+uint64_t process_max_rss(void);
 
 #endif //NETDATA_ND_MALLOCZ_H

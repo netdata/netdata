@@ -228,6 +228,11 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         if(OS_SYSTEM_MEMORY_OK(ds->memory)) {
             buffer_json_member_add_uint64(wb, "total", ds->memory.ram_total_bytes);
             buffer_json_member_add_uint64(wb, "free", ds->memory.ram_available_bytes);
+
+            if(ds->v >= 21) {
+                buffer_json_member_add_uint64(wb, "netdata", ds->netdata_max_rss);
+                buffer_json_member_add_uint64(wb, "oom_protection", ds->oom_protection);
+            }
         }
         buffer_json_object_close(wb);
 
@@ -331,6 +336,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v17 = version >= 17 ? strict : false;
     bool required_v18 = version >= 18 ? strict : false;
     bool required_v20 = version >= 20 ? strict : false;
+    bool required_v21 = version >= 21 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -414,6 +420,11 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, false);
             if(!OS_SYSTEM_MEMORY_OK(ds->memory))
                 ds->memory = OS_SYSTEM_MEMORY_EMPTY;
+
+            if(version >= 21) {
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "netdata", ds->netdata_max_rss, error, required_v21);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "oom_protection", ds->oom_protection, error, required_v21);
+            }
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "disk", error, required_v1, {
@@ -616,6 +627,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
+
+    session_status.oom_protection = dbengine_out_of_memory_protection;
+    session_status.netdata_max_rss = process_max_rss();
 
     session_status.claim_id = claim_id_get_uuid();
 
@@ -984,6 +998,8 @@ void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_uint64(wb, "priority", d->priority);
     buffer_json_member_add_uint64(wb, "version_saved", d->status->v);
     buffer_json_member_add_string(wb, "agent_version_now", NETDATA_VERSION);
+    buffer_json_member_add_boolean(wb, "host_memory_critical",
+                                   OS_SYSTEM_MEMORY_OK(d->status->memory) && d->status->memory.ram_available_bytes <= d->status->oom_protection);
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
@@ -1259,6 +1275,13 @@ void daemon_status_file_check_crash(void) {
                 cause = "killed fatal";
                 msg = "Netdata was last crashed due to a fatal error";
                 pri = PRI_FATAL;
+            }
+            else if (OS_SYSTEM_MEMORY_OK(last_session_status.memory) &&
+                     last_session_status.memory.ram_available_bytes <= last_session_status.oom_protection) {
+                cause = "killed hard low ram";
+                msg = "Netdata was last killed/crashed while available memory was critically low";
+                pri = PRI_KILLED_HARD;
+                this_is_a_crash = true;
             }
             else {
                 cause = "killed hard";
