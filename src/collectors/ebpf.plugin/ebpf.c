@@ -3845,7 +3845,7 @@ static inline void ebpf_create_statistic_ipc_usage(int update_every)
         NETDATA_MONITORING_FAMILY,
         NETDATA_EBPF_IPC_USAGE,
         "",
-        "IPC memory address",
+        "IPC used array positions.",
         "%",
         NETDATA_EBPF_FAMILY,
         NETDATA_EBPF_CHART_TYPE_LINE,
@@ -3855,8 +3855,8 @@ static inline void ebpf_create_statistic_ipc_usage(int update_every)
         NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_write_global_dimension(
-        "mem",
-        "mem",
+        "positions",
+        "positions",
         ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 }
 
