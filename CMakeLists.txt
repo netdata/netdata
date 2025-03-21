@@ -213,7 +213,10 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
-option(ENABLE_LIBUNWIND "Include stack traces in log output" False)
+cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" False "OS_LINUX OR OS_WINDOWS" True)
+mark_as_advanced(ENABLE_LIBBACKTRACE)
+cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
+mark_as_advanced(ENABLE_LIBUNWIND)
 
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
@@ -389,6 +392,7 @@ endif()
 
 include(NetdataJSONC)
 include(NetdataYAML)
+include(NetdataBacktrace)
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         include(NetdataEBPFLegacy)
@@ -494,6 +498,10 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
     add_link_options(-rdynamic)
     message(STATUS "Added compiler and linker flags for better stack trace support")
+endif()
+
+if(ENABLE_LIBBACKTRACE)
+    netdata_bundle_libbacktrace()
 endif()
 
 #
@@ -2173,6 +2181,10 @@ target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
+
+if(HAVE_LIBBACKTRACE)
+    netdata_add_libbacktrace_to_target(libnetdata)
+endif()
 
 if(OS_WINDOWS)
         set(HAVE_ETW True)

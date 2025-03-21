@@ -6,7 +6,180 @@ bool nd_log_forked = false;
 
 #define NO_STACK_TRACE_PREFIX "stack trace not available: "
 
-#if defined(HAVE_LIBUNWIND)
+#if defined(HAVE_LIBBACKTRACE)
+#include "backtrace-supported.h"
+#endif
+
+#if defined(HAVE_LIBBACKTRACE) && BACKTRACE_SUPPORTED == 1 /* && BACKTRACE_SUPPORTS_THREADS == 1 */
+#include "backtrace.h"
+
+static struct backtrace_state *backtrace_state = NULL;
+
+typedef struct {
+    BUFFER *wb;       // Buffer to write to
+    size_t frame_count; // Number of frames processed
+    bool first_frame;   // Is this the first frame?
+} backtrace_data_t;
+
+// Common function to format and add a stack frame to the buffer
+static void add_stack_frame(backtrace_data_t *bt_data, const char *function,
+                            const char *filename, int lineno) {
+    BUFFER *wb = bt_data->wb;
+
+    if (!wb)
+        return;
+
+    // Add a newline between frames
+    if (!bt_data->first_frame)
+        buffer_putc(wb, '\n');
+    else
+        bt_data->first_frame = false;
+
+    // Format: #ID function (filename.c:NNN)
+    buffer_putc(wb, '#');
+    buffer_print_uint64(wb, bt_data->frame_count);
+    buffer_putc(wb, ' ');
+
+    if (function && *function)
+        buffer_strcat(wb, function);
+    else
+        buffer_strcat(wb, "<unknown>");
+
+    if (filename && *filename) {
+        buffer_strcat(wb, " (");
+
+        // Strip path from filename - find the last slash
+        const char *base_filename = filename;
+        const char *last_slash = strrchr(filename, '/');
+        if (last_slash)
+            base_filename = last_slash + 1;
+
+        buffer_strcat(wb, base_filename);
+
+        if (lineno > 0) {
+            buffer_strcat(wb, ":");
+            buffer_print_uint64(wb, (uint64_t)lineno);
+        }
+
+        buffer_putc(wb, ')');
+    }
+
+    bt_data->frame_count++;
+}
+
+// Error callback for libbacktrace
+static void bt_error_handler(void *data, const char *msg, int errnum) {
+    backtrace_data_t *bt_data = (backtrace_data_t *)data;
+
+    if (!bt_data || !bt_data->wb)
+        return;
+
+    // Use <unknown> for function name in error cases
+    const char *function = "<unknown>";
+
+    // Format the error message as the filename
+    char error_buf[512] = "error: ";
+    size_t len = 7; // Length of "error: "
+
+    // Add the error message
+    if (msg)
+        len = strcatz(error_buf, len, sizeof(error_buf), msg);
+
+    // Add the error number description if available
+    if (errnum > 0) {
+        if (msg) {
+            len = strcatz(error_buf, len, sizeof(error_buf), ": ");
+        }
+        len = strcatz(error_buf, len, sizeof(error_buf), strerror(errnum));
+    }
+
+    add_stack_frame(bt_data, function, error_buf, 0);
+}
+
+// Full callback for libbacktrace
+static int bt_full_handler(void *data, uintptr_t pc,
+                           const char *filename, int lineno,
+                           const char *function) {
+    backtrace_data_t *bt_data = (backtrace_data_t *)data;
+    if (!bt_data)
+        return 0;
+
+    add_stack_frame(bt_data, function, filename, lineno);
+
+    return 0; // Continue backtrace
+}
+
+const char *capture_stack_trace_backend(void) {
+#if BACKTRACE_SUPPORTS_DATA
+#define BACKTRACE_DATA "data"
+#else
+#define BACKTRACE_DATA "no-data"
+#endif
+
+#if BACKTRACE_USES_MALLOC
+#define BACKTRACE_MEMORY "malloc"
+#else
+#define BACKTRACE_MEMORY "mmap"
+#endif
+
+#if BACKTRACE_SUPPORTS_THREADS
+#define BACKTRACE_THREADS "threads"
+#else
+#define BACKTRACE_THREADS "no-threads"
+#endif
+
+    return "libbacktrace (" BACKTRACE_MEMORY ", " BACKTRACE_THREADS ", " BACKTRACE_DATA ")";
+}
+
+void capture_stack_trace_init(void) {
+    if (!backtrace_state) {
+        backtrace_state = backtrace_create_state(NULL, BACKTRACE_SUPPORTS_THREADS,
+                                                 NULL, // We'll handle errors in bt_full_handler
+                                                 NULL);
+    }
+}
+
+void capture_stack_trace_flush(void) {
+    // Nothing to flush with libbacktrace
+}
+
+bool capture_stack_trace_is_async_signal_safe(void) {
+// libbacktrace may use malloc depending on configuration
+// Check the BACKTRACE_USES_MALLOC define
+#if BACKTRACE_USES_MALLOC
+    return false;
+#else
+    return true;
+#endif
+}
+
+bool capture_stack_trace_available(void) {
+    return backtrace_state != NULL && BACKTRACE_SUPPORTED;
+}
+
+void capture_stack_trace(BUFFER *wb) {
+    if (!backtrace_state) {
+        buffer_strcat(wb, NO_STACK_TRACE_PREFIX "libbacktrace not initialized");
+        return;
+    }
+
+    backtrace_data_t bt_data = {
+        .wb = wb,
+        .frame_count = 0,
+        .first_frame = true
+    };
+
+    // Skip one frame to hide capture_stack_trace() itself
+    backtrace_full(backtrace_state, 1, bt_full_handler,
+                   bt_error_handler, &bt_data);
+
+    // If no frames were reported
+    if (bt_data.frame_count == 0) {
+        buffer_strcat(wb, NO_STACK_TRACE_PREFIX "libbacktrace reports no frames");
+    }
+}
+
+#elif defined(HAVE_LIBUNWIND)
 #if !defined(STATIC_BUILD)
 #define UNW_LOCAL_ONLY
 #endif
