@@ -1027,8 +1027,30 @@ struct log_priority PRI_DEADLY_SIGNAL   = { NDLP_CRIT, NDLP_CRIT };
 struct log_priority PRI_KILLED_HARD     = { NDLP_ERR, NDLP_WARNING };
 
 static bool is_ci(void) {
-    const char *ci = getenv("CI");
-    return ci && *ci && strcasecmp(ci, "true") == 0;
+    // List of known CI environment variables.
+    const char *ci_vars[] = {
+        "CI",             // Generic CI flag
+        "TRAVIS",         // Travis CI
+        "GITHUB_ACTIONS", // GitHub Actions
+        "GITLAB_CI",      // GitLab CI
+        "CIRCLECI",       // CircleCI
+        "APPVEYOR",       // AppVeyor
+        NULL
+    };
+
+    // Iterate over the CI environment variable names.
+    for (const char **env = ci_vars; *env; env++) {
+        const char *val = getenv(*env);
+        if (val && *val &&
+            (strcasecmp(val, "true") == 0 ||
+             strcasecmp(val, "yes")  == 0 ||
+             strcasecmp(val, "on")   == 0 ||
+             strcasecmp(val, "1")    == 0)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 enum crash_report_t {
@@ -1269,13 +1291,11 @@ void daemon_status_file_check_crash(void) {
     if( // must be first for netdata.conf option to be used
         (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
 
-        // we have a previous status, or we managed to save the current one
-        (!no_previous_status || daemon_status_file_saved) &&
+        // we have a previous status, or
+        // (we managed to save the current one, and (we have more than 2 restarts, or this is not a CI run))
+        (!no_previous_status || (daemon_status_file_saved && (last_session_status.restarts > 2 || !is_ci()))) &&
 
-        // we are not running in CI
-        (last_session_status.restarts >= 10 || !is_ci()) &&
-
-        // we have not already reported this
+        // we have not reported this
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
 
         ) {
