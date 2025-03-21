@@ -70,7 +70,7 @@ static bool machine_guid_read_from_file(const char *filename, ND_MACHINE_GUID *h
         return false;
 
     // Update last modified timestamp.
-    h.last_modified_ut = st.st_mtim.tv_sec * USEC_PER_SEC + st.st_mtim.tv_nsec / 1000;
+    h.last_modified_ut = STAT_GET_MTIME_SEC(st) * USEC_PER_SEC + STAT_GET_MTIME_NSEC(st) / 1000;
     *host_id = h;
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: GUID read from file '%s'", filename);

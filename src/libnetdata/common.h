@@ -468,6 +468,27 @@ typedef uint32_t uid_t;
 // #include <winternl.h> // conflicts on STRING,
 #endif
 
+// --------------------------------------------------------------------------------------------------------------------
+
+/* Define a portable way to access st_mtim across Unix variants */
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200809L
+/* POSIX.1-2008 compliant systems have st_mtim */
+#define STAT_GET_MTIME_SEC(st)  ((st).st_mtim.tv_sec)
+#define STAT_GET_MTIME_NSEC(st) ((st).st_mtim.tv_nsec)
+#elif defined(__APPLE__) || defined(__darwin__) || defined(__MACH__)
+/* macOS has st_mtimespec */
+#define STAT_GET_MTIME_SEC(st)  ((st).st_mtimespec.tv_sec)
+#define STAT_GET_MTIME_NSEC(st) ((st).st_mtimespec.tv_nsec)
+#elif defined(__FreeBSD__) || defined(__DragonFly__) || defined(__NetBSD__) || defined(__OpenBSD__)
+/* BSD systems typically have st_mtim or provide a compatibility layer */
+#define STAT_GET_MTIME_SEC(st)  ((st).st_mtim.tv_sec)
+#define STAT_GET_MTIME_NSEC(st) ((st).st_mtim.tv_nsec)
+#else
+/* Fallback for systems with only second precision */
+#define STAT_GET_MTIME_SEC(st)  ((st).st_mtime)
+#define STAT_GET_MTIME_NSEC(st) (0)
+#endif
+
 # ifdef __cplusplus
 }
 # endif
