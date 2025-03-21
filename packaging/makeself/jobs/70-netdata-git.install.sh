@@ -28,7 +28,7 @@ export PKG_CONFIG_PATH="/libunwind-static/lib/pkgconfig:/openssl-static/lib64/pk
 export CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=/openssl-static -DOPENSSL_LIBRARIES=/openssl-static/lib64 -DCMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE=/openssl-static -DLWS_OPENSSL_INCLUDE_DIRS=/openssl-static/include -DLWS_OPENSSL_LIBRARIES=/openssl-static/lib64/libssl.a;/openssl-static/lib64/libcrypto.a"
 
 case "${BUILDARCH}" in
-    armv7l|armv6l) export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBUNWIND=ON -DENABLE_LIBBACKGRACE=OFF" ;;
+    armv7l|armv6l) export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=OFF -DENABLE_LIBUNWIND=ON" ;;
     *) export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On"
 esac
 
