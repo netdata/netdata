@@ -7,7 +7,7 @@
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
 
-#define STATUS_FILE_VERSION 20
+#define STATUS_FILE_VERSION 21
 
 typedef enum {
     DAEMON_STATUS_NONE,
