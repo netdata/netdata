@@ -121,7 +121,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
     localhost = rrdhost_create(
         hostname
         , registry_get_this_machine_hostname()
-        , registry_get_this_machine_guid(true)
+        , machine_guid_get_txt()
         , os_type
         , netdata_configured_timezone
         , netdata_configured_abbrev_timezone

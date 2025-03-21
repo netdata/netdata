@@ -3,6 +3,8 @@
 #ifndef NETDATA_DAEMON_H
 #define NETDATA_DAEMON_H 1
 
+#include "machine-guid.h"
+
 int become_daemon(int dont_fork, const char *user);
 
 void get_netdata_execution_path(void);

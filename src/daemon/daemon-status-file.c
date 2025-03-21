@@ -539,11 +539,10 @@ static void daemon_status_file_migrate_once(void) {
     session_status.node_id = last_session_status.node_id;
     session_status.host_id = last_session_status.host_id;
     if(UUIDiszero(session_status.host_id)) {
-        const char *machine_guid = registry_get_this_machine_guid(false);
-        if(machine_guid && *machine_guid) {
-            if (uuid_parse_flexi(machine_guid, session_status.host_id.uuid) != 0)
-                session_status.host_id = UUID_ZERO;
-        }
+        if(!UUIDiszero(last_session_status.host_id))
+            session_status.host_id = last_session_status.host_id;
+        else
+            session_status.host_id = machine_guid_get()->uuid;
     }
 
     strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
@@ -610,6 +609,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(session_status.status == DAEMON_STATUS_EXITING)
         session_status.timings.exit = (time_t)((now_ut - session_status.timings.exit_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
+    session_status.host_id = machine_guid_get()->uuid;
     session_status.boottime = now_boottime_sec();
     session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
@@ -1027,8 +1027,30 @@ struct log_priority PRI_DEADLY_SIGNAL   = { NDLP_CRIT, NDLP_CRIT };
 struct log_priority PRI_KILLED_HARD     = { NDLP_ERR, NDLP_WARNING };
 
 static bool is_ci(void) {
-    const char *ci = getenv("CI");
-    return ci && *ci && strcasecmp(ci, "true") == 0;
+    // List of known CI environment variables.
+    const char *ci_vars[] = {
+        "CI",             // Generic CI flag
+        "TRAVIS",         // Travis CI
+        "GITHUB_ACTIONS", // GitHub Actions
+        "GITLAB_CI",      // GitLab CI
+        "CIRCLECI",       // CircleCI
+        "APPVEYOR",       // AppVeyor
+        NULL
+    };
+
+    // Iterate over the CI environment variable names.
+    for (const char **env = ci_vars; *env; env++) {
+        const char *val = getenv(*env);
+        if (val && *val &&
+            (strcasecmp(val, "true") == 0 ||
+             strcasecmp(val, "yes")  == 0 ||
+             strcasecmp(val, "on")   == 0 ||
+             strcasecmp(val, "1")    == 0)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 enum crash_report_t {
@@ -1269,13 +1291,11 @@ void daemon_status_file_check_crash(void) {
     if( // must be first for netdata.conf option to be used
         (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
 
-        // we have a previous status, or we managed to save the current one
-        (!no_previous_status || daemon_status_file_saved) &&
+        // we have a previous status, or
+        // (we managed to save the current one, and (we have more than 2 restarts, or this is not a CI run))
+        (!no_previous_status || (daemon_status_file_saved && (last_session_status.restarts > 2 || !is_ci()))) &&
 
-        // we are not running in CI
-        (last_session_status.restarts >= 10 || !is_ci()) &&
-
-        // we have not already reported this
+        // we have not reported this
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
 
         ) {
@@ -1623,4 +1643,11 @@ size_t daemon_status_file_get_restarts(void) {
 
 ssize_t daemon_status_file_get_reliability(void) {
     return session_status.reliability;
+}
+
+ND_UUID daemon_status_file_get_host_id(void) {
+    if(!UUIDiszero(session_status.host_id))
+        return session_status.host_id;
+    else
+        return last_session_status.host_id;
 }
