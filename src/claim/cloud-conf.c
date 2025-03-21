@@ -79,7 +79,7 @@ void cloud_conf_init_after_registry(void) {
 
     // for machine guid and hostname we have to use inicfg_set() for that they will be saved uncommented
     if(!machine_guid || !*machine_guid)
-        inicfg_set(&cloud_config, CONFIG_SECTION_GLOBAL, "machine_guid", registry_get_this_machine_guid(true));
+        inicfg_set(&cloud_config, CONFIG_SECTION_GLOBAL, "machine_guid", machine_guid_get_txt());
 
     if(!hostname || !*hostname)
         inicfg_set(&cloud_config, CONFIG_SECTION_GLOBAL, "hostname", registry_get_this_machine_hostname());

@@ -7,7 +7,7 @@
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
 
-#define STATUS_FILE_VERSION 20
+#define STATUS_FILE_VERSION 21
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -79,7 +79,7 @@ typedef struct daemon_status_file {
     char cloud_instance_region[32];
     bool read_system_info;
 
-    char stack_traces[15];   // the backend for capturing stack traces
+    char stack_traces[63];   // the backend for capturing stack traces
 
     struct {
         SPINLOCK spinlock;
@@ -149,5 +149,6 @@ long daemon_status_file_get_fatal_line(void);
 DAEMON_STATUS daemon_status_file_get_status(void);
 size_t daemon_status_file_get_restarts(void);
 ssize_t daemon_status_file_get_reliability(void);
+ND_UUID daemon_status_file_get_host_id(void);
 
 #endif //NETDATA_DAEMON_STATUS_FILE_H
