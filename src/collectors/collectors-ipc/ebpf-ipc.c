@@ -41,9 +41,11 @@ static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index idx)
 
     netdata_ebpf_pid_stats_t *newValue = &integration_shm[last_idx];
     uint32_t *move = ebpf_shm_find_index_unsafe(newValue->pid);
-    *move = *lpid;
+    if (move) {
+        *move = *lpid;
+        memcpy(ptr, newValue, sizeof(*ptr));
+    }
 
-    memcpy(ptr, newValue, sizeof(*ptr));
     return false;
 }
 
@@ -58,6 +60,7 @@ static uint32_t ebpf_find_or_create_index_pid(uint32_t pid)
             *idx = last_idx++;
         } else
             idx = *Pvalue;
+
     }
     return *idx;
 }
@@ -170,3 +173,4 @@ void netdata_integration_current_ipc_data(ebpf_user_mem_stat_t *values)
     values->current = last_idx;
     values->total = max_idx;
 }
+

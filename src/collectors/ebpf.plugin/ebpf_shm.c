@@ -666,11 +666,12 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_tar
 {
     memset(shm, 0, sizeof(netdata_publish_shm_t));
     for (; root; root = root->next) {
-        int32_t pid = root->pid;
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_SHM_IDX);
-        netdata_publish_shm_t *w = pid_stat->shm;
-        if (!w)
+        uint32_t pid = root->pid;
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SHM_IDX);
+        if (!local_pid)
             continue;
+
+        netdata_publish_shm_t *w = &local_pid->shm;
 
         shm->get += w->get;
         shm->at += w->at;
