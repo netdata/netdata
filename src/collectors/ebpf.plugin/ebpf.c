@@ -3703,7 +3703,7 @@ void ebpf_send_statistic_data()
     if (ipc_data.total > 0 )
         ipc_value = ( (NETDATA_DOUBLE)ipc_data.current/(NETDATA_DOUBLE)ipc_data.total )*100.0;
     ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_IPC_USAGE, "");
-    write_chart_dimension("mem", (long long)ipc_value);
+    write_chart_dimension("positions", (long long)ipc_value);
     ebpf_write_end_chart();
 
     ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_LOADED, "");
