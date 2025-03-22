@@ -10,6 +10,12 @@
 
 #define BUFFER_JSON_MAX_DEPTH 32 // max is 255
 
+#ifdef __cplusplus
+#include <cmath>
+using std::isinf;
+using std::isnan;
+#endif
+
 extern const char hex_digits[16];
 extern const char hex_digits_lower[16];
 extern const char base64_digits[64];
