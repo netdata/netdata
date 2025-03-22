@@ -356,12 +356,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         env:
           BUILD_DIR: ${{ github.workspace }}\build
-        run: |
-          ./packaging/windows/build.ps1
-          Write-Host "::group::Netdata buildinfo"
-          $netdata = "$env:BUILD_DIR\netdata.exe"
-          & $netdata -W buildinfo
-          Write-Host "::endgroup::"
+        run: ./packaging/windows/build.ps1
       - name: Sign Agent Code
         id: sign-agent
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
