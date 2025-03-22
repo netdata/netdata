@@ -1000,6 +1000,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_string(wb, "agent_version_now", NETDATA_VERSION);
     buffer_json_member_add_boolean(wb, "host_memory_critical",
                                    OS_SYSTEM_MEMORY_OK(d->status->memory) && d->status->memory.ram_available_bytes <= d->status->oom_protection);
+    buffer_json_member_add_uint64(wb, "host_memory_free_percent", (uint64_t)round(os_system_memory_available_percent(d->status->memory)));
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
