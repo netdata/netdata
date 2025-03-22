@@ -5,6 +5,13 @@
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 # Source of truth for all the packages we bundle in static builds
 . "$(dirname "${0}")/../bundled-packages.version"
+
+
+case "${BUILDARCH}" in
+    armv6l|armv7l) ;;
+    *) exit 0 ;;
+esac
+
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building libucontext" || true
 
