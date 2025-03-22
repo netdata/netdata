@@ -11,6 +11,13 @@ typedef struct rrddim_acquired RRDDIM_ACQUIRED;
 typedef struct ml_dimension rrd_ml_dimension_t;
 typedef struct rrdmetric_acquired RRDMETRIC_ACQUIRED;
 
+// gcc with libstdc++ may require this,
+// but with libc++ it does not work correctly.
+#if defined(__cplusplus) && !defined(_LIBCPP_VERSION)
+#include <cmath>
+using std::isnan;
+#endif
+
 #include "rrdset.h"
 
 // options are permanent configuration options (no atomics to alter/access them)
