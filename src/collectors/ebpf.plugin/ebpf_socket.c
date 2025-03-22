@@ -1907,6 +1907,43 @@ void ebpf_socket_resume_apps_data()
 }
 
 /**
+ * Update cgroup
+ *
+ * Update cgroup data based in PIDs.
+ */
+static void ebpf_update_socket_cgroup()
+{
+    ebpf_cgroup_target_t *ect;
+
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        struct pid_on_target2 *pids;
+        for (pids = ect->pids; pids; pids = pids->next) {
+            uint32_t pid = pids->pid;
+            ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
+            if (!local_pid)
+                continue;
+
+            ebpf_socket_publish_apps_t *in = &local_pid->socket;
+
+            publish->bytes_sent = in->bytes_sent;
+            publish->bytes_received = in->bytes_received;
+            publish->call_tcp_sent = in->call_tcp_sent;
+            publish->call_tcp_received = in->call_tcp_received;
+            publish->retransmit = in->retransmit;
+            publish->call_udp_sent = in->call_udp_sent;
+            publish->call_udp_received = in->call_udp_received;
+            publish->call_close = in->call_close;
+            publish->call_tcp_v4_connection = in->call_tcp_v4_connection;
+            publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
+        }
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
  * Socket thread
  *
  * Thread used to generate socket charts.
@@ -1929,6 +1966,7 @@ void *ebpf_read_socket_thread(void *ptr)
 
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    int cgroups = em->cgroup_charts;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
@@ -1939,6 +1977,9 @@ void *ebpf_read_socket_thread(void *ptr)
         sem_wait(shm_mutex_ebpf_integration);
         ebpf_update_array_vectors(em);
         ebpf_socket_resume_apps_data();
+        if (cgroups && shm_ebpf_cgroup.header)
+            ebpf_update_socket_cgroup();
+
         sem_post(shm_mutex_ebpf_integration);
 
         counter = 0;
@@ -2107,44 +2148,6 @@ void ebpf_socket_fill_publish_apps(ebpf_socket_publish_apps_t *curr, netdata_soc
     curr->call_udp_received = ns->udp.call_udp_received;
 }
 
-/**
- * Update cgroup
- *
- * Update cgroup data based in PIDs.
- */
-static void ebpf_update_socket_cgroup()
-{
-    ebpf_cgroup_target_t *ect;
-
-    pthread_mutex_lock(&mutex_cgroup_shm);
-    sem_wait(shm_mutex_ebpf_integration);
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        struct pid_on_target2 *pids;
-        for (pids = ect->pids; pids; pids = pids->next) {
-            uint32_t pid = pids->pid;
-            ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
-            netdata_ebpf_pid_stats_t *local_pid =
-                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
-            if (!local_pid)
-                continue;
-
-            ebpf_socket_publish_apps_t *in = &local_pid->socket;
-
-            publish->bytes_sent = in->bytes_sent;
-            publish->bytes_received = in->bytes_received;
-            publish->call_tcp_sent = in->call_tcp_sent;
-            publish->call_tcp_received = in->call_tcp_received;
-            publish->retransmit = in->retransmit;
-            publish->call_udp_sent = in->call_udp_sent;
-            publish->call_udp_received = in->call_udp_received;
-            publish->call_close = in->call_close;
-            publish->call_tcp_v4_connection = in->call_tcp_v4_connection;
-            publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
-        }
-    }
-    sem_post(shm_mutex_ebpf_integration);
-    pthread_mutex_unlock(&mutex_cgroup_shm);
-}
 
 /**
  * Sum PIDs
@@ -2788,9 +2791,6 @@ static void socket_collector(ebpf_module_t *em)
             read_listen_table();
             ebpf_socket_read_hash_global_tables(stats, maps_per_core);
         }
-
-        if (cgroups && shm_ebpf_cgroup.header)
-            ebpf_update_socket_cgroup();
 
         pthread_mutex_lock(&lock);
         if (socket_global_enabled)

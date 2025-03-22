@@ -807,7 +807,6 @@ static void ebpf_update_cachestat_cgroup()
 {
     ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
-    sem_wait(shm_mutex_ebpf_integration);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
@@ -823,7 +822,6 @@ static void ebpf_update_cachestat_cgroup()
             memcpy(&out->current, &in->current, sizeof(netdata_cachestat_t));
         }
     }
-    sem_post(shm_mutex_ebpf_integration);
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
@@ -891,6 +889,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
+    int cgroups = em->cgroup_charts;
 
     int counter = update_every - 1;
 
@@ -907,6 +906,8 @@ void *ebpf_read_cachestat_thread(void *ptr)
         sem_wait(shm_mutex_ebpf_integration);
         ebpf_read_cachestat_apps_table(maps_per_core);
         ebpf_cachestat_resume_apps_data();
+        if (cgroups && shm_ebpf_cgroup.header)
+            ebpf_update_cachestat_cgroup();
         sem_post(shm_mutex_ebpf_integration);
 
         counter = 0;
@@ -1519,9 +1520,6 @@ static void cachestat_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_cachestat_read_global_tables(stats, maps_per_core);
-
-        if (cgroups && shm_ebpf_cgroup.header)
-            ebpf_update_cachestat_cgroup();
 
         pthread_mutex_lock(&lock);
 

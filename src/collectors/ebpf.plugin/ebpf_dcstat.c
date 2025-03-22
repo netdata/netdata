@@ -644,6 +644,34 @@ void ebpf_dc_resume_apps_data()
 }
 
 /**
+ * Update cgroup
+ *
+ * Update cgroup data based in collected PID.
+ *
+ * @param maps_per_core do I need to read all cores?
+ */
+static void ebpf_update_dc_cgroup()
+{
+    ebpf_cgroup_target_t *ect;
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        struct pid_on_target2 *pids;
+        for (pids = ect->pids; pids; pids = pids->next) {
+            uint32_t pid = pids->pid;
+            netdata_dcstat_pid_t *out = &pids->dc;
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_DCSTAT_IDX);
+            if (!local_pid)
+                continue;
+            netdata_publish_dcstat_t *in = &local_pid->directory_cache;
+
+            memcpy(out, &in->curr, sizeof(netdata_publish_dcstat_pid_t));
+        }
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
  * DCstat thread
  *
  * Thread used to generate dcstat charts.
@@ -659,6 +687,7 @@ void *ebpf_read_dcstat_thread(void *ptr)
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
     int collect_pid = (em->apps_charts || em->cgroup_charts);
+    int cgroups = em->cgroup_charts;
     if (!collect_pid)
         return NULL;
 
@@ -677,6 +706,9 @@ void *ebpf_read_dcstat_thread(void *ptr)
         sem_wait(shm_mutex_ebpf_integration);
         ebpf_read_dc_apps_table(maps_per_core);
         ebpf_dc_resume_apps_data();
+        if (cgroups && shm_ebpf_cgroup.header)
+            ebpf_update_dc_cgroup();
+
         sem_post(shm_mutex_ebpf_integration);
 
         counter = 0;
@@ -785,36 +817,6 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
  *  MAIN LOOP
  *
  *****************************************************************/
-
-/**
- * Update cgroup
- *
- * Update cgroup data based in collected PID.
- *
- * @param maps_per_core do I need to read all cores?
- */
-static void ebpf_update_dc_cgroup()
-{
-    ebpf_cgroup_target_t *ect;
-    pthread_mutex_lock(&mutex_cgroup_shm);
-    sem_wait(shm_mutex_ebpf_integration);
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        struct pid_on_target2 *pids;
-        for (pids = ect->pids; pids; pids = pids->next) {
-            uint32_t pid = pids->pid;
-            netdata_dcstat_pid_t *out = &pids->dc;
-            netdata_ebpf_pid_stats_t *local_pid =
-                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_DCSTAT_IDX);
-            if (!local_pid)
-                continue;
-            netdata_publish_dcstat_t *in = &local_pid->directory_cache;
-
-            memcpy(out, &in->curr, sizeof(netdata_publish_dcstat_pid_t));
-        }
-    }
-    sem_post(shm_mutex_ebpf_integration);
-    pthread_mutex_unlock(&mutex_cgroup_shm);
-}
 
 /**
  * Read global table
@@ -1352,9 +1354,6 @@ static void dcstat_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_dc_read_global_tables(stats, maps_per_core);
-
-        if (cgroups && shm_ebpf_cgroup.header)
-            ebpf_update_dc_cgroup();
 
         pthread_mutex_lock(&lock);
 

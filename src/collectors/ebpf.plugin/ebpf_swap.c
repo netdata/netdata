@@ -481,7 +481,6 @@ static void ebpf_update_swap_cgroup()
 {
     ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
-    sem_wait(shm_mutex_ebpf_integration);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
@@ -495,7 +494,6 @@ static void ebpf_update_swap_cgroup()
             memcpy(out, in, sizeof(netdata_publish_swap_t));
         }
     }
-    sem_post(shm_mutex_ebpf_integration);
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
@@ -611,6 +609,7 @@ void *ebpf_read_swap_thread(void *ptr)
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
+    int cgroups = em->cgroup_charts;
     pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
 
     heartbeat_t hb;
@@ -623,6 +622,9 @@ void *ebpf_read_swap_thread(void *ptr)
         sem_wait(shm_mutex_ebpf_integration);
         ebpf_read_swap_apps_table(maps_per_core);
         ebpf_swap_resume_apps_data();
+        if (cgroups && shm_ebpf_cgroup.header)
+            ebpf_update_swap_cgroup();
+
         sem_post(shm_mutex_ebpf_integration);
 
         counter = 0;
@@ -975,9 +977,6 @@ static void swap_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_swap_read_global_table(stats, maps_per_core);
-
-        if (cgroup && shm_ebpf_cgroup.header)
-            ebpf_update_swap_cgroup();
 
         pthread_mutex_lock(&lock);
 

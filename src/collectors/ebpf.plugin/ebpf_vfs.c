@@ -1347,7 +1347,6 @@ static void read_update_vfs_cgroup()
 {
     ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
-    sem_wait(shm_mutex_ebpf_integration);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
@@ -1363,7 +1362,6 @@ static void read_update_vfs_cgroup()
             vfs_aggregate_publish_vfs(out, in);
         }
     }
-    sem_post(shm_mutex_ebpf_integration);
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
@@ -2319,6 +2317,7 @@ void *ebpf_read_vfs_thread(void *ptr)
     int counter = update_every - 1;
 
     uint32_t lifetime = em->lifetime;
+    int cgroups = em->cgroup_charts;
     uint32_t running_time = 0;
     pids_fd[NETDATA_EBPF_PIDS_VFS_IDX] = vfs_maps[NETDATA_VFS_PID].map_fd;
     heartbeat_t hb;
@@ -2331,6 +2330,9 @@ void *ebpf_read_vfs_thread(void *ptr)
         sem_wait(shm_mutex_ebpf_integration);
         ebpf_vfs_read_apps(maps_per_core);
         ebpf_vfs_resume_apps_data();
+        if (cgroups && shm_ebpf_cgroup.header)
+            read_update_vfs_cgroup();
+
         sem_post(shm_mutex_ebpf_integration);
 
         counter = 0;
@@ -2374,9 +2376,6 @@ static void vfs_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_vfs_read_global_table(stats, maps_per_core);
-
-        if (cgroups && shm_ebpf_cgroup.header)
-            read_update_vfs_cgroup();
 
         pthread_mutex_lock(&lock);
 

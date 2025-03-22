@@ -550,7 +550,6 @@ static void ebpf_update_shm_cgroup()
     memset(cv, 0, length);
 
     pthread_mutex_lock(&mutex_cgroup_shm);
-    sem_wait(shm_mutex_ebpf_integration);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
@@ -565,7 +564,6 @@ static void ebpf_update_shm_cgroup()
             memcpy(out, in, sizeof(netdata_publish_shm_t));
         }
     }
-    sem_post(shm_mutex_ebpf_integration);
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
@@ -1093,6 +1091,7 @@ void *ebpf_read_shm_thread(void *ptr)
     int counter = update_every - 1;
 
     uint32_t lifetime = em->lifetime;
+    int cgroups = em->cgroup_charts;
     uint32_t running_time = 0;
     pids_fd[NETDATA_EBPF_PIDS_SHM_IDX] = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
     heartbeat_t hb;
@@ -1105,6 +1104,9 @@ void *ebpf_read_shm_thread(void *ptr)
         sem_wait(shm_mutex_ebpf_integration);
         ebpf_read_shm_apps_table(maps_per_core);
         ebpf_shm_resume_apps_data();
+        if (cgroups && shm_ebpf_cgroup.header)
+            ebpf_update_shm_cgroup();
+
         sem_post(shm_mutex_ebpf_integration);
 
         counter = 0;
@@ -1147,10 +1149,6 @@ static void shm_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_shm_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&lock);
-
-        if (cgroups && shm_ebpf_cgroup.header) {
-            ebpf_update_shm_cgroup();
-        }
 
         shm_send_global();
 

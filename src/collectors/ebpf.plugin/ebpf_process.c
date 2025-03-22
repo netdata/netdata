@@ -241,7 +241,6 @@ static void ebpf_update_process_cgroup()
 {
     ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
-    sem_wait(shm_mutex_ebpf_integration);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
@@ -257,7 +256,6 @@ static void ebpf_update_process_cgroup()
             memcpy(out, in, sizeof(ebpf_publish_process_t));
         }
     }
-    sem_post(shm_mutex_ebpf_integration);
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
