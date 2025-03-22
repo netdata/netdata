@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- status file 21b [\#19937](https://github.com/netdata/netdata/pull/19937) ([ktsaou](https://github.com/ktsaou))
+- Fix logic for libbacktrace enablement in CMakeLists,txt [\#19936](https://github.com/netdata/netdata/pull/19936) ([Ferroin](https://github.com/Ferroin))
+- Fix path to copy drop-in crontab from [\#19935](https://github.com/netdata/netdata/pull/19935) ([ralphm](https://github.com/ralphm))
+- Fix max\_page\_length calculation for GORILLA\_32BIT page type [\#19932](https://github.com/netdata/netdata/pull/19932) ([stelfrag](https://github.com/stelfrag))
+- Fix compile without dbengine [\#19930](https://github.com/netdata/netdata/pull/19930) ([stelfrag](https://github.com/stelfrag))
+- Metadata event loop code cleanup [\#19929](https://github.com/netdata/netdata/pull/19929) ([stelfrag](https://github.com/stelfrag))
+- status file v21 [\#19928](https://github.com/netdata/netdata/pull/19928) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.1 to 9.7.3 in /src/go [\#19926](https://github.com/netdata/netdata/pull/19926) ([dependabot[bot]](https://github.com/apps/dependabot))
 - do not expose web server filenames [\#19925](https://github.com/netdata/netdata/pull/19925) ([ktsaou](https://github.com/ktsaou))
 - Fix TOCTOU race in daemon status file handling. [\#19924](https://github.com/netdata/netdata/pull/19924) ([Ferroin](https://github.com/Ferroin))
@@ -16,6 +23,7 @@
 - do not enqueue command if aclk is not initialized [\#19914](https://github.com/netdata/netdata/pull/19914) ([ktsaou](https://github.com/ktsaou))
 - detect null datafile while finding datafiles in range [\#19913](https://github.com/netdata/netdata/pull/19913) ([ktsaou](https://github.com/ktsaou))
 - post the first status when there is no last status [\#19912](https://github.com/netdata/netdata/pull/19912) ([ktsaou](https://github.com/ktsaou))
+- initial implementation of libbacktrace [\#19910](https://github.com/netdata/netdata/pull/19910) ([ktsaou](https://github.com/ktsaou))
 - fix reliability calculation [\#19909](https://github.com/netdata/netdata/pull/19909) ([ktsaou](https://github.com/ktsaou))
 - new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
 - Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
@@ -478,13 +486,6 @@
 - Verify and cleanup deleted contexts [\#19389](https://github.com/netdata/netdata/pull/19389) ([stelfrag](https://github.com/stelfrag))
 - Reduce glibc memory fragmentation [\#19385](https://github.com/netdata/netdata/pull/19385) ([ktsaou](https://github.com/ktsaou))
 - added mmap count charts [\#19384](https://github.com/netdata/netdata/pull/19384) ([ktsaou](https://github.com/ktsaou))
-- used\_arena should exclude unused memory [\#19382](https://github.com/netdata/netdata/pull/19382) ([ktsaou](https://github.com/ktsaou))
-- fix mallinfo2 [\#19381](https://github.com/netdata/netdata/pull/19381) ([ktsaou](https://github.com/ktsaou))
-- limit the glibc unused memory [\#19380](https://github.com/netdata/netdata/pull/19380) ([ktsaou](https://github.com/ktsaou))
-- Pulse extended memory statistics, now report glibc allocations [\#19379](https://github.com/netdata/netdata/pull/19379) ([ktsaou](https://github.com/ktsaou))
-- build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.2 to 0.2.3 in /src/go [\#19378](https://github.com/netdata/netdata/pull/19378) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump go.mongodb.org/mongo-driver from 1.17.1 to 1.17.2 in /src/go [\#19377](https://github.com/netdata/netdata/pull/19377) ([dependabot[bot]](https://github.com/apps/dependabot))
-- ARAL: fast path to quickly allocate elements on a new page [\#19376](https://github.com/netdata/netdata/pull/19376) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
