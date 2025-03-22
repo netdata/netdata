@@ -7,6 +7,11 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/Modules")
 include(NetdataVersion)
 netdata_version()
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(ENV{CMAKE_BUILD_TYPE} "RelWithDebInfo")
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+endif()
+
 project(netdata
         VERSION "${NETDATA_VERSION_MAJOR}.${NETDATA_VERSION_MINOR}.${NETDATA_VERSION_PATCH}.${NETDATA_VERSION_TWEAK}"
         HOMEPAGE_URL "https://www.netdata.cloud"
@@ -49,10 +54,6 @@ set(CMAKE_C_STANDARD_REQUIRED On)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 
 set(SIZEOF_VOID_P ${CMAKE_SIZEOF_VOID_P})
-
-if(NOT CMAKE_BUILD_TYPE)
-        set(CMAKE_BUILD_TYPE "Release")
-endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
