@@ -24,7 +24,9 @@ void os_uuid_generate_time(void *out) {
 
 #else
 
-#if !defined(OS_MACOS)
+#if defined(OS_MACOS)
+#include <uuid/uuid.h>
+#else
 #include <uuid.h>
 #endif
 
