@@ -10,7 +10,7 @@
 . "$(dirname "${0}")/../bundled-packages.version" || exit 1
 
 # shellcheck disable=SC2015
-[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building libnetfilter_acct" || true
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building libnetfilter_acct" || true
 
 export CFLAGS="${TUNING_FLAGS} -static -I/usr/include/libmnl -pipe"
 export CXXFLAGS="${CFLAGS}"
@@ -18,9 +18,11 @@ export LDFLAGS="-static -L/usr/lib -lmnl"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/usr/lib/pkgconfig"
 
-fetch "libnetfilter_acct-${LIBNETFILTER_ACT_VERSION}" "${LIBNETFILTER_ACT_SOURCE}/libnetfilter_acct-${LIBNETFILTER_ACT_VERSION}.tar.bz2" \
-    "${LIBNETFILTER_ACT_ARTIFACT_SHA256}" libnetfilter_acct
+cache_key="libnetfilter_acct"
+build_dir="libnetfilter_acct-${LIBNETFILTER_ACT_VERSION}"
 
+fetch "${build_dir}" "${LIBNETFILTER_ACT_SOURCE}/libnetfilter_acct-${LIBNETFILTER_ACT_VERSION}.tar.bz2" \
+    "${LIBNETFILTER_ACT_ARTIFACT_SHA256}" "${cache_key}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run ./configure \
@@ -33,8 +35,7 @@ fi
 
 run make install
 
-store_cache libnetfilter_acct "${NETDATA_MAKESELF_PATH}/tmp/libnetfilter_acct-${LIBNETFILTER_ACT_VERSION}"
-
+store_cache "${cache_key}" "${build_dir}"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true
