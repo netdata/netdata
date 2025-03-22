@@ -3292,3 +3292,9 @@ modules:
               chart_type: line
               dimensions:
                 - name: thread
+            - name: netdata.ebpf_ipc_usage
+              description: IPC used array positions
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: positions
