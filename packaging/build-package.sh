@@ -51,7 +51,7 @@ add_cmake_option ENABLE_BUNDLED_PROTOBUF Off
 add_cmake_option ENABLE_BUNDLED_JSONC Off
 add_cmake_option ENABLE_BUNDLED_YAML Off
 
-add_cmake_option ENABLE_LIBUNWIND On
+add_cmake_option ENABLE_LIBBACKTRACE On
 
 add_cmake_option BUILD_FOR_PACKAGING On
 

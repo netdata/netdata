@@ -459,8 +459,7 @@ RRDHOST *rrdhost_create(
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         if (is_localhost) {
             BUFFER *buf = buffer_create(0, NULL);
-            size_t query_counter = 0;
-            store_host_info_and_metadata(host, buf, &query_counter);
+            store_host_info_and_metadata(host, buf);
             buffer_free(buf);
         }
         rrdhost_load_rrdcontext_data(host);

@@ -228,6 +228,11 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         if(OS_SYSTEM_MEMORY_OK(ds->memory)) {
             buffer_json_member_add_uint64(wb, "total", ds->memory.ram_total_bytes);
             buffer_json_member_add_uint64(wb, "free", ds->memory.ram_available_bytes);
+
+            if(ds->v >= 21) {
+                buffer_json_member_add_uint64(wb, "netdata", ds->netdata_max_rss);
+                buffer_json_member_add_uint64(wb, "oom_protection", ds->oom_protection);
+            }
         }
         buffer_json_object_close(wb);
 
@@ -331,6 +336,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v17 = version >= 17 ? strict : false;
     bool required_v18 = version >= 18 ? strict : false;
     bool required_v20 = version >= 20 ? strict : false;
+    bool required_v21 = version >= 21 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -414,6 +420,11 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, false);
             if(!OS_SYSTEM_MEMORY_OK(ds->memory))
                 ds->memory = OS_SYSTEM_MEMORY_EMPTY;
+
+            if(version >= 21) {
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "netdata", ds->netdata_max_rss, error, required_v21);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "oom_protection", ds->oom_protection, error, required_v21);
+            }
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "disk", error, required_v1, {
@@ -539,11 +550,10 @@ static void daemon_status_file_migrate_once(void) {
     session_status.node_id = last_session_status.node_id;
     session_status.host_id = last_session_status.host_id;
     if(UUIDiszero(session_status.host_id)) {
-        const char *machine_guid = registry_get_this_machine_guid(false);
-        if(machine_guid && *machine_guid) {
-            if (uuid_parse_flexi(machine_guid, session_status.host_id.uuid) != 0)
-                session_status.host_id = UUID_ZERO;
-        }
+        if(!UUIDiszero(last_session_status.host_id))
+            session_status.host_id = last_session_status.host_id;
+        else
+            session_status.host_id = machine_guid_get()->uuid;
     }
 
     strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
@@ -610,12 +620,16 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(session_status.status == DAEMON_STATUS_EXITING)
         session_status.timings.exit = (time_t)((now_ut - session_status.timings.exit_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
+    session_status.host_id = machine_guid_get()->uuid;
     session_status.boottime = now_boottime_sec();
     session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
+
+    session_status.oom_protection = dbengine_out_of_memory_protection;
+    session_status.netdata_max_rss = process_max_rss();
 
     session_status.claim_id = claim_id_get_uuid();
 
@@ -984,6 +998,8 @@ void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_uint64(wb, "priority", d->priority);
     buffer_json_member_add_uint64(wb, "version_saved", d->status->v);
     buffer_json_member_add_string(wb, "agent_version_now", NETDATA_VERSION);
+    buffer_json_member_add_boolean(wb, "host_memory_critical",
+                                   OS_SYSTEM_MEMORY_OK(d->status->memory) && d->status->memory.ram_available_bytes <= d->status->oom_protection);
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
@@ -1027,8 +1043,30 @@ struct log_priority PRI_DEADLY_SIGNAL   = { NDLP_CRIT, NDLP_CRIT };
 struct log_priority PRI_KILLED_HARD     = { NDLP_ERR, NDLP_WARNING };
 
 static bool is_ci(void) {
-    const char *ci = getenv("CI");
-    return ci && *ci && strcasecmp(ci, "true") == 0;
+    // List of known CI environment variables.
+    const char *ci_vars[] = {
+        "CI",             // Generic CI flag
+        "TRAVIS",         // Travis CI
+        "GITHUB_ACTIONS", // GitHub Actions
+        "GITLAB_CI",      // GitLab CI
+        "CIRCLECI",       // CircleCI
+        "APPVEYOR",       // AppVeyor
+        NULL
+    };
+
+    // Iterate over the CI environment variable names.
+    for (const char **env = ci_vars; *env; env++) {
+        const char *val = getenv(*env);
+        if (val && *val &&
+            (strcasecmp(val, "true") == 0 ||
+             strcasecmp(val, "yes")  == 0 ||
+             strcasecmp(val, "on")   == 0 ||
+             strcasecmp(val, "1")    == 0)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 enum crash_report_t {
@@ -1238,6 +1276,13 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last crashed due to a fatal error";
                 pri = PRI_FATAL;
             }
+            else if (OS_SYSTEM_MEMORY_OK(last_session_status.memory) &&
+                     last_session_status.memory.ram_available_bytes <= last_session_status.oom_protection) {
+                cause = "killed hard low ram";
+                msg = "Netdata was last killed/crashed while available memory was critically low";
+                pri = PRI_KILLED_HARD;
+                this_is_a_crash = true;
+            }
             else {
                 cause = "killed hard";
                 msg = "Netdata was last killed/crashed while operating normally";
@@ -1269,13 +1314,11 @@ void daemon_status_file_check_crash(void) {
     if( // must be first for netdata.conf option to be used
         (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
 
-        // we have a previous status, or we managed to save the current one
-        (!no_previous_status || daemon_status_file_saved) &&
+        // we have a previous status, or
+        // (we managed to save the current one, and (we have more than 2 restarts, or this is not a CI run))
+        (!no_previous_status || (daemon_status_file_saved && (last_session_status.restarts > 2 || !is_ci()))) &&
 
-        // we are not running in CI
-        (last_session_status.restarts >= 10 || !is_ci()) &&
-
-        // we have not already reported this
+        // we have not reported this
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
 
         ) {
@@ -1623,4 +1666,11 @@ size_t daemon_status_file_get_restarts(void) {
 
 ssize_t daemon_status_file_get_reliability(void) {
     return session_status.reliability;
+}
+
+ND_UUID daemon_status_file_get_host_id(void) {
+    if(!UUIDiszero(session_status.host_id))
+        return session_status.host_id;
+    else
+        return last_session_status.host_id;
 }

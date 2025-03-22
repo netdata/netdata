@@ -55,6 +55,7 @@
 
 // initialize the registry
 // should only happen when netdata starts
+void netdata_conf_section_registry(void);
 void registry_init(void);
 bool registry_load(void);
 
@@ -75,7 +76,6 @@ void registry_update_cloud_base_url();
 // update the registry monitoring charts
 void registry_statistics(void);
 
-const char *registry_get_this_machine_guid(bool create_it);
 char *registry_get_mgmt_api_key(void);
 const char *registry_get_this_machine_hostname(void);
 
