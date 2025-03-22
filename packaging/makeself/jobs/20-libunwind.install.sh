@@ -5,6 +5,12 @@
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 # Source of truth for all the packages we bundle in static builds
 . "$(dirname "${0}")/../bundled-packages.version"
+
+case "${BUILDARCH}" in
+    armv6l|armv7l) ;;
+    *) exit 0 ;;
+esac
+
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building libunwind" || true
 
@@ -16,11 +22,6 @@ export PKG_CONFIG="pkg-config --static"
 if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libunwind" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
 fi
-
-case "${BUILDARCH}" in
-    armv6l|armv7l) ;;
-    *) return 0 ;;
-esac
 
 cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/libunwind"
 
