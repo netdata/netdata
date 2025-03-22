@@ -24,8 +24,8 @@ github.com/AzureAD/microsoft-authentication-library-for-go v1.3.2/go.mod h1:wP83
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/DATA-DOG/go-sqlmock v1.5.2 h1:OcvFkGmslmlZibjAjaHm3L//6LiuBgolP7OputlJIzU=
 github.com/DATA-DOG/go-sqlmock v1.5.2/go.mod h1:88MAG/4G7SMwSE3CeA0ZKzrT5CiOU3OJ+JlNzwDqpNU=
-github.com/DataDog/datadog-agent/pkg/networkdevice/profile v0.65.0-devel.0.20250317105920-ce55f088ab29 h1:iaMpL007/uujrcE8kQyrmB4rfu+nW8Ugh82CI5Vwbos=
-github.com/DataDog/datadog-agent/pkg/networkdevice/profile v0.65.0-devel.0.20250317105920-ce55f088ab29/go.mod h1:BkwwzS9aVK+QQb9E+fF9q9ZYScH3Xvnt2dKcE5ZJbMw=
+github.com/DataDog/datadog-agent/pkg/networkdevice/profile v0.66.0-devel h1:AbJgisK+FGeqf4aQmU88vAFkmxdUvert/w2/1lGTJyI=
+github.com/DataDog/datadog-agent/pkg/networkdevice/profile v0.66.0-devel/go.mod h1:1enYhQYfFxvRmPRpwCWfPDr9G+6++tpCXq+YVSoC1Eo=
 github.com/Masterminds/goutils v1.1.1 h1:5nUrii3FMTL5diU80unEVvNevw1nH4+ZV4DSLVJLSYI=
 github.com/Masterminds/goutils v1.1.1/go.mod h1:8cTjp+g8YejhMuvIA5y2vz3BpJxksy863GQaJW2MFNU=
 github.com/Masterminds/semver/v3 v3.1.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0cBrbBpGY/8hQs=

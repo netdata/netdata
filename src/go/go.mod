@@ -6,7 +6,7 @@ replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/DataDog/datadog-agent/pkg/networkdevice/profile v0.65.0-devel.0.20250317105920-ce55f088ab29
+	github.com/DataDog/datadog-agent/pkg/networkdevice/profile v0.66.0-devel
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/Wing924/ltsv v0.4.0
 	github.com/apparentlymart/go-cidr v1.1.0
