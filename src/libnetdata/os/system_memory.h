@@ -29,4 +29,6 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram);
 // Returns the last successfully reported os_system_memory() value.
 OS_SYSTEM_MEMORY os_last_reported_system_memory(void);
 
+double os_system_memory_available_percent(OS_SYSTEM_MEMORY mem);
+
 #endif //NETDATA_OS_MEM_AVAILABLE_H
