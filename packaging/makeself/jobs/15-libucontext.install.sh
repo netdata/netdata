@@ -16,6 +16,11 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libucontext" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libucontext"
 fi
 
+case "${BUILDARCH}" in
+    armv6l|armv7l) ;;
+    *) return 0 ;;
+esac
+
 cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/libucontext"
 
 if [ -d "${cache}" ]; then

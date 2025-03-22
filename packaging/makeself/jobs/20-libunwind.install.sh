@@ -17,6 +17,11 @@ if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libunwind" ]; then
   rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
 fi
 
+case "${BUILDARCH}" in
+    armv6l|armv7l) ;;
+    *) return 0 ;;
+esac
+
 cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/libunwind"
 
 if [ -d "${cache}" ]; then
