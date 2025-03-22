@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/miekg/dns from 1.1.63 to 1.1.64 in /src/go [\#19945](https://github.com/netdata/netdata/pull/19945) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.2 to 5.7.3 in /src/go [\#19944](https://github.com/netdata/netdata/pull/19944) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.0 to 1.9.1 in /src/go [\#19943](https://github.com/netdata/netdata/pull/19943) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/docker/docker from 28.0.1+incompatible to 28.0.2+incompatible in /src/go [\#19942](https://github.com/netdata/netdata/pull/19942) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Don't build libunwind in static builds when it's not needed. [\#19939](https://github.com/netdata/netdata/pull/19939) ([Ferroin](https://github.com/Ferroin))
+- detect low ram conditions more aggresively [\#19938](https://github.com/netdata/netdata/pull/19938) ([ktsaou](https://github.com/ktsaou))
 - status file 21b [\#19937](https://github.com/netdata/netdata/pull/19937) ([ktsaou](https://github.com/ktsaou))
 - Fix logic for libbacktrace enablement in CMakeLists,txt [\#19936](https://github.com/netdata/netdata/pull/19936) ([Ferroin](https://github.com/Ferroin))
 - Fix path to copy drop-in crontab from [\#19935](https://github.com/netdata/netdata/pull/19935) ([ralphm](https://github.com/ralphm))
@@ -483,9 +489,6 @@
 - Make libunwind opt-in at build time instead of auto-enabled. [\#19393](https://github.com/netdata/netdata/pull/19393) ([Ferroin](https://github.com/Ferroin))
 - Remove openSUSE 15.5 from CI and package builds. [\#19392](https://github.com/netdata/netdata/pull/19392) ([Ferroin](https://github.com/Ferroin))
 - Reduce glibc fragmentation Part 2 [\#19390](https://github.com/netdata/netdata/pull/19390) ([ktsaou](https://github.com/ktsaou))
-- Verify and cleanup deleted contexts [\#19389](https://github.com/netdata/netdata/pull/19389) ([stelfrag](https://github.com/stelfrag))
-- Reduce glibc memory fragmentation [\#19385](https://github.com/netdata/netdata/pull/19385) ([ktsaou](https://github.com/ktsaou))
-- added mmap count charts [\#19384](https://github.com/netdata/netdata/pull/19384) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
