@@ -712,6 +712,20 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
     return true;
 }
 
+static int iis_web_service(char *name, int update_every, typeof(bool (PERF_DATA_BLOCK *, int)) *routine)
+{
+    DWORD id = RegistryFindIDByName(name);
+    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
+        return -1;
+
+    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
+    if (!pDataBlock)
+        return -1;
+
+    routine(pDataBlock, update_every);
+    return  0;
+}
+
 int do_PerflibWebService(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
@@ -721,15 +735,10 @@ int do_PerflibWebService(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    DWORD id = RegistryFindIDByName("Web Service");
-    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
-        return -1;
+    int ret = iis_web_service("Web Service", update_every, do_web_services);
+    if (ret)
+        goto end_iss_fcnt;
 
-    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-    if (!pDataBlock)
-        return -1;
-
-    do_web_services(pDataBlock, update_every);
-
-    return 0;
+end_iss_fcnt:
+    return ret;
 }
