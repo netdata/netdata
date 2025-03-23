@@ -191,14 +191,45 @@ void dict_web_service_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     initialize_web_service_keys(p);
 }
 
+static inline void initialize_app_was_keys(struct ad_was *p)
+{
+    p->WASCurrentApplicationPoolState.key = "Current Application Pool State";
+    p->WASCurrentApplicationPoolUptime.key = "Current Application Pool Uptime";
+    p->WASCurrentWorkerProcess.key = "Current Worker Processes";
+    p->WASMaximumWorkerProcess.key = "Maximum Worker Processes";
+    p->WASRecentWorkerProcessFailure.key = "Recent Worker Process Failures";
+    p->WASTimeSinceProcessFailure.key = "Time Since Last Worker Process Failure";
+    p->WASApplicationPoolRecycles.key = "Total Application Pool Recycles";
+    p->WASTotalApplicationPoolUptime.key = "Total Application Pool Uptime";
+    p->WAStWorkerProcessCreated.key = "Total Worker Processes Created";
+    p->WAStWorkerProcessFailures.key = "Total Worker Process Failures";
+    p->WAStWorkerProcessPingFailures.key = "Total Worker Process Ping Failures";
+    p->WAStWorkerProcessShutdownFailures.key = "Total Worker Process Shutdown Failures";
+    p->WAStWorkerProcessStartupFailures.key = "Total Worker Process Startup Failures";
+}
+
+void dict_app_was_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct ad_was *p = value;
+    initialize_app_was_keys(p);
+}
+
 static DICTIONARY *web_services = NULL;
+static DICTIONARY *app_pool_was = NULL;
 
 static void initialize(void)
 {
+    // IIS
     web_services = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct web_service));
 
     dictionary_register_insert_callback(web_services, dict_web_service_insert_cb, NULL);
+
+    // AD (APP_POOL_WAS)
+    app_pool_was = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct ad_was));
+
+    dictionary_register_insert_callback(app_pool_was, dict_app_was_insert_cb, NULL);
 }
 
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
@@ -712,7 +743,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
     return true;
 }
 
-static int iis_web_service(char *name, int update_every, typeof(bool (PERF_DATA_BLOCK *, int)) *routine)
+static int iis_web_service(char *name, int update_every, typeof(bool(PERF_DATA_BLOCK *, int)) *routine)
 {
     DWORD id = RegistryFindIDByName(name);
     if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
@@ -723,7 +754,7 @@ static int iis_web_service(char *name, int update_every, typeof(bool (PERF_DATA_
         return -1;
 
     routine(pDataBlock, update_every);
-    return  0;
+    return 0;
 }
 
 int do_PerflibWebService(int update_every, usec_t dt __maybe_unused)
