@@ -152,7 +152,7 @@ set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-apps/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-apps/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-APPS_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-APPS_DEBUGINFO_PACKAGE On)
 
 #
 # charts.d.plugin
@@ -195,7 +195,7 @@ set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-cups/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-cups/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-CUPS_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-CUPS_DEBUGINFO_PACKAGE On)
 
 #
 # debugfs.plugin
@@ -215,7 +215,7 @@ set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-debugfs/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-debugfs/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-DEBUGFS_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-DEBUGFS_DEBUGINFO_PACKAGE On)
 
 #
 # ebpf.plugin
@@ -237,7 +237,7 @@ set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-ebpf/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-ebpf/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-EBPF_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-EBPF_DEBUGINFO_PACKAGE On)
 
 #
 # ebpf-code-legacy
@@ -281,7 +281,7 @@ set(CPACK_DEBIAN_PLUGIN-FREEIPMI_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-freeipmi/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-freeipmi/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-FREEIPMI_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-FREEIPMI_DEBUGINFO_PACKAGE On)
 
 #
 # go.plugin
@@ -327,7 +327,7 @@ set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-network-viewer/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-network-viewer/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_DEBUGINFO_PACKAGE On)
 
 #
 # nfacct.plugin
@@ -348,7 +348,7 @@ set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-nfacct/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-nfacct/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-NFACCT_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-NFACCT_DEBUGINFO_PACKAGE On)
 
 #
 # perf.plugin
@@ -369,7 +369,7 @@ set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-perf/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-perf/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-PERF_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-PERF_DEBUGINFO_PACKAGE On)
 
 #
 # pythond.plugin
@@ -415,7 +415,7 @@ set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-slabinfo/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-slabinfo/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-SLABINFO_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-SLABINFO_DEBUGINFO_PACKAGE On)
 
 #
 # systemd-journal.plugin
@@ -435,7 +435,7 @@ set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-systemd-journal/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-systemd-journal/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-SYSTEMD_JOURNAL_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD_JOURNAL_DEBUGINFO_PACKAGE On)
 
 #
 # xenstat.plugin
@@ -456,7 +456,7 @@ set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-xenstat/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-xenstat/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-XENSTAT_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-XENSTAT_DEBUGINFO_PACKAGE On)
 
 #
 # CPack components
