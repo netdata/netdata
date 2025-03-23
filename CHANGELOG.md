@@ -6,10 +6,12 @@
 
 **Merged pull requests:**
 
+- Set default CMake build type to include debug info. [\#19946](https://github.com/netdata/netdata/pull/19946) ([Ferroin](https://github.com/Ferroin))
 - build\(deps\): bump github.com/miekg/dns from 1.1.63 to 1.1.64 in /src/go [\#19945](https://github.com/netdata/netdata/pull/19945) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.2 to 5.7.3 in /src/go [\#19944](https://github.com/netdata/netdata/pull/19944) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.0 to 1.9.1 in /src/go [\#19943](https://github.com/netdata/netdata/pull/19943) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/docker/docker from 28.0.1+incompatible to 28.0.2+incompatible in /src/go [\#19942](https://github.com/netdata/netdata/pull/19942) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/DataDog/datadog-agent/pkg/networkdevice/profile from 0.65.0-devel.0.20250317105920-ce55f088ab29 to 0.66.0-devel in /src/go [\#19941](https://github.com/netdata/netdata/pull/19941) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Don't build libunwind in static builds when it's not needed. [\#19939](https://github.com/netdata/netdata/pull/19939) ([Ferroin](https://github.com/Ferroin))
 - detect low ram conditions more aggresively [\#19938](https://github.com/netdata/netdata/pull/19938) ([ktsaou](https://github.com/ktsaou))
 - status file 21b [\#19937](https://github.com/netdata/netdata/pull/19937) ([ktsaou](https://github.com/ktsaou))
@@ -488,7 +490,6 @@
 - Regenerate integrations docs [\#19394](https://github.com/netdata/netdata/pull/19394) ([netdatabot](https://github.com/netdatabot))
 - Make libunwind opt-in at build time instead of auto-enabled. [\#19393](https://github.com/netdata/netdata/pull/19393) ([Ferroin](https://github.com/Ferroin))
 - Remove openSUSE 15.5 from CI and package builds. [\#19392](https://github.com/netdata/netdata/pull/19392) ([Ferroin](https://github.com/Ferroin))
-- Reduce glibc fragmentation Part 2 [\#19390](https://github.com/netdata/netdata/pull/19390) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
