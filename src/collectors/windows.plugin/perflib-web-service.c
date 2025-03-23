@@ -93,6 +93,62 @@ struct web_service {
     COUNTER_DATA IISRequestsOther;
 };
 
+// AD information
+struct ad_was {
+    RRDSET *st_was_current_application_pool_state;
+    RRDDIM *rd_was_current_application_pool_state;
+
+    RRDSET *st_was_current_application_pool_uptime;
+    RRDDIM *rd_was_current_application_pool_uptime;
+
+    RRDSET *st_was_current_worker_process;
+    RRDDIM *rd_was_current_worker_process;
+
+    RRDSET *st_was_maximum_worker_process;
+    RRDDIM *rd_was_maximum_worker_process;
+
+    RRDSET *st_was_recent_worker_process_failure;
+    RRDDIM *rd_was_recent_worker_process_failure;
+
+    RRDSET *st_was_time_since_process_failure;
+    RRDDIM *rd_was_time_since_process_failure;
+
+    RRDSET *st_was_application_pool_recycles;
+    RRDDIM *rd_was_application_pool_recycles;
+
+    RRDSET *st_was_application_pool_uptime;
+    RRDDIM *rd_was_application_pool_uptime;
+
+    RRDSET *st_was_worker_process_created;
+    RRDDIM *rd_was_worker_process_created;
+
+    RRDSET *st_was_worker_process_failures;
+    RRDDIM *rd_was_worker_process_failures;
+
+    RRDSET *st_was_worker_process_ping_failures;
+    RRDDIM *rd_was_worker_process_ping_failures;
+
+    RRDSET *st_was_worker_process_shutdown_failures;
+    RRDDIM *rd_was_worker_process_shutdown_failures;
+
+    RRDSET *st_was_worker_process_startup_failures;
+    RRDDIM *rd_was_worker_process_startup_failures;
+
+    COUNTER_DATA WASCurrentApplicationPoolState;
+    COUNTER_DATA WASCurrentApplicationPoolUptime;
+    COUNTER_DATA WASCurrentWorkerProcess;
+    COUNTER_DATA WASMaximumWorkerProcess;
+    COUNTER_DATA WASRecentWorkerProcessFailure;
+    COUNTER_DATA WASTimeSinceProcessFailure;
+    COUNTER_DATA WASApplicationPoolRecycles;
+    COUNTER_DATA WASTotalApplicationPoolUptime;
+    COUNTER_DATA WAStWorkerProcessCreated;
+    COUNTER_DATA WAStWorkerProcessFailures;
+    COUNTER_DATA WAStWorkerProcessPingFailures;
+    COUNTER_DATA WAStWorkerProcessShutdownFailures;
+    COUNTER_DATA WAStWorkerProcessStartupFailures;
+};
+
 static inline void initialize_web_service_keys(struct web_service *p)
 {
     p->IISCurrentAnonymousUser.key = "Current Anonymous Users";
