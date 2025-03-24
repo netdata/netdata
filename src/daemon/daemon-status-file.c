@@ -1046,10 +1046,13 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
+        nd_log(NDLS_DAEMON, NDLP_INFO, "Posted last status to agent-events successfully.");
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash, false);
         daemon_status_file_save(wb, &session_status, true);
     }
+    else
+        nd_log(NDLS_DAEMON, NDLP_INFO, "Failed to post last status to agent-events.");
 
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
