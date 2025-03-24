@@ -907,6 +907,47 @@ static inline void app_pool_maximum_worker_process(
     }
 }
 
+static inline void app_pool_worker_process_failures(
+    struct iis_app *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPRecentWorkerProcessFailure)) {
+        if (!p->st_app_recent_worker_process_failure) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_worker_process_failures", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_app_recent_worker_process_failure = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "process",
+                "iis.application_pool_worker_process_failures",
+                "Failures during the rapid-fail protection interval.",
+                "failure",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_APPLICATION_WORKER_PROCESS_FAILURE,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_app_recent_worker_process_failure =
+                rrddim_add(p->st_app_recent_worker_process_failure, "failure", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(
+                p->st_app_recent_worker_process_failure->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_app_recent_worker_process_failure,
+            p->rd_app_recent_worker_process_failure,
+            (collected_number)p->APPRecentWorkerProcessFailure.current.Data);
+
+        rrdset_done(p->st_app_recent_worker_process_failure);
+    }
+}
+
 static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "APP_POOL_WAS");
@@ -932,6 +973,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         app_pool_current_uptime(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_current_worker_process(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_maximum_worker_process(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_worker_process_failures(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
