@@ -30,12 +30,16 @@ mqtt_wss_client mqttwss_client;
 static bool aclk_connected = false;
 static inline void aclk_set_connected(void) {
     __atomic_store_n(&aclk_connected, true, __ATOMIC_RELAXED);
+
+    daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
 static inline void aclk_set_disconnected(void) {
     __atomic_store_n(&aclk_connected, false, __ATOMIC_RELAXED);
 
     if(mqttwss_client)
         mqtt_wss_reset_stats(mqttwss_client);
+
+    daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
 
 inline bool aclk_online(void) {
