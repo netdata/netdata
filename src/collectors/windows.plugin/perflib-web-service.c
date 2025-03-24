@@ -784,6 +784,46 @@ static inline void app_pool_current_state(
     }
 }
 
+static inline void app_pool_current_uptime(
+    struct iis_app *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentApplicationPoolUptime)) {
+        if (!p->st_app_current_application_pool_uptime) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_start_time", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_app_current_application_pool_uptime = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "uptime",
+                "iis.application_pool_start_time",
+                "The Unix epoch for the application pool start time.",
+                "seconds",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_APPLICATION_POOL_START_TIME,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_app_current_application_pool_uptime =
+                rrddim_add(p->st_app_current_application_pool_uptime, "seconds", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(
+                p->st_app_current_application_pool_uptime->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_app_current_application_pool_uptime,
+            p->rd_app_current_application_pool_uptime,
+            (collected_number)p->APPCurrentApplicationPoolUptime.current.Data);
+
+        rrdset_done(p->st_app_current_application_pool_uptime);
+    }
+}
 static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "APP_POOL_WAS");
@@ -806,6 +846,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         struct iis_app *p = dictionary_set(app_pools, windows_shared_buffer, NULL, sizeof(*p));
         app_pool_current_state(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_current_uptime(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
