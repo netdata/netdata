@@ -140,6 +140,9 @@ void dictionary_register_insert_callback(DICTIONARY *dict, dict_cb_insert_t inse
 typedef void (*dict_cb_delete_t)(const DICTIONARY_ITEM *item, void *value, void *data);
 void dictionary_register_delete_callback(DICTIONARY *dict, dict_cb_delete_t delete_callback, void *data);
 
+// a on_delete callback to be called when an item is marked for deletion
+void dictionary_register_on_delete_callback(DICTIONARY *dict, dict_cb_delete_t on_delete_callback, void *data);
+
 // a merge callback to be called when DICT_OPTION_DONT_OVERWRITE_VALUE
 // and an item is already found in the dictionary - the dictionary does nothing else in this case
 // the old_value will remain in the dictionary - the new_value is ignored

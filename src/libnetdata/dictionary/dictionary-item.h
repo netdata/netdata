@@ -210,6 +210,8 @@ static inline void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY
 static inline size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     netdata_log_debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(item));
 
+    dictionary_execute_on_delete_callback(dict, item);
+
     if(!item_flag_check(item, ITEM_FLAG_DELETED))
         DICTIONARY_ENTRIES_MINUS1(dict);
 
@@ -326,6 +328,7 @@ static inline void dict_item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_I
         case RC_ITEM_IS_REFERENCED:
         case RC_ITEM_IS_CURRENTLY_BEING_CREATED:
             // the item is currently referenced by others
+            dictionary_execute_on_delete_callback(dict, item);
             dict_item_shared_set_deleted(dict, item);
             dict_item_set_deleted(dict, item);
             // after this point do not touch the item

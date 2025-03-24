@@ -106,7 +106,16 @@ void dictionary_register_delete_callback(DICTIONARY *dict, dict_cb_delete_t dele
 
     dictionary_hooks_allocate(dict);
     dict->hooks->delete_callback = delete_callback;
-    dict->hooks->delelte_callback_data = data;
+    dict->hooks->delete_callback_data = data;
+}
+
+void dictionary_register_on_delete_callback(DICTIONARY *dict, dict_cb_delete_t on_delete_callback,  void *data) {
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
+
+    dictionary_hooks_allocate(dict);
+    dict->hooks->on_delete_callback = on_delete_callback;
+    dict->hooks->on_delete_callback_data = data;
 }
 
 // ----------------------------------------------------------------------------

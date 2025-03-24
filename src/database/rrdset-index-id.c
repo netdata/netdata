@@ -143,7 +143,8 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     dictionary_destroy(st->functions_view);
 
-    rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
+    if(st->alerts.base)
+        fatal("RRDSET: it is being deleted while having alerts linked to it.");
 
     // ------------------------------------------------------------------------
     // the order of destruction is important here
@@ -179,6 +180,11 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     string_freez(st->module_name);
 
     freez(st->exporting_flags);
+}
+
+static void rrdset_on_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
+    RRDSET *st = rrdset;
+    rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
 }
 
 // the item to be inserted, is already in the dictionary
@@ -296,6 +302,7 @@ void rrdset_index_init(RRDHOST *host) {
         dictionary_register_conflict_callback(host->rrdset_root_index, rrdset_conflict_callback, NULL);
         dictionary_register_react_callback(host->rrdset_root_index, rrdset_react_callback, NULL);
         dictionary_register_delete_callback(host->rrdset_root_index, rrdset_delete_callback, host);
+        dictionary_register_on_delete_callback(host->rrdset_root_index, rrdset_on_delete_callback, host);
     }
 
     rrdset_index_byname_init(host);

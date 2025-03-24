@@ -516,7 +516,7 @@ int dyncfg_health_prototype_to_conf(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, const c
             buffer_sprintf(wb, "%13s: %s\n", "to", string2str(nap->config.recipient));
     }
 
-    return 200;
+    return HTTP_RESP_OK;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

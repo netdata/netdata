@@ -249,13 +249,14 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
 
 static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
     RRDSET *st = rc->rrdset;
+    if(!st) return;
 
     if (!exit_initiated_get()) {
-        RRDHOST *host = st->rrdhost;
-
         time_t now = now_realtime_sec();
 
         if (likely(rc->status != RRDCALC_STATUS_REMOVED)) {
+            RRDHOST *host = st->rrdhost;
+
             ALARM_ENTRY *ae = health_create_alarm_entry(
                 host,
                 rc,
@@ -278,6 +279,8 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
 
     if(rc->prev)
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
+
+    rc->rrdset = NULL;
 
     if(!having_ll_wrlock)
         rw_spinlock_write_unlock(&st->alerts.spinlock);
@@ -379,14 +382,16 @@ static __thread bool thread_having_ll_wrlock = false;
 
 static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdhost __maybe_unused) {
     RRDCALC *rc = rrdcalc;
-    //RRDHOST *host = rrdhost;
 
-    rrdcalc_unlink_from_rrdset(rc, thread_having_ll_wrlock);
-
-    // any destruction actions that require other locks
-    // have to be placed in rrdcalc_del(), because the object is actually locked for deletion
+    if(unlikely(rc->prev))
+        fatal("RRDCALC: it is being deleted while bing linked to an RRDSET.");
 
     rrdcalc_free_internals(rc);
+}
+
+static void rrdcalc_rrdhost_on_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdhost __maybe_unused) {
+    RRDCALC *rc = rrdcalc;
+    rrdcalc_unlink_from_rrdset(rc, thread_having_ll_wrlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -401,6 +406,7 @@ void rrdcalc_rrdhost_index_init(RRDHOST *host) {
         dictionary_register_conflict_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_conflict_callback, NULL);
         dictionary_register_react_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_react_callback, NULL);
         dictionary_register_delete_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_delete_callback, host);
+        dictionary_register_on_delete_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_on_delete_callback, host);
     }
 }
 

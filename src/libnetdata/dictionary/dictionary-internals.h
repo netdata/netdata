@@ -35,6 +35,7 @@ typedef enum __attribute__ ((__packed__)) item_flags {
     ITEM_FLAG_NONE              = 0,
     ITEM_FLAG_DELETED           = (1 << 0), // this item is marked deleted, so it is not available for traversal (deleted from the index too)
     ITEM_FLAG_BEING_CREATED     = (1 << 1), // this item is currently being created - this flag is removed when construction finishes
+    ITEM_FLAG_ON_DELETE_RUN     = (1 << 2), // the on_delete callback has been run for this item
 
     // IMPORTANT: This is 8-bit
 } ITEM_FLAGS;
@@ -123,7 +124,10 @@ struct dictionary_hooks {
     void *react_callback_data;
 
     dict_cb_delete_t delete_callback;
-    void *delelte_callback_data;
+    void *delete_callback_data;
+
+    dict_cb_delete_t on_delete_callback;
+    void *on_delete_callback_data;
 };
 
 struct dictionary {

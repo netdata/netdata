@@ -84,10 +84,17 @@ static inline void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONA
                    dict->creation_line,
                    dict->creation_file);
 
-    dict->hooks->delete_callback(item, item->shared->value, dict->hooks->delelte_callback_data);
+    dict->hooks->delete_callback(item, item->shared->value, dict->hooks->delete_callback_data);
 
     DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict);
 }
 
+static inline void dictionary_execute_on_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    if(likely(!dict->hooks || !dict->hooks->on_delete_callback) || item_shared_flag_check(item, ITEM_FLAG_ON_DELETE_RUN))
+        return;
+
+    item_shared_flag_set(item, ITEM_FLAG_ON_DELETE_RUN);
+    dict->hooks->on_delete_callback(item, item->shared->value, dict->hooks->on_delete_callback_data);
+}
 
 #endif //NETDATA_DICTIONARY_CALLBACKS_H
