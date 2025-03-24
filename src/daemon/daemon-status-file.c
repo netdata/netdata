@@ -90,6 +90,15 @@ static void set_stack_trace_message_if_empty(DAEMON_STATUS_FILE *ds, const char 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
 
+static void stack_trace_anonymize(char *s) {
+    char *p = s;
+    while (*p && (p = strstr(p, "0x"))) {
+        p[1] = '0';
+        p += 2;
+        while(isxdigit((uint8_t)*p)) *p++ = '0';
+    }
+}
+
 static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const char *cause) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
@@ -146,6 +155,8 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
 
     if(cause)
         strncpyz(to_hash.cause, cause, sizeof(to_hash.cause) - 1);
+
+    stack_trace_anonymize(to_hash.stack_trace);
 
     uint64_t hash = fnv1a_hash_bin64(&to_hash, sizeof(to_hash));
 
@@ -407,10 +418,6 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 18) {
             JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "reliability", ds->reliability, error, required_v18);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "stack_traces", ds->stack_traces, error, required_v18);
-
-            char buf[UINT64_HEX_MAX_LENGTH];
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
-            ds->fatal.fault_address = str2ull_encoded(buf);
         }
     });
 
@@ -484,8 +491,13 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 17)
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "sentry", SIGNAL_CODE_2id_h, ds->fatal.sentry, error, required_v17);
 
-        if(version >= 18)
+        if(version >= 18) {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "thread_id", ds->fatal.thread_id, error, required_v18);
+
+            char buf[UINT64_HEX_MAX_LENGTH];
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
+            ds->fatal.fault_address = str2ull_encoded(buf);
+        }
     });
 
     // Parse the last posted object
