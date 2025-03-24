@@ -743,9 +743,49 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
     return true;
 }
 
-static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
+static inline void app_pool_current_state(
+    struct ad_was *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentApplicationPoolState)) {
+        if (!p->st_app_current_application_pool_state) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_current_state", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_app_current_application_pool_state = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "state",
+                "iis.application_pool_current_state",
+                "The current status of the application pool (1 - Uninitialized, 2 - Initialized, 3 - Running, 4 - Disabling, 5 - Disabled, 6 - Shutdown Pending, 7 - Delete Pending)",
+                "status",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_APPLICATION_POOL_STATE,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_app_current_application_pool_state =
+                rrddim_add(p->st_app_current_application_pool_state, "state", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(
+                p->st_app_current_application_pool_state->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_app_current_application_pool_state,
+            p->rd_app_current_application_pool_state,
+            (collected_number)p->APPCurrentApplicationPoolState.current.Data);
+
+        rrdset_done(p->st_app_current_application_pool_state);
+    }
+}
+
+static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
+{
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "APP_POOL_WAS");
     if (!pObjectType)
         return false;
@@ -765,40 +805,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         }
 
         struct ad_was *p = dictionary_set(web_services, windows_shared_buffer, NULL, sizeof(*p));
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentApplicationPoolState)) {
-            if (!p->st_app_current_application_pool_state) {
-                snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_current_state", windows_shared_buffer);
-                netdata_fix_chart_name(id);
-                p->st_app_current_application_pool_state = rrdset_create_localhost(
-                    "iis",
-                    id,
-                    NULL,
-                    "state",
-                    "iis.application_pool_current_state",
-                    "The current status of the application pool (1 - Uninitialized, 2 - Initialized, 3 - Running, 4 - Disabling, 5 - Disabled, 6 - Shutdown Pending, 7 - Delete Pending)",
-                    "status",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibWebService",
-                    PRIO_WEBSITE_IIS_APPLICATION_POOL_STATE,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-                p->rd_app_current_application_pool_state = rrddim_add(
-                    p->st_app_current_application_pool_state, "state", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rrdlabels_add(
-                    p->st_app_current_application_pool_state->rrdlabels,
-                    "app",
-                    windows_shared_buffer,
-                    RRDLABEL_SRC_AUTO);
-            }
-
-            rrddim_set_by_pointer(
-                p->st_app_current_application_pool_state,
-                p->rd_app_current_application_pool_state,
-                (collected_number)p->APPCurrentApplicationPoolState.current.Data);
-
-            rrdset_done(p->st_app_current_application_pool_state);
-        }
+        app_pool_current_state(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
