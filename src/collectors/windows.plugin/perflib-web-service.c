@@ -853,8 +853,7 @@ static inline void app_pool_current_worker_process(
 
             p->rd_app_current_worker_process =
                 rrddim_add(p->st_app_current_worker_process, "process", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(
-                p->st_app_current_worker_process->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_app_current_worker_process->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -894,8 +893,7 @@ static inline void app_pool_maximum_worker_process(
 
             p->rd_app_maximum_worker_process =
                 rrddim_add(p->st_app_maximum_worker_process, "process", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(
-                p->st_app_maximum_worker_process->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_app_maximum_worker_process->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -985,7 +983,48 @@ static inline void app_pool_time_since_process_failures(
             p->rd_app_time_since_process_failure,
             (collected_number)p->APPTimeSinceProcessFailure.current.Data);
 
-        rrdset_done(p->st_app_recent_worker_process_failure);
+        rrdset_done(p->st_app_time_since_process_failure);
+    }
+}
+
+static inline void app_pool_recycles(
+    struct iis_app *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPApplicationPoolRecycles)) {
+        if (!p->st_app_application_pool_recycles) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_recycles", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_app_application_pool_recycles = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "pool",
+                "iis.application_pool_recycles",
+                "Number of recycles since start.",
+                "recycles",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_APPLICATION_RECYCLES,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_app_application_pool_recycles =
+                rrddim_add(p->st_app_application_pool_recycles, "recycles", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_app_application_pool_recycles->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_app_application_pool_recycles,
+            p->rd_app_application_pool_recycles,
+            (collected_number)p->APPApplicationPoolRecycles.current.Data);
+
+        rrdset_done(p->st_app_application_pool_recycles);
     }
 }
 
@@ -1016,6 +1055,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         app_pool_maximum_worker_process(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_worker_process_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_time_since_process_failures(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_recycles(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
