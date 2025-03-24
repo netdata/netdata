@@ -1028,7 +1028,7 @@ static const char *agent_health(DAEMON_STATUS_FILE *ds) {
         return "healthy-recovered";
 }
 
-void post_status_file(struct post_status_file_thread_data *d) {
+static void post_status_file(struct post_status_file_thread_data *d) {
     daemon_status_file_startup_step("startup(crash reports json)");
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -1367,9 +1367,11 @@ void daemon_status_file_check_crash(void) {
     if( // must be first for netdata.conf option to be used
         (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
 
-        // we have a previous status, or
-        // (we managed to save the current one, and (we have more than 2 restarts, or this is not a CI run))
-        (!no_previous_status || (daemon_status_file_saved && (last_session_status.restarts > 2 || !is_ci()))) &&
+        // we have a previous status, or we managed to save the current one
+        (!no_previous_status || daemon_status_file_saved) &&
+
+        // we have more than 2 restarts, or this is not a CI run
+        (last_session_status.restarts > 2 || !is_ci()) &&
 
         // we have not reported this
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
