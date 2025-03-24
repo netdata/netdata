@@ -1984,8 +1984,11 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
             hclt[thread_index].host = host;
             rc = uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]);
             async_exec += (rc == 0);
+            // if it failed, mark the thread slot as free
+            if (rc)
+                __atomic_store_n(&hclt[thread_index].busy, false, __ATOMIC_RELAXED);
         }
-        // if single thread, thread creation failure or failure to find slot
+        // if single thread, thread creation failure or failure tofind slot
         if (rc || !thread_found) {
             sync_exec++;
             struct host_context_load_thread hclt_sync = {.host = host};
