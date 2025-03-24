@@ -22,7 +22,7 @@ typedef struct {
 } backtrace_data_t;
 
 // Common function to format and add a stack frame to the buffer
-static void add_stack_frame(backtrace_data_t *bt_data, const char *function,
+static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char *function,
                             const char *filename, int lineno) {
     BUFFER *wb = bt_data->wb;
 
@@ -44,6 +44,12 @@ static void add_stack_frame(backtrace_data_t *bt_data, const char *function,
         buffer_strcat(wb, function);
     else
         buffer_strcat(wb, "<unknown>");
+
+    if(pc) {
+        buffer_strcat(wb, " [");
+        buffer_print_uint64_hex(wb, pc);
+        buffer_putc(wb, ']');
+    }
 
     if (filename && *filename) {
         buffer_strcat(wb, " (");
@@ -93,18 +99,18 @@ static void bt_error_handler(void *data, const char *msg, int errnum) {
         len = strcatz(error_buf, len, sizeof(error_buf), strerror(errnum));
     }
 
-    add_stack_frame(bt_data, function, error_buf, 0);
+    add_stack_frame(bt_data, 0, function, error_buf, 0);
 }
 
 // Full callback for libbacktrace
-static int bt_full_handler(void *data, uintptr_t pc __maybe_unused,
+static int bt_full_handler(void *data, uintptr_t pc,
                            const char *filename, int lineno,
                            const char *function) {
     backtrace_data_t *bt_data = (backtrace_data_t *)data;
     if (!bt_data)
         return 0;
 
-    add_stack_frame(bt_data, function, filename, lineno);
+    add_stack_frame(bt_data, pc, function, filename, lineno);
 
     return 0; // Continue backtrace
 }
@@ -297,29 +303,10 @@ void capture_stack_trace(BUFFER *wb) {
             if(added)
                 buffer_putc(wb, '\n');
 
-#if defined(OS_MACOS)
-            // remove the address part
-            char *p = strstr(messages[i], "0x");
-            char *e = p ? strchr(p, ' ') : NULL;
-            if (e) {
-                e++;
-                buffer_putc(wb, '#');
-                buffer_print_uint64(wb, added);
-                buffer_putc(wb, ' ');
-                buffer_strcat(wb, e);
-            }
-            else
-                buffer_strcat(wb, messages[i]);
-#else
             buffer_putc(wb, '#');
             buffer_print_uint64(wb, i);
             buffer_putc(wb, ' ');
-
-            // remove the address part
-            char *p = strstr(messages[i], " [");
-            size_t len = p ? (size_t)(p - messages[i]) : strlen(messages[i]);
-            buffer_fast_strcat(wb, messages[i], len);
-#endif
+            buffer_strcat(wb, messages[i]);
             added++;
         }
     }

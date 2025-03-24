@@ -90,6 +90,15 @@ static void set_stack_trace_message_if_empty(DAEMON_STATUS_FILE *ds, const char 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
 
+static void stack_trace_anonymize(char *s) {
+    char *p = s;
+    while (*p && (p = strstr(p, "0x"))) {
+        p[1] = '0';
+        p += 2;
+        while(isxdigit((uint8_t)*p)) *p++ = '0';
+    }
+}
+
 static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const char *cause) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
@@ -146,6 +155,8 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
 
     if(cause)
         strncpyz(to_hash.cause, cause, sizeof(to_hash.cause) - 1);
+
+    stack_trace_anonymize(to_hash.stack_trace);
 
     uint64_t hash = fnv1a_hash_bin64(&to_hash, sizeof(to_hash));
 
