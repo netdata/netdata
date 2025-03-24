@@ -750,9 +750,9 @@ static inline void app_pool_current_state(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentApplicationPoolState)) {
         if (!p->st_app_current_application_pool_state) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_current_state", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_current_application_pool_state = rrdset_create_localhost(
@@ -791,9 +791,9 @@ static inline void app_pool_current_uptime(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentApplicationPoolUptime)) {
         if (!p->st_app_current_application_pool_uptime) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_start_time", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_current_application_pool_uptime = rrdset_create_localhost(
@@ -832,9 +832,9 @@ static inline void app_pool_current_worker_process(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentWorkerProcess)) {
         if (!p->st_app_current_worker_process) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_worker_process", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_current_worker_process = rrdset_create_localhost(
@@ -872,9 +872,9 @@ static inline void app_pool_maximum_worker_process(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPMaximumWorkerProcess)) {
         if (!p->st_app_maximum_worker_process) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_maximum_worker_process", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_maximum_worker_process = rrdset_create_localhost(
@@ -912,9 +912,9 @@ static inline void app_pool_worker_process_failures(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPRecentWorkerProcessFailure)) {
         if (!p->st_app_recent_worker_process_failure) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_worker_process_failures", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_recent_worker_process_failure = rrdset_create_localhost(
@@ -953,9 +953,9 @@ static inline void app_pool_time_since_process_failures(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPTimeSinceProcessFailure)) {
         if (!p->st_app_time_since_process_failure) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_time_since_failure", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_time_since_process_failure = rrdset_create_localhost(
@@ -994,9 +994,9 @@ static inline void app_pool_recycles(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPApplicationPoolRecycles)) {
         if (!p->st_app_application_pool_recycles) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_recycles", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_application_pool_recycles = rrdset_create_localhost(
@@ -1035,9 +1035,9 @@ static inline void app_pool_total_upime(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPTotalApplicationPoolUptime)) {
         if (!p->st_app_application_pool_uptime) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_uptime", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_application_pool_uptime = rrdset_create_localhost(
@@ -1076,9 +1076,9 @@ static inline void app_pool_process_created(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessCreated)) {
         if (!p->st_app_worker_process_created) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_worker_process_created", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_worker_process_created = rrdset_create_localhost(
@@ -1116,9 +1116,9 @@ static inline void app_pool_process_failures(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessFailures)) {
         if (!p->st_app_worker_process_failures) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_process_crashes", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_worker_process_failures = rrdset_create_localhost(
@@ -1157,9 +1157,9 @@ static inline void app_pool_total_process_failures(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessFailures)) {
         if (!p->st_app_worker_process_failures) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_process_crashes", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_worker_process_failures = rrdset_create_localhost(
@@ -1198,9 +1198,9 @@ static inline void app_pool_process_ping_failures(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessPingFailures)) {
         if (!p->st_app_worker_process_ping_failures) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_process_ping_failure", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_worker_process_ping_failures = rrdset_create_localhost(
@@ -1239,9 +1239,9 @@ static inline void app_pool_process_shutdown_failures(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessShutdownFailures)) {
         if (!p->st_app_worker_process_shutdown_failures) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_shutdown_failures", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_worker_process_shutdown_failures = rrdset_create_localhost(
@@ -1280,9 +1280,9 @@ static inline void app_pool_process_startup_failures(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessStartupFailures)) {
         if (!p->st_app_worker_process_startup_failures) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_startup_failures", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_worker_process_startup_failures = rrdset_create_localhost(
@@ -1339,6 +1339,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         app_pool_current_uptime(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_current_worker_process(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_maximum_worker_process(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_process_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_worker_process_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_time_since_process_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_recycles(p, pDataBlock, pObjectType, pi, update_every);
