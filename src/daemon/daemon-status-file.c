@@ -1024,6 +1024,8 @@ static const char *agent_health(DAEMON_STATUS_FILE *ds) {
 }
 
 void post_status_file(struct post_status_file_thread_data *d) {
+    daemon_status_file_startup_step("startup(crash reports json)");
+
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_string(wb, "exit_cause", d->cause);
@@ -1044,6 +1046,8 @@ void post_status_file(struct post_status_file_thread_data *d) {
     if(!curl)
         return;
 
+    daemon_status_file_startup_step("startup(crash reports curl)");
+
     curl_easy_setopt(curl, CURLOPT_URL, "https://agent-events.netdata.cloud/agent-events");
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
@@ -1054,6 +1058,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
+        daemon_status_file_startup_step("startup(crash reports dedup)");
         nd_log(NDLS_DAEMON, NDLP_INFO, "Posted last status to agent-events successfully.");
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash, false);
@@ -1062,6 +1067,8 @@ void post_status_file(struct post_status_file_thread_data *d) {
     }
     else
         nd_log(NDLS_DAEMON, NDLP_INFO, "Failed to post last status to agent-events.");
+
+    daemon_status_file_startup_step("startup(crash reports cleanup)");
 
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
@@ -1349,6 +1356,8 @@ void daemon_status_file_check_crash(void) {
            "Last exit status: %s (%s):\n\n%s",
            NETDATA_VERSION, msg, cause, buffer_tostring(wb));
 
+    daemon_status_file_startup_step("startup(crash reports check)");
+
     enum crash_report_t r = check_crash_reports_config();
     if( // must be first for netdata.conf option to be used
         (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
@@ -1361,6 +1370,8 @@ void daemon_status_file_check_crash(void) {
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
 
         ) {
+        daemon_status_file_startup_step("startup(crash reports prep)");
+
         netdata_conf_ssl();
 
         if(no_previous_status) {
