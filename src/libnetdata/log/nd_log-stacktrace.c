@@ -54,13 +54,14 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
     if (filename && *filename) {
         buffer_strcat(wb, " (");
 
-        // Strip path from filename - find the last slash
-        const char *base_filename = filename;
-        const char *last_slash = strrchr(filename, '/');
-        if (last_slash)
-            base_filename = last_slash + 1;
+        const char *f = strstr(filename, "/src/");
+        if (f) {
+            const char *f2 = strstr(f + 1, "/src/");
+            if(f2) f = f2;
+        }
+        if(!f) f = filename;
 
-        buffer_strcat(wb, base_filename);
+        buffer_strcat(wb, f);
 
         if (lineno > 0) {
             buffer_strcat(wb, ":");
