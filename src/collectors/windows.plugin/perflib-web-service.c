@@ -144,9 +144,9 @@ struct iis_app {
     COUNTER_DATA APPTotalApplicationPoolUptime;
     COUNTER_DATA APPWorkerProcessCreated;
     COUNTER_DATA APPWorkerProcessFailures;
-    COUNTER_DATA APPtWorkerProcessPingFailures;
-    COUNTER_DATA APPtWorkerProcessShutdownFailures;
-    COUNTER_DATA APPtWorkerProcessStartupFailures;
+    COUNTER_DATA APPWorkerProcessPingFailures;
+    COUNTER_DATA APPWorkerProcessShutdownFailures;
+    COUNTER_DATA APPWorkerProcessStartupFailures;
 };
 
 static inline void initialize_web_service_keys(struct web_service *p)
@@ -203,9 +203,9 @@ static inline void initialize_app_pool_keys(struct iis_app *p)
     p->APPTotalApplicationPoolUptime.key = "Total Application Pool Uptime";
     p->APPWorkerProcessCreated.key = "Total Worker Processes Created";
     p->APPWorkerProcessFailures.key = "Total Worker Process Failures";
-    p->APPtWorkerProcessPingFailures.key = "Total Worker Process Ping Failures";
-    p->APPtWorkerProcessShutdownFailures.key = "Total Worker Process Shutdown Failures";
-    p->APPtWorkerProcessStartupFailures.key = "Total Worker Process Startup Failures";
+    p->APPWorkerProcessPingFailures.key = "Total Worker Process Ping Failures";
+    p->APPWorkerProcessShutdownFailures.key = "Total Worker Process Shutdown Failures";
+    p->APPWorkerProcessStartupFailures.key = "Total Worker Process Startup Failures";
 }
 
 void dict_app_pool_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1199,7 +1199,7 @@ static inline void app_pool_process_ping_failures(
     int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPtWorkerProcessPingFailures)) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessPingFailures)) {
         if (!p->st_app_worker_process_ping_failures) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_process_ping_failure", windows_shared_buffer);
             netdata_fix_chart_name(id);
@@ -1226,11 +1226,52 @@ static inline void app_pool_process_ping_failures(
         rrddim_set_by_pointer(
             p->st_app_worker_process_ping_failures,
             p->rd_app_worker_process_ping_failures,
-            (collected_number)p->APPtWorkerProcessPingFailures.current.Data);
+            (collected_number)p->APPWorkerProcessPingFailures.current.Data);
 
-        rrdset_done(p->st_app_worker_process_ping_failures;
+        rrdset_done(p->st_app_worker_process_ping_failures);
     }
+}
+
+static inline void app_pool_process_shutdown_failures(
+    struct iis_app *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessShutdownFailures)) {
+        if (!p->st_app_worker_process_shutdown_failures) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_shutdown_failures", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_app_worker_process_shutdown_failures = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "pool",
+                "iis.application_pool_total_shutdown_failures",
+                "Total number of times WAS could not shutdown a worker process.",
+                "failures",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_APPLICATION_TOTAL_PROCESS_SHUTDOWN_FAILURES,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_app_worker_process_shutdown_failures =
+                rrddim_add(p->st_app_worker_process_shutdown_failures, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_app_worker_process_shutdown_failures->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
+
+        rrddim_set_by_pointer(
+            p->st_app_worker_process_shutdown_failures,
+            p->rd_app_worker_process_shutdown_failures,
+            (collected_number)p->APPWorkerProcessShutdownFailures.current.Data);
+
+        rrdset_done(p->st_app_worker_process_shutdown_failures);
+    }
+}
 
 static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
@@ -1264,6 +1305,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         app_pool_process_created(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_process_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_process_ping_failures(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_process_shutdown_failures(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
