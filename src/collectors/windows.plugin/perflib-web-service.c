@@ -866,6 +866,47 @@ static inline void app_pool_current_worker_process(
     }
 }
 
+static inline void app_pool_maximum_worker_process(
+    struct iis_app *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPMaximumWorkerProcess)) {
+        if (!p->st_app_maximum_worker_process) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_maximum_worker_process", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_app_maximum_worker_process = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "process",
+                "iis.application_pool_maximum_worker_process",
+                "Maximum number of processes created.",
+                "process",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_APPLICATION_MAXIMUM_PROCESS_RUNNING,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_app_maximum_worker_process =
+                rrddim_add(p->st_app_maximum_worker_process, "process", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(
+                p->st_app_maximum_worker_process->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_app_maximum_worker_process,
+            p->rd_app_maximum_worker_process,
+            (collected_number)p->APPMaximumWorkerProcess.current.Data);
+
+        rrdset_done(p->st_app_maximum_worker_process);
+    }
+}
+
 static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "APP_POOL_WAS");
@@ -890,6 +931,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         app_pool_current_state(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_current_uptime(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_current_worker_process(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_maximum_worker_process(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
