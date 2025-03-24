@@ -594,13 +594,17 @@ static void free_query_list(Pvoid_t JudyL)
     }
 }
 
-static void aclk_synchronization(void *arg)
+#define ACLK_SYNC_SHOULD_BE_RUNNING                                                                                    \
+    (!shutdown_requested || config->aclk_queries_running || config->alert_push_running ||                              \
+     config->aclk_batch_job_is_running)
+
+static void aclk_synchronization_event_loop(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
     uv_thread_set_name_np("ACLKSYNC");
     config->ar = aral_by_size_acquire(sizeof(struct aclk_database_cmd));
-
     worker_register("ACLKSYNC");
+
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
     worker_register_job_name(ACLK_DATABASE_NOOP,                "noop");
@@ -645,23 +649,26 @@ static void aclk_synchronization(void *arg)
     unsigned cmd_batch_size;
 
     completion_mark_complete(&config->start_stop_complete);
-    while (likely(service_running(SERVICE_ACLK))) {
+    int shutdown_requested = 0;
+
+    while (likely(ACLK_SYNC_SHOULD_BE_RUNNING)) {
         enum aclk_database_opcode opcode;
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
 
+        if (unlikely(shutdown_requested)) {
+            nd_log_limit_static_thread_var(erl, 5, 0);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO, "ACLKSYNC: Waiting for pending queries to finish before shutdown");
+            continue;
+        }
+
         /* wait for commands */
         cmd_batch_size = 0;
         do {
-            if (unlikely(cmd_batch_size >= MAX_BATCH_SIZE))
+            if (unlikely(++cmd_batch_size >= MAX_BATCH_SIZE))
                 break;
 
             struct aclk_database_cmd cmd = aclk_database_deq_cmd();
-
-            if (unlikely(!service_running(SERVICE_ACLK)))
-                break;
-
-            ++cmd_batch_size;
             opcode = cmd.opcode;
 
             if(likely(opcode != ACLK_DATABASE_NOOP && opcode != ACLK_QUERY_EXECUTE))
@@ -848,7 +855,9 @@ static void aclk_synchronization(void *arg)
                         config->aclk_batch_job_is_running = false;
                     }
                     break;
-
+                case ACLK_SYNC_SHUTDOWN:
+                    shutdown_requested = 1;
+                    break;
                 default:
                     break;
             }
@@ -880,19 +889,20 @@ static void aclk_synchronization(void *arg)
     }
 
     aral_by_size_release(config->ar);
+    completion_mark_complete(&config->start_stop_complete);
 
     worker_unregister();
     service_exits();
     netdata_log_info("ACLK SYNC: Shutting down ACLK synchronization event loop");
 }
 
-static void aclk_synchronization_init(void)
+static void aclk_initialize_event_loop(void)
 {
     memset(&aclk_sync_config, 0, sizeof(aclk_sync_config));
     completion_init(&aclk_sync_config.start_stop_complete);
 
     int retries = 0;
-    int create_uv_thread_rc = create_uv_thread(&aclk_sync_config.thread, aclk_synchronization, &aclk_sync_config, &retries);
+    int create_uv_thread_rc = create_uv_thread(&aclk_sync_config.thread, aclk_synchronization_event_loop, &aclk_sync_config, &retries);
     if (create_uv_thread_rc)
         nd_log_daemon(NDLP_ERR, "Failed to create ACLK synchronization thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
 
@@ -900,9 +910,10 @@ static void aclk_synchronization_init(void)
 
     if (retries)
         nd_log_daemon(NDLP_WARNING, "ACLK synchronization thread was created after %d attempts", retries);
-
     completion_wait_for(&aclk_sync_config.start_stop_complete);
-    completion_destroy(&aclk_sync_config.start_stop_complete);
+
+    // Keep completion, just reset it for next use during shutdown
+    completion_reset(&aclk_sync_config.start_stop_complete);
 }
 
 // -------------------------------------------------------------
@@ -950,12 +961,10 @@ void destroy_aclk_config(RRDHOST *host)
     "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni "                                                     \
     "WHERE h.host_id = ni.host_id AND ni.node_id IS NOT NULL"
 
-void sql_aclk_sync_init(void)
+void aclk_synchronization_init(void)
 {
     char *err_msg = NULL;
     int rc;
-
-    REQUIRE_DB(db_meta);
 
     netdata_log_info("Creating archived hosts");
     int number_of_children = 0;
@@ -979,7 +988,8 @@ void sql_aclk_sync_init(void)
         error_report("SQLite error when configuring host ACLK synchonization parameters, rc = %d (%s)", rc, err_msg);
         sqlite3_free(err_msg);
     }
-    aclk_synchronization_init();
+
+    aclk_initialize_event_loop();
 
     netdata_log_info("ACLK sync initialization completed");
 }
@@ -991,6 +1001,17 @@ static inline void queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const v
     cmd.param[0] = (void *) param0;
     cmd.param[1] = (void *) param1;
     aclk_database_enq_cmd(&cmd);
+}
+
+void aclk_synchronization_shutdown(void)
+{
+    // Send shutdown command, not that the completion is initialized
+    // on init and still valid
+    queue_aclk_sync_cmd(ACLK_SYNC_SHUTDOWN, NULL, NULL);
+
+    completion_wait_for(&aclk_sync_config.start_stop_complete);
+    completion_destroy(&aclk_sync_config.start_stop_complete);
+    nd_log_daemon(NDLP_INFO, "ACLK sync shutdown completed");
 }
 
 // Public

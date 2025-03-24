@@ -26,6 +26,7 @@ enum aclk_database_opcode {
     ACLK_QUERY_EXECUTE_SYNC,
     ACLK_QUERY_BATCH_ADD,
     ACLK_QUERY_BATCH_EXECUTE,
+    ACLK_SYNC_SHUTDOWN,
 
     // leave this last
     // we need it to check for worker utilization
@@ -54,7 +55,8 @@ typedef struct aclk_sync_cfg_t {
 
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id);
 void destroy_aclk_config(RRDHOST *host);
-void sql_aclk_sync_init(void);
+void aclk_synchronization_init(void);
+void aclk_synchronization_shutdown(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void schedule_node_state_update(RRDHOST *host, uint64_t delay);
 void unregister_node(const char *machine_guid);
