@@ -95,8 +95,8 @@ struct web_service {
 
 // AD information
 struct ad_was {
-    RRDSET *st_was_current_application_pool_state;
-    RRDDIM *rd_was_current_application_pool_state;
+    RRDSET *st_app_current_application_pool_state;
+    RRDDIM *rd_app_current_application_pool_state;
 
     RRDSET *st_was_current_application_pool_uptime;
     RRDDIM *rd_was_current_application_pool_uptime;
@@ -134,7 +134,7 @@ struct ad_was {
     RRDSET *st_was_worker_process_startup_failures;
     RRDDIM *rd_was_worker_process_startup_failures;
 
-    COUNTER_DATA WASCurrentApplicationPoolState;
+    COUNTER_DATA APPCurrentApplicationPoolState;
     COUNTER_DATA WASCurrentApplicationPoolUptime;
     COUNTER_DATA WASCurrentWorkerProcess;
     COUNTER_DATA WASMaximumWorkerProcess;
@@ -193,7 +193,7 @@ void dict_web_service_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void
 
 static inline void initialize_app_was_keys(struct ad_was *p)
 {
-    p->WASCurrentApplicationPoolState.key = "Current Application Pool State";
+    p->APPCurrentApplicationPoolState.key = "Current Application Pool State";
     p->WASCurrentApplicationPoolUptime.key = "Current Application Pool Uptime";
     p->WASCurrentWorkerProcess.key = "Current Worker Processes";
     p->WASMaximumWorkerProcess.key = "Maximum Worker Processes";
@@ -743,6 +743,67 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
     return true;
 }
 
+static bool do_was_app(PERF_DATA_BLOCK *pDataBlock, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "APP_POOL_WAS");
+    if (!pObjectType)
+        return false;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        // We are not ploting _Total here, because cloud will group the sites
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0) {
+            continue;
+        }
+
+        struct ad_was *p = dictionary_set(web_services, windows_shared_buffer, NULL, sizeof(*p));
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentApplicationPoolState)) {
+            if (!p->st_app_current_application_pool_state) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_current_state", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->st_app_current_application_pool_state = rrdset_create_localhost(
+                    "iis",
+                    id,
+                    NULL,
+                    "state",
+                    "iis.application_pool_current_state",
+                    "The current status of the application pool (1 - Uninitialized, 2 - Initialized, 3 - Running, 4 - Disabling, 5 - Disabled, 6 - Shutdown Pending, 7 - Delete Pending)",
+                    "status",
+                    PLUGIN_WINDOWS_NAME,
+                    "PerflibWebService",
+                    PRIO_WEBSITE_IIS_APPLICATION_POOL_STATE,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_app_current_application_pool_state = rrddim_add(
+                    p->st_app_current_application_pool_state, "state", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrdlabels_add(
+                    p->st_app_current_application_pool_state->rrdlabels,
+                    "app",
+                    windows_shared_buffer,
+                    RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(
+                p->st_app_current_application_pool_state,
+                p->rd_app_current_application_pool_state,
+                (collected_number)p->APPCurrentApplicationPoolState.current.Data);
+
+            rrdset_done(p->st_app_current_application_pool_state);
+        }
+    }
+
+    return true;
+}
+
 static int iis_web_service(char *name, int update_every, typeof(bool(PERF_DATA_BLOCK *, int)) *routine)
 {
     DWORD id = RegistryFindIDByName(name);
@@ -766,10 +827,10 @@ int do_PerflibWebService(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    int ret = iis_web_service("Web Service", update_every, do_web_services);
-    if (ret)
-        goto end_iss_fcnt;
+    int ret = 0;
+#define TOTAL_NUMBER_OF_FAILURES -2
+    ret += iis_web_service("Web Service", update_every, do_web_services);
+    ret += iis_web_service("APP_POOL_WAS", update_every, do_was_app);
 
-end_iss_fcnt:
-    return ret;
+    return (ret == TOTAL_NUMBER_OF_FAILURES) ? -1 : 0;
 }
