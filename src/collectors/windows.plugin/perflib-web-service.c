@@ -94,7 +94,7 @@ struct web_service {
 };
 
 // AD information
-struct ad_was {
+struct iis_app {
     RRDSET *st_app_current_application_pool_state;
     RRDDIM *rd_app_current_application_pool_state;
 
@@ -191,7 +191,7 @@ void dict_web_service_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     initialize_web_service_keys(p);
 }
 
-static inline void initialize_app_pool_keys(struct ad_was *p)
+static inline void initialize_app_pool_keys(struct iis_app *p)
 {
     p->APPCurrentApplicationPoolState.key = "Current Application Pool State";
     p->APPCurrentApplicationPoolUptime.key = "Current Application Pool Uptime";
@@ -210,12 +210,12 @@ static inline void initialize_app_pool_keys(struct ad_was *p)
 
 void dict_app_pool_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
-    struct ad_was *p = value;
+    struct iis_app *p = value;
     initialize_app_pool_keys(p);
 }
 
 static DICTIONARY *web_services = NULL;
-static DICTIONARY *app_pool_was = NULL;
+static DICTIONARY *app_pools = NULL;
 
 static void initialize(void)
 {
@@ -226,10 +226,10 @@ static void initialize(void)
     dictionary_register_insert_callback(web_services, dict_web_service_insert_cb, NULL);
 
     // AD (APP_POOL_WAS)
-    app_pool_was = dictionary_create_advanced(
-        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct ad_was));
+    app_pools = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct iis_app));
 
-    dictionary_register_insert_callback(app_pool_was, dict_app_pool_insert_cb, NULL);
+    dictionary_register_insert_callback(app_pools, dict_app_pool_insert_cb, NULL);
 }
 
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
@@ -744,7 +744,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
 }
 
 static inline void app_pool_current_state(
-    struct ad_was *p,
+    struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
@@ -804,7 +804,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
             continue;
         }
 
-        struct ad_was *p = dictionary_set(web_services, windows_shared_buffer, NULL, sizeof(*p));
+        struct iis_app *p = dictionary_set(app_pools, windows_shared_buffer, NULL, sizeof(*p));
         app_pool_current_state(p, pDataBlock, pObjectType, pi, update_every);
     }
 
