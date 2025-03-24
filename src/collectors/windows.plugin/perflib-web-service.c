@@ -1150,7 +1150,7 @@ static inline void app_pool_process_failures(
     }
 }
 
-static inline void app_pool_process_failures(
+static inline void app_pool_total_process_failures(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -1273,6 +1273,47 @@ static inline void app_pool_process_shutdown_failures(
     }
 }
 
+static inline void app_pool_process_startup_failures(
+    struct iis_app *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessStartupFailures)) {
+        if (!p->st_app_worker_process_startup_failures) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_startup_failures", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_app_worker_process_startup_failures = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "pool",
+                "iis.application_pool_total_startup_failures",
+                "Total number of times WAS could not start a worker process.",
+                "failures",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_APPLICATION_TOTAL_PROCESS_STARTUP_FAILURES,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_app_worker_process_startup_failures =
+                rrddim_add(p->st_app_worker_process_startup_failures, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_app_worker_process_startup_failures->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_app_worker_process_startup_failures,
+            p->rd_app_worker_process_startup_failures,
+            (collected_number)p->APPWorkerProcessStartupFailures.current.Data);
+
+        rrdset_done(p->st_app_worker_process_startup_failures);
+    }
+}
+
 static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "APP_POOL_WAS");
@@ -1303,9 +1344,10 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         app_pool_recycles(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_total_upime(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_process_created(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_process_failures(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_total_process_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_process_ping_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_process_shutdown_failures(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_process_startup_failures(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
