@@ -174,6 +174,11 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
         buffer_json_member_add_uint64(wb, "restarts", ds->restarts);
 
+        if(ds->v >= 22) {
+            buffer_json_member_add_uint64(wb, "posts", ds->posts);
+            buffer_json_member_add_string(wb, "aclk", CLOUD_STATUS_2str(ds->cloud_status));
+        }
+
         ND_PROFILE_2json(wb, "profile", ds->profile);
         buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
         EXIT_REASON_2json(wb, "exit_reason", ds->exit_reason);
@@ -337,6 +342,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v18 = version >= 18 ? strict : false;
     bool required_v20 = version >= 20 ? strict : false;
     bool required_v21 = version >= 21 ? strict : false;
+    bool required_v22 = version >= 22 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -377,6 +383,11 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
         if(version >= 4)
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, restarts_key, ds->restarts, error, required_v4);
+
+        if(version >= 22) {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "posts", ds->posts, error, required_v22);
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "aclk", CLOUD_STATUS_2id, ds->cloud_status, error, required_v22);
+        }
 
         if(version >= 14) {
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, db_mode_key, rrd_memory_mode_id, ds->db_mode, error, required_v14);
@@ -569,10 +580,11 @@ static void daemon_status_file_migrate_once(void) {
     strncpyz(session_status.cloud_instance_type, last_session_status.cloud_instance_type, sizeof(session_status.cloud_instance_type) - 1);
     strncpyz(session_status.cloud_instance_region, last_session_status.cloud_instance_region, sizeof(session_status.cloud_instance_region) - 1);
 
+    session_status.posts = last_session_status.posts;
     session_status.restarts = last_session_status.restarts + 1;
     session_status.reliability = last_session_status.reliability;
 
-    if(daemon_status_file_has_last_crashed())  {
+    if(daemon_status_file_has_last_crashed(&last_session_status))  {
         if(session_status.reliability > 0) session_status.reliability = 0;
         session_status.reliability--;
     }
@@ -627,6 +639,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
+    session_status.cloud_status = cloud_status();
 
     session_status.oom_protection = dbengine_out_of_memory_protection;
     session_status.netdata_max_rss = process_max_rss();
@@ -990,7 +1003,34 @@ struct post_status_file_thread_data {
     DAEMON_STATUS_FILE *status;
 };
 
-void post_status_file(struct post_status_file_thread_data *d) {
+static const char *agent_health(DAEMON_STATUS_FILE *ds) {
+    if(daemon_status_file_has_last_crashed(ds)) {
+        // it crashed
+
+        if(ds->restarts == 1)
+            return "crash-first";
+        else if(ds->reliability <= -2)
+            return "crash-loop";
+        else if(ds->reliability < 0)
+            return "crash-repeated";
+        else
+            return "crash-entered";
+    }
+
+    // it didn't crash
+    if(ds->restarts == 1)
+        return "healthy-first";
+    else if(ds->reliability >= 2)
+        return "healthy-loop";
+    else if(ds->reliability > 0)
+        return "healthy-repeated";
+    else
+        return "healthy-recovered";
+}
+
+static void post_status_file(struct post_status_file_thread_data *d) {
+    daemon_status_file_startup_step("startup(crash reports json)");
+
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_string(wb, "exit_cause", d->cause);
@@ -1001,6 +1041,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_boolean(wb, "host_memory_critical",
                                    OS_SYSTEM_MEMORY_OK(d->status->memory) && d->status->memory.ram_available_bytes <= d->status->oom_protection);
     buffer_json_member_add_uint64(wb, "host_memory_free_percent", (uint64_t)round(os_system_memory_available_percent(d->status->memory)));
+    buffer_json_member_add_string(wb, "agent_health", agent_health(d->status));
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
@@ -1009,6 +1050,8 @@ void post_status_file(struct post_status_file_thread_data *d) {
     CURL *curl = curl_easy_init();
     if(!curl)
         return;
+
+    daemon_status_file_startup_step("startup(crash reports curl)");
 
     curl_easy_setopt(curl, CURLOPT_URL, "https://agent-events.netdata.cloud/agent-events");
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -1020,10 +1063,17 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
+        daemon_status_file_startup_step("startup(crash reports dedup)");
+        nd_log(NDLS_DAEMON, NDLP_INFO, "Posted last status to agent-events successfully.");
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash, false);
+        session_status.posts++;
         daemon_status_file_save(wb, &session_status, true);
     }
+    else
+        nd_log(NDLS_DAEMON, NDLP_INFO, "Failed to post last status to agent-events.");
+
+    daemon_status_file_startup_step("startup(crash reports cleanup)");
 
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
@@ -1311,18 +1361,24 @@ void daemon_status_file_check_crash(void) {
            "Last exit status: %s (%s):\n\n%s",
            NETDATA_VERSION, msg, cause, buffer_tostring(wb));
 
+    daemon_status_file_startup_step("startup(crash reports check)");
+
     enum crash_report_t r = check_crash_reports_config();
     if( // must be first for netdata.conf option to be used
         (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
 
-        // we have a previous status, or
-        // (we managed to save the current one, and (we have more than 2 restarts, or this is not a CI run))
-        (!no_previous_status || (daemon_status_file_saved && (last_session_status.restarts > 2 || !is_ci()))) &&
+        // we have a previous status, or we managed to save the current one
+        (!no_previous_status || daemon_status_file_saved) &&
+
+        // we have more than 2 restarts, or this is not a CI run
+        (last_session_status.restarts > 2 || !is_ci()) &&
 
         // we have not reported this
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
 
         ) {
+        daemon_status_file_startup_step("startup(crash reports prep)");
+
         netdata_conf_ssl();
 
         if(no_previous_status) {
@@ -1545,9 +1601,11 @@ void daemon_status_file_shutdown_step(const char *step) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-bool daemon_status_file_has_last_crashed(void) {
-    return (last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED) ||
-           !is_exit_reason_normal(last_session_status.exit_reason);
+bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds) {
+    if(!ds) ds = &last_session_status;
+
+    return (ds->status != DAEMON_STATUS_NONE && ds->status != DAEMON_STATUS_EXITED) ||
+           !is_exit_reason_normal(ds->exit_reason);
 }
 
 bool daemon_status_file_was_incomplete_shutdown(void) {

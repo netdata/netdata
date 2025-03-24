@@ -6,8 +6,9 @@
 #include "libnetdata/libnetdata.h"
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
+#include "claim/cloud-status.h"
 
-#define STATUS_FILE_VERSION 21
+#define STATUS_FILE_VERSION 22
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -37,6 +38,7 @@ typedef struct daemon_status_file {
     ND_PROFILE profile;         // the profile of the agent
     DAEMON_OS_TYPE os_type;
     RRD_DB_MODE db_mode;
+    CLOUD_STATUS cloud_status;
     uint8_t db_tiers;
     bool kubernetes;
     bool sentry_available;      // true when sentry support is compiled in
@@ -45,6 +47,7 @@ typedef struct daemon_status_file {
     time_t uptime;              // netdata uptime
     usec_t timestamp_ut;        // the timestamp of the status file
     size_t restarts;            // the number of times this agent has restarted (ever)
+    size_t posts;               // the number of posts to the backend
     ssize_t reliability;        // consecutive restarts: > 0 reliable, < 0 crashing
 
     ND_UUID boot_id;            // the boot id of the system
@@ -116,7 +119,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 // check for a crash
 void daemon_status_file_check_crash(void);
 
-bool daemon_status_file_has_last_crashed(void);
+bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds);
 bool daemon_status_file_was_incomplete_shutdown(void);
 
 void daemon_status_file_startup_step(const char *step);

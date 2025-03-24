@@ -97,7 +97,7 @@ static void bt_error_handler(void *data, const char *msg, int errnum) {
 }
 
 // Full callback for libbacktrace
-static int bt_full_handler(void *data, uintptr_t pc,
+static int bt_full_handler(void *data, uintptr_t pc __maybe_unused,
                            const char *filename, int lineno,
                            const char *function) {
     backtrace_data_t *bt_data = (backtrace_data_t *)data;
