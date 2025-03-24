@@ -1050,7 +1050,7 @@ static inline void app_pool_total_upime(
                 "seconds",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
-                PRIO_WEBSITE_IIS_APPLICATION_RECYCLES,
+                PRIO_WEBSITE_IIS_APPLICATION_TOTAL_UPTIME,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1066,6 +1066,46 @@ static inline void app_pool_total_upime(
             (collected_number)p->APPTotalApplicationPoolUptime.current.Data);
 
         rrdset_done(p->st_app_application_pool_uptime);
+    }
+}
+
+static inline void app_pool_process_created(
+    struct iis_app *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessCreated)) {
+        if (!p->st_app_worker_process_created) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_worker_process_created", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_app_worker_process_created = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "pool",
+                "iis.application_pool_total_worker_process_created",
+                "Total worker process created.",
+                "process",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_APPLICATION_TOTAL_WORKER_PROCESS,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_app_worker_process_created =
+                rrddim_add(p->st_app_worker_process_created, "process", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_app_worker_process_created->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_app_worker_process_created,
+            p->rd_app_worker_process_created,
+            (collected_number)p->APPWorkerProcessCreated.current.Data);
+
+        rrdset_done(p->st_app_worker_process_created);
     }
 }
 
@@ -1098,6 +1138,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         app_pool_time_since_process_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_recycles(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_total_upime(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_process_created(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
