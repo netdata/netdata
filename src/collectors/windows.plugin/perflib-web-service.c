@@ -1040,7 +1040,7 @@ static inline void app_pool_total_was_upime(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    time_t unning = time(NULL);
+    time_t running = time(NULL);
     if (running < 0)
         return;
 
