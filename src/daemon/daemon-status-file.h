@@ -6,6 +6,7 @@
 #include "libnetdata/libnetdata.h"
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
+#include "claim/cloud-status.h"
 
 #define STATUS_FILE_VERSION 22
 
@@ -37,6 +38,7 @@ typedef struct daemon_status_file {
     ND_PROFILE profile;         // the profile of the agent
     DAEMON_OS_TYPE os_type;
     RRD_DB_MODE db_mode;
+    CLOUD_STATUS cloud_status;
     uint8_t db_tiers;
     bool kubernetes;
     bool sentry_available;      // true when sentry support is compiled in

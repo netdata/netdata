@@ -174,8 +174,10 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
         buffer_json_member_add_uint64(wb, "restarts", ds->restarts);
 
-        if(ds->v >= 22)
+        if(ds->v >= 22) {
             buffer_json_member_add_uint64(wb, "posts", ds->posts);
+            buffer_json_member_add_string(wb, "aclk", CLOUD_STATUS_2str(ds->cloud_status));
+        }
 
         ND_PROFILE_2json(wb, "profile", ds->profile);
         buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
@@ -382,8 +384,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 4)
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, restarts_key, ds->restarts, error, required_v4);
 
-        if(version >= 22)
+        if(version >= 22) {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "posts", ds->posts, error, required_v22);
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "aclk", CLOUD_STATUS_2id, ds->cloud_status, error, required_v22);
+        }
 
         if(version >= 14) {
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, db_mode_key, rrd_memory_mode_id, ds->db_mode, error, required_v14);
@@ -635,6 +639,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
+    session_status.cloud_status = cloud_status();
 
     session_status.oom_protection = dbengine_out_of_memory_protection;
     session_status.netdata_max_rss = process_max_rss();

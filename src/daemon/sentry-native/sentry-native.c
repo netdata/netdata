@@ -46,7 +46,7 @@ static void nd_sentry_set_tag_uint64(const char *key, uint64_t value) {
     nd_sentry_set_tag(key, buf);
 }
 
-static void nd_sentry_set_tag_uuid(const char *key, const ND_UUID uuid) {
+static inline void nd_sentry_set_tag_uuid(const char *key, const ND_UUID uuid) {
     if(UUIDiszero(uuid))
         return;
 

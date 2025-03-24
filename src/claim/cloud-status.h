@@ -3,7 +3,8 @@
 #ifndef NETDATA_CLOUD_STATUS_H
 #define NETDATA_CLOUD_STATUS_H
 
-#include "daemon/common.h"
+#include "libnetdata/libnetdata.h"
+#include "claim/cloud-status.h"
 
 typedef enum __attribute__((packed)) {
     CLOUD_STATUS_AVAILABLE = 1,     // cloud and aclk functionality is available, but the agent is not claimed
@@ -14,7 +15,8 @@ typedef enum __attribute__((packed)) {
     CLOUD_STATUS_ONLINE,            // the agent is connected to cloud
 } CLOUD_STATUS;
 
-const char *cloud_status_to_string(CLOUD_STATUS status);
+ENUM_STR_DEFINE_FUNCTIONS_EXTERN(CLOUD_STATUS);
+
 CLOUD_STATUS cloud_status(void);
 
 time_t cloud_last_change(void);
