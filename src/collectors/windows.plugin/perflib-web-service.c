@@ -98,55 +98,55 @@ struct ad_was {
     RRDSET *st_app_current_application_pool_state;
     RRDDIM *rd_app_current_application_pool_state;
 
-    RRDSET *st_was_current_application_pool_uptime;
-    RRDDIM *rd_was_current_application_pool_uptime;
+    RRDSET *st_app_current_application_pool_uptime;
+    RRDDIM *rd_app_current_application_pool_uptime;
 
-    RRDSET *st_was_current_worker_process;
-    RRDDIM *rd_was_current_worker_process;
+    RRDSET *st_app_current_worker_process;
+    RRDDIM *rd_app_current_worker_process;
 
-    RRDSET *st_was_maximum_worker_process;
-    RRDDIM *rd_was_maximum_worker_process;
+    RRDSET *st_app_maximum_worker_process;
+    RRDDIM *rd_app_maximum_worker_process;
 
-    RRDSET *st_was_recent_worker_process_failure;
-    RRDDIM *rd_was_recent_worker_process_failure;
+    RRDSET *st_app_recent_worker_process_failure;
+    RRDDIM *rd_app_recent_worker_process_failure;
 
-    RRDSET *st_was_time_since_process_failure;
-    RRDDIM *rd_was_time_since_process_failure;
+    RRDSET *st_app_time_since_process_failure;
+    RRDDIM *rd_app_time_since_process_failure;
 
-    RRDSET *st_was_application_pool_recycles;
-    RRDDIM *rd_was_application_pool_recycles;
+    RRDSET *st_app_application_pool_recycles;
+    RRDDIM *rd_app_application_pool_recycles;
 
-    RRDSET *st_was_application_pool_uptime;
-    RRDDIM *rd_was_application_pool_uptime;
+    RRDSET *st_app_application_pool_uptime;
+    RRDDIM *rd_app_application_pool_uptime;
 
-    RRDSET *st_was_worker_process_created;
-    RRDDIM *rd_was_worker_process_created;
+    RRDSET *st_app_worker_process_created;
+    RRDDIM *rd_app_worker_process_created;
 
-    RRDSET *st_was_worker_process_failures;
-    RRDDIM *rd_was_worker_process_failures;
+    RRDSET *st_app_worker_process_failures;
+    RRDDIM *rd_app_worker_process_failures;
 
-    RRDSET *st_was_worker_process_ping_failures;
-    RRDDIM *rd_was_worker_process_ping_failures;
+    RRDSET *st_app_worker_process_ping_failures;
+    RRDDIM *rd_app_worker_process_ping_failures;
 
-    RRDSET *st_was_worker_process_shutdown_failures;
-    RRDDIM *rd_was_worker_process_shutdown_failures;
+    RRDSET *st_app_worker_process_shutdown_failures;
+    RRDDIM *rd_app_worker_process_shutdown_failures;
 
-    RRDSET *st_was_worker_process_startup_failures;
-    RRDDIM *rd_was_worker_process_startup_failures;
+    RRDSET *st_app_worker_process_startup_failures;
+    RRDDIM *rd_app_worker_process_startup_failures;
 
     COUNTER_DATA APPCurrentApplicationPoolState;
-    COUNTER_DATA WASCurrentApplicationPoolUptime;
-    COUNTER_DATA WASCurrentWorkerProcess;
-    COUNTER_DATA WASMaximumWorkerProcess;
-    COUNTER_DATA WASRecentWorkerProcessFailure;
-    COUNTER_DATA WASTimeSinceProcessFailure;
-    COUNTER_DATA WASApplicationPoolRecycles;
-    COUNTER_DATA WASTotalApplicationPoolUptime;
-    COUNTER_DATA WAStWorkerProcessCreated;
-    COUNTER_DATA WAStWorkerProcessFailures;
-    COUNTER_DATA WAStWorkerProcessPingFailures;
-    COUNTER_DATA WAStWorkerProcessShutdownFailures;
-    COUNTER_DATA WAStWorkerProcessStartupFailures;
+    COUNTER_DATA APPCurrentApplicationPoolUptime;
+    COUNTER_DATA APPCurrentWorkerProcess;
+    COUNTER_DATA APPMaximumWorkerProcess;
+    COUNTER_DATA APPRecentWorkerProcessFailure;
+    COUNTER_DATA APPTimeSinceProcessFailure;
+    COUNTER_DATA APPApplicationPoolRecycles;
+    COUNTER_DATA APPTotalApplicationPoolUptime;
+    COUNTER_DATA APPtWorkerProcessCreated;
+    COUNTER_DATA APAPPorkerProcessFailures;
+    COUNTER_DATA APPtWorkerProcessPingFailures;
+    COUNTER_DATA APPtWorkerProcessShutdownFailures;
+    COUNTER_DATA APPtWorkerProcessStartupFailures;
 };
 
 static inline void initialize_web_service_keys(struct web_service *p)
@@ -191,27 +191,27 @@ void dict_web_service_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     initialize_web_service_keys(p);
 }
 
-static inline void initialize_app_was_keys(struct ad_was *p)
+static inline void initialize_app_pool_keys(struct ad_was *p)
 {
     p->APPCurrentApplicationPoolState.key = "Current Application Pool State";
-    p->WASCurrentApplicationPoolUptime.key = "Current Application Pool Uptime";
-    p->WASCurrentWorkerProcess.key = "Current Worker Processes";
-    p->WASMaximumWorkerProcess.key = "Maximum Worker Processes";
-    p->WASRecentWorkerProcessFailure.key = "Recent Worker Process Failures";
-    p->WASTimeSinceProcessFailure.key = "Time Since Last Worker Process Failure";
-    p->WASApplicationPoolRecycles.key = "Total Application Pool Recycles";
-    p->WASTotalApplicationPoolUptime.key = "Total Application Pool Uptime";
-    p->WAStWorkerProcessCreated.key = "Total Worker Processes Created";
-    p->WAStWorkerProcessFailures.key = "Total Worker Process Failures";
-    p->WAStWorkerProcessPingFailures.key = "Total Worker Process Ping Failures";
-    p->WAStWorkerProcessShutdownFailures.key = "Total Worker Process Shutdown Failures";
-    p->WAStWorkerProcessStartupFailures.key = "Total Worker Process Startup Failures";
+    p->APPCurrentApplicationPoolUptime.key = "Current Application Pool Uptime";
+    p->APPCurrentWorkerProcess.key = "Current Worker Processes";
+    p->APPMaximumWorkerProcess.key = "Maximum Worker Processes";
+    p->APPRecentWorkerProcessFailure.key = "Recent Worker Process Failures";
+    p->APPTimeSinceProcessFailure.key = "Time Since Last Worker Process Failure";
+    p->APPApplicationPoolRecycles.key = "Total Application Pool Recycles";
+    p->APPTotalApplicationPoolUptime.key = "Total Application Pool Uptime";
+    p->APPtWorkerProcessCreated.key = "Total Worker Processes Created";
+    p->APPtWorkerProcessFailures.key = "Total Worker Process Failures";
+    p->APPtWorkerProcessPingFailures.key = "Total Worker Process Ping Failures";
+    p->APPtWorkerProcessShutdownFailures.key = "Total Worker Process Shutdown Failures";
+    p->APPtWorkerProcessStartupFailures.key = "Total Worker Process Startup Failures";
 }
 
-void dict_app_was_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+void dict_app_pool_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct ad_was *p = value;
-    initialize_app_was_keys(p);
+    initialize_app_pool_keys(p);
 }
 
 static DICTIONARY *web_services = NULL;
@@ -229,7 +229,7 @@ static void initialize(void)
     app_pool_was = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct ad_was));
 
-    dictionary_register_insert_callback(app_pool_was, dict_app_was_insert_cb, NULL);
+    dictionary_register_insert_callback(app_pool_was, dict_app_pool_insert_cb, NULL);
 }
 
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
@@ -743,7 +743,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
     return true;
 }
 
-static bool do_was_app(PERF_DATA_BLOCK *pDataBlock, int update_every)
+static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "APP_POOL_WAS");
@@ -830,7 +830,7 @@ int do_PerflibWebService(int update_every, usec_t dt __maybe_unused)
     int ret = 0;
 #define TOTAL_NUMBER_OF_FAILURES -2
     ret += iis_web_service("Web Service", update_every, do_web_services);
-    ret += iis_web_service("APP_POOL_WAS", update_every, do_was_app);
+    ret += iis_web_service("APP_POOL_WAS", update_every, do_app_pool);
 
     return (ret == TOTAL_NUMBER_OF_FAILURES) ? -1 : 0;
 }
