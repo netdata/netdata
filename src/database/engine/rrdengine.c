@@ -1804,7 +1804,16 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
 
         dbengine_initialize_structures();
 
-        fatal_assert(0 == uv_thread_create(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main));
+        int retries = 0;
+        int create_uv_thread_rc = create_uv_thread(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main, &retries);
+        if (create_uv_thread_rc)
+            nd_log_daemon(NDLP_ERR, "Failed to create DBENGINE thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
+
+        fatal_assert(0 == create_uv_thread_rc);
+
+        if (retries)
+            nd_log_daemon(NDLP_WARNING, "DBENGINE thread was created after %d attempts", retries);
+
         spawned = true;
     }
 

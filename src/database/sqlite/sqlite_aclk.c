@@ -890,7 +890,17 @@ static void aclk_synchronization_init(void)
 {
     memset(&aclk_sync_config, 0, sizeof(aclk_sync_config));
     completion_init(&aclk_sync_config.start_stop_complete);
-    fatal_assert(0 == uv_thread_create(&aclk_sync_config.thread, aclk_synchronization, &aclk_sync_config));
+
+    int retries = 0;
+    int create_uv_thread_rc = create_uv_thread(&aclk_sync_config.thread, aclk_synchronization, &aclk_sync_config, &retries);
+    if (create_uv_thread_rc)
+        nd_log_daemon(NDLP_ERR, "Failed to create ACLK synchronization thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
+
+    fatal_assert(0 == create_uv_thread_rc);
+
+    if (retries)
+        nd_log_daemon(NDLP_WARNING, "ACLK synchronization thread was created after %d attempts", retries);
+
     completion_wait_for(&aclk_sync_config.start_stop_complete);
     completion_destroy(&aclk_sync_config.start_stop_complete);
 }

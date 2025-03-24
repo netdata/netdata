@@ -1984,8 +1984,11 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
             hclt[thread_index].host = host;
             rc = uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]);
             async_exec += (rc == 0);
+            // if it failed, mark the thread slot as free
+            if (rc)
+                __atomic_store_n(&hclt[thread_index].busy, false, __ATOMIC_RELAXED);
         }
-        // if single thread, thread creation failure or failure to find slot
+        // if single thread, thread creation failure or failure tofind slot
         if (rc || !thread_found) {
             sync_exec++;
             struct host_context_load_thread hclt_sync = {.host = host};
@@ -2762,7 +2765,15 @@ void metadata_sync_init(void)
     memset(&metasync_worker, 0, sizeof(metasync_worker));
     completion_init(&metasync_worker.start_stop_complete);
 
-    fatal_assert(0 == uv_thread_create(&metasync_worker.thread, metadata_event_loop, &metasync_worker));
+    int retries = 0;
+    int create_uv_thread_rc = create_uv_thread(&metasync_worker.thread, metadata_event_loop, &metasync_worker, &retries);
+    if (create_uv_thread_rc)
+        nd_log_daemon(NDLP_ERR, "Failed to create SQLite metadata sync thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
+
+    fatal_assert(0 == create_uv_thread_rc);
+
+    if (retries)
+        nd_log_daemon(NDLP_WARNING, "SQLite metadata sync thread was created after %d attempts", retries);
 
     completion_wait_for(&metasync_worker.start_stop_complete);
     completion_destroy(&metasync_worker.start_stop_complete);
