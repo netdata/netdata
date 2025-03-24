@@ -174,6 +174,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
         buffer_json_member_add_uint64(wb, "restarts", ds->restarts);
 
+        if(ds->v >= 22)
+            buffer_json_member_add_uint64(wb, "posts", ds->posts);
+
         ND_PROFILE_2json(wb, "profile", ds->profile);
         buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
         EXIT_REASON_2json(wb, "exit_reason", ds->exit_reason);
@@ -337,6 +340,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v18 = version >= 18 ? strict : false;
     bool required_v20 = version >= 20 ? strict : false;
     bool required_v21 = version >= 21 ? strict : false;
+    bool required_v22 = version >= 22 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -377,6 +381,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
         if(version >= 4)
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, restarts_key, ds->restarts, error, required_v4);
+
+        if(version >= 22)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "posts", ds->posts, error, required_v22);
 
         if(version >= 14) {
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, db_mode_key, rrd_memory_mode_id, ds->db_mode, error, required_v14);
@@ -569,6 +576,7 @@ static void daemon_status_file_migrate_once(void) {
     strncpyz(session_status.cloud_instance_type, last_session_status.cloud_instance_type, sizeof(session_status.cloud_instance_type) - 1);
     strncpyz(session_status.cloud_instance_region, last_session_status.cloud_instance_region, sizeof(session_status.cloud_instance_region) - 1);
 
+    session_status.posts = last_session_status.posts;
     session_status.restarts = last_session_status.restarts + 1;
     session_status.reliability = last_session_status.reliability;
 
@@ -1049,6 +1057,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
         nd_log(NDLS_DAEMON, NDLP_INFO, "Posted last status to agent-events successfully.");
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash, false);
+        session_status.posts++;
         daemon_status_file_save(wb, &session_status, true);
     }
     else
