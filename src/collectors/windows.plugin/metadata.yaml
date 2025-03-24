@@ -1143,6 +1143,24 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+        - name: IIS APP pool WAS
+          description: "These metrics refer to the IIS application pool WAS (Windows Process Activation Service)."
+          labels:
+            - name: app
+              description: The name of the Application Pool.
+          metrics:
+            - name: iis.application_pool_current_state
+              description: The current status of the application pool (1 - Uninitialized, 2 - Initialized, 3 - Running, 4 - Disabling, 5 - Disabled, 6 - Shutdown Pending, 7 - Delete Pending)
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: state
+            - name: iis.application_pool_uptime
+              description: Total duration the application pool has been running.
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: seconds
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV

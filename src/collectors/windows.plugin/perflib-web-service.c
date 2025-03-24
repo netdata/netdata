@@ -794,15 +794,15 @@ static inline void app_pool_current_uptime(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentApplicationPoolUptime)) {
         if (!p->st_app_current_application_pool_uptime) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_start_time", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_uptime", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_current_application_pool_uptime = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
                 "pool",
-                "iis.application_pool_start_time",
-                "The Unix epoch for the application pool start time.",
+                "iis.application_pool_uptime",
+                "Total duration the application pool has been running.",
                 "seconds",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -816,12 +816,16 @@ static inline void app_pool_current_uptime(
                 p->st_app_current_application_pool_uptime->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
-        rrddim_set_by_pointer(
-            p->st_app_current_application_pool_uptime,
-            p->rd_app_current_application_pool_uptime,
-            (collected_number)p->APPCurrentApplicationPoolUptime.current.Data);
+        time_t running = time(NULL);
+        if (running > 0) {
+            running -= (time_t)p->APPCurrentApplicationPoolUptime.current.Data;
+            rrddim_set_by_pointer(
+                p->st_app_current_application_pool_uptime,
+                p->rd_app_current_application_pool_uptime,
+                (collected_number)running);
 
-        rrdset_done(p->st_app_current_application_pool_uptime);
+            rrdset_done(p->st_app_current_application_pool_uptime);
+        }
     }
 }
 
