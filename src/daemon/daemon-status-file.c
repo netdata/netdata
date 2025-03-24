@@ -418,10 +418,6 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 18) {
             JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "reliability", ds->reliability, error, required_v18);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "stack_traces", ds->stack_traces, error, required_v18);
-
-            char buf[UINT64_HEX_MAX_LENGTH];
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
-            ds->fatal.fault_address = str2ull_encoded(buf);
         }
     });
 
@@ -495,8 +491,13 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 17)
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "sentry", SIGNAL_CODE_2id_h, ds->fatal.sentry, error, required_v17);
 
-        if(version >= 18)
+        if(version >= 18) {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "thread_id", ds->fatal.thread_id, error, required_v18);
+
+            char buf[UINT64_HEX_MAX_LENGTH];
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
+            ds->fatal.fault_address = str2ull_encoded(buf);
+        }
     });
 
     // Parse the last posted object
