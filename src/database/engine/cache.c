@@ -1018,8 +1018,10 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
 
     PGC_PAGE *found_page = *page_ptr;
     if(unlikely(found_page != page))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, but the index returned a different address.",
-              page->start_time_s, page->metric_id, page->section);
+        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, "
+              "but the index returned a different address (expected %p, got %p).",
+              page->start_time_s, page->metric_id, page->section,
+              page, found_page);
 
     JudyAllocThreadPulseReset();
 
