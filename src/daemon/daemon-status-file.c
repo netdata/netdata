@@ -572,7 +572,7 @@ static void daemon_status_file_migrate_once(void) {
     session_status.restarts = last_session_status.restarts + 1;
     session_status.reliability = last_session_status.reliability;
 
-    if(daemon_status_file_has_last_crashed())  {
+    if(daemon_status_file_has_last_crashed(&last_session_status))  {
         if(session_status.reliability > 0) session_status.reliability = 0;
         session_status.reliability--;
     }
@@ -990,6 +990,31 @@ struct post_status_file_thread_data {
     DAEMON_STATUS_FILE *status;
 };
 
+static const char *agent_health(DAEMON_STATUS_FILE *ds) {
+    if(daemon_status_file_has_last_crashed(ds)) {
+        // it crashed
+
+        if(ds->restarts == 1)
+            return "crash-first";
+        else if(ds->reliability <= -2)
+            return "crash-loop";
+        else if(ds->reliability < 0)
+            return "crash-repeated";
+        else
+            return "crash-entered";
+    }
+
+    // it didn't crash
+    if(ds->restarts == 1)
+        return "healthy-first";
+    else if(ds->reliability >= 2)
+        return "healthy-loop";
+    else if(ds->reliability > 0)
+        return "healthy-repeated";
+    else
+        return "healthy-recovered";
+}
+
 void post_status_file(struct post_status_file_thread_data *d) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
@@ -1001,6 +1026,7 @@ void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_boolean(wb, "host_memory_critical",
                                    OS_SYSTEM_MEMORY_OK(d->status->memory) && d->status->memory.ram_available_bytes <= d->status->oom_protection);
     buffer_json_member_add_uint64(wb, "host_memory_free_percent", (uint64_t)round(os_system_memory_available_percent(d->status->memory)));
+    buffer_json_member_add_string(wb, "agent_health", agent_health(d->status));
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
@@ -1545,9 +1571,11 @@ void daemon_status_file_shutdown_step(const char *step) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-bool daemon_status_file_has_last_crashed(void) {
-    return (last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED) ||
-           !is_exit_reason_normal(last_session_status.exit_reason);
+bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds) {
+    if(!ds) ds = &last_session_status;
+
+    return (ds->status != DAEMON_STATUS_NONE && ds->status != DAEMON_STATUS_EXITED) ||
+           !is_exit_reason_normal(ds->exit_reason);
 }
 
 bool daemon_status_file_was_incomplete_shutdown(void) {

@@ -1105,7 +1105,7 @@ int netdata_main(int argc, char **argv) {
 
         analytics_statistic_t start_statistic = {"START", "-", "-"};
         analytics_statistic_send(&start_statistic);
-        if (daemon_status_file_has_last_crashed()) {
+        if (daemon_status_file_has_last_crashed(NULL)) {
             analytics_statistic_t crash_statistic = {"CRASH", "-", "-"};
             analytics_statistic_send(&crash_statistic);
         }

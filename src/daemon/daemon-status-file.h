@@ -7,7 +7,7 @@
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
 
-#define STATUS_FILE_VERSION 21
+#define STATUS_FILE_VERSION 22
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -116,7 +116,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 // check for a crash
 void daemon_status_file_check_crash(void);
 
-bool daemon_status_file_has_last_crashed(void);
+bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds);
 bool daemon_status_file_was_incomplete_shutdown(void);
 
 void daemon_status_file_startup_step(const char *step);
