@@ -249,13 +249,13 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
 
 static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
     RRDSET *st = rc->rrdset;
+    if(!st) return;
 
     if (!exit_initiated_get()) {
-        RRDHOST *host = st->rrdhost;
-
         time_t now = now_realtime_sec();
 
         if (likely(rc->status != RRDCALC_STATUS_REMOVED)) {
+            RRDHOST *host = st->rrdhost;
             ALARM_ENTRY *ae = health_create_alarm_entry(
                 host,
                 rc,
@@ -278,6 +278,8 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
 
     if(rc->prev)
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
+
+    rc->rrdset = NULL;
 
     if(!having_ll_wrlock)
         rw_spinlock_write_unlock(&st->alerts.spinlock);
