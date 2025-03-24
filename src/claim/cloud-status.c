@@ -20,7 +20,7 @@ CLOUD_STATUS cloud_status(void) {
         return CLOUD_STATUS_BANNED;
 
     if(likely(aclk_online())) {
-        if (rrdhost_flag_check(localhost, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS))
+        if (localhost && rrdhost_flag_check(localhost, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS))
             return CLOUD_STATUS_ONLINE;
         else
             return CLOUD_STATUS_CONNECTING;
