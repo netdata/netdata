@@ -835,7 +835,7 @@ int do_PerflibWebService(int update_every, usec_t dt __maybe_unused)
     }
 
     int ret = 0;
-#define TOTAL_NUMBER_OF_FAILURES -2
+#define TOTAL_NUMBER_OF_FAILURES (-2)
     ret += iis_web_service("Web Service", update_every, do_web_services);
     ret += iis_web_service("APP_POOL_WAS", update_every, do_app_pool);
 
