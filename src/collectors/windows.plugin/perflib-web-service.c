@@ -142,8 +142,8 @@ struct ad_was {
     COUNTER_DATA APPTimeSinceProcessFailure;
     COUNTER_DATA APPApplicationPoolRecycles;
     COUNTER_DATA APPTotalApplicationPoolUptime;
-    COUNTER_DATA APPtWorkerProcessCreated;
-    COUNTER_DATA APAPPorkerProcessFailures;
+    COUNTER_DATA APPWorkerProcessCreated;
+    COUNTER_DATA APPWorkerProcessFailures;
     COUNTER_DATA APPtWorkerProcessPingFailures;
     COUNTER_DATA APPtWorkerProcessShutdownFailures;
     COUNTER_DATA APPtWorkerProcessStartupFailures;
@@ -201,8 +201,8 @@ static inline void initialize_app_pool_keys(struct ad_was *p)
     p->APPTimeSinceProcessFailure.key = "Time Since Last Worker Process Failure";
     p->APPApplicationPoolRecycles.key = "Total Application Pool Recycles";
     p->APPTotalApplicationPoolUptime.key = "Total Application Pool Uptime";
-    p->APPtWorkerProcessCreated.key = "Total Worker Processes Created";
-    p->APPtWorkerProcessFailures.key = "Total Worker Process Failures";
+    p->APPWorkerProcessCreated.key = "Total Worker Processes Created";
+    p->APPWorkerProcessFailures.key = "Total Worker Process Failures";
     p->APPtWorkerProcessPingFailures.key = "Total Worker Process Ping Failures";
     p->APPtWorkerProcessShutdownFailures.key = "Total Worker Process Shutdown Failures";
     p->APPtWorkerProcessStartupFailures.key = "Total Worker Process Startup Failures";
@@ -835,9 +835,11 @@ int do_PerflibWebService(int update_every, usec_t dt __maybe_unused)
     }
 
     int ret = 0;
-#define TOTAL_NUMBER_OF_FAILURES (-2)
-    ret += iis_web_service("Web Service", update_every, do_web_services);
-    ret += iis_web_service("APP_POOL_WAS", update_every, do_app_pool);
+#define TOTAL_NUMBER_OF_FAILURES (2)
+    if (iis_web_service("Web Service", update_every, do_web_services))
+        ret++;
+    if (iis_web_service("APP_POOL_WAS", update_every, do_app_pool))
+        ret++;
 
     return (ret == TOTAL_NUMBER_OF_FAILURES) ? -1 : 0;
 }
