@@ -1161,6 +1161,72 @@ modules:
               chart_type: line
               dimensions:
                 - name: seconds
+            - name: iis.application_pool_current_worker_process
+              description: Process running in application pool.
+              unit: "process"
+              chart_type: line
+              dimensions:
+                - name: process
+            - name: iis.application_pool_maximum_worker_process
+              description: Maximum number of worker processes created.
+              unit: "process"
+              chart_type: line
+              dimensions:
+                - name: process
+            - name: iis.application_pool_worker_process_failures
+              description: Failures during the rapid-fail protection interval.
+              unit: "failures"
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: iis.application_pool_time_since_failure
+              description: The length of time since the last worker process failure.
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: seconds
+            - name: iis.application_pool_recycles
+              description: Number of times application pool has been recycled since WAS started.
+              unit: "recycles"
+              chart_type: line
+              dimensions:
+                - name: recycles
+            - name: iis.application_pool_was_uptime
+              description: Period of time since WAS has been started.
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: seconds
+            - name: iis.application_pool_was_worker_process_created
+              description: Total worker process created since WAS started.
+              unit: "process"
+              chart_type: line
+              dimensions:
+                - name: process
+            - name: iis.application_pool_total_worker_process_failures
+              description: Total number of time process have creashed since application pool started.
+              unit: "failures"
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: iis.application_pool_process_ping_failure
+              description: Total number of times WAS did not receive an answer from a ping message.
+              unit: "failures"
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: iis.application_pool_shutdown_failures
+              description: Total number of times WAS could not shutdown a worker process.
+              unit: "failures"
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: iis.application_pool_startup_failures
+              description: Total number of times WAS could not start a worker process.
+              unit: "failures"
+              chart_type: line
+              dimensions:
+                - name: failures
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
