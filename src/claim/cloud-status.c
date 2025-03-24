@@ -3,12 +3,11 @@
 #include "claim.h"
 
 ENUM_STR_MAP_DEFINE(CLOUD_STATUS) = {
+    { CLOUD_STATUS_ONLINE, "online"},
+    { CLOUD_STATUS_INDIRECT, "indirect"},
     { CLOUD_STATUS_AVAILABLE, "available"},
     { CLOUD_STATUS_BANNED, "banned"},
     { CLOUD_STATUS_OFFLINE, "offline"},
-    { CLOUD_STATUS_ONLINE, "online"},
-    { CLOUD_STATUS_CONNECTING, "connecting"},
-    { CLOUD_STATUS_INDIRECT, "indirect"},
 
     // terminator
     { 0, NULL },
@@ -19,12 +18,8 @@ CLOUD_STATUS cloud_status(void) {
     if(unlikely(aclk_disable_runtime))
         return CLOUD_STATUS_BANNED;
 
-    if(likely(aclk_online())) {
-        if (localhost && rrdhost_flag_check(localhost, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS))
-            return CLOUD_STATUS_ONLINE;
-        else
-            return CLOUD_STATUS_CONNECTING;
-    }
+    if(likely(aclk_online()))
+        return CLOUD_STATUS_ONLINE;
 
     if(localhost &&
         localhost->sender &&
