@@ -256,7 +256,6 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
 
         if (likely(rc->status != RRDCALC_STATUS_REMOVED)) {
             RRDHOST *host = st->rrdhost;
-
             ALARM_ENTRY *ae = health_create_alarm_entry(
                 host,
                 rc,
