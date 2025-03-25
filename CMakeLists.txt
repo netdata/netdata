@@ -1083,6 +1083,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/machine_id.h
         src/libnetdata/signals/signal-code.c
         src/libnetdata/signals/signal-code.h
+        src/libnetdata/lmdb/vendored/libraries/liblmdb/lmdb.h
+        src/libnetdata/lmdb/vendored/libraries/liblmdb/mdb.c
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})

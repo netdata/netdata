@@ -135,6 +135,8 @@ extern const char *netdata_configured_host_prefix;
 #include "functions_evloop/functions_evloop.h"
 #include "query_progress/progress.h"
 
+#include "lmdb/vendored/libraries/liblmdb/lmdb.h"
+
 static ALWAYS_INLINE PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
     if(unlikely(*first)) {
         *first = false;
