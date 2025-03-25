@@ -152,7 +152,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v4.6.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: dist-tarball
           path: artifacts/*.tar.gz
@@ -276,7 +276,6 @@ jobs:
       - name: Build
         if: github.event_name != 'workflow_dispatch' && needs.file-check.outputs.run == 'true' # Don’t use retries on PRs.
         run: |
-          export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
           [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
           .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Build
@@ -287,13 +286,12 @@ jobs:
           timeout_minutes: 150
           max_attempts: 2
           command: |
-            export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
             [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
             .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v4.6.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
@@ -398,7 +396,7 @@ jobs:
           timestamp-digest: SHA256
       - name: Upload Installer
         id: upload
-        uses: actions/upload-artifact@v4.6.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: windows-x86_64-installer
           path: packaging\windows\netdata*.msi
@@ -488,7 +486,7 @@ jobs:
       - name: Store Artifacts
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v4.6.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: final-artifacts
           path: artifacts/*
