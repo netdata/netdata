@@ -1395,6 +1395,8 @@ void daemon_status_file_check_crash(void) {
 
         if(no_previous_status) {
             last_session_status = session_status;
+            last_session_status.status = DAEMON_STATUS_NONE;
+            last_session_status.exit_reason = 0;
             strncpyz(last_session_status.fatal.function, "no_status", sizeof(last_session_status.fatal.function) - 1);
         }
 
