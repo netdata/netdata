@@ -26,6 +26,7 @@ function(netdata_bundle_libbacktrace)
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS "${libbacktrace_LIBRARY}"
                 EXCLUDE_FROM_ALL 1
+                UPDATE_DISCONNECTED ON
         )
 
         # Create an imported library target
