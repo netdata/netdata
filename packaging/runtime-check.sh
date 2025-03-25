@@ -38,11 +38,11 @@ case $? in
     2) exit 3 ;;
 esac
 
-curl -sfS http://127.0.0.1:19999/api/v1/info > ./response || exit 1
+curl -sfS http://127.0.0.1:19999/api/v1/info > /tmp/response || exit 1
 
-cat ./response
+cat /tmp/response
 
-jq '.version' ./response || exit 1
+jq '.version' /tmp/response || exit 1
 
 curl -sfS http://127.0.0.1:19999/index.html || exit 1
 curl -sfS http://127.0.0.1:19999/v0/index.html || exit 1

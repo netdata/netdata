@@ -2,10 +2,16 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.3.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.3.1...HEAD)
 
 **Merged pull requests:**
 
+- status file 22b [\#19957](https://github.com/netdata/netdata/pull/19957) ([ktsaou](https://github.com/ktsaou))
+- fix rrdcalc\_unlink\_from\_rrdset\(\) [\#19956](https://github.com/netdata/netdata/pull/19956) ([ktsaou](https://github.com/ktsaou))
+- Fix claiming on startup [\#19954](https://github.com/netdata/netdata/pull/19954) ([stelfrag](https://github.com/stelfrag))
+- daemon status 22 [\#19953](https://github.com/netdata/netdata/pull/19953) ([ktsaou](https://github.com/ktsaou))
+- Enable interface to release sqlite memory [\#19952](https://github.com/netdata/netdata/pull/19952) ([stelfrag](https://github.com/stelfrag))
+- Improve event loop thread creation [\#19951](https://github.com/netdata/netdata/pull/19951) ([stelfrag](https://github.com/stelfrag))
 - Disable generation of debuginfo packages for DEB distros. [\#19948](https://github.com/netdata/netdata/pull/19948) ([Ferroin](https://github.com/Ferroin))
 - Set default CMake build type to include debug info. [\#19946](https://github.com/netdata/netdata/pull/19946) ([Ferroin](https://github.com/Ferroin))
 - build\(deps\): bump github.com/miekg/dns from 1.1.63 to 1.1.64 in /src/go [\#19945](https://github.com/netdata/netdata/pull/19945) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -36,6 +42,10 @@
 - fix reliability calculation [\#19909](https://github.com/netdata/netdata/pull/19909) ([ktsaou](https://github.com/ktsaou))
 - new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
 - Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
+
+## [v2.3.1](https://github.com/netdata/netdata/tree/v2.3.1) (2025-03-24)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.3.0...v2.3.1)
 
 ## [v2.3.0](https://github.com/netdata/netdata/tree/v2.3.0) (2025-03-19)
 
@@ -483,13 +493,6 @@
 - system memory calculation for cgroups v1 fix [\#19402](https://github.com/netdata/netdata/pull/19402) ([ktsaou](https://github.com/ktsaou))
 - do not process contexts before they are loaded [\#19401](https://github.com/netdata/netdata/pull/19401) ([ktsaou](https://github.com/ktsaou))
 - Revert "Update kickstart script to use new repository host." [\#19400](https://github.com/netdata/netdata/pull/19400) ([Ferroin](https://github.com/Ferroin))
-- split rrdhost/rrdset/rrddim and rrd.h [\#19399](https://github.com/netdata/netdata/pull/19399) ([ktsaou](https://github.com/ktsaou))
-- fix nodes staying in initializing status [\#19398](https://github.com/netdata/netdata/pull/19398) ([ktsaou](https://github.com/ktsaou))
-- Use worker when dispatching alert transitions to the cloud [\#19397](https://github.com/netdata/netdata/pull/19397) ([stelfrag](https://github.com/stelfrag))
-- Unified memory API [\#19396](https://github.com/netdata/netdata/pull/19396) ([ktsaou](https://github.com/ktsaou))
-- build\(go.d\): switch to gohugoio/hashstructure [\#19395](https://github.com/netdata/netdata/pull/19395) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19394](https://github.com/netdata/netdata/pull/19394) ([netdatabot](https://github.com/netdatabot))
-- Make libunwind opt-in at build time instead of auto-enabled. [\#19393](https://github.com/netdata/netdata/pull/19393) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
