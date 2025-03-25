@@ -276,7 +276,6 @@ jobs:
       - name: Build
         if: github.event_name != 'workflow_dispatch' && needs.file-check.outputs.run == 'true' # Don’t use retries on PRs.
         run: |
-          export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
           [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
           .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Build
@@ -287,7 +286,6 @@ jobs:
           timeout_minutes: 150
           max_attempts: 2
           command: |
-            export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
             [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
             .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Store

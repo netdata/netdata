@@ -17,7 +17,7 @@ prepare_build() {
 }
 
 build_static() {
-  EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}" USER="" ./packaging/makeself/build-static.sh "${BUILDARCH}"
+  USER="" ./packaging/makeself/build-static.sh "${BUILDARCH}"
 }
 
 prepare_assets() {
