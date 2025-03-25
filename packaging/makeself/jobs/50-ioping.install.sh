@@ -9,8 +9,11 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building ioping" || true
 
-fetch "ioping-${IOPING_VERSION}" "${IOPING_SOURCE}/archive/refs/tags/v${IOPING_VERSION}.tar.gz" \
-    "${IOPING_ARTIFACT_SHA256}" ioping
+cache_key="ioping"
+build_dir="ioping-${IOPING_VERSION}"
+
+fetch "${build_dir}" "${IOPING_SOURCE}/archive/refs/tags/v${IOPING_VERSION}.tar.gz" \
+    "${IOPING_ARTIFACT_SHA256}" "${cache_key}"
 
 export CFLAGS="${TUNING_FLAGS} -static -pipe"
 export CXXFLAGS="${CFLAGS}"
@@ -23,7 +26,7 @@ fi
 run mkdir -p "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/
 run install -o root -g root -m 4750 ioping "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/
 
-store_cache ioping "${NETDATA_MAKESELF_PATH}/tmp/ioping-${IOPING_VERSION}"
+store_cache "${cache_key}" "${build_dir}"
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/ioping

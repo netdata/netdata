@@ -7,25 +7,12 @@
 . "$(dirname "${0}")/../bundled-packages.version"
 
 # shellcheck disable=SC2015
-[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building cURL" || true
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building curl" || true
 
-if [ -d "${NETDATA_MAKESELF_PATH}/tmp/curl" ]; then
-  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/curl"
-fi
+cache_key="curl"
+build_dir="${CURL_VERSION}"
 
-cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/curl"
-
-if [ -d "${cache}" ]; then
-  echo "Found cached copy of build directory for curl, using it."
-  cp -a "${cache}/curl" "${NETDATA_MAKESELF_PATH}/tmp/"
-  CACHE_HIT=1
-else
-  echo "No cached copy of build directory for curl found, fetching sources instead."
-  run git clone --branch "${CURL_VERSION}" --single-branch --depth 1 "${CURL_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/curl"
-  CACHE_HIT=0
-fi
-
-cd "${NETDATA_MAKESELF_PATH}/tmp/curl" || exit 1
+fetch_git "${build_dir}" "${CURL_SOURCE}" "${CURL_VERSION}" "${cache_key}"
 
 export CFLAGS="${TUNING_FLAGS} -I/openssl-static/include -pipe"
 export CXXFLAGS="${CFLAGS}"
@@ -70,7 +57,7 @@ fi
 
 run make install
 
-store_cache curl "${NETDATA_MAKESELF_PATH}/tmp/curl"
+store_cache "${cache_key}" "${build_dir}"
 
 cp /curl-local/bin/curl "${NETDATA_INSTALL_PATH}"/bin/curl
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then

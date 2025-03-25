@@ -19,23 +19,10 @@ export CFLAGS="${TUNING_FLAGS} -pipe"
 export CXXFLAGS="${CFLAGS}"
 export LDFLAGS=""
 
-if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libucontext" ]; then
-  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libucontext"
-fi
+cache_key="libucontext"
+build_dir="${LIBUCONTEXT_VERSION}"
 
-cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/libucontext"
-
-if [ -d "${cache}" ]; then
-  echo "Found cached copy of build directory for libucontext, using it."
-  cp -a "${cache}/libucontext" "${NETDATA_MAKESELF_PATH}/tmp/"
-  CACHE_HIT=1
-else
-  echo "No cached copy of build directory for libucontext found, fetching sources instead."
-  run git clone --branch "${LIBUCONTEXT_VERSION}" --single-branch --depth 1 "${LIBUCONTEXT_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/libucontext"
-  CACHE_HIT=0
-fi
-
-cd "${NETDATA_MAKESELF_PATH}/tmp/libucontext" || exit 1
+fetch_git "${build_dir}" "${LIBUCONTEXT_SOURCE}" "${LIBUCONTEXT_VERSION}" "${cache_key}"
 
 case "${BUILDARCH}" in
     armv6l|armv7l) arch=arm ;;
@@ -49,7 +36,7 @@ fi
 
 run make ARCH="${arch}" EXPORT_UNPREFIXED="yes" DESTDIR="/libucontext-static" -j "$(nproc)" install
 
-store_cache libucontext "${NETDATA_MAKESELF_PATH}/tmp/libucontext"
+store_cache "${cache_key}" "${build_dir}"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true
