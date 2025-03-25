@@ -13,7 +13,7 @@
             <Media Id="1" Cabinet="netdata" EmbedCab="yes" />
 
             <!-- Modified: Changed schedule to handle service shutdown more gracefully and allow downgrades -->
-            <MajorUpgrade Schedule="afterInstallValidate" AllowDowngrades="yes" AllowSameVersionUpgrades="yes" />
+            <MajorUpgrade Schedule="afterInstallValidate" AllowDowngrades="yes" />
             <Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
             <Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
 
