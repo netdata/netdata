@@ -96,7 +96,13 @@ struct web_service {
 // AD information
 struct iis_app {
     RRDSET *st_app_current_application_pool_state;
-    RRDDIM *rd_app_current_application_pool_state;
+    RRDDIM *rd_app_current_application_pool_state_uninitialized;
+    RRDDIM *rd_app_current_application_pool_state_initialized;
+    RRDDIM *rd_app_current_application_pool_state_running;
+    RRDDIM *rd_app_current_application_pool_state_disabling;
+    RRDDIM *rd_app_current_application_pool_state_disabled;
+    RRDDIM *rd_app_current_application_pool_state_shutdown_pending;
+    RRDDIM *rd_app_current_application_pool_state_delete_pending;
 
     RRDSET *st_app_current_application_pool_uptime;
     RRDDIM *rd_app_current_application_pool_uptime;
@@ -743,6 +749,27 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
     return true;
 }
 
+static RRDDIM *app_pool_select_dim(struct iis_app *p, uint32_t selector)
+{
+    switch (selector) {
+        case 1:
+            return p->rd_app_current_application_pool_state_uninitialized;
+        case 2:
+            return p->rd_app_current_application_pool_state_initialized;
+        case 3:
+            return p->rd_app_current_application_pool_state_running;
+        case 4:
+            return p->rd_app_current_application_pool_state_disabling;
+        case 5:
+            return p->rd_app_current_application_pool_state_disabled;
+        case 6:
+            return p->rd_app_current_application_pool_state_shutdown_pending;
+        case 7:
+        default:
+            return p->rd_app_current_application_pool_state_delete_pending;
+    }
+}
+
 static inline void app_pool_current_state(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
@@ -761,7 +788,7 @@ static inline void app_pool_current_state(
                 NULL,
                 "App pool WAS",
                 "iis.application_pool_current_state",
-                "The current status of the application pool (1 - Uninitialized, 2 - Initialized, 3 - Running, 4 - Disabling, 5 - Disabled, 6 - Shutdown Pending, 7 - Delete Pending)",
+                "The current status of the application pool.",
                 "status",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -769,16 +796,42 @@ static inline void app_pool_current_state(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_app_current_application_pool_state =
-                rrddim_add(p->st_app_current_application_pool_state, "state", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_app_current_application_pool_state_uninitialized = rrddim_add(
+                p->st_app_current_application_pool_state, "uninitialized", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            p->rd_app_current_application_pool_state_initialized =
+                rrddim_add(p->st_app_current_application_pool_state, "initialized", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            p->rd_app_current_application_pool_state_running =
+                rrddim_add(p->st_app_current_application_pool_state, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            p->rd_app_current_application_pool_state_disabling =
+                rrddim_add(p->st_app_current_application_pool_state, "disabling", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            p->rd_app_current_application_pool_state_disabled =
+                rrddim_add(p->st_app_current_application_pool_state, "disabled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            p->rd_app_current_application_pool_state_shutdown_pending = rrddim_add(
+                p->st_app_current_application_pool_state, "shutdown_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            p->rd_app_current_application_pool_state_delete_pending = rrddim_add(
+                p->st_app_current_application_pool_state, "delete_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
             rrdlabels_add(
                 p->st_app_current_application_pool_state->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
-        rrddim_set_by_pointer(
-            p->st_app_current_application_pool_state,
-            p->rd_app_current_application_pool_state,
-            (collected_number)p->APPCurrentApplicationPoolState.current.Data);
+#define NETDATA_APP_COOL_TOTAL_STATES (7)
+        uint32_t current_state = (uint32_t)p->APPCurrentApplicationPoolState.current.Data;
+        for (uint32_t i = 1; i <= NETDATA_APP_COOL_TOTAL_STATES; i++) {
+            RRDDIM *dim = app_pool_select_dim(p, i);
+            uint32_t value = (current_state == i) ? 1 :0;
+
+            rrddim_set_by_pointer(
+                p->st_app_current_application_pool_state,
+                dim,
+                (collected_number)value);
+        }
 
         rrdset_done(p->st_app_current_application_pool_state);
     }
@@ -1075,9 +1128,7 @@ static inline void app_pool_total_was_upime(
 
         running -= (time_t)p->APPTotalApplicationPoolUptime.current.Data;
         rrddim_set_by_pointer(
-            p->st_app_application_pool_uptime,
-            p->rd_app_application_pool_uptime,
-            (collected_number)running);
+            p->st_app_application_pool_uptime, p->rd_app_application_pool_uptime, (collected_number)running);
 
         rrdset_done(p->st_app_application_pool_uptime);
     }
@@ -1133,7 +1184,8 @@ static inline void app_pool_process_failures(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessFailures)) {
         if (!p->st_app_worker_process_failures) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_worker_process_failures", windows_shared_buffer);
+            snprintfz(
+                id, RRD_ID_LENGTH_MAX, "application_pool_%s_total_worker_process_failures", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_worker_process_failures = rrdset_create_localhost(
                 "iis",
@@ -1231,8 +1283,8 @@ static inline void app_pool_process_shutdown_failures(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_app_worker_process_shutdown_failures =
-                rrddim_add(p->st_app_worker_process_shutdown_failures, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_app_worker_process_shutdown_failures = rrddim_add(
+                p->st_app_worker_process_shutdown_failures, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_app_worker_process_shutdown_failures->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
@@ -1272,8 +1324,8 @@ static inline void app_pool_process_startup_failures(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_app_worker_process_startup_failures =
-                rrddim_add(p->st_app_worker_process_startup_failures, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_app_worker_process_startup_failures = rrddim_add(
+                p->st_app_worker_process_startup_failures, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_app_worker_process_startup_failures->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
