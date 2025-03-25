@@ -784,6 +784,7 @@ static inline void app_pool_current_state(
     }
 }
 
+/* RAW data is not second as described in documentations.
 static inline void app_pool_current_uptime(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
@@ -829,6 +830,7 @@ static inline void app_pool_current_uptime(
         rrdset_done(p->st_app_current_application_pool_uptime);
     }
 }
+*/
 
 static inline void app_pool_current_worker_process(
     struct iis_app *p,
@@ -951,6 +953,7 @@ static inline void app_pool_worker_process_failures(
     }
 }
 
+/* RAW data is not second as described in documentations.
 static inline void app_pool_time_since_process_failures(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
@@ -991,6 +994,7 @@ static inline void app_pool_time_since_process_failures(
         rrdset_done(p->st_app_time_since_process_failure);
     }
 }
+*/
 
 static inline void app_pool_recycles(
     struct iis_app *p,
@@ -1156,7 +1160,7 @@ static inline void app_pool_process_failures(
             p->rd_app_worker_process_failures,
             (collected_number)p->APPWorkerProcessFailures.current.Data);
 
-        rrdset_done(p->st_app_worker_process_created);
+        rrdset_done(p->st_app_worker_process_failures);
     }
 }
 
@@ -1305,12 +1309,12 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         struct iis_app *p = dictionary_set(app_pools, windows_shared_buffer, NULL, sizeof(*p));
         app_pool_current_state(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_current_uptime(p, pDataBlock, pObjectType, pi, update_every);
+        // app_pool_current_uptime(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_current_worker_process(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_maximum_worker_process(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_process_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_worker_process_failures(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_time_since_process_failures(p, pDataBlock, pObjectType, pi, update_every);
+        // app_pool_time_since_process_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_recycles(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_total_was_upime(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_process_created(p, pDataBlock, pObjectType, pi, update_every);

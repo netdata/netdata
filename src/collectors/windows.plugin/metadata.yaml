@@ -1155,12 +1155,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: state
-            - name: iis.application_pool_uptime
-              description: Total duration the application pool has been running.
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: seconds
             - name: iis.application_pool_current_worker_process
               description: Process running in application pool.
               unit: "process"
@@ -1191,12 +1185,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: recycles
-            - name: iis.application_pool_was_uptime
-              description: Period of time since WAS has been started.
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: seconds
             - name: iis.application_pool_was_worker_process_created
               description: Total worker process created since WAS started.
               unit: "process"
