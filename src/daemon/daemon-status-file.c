@@ -1395,6 +1395,8 @@ void daemon_status_file_check_crash(void) {
 
         if(no_previous_status) {
             last_session_status = session_status;
+            last_session_status.status = DAEMON_STATUS_NONE;
+            last_session_status.exit_reason = 0;
             strncpyz(last_session_status.fatal.function, "no_status", sizeof(last_session_status.fatal.function) - 1);
         }
 
@@ -1495,9 +1497,11 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
 // --------------------------------------------------------------------------------------------------------------------
 
 void daemon_status_file_update_status(DAEMON_STATUS status) {
+    int saved_errno = errno;
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     daemon_status_file_refresh(status);
     daemon_status_file_save(wb, &session_status, true);
+    errno = saved_errno;
 }
 
 static void daemon_status_file_out_of_memory(void) {
