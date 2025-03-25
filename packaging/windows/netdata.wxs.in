@@ -159,9 +159,7 @@
             <!-- Added StopNetdataService custom action to ensure service is stopped before file operations -->
             <CustomAction Id="StopNetdataService" Directory="System64Folder" ExeCommand='net stop Netdata' Execute="immediate" Return="ignore" />
             <InstallExecuteSequence>
-                <Custom Action="StopNetdataService" Before="InstallValidate" Condition="Installed AND NOT REMOVE">
-                    <![CDATA[Installed AND NOT REMOVE]]>
-                </Custom>
+                <Custom Action="StopNetdataService" Before="InstallValidate" Condition="Installed AND NOT REMOVE" />
             </InstallExecuteSequence>
 
             <Component Id="NetdataService" Directory="USRBINDIR">
