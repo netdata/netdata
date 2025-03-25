@@ -238,10 +238,11 @@
             <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
             <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
 
-            <!-- Handle files in use dialog elegantly -->
+            <!-- Next lines have Primary Key dupplication avoiding binary to be generated -->
+            <!-- Handle files in use dialog elegantly>
             <Publish Dialog="FilesInUse" Control="Retry" Event="EndDialog" Value="Retry" Order="1" />
             <Publish Dialog="FilesInUse" Control="Ignore" Event="EndDialog" Value="Ignore" Order="2" />
-            <Publish Dialog="FilesInUse" Control="Exit" Event="EndDialog" Value="Exit" Order="3" />
+            <Publish Dialog="FilesInUse" Control="Exit" Event="EndDialog" Value="Exit" Order="3" / -->
 
         </UI>
 
