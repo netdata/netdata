@@ -13,3 +13,6 @@
 [submodule "src/collectors/debugfs.plugin/libsensors/vendored"]
 	path = src/collectors/debugfs.plugin/libsensors/vendored
 	url = https://github.com/lm-sensors/lm-sensors.git
+[submodule "src/libnetdata/lmdb/vendored"]
+	path = src/libnetdata/lmdb/vendored
+	url = https://github.com/LMDB/lmdb.git
