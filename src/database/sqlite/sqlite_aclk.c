@@ -975,32 +975,32 @@ void aclk_synchronization_init(void)
     char *err_msg = NULL;
     int rc;
 
-    netdata_log_info("Creating archived hosts");
+    nd_log_daemon(NDLP_INFO, "Creating archived hosts");
     int number_of_children = 0;
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_HOSTS, create_host_callback, &number_of_children, &err_msg);
 
     if (rc != SQLITE_OK) {
-        error_report("SQLite error when loading archived hosts, rc = %d (%s)", rc, err_msg);
+        nd_log_daemon(NDLP_ERR, "SQLite error when loading archived hosts, rc = %d (%s)", rc, err_msg);
         sqlite3_free(err_msg);
     }
 
-    netdata_log_info("Created %d archived hosts", number_of_children);
+    nd_log_daemon(NDLP_INFO, "Created %d archived hosts", number_of_children);
     // Trigger host context load for hosts that have been created
     metadata_queue_load_host_context();
-
-    if (!number_of_children)
-        aclk_queue_node_info(localhost, true);
 
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES, aclk_config_parameters, NULL, &err_msg);
 
     if (rc != SQLITE_OK) {
-        error_report("SQLite error when configuring host ACLK synchonization parameters, rc = %d (%s)", rc, err_msg);
+        nd_log_daemon(NDLP_ERR, "SQLite error when configuring host ACLK synchonization parameters, rc = %d (%s)", rc, err_msg);
         sqlite3_free(err_msg);
     }
 
     aclk_initialize_event_loop();
 
-    netdata_log_info("ACLK sync initialization completed");
+    if (!number_of_children)
+        aclk_queue_node_info(localhost, true);
+
+    nd_log_daemon(NDLP_INFO, "ACLK sync initialization completed");
 }
 
 static inline void queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const void *param0, const void *param1)
