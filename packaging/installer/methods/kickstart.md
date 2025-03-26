@@ -113,7 +113,7 @@ By default, the kickstart script will provide a Netdata Agent installation that 
 
 ### anonymous telemetry
 
-By default, the Agent is sending anonymous telemetry data to help us take identify the most common operating systems and the configurations Netdata Agents run. We use this information to prioritize our efforts towards what is most commonly used by our community.
+By default, the Agent is sending anonymous telemetry data to help us identify the most common operating systems and the configurations Netdata Agents run. We use this information to prioritize our efforts towards what is most commonly used by our community.
 
 - `--disable-telemetry`
   Disable anonymous statistics.
@@ -184,5 +184,6 @@ The `kickstart.sh` script does the following after being downloaded and run usin
 - Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated with new nightly versions, unless you override that with an [optional parameter](#optional-parameters-to-alter-your-installation).
 - Prints a message whether installation succeeded or failed for QA purposes.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE1ODk2MzM4MTRdfQ==
+eyJoaXN0b3J5IjpbLTExMTgwOTg4NzMsLTE1ODk2MzM4MTRdfQ
+==
 -->
