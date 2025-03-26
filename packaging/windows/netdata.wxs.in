@@ -54,6 +54,9 @@
                 <Directory Id="INSTALLFOLDER" Name="Netdata">
                     <Directory Id="USRDIR" Name="usr">
                         <Directory Id="USRBINDIR" Name="bin" />
+                        <Directory Id="USRLIBEXECDIR" Name="libexec">
+                            <Directory Id="USRLIBEXECNETDATADIR" Name="netdata" />
+                        </Directory>
                     </Directory>
                     <Directory Id="VARDIR" Name="var">
                         <Directory Id="VARCACHEDIR" Name="cache" />
@@ -136,6 +139,12 @@
             <InstallExecuteSequence>
                 <Custom Action="ClaimAgent" After="InstallFiles" />
             </InstallExecuteSequence>
+
+            <!-- Error 2726 -->
+            <!-- CustomAction Id="CopyConfigFiles" Directory="USRLIBEXECNETDATADIR" ExeCommand='powershell.exe -ExecutionPolicy Bypass -NonInteractive -File &quot;[INSTALLFOLDER]\usr\libexec\netdata\copy_files.ps1&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
+            <InstallExecuteSequence>
+                <Custom Action="CopyConfigFiles" After="InstallFinalize" />
+            </InstallExecuteSequence -->
 
             <!-- Install wevt manifest/dll files -->
             <ComponentGroup Id="WevtComponents" Directory="System64Folder">
