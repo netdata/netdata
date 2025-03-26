@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata/libnetdata.h"
 #include "mrg-lmdb.h"
 #include "mrg-internals.h"
+
+#include "vendored/lmdb/lmdb.h"
 
 // LMDB environment and database handles structure
 typedef struct lmdb_instance {

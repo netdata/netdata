@@ -1083,10 +1083,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/machine_id.h
         src/libnetdata/signals/signal-code.c
         src/libnetdata/signals/signal-code.h
-        src/libnetdata/lmdb/vendored/libraries/liblmdb/lmdb.h
-        src/libnetdata/lmdb/vendored/libraries/liblmdb/mdb.c
-        src/libnetdata/lmdb/vendored/libraries/liblmdb/midl.h
-        src/libnetdata/lmdb/vendored/libraries/liblmdb/midl.c
 )
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
@@ -2134,6 +2130,33 @@ if(ENABLE_H2O)
 endif()
 
 #
+# build lmdb
+#
+
+add_library(lmdb STATIC
+    src/vendored/lmdb/lmdb.h
+    src/vendored/lmdb/mdb.c
+    src/vendored/lmdb/midl.h
+    src/vendored/lmdb/midl.c
+)
+
+target_include_directories(lmdb PUBLIC
+    ${CMAKE_SOURCE_DIR}/src/vendored/lmdb
+)
+
+target_compile_options(lmdb PRIVATE
+    -Wno-all
+    -Wno-extra
+    -Wno-shadow
+    -Wformat
+)
+
+target_compile_definitions(lmdb PRIVATE
+    MDB_USE_POSIX_SEM
+    $<$<BOOL:${OS_LINUX}>:_GNU_SOURCE>
+)
+
+#
 # build libjudy
 #
 
@@ -2986,6 +3009,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
+        "$<$<BOOL:${ENABLE_DBENGINE}>:lmdb>"
 )
 
 netdata_add_protobuf(netdata)
