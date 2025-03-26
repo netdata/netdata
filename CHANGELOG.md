@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Don’t skip building Go code on static builds. [\#19961](https://github.com/netdata/netdata/pull/19961) ([Ferroin](https://github.com/Ferroin))
+- fix undefined [\#19960](https://github.com/netdata/netdata/pull/19960) ([ktsaou](https://github.com/ktsaou))
+- daemon status 22c [\#19959](https://github.com/netdata/netdata/pull/19959) ([ktsaou](https://github.com/ktsaou))
+- Use UPDATE\_DISCONNECTED mode for libbacktrace. [\#19958](https://github.com/netdata/netdata/pull/19958) ([Ferroin](https://github.com/Ferroin))
 - status file 22b [\#19957](https://github.com/netdata/netdata/pull/19957) ([ktsaou](https://github.com/ktsaou))
 - fix rrdcalc\_unlink\_from\_rrdset\(\) [\#19956](https://github.com/netdata/netdata/pull/19956) ([ktsaou](https://github.com/ktsaou))
 - Fix claiming on startup [\#19954](https://github.com/netdata/netdata/pull/19954) ([stelfrag](https://github.com/stelfrag))
@@ -42,6 +46,7 @@
 - fix reliability calculation [\#19909](https://github.com/netdata/netdata/pull/19909) ([ktsaou](https://github.com/ktsaou))
 - new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
 - Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
+- Large-scale cleanup of static build infrastructure. [\#19852](https://github.com/netdata/netdata/pull/19852) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.3.1](https://github.com/netdata/netdata/tree/v2.3.1) (2025-03-24)
 
@@ -487,12 +492,6 @@
 - build\(deps\): bump github.com/docker/docker from 27.4.1+incompatible to 27.5.0+incompatible in /src/go [\#19408](https://github.com/netdata/netdata/pull/19408) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.7.1 to 4.8.0 in /src/go [\#19407](https://github.com/netdata/netdata/pull/19407) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fixed http clients accounting [\#19406](https://github.com/netdata/netdata/pull/19406) ([ktsaou](https://github.com/ktsaou))
-- RRD files split, renames, cleanup Part 2 [\#19405](https://github.com/netdata/netdata/pull/19405) ([ktsaou](https://github.com/ktsaou))
-- fix loading contexts [\#19404](https://github.com/netdata/netdata/pull/19404) ([ktsaou](https://github.com/ktsaou))
-- Delay context cleanup checks after startup [\#19403](https://github.com/netdata/netdata/pull/19403) ([stelfrag](https://github.com/stelfrag))
-- system memory calculation for cgroups v1 fix [\#19402](https://github.com/netdata/netdata/pull/19402) ([ktsaou](https://github.com/ktsaou))
-- do not process contexts before they are loaded [\#19401](https://github.com/netdata/netdata/pull/19401) ([ktsaou](https://github.com/ktsaou))
-- Revert "Update kickstart script to use new repository host." [\#19400](https://github.com/netdata/netdata/pull/19400) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
