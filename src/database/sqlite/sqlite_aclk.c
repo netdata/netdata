@@ -594,6 +594,8 @@ static void free_query_list(Pvoid_t JudyL)
     }
 }
 
+#define MAX_SHUTDOWN_TIMEOUT_SECONDS (5)
+
 #define ACLK_SYNC_SHOULD_BE_RUNNING                                                                                    \
     (!shutdown_requested || config->aclk_queries_running || config->alert_push_running ||                              \
      config->aclk_batch_job_is_running)
@@ -650,6 +652,7 @@ static void aclk_synchronization_event_loop(void *arg)
 
     completion_mark_complete(&config->start_stop_complete);
     int shutdown_requested = 0;
+    time_t shutdown_initiated = 0;
 
     while (likely(ACLK_SYNC_SHOULD_BE_RUNNING)) {
         enum aclk_database_opcode opcode;
@@ -657,8 +660,12 @@ static void aclk_synchronization_event_loop(void *arg)
         uv_run(loop, UV_RUN_DEFAULT);
 
         if (unlikely(shutdown_requested)) {
-            nd_log_limit_static_thread_var(erl, 5, 0);
+            nd_log_limit_static_thread_var(erl, 1, 0);
             nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO, "ACLKSYNC: Waiting for pending queries to finish before shutdown");
+            if (now_realtime_sec() - shutdown_initiated > MAX_SHUTDOWN_TIMEOUT_SECONDS) {
+                nd_log_daemon(NDLP_INFO, "ACLKSYNC: Shutdown timeout, forcing exit");
+                break;
+            }
             continue;
         }
 
@@ -857,6 +864,8 @@ static void aclk_synchronization_event_loop(void *arg)
                     break;
                 case ACLK_SYNC_SHUTDOWN:
                     shutdown_requested = 1;
+                    shutdown_initiated = now_realtime_sec();
+                    mark_pending_req_cancel_all();
                     break;
                 default:
                     break;
