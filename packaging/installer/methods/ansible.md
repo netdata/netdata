@@ -2,10 +2,7 @@
 
 
 
-What if you're trying to bootstrap an infrastructure monitoring solution as quickly as possible? What if you need to
-deploy Netdata across an entire infrastructure with many nodes? What if you want to make this deployment reliable,
-repeatable, and idempotent? What if you want to write and deploy your infrastructure or cloud monitoring system like
-code?
+How can you quickly bootstrap an infrastructure monitoring solution? How do you deploy Netdata across multiple nodes efficiently? How do you ensure the deployment is **reliable, repeatable, and idempotent**? How can you manage infrastructure or cloud monitoring as **code**?
 
 Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as
 code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run
@@ -142,5 +139,6 @@ task results in a changed, failure, or was skipped entirely.
 The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the connect to Cloud
 task, your nodes start populating your Space in Netdata Cloud.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTEyOTgzMjUyOTcsLTI0NTAxMDk5Nl19
+eyJoaXN0b3J5IjpbLTE0OTE0MjYwMywtMTI5ODMyNTI5NywtMj
+Q1MDEwOTk2XX0=
 -->
