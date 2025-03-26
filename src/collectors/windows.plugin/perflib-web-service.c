@@ -834,54 +834,6 @@ static inline void app_pool_current_state(
     }
 }
 
-/* RAW data is not second as described in documentations.
-static inline void app_pool_current_uptime(
-    struct iis_app *p,
-    PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
-    PERF_INSTANCE_DEFINITION *pi,
-    int update_every)
-{
-    time_t running = time(NULL);
-    if (running < 0)
-        return;
-
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentApplicationPoolUptime)) {
-        if (!p->st_app_current_application_pool_uptime) {
-            char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_uptime", windows_shared_buffer);
-            netdata_fix_chart_name(id);
-            p->st_app_current_application_pool_uptime = rrdset_create_localhost(
-                "iis",
-                id,
-                NULL,
-                "App pool WAS",
-                "iis.application_pool_uptime",
-                "Total duration the application pool has been running.",
-                "seconds",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibWebService",
-                PRIO_WEBSITE_IIS_APPLICATION_POOL_START_TIME,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_app_current_application_pool_uptime =
-                rrddim_add(p->st_app_current_application_pool_uptime, "seconds", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(
-                p->st_app_current_application_pool_uptime->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-        }
-
-        running -= (time_t)p->APPCurrentApplicationPoolUptime.current.Data;
-        rrddim_set_by_pointer(
-            p->st_app_current_application_pool_uptime,
-            p->rd_app_current_application_pool_uptime,
-            (collected_number)running);
-
-        rrdset_done(p->st_app_current_application_pool_uptime);
-    }
-}
-*/
-
 static inline void app_pool_current_worker_process(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
@@ -1002,49 +954,6 @@ static inline void app_pool_worker_process_failures(
         rrdset_done(p->st_app_recent_worker_process_failure);
     }
 }
-
-/* RAW data is not second as described in documentations.
-static inline void app_pool_time_since_process_failures(
-    struct iis_app *p,
-    PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
-    PERF_INSTANCE_DEFINITION *pi,
-    int update_every)
-{
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPTimeSinceProcessFailure)) {
-        if (!p->st_app_time_since_process_failure) {
-            char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_time_since_failure", windows_shared_buffer);
-            netdata_fix_chart_name(id);
-            p->st_app_time_since_process_failure = rrdset_create_localhost(
-                "iis",
-                id,
-                NULL,
-                "App pool WAS",
-                "iis.application_pool_time_since_failure",
-                "The length of time since the last worker process failure.",
-                "seconds",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibWebService",
-                PRIO_WEBSITE_IIS_APPLICATION_LAST_PROCESS_FAILURE,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_app_time_since_process_failure =
-                rrddim_add(p->st_app_time_since_process_failure, "seconds", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(
-                p->st_app_time_since_process_failure->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-            p->st_app_time_since_process_failure,
-            p->rd_app_time_since_process_failure,
-            (collected_number)p->APPTimeSinceProcessFailure.current.Data);
-
-        rrdset_done(p->st_app_time_since_process_failure);
-    }
-}
-*/
 
 static inline void app_pool_recycles(
     struct iis_app *p,
