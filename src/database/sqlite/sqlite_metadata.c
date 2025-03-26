@@ -991,9 +991,9 @@ done:
 // Store host and host system info information in the database
 static int store_host_metadata(RRDHOST *host)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_STORE_HOST_INFO, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_STORE_HOST_INFO, &res))
         return false;
 
     int param = 0;
@@ -1019,24 +1019,24 @@ static int store_host_metadata(RRDHOST *host)
     if (unlikely(store_rc != SQLITE_DONE))
         error_report("Failed to store host %s, rc = %d", rrdhost_hostname(host), store_rc);
 
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 
     return store_rc != SQLITE_DONE;
 
 bind_fail:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return 1;
 }
 
 static int add_host_sysinfo_key_value(const char *name, const char *value, nd_uuid_t *uuid)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
     if (!REQUIRE_DB(db_meta))
         return 0;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_STORE_HOST_SYSTEM_INFO_VALUES, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_STORE_HOST_SYSTEM_INFO_VALUES, &res))
         return 0;
 
     int param = 0;
@@ -1048,13 +1048,13 @@ static int add_host_sysinfo_key_value(const char *name, const char *value, nd_uu
     if (unlikely(store_rc != SQLITE_DONE))
         error_report("Failed to store host info value %s, rc = %d", name, store_rc);
 
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 
     return store_rc == SQLITE_DONE;
 
 bind_fail:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return 0;
 }
 
