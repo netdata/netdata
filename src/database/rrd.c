@@ -161,7 +161,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
 
     if (likely(system_info)) {
         detect_machine_guid_change(&localhost->host_id.uuid);
-        sql_aclk_sync_init();
+        aclk_synchronization_init();
         api_v1_management_init();
     }
 
