@@ -1032,11 +1032,11 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     nd_log(
         NDLS_ACCESS,
         NDLP_DEBUG,
-        "ACLK REQ [%s (%s)]: Sent! %d alerts snapshot, snapshot_uuid %s  (version = %llu)",
+        "ACLK REQ [%s (%s)]: Created snapshot %s with %d alerts (version = %llu)",
         wc->node_id,
         rrdhost_hostname(host),
-        cnt,
         snapshot_uuid,
+        total_count,
         (long long unsigned)version);
 
 done:
