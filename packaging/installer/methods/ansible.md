@@ -1,34 +1,15 @@
 # Deploy Netdata with Ansible
 
-Netdata's [one-line kickstart](/packaging/installer/README.md) is zero-configuration, highly adaptable, and compatible with tons
-of different operating systems and Linux distributions. You can use it on bare metal, VMs, containers, and everything
-in-between.
+How can you quickly bootstrap an infrastructure monitoring solution? How do you deploy Netdata across multiple nodes efficiently? How do you ensure the deployment is **reliable, repeatable, and idempotent**? How can you manage infrastructure or cloud monitoring as **code**?
 
-But what if you're trying to bootstrap an infrastructure monitoring solution as quickly as possible? What if you need to
-deploy Netdata across an entire infrastructure with many nodes? What if you want to make this deployment reliable,
-repeatable, and idempotent? What if you want to write and deploy your infrastructure or cloud monitoring system like
-code?
+Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run those operations over standard and secure SSH connections. There's no Agent to install on the remote system, so all you have to worry about is your application and your monitoring software.
 
-Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as
-code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run
-those operations over standard and secure SSH connections. There's no Agent to install on the remote system, so all you
-have to worry about is your application and your monitoring software.
+What does **idempotent** mean? 
+From the [Ansible glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
 
-Ansible has some competition from the likes of [Puppet](https://puppet.com/) or [Chef](https://www.chef.io/), but the
-most valuable feature about Ansible is **idempotent**. From the [Ansible
-glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
+> An operation is **idempotent** if running it once produces the same result as running it multiple times, without unintended changes. With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
 
-> An operation is idempotent if the result of performing it once is exactly the same as the result of performing it
-> repeatedly without any intervening actions.
-
-Idempotency means you can run an Ansible playbook against your nodes any number of times without affecting how they
-operate. When you deploy Netdata with Ansible, you're also deploying _monitoring as code_.
-
-In this guide, we'll walk through the process of using an [Ansible
-playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/) to automatically
-deploy the Netdata Agent to any number of distributed nodes, manage the configuration of each node, and connect them to
-your Netdata Cloud account. You'll go from some unmonitored nodes to a infrastructure monitoring solution in a matter of
-minutes.
+This guide walks you through deploying the **Netdata Agent** across multiple nodes using an [Ansible playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/), managing configurations, and connecting to **Netdata Cloud**—all in minutes.
 
 ## Prerequisites
 
@@ -144,3 +125,6 @@ task results in a changed, failure, or was skipped entirely.
 
 The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the connect to Cloud
 task, your nodes start populating your Space in Netdata Cloud.
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbLTczOTQyMjA3Ml19
+-->
