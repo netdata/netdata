@@ -13,14 +13,14 @@ struct rrdengine_instance;
 #define DATAFILE_PREFIX "datafile-"
 #define DATAFILE_EXTENSION ".ndf"
 
+#define MIN_DATAFILE_SIZE   (512LU * 1024LU)
 #ifndef MAX_DATAFILE_SIZE
-#define MAX_DATAFILE_SIZE   (UINT32_MAX)
+#define MAX_DATAFILE_SIZE   (1LLU * 1024LLU * 1024LLU * 1024LLU)
 #endif
 #if  MIN_DATAFILE_SIZE > MAX_DATAFILE_SIZE
 #error MIN_DATAFILE_SIZE > MAX_DATAFILE_SIZE
 #endif
 
-#define MIN_DATAFILE_SIZE   (512LU * 1024LU)
 #define MAX_DATAFILES (65536 * 4) /* Supports up to 64TiB for now */
 #define TARGET_DATAFILES (100)
 
