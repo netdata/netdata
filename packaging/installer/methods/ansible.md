@@ -126,6 +126,5 @@ task results in a changed, failure, or was skipped entirely.
 The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the connect to Cloud
 task, your nodes start populating your Space in Netdata Cloud.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTczOTQyMjA3MiwtMTI5ODMyNTI5NywtMj
-Q1MDEwOTk2XX0=
+eyJoaXN0b3J5IjpbLTczOTQyMjA3Ml19
 -->
