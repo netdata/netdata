@@ -7,7 +7,8 @@ How can you quickly bootstrap an infrastructure monitoring solution? How do you 
 
 Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run those operations over standard and secure SSH connections. There's no Agent to install on the remote system, so all you have to worry about is your application and your monitoring software.
 
-What does **idempotent** mean? From the [Ansible] glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
+What does **idempotent** mean? 
+From the [Ansible] [glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
 
 > An operation is **idempotent** if running it once produces the same result as running it multiple times, without unintended changes. With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
 
@@ -135,6 +136,6 @@ task results in a changed, failure, or was skipped entirely.
 The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the connect to Cloud
 task, your nodes start populating your Space in Netdata Cloud.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE3MzQ1MDk3MTcsLTEyOTgzMjUyOTcsLT
-I0NTAxMDk5Nl19
+eyJoaXN0b3J5IjpbLTMwMTQzOTY2OCwtMTI5ODMyNTI5NywtMj
+Q1MDEwOTk2XX0=
 -->
