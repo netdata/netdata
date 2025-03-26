@@ -31,7 +31,7 @@ typedef struct metric_lmdb_value {
 int mrg_lmdb_init(const char *path);
 
 // Save MRG to LMDB for a specific section
-int mrg_lmdb_save(Word_t section, const char *path);
+int mrg_lmdb_save(struct rrdengine_instance *ctx, const char *path);
 
 // Load MRG from LMDB for a specific section
 // Returns:

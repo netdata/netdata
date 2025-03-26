@@ -505,25 +505,21 @@ static int mrg_traverse_save_callback(METRIC *metric, void *data) {
 }
 
 // Save MRG to LMDB for a specific section
-int mrg_lmdb_save(Word_t section, const char *path) {
-    int rc;
+int mrg_lmdb_save(struct rrdengine_instance *ctx, const char *path) {
     MDB_txn *txn = NULL;
     MDB_dbi dbi;
-    MRG_SAVE_CONTEXT save_ctx;
     MRG_DATAFILE_INFO *datafiles = NULL;
     size_t datafiles_count = 0;
     int retry_count = 0;
-    LMDB_INSTANCE *instance;
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)section;
 
     // Initialize LMDB for this tier if needed
-    rc = mrg_lmdb_init(path);
+    int rc = mrg_lmdb_init(path);
     if (rc != 0) {
         return -1;
     }
 
     // Get LMDB instance
-    instance = get_lmdb_instance(path);
+    LMDB_INSTANCE *instance = get_lmdb_instance(path);
     if (!instance || !instance->env) {
         netdata_log_error("LMDB: Failed to get LMDB instance for %s", path);
         return -1;
@@ -565,10 +561,12 @@ retry_transaction:
     }
 
     // Set up save context
-    save_ctx.txn = txn;
-    save_ctx.dbi = dbi;
-    save_ctx.count = 0;
-    save_ctx.section = section;
+    MRG_SAVE_CONTEXT save_ctx = {
+        .txn = txn,
+        .dbi = dbi,
+        .count = 0,
+        .section = (Word_t)ctx,
+    };
 
     // TODO: Fill this in with proper MRG traversal when API is available
     // For now, we'd need to adapt to traverse the MRG and call mrg_save_metric
