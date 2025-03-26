@@ -140,11 +140,11 @@
                 <Custom Action="ClaimAgent" After="InstallFiles" />
             </InstallExecuteSequence>
 
-            <!-- Error 2726 -->
-            <!-- CustomAction Id="CopyConfigFiles" Directory="USRLIBEXECNETDATADIR" ExeCommand='powershell.exe -ExecutionPolicy Bypass -NonInteractive -File &quot;[INSTALLFOLDER]\usr\libexec\netdata\copy_files.ps1&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
+            <!-- Add new files (stream.conf and netdata.conf) -->
+            <CustomAction Id="NDCreateNewFiles" Directory="USRLIBEXECNETDATADIR" ExeCommand='powershell.exe -ExecutionPolicy Bypass -NonInteractive -File &quot;[USRLIBEXECNETDATADIR]\copy_files.ps1&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
             <InstallExecuteSequence>
-                <Custom Action="CopyConfigFiles" After="InstallFinalize" />
-            </InstallExecuteSequence -->
+                <Custom Action="NDCreateNewFiles" Before="InstallFinalize" />
+            </InstallExecuteSequence>
 
             <!-- Install wevt manifest/dll files -->
             <ComponentGroup Id="WevtComponents" Directory="System64Folder">
