@@ -1,25 +1,15 @@
 # Deploy Netdata with Ansible
 
-
-
 How can you quickly bootstrap an infrastructure monitoring solution? How do you deploy Netdata across multiple nodes efficiently? How do you ensure the deployment is **reliable, repeatable, and idempotent**? How can you manage infrastructure or cloud monitoring as **code**?
-
 
 Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run those operations over standard and secure SSH connections. There's no Agent to install on the remote system, so all you have to worry about is your application and your monitoring software.
 
 What does **idempotent** mean? 
-From the [Ansible] [glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
+From the [Ansible glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
 
 > An operation is **idempotent** if running it once produces the same result as running it multiple times, without unintended changes. With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
 
-This guide walks you through deploying the **Netdata Agent** across multiple nodes using an [Ansible
-playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/), managing configurations, and connecting to **Netdata Cloud**—all in minutes.
-
-In this guide, we'll walk through the process of using an [Ansible
-playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/) to automatically
-deploy the Netdata Agent to any number of distributed nodes, manage the configuration of each node, and connect them to
-your Netdata Cloud account. You'll go from some unmonitored nodes to a infrastructure monitoring solution in a matter of
-minutes.
+This guide walks you through deploying the **Netdata Agent** across multiple nodes using an [Ansible playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/), managing configurations, and connecting to **Netdata Cloud**—all in minutes.
 
 ## Prerequisites
 
@@ -136,6 +126,6 @@ task results in a changed, failure, or was skipped entirely.
 The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the connect to Cloud
 task, your nodes start populating your Space in Netdata Cloud.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTMwMTQzOTY2OCwtMTI5ODMyNTI5NywtMj
+eyJoaXN0b3J5IjpbLTczOTQyMjA3MiwtMTI5ODMyNTI5NywtMj
 Q1MDEwOTk2XX0=
 -->
