@@ -4,6 +4,7 @@
 
 How can you quickly bootstrap an infrastructure monitoring solution? How do you deploy Netdata across multiple nodes efficiently? How do you ensure the deployment is **reliable, repeatable, and idempotent**? How can you manage infrastructure or cloud monitoring as **code**?
 
+
 Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as
 code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run
 those operations over standard and secure SSH connections. There's no Agent to install on the remote system, so all you
@@ -14,7 +15,9 @@ glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.
 
 > An operation is idempotent if the result of performing it once is exactly the same as the result of performing it
 > repeatedly without any intervening actions.
+An operation is **idempotent** if running it once produces the same result as running it multiple times, without unintended changes. With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
 
+This guide walks you through deploying the **Netdata Agent** across multiple nodes using an **Ansible playbook**, managing configurations, and connecting to **Netdata Cloud**—all in minutes.
 Idempotency means you can run an Ansible playbook against your nodes any number of times without affecting how they
 operate. When you deploy Netdata with Ansible, you're also deploying _monitoring as code_.
 
@@ -139,6 +142,6 @@ task results in a changed, failure, or was skipped entirely.
 The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the connect to Cloud
 task, your nodes start populating your Space in Netdata Cloud.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE0OTE0MjYwMywtMTI5ODMyNTI5NywtMj
-Q1MDEwOTk2XX0=
+eyJoaXN0b3J5IjpbLTIwNzY2MjM0MTEsLTEyOTgzMjUyOTcsLT
+I0NTAxMDk5Nl19
 -->
