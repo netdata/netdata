@@ -9,7 +9,7 @@ import TabItem from '@theme/TabItem';
 
 **`kickstart.sh` is the recommended way of installing Netdata.**
 
-This script works on all Linux distributions and macOS environments, by detecting the optimal method of installing Netdata directly to the operating system.
+This script works on all Linux distributions, by detecting the optimal method of installing Netdata directly to the operating system.
 
 
 ## Installation
@@ -184,5 +184,6 @@ The `kickstart.sh` script does the following after being downloaded and run usin
 - Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated with new nightly versions, unless you override that with an [optional parameter](#optional-parameters-to-alter-your-installation).
 - Prints a message whether installation succeeded or failed for QA purposes.
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTY4MDgyNDI2NiwtMTI0Mjc1NDY0Nl19
+eyJoaXN0b3J5IjpbLTE1ODk2MzM4MTQsMTY4MDgyNDI2NiwtMT
+I0Mjc1NDY0Nl19
 -->
