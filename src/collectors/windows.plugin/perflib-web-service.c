@@ -818,7 +818,7 @@ static inline void app_pool_current_state(
                 p->st_app_current_application_pool_state, "delete_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
             rrdlabels_add(
-                p->st_app_current_application_pool_state->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_app_current_application_pool_state->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
 #define NETDATA_APP_COOL_TOTAL_STATES (7)
@@ -862,7 +862,7 @@ static inline void app_pool_current_worker_process(
 
             p->rd_app_current_worker_process =
                 rrddim_add(p->st_app_current_worker_process, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_app_current_worker_process->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_app_current_worker_process->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -902,7 +902,7 @@ static inline void app_pool_maximum_worker_process(
 
             p->rd_app_maximum_worker_process =
                 rrddim_add(p->st_app_maximum_worker_process, "created", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_app_maximum_worker_process->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_app_maximum_worker_process->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -943,7 +943,7 @@ static inline void app_pool_worker_process_failures(
             p->rd_app_recent_worker_process_failure =
                 rrddim_add(p->st_app_recent_worker_process_failure, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_app_recent_worker_process_failure->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_app_recent_worker_process_failure->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -984,7 +984,7 @@ static inline void app_pool_recycles(
             p->rd_app_application_pool_recycles =
                 rrddim_add(p->st_app_application_pool_recycles, "recycles", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_app_application_pool_recycles->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_app_application_pool_recycles->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1029,7 +1029,7 @@ static inline void app_pool_total_was_upime(
             p->rd_app_application_pool_uptime =
                 rrddim_add(p->st_app_application_pool_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(
-                p->st_app_application_pool_uptime->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_app_application_pool_uptime->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         running -= (time_t)p->APPTotalApplicationPoolUptime.current.Data;
@@ -1068,7 +1068,7 @@ static inline void app_pool_process_created(
 
             p->rd_app_worker_process_created =
                 rrddim_add(p->st_app_worker_process_created, "created", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_app_worker_process_created->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_app_worker_process_created->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1110,7 +1110,7 @@ static inline void app_pool_process_failures(
             p->rd_app_worker_process_failures =
                 rrddim_add(p->st_app_worker_process_failures, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_app_worker_process_failures->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_app_worker_process_failures->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1151,7 +1151,7 @@ static inline void app_pool_process_ping_failures(
             p->rd_app_worker_process_ping_failures =
                 rrddim_add(p->st_app_worker_process_ping_failures, "ping", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_app_worker_process_ping_failures->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_app_worker_process_ping_failures->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1192,7 +1192,7 @@ static inline void app_pool_process_shutdown_failures(
             p->rd_app_worker_process_shutdown_failures = rrddim_add(
                 p->st_app_worker_process_shutdown_failures, "shutdown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_app_worker_process_shutdown_failures->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_app_worker_process_shutdown_failures->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1233,7 +1233,7 @@ static inline void app_pool_process_startup_failures(
             p->rd_app_worker_process_startup_failures = rrddim_add(
                 p->st_app_worker_process_startup_failures, "startup", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_app_worker_process_startup_failures->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_app_worker_process_startup_failures->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
