@@ -45,7 +45,7 @@ static bool mrg_lmdb_get_file(struct mrg_lmdb *lmdb, uint32_t id, struct mrg_lmd
 }
 
 // Function to retrieve a UUID from the UUIDs database
-static bool mrg_lmdb_get_uuid(struct mrg_lmdb *lmdb, uint32_t id, nd_uuid_t *uuid) {
+static bool mrg_lmdb_get_uuid(struct mrg_lmdb *lmdb, uint32_t id, ND_UUID *uuid) {
     MDB_val key, data;
     key.mv_size = sizeof(id);
     key.mv_data = &id;
@@ -61,7 +61,7 @@ static bool mrg_lmdb_get_uuid(struct mrg_lmdb *lmdb, uint32_t id, nd_uuid_t *uui
         return false;
     }
 
-    memcpy(uuid, ((ND_UUID *)data.mv_data)->uuid, sizeof(nd_uuid_t));
+    memcpy(uuid, data.mv_data, sizeof(*uuid));
     return true;
 }
 
@@ -161,6 +161,8 @@ static bool mrg_lmdb_verify_files(struct mrg_lmdb *lmdb) {
 
 // Main function to load metrics from LMDB into MRG
 bool mrg_lmdb_load(MRG *mrg) {
+    usec_t started = now_monotonic_usec();
+
     // First check if the LMDB database exists
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/" MRG_LMDB_FILE, netdata_configured_cache_dir);
@@ -184,17 +186,13 @@ bool mrg_lmdb_load(MRG *mrg) {
         !mrg_lmdb_get_meta_uint64(&lmdb, "metrics", &metrics_count) ||
         !mrg_lmdb_get_meta_uint64(&lmdb, "tiers", &tiers_count)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: Failed to read metadata");
-        mrg_lmdb_finalize(&lmdb, false);
-        mrg_lmdb_unlink_all();
-        return false;
+        goto failed;
     }
 
     // Check version compatibility
     if (version != 1) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: Unsupported version %lu", version);
-        mrg_lmdb_finalize(&lmdb, false);
-        mrg_lmdb_unlink_all();
-        return false;
+        goto failed;
     }
 
     // Update base time
@@ -204,17 +202,13 @@ bool mrg_lmdb_load(MRG *mrg) {
     if (tiers_count != nd_profile.storage_tiers) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: wrong number of tiers (%lu in lmdb, %zu expected)",
                tiers_count, nd_profile.storage_tiers);
-        mrg_lmdb_finalize(&lmdb, false);
-        mrg_lmdb_unlink_all();
-        return false;
+        goto failed;
     }
 
     // Verify files before loading metrics
     if (!mrg_lmdb_verify_files(&lmdb)) {
         nd_log(NDLS_DAEMON, NDLP_WARNING, "MRG LMDB: Some database files are missing or changed");
-        mrg_lmdb_finalize(&lmdb, false);
-        mrg_lmdb_unlink_all();
-        return false;
+        goto failed;
     }
 
     time_t now_s = now_realtime_sec();
@@ -223,7 +217,7 @@ bool mrg_lmdb_load(MRG *mrg) {
 
     // Process all metric UUIDs
     for (uint32_t id = 0; id < metrics_count; id++) {
-        nd_uuid_t uuid;
+        ND_UUID uuid;
         if (!mrg_lmdb_get_uuid(&lmdb, id, &uuid)) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: Failed to read UUID for metric %u", id);
             goto failed;
@@ -252,7 +246,7 @@ bool mrg_lmdb_load(MRG *mrg) {
             mrg_update_metric_retention_and_granularity_by_uuid(
                 mrg,
                 (Word_t)multidb_ctx[tier],
-                &uuid,
+                &uuid.uuid,
                 first_time_s,
                 last_time_s,
                 update_every_s,
@@ -263,10 +257,16 @@ bool mrg_lmdb_load(MRG *mrg) {
         }
     }
 
-    mrg_lmdb_finalize(&lmdb, false);
+    if(!mrg_lmdb_finalize(&lmdb, false))
+        goto failed;
 
-    nd_log(NDLS_DAEMON, NDLP_INFO, "MRG LMDB: Loaded %u metrics, skipped %u metrics",
-           metrics_loaded, metrics_skipped);
+    usec_t ended = now_monotonic_usec();
+    char dt[32];
+    duration_snprintf(dt, sizeof(dt), ended - started, "us", false);
+    nd_log(NDLS_DAEMON, NDLP_INFO, "MRG LMDB: Loaded %u metrics, skipped %u metrics, in %s",
+           metrics_loaded, metrics_skipped, dt);
+
+    mrg_lmdb_unlink_all();
 
     return metrics_loaded > 0;
 

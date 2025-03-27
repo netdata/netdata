@@ -6,12 +6,18 @@
 
 static bool mrg_lmdb_save_reopen_transaction(struct mrg_lmdb *lmdb, bool grow) {
     if(lmdb->txn) {
-        mdb_txn_commit(lmdb->txn);
+        int rc = mdb_txn_commit(lmdb->txn);
+        if (rc != MDB_SUCCESS) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: Failed to commit transaction: %s", mdb_strerror(rc));
+            return false;
+        }
         lmdb->txn = NULL;
     }
 
     if(grow) {
-        mrg_lmdb_finalize(lmdb, false);
+        if(!mrg_lmdb_finalize(lmdb, true))
+            return false;
+
         if(!mrg_lmdb_init(lmdb, lmdb->mode, lmdb->base_time, lmdb->metrics_per_transaction, lmdb->tiers, grow)) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: failed to grow the LMDB environment");
             return false;
@@ -52,7 +58,7 @@ static int mrg_lmdb_put_auto(struct mrg_lmdb *lmdb, MDB_dbi dbi, MDB_val *key, M
     return rc;
 }
 
-static bool mrg_lmdb_put_uuid(struct mrg_lmdb *lmdb, UUIDMAP_ID uid) {
+static bool mrg_lmdb_put_uuid(struct mrg_lmdb *lmdb, UUIDMAP_ID uid, uint32_t id) {
     ND_UUID uuid = uuidmap_get(uid);
     if(UUIDiszero(uuid)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, invalid UUID found");
@@ -60,8 +66,8 @@ static bool mrg_lmdb_put_uuid(struct mrg_lmdb *lmdb, UUIDMAP_ID uid) {
     }
 
     MDB_val key, data;
-    key.mv_size = sizeof(lmdb->metrics_added);
-    key.mv_data = &lmdb->metrics_added;
+    key.mv_size = sizeof(id);
+    key.mv_data = &id;
     data.mv_size = sizeof(ND_UUID);
     data.mv_data = &uuid;
 
@@ -71,7 +77,6 @@ static bool mrg_lmdb_put_uuid(struct mrg_lmdb *lmdb, UUIDMAP_ID uid) {
         return false;
     }
 
-    lmdb->metrics_added++;
     lmdb->metrics_in_this_transaction++;
 
     if(!lmdb->txn || lmdb->metrics_in_this_transaction >= lmdb->metrics_per_transaction) {
@@ -120,12 +125,10 @@ static bool mrg_lmdb_put_meta_uint64(struct mrg_lmdb *lmdb, MDB_dbi dbi, const c
     return true;
 }
 
-static bool mrg_lmdb_put_file(struct mrg_lmdb *lmdb, size_t tier, size_t fileno, size_t size, usec_t mtime) {
-    lmdb->files_added++;
-
+static bool mrg_lmdb_put_file(struct mrg_lmdb *lmdb, uint32_t id, size_t tier, size_t fileno, size_t size, usec_t mtime) {
     MDB_val key, data;
-    key.mv_size = sizeof(lmdb->files_added);
-    key.mv_data = &lmdb->files_added;
+    key.mv_size = sizeof(id);
+    key.mv_data = &id;
 
     struct mrg_lmdb_file_value value = {
         .tier = tier,
@@ -147,6 +150,7 @@ static bool mrg_lmdb_put_file(struct mrg_lmdb *lmdb, size_t tier, size_t fileno,
 }
 
 bool mrg_lmdb_save(MRG *mrg) {
+    usec_t started = now_monotonic_usec();
     mrg_lmdb_unlink_all();
 
     struct mrg_lmdb lmdb;
@@ -155,6 +159,7 @@ bool mrg_lmdb_save(MRG *mrg) {
         return false;
     }
 
+    uint32_t metrics_added = 0;
     for (size_t i = 0; i < UUIDMAP_PARTITIONS; i++) {
         mrg_index_read_lock(mrg, i);
 
@@ -183,7 +188,7 @@ bool mrg_lmdb_save(MRG *mrg) {
                 if(unlikely(!mrg_lmdb_put_metric_at_tier(
                         &lmdb,
                         ctx->config.tier,
-                        lmdb.metrics_added,
+                        metrics_added,
                         m->latest_update_every_s,
                         m->first_time_s,
                         m->latest_time_s_clean))) {
@@ -195,7 +200,7 @@ bool mrg_lmdb_save(MRG *mrg) {
                 lmdb.metrics_on_tiers_ok++;
             }
 
-            if(unlikely(added && !mrg_lmdb_put_uuid(&lmdb, uuid_index))) {
+            if(unlikely(added && !mrg_lmdb_put_uuid(&lmdb, uuid_index, metrics_added++))) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, failed to add UUID");
                 mrg_index_read_unlock(mrg, i);
                 goto failed;
@@ -205,6 +210,7 @@ bool mrg_lmdb_save(MRG *mrg) {
         mrg_index_read_unlock(mrg, i);
     }
 
+    uint32_t files_added = 0;
     char filename[FILENAME_MAX + 1];
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS ; tier++) {
         if(!multidb_ctx[tier]) continue;
@@ -226,7 +232,7 @@ bool mrg_lmdb_save(MRG *mrg) {
                 goto failed;
             }
 
-            if(!mrg_lmdb_put_file(&lmdb, tier, d->fileno, st.st_size, STAT_GET_MTIME_SEC(st) * USEC_PER_SEC + STAT_GET_MTIME_NSEC(st) / 1000)) {
+            if(!mrg_lmdb_put_file(&lmdb, files_added++, tier, d->fileno, st.st_size, STAT_GET_MTIME_SEC(st) * USEC_PER_SEC + STAT_GET_MTIME_NSEC(st) / 1000)) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, failed to add file");
                 uv_rwlock_rdunlock(&multidb_ctx[tier]->datafiles.rwlock);
                 goto failed;
@@ -238,16 +244,21 @@ bool mrg_lmdb_save(MRG *mrg) {
     // save the metadata
     if (!mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "version", 1) ||
         !mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "base_time", lmdb.base_time) ||
-        !mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "metrics", lmdb.metrics_added) ||
+        !mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "metrics", metrics_added) ||
         !mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "tiers", lmdb.tiers))
         goto failed;
 
-    mrg_lmdb_finalize(&lmdb, true);
+    if(!mrg_lmdb_finalize(&lmdb, true))
+        goto failed;
 
     bool rc = mrg_lmdb_rename_completed();
-    if(rc)
-        nd_log(NDLS_DAEMON, NDLP_INFO, "MRG LMDB: saved %u metrics in %u tiers (%u total, %u invalid), from %u files.",
-               lmdb.metrics_added, lmdb.tiers, lmdb.metrics_on_tiers_ok, lmdb.metrics_on_tiers_invalid, lmdb.files_added);
+    if(rc) {
+        usec_t ended = now_monotonic_usec();
+        char dt[32];
+        duration_snprintf(dt, sizeof(dt), ended - started, "us", false);
+        nd_log(NDLS_DAEMON, NDLP_INFO, "MRG LMDB: saved %u metrics in %u tiers (%u total, %u invalid), from %u files, in %s.",
+               metrics_added, lmdb.tiers, lmdb.metrics_on_tiers_ok, lmdb.metrics_on_tiers_invalid, files_added, dt);
+    }
     else
         goto failed;
 

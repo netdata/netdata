@@ -51,8 +51,6 @@ struct mrg_lmdb {
     MDB_txn *txn;
     uint32_t metrics_per_transaction;
     uint32_t metrics_in_this_transaction;
-    uint32_t metrics_added;
-    uint32_t files_added;
     uint32_t tiers;
 
     uint32_t metrics_on_tiers_ok;
@@ -73,7 +71,7 @@ static inline bool mrg_lmdb_init(struct mrg_lmdb *lmdb, enum mrg_lmdb_mode mode,
     char filename[FILENAME_MAX + 1];
     if(lmdb->mode == MRG_LMDB_MODE_SAVE) {
         snprintfz(filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_FILE, netdata_configured_cache_dir);
-        flags = MDB_WRITEMAP | MDB_NOSYNC | MDB_NOMETASYNC | MDB_NORDAHEAD | MDB_NOSUBDIR | MDB_NOLOCK;
+        flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOMETASYNC | MDB_NORDAHEAD | MDB_NOSUBDIR | MDB_NOLOCK;
     }
     else {
         snprintfz(filename, FILENAME_MAX, "%s/" MRG_LMDB_FILE, netdata_configured_cache_dir);
@@ -149,20 +147,35 @@ static inline bool mrg_lmdb_init(struct mrg_lmdb *lmdb, enum mrg_lmdb_mode mode,
             lmdb->txn = NULL;
             return false;
         }
+
+        if(lmdb->mode == MRG_LMDB_MODE_LOAD) {
+            MDB_stat stat;
+            rc = mdb_stat(lmdb->txn, lmdb->dbi[i], &stat);
+            if (rc == MDB_SUCCESS)
+                nd_log(NDLS_DAEMON, NDLP_INFO, "MRG LMDB: '%s' database has %u entries", db_name, (unsigned)stat.ms_entries);
+            else
+                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: Failed to get '%s' database stats: %s", db_name, mdb_strerror(rc));
+        }
     }
 
     return true;
 }
 
-static inline void mrg_lmdb_finalize(struct mrg_lmdb *lmdb, bool sync) {
+static inline bool mrg_lmdb_finalize(struct mrg_lmdb *lmdb, bool sync) {
     if(!lmdb->env)
-        return;
+        return false;
 
     if(lmdb->txn) {
-        if(lmdb->mode == MRG_LMDB_MODE_SAVE)
-            mdb_txn_commit(lmdb->txn);
+        if(lmdb->mode == MRG_LMDB_MODE_SAVE) {
+            int rc = mdb_txn_commit(lmdb->txn);
+            if (rc != MDB_SUCCESS) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: Failed to commit transaction: %s", mdb_strerror(rc));
+                return false;
+            }
+        }
         else
             mdb_txn_abort(lmdb->txn);
+
         lmdb->txn = NULL;
     }
 
@@ -176,6 +189,8 @@ static inline void mrg_lmdb_finalize(struct mrg_lmdb *lmdb, bool sync) {
 
     mdb_env_close(lmdb->env);
     lmdb->env = NULL;
+
+    return true;
 }
 
 static inline void mrg_lmdb_unlink_all(void) {
