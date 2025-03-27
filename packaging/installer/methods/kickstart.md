@@ -183,7 +183,3 @@ The `kickstart.sh` script does the following after being downloaded and run usin
 - If no static build is available, installs required dependencies and then attempts to install by building Netdata locally (by downloading the sources and building them directly).
 - Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated with new nightly versions, unless you override that with an [optional parameter](#optional-parameters-to-alter-your-installation).
 - Prints a message whether installation succeeded or failed for QA purposes.
-<!--stackedit_data:
-eyJoaXN0b3J5IjpbLTExMTgwOTg4NzMsLTE1ODk2MzM4MTRdfQ
-==
--->
