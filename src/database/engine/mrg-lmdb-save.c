@@ -2,149 +2,7 @@
 
 #include "mrg-lmdb.h"
 
-#define MRG_LMDB_BASE_TIMESTAMP 1262304000
-
-void mrg_lmdb_unlink_all(void) {
-    char old_filename[FILENAME_MAX + 1];
-
-    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_FILE, netdata_configured_cache_dir);
-    unlink(old_filename);
-
-    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_LOCK_FILE, netdata_configured_cache_dir);
-    unlink(old_filename);
-
-    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_FILE, netdata_configured_cache_dir);
-    unlink(old_filename);
-
-    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_LOCK_FILE, netdata_configured_cache_dir);
-    unlink(old_filename);
-
-    errno_clear();
-}
-
-static bool mrg_lmdb_rename_completed(void) {
-    char old_filename[FILENAME_MAX + 1];
-    char new_filename[FILENAME_MAX + 1];
-
-    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_FILE, netdata_configured_cache_dir);
-    snprintfz(new_filename, FILENAME_MAX, "%s/" MRG_LMDB_FILE, netdata_configured_cache_dir);
-    if(rename(old_filename, new_filename) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: rename from '%s' to '%s' failed", old_filename, new_filename);
-        return false;
-    }
-
-    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_LOCK_FILE, netdata_configured_cache_dir);
-    snprintfz(new_filename, FILENAME_MAX, "%s/" MRG_LMDB_LOCK_FILE, netdata_configured_cache_dir);
-    if(rename(old_filename, new_filename) != 0) {
-        // we don't need a lock file by default
-        // nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: rename from '%s' to '%s' failed", old_filename, new_filename);
-        // return false;
-    }
-
-    return true;
-}
-
-static bool mrg_lmdb_save_init(struct mrg_lmdb *lmdb, time_t base_time, uint32_t metrics_per_transaction, uint32_t tiers, bool grow) {
-    if(!grow)
-        memset(lmdb, 0, sizeof(*lmdb));
-
-    lmdb->tiers = tiers;
-    lmdb->base_time = base_time;
-    lmdb->metrics_per_transaction = metrics_per_transaction;
-
-    if(lmdb->memory)
-        lmdb->memory *= 2;
-    else
-        lmdb->memory = 4 * 1024 * 1024;
-
-    // create the LMDB environment
-    int rc = mdb_env_create(&lmdb->env);
-    if(rc != MDB_SUCCESS) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_env_create() failed: %s", mdb_strerror(rc));
-        return false;
-    }
-
-    // set the map size
-    rc = mdb_env_set_mapsize(lmdb->env, lmdb->memory);
-    if(rc != MDB_SUCCESS) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_env_set_mapsize() failed: %s", mdb_strerror(rc));
-        mdb_env_close(lmdb->env);
-        return false;
-    }
-
-    // set up the number of databases
-    // section + 1 for the UUIDs + 1 for the metadata
-    rc = mdb_env_set_maxdbs(lmdb->env, tiers + MRG_LMDB_DBI_TIERS_BASE);
-    if(rc != MDB_SUCCESS) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_env_set_maxdbs() failed: %s", mdb_strerror(rc));
-        mdb_env_close(lmdb->env);
-        return false;
-    }
-
-    // open the environment
-    {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_FILE, netdata_configured_cache_dir);
-        rc = mdb_env_open(lmdb->env, filename, MDB_WRITEMAP | MDB_NOSYNC | MDB_NOMETASYNC | MDB_NORDAHEAD | MDB_NOSUBDIR | MDB_NOLOCK, 0660);
-        if(rc != MDB_SUCCESS) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_env_open() failed: %s", mdb_strerror(rc));
-            mdb_env_close(lmdb->env);
-            return false;
-        }
-    }
-
-    // open the first transaction
-    rc = mdb_txn_begin(lmdb->env, NULL, 0, &lmdb->txn);
-    if(rc != MDB_SUCCESS) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_txn_begin() failed: %s", mdb_strerror(rc));
-        return false;
-    }
-
-    // open the databases - these remain valid for the lifetime of the environment
-    for(size_t i = 0; i < lmdb->tiers + MRG_LMDB_DBI_TIERS_BASE; i++) {
-        char db_name[32];
-
-        if(i == MRG_LMDB_DBI_METADATA)
-            snprintfz(db_name, 32, MRG_LMDB_DBI_METADATA_NAME);
-        else if(i == MRG_LMDB_DBI_FILES)
-            snprintfz(db_name, 32, MRG_LMDB_DBI_FILES_NAME);
-        else if(i == MRG_LMDB_DBI_UUIDS)
-            snprintfz(db_name, 32, MRG_LMDB_DBI_UUIDS_NAME);
-        else
-            snprintfz(db_name, 32, MRG_LMDB_DBI_TIERS_FORMAT, (size_t)(i - MRG_LMDB_DBI_TIERS_BASE));
-
-        rc = mdb_dbi_open(lmdb->txn, db_name, MDB_CREATE, &lmdb->dbi[i]);
-        if(rc != MDB_SUCCESS) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_dbi_open() failed: %s", mdb_strerror(rc));
-            mdb_txn_abort(lmdb->txn);
-            lmdb->txn = NULL;
-            return false;
-        }
-    }
-
-    return true;
-}
-
-static void mrg_lmdb_save_finalize(struct mrg_lmdb *lmdb, bool sync) {
-    if(!lmdb->env)
-        return;
-
-    if(lmdb->txn) {
-        mdb_txn_commit(lmdb->txn);
-        lmdb->txn = NULL;
-    }
-
-    for(size_t i = 0; i < lmdb->tiers + MRG_LMDB_DBI_TIERS_BASE; i++) {
-        mdb_dbi_close(lmdb->env, lmdb->dbi[i]);
-        lmdb->dbi[i] = 0;
-    }
-
-    if(sync)
-        mdb_env_sync(lmdb->env, 1);
-
-    mdb_env_close(lmdb->env);
-    lmdb->env = NULL;
-}
+#define MRG_LMDB_BASE_TIMESTAMP 1262304000 // Jan 1st, 2010
 
 static bool mrg_lmdb_save_reopen_transaction(struct mrg_lmdb *lmdb, bool grow) {
     if(lmdb->txn) {
@@ -153,8 +11,8 @@ static bool mrg_lmdb_save_reopen_transaction(struct mrg_lmdb *lmdb, bool grow) {
     }
 
     if(grow) {
-        mrg_lmdb_save_finalize(lmdb, false);
-        if(!mrg_lmdb_save_init(lmdb, lmdb->base_time, lmdb->metrics_per_transaction, lmdb->tiers, grow)) {
+        mrg_lmdb_finalize(lmdb, false);
+        if(!mrg_lmdb_init(lmdb, lmdb->mode, lmdb->base_time, lmdb->metrics_per_transaction, lmdb->tiers, grow)) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: failed to grow the LMDB environment");
             return false;
         }
@@ -292,7 +150,7 @@ bool mrg_lmdb_save(MRG *mrg) {
     mrg_lmdb_unlink_all();
 
     struct mrg_lmdb lmdb;
-    if(!mrg_lmdb_save_init(&lmdb, MRG_LMDB_BASE_TIMESTAMP, 100000, nd_profile.storage_tiers, false)) {
+    if(!mrg_lmdb_init(&lmdb, MRG_LMDB_MODE_SAVE, MRG_LMDB_BASE_TIMESTAMP, 100000, nd_profile.storage_tiers, false)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, failed to initialize LMDB");
         return false;
     }
@@ -383,7 +241,7 @@ bool mrg_lmdb_save(MRG *mrg) {
                 goto failed;
             }
 
-            if(!mrg_lmdb_put_file(&lmdb, tier, d->fileno, st.st_size, st.st_mtime * USEC_PER_SEC + st.st_mtim.tv_nsec / 1000)) {
+            if(!mrg_lmdb_put_file(&lmdb, tier, d->fileno, st.st_size, STAT_GET_MTIME_SEC(st) * USEC_PER_SEC + STAT_GET_MTIME_NSEC(st) / 1000)) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, failed to add file");
                 uv_rwlock_rdunlock(&multidb_ctx[tier]->datafiles.rwlock);
                 goto failed;
@@ -399,7 +257,7 @@ bool mrg_lmdb_save(MRG *mrg) {
         !mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "tiers", lmdb.tiers))
         goto failed;
 
-    mrg_lmdb_save_finalize(&lmdb, true);
+    mrg_lmdb_finalize(&lmdb, true);
 
     bool rc = mrg_lmdb_rename_completed();
     if(rc)
@@ -411,7 +269,7 @@ bool mrg_lmdb_save(MRG *mrg) {
     return rc;
 
 failed:
-    mrg_lmdb_save_finalize(&lmdb, false);
+    mrg_lmdb_finalize(&lmdb, false);
     mrg_lmdb_unlink_all();
     return false;
 }
