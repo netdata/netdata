@@ -8,12 +8,10 @@
 #include <zstd.h>
 
 // File layout constants
-#define MRG_FILE_HEADER_SIZE 4096
-#define MRG_FILE_PAGE_HEADER_SIZE 64
 #define MRG_FILE_PAGE_SIZE (1024 * 1024)  // 1 MiB uncompressed page size
 #define MRG_FILE_EXTENSION ".mrg"
 #define MRG_FILE_NAME "metrics" MRG_FILE_EXTENSION
-#define MRG_FILE_TMP_NAME "metrics.tmp" MRG_FILE_EXTENSION
+#define MRG_FILE_TMP_NAME "metrics-tmp" MRG_FILE_EXTENSION
 
 // Page types
 typedef enum {
@@ -22,7 +20,7 @@ typedef enum {
 } mrg_page_type_t;
 
 // File header structure
-typedef struct {
+typedef struct mrg_file_header {
     char magic[8];                   // Magic identifier "NETDMRG\0"
     uint32_t version;                // File format version
     uint64_t base_time;              // Base timestamp for relative time values
@@ -41,22 +39,22 @@ typedef struct {
         uint32_t page_count;         // Number of file pages
     } file_pages;
 
-    uint8_t reserved[4048];          // Reserved space to maintain 4KB header
+    uint8_t reserved[440];           // Reserved space to maintain 4KB header
 } mrg_file_header_t;
 
 // Page header structure
-typedef struct {
+typedef struct mrg_page_header {
     char magic[4];                   // Magic identifier "MRGP"
     uint32_t type;                   // Page type (metric, file)
     uint64_t prev_offset;            // Offset to previous page of same type
     uint32_t compressed_size;        // Size of the compressed data
     uint32_t uncompressed_size;      // Size of the uncompressed data
     uint32_t entries_count;          // Number of entries in this page
-    uint8_t reserved[40];            // Reserved space to maintain 64-byte header
+    uint8_t reserved[36];            // Reserved space to maintain 64-byte header
 } mrg_page_header_t;
 
 // Metric entry structure
-typedef struct {
+typedef struct mrg_file_metric {
     ND_UUID uuid;                    // Metric UUID
     uint32_t tier;                   // Tier number this metric belongs to
     uint32_t first_time;             // First timestamp relative to base_time
@@ -65,7 +63,7 @@ typedef struct {
 } mrg_file_metric_t;
 
 // File entry structure
-typedef struct {
+typedef struct mrg_file_entry {
     uint32_t tier;                   // Tier this file belongs to
     uint32_t fileno;                 // File number in tier
     uint64_t size;                   // File size

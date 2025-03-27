@@ -66,6 +66,26 @@ static bool mrg_file_write_page(mrg_file_ctx_t *ctx, mrg_page_type_t type,
                                 uint64_t *prev_offset) {
     if (data_size == 0) return true;
 
+    // Ensure we're at the correct file position
+    if (lseek(ctx->fd, ctx->file_size, SEEK_SET) != (off_t)ctx->file_size) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to seek to position %"PRIu64": %s",
+               ctx->file_size, strerror(errno));
+        return false;
+    }
+
+    // Store the current position as the starting offset for this page
+    uint64_t current_page_offset = ctx->file_size;
+
+    // Prepare page header with MRGP magic
+    mrg_page_header_t page_header;
+    memcpy(page_header.magic, "MRGP", 4);
+    page_header.type = type;
+    page_header.prev_offset = *prev_offset;
+    page_header.compressed_size = 0; // Will be set after compression
+    page_header.uncompressed_size = data_size;
+    page_header.entries_count = entries_count;
+    memset(page_header.reserved, 0, sizeof(page_header.reserved));
+
     // Compress the data
     size_t compressed_size = ZSTD_compress(
         ctx->compressed_buffer,
@@ -81,15 +101,8 @@ static bool mrg_file_write_page(mrg_file_ctx_t *ctx, mrg_page_type_t type,
         return false;
     }
 
-    // Prepare page header
-    mrg_page_header_t page_header;
-    memcpy(page_header.magic, "MRGP", 4);
-    page_header.type = type;
-    page_header.prev_offset = *prev_offset;
+    // Update the compressed size in the header
     page_header.compressed_size = (uint32_t)compressed_size;
-    page_header.uncompressed_size = data_size;
-    page_header.entries_count = entries_count;
-    memset(page_header.reserved, 0, sizeof(page_header.reserved));
 
     // Write page header
     if (write(ctx->fd, &page_header, sizeof(mrg_page_header_t)) != sizeof(mrg_page_header_t)) {
@@ -103,11 +116,11 @@ static bool mrg_file_write_page(mrg_file_ctx_t *ctx, mrg_page_type_t type,
         return false;
     }
 
-    // Update the previous offset to current page
-    *prev_offset = ctx->file_size;
+    // Update the previous offset to the current page's offset
+    *prev_offset = current_page_offset;
 
     // Update file size
-    ctx->file_size += sizeof(mrg_page_header_t) + compressed_size;
+    ctx->file_size = current_page_offset + sizeof(mrg_page_header_t) + compressed_size;
 
     return true;
 }
@@ -224,14 +237,22 @@ bool mrg_dump_save(MRG *mrg) {
     mrg_file_ctx_t *ctx = mrg_file_ctx_create();
     ctx->fd = fd;
 
-    // Skip the header for now, we'll write it at the end
-    if (lseek(fd, MRG_FILE_HEADER_SIZE, SEEK_SET) != MRG_FILE_HEADER_SIZE) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to seek past header: %s", strerror(errno));
+    // Write a placeholder header
+    if (!mrg_file_write_header(ctx)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to write placeholder header");
         mrg_file_ctx_destroy(ctx);
         return false;
     }
 
-    ctx->file_size = MRG_FILE_HEADER_SIZE;
+    // Set initial file size to header size
+    ctx->file_size = sizeof(mrg_file_header_t);
+
+    // Ensure we're at the correct position after the header
+    if (lseek(fd, ctx->file_size, SEEK_SET) != (off_t)ctx->file_size) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to seek past header: %s", strerror(errno));
+        mrg_file_ctx_destroy(ctx);
+        return false;
+    }
 
     // Process metrics (iterate through all partitions)
     uint32_t metrics_added = 0;
@@ -329,7 +350,7 @@ bool mrg_dump_save(MRG *mrg) {
     if (success && !mrg_file_flush_file_buffer(ctx))
         success = false;
 
-    // Write the header
+    // Write the final header with updated offsets and counts
     if (success && !mrg_file_write_header(ctx))
         success = false;
 

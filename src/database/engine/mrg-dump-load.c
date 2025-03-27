@@ -64,6 +64,7 @@ static bool mrg_file_read_header(mrg_file_load_ctx_t *ctx) {
 
 // Read a page from the file
 static ssize_t mrg_file_read_page(mrg_file_load_ctx_t *ctx, uint64_t offset, mrg_page_header_t *header, void *data) {
+    // Seek to the specified offset in the file
     if (lseek(ctx->fd, offset, SEEK_SET) != (off_t)offset) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to seek to offset %"PRIu64": %s",
                offset, strerror(errno));
@@ -71,20 +72,35 @@ static ssize_t mrg_file_read_page(mrg_file_load_ctx_t *ctx, uint64_t offset, mrg
     }
 
     // Read page header
-    if (read(ctx->fd, header, sizeof(mrg_page_header_t)) != sizeof(mrg_page_header_t)) {
+    ssize_t bytes_read = read(ctx->fd, header, sizeof(mrg_page_header_t));
+    if (bytes_read != sizeof(mrg_page_header_t)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to read page header: %s", strerror(errno));
         return -1;
     }
 
     // Verify page magic
     if (memcmp(header->magic, "MRGP", 4) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Invalid magic in page header at offset %"PRIu64, offset);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Invalid magic in page header at offset %"PRIu64" (got: %02x %02x %02x %02x)",
+               offset,
+               (unsigned char)header->magic[0],
+               (unsigned char)header->magic[1],
+               (unsigned char)header->magic[2],
+               (unsigned char)header->magic[3]);
+        return -1;
+    }
+
+    // Validate compressed size
+    if (header->compressed_size == 0 || header->compressed_size > ZSTD_compressBound(MRG_FILE_PAGE_SIZE)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Invalid compressed size %u at offset %"PRIu64,
+               header->compressed_size, offset);
         return -1;
     }
 
     // Read compressed data
-    if (read(ctx->fd, ctx->compressed_buffer, header->compressed_size) != header->compressed_size) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to read compressed data: %s", strerror(errno));
+    bytes_read = read(ctx->fd, ctx->compressed_buffer, header->compressed_size);
+    if (bytes_read != (ssize_t)header->compressed_size) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to read compressed data (%zd of %u bytes): %s",
+               bytes_read, header->compressed_size, strerror(errno));
         return -1;
     }
 
@@ -256,26 +272,38 @@ static bool mrg_file_traverse_pages(MRG *mrg, mrg_file_load_ctx_t *ctx,
                                     uint32_t *processed_files) {
     uint64_t offset = last_offset;
     while (offset > 0) {
+        // Debug logging for page traversal
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "MRG DUMP: Processing page at offset %"PRIu64" of type %u",
+               offset, (unsigned)type);
+
         mrg_page_header_t header;
         ssize_t size = mrg_file_read_page(ctx, offset, &header, ctx->uncompressed_buffer);
-        if (size < 0) return false;
+        if (size < 0) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to read page at offset %"PRIu64, offset);
+            return false;
+        }
 
         // Verify page type
         if (header.type != type) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "MRG DUMP: Page type mismatch: expected %u, got %u",
-                   type, header.type);
+                   "MRG DUMP: Page type mismatch at offset %"PRIu64": expected %u, got %u",
+                   offset, type, header.type);
             return false;
         }
 
         // Process page based on type
         if (type == MRG_PAGE_TYPE_METRIC) {
-            if (!mrg_file_process_metric_page(mrg, ctx, &header, ctx->uncompressed_buffer, size, processed_metrics))
+            if (!mrg_file_process_metric_page(mrg, ctx, &header, ctx->uncompressed_buffer, size, processed_metrics)) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to process metric page at offset %"PRIu64, offset);
                 return false;
+            }
         }
         else if (type == MRG_PAGE_TYPE_FILE) {
-            if (!mrg_file_process_file_page(ctx, &header, ctx->uncompressed_buffer, size, processed_files))
+            if (!mrg_file_process_file_page(ctx, &header, ctx->uncompressed_buffer, size, processed_files)) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to process file page at offset %"PRIu64, offset);
                 return false;
+            }
         }
 
         // Move to previous page
