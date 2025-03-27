@@ -42,6 +42,9 @@ typedef enum {
 
     // netdata update
     EXIT_REASON_UPDATE              = (1 << 18),
+
+    // timeout while shutting down
+    EXIT_REASON_SHUTDOWN_TIMEOUT    = (1 << 19),
 } EXIT_REASON;
 
 #define EXIT_REASON_NORMAL              \
@@ -74,10 +77,11 @@ typedef enum {
         | EXIT_REASON_FATAL             \
         | EXIT_REASON_ALREADY_RUNNING   \
         | EXIT_REASON_OUT_OF_MEMORY     \
+        | EXIT_REASON_SHUTDOWN_TIMEOUT  \
     )
 
 #define is_deadly_signal(reason) ((reason) & (EXIT_REASON_DEADLY_SIGNAL))
-#define is_exit_reason_normal(reason) (((reason) & EXIT_REASON_NORMAL) && !((reason) & EXIT_REASON_ABNORMAL))
+#define is_exit_reason_normal(reason) (((reason == EXIT_REASON_NONE) || ((reason) & EXIT_REASON_NORMAL)) && !((reason) & EXIT_REASON_ABNORMAL))
 
 typedef struct web_buffer BUFFER;
 BITMAP_STR_DEFINE_FUNCTIONS_EXTERN(EXIT_REASON);

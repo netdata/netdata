@@ -6,8 +6,9 @@
 #include "libnetdata/libnetdata.h"
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
+#include "claim/cloud-status.h"
 
-#define STATUS_FILE_VERSION 19
+#define STATUS_FILE_VERSION 22
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -37,6 +38,7 @@ typedef struct daemon_status_file {
     ND_PROFILE profile;         // the profile of the agent
     DAEMON_OS_TYPE os_type;
     RRD_DB_MODE db_mode;
+    CLOUD_STATUS cloud_status;
     uint8_t db_tiers;
     bool kubernetes;
     bool sentry_available;      // true when sentry support is compiled in
@@ -45,6 +47,7 @@ typedef struct daemon_status_file {
     time_t uptime;              // netdata uptime
     usec_t timestamp_ut;        // the timestamp of the status file
     size_t restarts;            // the number of times this agent has restarted (ever)
+    size_t posts;               // the number of posts to the backend
     ssize_t reliability;        // consecutive restarts: > 0 reliable, < 0 crashing
 
     ND_UUID boot_id;            // the boot id of the system
@@ -61,6 +64,8 @@ typedef struct daemon_status_file {
         time_t exit;
     } timings;
 
+    uint64_t oom_protection;
+    uint64_t netdata_max_rss;
     OS_SYSTEM_MEMORY memory;
     OS_SYSTEM_DISK_SPACE var_cache;
 
@@ -73,9 +78,13 @@ typedef struct daemon_status_file {
     char os_version[32];     // ECS: os.version
     char os_id[64];          // ECS: os.family
     char os_id_like[64];     // ECS: os.platform
+    char timezone[32];
+    char cloud_provider_type[32];
+    char cloud_instance_type[32];
+    char cloud_instance_region[32];
     bool read_system_info;
 
-    char stack_traces[15];   // the backend for capturing stack traces
+    char stack_traces[63];   // the backend for capturing stack traces
 
     struct {
         SPINLOCK spinlock;
@@ -110,11 +119,12 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 // check for a crash
 void daemon_status_file_check_crash(void);
 
-bool daemon_status_file_has_last_crashed(void);
+bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds);
 bool daemon_status_file_was_incomplete_shutdown(void);
 
 void daemon_status_file_startup_step(const char *step);
 void daemon_status_file_shutdown_step(const char *step);
+void daemon_status_file_shutdown_timeout(void);
 
 void daemon_status_file_init(void);
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
@@ -127,8 +137,12 @@ const char *daemon_status_file_get_os_name(void);
 const char *daemon_status_file_get_os_version(void);
 const char *daemon_status_file_get_os_id(void);
 const char *daemon_status_file_get_os_id_like(void);
+const char *daemon_status_file_get_timezone(void);
+const char *daemon_status_file_get_cloud_provider_type(void);
+const char *daemon_status_file_get_cloud_instance_type(void);
+const char *daemon_status_file_get_cloud_instance_region(void);
 
-const char *daemon_status_file_get_fatal_filename(void);
+    const char *daemon_status_file_get_fatal_filename(void);
 const char *daemon_status_file_get_fatal_function(void);
 const char *daemon_status_file_get_fatal_message(void);
 const char *daemon_status_file_get_fatal_errno(void);
@@ -140,5 +154,6 @@ long daemon_status_file_get_fatal_line(void);
 DAEMON_STATUS daemon_status_file_get_status(void);
 size_t daemon_status_file_get_restarts(void);
 ssize_t daemon_status_file_get_reliability(void);
+ND_UUID daemon_status_file_get_host_id(void);
 
 #endif //NETDATA_DAEMON_STATUS_FILE_H

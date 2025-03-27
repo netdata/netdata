@@ -249,74 +249,7 @@ REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *reques
 
 
 // ----------------------------------------------------------------------------
-// REGISTRY THIS MACHINE UNIQUE ID
-
-static inline int is_machine_guid_blacklisted(const char *guid) {
-    // these are machine GUIDs that have been included in distribution packages.
-    // we blacklist them here, so that the next version of netdata will generate
-    // new ones.
-
-    if(!strcmp(guid, "8a795b0c-2311-11e6-8563-000c295076a6")
-       || !strcmp(guid, "4aed1458-1c3e-11e6-a53f-000c290fc8f5")
-            ) {
-        netdata_log_error("Blacklisted machine GUID '%s' found.", guid);
-        return 1;
-    }
-
-    return 0;
-}
 
 const char *registry_get_this_machine_hostname(void) {
     return registry.hostname;
-}
-
-const char *registry_get_this_machine_guid(bool create_it) {
-    static char guid[GUID_LEN + 1] = "";
-
-    if(likely(guid[0]))
-        return guid;
-
-    // read it from disk
-    int fd = open(registry.machine_guid_filename, O_RDONLY | O_CLOEXEC);
-    if(fd != -1) {
-        char buf[GUID_LEN + 1];
-        if(read(fd, buf, GUID_LEN) != GUID_LEN)
-            netdata_log_error("Failed to read machine GUID from '%s'", registry.machine_guid_filename);
-        else {
-            buf[GUID_LEN] = '\0';
-            if(regenerate_guid(buf, guid) == -1) {
-                netdata_log_error("Failed to validate machine GUID '%s' from '%s'. Ignoring it - this might mean this netdata will appear as duplicate in the registry.",
-                        buf, registry.machine_guid_filename);
-
-                guid[0] = '\0';
-            }
-            else if(is_machine_guid_blacklisted(guid))
-                guid[0] = '\0';
-        }
-        close(fd);
-    }
-
-    // generate a new one?
-    if(!guid[0] && create_it) {
-        nd_uuid_t uuid;
-
-        uuid_generate_time(uuid);
-        uuid_unparse_lower(uuid, guid);
-        guid[GUID_LEN] = '\0';
-
-        // save it
-        fd = open(registry.machine_guid_filename, O_WRONLY|O_CREAT|O_TRUNC | O_CLOEXEC, 444);
-        if(fd == -1)
-            fatal("Cannot create unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
-
-        if(write(fd, guid, GUID_LEN) != GUID_LEN)
-            fatal("Cannot write the unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
-
-        close(fd);
-    }
-
-    if(guid[0])
-        nd_setenv("NETDATA_REGISTRY_UNIQUE_ID", guid, 1);
-
-    return guid;
 }

@@ -5,6 +5,12 @@
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 # Source of truth for all the packages we bundle in static builds
 . "$(dirname "${0}")/../bundled-packages.version"
+
+case "${BUILDARCH}" in
+    armv6l|armv7l) ;;
+    *) exit 0 ;;
+esac
+
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building libunwind" || true
 
@@ -13,24 +19,10 @@ export CXXFLAGS="${CFLAGS}"
 export LDFLAGS="-static -L/libucontext-static/usr/lib/ -lucontext"
 export PKG_CONFIG="pkg-config --static"
 
-if [ -d "${NETDATA_MAKESELF_PATH}/tmp/libunwind" ]; then
-  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
-fi
+cache_key="libunwind"
+build_dir="libunwind-${LIBUNWIND_VERSION}"
 
-cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/libunwind"
-
-if [ -d "${cache}" ]; then
-  echo "Found cached copy of build directory for libunwind, using it."
-  cp -a "${cache}/libunwind" "${NETDATA_MAKESELF_PATH}/tmp/"
-  CACHE_HIT=1
-else
-  echo "No cached copy of build directory for libunwind found, fetching sources instead."
-  run git clone "${LIBUNWIND_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
-  cd "${NETDATA_MAKESELF_PATH}/tmp/libunwind" && run git checkout "${LIBUNWIND_VERSION}"
-  CACHE_HIT=0
-fi
-
-cd "${NETDATA_MAKESELF_PATH}/tmp/libunwind" || exit 1
+fetch_git "${build_dir}" "${LIBUNWIND_SOURCE}" "${LIBUNWIND_VERSION}" "${cache_key}" fetch-via-checkout
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
   run autoreconf -ivf
@@ -50,7 +42,7 @@ fi
 
 run make -j "$(nproc)" install
 
-store_cache libunwind "${NETDATA_MAKESELF_PATH}/tmp/libunwind"
+store_cache "${cache_key}" "${build_dir}"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

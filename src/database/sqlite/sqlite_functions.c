@@ -410,8 +410,20 @@ int sqlite_library_init(void)
 
 SPINLOCK sqlite_spinlock = SPINLOCK_INITIALIZER;
 
+int sqlite_release_memory(int bytes)
+{
+    return sqlite3_release_memory(bytes);
+}
+
 void sqlite_library_shutdown(void)
 {
+#ifdef NETDATA_INTERNAL_CHECKS
+    int bytes;
+    do {
+        bytes = sqlite_release_memory(1024 * 1024);
+        netdata_log_info("SQLITE: Released %d bytes of memory", bytes);
+    } while (bytes);
+#endif
     spinlock_lock(&sqlite_spinlock);
     (void) sqlite3_shutdown();
     spinlock_unlock(&sqlite_spinlock);

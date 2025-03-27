@@ -321,3 +321,10 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram) {
     return os_system_memory_last;
 }
 #endif
+
+double os_system_memory_available_percent(OS_SYSTEM_MEMORY mem) {
+    if (!OS_SYSTEM_MEMORY_OK(mem))
+        return 100.0;
+
+    return 100.0 * (double)mem.ram_available_bytes / (double)mem.ram_total_bytes;
+}

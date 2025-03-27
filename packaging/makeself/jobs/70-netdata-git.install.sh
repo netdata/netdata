@@ -23,10 +23,13 @@ export EBPF_LIBC="static"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/libunwind-static/lib/pkgconfig:/openssl-static/lib64/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig:/curl-local/lib/pkgconfig"
 
-# Set correct CMake flags for building against non-System OpenSSL
-# See: https://github.com/warmcat/libwebsockets/blob/master/READMEs/README.build.md
-export CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=/openssl-static -DOPENSSL_LIBRARIES=/openssl-static/lib64 -DCMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE=/openssl-static -DLWS_OPENSSL_INCLUDE_DIRS=/openssl-static/include -DLWS_OPENSSL_LIBRARIES=/openssl-static/lib64/libssl.a;/openssl-static/lib64/libcrypto.a"
-[ "${BUILDARCH}" != "ppc64le" ] && export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBUNWIND=ON"
+NETDATA_BUILD_DIR="$(build_path netdata)"
+export NETDATA_BUILD_DIR
+
+case "${BUILDARCH}" in
+    armv7l|armv6l) export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=OFF -DENABLE_LIBUNWIND=ON" ;;
+    *) export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On"
+esac
 
 run ./netdata-installer.sh \
   --install-prefix "${NETDATA_INSTALL_PARENT}" \
@@ -38,25 +41,3 @@ run ./netdata-installer.sh \
   --one-time-build \
   --enable-lto \
   ${EXTRA_INSTALL_FLAGS:+${EXTRA_INSTALL_FLAGS}} \
-
-# shellcheck disable=SC2015
-[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Finishing netdata install" || true
-
-# Properly mark the install type
-cat > "${NETDATA_INSTALL_PATH}/etc/netdata/.install-type" <<-EOF
-	INSTALL_TYPE='manual-static'
-	PREBUILT_ARCH='${BUILDARCH}'
-	EOF
-
-# Remove the netdata.conf file from the tree. It has hard-coded sensible defaults builtin.
-run rm -f "${NETDATA_INSTALL_PATH}/etc/netdata/netdata.conf"
-
-# Ensure the netdata binary is in fact statically linked
-if run readelf -l "${NETDATA_INSTALL_PATH}"/bin/netdata | grep 'INTERP'; then
-  printf >&2 "Ooops. %s is not a statically linked binary!\n" "${NETDATA_INSTALL_PATH}"/bin/netdata
-  ldd "${NETDATA_INSTALL_PATH}"/bin/netdata
-  exit 1
-fi
-
-# shellcheck disable=SC2015
-[ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

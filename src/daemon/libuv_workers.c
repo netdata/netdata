@@ -53,6 +53,7 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_CTX_CLEANUP_SCHEDULE, "metadata ctx cleanup schedule");
     worker_register_job_name(UV_EVENT_CTX_CLEANUP, "metadata ctx cleanup");
     worker_register_job_name(UV_EVENT_STORE_ALERT_TRANSITIONS, "metadata store alert transitions");
+    worker_register_job_name(UV_EVENT_STORE_SQL_STATEMENTS, "metadata store sql statements");
     worker_register_job_name(UV_EVENT_CHART_LABEL_CLEANUP, "metadata chart label cleanup");
     worker_register_job_name(UV_EVENT_HEALTH_LOG_CLEANUP, "alert transitions cleanup");
     worker_register_job_name(UV_EVENT_UUID_DELETION, "metadata dimension deletion");
@@ -107,4 +108,23 @@ void register_libuv_worker_jobs() {
 
     registered = true;
     register_libuv_worker_jobs_internal();
+}
+
+// utils
+#define MAX_THREAD_CREATE_RETRIES (10)
+#define MAX_THREAD_CREATE_WAIT_MS (1000)
+
+int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries)
+{
+    int err;
+
+    do {
+        err = uv_thread_create(thread, thread_func, arg);
+        if (err == 0)
+            break;
+
+        uv_sleep(MAX_THREAD_CREATE_WAIT_MS);
+    } while (err == UV_EAGAIN && ++(*retries) < MAX_THREAD_CREATE_RETRIES);
+
+    return err;
 }
