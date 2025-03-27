@@ -2709,7 +2709,7 @@ void metadata_sync_shutdown(void)
     if (rc)
         nd_log_daemon(NDLP_ERR, "METADATA: Failed to join synchronization thread, error %s", uv_err_name(rc));
     else
-        nd_log_daemon(NDLP_DEBUG, "METADATA: synchronization thread shutdown completed");
+        nd_log_daemon(NDLP_INFO, "METADATA: synchronization thread shutdown completed");
 }
 
 void metadata_sync_shutdown_prepare(void)
