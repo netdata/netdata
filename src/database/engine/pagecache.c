@@ -1151,5 +1151,5 @@ void pgc_and_mrg_initialize(void)
     );
     pgc_set_dynamic_target_cache_size_callback(extent_cache, dynamic_extent_cache_size);
 
-    mrg_lmdb_load(main_mrg);
+    mrg_load(main_mrg);
 }

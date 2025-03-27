@@ -311,7 +311,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
 
-    mrg_lmdb_save(main_mrg);
+    mrg_save(main_mrg);
     watcher_step_complete(WATCHER_STEP_ID_MRG_SAVE);
 
     // unlink the pid

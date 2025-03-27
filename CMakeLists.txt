@@ -1656,9 +1656,10 @@ if(ENABLE_DBENGINE)
             src/database/engine/mrg.h
             src/database/engine/mrg-internals.h
             src/database/engine/mrg-unittest.c
-            src/database/engine/mrg-lmdb.h
-            src/database/engine/mrg-lmdb-load.c
-            src/database/engine/mrg-lmdb-save.c
+            src/database/engine/mrg-dump.c
+            src/database/engine/mrg-dump.h
+            src/database/engine/mrg-dump-save.c
+            src/database/engine/mrg-dump-load.c
             src/database/engine/pdc.c
             src/database/engine/pdc.h
             src/database/engine/dbengine-unittest.c
