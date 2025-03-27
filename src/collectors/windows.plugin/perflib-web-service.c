@@ -1000,42 +1000,40 @@ static inline void app_pool_upime(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    if (p->APPTotalApplicationPoolUptime.current.Frequency == 0) {
-        return;
-    }
-
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPTotalApplicationPoolUptime)) {
-        if (!p->st_app_application_pool_uptime) {
-            char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_uptime", windows_shared_buffer);
-            netdata_fix_chart_name(id);
-            p->st_app_application_pool_uptime = rrdset_create_localhost(
-                "iis",
-                id,
-                NULL,
-                "app pool uptime",
-                "iis.application_pool_uptime",
-                "IIS App Pool uptime",
-                "seconds",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibWebService",
-                PRIO_IIS_APP_POOL_TOTAL_UPTIME,
-                update_every,
-                RRDSET_TYPE_LINE);
+        if (p->APPTotalApplicationPoolUptime.current.Frequency != 0) {
+            if (!p->st_app_application_pool_uptime) {
+                char id[RRD_ID_LENGTH_MAX + 1];
+                snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_uptime", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->st_app_application_pool_uptime = rrdset_create_localhost(
+                    "iis",
+                    id,
+                    NULL,
+                    "app pool uptime",
+                    "iis.application_pool_uptime",
+                    "IIS App Pool uptime",
+                    "seconds",
+                    PLUGIN_WINDOWS_NAME,
+                    "PerflibWebService",
+                    PRIO_IIS_APP_POOL_TOTAL_UPTIME,
+                    update_every,
+                    RRDSET_TYPE_LINE);
 
-            p->rd_app_application_pool_uptime =
-                rrddim_add(p->st_app_application_pool_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(
-                p->st_app_application_pool_uptime->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->rd_app_application_pool_uptime =
+                    rrddim_add(p->st_app_application_pool_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrdlabels_add(
+                    p->st_app_application_pool_uptime->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            time_t uptime = (time_t)(p->APPTotalApplicationPoolUptime.current.Time /
+                                     p->APPTotalApplicationPoolUptime.current.Frequency);
+
+            rrddim_set_by_pointer(
+                p->st_app_application_pool_uptime, p->rd_app_application_pool_uptime, (collected_number)uptime);
+
+            rrdset_done(p->st_app_application_pool_uptime);
         }
-
-        time_t uptime = (time_t)(p->APPTotalApplicationPoolUptime.current.Time /
-                                 p->APPTotalApplicationPoolUptime.current.Frequency);
-
-        rrddim_set_by_pointer(
-            p->st_app_application_pool_uptime, p->rd_app_application_pool_uptime, (collected_number)uptime);
-
-        rrdset_done(p->st_app_application_pool_uptime);
     }
 }
 
