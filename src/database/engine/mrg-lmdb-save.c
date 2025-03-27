@@ -58,8 +58,9 @@ static bool mrg_lmdb_rename_completed(void) {
     snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_LOCK_FILE, netdata_configured_cache_dir);
     snprintfz(new_filename, FILENAME_MAX, "%s/" MRG_LMDB_LOCK_FILE, netdata_configured_cache_dir);
     if(rename(old_filename, new_filename) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: rename from '%s' to '%s' failed", old_filename, new_filename);
-        return false;
+        // we don't need a lock file by default
+        // nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: rename from '%s' to '%s' failed", old_filename, new_filename);
+        // return false;
     }
 
     return true;
@@ -82,6 +83,9 @@ struct mrg_lmdb {
     uint32_t metrics_added;
     uint32_t files_added;
     uint32_t tiers;
+
+    uint32_t metrics_on_tiers_ok;
+    uint32_t metrics_on_tiers_invalid;
 };
 
 static bool mrg_lmdb_init(struct mrg_lmdb *lmdb, time_t base_time, uint32_t metrics_per_transaction, uint32_t tiers, bool grow) {
@@ -95,7 +99,7 @@ static bool mrg_lmdb_init(struct mrg_lmdb *lmdb, time_t base_time, uint32_t metr
     if(lmdb->memory)
         lmdb->memory *= 2;
     else
-        lmdb->memory = 10 * 1024 * 1024;
+        lmdb->memory = 4 * 1024 * 1024;
 
     // create the LMDB environment
     int rc = mdb_env_create(&lmdb->env);
@@ -125,7 +129,7 @@ static bool mrg_lmdb_init(struct mrg_lmdb *lmdb, time_t base_time, uint32_t metr
     {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_FILE, netdata_configured_cache_dir);
-        rc = mdb_env_open(lmdb->env, filename, MDB_WRITEMAP | MDB_NOSYNC | MDB_NOMETASYNC | MDB_MAPASYNC | MDB_NORDAHEAD | MDB_NOSUBDIR, 0660);
+        rc = mdb_env_open(lmdb->env, filename, MDB_WRITEMAP | MDB_NOSYNC | MDB_NOMETASYNC | MDB_NORDAHEAD | MDB_NOSUBDIR | MDB_NOLOCK, 0660);
         if(rc != MDB_SUCCESS) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_env_open() failed: %s", mdb_strerror(rc));
             mdb_env_close(lmdb->env);
@@ -165,7 +169,10 @@ static bool mrg_lmdb_init(struct mrg_lmdb *lmdb, time_t base_time, uint32_t metr
     return true;
 }
 
-void mrg_lmdb_finalize(struct mrg_lmdb *lmdb) {
+void mrg_lmdb_finalize(struct mrg_lmdb *lmdb, bool sync) {
+    if(!lmdb->env)
+        return;
+
     if(lmdb->txn) {
         mdb_txn_commit(lmdb->txn);
         lmdb->txn = NULL;
@@ -175,6 +182,9 @@ void mrg_lmdb_finalize(struct mrg_lmdb *lmdb) {
         mdb_dbi_close(lmdb->env, lmdb->dbi[i]);
         lmdb->dbi[i] = 0;
     }
+
+    if(sync)
+        mdb_env_sync(lmdb->env, 1);
 
     mdb_env_close(lmdb->env);
     lmdb->env = NULL;
@@ -187,7 +197,7 @@ bool mrg_lmdb_reopen_transaction(struct mrg_lmdb *lmdb, bool grow) {
     }
 
     if(grow) {
-        mrg_lmdb_finalize(lmdb);
+        mrg_lmdb_finalize(lmdb, false);
         if(!mrg_lmdb_init(lmdb, lmdb->base_time, lmdb->metrics_per_transaction, lmdb->tiers, grow)) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: failed to grow the LMDB environment");
             return false;
@@ -205,16 +215,6 @@ bool mrg_lmdb_reopen_transaction(struct mrg_lmdb *lmdb, bool grow) {
     }
 
     lmdb->metrics_in_this_transaction = 0;
-    return true;
-}
-
-bool mrg_lmdb_count_metric(struct mrg_lmdb *lmdb) {
-    if(!lmdb->txn || lmdb->metrics_in_this_transaction >= lmdb->metrics_per_transaction) {
-        if(!mrg_lmdb_reopen_transaction(lmdb, false))
-            return false;
-    }
-
-    lmdb->metrics_in_this_transaction++;
     return true;
 }
 
@@ -245,8 +245,6 @@ bool mrg_lmdb_add_uuid(struct mrg_lmdb *lmdb, UUIDMAP_ID uid) {
         return false;
     }
 
-    lmdb->metrics_added++;
-
     MDB_val key, data;
     key.mv_size = sizeof(lmdb->metrics_added);
     key.mv_data = &lmdb->metrics_added;
@@ -257,6 +255,14 @@ bool mrg_lmdb_add_uuid(struct mrg_lmdb *lmdb, UUIDMAP_ID uid) {
     if(rc != MDB_SUCCESS) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_put() failed: %s", mdb_strerror(rc));
         return false;
+    }
+
+    lmdb->metrics_added++;
+    lmdb->metrics_in_this_transaction++;
+
+    if(!lmdb->txn || lmdb->metrics_in_this_transaction >= lmdb->metrics_per_transaction) {
+        if(!mrg_lmdb_reopen_transaction(lmdb, false))
+            return false;
     }
 
     return true;
@@ -345,18 +351,7 @@ bool mrg_lmdb_save(MRG *mrg) {
              uuid_pvalue != NULL && uuid_pvalue != PJERR;
              uuid_pvalue = JudyLNext(mrg->index[i].uuid_judy, &uuid_index, PJE0)) {
 
-            if(unlikely(!mrg_lmdb_count_metric(&lmdb))) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, LMDB transaction failed");
-                mrg_index_read_unlock(mrg, i);
-                goto failed;
-            }
-
-            if(unlikely(!mrg_lmdb_add_uuid(&lmdb, uuid_index))) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, failed to add UUID");
-                mrg_index_read_unlock(mrg, i);
-                goto failed;
-            }
-
+            size_t added = 0;
             Pvoid_t sections_judy = *uuid_pvalue;
             Word_t section_index = 0;
             for(Pvoid_t *section_pvalue = JudyLFirst(sections_judy, &section_index, PJE0);
@@ -365,8 +360,10 @@ bool mrg_lmdb_save(MRG *mrg) {
 
                 METRIC *m = *section_pvalue;
 
-                if(unlikely(!m->first_time_s))
+                if(unlikely(!m->first_time_s || !m->latest_time_s_clean)) {
+                    lmdb.metrics_on_tiers_invalid++;
                     continue;
+                }
 
                 struct rrdengine_instance *ctx = (struct rrdengine_instance *)m->section;
 
@@ -390,11 +387,19 @@ bool mrg_lmdb_save(MRG *mrg) {
                         lmdb.metrics_added,
                         m->latest_update_every_s,
                         m->first_time_s,
-                        MAX(m->latest_time_s_clean, m->latest_time_s_hot)))) {
+                        m->latest_time_s_clean))) {
                     nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, failed to add metric");
                     mrg_index_read_unlock(mrg, i);
                     goto failed;
                 }
+                added++;
+                lmdb.metrics_on_tiers_ok++;
+            }
+
+            if(unlikely(added && !mrg_lmdb_add_uuid(&lmdb, uuid_index))) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, failed to add UUID");
+                mrg_index_read_unlock(mrg, i);
+                goto failed;
             }
         }
 
@@ -438,17 +443,19 @@ bool mrg_lmdb_save(MRG *mrg) {
         !mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "tiers", lmdb.tiers))
         goto failed;
 
-    mrg_lmdb_finalize(&lmdb);
+    mrg_lmdb_finalize(&lmdb, true);
 
     bool rc = mrg_lmdb_rename_completed();
     if(rc)
-        nd_log(NDLS_DAEMON, NDLP_INFO, "MRG LMDB: saved %u metrics in %u tiers, from %u files.",
-               lmdb.metrics_added, lmdb.tiers, lmdb.files_added);
+        nd_log(NDLS_DAEMON, NDLP_INFO, "MRG LMDB: saved %u metrics in %u tiers (%u total, %u invalid), from %u files.",
+               lmdb.metrics_added, lmdb.tiers, lmdb.metrics_on_tiers_ok, lmdb.metrics_on_tiers_invalid, lmdb.files_added);
+    else
+        goto failed;
 
     return rc;
 
 failed:
-    mrg_lmdb_finalize(&lmdb);
+    mrg_lmdb_finalize(&lmdb, false);
     mrg_lmdb_unlink_all();
     return false;
 }
