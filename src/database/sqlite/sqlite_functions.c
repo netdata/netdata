@@ -399,11 +399,31 @@ uint64_t get_total_database_space(void)
 */
 }
 
+#define SQLITE_HEAP_HARD_LIMIT (256 * 1024 * 1024)
+#define SQLITE_HEAP_SOFT_LIMIT (32 * 1024 * 1024)
+
 int sqlite_library_init(void)
 {
     initialize_thread_key_pool();
 
     int rc = sqlite3_initialize();
+    if (rc == SQLITE_OK) {
+
+        (void )sqlite3_hard_heap_limit64(SQLITE_HEAP_HARD_LIMIT);
+        int64_t hard_limit_bytes = sqlite3_hard_heap_limit64(-1);
+
+        (void) sqlite3_soft_heap_limit64(SQLITE_HEAP_SOFT_LIMIT);
+        int64_t soft_limit_bytes = sqlite3_soft_heap_limit64(-1);
+
+        const char sqlite_hard_limit_mb[32];
+        size_snprintf_bytes((char *)sqlite_hard_limit_mb, sizeof(sqlite_hard_limit_mb), hard_limit_bytes);
+
+        const char sqlite_soft_limit_mb[32];
+        size_snprintf_bytes((char *)sqlite_soft_limit_mb, sizeof(sqlite_soft_limit_mb), soft_limit_bytes);
+
+        nd_log_daemon(
+            NDLP_INFO, "SQLITE: heap memory hard limit %s, soft limit %s", sqlite_hard_limit_mb, sqlite_soft_limit_mb);
+    }
 
     return (SQLITE_OK != rc);
 }
