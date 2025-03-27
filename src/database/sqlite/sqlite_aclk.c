@@ -1020,7 +1020,11 @@ void aclk_synchronization_shutdown(void)
 
     completion_wait_for(&aclk_sync_config.start_stop_complete);
     completion_destroy(&aclk_sync_config.start_stop_complete);
-    nd_log_daemon(NDLP_INFO, "ACLK sync shutdown completed");
+    int rc = uv_thread_join(&aclk_sync_config.thread);
+    if (rc)
+        nd_log_daemon(NDLP_ERR, "ACLK: Failed to join synchronization thread, error %s", uv_err_name(rc));
+    else
+        nd_log_daemon(NDLP_INFO, "ACLK: synchronization thread shutdown completed");
 }
 
 // Public
