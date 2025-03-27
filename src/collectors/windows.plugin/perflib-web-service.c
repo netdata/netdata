@@ -1029,7 +1029,7 @@ static inline void app_pool_upime(
                 p->st_app_application_pool_uptime->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
-        running -= (time_t)(p->APPTotalApplicationPoolUptime.current.Time/p->APPTotalApplicationPoolUptime.current.Frequnecy);
+        running -= (time_t)(p->APPTotalApplicationPoolUptime.current.Time/p->APPTotalApplicationPoolUptime.current.Frequency);
         rrddim_set_by_pointer(
             p->st_app_application_pool_uptime, p->rd_app_application_pool_uptime, (collected_number)running);
 
