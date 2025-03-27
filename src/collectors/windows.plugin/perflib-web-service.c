@@ -1000,9 +1000,9 @@ static inline void app_pool_upime(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    time_t running = time(NULL);
-    if (running < 0)
+    if (p->APPTotalApplicationPoolUptime.current.Frequency == 0) {
         return;
+    }
 
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPTotalApplicationPoolUptime)) {
         if (!p->st_app_application_pool_uptime) {
@@ -1029,9 +1029,11 @@ static inline void app_pool_upime(
                 p->st_app_application_pool_uptime->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
-        running -= (time_t)(p->APPTotalApplicationPoolUptime.current.Time/p->APPTotalApplicationPoolUptime.current.Frequency);
+        time_t uptime = (time_t)(p->APPTotalApplicationPoolUptime.current.Time /
+                                 p->APPTotalApplicationPoolUptime.current.Frequency);
+
         rrddim_set_by_pointer(
-            p->st_app_application_pool_uptime, p->rd_app_application_pool_uptime, (collected_number)running);
+            p->st_app_application_pool_uptime, p->rd_app_application_pool_uptime, (collected_number)uptime);
 
         rrdset_done(p->st_app_application_pool_uptime);
     }
