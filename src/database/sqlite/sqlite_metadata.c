@@ -968,10 +968,10 @@ done:
 
 static void delete_dimension_uuid(nd_uuid_t *dimension_uuid, sqlite3_stmt **action_res __maybe_unused, bool flag __maybe_unused)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
     int rc;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, DELETE_DIMENSION_UUID, &res))
+    if (!PREPARE_STATEMENT(db_meta, DELETE_DIMENSION_UUID, &res))
         return;
 
     int param = 0;
@@ -984,7 +984,7 @@ static void delete_dimension_uuid(nd_uuid_t *dimension_uuid, sqlite3_stmt **acti
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 //
