@@ -4,90 +4,67 @@
 #include "rrdengineapi.h"
 #include <lmdb.h>
 
-struct mrg_lmdb_value {
+struct mrg_lmdb_metric_value {
     uint32_t first_time;
     uint32_t last_time;
-    uint16_t update_every;
-} __attribute__((packed));
-
-struct mrg_lmdb_stats {
-    uint32_t max_sections;
-    uint32_t metrics;
-    uint32_t min_update_every;
-    uint32_t max_update_every;
-    time_t min_first_time_s;
-    time_t max_last_time_s;
+    uint32_t update_every;
 };
 
-void mrg_lmdb_statistics(MRG *mrg, struct mrg_lmdb_stats *stats) {
-    memset(stats, 0, sizeof(*stats));
-    stats->min_update_every = UINT32_MAX;
-    stats->min_first_time_s = now_realtime_sec();
+struct mrg_lmdb_file_value {
+    size_t tier;
+    size_t fileno;
+    uint64_t size;
+    usec_t mtime;
+};
 
-    for (size_t i = 0; i < UUIDMAP_PARTITIONS; i++) {
-        mrg_index_read_lock(mrg, i);
+#define MRG_LMDB_LOCK_SUFFIX "-lock"
+#define MRG_LMDB_EXTENSION ".mdb"
+#define MRG_LMDB_FILE "mrg" MRG_LMDB_EXTENSION
+#define MRG_LMDB_LOCK_FILE MRG_LMDB_FILE MRG_LMDB_LOCK_SUFFIX
+#define MRG_LMDB_TMP_FILE "mrg-tmp" MRG_LMDB_EXTENSION
+#define MRG_LMDB_TMP_LOCK_FILE MRG_LMDB_TMP_FILE MRG_LMDB_LOCK_SUFFIX
 
-        Word_t uuid_index = 0;
+#define MRG_LMDB_BASE_TIMESTAMP 1262304000
 
-        // Traverse all UUIDs in this partition
-        for(Pvoid_t *uuid_pvalue = JudyLFirst(mrg->index[i].uuid_judy, &uuid_index, PJE0);
-             uuid_pvalue != NULL && uuid_pvalue != PJERR;
-                uuid_pvalue = JudyLNext(mrg->index[i].uuid_judy, &uuid_index, PJE0)) {
-
-            size_t sections = 0;
-            Pvoid_t sections_judy = *uuid_pvalue;
-            Word_t section_index = 0;
-            for(Pvoid_t *section_pvalue = JudyLFirst(sections_judy, &section_index, PJE0);
-                section_pvalue != NULL && section_pvalue != PJERR;
-                section_pvalue = JudyLNext(sections_judy, &section_index, PJE0)) {
-
-                METRIC *m = *section_pvalue;
-
-                if(unlikely(m->latest_update_every_s < stats->min_update_every))
-                    stats->min_update_every = m->latest_update_every_s;
-
-                if(unlikely(m->latest_update_every_s > stats->max_update_every))
-                    stats->max_update_every = m->latest_update_every_s;
-
-                if(unlikely(m->first_time_s < stats->min_first_time_s))
-                    stats->min_first_time_s = m->first_time_s;
-
-                if(unlikely(m->latest_time_s_clean > stats->max_last_time_s))
-                    stats->max_last_time_s = m->latest_time_s_clean;
-
-                if(unlikely(m->latest_time_s_hot > stats->max_last_time_s))
-                    stats->max_last_time_s = m->latest_time_s_hot;
-
-                sections++;
-            }
-
-            stats->metrics++;
-
-            if(sections > stats->max_sections)
-                stats->max_sections = sections;
-        }
-
-        mrg_index_read_unlock(mrg, i);
-    }
-}
-
-static void mrg_lmdb_unlink(void) {
+static void mrg_lmdb_unlink_all(void) {
     char old_filename[FILENAME_MAX + 1];
 
-    snprintfz(old_filename, FILENAME_MAX, "%s/mrg.mdb", netdata_configured_cache_dir);
+    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_FILE, netdata_configured_cache_dir);
     unlink(old_filename);
 
-    snprintfz(old_filename, FILENAME_MAX, "%s/mrg-lock.mdb", netdata_configured_cache_dir);
+    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_LOCK_FILE, netdata_configured_cache_dir);
     unlink(old_filename);
 
-    snprintfz(old_filename, FILENAME_MAX, "%s/mrg-tmp.mdb", netdata_configured_cache_dir);
+    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_FILE, netdata_configured_cache_dir);
     unlink(old_filename);
 
-    snprintfz(old_filename, FILENAME_MAX, "%s/mrg-tmp-lock.mdb", netdata_configured_cache_dir);
+    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_LOCK_FILE, netdata_configured_cache_dir);
     unlink(old_filename);
 
     errno_clear();
 }
+
+static bool mrg_lmdb_rename_completed(void) {
+    char old_filename[FILENAME_MAX + 1];
+    char new_filename[FILENAME_MAX + 1];
+
+    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_FILE, netdata_configured_cache_dir);
+    snprintfz(new_filename, FILENAME_MAX, "%s/" MRG_LMDB_FILE, netdata_configured_cache_dir);
+    if(rename(old_filename, new_filename) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: rename from '%s' to '%s' failed", old_filename, new_filename);
+        return false;
+    }
+
+    snprintfz(old_filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_LOCK_FILE, netdata_configured_cache_dir);
+    snprintfz(new_filename, FILENAME_MAX, "%s/" MRG_LMDB_LOCK_FILE, netdata_configured_cache_dir);
+    if(rename(old_filename, new_filename) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: rename from '%s' to '%s' failed", old_filename, new_filename);
+        return false;
+    }
+
+    return true;
+}
+
 
 #define MRG_LMDB_DBI_METADATA 0
 #define MRG_LMDB_DBI_FILES 1
@@ -96,27 +73,29 @@ static void mrg_lmdb_unlink(void) {
 
 struct mrg_lmdb {
     time_t base_time;
-    size_t metrics;
-    size_t sections;
     size_t memory;
-    size_t metrics_per_transaction;
     MDB_env *env;
     MDB_dbi dbi[RRD_STORAGE_TIERS + MRG_LMDB_DBI_TIERS_BASE];
     MDB_txn *txn;
+    uint32_t metrics_per_transaction;
     uint32_t metrics_in_this_transaction;
     uint32_t metrics_added;
+    uint32_t files_added;
+    uint32_t tiers;
 };
 
-static bool mrg_lmdb_init(struct mrg_lmdb *lmdb, time_t base_time, size_t metrics, size_t sections, size_t metrics_per_transaction) {
-    memset(lmdb, 0, sizeof(*lmdb));
+static bool mrg_lmdb_init(struct mrg_lmdb *lmdb, time_t base_time, uint32_t metrics_per_transaction, uint32_t tiers, bool grow) {
+    if(!grow)
+        memset(lmdb, 0, sizeof(*lmdb));
 
+    lmdb->tiers = tiers;
     lmdb->base_time = base_time;
-    lmdb->metrics = metrics;
-    lmdb->sections = sections;
     lmdb->metrics_per_transaction = metrics_per_transaction;
-    lmdb->memory = (sizeof(struct mrg_lmdb_value) + sizeof(uint32_t) + 16) * metrics * sections +
-                   (sizeof(ND_UUID) + 16) * metrics;
-    lmdb->memory += lmdb->memory / 5; // 20% more for overhead
+
+    if(lmdb->memory)
+        lmdb->memory *= 2;
+    else
+        lmdb->memory = 10 * 1024 * 1024;
 
     // create the LMDB environment
     int rc = mdb_env_create(&lmdb->env);
@@ -135,7 +114,7 @@ static bool mrg_lmdb_init(struct mrg_lmdb *lmdb, time_t base_time, size_t metric
 
     // set up the number of databases
     // section + 1 for the UUIDs + 1 for the metadata
-    rc = mdb_env_set_maxdbs(lmdb->env, sections + 2);
+    rc = mdb_env_set_maxdbs(lmdb->env, tiers + MRG_LMDB_DBI_TIERS_BASE);
     if(rc != MDB_SUCCESS) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_env_set_maxdbs() failed: %s", mdb_strerror(rc));
         mdb_env_close(lmdb->env);
@@ -145,7 +124,7 @@ static bool mrg_lmdb_init(struct mrg_lmdb *lmdb, time_t base_time, size_t metric
     // open the environment
     {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/mrg-tmp", netdata_configured_cache_dir);
+        snprintfz(filename, FILENAME_MAX, "%s/" MRG_LMDB_TMP_FILE, netdata_configured_cache_dir);
         rc = mdb_env_open(lmdb->env, filename, MDB_WRITEMAP | MDB_NOSYNC | MDB_NOMETASYNC | MDB_MAPASYNC | MDB_NORDAHEAD | MDB_NOSUBDIR, 0660);
         if(rc != MDB_SUCCESS) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_env_open() failed: %s", mdb_strerror(rc));
@@ -162,7 +141,7 @@ static bool mrg_lmdb_init(struct mrg_lmdb *lmdb, time_t base_time, size_t metric
     }
 
     // open the databases - these remain valid for the lifetime of the environment
-    for(size_t i = 0; i < lmdb->sections + MRG_LMDB_DBI_TIERS_BASE; i++) {
+    for(size_t i = 0; i < lmdb->tiers + MRG_LMDB_DBI_TIERS_BASE; i++) {
         char db_name[32];
 
         if(i == MRG_LMDB_DBI_METADATA)
@@ -192,10 +171,13 @@ void mrg_lmdb_finalize(struct mrg_lmdb *lmdb) {
         lmdb->txn = NULL;
     }
 
-    for(size_t i = 0; i < lmdb->sections + MRG_LMDB_DBI_TIERS_BASE; i++)
+    for(size_t i = 0; i < lmdb->tiers + MRG_LMDB_DBI_TIERS_BASE; i++) {
         mdb_dbi_close(lmdb->env, lmdb->dbi[i]);
+        lmdb->dbi[i] = 0;
+    }
 
     mdb_env_close(lmdb->env);
+    lmdb->env = NULL;
 }
 
 bool mrg_lmdb_reopen_transaction(struct mrg_lmdb *lmdb, bool grow) {
@@ -206,19 +188,20 @@ bool mrg_lmdb_reopen_transaction(struct mrg_lmdb *lmdb, bool grow) {
 
     if(grow) {
         mrg_lmdb_finalize(lmdb);
-
-        lmdb->memory += lmdb->memory / 5; // 20% more for overhead
-        if(!mrg_lmdb_init(lmdb, lmdb->base_time, lmdb->metrics, lmdb->sections, lmdb->metrics_per_transaction)) {
+        if(!mrg_lmdb_init(lmdb, lmdb->base_time, lmdb->metrics_per_transaction, lmdb->tiers, grow)) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: failed to grow the LMDB environment");
             return false;
         }
     }
 
-    // open the transaction
-    int rc = mdb_txn_begin(lmdb->env, NULL, 0, &lmdb->txn);
-    if(rc != MDB_SUCCESS) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_txn_begin() failed: %s", mdb_strerror(rc));
-        return false;
+    if(!lmdb->txn) {
+        // open the transaction if not open already
+        // keep in mind mrg_lmdb_init() opens a transaction too
+        int rc = mdb_txn_begin(lmdb->env, NULL, 0, &lmdb->txn);
+        if (rc != MDB_SUCCESS) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_txn_begin() failed: %s", mdb_strerror(rc));
+            return false;
+        }
     }
 
     lmdb->metrics_in_this_transaction = 0;
@@ -284,7 +267,7 @@ bool mrg_lmdb_add_metric_at_tier(struct mrg_lmdb *lmdb, size_t tier, size_t id, 
     key.mv_size = sizeof(uint32_t);
     key.mv_data = &id;
 
-    struct mrg_lmdb_value value;
+    struct mrg_lmdb_metric_value value;
     value.first_time = first_time_s - lmdb->base_time;
     value.last_time = last_time_s - lmdb->base_time;
     value.update_every = update_every;
@@ -301,44 +284,53 @@ bool mrg_lmdb_add_metric_at_tier(struct mrg_lmdb *lmdb, size_t tier, size_t id, 
     return true;
 }
 
+static bool mrg_lmdb_put_meta_uint64(struct mrg_lmdb *lmdb, MDB_dbi dbi, const char *key, uint64_t value) {
+    MDB_val k, v;
+    k.mv_size = strlen(key);
+    k.mv_data = (void *)key;
+    v.mv_size = sizeof(uint64_t);
+    v.mv_data = &value;
+
+    int rc = mrg_lmdb_put_auto(lmdb, dbi, &k, &v);
+    if(rc != MDB_SUCCESS) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_put() failed: %s", mdb_strerror(rc));
+        return false;
+    }
+
+    return true;
+}
+
+static bool mrg_lmdb_put_file(struct mrg_lmdb *lmdb, size_t tier, size_t fileno, size_t size, usec_t mtime) {
+    lmdb->files_added++;
+
+    MDB_val key, data;
+    key.mv_size = sizeof(lmdb->files_added);
+    key.mv_data = &lmdb->files_added;
+
+    struct mrg_lmdb_file_value value = {
+        .tier = tier,
+        .fileno = fileno,
+        .size = size,
+        .mtime = mtime,
+    };
+
+    data.mv_size = sizeof(value);
+    data.mv_data = &value;
+
+    int rc = mrg_lmdb_put_auto(lmdb, lmdb->dbi[MRG_LMDB_DBI_FILES], &key, &data);
+    if(rc != MDB_SUCCESS) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: mdb_put() failed: %s", mdb_strerror(rc));
+        return false;
+    }
+
+    return true;
+}
+
 bool mrg_lmdb_save(MRG *mrg) {
-    mrg_lmdb_unlink();
-
-    struct mrg_lmdb_stats stats;
-    mrg_lmdb_statistics(mrg, &stats);
-
-    if(stats.max_sections != nd_profile.storage_tiers) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, max sections %u != storage tiers %zu", stats.max_sections, nd_profile.storage_tiers);
-        return false;
-    }
-
-    if(stats.max_sections > RRD_STORAGE_TIERS) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, max sections %u > max storage tiers %d", stats.max_sections, RRD_STORAGE_TIERS);
-        return false;
-    }
-
-    if(stats.max_update_every >= UINT16_MAX) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, max update every %u >= %u", stats.max_update_every, (uint32_t)UINT16_MAX);
-        return false;
-    }
-
-    if(!stats.metrics) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, no metrics");
-        return false;
-    }
-
-    if(!stats.min_first_time_s) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, no first time");
-        return false;
-    }
-
-    if(stats.min_first_time_s > stats.max_last_time_s) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, min first time %ld > max last time %ld", stats.min_first_time_s, stats.max_last_time_s);
-        return false;
-    }
+    mrg_lmdb_unlink_all();
 
     struct mrg_lmdb lmdb;
-    if(!mrg_lmdb_init(&lmdb, stats.min_first_time_s, stats.metrics, stats.max_sections, 100000)) {
+    if(!mrg_lmdb_init(&lmdb, MRG_LMDB_BASE_TIMESTAMP, 100000, nd_profile.storage_tiers, false)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, failed to initialize LMDB");
         return false;
     }
@@ -372,10 +364,14 @@ bool mrg_lmdb_save(MRG *mrg) {
                  section_pvalue = JudyLNext(sections_judy, &section_index, PJE0)) {
 
                 METRIC *m = *section_pvalue;
+
+                if(unlikely(!m->first_time_s))
+                    continue;
+
                 struct rrdengine_instance *ctx = (struct rrdengine_instance *)m->section;
 
                 size_t tier = SIZE_MAX;
-                for(size_t t = 0; t < stats.max_sections; t++) {
+                for(size_t t = 0; t < lmdb.tiers; t++) {
                     if(ctx == multidb_ctx[t]) {
                         tier = t;
                         break;
@@ -390,7 +386,7 @@ bool mrg_lmdb_save(MRG *mrg) {
 
                 if(unlikely(!mrg_lmdb_add_metric_at_tier(
                         &lmdb,
-                        m->partition,
+                        tier,
                         lmdb.metrics_added,
                         m->latest_update_every_s,
                         m->first_time_s,
@@ -405,26 +401,55 @@ bool mrg_lmdb_save(MRG *mrg) {
         mrg_index_read_unlock(mrg, i);
     }
 
-    // TODO: save the metadata
-    // 1. the current version (1)
-    // 2. the base time
-    // 3. the number of metrics
-    // 4. the number of sections
+    char filename[FILENAME_MAX + 1];
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS ; tier++) {
+        if(!multidb_ctx[tier]) continue;
 
-    // TODO: save the data files
-    // for each ctx in multidb_ctx[i]
-    // lock ctx->datafiles->rwlock
-    // traverse the linked list ctx->datafiles->first
-    // for each data file, stat() it and save the size and mtime
+        uv_rwlock_rdlock(&multidb_ctx[tier]->datafiles.rwlock);
+        for(struct rrdengine_datafile *d = multidb_ctx[tier]->datafiles.first; d ;d = d->next) {
+            if(d->tier != 1) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, invalid tier %u", d->tier);
+                uv_rwlock_rdunlock(&multidb_ctx[tier]->datafiles.rwlock);
+                goto failed;
+            }
 
-    // TODO: move the mrg-tmp files to mrg files
+            generate_datafilepath(d, filename, sizeof(filename));
+
+            struct stat st;
+            if(stat(filename, &st) != 0) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, failed to stat() %s: %s", filename, strerror(errno));
+                uv_rwlock_rdunlock(&multidb_ctx[tier]->datafiles.rwlock);
+                goto failed;
+            }
+
+            if(!mrg_lmdb_put_file(&lmdb, tier, d->fileno, st.st_size, st.st_mtime * USEC_PER_SEC + st.st_mtim.tv_nsec / 1000)) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, failed to add file");
+                uv_rwlock_rdunlock(&multidb_ctx[tier]->datafiles.rwlock);
+                goto failed;
+            }
+        }
+        uv_rwlock_rdunlock(&multidb_ctx[tier]->datafiles.rwlock);
+    }
+
+    // save the metadata
+    if (!mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "version", 1) ||
+        !mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "base_time", lmdb.base_time) ||
+        !mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "metrics", lmdb.metrics_added) ||
+        !mrg_lmdb_put_meta_uint64(&lmdb, lmdb.dbi[MRG_LMDB_DBI_METADATA], "tiers", lmdb.tiers))
+        goto failed;
 
     mrg_lmdb_finalize(&lmdb);
-    return true;
+
+    bool rc = mrg_lmdb_rename_completed();
+    if(rc)
+        nd_log(NDLS_DAEMON, NDLP_INFO, "MRG LMDB: saved %u metrics in %u tiers, from %u files.",
+               lmdb.metrics_added, lmdb.tiers, lmdb.files_added);
+
+    return rc;
 
 failed:
     mrg_lmdb_finalize(&lmdb);
-    mrg_lmdb_unlink();
+    mrg_lmdb_unlink_all();
     return false;
 }
 
