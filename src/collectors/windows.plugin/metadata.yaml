@@ -1167,7 +1167,7 @@ modules:
               chart_type: line
               dimensions:
                 - name: running
-            - name: iis.application_pool_maximum_worker_process
+            - name: iis.application_pool_maximum_worker_processes
               description: IIS App Pool maximum created worker processes
               unit: "processes"
               chart_type: line
