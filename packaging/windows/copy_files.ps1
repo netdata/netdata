@@ -1,6 +1,9 @@
 
 Function NetdataCopyConfig {
     param ($dst, $src, $file)
+
+    Write-Host "Creating $file if it does not exist!"
+
     $testDST = "$dst\$file"
     $testSRC = "$src\$file"
     if (-Not (Test-Path $testDST)) {
@@ -13,18 +16,20 @@ Function NetdataCopyConfig {
 Function NetdataDownloadNetdataConfig {
     param ($path)
 
+    Write-Host "Creating netdata.conf if it does not exist!"
+
     $netdataConfPATH = "$path\netdata.conf"
     $netdataConfURL = "http://localhost:19999/netdata.conf"
     if (Test-Path $netdataConfPATH) {
         exit 0
     }
 
-    Invoke-WebRequest $netdataConfURL -OutFile $netdataConfPATH
-    if (Test-Path $netdataConfPATH) {
-        exit 0
+    try {
+        Invoke-WebRequest $netdataConfURL -OutFile $netdataConfPATH
     }
-
-    New-Item -Path "$netdataConfPATH" -ItemType File
+    catch {
+        New-Item -Path "$netdataConfPATH" -ItemType File
+    }
 }
 
 $confPath = "C:\Program Files\Netdata\etc\netdata";
