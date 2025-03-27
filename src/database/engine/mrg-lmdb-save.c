@@ -180,24 +180,9 @@ bool mrg_lmdb_save(MRG *mrg) {
                 }
 
                 struct rrdengine_instance *ctx = (struct rrdengine_instance *)m->section;
-
-                size_t tier = SIZE_MAX;
-                for(size_t t = 0; t < lmdb.tiers; t++) {
-                    if(ctx == multidb_ctx[t]) {
-                        tier = t;
-                        break;
-                    }
-                }
-
-                if(unlikely(tier == SIZE_MAX)) {
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: not saving, invalid tier");
-                    mrg_index_read_unlock(mrg, i);
-                    goto failed;
-                }
-
                 if(unlikely(!mrg_lmdb_put_metric_at_tier(
                         &lmdb,
-                        tier,
+                        ctx->config.tier,
                         lmdb.metrics_added,
                         m->latest_update_every_s,
                         m->first_time_s,

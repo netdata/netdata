@@ -89,6 +89,7 @@ void mrg_update_metric_retention_and_granularity_by_uuid(
         time_t first_time_s, time_t last_time_s,
         uint32_t update_every_s, time_t now_s);
 
+bool mrg_lmdb_load(MRG *mrg);
 bool mrg_lmdb_save(MRG *mrg);
 
 #endif // DBENGINE_METRIC_H

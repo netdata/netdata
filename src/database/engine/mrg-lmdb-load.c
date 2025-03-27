@@ -19,7 +19,7 @@ static bool mrg_lmdb_get_meta_uint64(struct mrg_lmdb *lmdb, const char *key, uin
         return false;
     }
 
-    *value = *(uint64_t *)v.mv_data;
+    memcpy(value, v.mv_data, sizeof(uint64_t));
     return true;
 }
 
@@ -101,35 +101,46 @@ static bool mrg_lmdb_verify_files(struct mrg_lmdb *lmdb) {
     MDB_val key, data;
     rc = mdb_cursor_get(cursor, &key, &data, MDB_FIRST);
     while (rc == MDB_SUCCESS) {
-        struct mrg_lmdb_file_value *file_value = (struct mrg_lmdb_file_value *)data.mv_data;
+        struct mrg_lmdb_file_value *t = (struct mrg_lmdb_file_value *)data.mv_data;
+        struct mrg_lmdb_file_value file_value;
+        memcpy(&file_value, t, sizeof(struct mrg_lmdb_file_value));
 
         // Ensure the tier is valid
-        if (file_value->tier >= lmdb->tiers) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: Invalid tier %zu in file record", file_value->tier);
+        if (file_value.tier >= lmdb->tiers) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: Invalid tier %zu in file record", file_value.tier);
             mdb_cursor_close(cursor);
             return false;
         }
 
         // Check if the file exists on disk
         char filepath[FILENAME_MAX + 1];
-        snprintfz(filepath, FILENAME_MAX, "%s/dbengine-%zu/datafile-1-%zu.ndf",
-                  netdata_configured_cache_dir, file_value->tier, file_value->fileno);
+        if(file_value.tier == 0)
+            snprintfz(filepath, FILENAME_MAX, "%s/dbengine/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+                      netdata_configured_cache_dir, (unsigned)1, (unsigned)file_value.fileno);
+        else
+            snprintfz(filepath, FILENAME_MAX, "%s/dbengine-tier%u/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+                      netdata_configured_cache_dir, (unsigned)file_value.tier, (unsigned)1, (unsigned)file_value.fileno);
 
         struct stat st;
         if (stat(filepath, &st) != 0) {
             nd_log(NDLS_DAEMON, NDLP_WARNING, "MRG LMDB: Datafile %s not found", filepath);
-            // We continue even if files are missing - they might have been removed
+            mdb_cursor_close(cursor);
+            return false;
         }
         else {
             // Optionally verify file size and modification time
-            if (st.st_size != (off_t)file_value->size) {
+            if (st.st_size != (off_t)file_value.size) {
                 nd_log(NDLS_DAEMON, NDLP_WARNING, "MRG LMDB: Datafile %s size mismatch: expected %zu, found %ld",
-                       filepath, file_value->size, (long)st.st_size);
+                       filepath, file_value.size, (long)st.st_size);
+                mdb_cursor_close(cursor);
+                return false;
             }
 
             usec_t file_mtime = STAT_GET_MTIME_SEC(st) * USEC_PER_SEC + STAT_GET_MTIME_NSEC(st) / 1000;
-            if (file_mtime != file_value->mtime) {
+            if (file_mtime != file_value.mtime) {
                 nd_log(NDLS_DAEMON, NDLP_WARNING, "MRG LMDB: Datafile %s modification time mismatch", filepath);
+                mdb_cursor_close(cursor);
+                return false;
             }
         }
 
@@ -160,7 +171,7 @@ bool mrg_lmdb_load(MRG *mrg) {
     }
 
     struct mrg_lmdb lmdb;
-    if (!mrg_lmdb_init(&lmdb, MRG_LMDB_MODE_LOAD, 0, 0, RRD_STORAGE_TIERS, false)) {
+    if (!mrg_lmdb_init(&lmdb, MRG_LMDB_MODE_LOAD, 0, 0, nd_profile.storage_tiers, false)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MRG LMDB: Failed to initialize LMDB for loading");
         mrg_lmdb_unlink_all();
         return false;
