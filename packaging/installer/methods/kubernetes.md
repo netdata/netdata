@@ -3,16 +3,15 @@ import TabItem from '@theme/TabItem';
 
 # Install Netdata on Kubernetes
 
-This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud. Read our [Kubernetes visualizations](/docs/dashboards-and-charts/kubernetes-tab.md) documentation, to see what you will get.
+This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud. 
 
-The [Netdata Helm chart](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) installs one `parent` pod for storing metrics and managing alert notifications, plus an additional
-`child` pod for every node in the cluster, responsible for collecting metrics from the node, Kubernetes control planes,
-pods/containers, and [supported application-specific
-metrics](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
+Read our [Kubernetes visualizations](/docs/dashboards-and-charts/kubernetes-tab.md) documentation, to see what you will get.
+
+The [Netdata Helm chart](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) installs one `parent` pod for storing metrics and managing alert notifications, plus an additional `child` pod for every node in the cluster, responsible for collecting metrics from the node, Kubernetes control planes, pods/containers, and [supported application-specific metrics](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
 
 ## Prerequisites
 
-To deploy Kubernetes monitoring with Netdata, you need:
+To deploy Kubernetes monitoring with Netdata, you'll need:
 
 - A working cluster running Kubernetes v1.9 or newer.
 - The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version
@@ -121,8 +120,7 @@ The cluster terminates the old pods and creates new ones with the proper persist
 ![Netdata's Kubernetes monitoring
 visualizations](https://user-images.githubusercontent.com/1153921/107801491-5dcb0f00-6d1d-11eb-9ab1-876c39f556e2.png)
 
-If you don't need to configure your Netdata deployment, [skip down](#whats-next) to see how Kubernetes monitoring works
-in Netdata, in addition to more guides and resources.
+If you don't need to configure your Netdata deployment, [skip down](#whats-next) to see how Kubernetes monitoring works in Netdata, in addition to more guides and resources.
 
 ## Configure your Netdata monitoring deployment
 

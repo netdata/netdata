@@ -2097,3 +2097,14 @@ void dbengine_event_loop(void* arg) {
     (void) uv_loop_close(&main->loop);
     worker_unregister();
 }
+
+void dbengine_shutdown()
+{
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
+    int rc = uv_thread_join(&rrdeng_main.thread);
+    if (rc)
+        nd_log_daemon(NDLP_ERR, "DBENGINE: Failed to join thread, error %s", uv_err_name(rc));
+    else
+        nd_log_daemon(NDLP_INFO, "DBENGINE: thread shutdown completed");
+}

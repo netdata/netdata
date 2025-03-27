@@ -1352,7 +1352,9 @@ static void rrdset_metric_correlations_ks2(
 
     size_t high_points = 0;
     STORAGE_POINT highlighted_sp;
-    NETDATA_DOUBLE *highlight = rrd2rrdr_ks2(
+    NETDATA_DOUBLE *highlight = NULL, *baseline = NULL;
+
+    highlight = rrd2rrdr_ks2(
             owa, host, rca, ria, rma, after, before, points,
             options, time_group_method, time_group_options, tier, stats, &high_points, &highlighted_sp);
 
@@ -1361,7 +1363,7 @@ static void rrdset_metric_correlations_ks2(
 
     size_t base_points = 0;
     STORAGE_POINT baseline_sp;
-    NETDATA_DOUBLE *baseline = rrd2rrdr_ks2(
+    baseline = rrd2rrdr_ks2(
             owa, host, rca, ria, rma, baseline_after, baseline_before, high_points << shifts,
             options, time_group_method, time_group_options, tier, stats, &base_points, &baseline_sp);
 
@@ -1392,6 +1394,8 @@ static void rrdset_metric_correlations_ks2(
     }
 
 cleanup:
+    onewayalloc_freez(owa, highlight);
+    onewayalloc_freez(owa, baseline);
     onewayalloc_destroy(owa);
 }
 

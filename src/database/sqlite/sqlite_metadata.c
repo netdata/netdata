@@ -968,10 +968,10 @@ done:
 
 static void delete_dimension_uuid(nd_uuid_t *dimension_uuid, sqlite3_stmt **action_res __maybe_unused, bool flag __maybe_unused)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
     int rc;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, DELETE_DIMENSION_UUID, &res))
+    if (!PREPARE_STATEMENT(db_meta, DELETE_DIMENSION_UUID, &res))
         return;
 
     int param = 0;
@@ -984,7 +984,7 @@ static void delete_dimension_uuid(nd_uuid_t *dimension_uuid, sqlite3_stmt **acti
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 //
@@ -2697,15 +2697,19 @@ void metadata_sync_shutdown(void)
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Sending a shutdown command");
+    nd_log_daemon(NDLP_DEBUG, "METADATA: Sending a shutdown command");
     cmd.opcode = METADATA_SYNC_SHUTDOWN;
     metadata_enq_cmd(&metasync_worker, &cmd);
 
     /* wait for metadata thread to shut down */
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Waiting for shutdown ACK");
+    nd_log_daemon(NDLP_DEBUG, "METADATA: Waiting for shutdown ACK");
     completion_wait_for(&metasync_worker.start_stop_complete);
     completion_destroy(&metasync_worker.start_stop_complete);
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Shutdown complete");
+    int rc = uv_thread_join(&metasync_worker.thread);
+    if (rc)
+        nd_log_daemon(NDLP_ERR, "METADATA: Failed to join synchronization thread, error %s", uv_err_name(rc));
+    else
+        nd_log_daemon(NDLP_INFO, "METADATA: synchronization thread shutdown completed");
 }
 
 void metadata_sync_shutdown_prepare(void)
