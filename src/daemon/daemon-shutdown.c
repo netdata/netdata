@@ -207,8 +207,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
     service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS |
-                        ABILITY_STREAMING_CONNECTIONS | SERVICE_ACLK | SERVICE_SYSTEMD);
-    watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
+                        ABILITY_STREAMING_CONNECTIONS | SERVICE_SYSTEMD);
+    watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS);
 
     service_wait_exit(SERVICE_MAINTENANCE | SERVICE_SYSTEMD, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
@@ -232,7 +232,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     ml_stop_threads();
     ml_fini();
-    watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS);
+    watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS);
 
     service_wait_exit(SERVICE_CONTEXT, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_CONTEXT_THREAD);
@@ -240,8 +240,13 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     web_client_cache_destroy();
     watcher_step_complete(WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE);
 
+    aclk_synchronization_shutdown();
+    watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_SYNC_THREAD);
+
+    service_signal_exit(SERVICE_ACLK);
+
     service_wait_exit(SERVICE_ACLK, 3 * USEC_PER_SEC);
-    watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_THREADS);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD);
 
     service_wait_exit(~0, 10 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);

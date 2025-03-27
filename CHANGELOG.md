@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- Fix random crash during shutdown [\#19978](https://github.com/netdata/netdata/pull/19978) ([stelfrag](https://github.com/stelfrag))
+- set max datafile size to 1GiB [\#19977](https://github.com/netdata/netdata/pull/19977) ([ktsaou](https://github.com/ktsaou))
+- Doc Linux improved order in kickstart [\#19975](https://github.com/netdata/netdata/pull/19975) ([kanelatechnical](https://github.com/kanelatechnical))
+- fix crash in variable\_lookup\_add\_result\_with\_score\(\) [\#19972](https://github.com/netdata/netdata/pull/19972) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#19970](https://github.com/netdata/netdata/pull/19970) ([netdatabot](https://github.com/netdatabot))
+- Update SCIM docs with Groups support [\#19969](https://github.com/netdata/netdata/pull/19969) ([juacker](https://github.com/juacker))
+- build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.3 to 5.7.4 in /src/go [\#19968](https://github.com/netdata/netdata/pull/19968) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/docker/docker from 28.0.2+incompatible to 28.0.4+incompatible in /src/go [\#19967](https://github.com/netdata/netdata/pull/19967) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Improve ACLK sync shutdown process [\#19966](https://github.com/netdata/netdata/pull/19966) ([stelfrag](https://github.com/stelfrag))
 - Don’t skip building Go code on static builds. [\#19961](https://github.com/netdata/netdata/pull/19961) ([Ferroin](https://github.com/Ferroin))
 - fix undefined [\#19960](https://github.com/netdata/netdata/pull/19960) ([ktsaou](https://github.com/ktsaou))
 - daemon status 22c [\#19959](https://github.com/netdata/netdata/pull/19959) ([ktsaou](https://github.com/ktsaou))
@@ -481,17 +490,6 @@
 - add 'type' to GH report forms [\#19421](https://github.com/netdata/netdata/pull/19421) ([ilyam8](https://github.com/ilyam8))
 - fix mmaps accounting [\#19420](https://github.com/netdata/netdata/pull/19420) ([ktsaou](https://github.com/ktsaou))
 - PULSE: network traffic [\#19419](https://github.com/netdata/netdata/pull/19419) ([ktsaou](https://github.com/ktsaou))
-- hostnames: convert to utf8 and santitize [\#19418](https://github.com/netdata/netdata/pull/19418) ([ktsaou](https://github.com/ktsaou))
-- Enable libunwind in DEB native packages. [\#19417](https://github.com/netdata/netdata/pull/19417) ([Ferroin](https://github.com/Ferroin))
-- cleanup contexts during loading [\#19416](https://github.com/netdata/netdata/pull/19416) ([ktsaou](https://github.com/ktsaou))
-- packaging\(windows\): use local copy of GPL-3 [\#19414](https://github.com/netdata/netdata/pull/19414) ([ilyam8](https://github.com/ilyam8))
-- add "netdata-" prefix to streaming and metrics-cardinality functions [\#19413](https://github.com/netdata/netdata/pull/19413) ([ilyam8](https://github.com/ilyam8))
-- REFCOUNT: use only compare-and-exchange [\#19411](https://github.com/netdata/netdata/pull/19411) ([ktsaou](https://github.com/ktsaou))
-- Alert prototypes: use r/w spinlock instead of spinlock [\#19410](https://github.com/netdata/netdata/pull/19410) ([ktsaou](https://github.com/ktsaou))
-- Enable libunwind in Docker images. [\#19409](https://github.com/netdata/netdata/pull/19409) ([Ferroin](https://github.com/Ferroin))
-- build\(deps\): bump github.com/docker/docker from 27.4.1+incompatible to 27.5.0+incompatible in /src/go [\#19408](https://github.com/netdata/netdata/pull/19408) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.7.1 to 4.8.0 in /src/go [\#19407](https://github.com/netdata/netdata/pull/19407) ([dependabot[bot]](https://github.com/apps/dependabot))
-- fixed http clients accounting [\#19406](https://github.com/netdata/netdata/pull/19406) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
