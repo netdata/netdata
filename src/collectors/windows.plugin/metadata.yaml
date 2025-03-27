@@ -1167,6 +1167,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: running
+            - name: iis.application_pool_worker_processes_created
+              description: IIS App Pool worker processes created
+              unit: "processes/s"
+              chart_type: line
+              dimensions:
+                - name: created
             - name: iis.application_pool_maximum_worker_processes
               description: IIS App Pool maximum created worker processes
               unit: "processes"
@@ -1179,42 +1185,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: failures
+            - name: iis.application_pool_worker_process_failures
+              description: IIS App Pool worker process crashes
+              unit: "failures/s"
+              chart_type: line
+              dimensions:
+                - name: crash
+                - name: ping
+                - name: startup
+                - name: shutdown
             - name: iis.application_pool_recycles
               description: IIS App Pool recycles
               unit: "recycles/s"
               chart_type: line
               dimensions:
                 - name: recycles
-            - name: iis.application_pool_worker_processes_created
-              description: IIS App Pool worker processes created
-              unit: "processes/s"
-              chart_type: line
-              dimensions:
-                - name: created
-            - name: iis.application_pool_worker_process_failures
-              description: IIS App Pool worker process crashes
-              unit: "failures/s"
-              chart_type: line
-              dimensions:
-                - name: failures
-            - name: iis.application_pool_worker_process_ping_failures
-              description: IIS App Pool WAS worker process ping failures
-              unit: "failures/s"
-              chart_type: line
-              dimensions:
-                - name: ping
-            - name: iis.application_pool_worker_process_shutdown_failures
-              description: IIS App Poo WAS worker process shutdown failures
-              unit: "failures/s"
-              chart_type: line
-              dimensions:
-                - name: shutdown
-            - name: iis.application_pool_worker_process_startup_failures
-              description: IIS App Poo WAS worker process startup failures
-              unit: "failures/s"
-              chart_type: line
-              dimensions:
-                - name: startup
             - name: iis.application_pool_uptime
               description: IIS App Pool uptime
               unit: "seconds"

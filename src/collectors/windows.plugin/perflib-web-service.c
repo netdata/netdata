@@ -129,15 +129,9 @@ struct iis_app {
     RRDDIM *rd_app_worker_process_created;
 
     RRDSET *st_app_worker_process_failures;
-    RRDDIM *rd_app_worker_process_failures;
-
-    RRDSET *st_app_worker_process_ping_failures;
+    RRDDIM *rd_app_worker_process_crashes;
     RRDDIM *rd_app_worker_process_ping_failures;
-
-    RRDSET *st_app_worker_process_shutdown_failures;
     RRDDIM *rd_app_worker_process_shutdown_failures;
-
-    RRDSET *st_app_worker_process_startup_failures;
     RRDDIM *rd_app_worker_process_startup_failures;
 
     COUNTER_DATA APPCurrentApplicationPoolState;
@@ -818,7 +812,10 @@ static inline void app_pool_current_state(
                 p->st_app_current_application_pool_state, "delete_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
             rrdlabels_add(
-                p->st_app_current_application_pool_state->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_app_current_application_pool_state->rrdlabels,
+                "app_pool",
+                windows_shared_buffer,
+                RRDLABEL_SRC_AUTO);
         }
 
 #define NETDATA_APP_COOL_TOTAL_STATES (7)
@@ -834,7 +831,7 @@ static inline void app_pool_current_state(
     }
 }
 
-static inline void app_pool_current_worker_process(
+static inline void app_pool_current_worker_processes(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -862,7 +859,8 @@ static inline void app_pool_current_worker_process(
 
             p->rd_app_current_worker_process =
                 rrddim_add(p->st_app_current_worker_process, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_app_current_worker_process->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(
+                p->st_app_current_worker_process->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -874,7 +872,7 @@ static inline void app_pool_current_worker_process(
     }
 }
 
-static inline void app_pool_maximum_worker_process(
+static inline void app_pool_maximum_worker_processes(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -902,7 +900,8 @@ static inline void app_pool_maximum_worker_process(
 
             p->rd_app_maximum_worker_process =
                 rrddim_add(p->st_app_maximum_worker_process, "created", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_app_maximum_worker_process->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(
+                p->st_app_maximum_worker_process->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -914,7 +913,7 @@ static inline void app_pool_maximum_worker_process(
     }
 }
 
-static inline void app_pool_worker_process_failures(
+static inline void app_pool_recent_worker_process_failures(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -924,7 +923,8 @@ static inline void app_pool_worker_process_failures(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPRecentWorkerProcessFailure)) {
         if (!p->st_app_recent_worker_process_failure) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_recent_worker_process_failures", windows_shared_buffer);
+            snprintfz(
+                id, RRD_ID_LENGTH_MAX, "application_pool_%s_recent_worker_process_failures", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_recent_worker_process_failure = rrdset_create_localhost(
                 "iis",
@@ -943,7 +943,10 @@ static inline void app_pool_worker_process_failures(
             p->rd_app_recent_worker_process_failure =
                 rrddim_add(p->st_app_recent_worker_process_failure, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_app_recent_worker_process_failure->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_app_recent_worker_process_failure->rrdlabels,
+                "app_pool",
+                windows_shared_buffer,
+                RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -996,7 +999,7 @@ static inline void app_pool_recycles(
     }
 }
 
-static inline void app_pool_total_was_upime(
+static inline void app_pool_upime(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -1040,7 +1043,7 @@ static inline void app_pool_total_was_upime(
     }
 }
 
-static inline void app_pool_process_created(
+static inline void app_pool_worker_processes_created(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -1068,7 +1071,8 @@ static inline void app_pool_process_created(
 
             p->rd_app_worker_process_created =
                 rrddim_add(p->st_app_worker_process_created, "created", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_app_worker_process_created->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(
+                p->st_app_worker_process_created->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1080,18 +1084,20 @@ static inline void app_pool_process_created(
     }
 }
 
-static inline void app_pool_process_failures(
+static inline void app_pool_worker_process_failures(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessFailures)) {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessFailures) &&
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessPingFailures) &&
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessShutdownFailures) &&
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessStartupFailures)) {
         if (!p->st_app_worker_process_failures) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(
-                id, RRD_ID_LENGTH_MAX, "application_pool_%s_worker_process_failures", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_worker_process_failures", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_app_worker_process_failures = rrdset_create_localhost(
                 "iis",
@@ -1099,7 +1105,7 @@ static inline void app_pool_process_failures(
                 NULL,
                 "app pool failures",
                 "iis.application_pool_worker_process_failures",
-                "IIS App Pool worker process crashes",
+                "IIS App Pool worker process failures",
                 "failures/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -1107,141 +1113,39 @@ static inline void app_pool_process_failures(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_app_worker_process_failures =
-                rrddim_add(p->st_app_worker_process_failures, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_app_worker_process_crashes =
+                rrddim_add(p->st_app_worker_process_failures, "crash", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_app_worker_process_ping_failures =
+                rrddim_add(p->st_app_worker_process_failures, "ping", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_app_worker_process_startup_failures =
+                rrddim_add(p->st_app_worker_process_failures, "startup", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_app_worker_process_shutdown_failures =
+                rrddim_add(p->st_app_worker_process_failures, "shutdown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_app_worker_process_failures->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
             p->st_app_worker_process_failures,
-            p->rd_app_worker_process_failures,
+            p->rd_app_worker_process_crashes,
             (collected_number)p->APPWorkerProcessFailures.current.Data);
 
-        rrdset_done(p->st_app_worker_process_failures);
-    }
-}
-
-static inline void app_pool_process_ping_failures(
-    struct iis_app *p,
-    PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
-    PERF_INSTANCE_DEFINITION *pi,
-    int update_every)
-{
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessPingFailures)) {
-        if (!p->st_app_worker_process_ping_failures) {
-            char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_worker_process_ping_failure", windows_shared_buffer);
-            netdata_fix_chart_name(id);
-            p->st_app_worker_process_ping_failures = rrdset_create_localhost(
-                "iis",
-                id,
-                NULL,
-                "app pool failures",
-                "iis.application_pool_worker_process_ping_failures",
-                "IIS App Pool WAS worker process ping failures",
-                "failures/s",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibWebService",
-                PRIO_IIS_APP_POOL_TOTAL_WORKER_PROCESS_PING_FAILURES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_app_worker_process_ping_failures =
-                rrddim_add(p->st_app_worker_process_ping_failures, "ping", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(
-                p->st_app_worker_process_ping_failures->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-        }
-
         rrddim_set_by_pointer(
-            p->st_app_worker_process_ping_failures,
+            p->st_app_worker_process_failures,
             p->rd_app_worker_process_ping_failures,
             (collected_number)p->APPWorkerProcessPingFailures.current.Data);
 
-        rrdset_done(p->st_app_worker_process_ping_failures);
-    }
-}
-
-static inline void app_pool_process_shutdown_failures(
-    struct iis_app *p,
-    PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
-    PERF_INSTANCE_DEFINITION *pi,
-    int update_every)
-{
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessShutdownFailures)) {
-        if (!p->st_app_worker_process_shutdown_failures) {
-            char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_worker_process_shutdown_failures", windows_shared_buffer);
-            netdata_fix_chart_name(id);
-            p->st_app_worker_process_shutdown_failures = rrdset_create_localhost(
-                "iis",
-                id,
-                NULL,
-                "app pool failures",
-                "iis.application_pool_worker_process_shutdown_failures",
-                "IIS App Poo WAS worker process shutdown failures",
-                "failures/s",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibWebService",
-                PRIO_IIS_APP_POOL_TOTAL_WORKER_PROCESS_SHUTDOWN_FAILURES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_app_worker_process_shutdown_failures = rrddim_add(
-                p->st_app_worker_process_shutdown_failures, "shutdown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(
-                p->st_app_worker_process_shutdown_failures->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-        }
-
         rrddim_set_by_pointer(
-            p->st_app_worker_process_shutdown_failures,
-            p->rd_app_worker_process_shutdown_failures,
-            (collected_number)p->APPWorkerProcessShutdownFailures.current.Data);
-
-        rrdset_done(p->st_app_worker_process_shutdown_failures);
-    }
-}
-
-static inline void app_pool_process_startup_failures(
-    struct iis_app *p,
-    PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
-    PERF_INSTANCE_DEFINITION *pi,
-    int update_every)
-{
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPWorkerProcessStartupFailures)) {
-        if (!p->st_app_worker_process_startup_failures) {
-            char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "application_pool_%s_worker_process_startup_failures", windows_shared_buffer);
-            netdata_fix_chart_name(id);
-            p->st_app_worker_process_startup_failures = rrdset_create_localhost(
-                "iis",
-                id,
-                NULL,
-                "app pool failures",
-                "iis.application_pool_worker_process_startup_failures",
-                "IIS App Poo WAS worker process startup failures",
-                "failures/s",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibWebService",
-                PRIO_IIS_APP_POOL_TOTAL_WORKER_PROCESS_STARTUP_FAILURES,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_app_worker_process_startup_failures = rrddim_add(
-                p->st_app_worker_process_startup_failures, "startup", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(
-                p->st_app_worker_process_startup_failures->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-            p->st_app_worker_process_startup_failures,
+            p->st_app_worker_process_failures,
             p->rd_app_worker_process_startup_failures,
             (collected_number)p->APPWorkerProcessStartupFailures.current.Data);
 
-        rrdset_done(p->st_app_worker_process_startup_failures);
+        rrddim_set_by_pointer(
+            p->st_app_worker_process_failures,
+            p->rd_app_worker_process_shutdown_failures,
+            (collected_number)p->APPWorkerProcessShutdownFailures.current.Data);
+
+        rrdset_done(p->st_app_worker_process_failures);
     }
 }
 
@@ -1267,18 +1171,16 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         struct iis_app *p = dictionary_set(app_pools, windows_shared_buffer, NULL, sizeof(*p));
         app_pool_current_state(p, pDataBlock, pObjectType, pi, update_every);
-        // app_pool_current_uptime(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_current_worker_process(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_maximum_worker_process(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_process_failures(p, pDataBlock, pObjectType, pi, update_every);
+
+        app_pool_current_worker_processes(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_maximum_worker_processes(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_worker_processes_created(p, pDataBlock, pObjectType, pi, update_every);
+
+        app_pool_recent_worker_process_failures(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_worker_process_failures(p, pDataBlock, pObjectType, pi, update_every);
-        // app_pool_time_since_process_failures(p, pDataBlock, pObjectType, pi, update_every);
+
         app_pool_recycles(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_total_was_upime(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_process_created(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_process_ping_failures(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_process_shutdown_failures(p, pDataBlock, pObjectType, pi, update_every);
-        app_pool_process_startup_failures(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_upime(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
