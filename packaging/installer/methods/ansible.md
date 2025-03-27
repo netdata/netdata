@@ -1,8 +1,8 @@
 # Deploy Netdata with Ansible
 
-How can you quickly bootstrap an infrastructure monitoring solution? How do you deploy Netdata across multiple nodes efficiently? How do you ensure the deployment is **reliable, repeatable, and idempotent**? How can you manage infrastructure or cloud monitoring as **code**?
+How do you quickly set up infrastructure monitoring? How can you efficiently deploy Netdata across multiple nodes? How do you make sure the deployment is **reliable, repeatable, and idempotent**? And how can you manage monitoring as **code**?
 
-Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run those operations over standard and secure SSH connections. There's no Agent to install on the remote system, so all you have to worry about is your application and your monitoring software.
+Meet [Ansible](https://ansible.com), a popular tool for provisioning, configuration management, and infrastructure as code (IaC). It uses **playbooks** to streamline operations with simple syntax, running them securely over SSH—no agent required. That means less setup and more focus on your application and monitoring.
 
 What does **idempotent** mean? 
 From the [Ansible glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
@@ -96,9 +96,7 @@ claim_rooms: XXXXX
 Change the `dbengine_multihost_disk_space` if you want to change the metrics retention policy by allocating more or less
 disk space for storing metrics. The default is 2048 Mib, or 2 GiB.
 
-Because we're connecting this node to Netdata Cloud, and will view its dashboards there instead of via the IP address or
-hostname of the node, the playbook disables that local dashboard by setting `web_mode` to `none`. This gives a small
-security boost by not allowing any unwanted access to the local dashboard.
+Since this node connects to Netdata Cloud, we’ll view its dashboards there instead of using its IP or hostname. The playbook disables the local dashboard by setting `web_mode` to `none`, adding a small security boost by preventing unwanted access.
 
 You can read more about this decision, or other ways you might lock down the local dashboard, in our [node security
 doc](/docs/security-and-privacy-design/README.md).
@@ -116,8 +114,7 @@ ansible-playbook -i hosts tasks/main.yml
 
 Ansible first connects to your node(s) via SSH, then [collects
 facts](https://docs.ansible.com/ansible/latest/user_guide/playbooks_vars_facts.html#ansible-facts) about the system.
-This playbook doesn't use these facts, but you could expand it to provision specific types of systems based on the
-makeup of your infrastructure.
+This playbook doesn’t use these facts yet, but you can expand it to set up systems based on your infrastructure.
 
 Next, Ansible makes changes to each node according to the `tasks` defined in the playbook, and
 [returns](https://docs.ansible.com/ansible/latest/reference_appendices/common_return_values.html#changed) whether each
@@ -125,6 +122,3 @@ task results in a changed, failure, or was skipped entirely.
 
 The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the connect to Cloud
 task, your nodes start populating your Space in Netdata Cloud.
-<!--stackedit_data:
-eyJoaXN0b3J5IjpbLTczOTQyMjA3Ml19
--->
