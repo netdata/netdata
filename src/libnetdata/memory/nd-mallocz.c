@@ -23,6 +23,7 @@ uint64_t process_max_rss(void) {
 
 ALWAYS_INLINE NORETURN
 void out_of_memory(const char *call, size_t size, const char *details) {
+    int errno_saved = errno;
     exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
 
     if(out_of_memory_callback)
@@ -37,6 +38,7 @@ void out_of_memory(const char *call, size_t size, const char *details) {
     size_snprintf(mem_available, sizeof(mem_available), sm.ram_available_bytes, "B", false);
     size_snprintf(rss_used, sizeof(rss_used), max_rss, "B", false);
 
+    errno = errno_saved;
     fatal("Out of memory on %s(%zu bytes)!\n"
           "System memory available: %s, while our max RSS usage is: %s\n"
           "O/S mmap limit: %llu, while our mmap count is: %zu\n"

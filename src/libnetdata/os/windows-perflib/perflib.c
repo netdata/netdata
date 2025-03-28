@@ -65,6 +65,9 @@ static BOOL getCounterData(
     PERF_COUNTER_DEFINITION* pBaseCounter = NULL;
     BOOL fSuccess = TRUE;
 
+    if(!pCounterDataBlock)
+        return FALSE;
+
     //Point to the raw counter data.
     pData = (PVOID)((LPBYTE)pCounterDataBlock + pCounter->CounterOffset);
 

@@ -76,37 +76,6 @@
 // dimension
 #define EBPF_COMMON_UNITS_BYTES "bytes/s"
 
-typedef struct __attribute__((packed)) netdata_publish_vfs {
-    uint64_t ct;
-
-    //Counter
-    uint32_t write_call;
-    uint32_t writev_call;
-    uint32_t read_call;
-    uint32_t readv_call;
-    uint32_t unlink_call;
-    uint32_t fsync_call;
-    uint32_t open_call;
-    uint32_t create_call;
-
-    //Accumulator
-    uint64_t write_bytes;
-    uint64_t writev_bytes;
-    uint64_t readv_bytes;
-    uint64_t read_bytes;
-
-    //Counter
-    uint32_t write_err;
-    uint32_t writev_err;
-    uint32_t read_err;
-    uint32_t readv_err;
-    uint32_t unlink_err;
-    uint32_t fsync_err;
-    uint32_t open_err;
-    uint32_t create_err;
-
-} netdata_publish_vfs_t;
-
 enum netdata_publish_vfs_list {
     NETDATA_KEY_PUBLISH_VFS_UNLINK,
     NETDATA_KEY_PUBLISH_VFS_READ,

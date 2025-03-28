@@ -144,7 +144,7 @@ bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
     bool found = false;
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(vbd->host, rc) {
-        if(rc->config.name == vbd->variable) {
+        if(rc->config.name == vbd->variable && rc->rrdset) {
             variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, rc->rrdset, "alarm value");
             found = true;
         }

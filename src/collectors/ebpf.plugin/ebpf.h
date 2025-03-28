@@ -152,6 +152,7 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_EBPF_THREADS "ebpf_threads"
 #define NETDATA_EBPF_LIFE_TIME "ebpf_life_time"
 #define NETDATA_EBPF_LOAD_METHOD "ebpf_load_methods"
+#define NETDATA_EBPF_IPC_USAGE "ebpf_ipc_usage"
 #define NETDATA_EBPF_KERNEL_MEMORY "ebpf_kernel_memory"
 #define NETDATA_EBPF_HASH_TABLES_LOADED "ebpf_hash_tables_count"
 #define NETDATA_EBPF_HASH_TABLES_PER_CORE "ebpf_hash_tables_per_core"

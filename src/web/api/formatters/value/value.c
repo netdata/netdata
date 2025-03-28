@@ -5,6 +5,9 @@
 inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, NETDATA_DOUBLE *anomaly_rate) {
     size_t c;
 
+    if(!r->d || !r->n || (size_t)i >= r->n)
+        return NAN;
+
     NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
     RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
     NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];

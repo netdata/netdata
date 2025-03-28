@@ -1143,6 +1143,69 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+        - name: IIS Application Pool
+          description: "These metrics refer to the IIS application pool WAS (Windows Process Activation Service)."
+          labels:
+            - name: app
+              description: The name of the Application Pool.
+          metrics:
+            - name: iis.application_pool_current_status
+              description: IIS App Pool current status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: uninitialized
+                - name: initialized
+                - name: running
+                - name: disabling
+                - name: disabled
+                - name: shutdown_pending
+                - name: delete_pending
+            - name: iis.application_pool_current_worker_processes
+              description: IIS App Pool worker processes currently running
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: running
+            - name: iis.application_pool_worker_processes_created
+              description: IIS App Pool worker processes created
+              unit: "processes/s"
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: iis.application_pool_maximum_worker_processes
+              description: IIS App Pool maximum created worker processes
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: iis.application_pool_recent_worker_process_failures
+              description: IIS App Pool worker process failures during the rapid-fail protection interval
+              unit: "failures/s"
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: iis.application_pool_worker_process_failures
+              description: IIS App Pool worker process crashes
+              unit: "failures/s"
+              chart_type: line
+              dimensions:
+                - name: crash
+                - name: ping
+                - name: startup
+                - name: shutdown
+            - name: iis.application_pool_recycles
+              description: IIS App Pool recycles
+              unit: "recycles/s"
+              chart_type: line
+              dimensions:
+                - name: recycles
+            - name: iis.application_pool_uptime
+              description: IIS App Pool uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV

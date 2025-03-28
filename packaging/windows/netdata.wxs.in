@@ -12,7 +12,8 @@
 
             <Media Id="1" Cabinet="netdata" EmbedCab="yes" />
 
-            <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of [ProductName] is already installed." AllowSameVersionUpgrades="yes" />
+            <!-- Modified: Changed schedule to handle service shutdown more gracefully and allow downgrades -->
+            <MajorUpgrade Schedule="afterInstallValidate" AllowDowngrades="yes" />
             <Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
             <Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
 
@@ -26,6 +27,9 @@
             <Property Id="CLOUDUILICENSE" Value="0" />
 
             <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+            <!-- Added to handle FilesInUse dialog -->
+            <Property Id="MSIRESTARTMANAGERCONTROL" Value="DisableShutdown" />
 
             <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Access Netdata dashboard" />
             <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
@@ -50,6 +54,9 @@
                 <Directory Id="INSTALLFOLDER" Name="Netdata">
                     <Directory Id="USRDIR" Name="usr">
                         <Directory Id="USRBINDIR" Name="bin" />
+                        <Directory Id="USRLIBEXECDIR" Name="libexec">
+                            <Directory Id="USRLIBEXECNETDATADIR" Name="netdata" />
+                        </Directory>
                     </Directory>
                     <Directory Id="VARDIR" Name="var">
                         <Directory Id="VARCACHEDIR" Name="cache" />
@@ -133,6 +140,12 @@
                 <Custom Action="ClaimAgent" After="InstallFiles" />
             </InstallExecuteSequence>
 
+            <!-- Add new files (stream.conf and netdata.conf) -->
+            <CustomAction Id="NDCreateNewFiles" Directory="USRLIBEXECNETDATADIR" ExeCommand='powershell.exe -ExecutionPolicy Bypass -NonInteractive -File &quot;[USRLIBEXECNETDATADIR]\copy_files.ps1&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
+            <InstallExecuteSequence>
+                <Custom Action="NDCreateNewFiles" Before="InstallFinalize" />
+            </InstallExecuteSequence>
+
             <!-- Install wevt manifest/dll files -->
             <ComponentGroup Id="WevtComponents" Directory="System64Folder">
                 <File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
@@ -152,6 +165,12 @@
                 <Custom Action="InstallManifest" After="InstallFiles" />
             </InstallExecuteSequence>
 
+            <!-- Added StopNetdataService custom action to ensure service is stopped before file operations -->
+            <CustomAction Id="StopNetdataService" Directory="System64Folder" ExeCommand='net stop Netdata' Execute="immediate" Return="ignore" />
+            <InstallExecuteSequence>
+                <Custom Action="StopNetdataService" Before="InstallValidate" Condition="Installed AND NOT REMOVE" />
+            </InstallExecuteSequence>
+
             <Component Id="NetdataService" Directory="USRBINDIR">
                 <File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
 
@@ -163,11 +182,12 @@
                                 Start="auto"
                                 ErrorControl="normal" />
 
+                <!-- Modified to ensure proper service handling during update -->
                 <ServiceControl Id="ControlService"
-                                Start="install"
-                                Stop="both"
-                                Remove="uninstall"
                                 Name="Netdata"
+                                Stop="both"
+                                Start="install"
+                                Remove="uninstall"
                                 Wait="yes" />
 
                  <RegistryValue Root="HKLM"
@@ -226,6 +246,12 @@
             <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
             <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
             <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+
+            <!-- Next lines have Primary Key dupplication avoiding binary to be generated -->
+            <!-- Handle files in use dialog elegantly>
+            <Publish Dialog="FilesInUse" Control="Retry" Event="EndDialog" Value="Retry" Order="1" />
+            <Publish Dialog="FilesInUse" Control="Ignore" Event="EndDialog" Value="Ignore" Order="2" />
+            <Publish Dialog="FilesInUse" Control="Exit" Event="EndDialog" Value="Exit" Order="3" / -->
 
         </UI>
 
@@ -297,18 +323,18 @@
 
                 <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="55" Height="15" Text="Claim Token:" HideCondition="OS_HAS_FILE" />
                 <Control Id="Token" Type="Edit" X="65" Y="100" Width="290" Height="18" Property="TOKEN" Text="{135}" HideCondition="OS_HAS_FILE" />
-            
+
                 <Control Id="RoomsLabel" Type="Text" X="10" Y="115" Width="55" Height="15" Text="Rooms ID(s):" HideCondition="OS_HAS_FILE" />
                 <Control Id="Rooms" Type="Edit" X="65" Y="115" Width="290" Height="18" Property="ROOMS" HideCondition="OS_HAS_FILE" />
-            
+
                 <Control Id="ProxyLabel" Type="Text" X="10" Y="130" Width="55" Height="15" Text="Proxy URL:" HideCondition="OS_HAS_FILE" />
                 <Control Id="Proxy" Type="Edit" X="65" Y="130" Width="290" Height="18" Property="PROXY" HideCondition="OS_HAS_FILE" />
-            
+
                 <Control Id="URLLabel" Type="Text" X="10" Y="145" Width="55" Height="15" Text="Cloud URL:" HideCondition="OS_HAS_FILE" />
                 <Control Id="URL" Type="Edit" X="65" Y="145" Width="290" Height="18" Property="URL" HideCondition="OS_HAS_FILE" />
 
                 <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="160" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" HideCondition="OS_HAS_FILE" />
-            
+
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
                 <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
@@ -318,4 +344,3 @@
         </UI>
     </Fragment>
 </Wix>
-

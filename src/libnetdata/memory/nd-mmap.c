@@ -183,6 +183,8 @@ void *nd_mmap_advanced(const char *filename, size_t size, int flags, int ksm, bo
     int fd = -1;
     void *mem = MAP_FAILED;
 
+    errno_clear();
+
     if(filename && *filename) {
         // open/create the file to be used
         fd = memory_file_open(filename, size);
