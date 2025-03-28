@@ -254,8 +254,6 @@ volumes:
 
 ### With SSL/TLS enabled HTTP Proxy
 
-For a permanent installation on a public server, [secure your Netdata instance](/docs/netdata-agent/securing-netdata-agents.md).  
-
 Below is an example of installing Netdata with an **SSL reverse proxy** and **basic authentication** using Docker.  
 
 #### Caddyfile Setup
@@ -570,8 +568,7 @@ Commonly useful packages:
 Netdata’s Docker image supports **health checks** via standard Docker interfaces. You can control them using the `NETDATA_HEALTHCHECK_TARGET` environment variable:  
 
 - **Unset** – Defaults to checking `/api/v1/info`.  
-- **`cli`** – Uses `netdatacli ping` to confirm the Agent is running (but not full data collection).  
-- **Custom URL** – Checks for a `200` status code. Use `http://localhost:19999/` to verify the container’s Agent.
+- **`cli`** – Uses `netdatacli ping` to confirm the Agent is running (but not full data collection).
 
 The default `/api/v1/info` check is usually sufficient. However, if the web server is disabled or API access is restricted, you'll need to customize the health check configuration.
 
