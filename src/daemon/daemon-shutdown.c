@@ -311,9 +311,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
 
-    mrg_save(main_mrg);
-    watcher_step_complete(WATCHER_STEP_ID_MRG_SAVE);
-
     // unlink the pid
     if(pidfile && *pidfile && unlink(pidfile) != 0)
         netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);

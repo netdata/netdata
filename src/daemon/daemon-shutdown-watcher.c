@@ -131,7 +131,6 @@ void *watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_DBENGINE_TIERS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_METASYNC_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_MRG_SAVE, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES, shutdown_start_time);
 
@@ -170,7 +169,6 @@ void watcher_thread_start() {
     watcher_steps[WATCHER_STEP_ID_STOP_DBENGINE_TIERS].msg = "stop dbengine tiers";
     watcher_steps[WATCHER_STEP_ID_STOP_METASYNC_THREADS].msg = "stop metasync threads";
     watcher_steps[WATCHER_STEP_ID_CLOSE_SQL_DATABASES].msg = "close SQL databases";
-    watcher_steps[WATCHER_STEP_ID_MRG_SAVE].msg = "MRG save";
     watcher_steps[WATCHER_STEP_ID_REMOVE_PID_FILE].msg = "remove pid file";
     watcher_steps[WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES].msg = "free openssl structures";
 
