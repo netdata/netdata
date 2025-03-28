@@ -1329,20 +1329,72 @@ static void *flush_dirty_pages_of_section_tp_worker(struct rrdengine_instance *c
     return data;
 }
 
+struct mrg_load_thread {
+    int max_threads;
+    uv_thread_t thread;
+    uv_sem_t *sem;
+    int tier;
+    struct rrdengine_datafile *datafile;
+    bool busy;
+    bool finished;
+};
 
-static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    ;
+size_t max_running_threads = 0;
+size_t running_threads = 0;
+
+void journalfile_v2_populate_retention_to_mrg_worker(void *arg)
+{
+    struct mrg_load_thread *mlt = arg;
+    uv_sem_wait(mlt->sem);
+
+    struct rrdengine_instance *ctx = mlt->datafile->ctx;
+
+    size_t current_threads = __atomic_add_fetch(&running_threads, 1, __ATOMIC_RELAXED);
+    size_t prev_max;
+    do {
+        prev_max = __atomic_load_n(&max_running_threads, __ATOMIC_RELAXED);
+        if (current_threads <= prev_max) {
+            break;
+        }
+    } while (!__atomic_compare_exchange_n(
+        &max_running_threads, &prev_max, current_threads, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+
+    journalfile_v2_populate_retention_to_mrg(ctx, mlt->datafile->journalfile);
+
+    __atomic_sub_fetch(&running_threads, 1, __ATOMIC_RELAXED);
+    uv_sem_post(mlt->sem);
+
+    // Signal completion - this needs to be last
+    __atomic_store_n(&mlt->finished, true, __ATOMIC_RELEASE);
 }
 
-static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    if (completion)
+        completion_mark_complete(completion);
+}
+
+static void *populate_mrg_tp_worker(
+    struct rrdengine_instance *ctx,
+    void *data,
+    struct completion *completion __maybe_unused,
+    uv_work_t *uv_work_req __maybe_unused)
+{
     worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
+
+    struct mrg_load_thread *mlt = data;
+    size_t max_threads = mlt->max_threads;
+    int tier = ctx->config.tier;
+
+    size_t thread_index = 0;
+    size_t threads_used = 0;
+    int rc;
 
     do {
         struct rrdengine_datafile *datafile = NULL;
 
-        // find a datafile to work
+        // find a datafile to work on
         uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-        for(datafile = ctx->datafiles.first; datafile ; datafile = datafile->next) {
+        for(datafile = ctx->datafiles.first; datafile; datafile = datafile->next) {
             if(!spinlock_trylock(&datafile->populate_mrg.spinlock))
                 continue;
 
@@ -1359,14 +1411,98 @@ static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unuse
         if(!datafile)
             break;
 
-        journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
-        datafile->populate_mrg.populated = true;
-        spinlock_unlock(&datafile->populate_mrg.spinlock);
+        // Datafile populate mrg spinlock is acquired
+        // Find an available thread slot or join finished threads
+        bool thread_slot_found = false;
+
+        while (!thread_slot_found) {
+            // First, check for any finished threads to clean up
+            for (size_t index = 0; index < max_threads; index++) {
+                if (__atomic_load_n(&mlt[index].finished, __ATOMIC_RELAXED) &&
+                    __atomic_load_n(&mlt[index].tier, __ATOMIC_ACQUIRE) == tier) {
+
+                    rc = uv_thread_join(&(mlt[index].thread));
+                    if (rc)
+                        nd_log_daemon(NDLP_WARNING, "Failed to join thread, rc = %d", rc);
+
+                    __atomic_store_n(&mlt[index].busy, false, __ATOMIC_RELEASE);
+                    __atomic_store_n(&mlt[index].finished, false, __ATOMIC_RELEASE);
+                    mlt[index].datafile->populate_mrg.populated = true;
+                    spinlock_unlock(&mlt[index].datafile->populate_mrg.spinlock);
+
+                    // We've cleaned up a thread slot, but we'll still look for a free one
+                }
+            }
+
+            // Look for a free thread slot
+            for (size_t index = 0; index < max_threads; index++) {
+                bool expected = false;
+                if (__atomic_compare_exchange_n(&(mlt[index].busy), &expected, true, false,
+                                                __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+                    thread_index = index;
+                    thread_slot_found = true;
+                    break;
+                }
+            }
+
+            if (!thread_slot_found) {
+                // If we couldn't find a free slot after cleanup, wait a bit and try again
+                sleep_usec(10 * USEC_PER_MS);
+            }
+        }
+
+        // We have a thread slot (thread_index) and a datafile to process
+        __atomic_store_n(&mlt[thread_index].tier, tier, __ATOMIC_RELAXED);
+        mlt[thread_index].datafile = datafile;
+
+        rc = uv_thread_create(&mlt[thread_index].thread,
+                              journalfile_v2_populate_retention_to_mrg_worker,
+                              &mlt[thread_index]);
+
+        if (rc) {
+            nd_log_daemon(NDLP_WARNING, "Failed to create thread, rc = %d", rc);
+            __atomic_store_n(&mlt[thread_index].busy, false, __ATOMIC_RELEASE);
+            spinlock_unlock(&datafile->populate_mrg.spinlock);
+        } else {
+            threads_used++;
+        }
 
     } while(1);
 
-    completion_mark_complete(completion);
+    // We've processed all datafiles. Now wait for all our threads to complete
+    bool threads_still_running;
+    do {
+        threads_still_running = false;
 
+        for (size_t index = 0; index < max_threads; index++) {
+            if (__atomic_load_n(&mlt[index].busy, __ATOMIC_ACQUIRE) &&
+                __atomic_load_n(&mlt[index].tier, __ATOMIC_ACQUIRE) == tier) {
+
+                if (__atomic_load_n(&mlt[index].finished, __ATOMIC_RELAXED)) {
+                    // Thread is finished, join it
+                    rc = uv_thread_join(&(mlt[index].thread));
+                    if (rc)
+                        nd_log_daemon(NDLP_WARNING, "Failed to join thread, rc = %d", rc);
+
+                    __atomic_store_n(&mlt[index].busy, false, __ATOMIC_RELEASE);
+                    __atomic_store_n(&mlt[index].finished, false, __ATOMIC_RELEASE);
+                    mlt[index].datafile->populate_mrg.populated = true;
+                    spinlock_unlock(&mlt[index].datafile->populate_mrg.spinlock);
+                } else {
+                    // Thread is still running
+                    threads_still_running = true;
+                }
+            }
+        }
+
+        if (threads_still_running) {
+            // Wait a bit before checking again
+            sleep_usec(10 * USEC_PER_MS);
+        }
+
+    } while (threads_still_running);
+
+    worker_is_idle();
     return data;
 }
 
@@ -1934,6 +2070,17 @@ void dbengine_event_loop(void* arg) {
     fatal_assert(0 == uv_timer_start(&main->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
 
     bool shutdown = false;
+    size_t cpus = netdata_conf_cpus();
+    uv_sem_t sem;
+    uv_sem_init(&sem, (unsigned int) cpus);
+    struct mrg_load_thread *mlt = callocz(cpus, sizeof(*mlt));
+    for (size_t i = 0; i < cpus; i++) {
+        mlt[i].sem = &sem;
+        mlt[i].max_threads = cpus;
+        mlt[i].busy = false;
+        mlt[i].finished = false;
+    }
+
     while (likely(!shutdown)) {
         worker_is_idle();
         uv_run(&main->loop, UV_RUN_DEFAULT);
@@ -2038,7 +2185,7 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_CTX_POPULATE_MRG: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct completion *completion = cmd.completion;
-                    work_dispatch(ctx, NULL, completion, opcode, populate_mrg_tp_worker, after_populate_mrg);
+                    work_dispatch(ctx, mlt, completion, opcode, populate_mrg_tp_worker, after_populate_mrg);
                     break;
                 }
 
