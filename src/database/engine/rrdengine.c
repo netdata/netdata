@@ -1342,6 +1342,77 @@ static void *flush_dirty_pages_of_section_tp_worker(struct rrdengine_instance *c
     return data;
 }
 
+struct mrg_load_thread {
+    uv_thread_t thread;
+    uv_sem_t *sem_control;
+    struct rrdengine_instance *ctx;
+    struct rrdengine_datafile *datafile;
+    size_t index;
+    bool busy;
+    bool finished;
+};
+
+static bool cleanup_finished_threads(struct mrg_load_thread *mlt, size_t max_thread_slots, bool wait, size_t *free_slot)
+{
+    if (!mlt)
+        return false;
+
+    bool found_slot = false;
+
+    size_t loop_count = 20;
+    while (loop_count--) {
+        for (size_t index = 0; index < max_thread_slots; index++) {
+            if (free_slot && false == __atomic_load_n(&(mlt[index].busy), __ATOMIC_ACQUIRE)) {
+                found_slot = true;
+                *free_slot = index;
+                break;
+            }
+            if (__atomic_load_n(&(mlt[index].finished), __ATOMIC_RELAXED) ||
+                (wait && __atomic_load_n(&(mlt[index].busy), __ATOMIC_ACQUIRE))) {
+
+                int rc = uv_thread_join(&(mlt[index].thread));
+                if (rc)
+                    nd_log_daemon(NDLP_WARNING, "Failed to join thread, rc = %d", rc);
+                __atomic_store_n(&(mlt[index].busy), false, __ATOMIC_RELEASE);
+                __atomic_store_n(&(mlt[index].finished), false, __ATOMIC_RELEASE);
+                mlt[index].datafile->populate_mrg.populated = true;
+                spinlock_unlock(&mlt[index].datafile->populate_mrg.spinlock);
+
+                found_slot = true;
+                if (free_slot) {
+                    *free_slot = index;
+                    break;
+                }
+            }
+        }
+        if (found_slot || wait)
+            break;
+        sleep_usec(10 * USEC_PER_MS);
+    }
+    return found_slot || wait;
+}
+
+size_t max_running_threads = 0;
+size_t running_threads = 0;
+
+void journalfile_v2_populate_retention_to_mrg_worker(void *arg)
+{
+    struct mrg_load_thread *mlt = arg;
+//    nd_log_daemon(NDLP_INFO, "DBENGINE: Waiting to populate retention for datafile %u (index %zu)", mlt->datafile->fileno, mlt->index);
+
+    uv_sem_wait(mlt->sem_control);
+
+    __atomic_add_fetch(&running_threads, 1, __ATOMIC_RELAXED);
+
+//    nd_log_daemon(NDLP_INFO, "DBENGINE: Starting retention for datafile %u (index %zu)", mlt->datafile->fileno, mlt->index);
+    journalfile_v2_populate_retention_to_mrg(mlt->ctx, mlt->datafile->journalfile);
+
+    __atomic_store_n(&mlt->finished, true, __ATOMIC_RELEASE);
+    uv_sem_post(mlt->sem_control);
+    __atomic_sub_fetch(&running_threads, 1, __ATOMIC_RELAXED);
+
+//    nd_log_daemon(NDLP_INFO, "DBENGINE: Releasing thread for datafile %u (index %zu)", mlt->datafile->fileno, mlt->index);
+}
 
 static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ;
@@ -1350,6 +1421,13 @@ static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, vo
 static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
+    size_t max_threads = netdata_conf_cpus();
+
+    struct mrg_load_thread *mlt = max_threads > 1 ? callocz(max_threads, sizeof(*mlt)) : NULL;
+    size_t thread_index = 0;
+    uv_sem_t *sem_control = (uv_sem_t *) data;
+    int rc;
+    size_t threads_used = 0;
     do {
         struct rrdengine_datafile *datafile = NULL;
 
@@ -1372,11 +1450,34 @@ static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unuse
         if(!datafile)
             break;
 
-        journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
-        datafile->populate_mrg.populated = true;
-        spinlock_unlock(&datafile->populate_mrg.spinlock);
-
+        // Datafile populate mrg spinlock is acquired
+        while (1) {
+            bool thread_found = cleanup_finished_threads(mlt, max_threads, false, &thread_index);
+            if (thread_found) {
+                __atomic_store_n(&mlt[thread_index].busy, true, __ATOMIC_RELAXED);
+                mlt[thread_index].ctx = ctx;
+                mlt[thread_index].datafile = datafile;
+                mlt[thread_index].sem_control = sem_control;
+                mlt[thread_index].index = thread_index;
+                rc = uv_thread_create(
+                    &mlt[thread_index].thread, journalfile_v2_populate_retention_to_mrg_worker, &mlt[thread_index]);
+                if (rc)
+                    __atomic_store_n(&mlt[thread_index].busy, false, __ATOMIC_RELAXED);
+                else {
+                    threads_used++;
+                    break;
+                }
+            }
+            else
+                uv_sleep(100);
+        }
     } while(1);
+
+    (void) cleanup_finished_threads(mlt, max_threads, true, &thread_index);
+    freez(mlt);
+
+    nd_log_daemon(NDLP_INFO, "DBENGINE: Finished populating files for ctx %u using %zu threads",
+         ctx->config.tier, threads_used);
 
     completion_mark_complete(completion);
 
@@ -1934,6 +2035,9 @@ void dbengine_event_loop(void* arg) {
     fatal_assert(0 == uv_timer_start(&main->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
 
     bool shutdown = false;
+    uv_sem_t sem_control;
+    size_t cpus = netdata_conf_cpus();
+    uv_sem_init(&sem_control, (unsigned int) cpus);
     while (likely(!shutdown)) {
         worker_is_idle();
         uv_run(&main->loop, UV_RUN_DEFAULT);
@@ -2038,7 +2142,7 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_CTX_POPULATE_MRG: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct completion *completion = cmd.completion;
-                    work_dispatch(ctx, NULL, completion, opcode, populate_mrg_tp_worker, after_populate_mrg);
+                    work_dispatch(ctx, &sem_control, completion, opcode, populate_mrg_tp_worker, after_populate_mrg);
                     break;
                 }
 
