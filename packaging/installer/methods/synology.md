@@ -12,7 +12,14 @@ The good news is that our
 works fine if your NAS is one that uses the amd64 architecture. It
 will install the content into `/opt/netdata`, making future removal safe and simple.
 
-## Run as netdata user
+It your NAS is up-to-date,  running at least DSM 7.2.2, the latest kickstart script takes care of everything.
+You can start/stop the netdata service using the installed `systemd` and the service runs under the `netdata` user.
+
+## Older systems
+
+Older versions of DSM and the kickstart scripts did require some extra steps.
+
+### Run as netdata user
 
 When Netdata is first installed, it will run as _root_. This may or may not be acceptable for you, and since other
 installations run it as the `netdata` user, you might wish to do the same. This requires some extra work:
@@ -34,10 +41,14 @@ installations run it as the `netdata` user, you might wish to do the same. This 
     /etc/rc.netdata restart
     ```
 
-## Create startup script
+### Create startup script
 
 Additionally, as of 2018/06/24, the Netdata installer doesn't recognize DSM as an operating system, so no init script is
-installed. You'll have to do this manually:
+installed.
+
+DSM versions at the time where using upstart, so an upstart script was required.
+
+You'll have to do this manually:
 
 1. Add [this file](https://gist.github.com/oskapt/055d474d7bfef32c49469c1b53e8225f) as `/etc/rc.netdata`. Make it
     executable with `chmod 0755 /etc/rc.netdata`.
