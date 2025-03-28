@@ -13,7 +13,7 @@ Additionally, our **POWER8+ Docker images** don’t support the **FreeIPMI colle
 
 You can create a new Agent container with `docker run` or `docker-compose`, then access the dashboard at `http://NODE:19999`.  
 
-To function like a host installation, the Netdata container needs specific **privileges** and **mounts**. Below is a list of required components and their purposes.
+The Netdata container requires specific **privileges** and **mounts** to provide full monitoring capabilities equivalent to a direct host installation. Below is a list of required components and their purposes.
 
 <details open>
 <summary>Privileges</summary>
