@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- perflib: do not dereference null pointer [\#19985](https://github.com/netdata/netdata/pull/19985) ([ktsaou](https://github.com/ktsaou))
+- keep errno in out of memory situations [\#19984](https://github.com/netdata/netdata/pull/19984) ([ktsaou](https://github.com/ktsaou))
+- do not allocate or access zero sized arrays [\#19983](https://github.com/netdata/netdata/pull/19983) ([ktsaou](https://github.com/ktsaou))
+- Revert "fix undefined" [\#19982](https://github.com/netdata/netdata/pull/19982) ([stelfrag](https://github.com/stelfrag))
+- Installation section Improvements [\#19981](https://github.com/netdata/netdata/pull/19981) ([kanelatechnical](https://github.com/kanelatechnical))
+- Improve agent shutdown [\#19980](https://github.com/netdata/netdata/pull/19980) ([stelfrag](https://github.com/stelfrag))
+- Release memory when calculating metric correlations [\#19979](https://github.com/netdata/netdata/pull/19979) ([stelfrag](https://github.com/stelfrag))
 - Fix random crash during shutdown [\#19978](https://github.com/netdata/netdata/pull/19978) ([stelfrag](https://github.com/stelfrag))
 - set max datafile size to 1GiB [\#19977](https://github.com/netdata/netdata/pull/19977) ([ktsaou](https://github.com/ktsaou))
 - Doc Linux improved order in kickstart [\#19975](https://github.com/netdata/netdata/pull/19975) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -15,6 +22,8 @@
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.3 to 5.7.4 in /src/go [\#19968](https://github.com/netdata/netdata/pull/19968) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/docker/docker from 28.0.2+incompatible to 28.0.4+incompatible in /src/go [\#19967](https://github.com/netdata/netdata/pull/19967) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Improve ACLK sync shutdown process [\#19966](https://github.com/netdata/netdata/pull/19966) ([stelfrag](https://github.com/stelfrag))
+- Set sqlite max soft and hard heap limit [\#19963](https://github.com/netdata/netdata/pull/19963) ([stelfrag](https://github.com/stelfrag))
+- fix MSI installer [\#19962](https://github.com/netdata/netdata/pull/19962) ([ktsaou](https://github.com/ktsaou))
 - Don’t skip building Go code on static builds. [\#19961](https://github.com/netdata/netdata/pull/19961) ([Ferroin](https://github.com/Ferroin))
 - fix undefined [\#19960](https://github.com/netdata/netdata/pull/19960) ([ktsaou](https://github.com/ktsaou))
 - daemon status 22c [\#19959](https://github.com/netdata/netdata/pull/19959) ([ktsaou](https://github.com/ktsaou))
@@ -25,6 +34,7 @@
 - daemon status 22 [\#19953](https://github.com/netdata/netdata/pull/19953) ([ktsaou](https://github.com/ktsaou))
 - Enable interface to release sqlite memory [\#19952](https://github.com/netdata/netdata/pull/19952) ([stelfrag](https://github.com/stelfrag))
 - Improve event loop thread creation [\#19951](https://github.com/netdata/netdata/pull/19951) ([stelfrag](https://github.com/stelfrag))
+- IIS Application Pool \(Windows.plugin\) [\#19950](https://github.com/netdata/netdata/pull/19950) ([thiagoftsm](https://github.com/thiagoftsm))
 - Disable generation of debuginfo packages for DEB distros. [\#19948](https://github.com/netdata/netdata/pull/19948) ([Ferroin](https://github.com/Ferroin))
 - Set default CMake build type to include debug info. [\#19946](https://github.com/netdata/netdata/pull/19946) ([Ferroin](https://github.com/Ferroin))
 - build\(deps\): bump github.com/miekg/dns from 1.1.63 to 1.1.64 in /src/go [\#19945](https://github.com/netdata/netdata/pull/19945) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -53,6 +63,7 @@
 - post the first status when there is no last status [\#19912](https://github.com/netdata/netdata/pull/19912) ([ktsaou](https://github.com/ktsaou))
 - initial implementation of libbacktrace [\#19910](https://github.com/netdata/netdata/pull/19910) ([ktsaou](https://github.com/ktsaou))
 - fix reliability calculation [\#19909](https://github.com/netdata/netdata/pull/19909) ([ktsaou](https://github.com/ktsaou))
+- improvement\(health/dyncfg\): add widget to load available contexts [\#19904](https://github.com/netdata/netdata/pull/19904) ([ilyam8](https://github.com/ilyam8))
 - new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
 - Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
 - Large-scale cleanup of static build infrastructure. [\#19852](https://github.com/netdata/netdata/pull/19852) ([Ferroin](https://github.com/Ferroin))
@@ -427,7 +438,6 @@
 - Enable libunwind in native packages and Docker images. [\#19452](https://github.com/netdata/netdata/pull/19452) ([Ferroin](https://github.com/Ferroin))
 - fix rrdset name crash on rrdset obsoletion [\#19449](https://github.com/netdata/netdata/pull/19449) ([ktsaou](https://github.com/ktsaou))
 - Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
-- Start using new GitHub hosted ARM runners for CI when appropriate. [\#19427](https://github.com/netdata/netdata/pull/19427) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
@@ -479,17 +489,6 @@
 - Cleanup context check list on startup [\#19433](https://github.com/netdata/netdata/pull/19433) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#19432](https://github.com/netdata/netdata/pull/19432) ([netdatabot](https://github.com/netdatabot))
 - Drop Fedora 39 from CI and package builds. [\#19431](https://github.com/netdata/netdata/pull/19431) ([Ferroin](https://github.com/Ferroin))
-- docs: fix go.d/ethtool meta [\#19430](https://github.com/netdata/netdata/pull/19430) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/ethtool\): use ndsudo for module info [\#19429](https://github.com/netdata/netdata/pull/19429) ([ilyam8](https://github.com/ilyam8))
-- add 'ethtool -m' to ndsudo [\#19428](https://github.com/netdata/netdata/pull/19428) ([ilyam8](https://github.com/ilyam8))
-- feat\(go.d/ethtool\): collect module ddm info using ethtool [\#19426](https://github.com/netdata/netdata/pull/19426) ([ilyam8](https://github.com/ilyam8))
-- ACLK timeout [\#19425](https://github.com/netdata/netdata/pull/19425) ([ktsaou](https://github.com/ktsaou))
-- log stream\_info payload when it cannot be parsed [\#19424](https://github.com/netdata/netdata/pull/19424) ([ktsaou](https://github.com/ktsaou))
-- Add missing information in rule based membership document [\#19423](https://github.com/netdata/netdata/pull/19423) ([juacker](https://github.com/juacker))
-- Fix coverity issues [\#19422](https://github.com/netdata/netdata/pull/19422) ([stelfrag](https://github.com/stelfrag))
-- add 'type' to GH report forms [\#19421](https://github.com/netdata/netdata/pull/19421) ([ilyam8](https://github.com/ilyam8))
-- fix mmaps accounting [\#19420](https://github.com/netdata/netdata/pull/19420) ([ktsaou](https://github.com/ktsaou))
-- PULSE: network traffic [\#19419](https://github.com/netdata/netdata/pull/19419) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
