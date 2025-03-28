@@ -506,7 +506,7 @@ The official `netdata/netdata` Docker image provides the following named tags:
 
 Minor and major version tags update with each matching release. For example, if `v1.40.1` is published, the `v1.40` tag moves from `v1.40.0` to `v1.40.1`.  
 
-## Configure Agent Containers  
+## Configure Agent Containers
 
 If you started an Agent container using one of the [recommended methods](#create-a-new-netdata-agent-container) and need to edit its configuration, first attach to the container with `docker exec`, replacing `netdata` with your container’s name.
 
