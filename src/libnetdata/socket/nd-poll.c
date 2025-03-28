@@ -238,7 +238,7 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
     } while(true);
 }
 
-static void nd_poll_free_callback(Word_t fd __maybe_unused, struct fd_info *fdi) {
+static void nd_poll_free_callback(Word_t fd __maybe_unused, struct fd_info *fdi, void *data __maybe_unused) {
     freez(fdi);
 }
 
@@ -246,7 +246,7 @@ static void nd_poll_free_callback(Word_t fd __maybe_unused, struct fd_info *fdi)
 void nd_poll_destroy(nd_poll_t *ndpl) {
     if (ndpl) {
         close(ndpl->epoll_fd);
-        POINTERS_FREE(&ndpl->pointers, nd_poll_free_callback);
+        POINTERS_FREE(&ndpl->pointers, nd_poll_free_callback, NULL);
         freez(ndpl);
     }
 }
@@ -440,7 +440,7 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
 void nd_poll_destroy(nd_poll_t *ndpl) {
     if (ndpl) {
         free(ndpl->fds);
-        POINTERS_FREE(&ndpl->pointers, NULL);
+        POINTERS_FREE(&ndpl->pointers, NULL, NULL);
         freez(ndpl);
     }
 }

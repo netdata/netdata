@@ -1126,6 +1126,11 @@ int netdata_main(int argc, char **argv) {
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("mrg cleanup");
+
+    mrg_metric_prepopulate_cleanup(main_mrg);
+
+    // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("done");
 
     nd_log_register_fatal_final_cb(netdata_exit_fatal);
