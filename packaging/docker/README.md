@@ -504,7 +504,7 @@ The official `netdata/netdata` Docker image provides the following named tags:
 |  `vX.Y`  | the major and minor version (for example, `v1.40`).                                                                                                     |
 |   `vX`   | just the major version (for example, `v1`).                                                                                                             |
 
-Minor and major version tags update with each matching release. For example, if `v1.40.1` is published, the `v1.40` tag moves from `v1.40.0` to `v1.40.1`.  
+Minor and major version tags update with each matching release. For example, if `v1.40.1` is published, the `v1.40` tag moves from `v1.40.0` to `v1.40.1`.
 
 ## Configure Agent Containers
 
