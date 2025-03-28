@@ -2061,6 +2061,50 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     freez(data);
 }
 
+#define GET_UUID_LIST  "SELECT dim_id FROM dimension"
+size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid))
+{
+    sqlite3_stmt *res = NULL;
+    sqlite3 *local_meta_db = NULL;
+
+    char sqlite_database[FILENAME_MAX + 1];
+    snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
+    int rc = sqlite3_open_v2(sqlite_database, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+    if (rc != SQLITE_OK) {
+        sqlite3_close(local_meta_db);
+        local_meta_db = NULL;
+    }
+
+    if (local_meta_db)
+        db_execute(local_meta_db, "PRAGMA cache_size=10000");
+
+    if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
+        sqlite3_close(local_meta_db);
+        return 0;
+    }
+
+    size_t count = 0;
+
+    usec_t started_ut = now_monotonic_usec();
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        nd_uuid_t *uuid = (nd_uuid_t *)sqlite3_column_blob(res, 0);
+
+        for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++) {
+            if (unlikely(!multidb_ctx[tier]))
+                continue;
+
+            populate_cb(mrg, (Word_t)multidb_ctx[tier], uuid);
+        }
+        count++;
+    }
+
+    SQLITE_FINALIZE(res);
+    sqlite3_close(local_meta_db);
+    COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
+    nd_log_daemon(NDLP_INFO, "MRG: Loaded %zu metrics from database in %s", count, report_duration);
+    return count;
+}
+
 static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool shutting_down)
 {
     static bool skip_models = false;

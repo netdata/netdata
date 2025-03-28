@@ -1652,8 +1652,11 @@ if(ENABLE_DBENGINE)
             src/database/engine/page.h
             src/database/engine/cache.c
             src/database/engine/cache.h
-            src/database/engine/metric.c
-            src/database/engine/metric.h
+            src/database/engine/mrg.c
+            src/database/engine/mrg.h
+            src/database/engine/mrg-internals.h
+            src/database/engine/mrg-unittest.c
+            src/database/engine/mrg-load.c
             src/database/engine/pdc.c
             src/database/engine/pdc.h
             src/database/engine/dbengine-unittest.c
