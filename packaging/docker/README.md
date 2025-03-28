@@ -516,7 +516,7 @@ cd /etc/netdata
 ./edit-config netdata.conf
 ```
 
-Restart the Agent to apply changes. Exit the container if needed, then run: `docker restart netdata`.
+Restart the Agent to apply changes: exit the container if necessary, then run `docker restart netdata`.
 
 ### Change the default hostname
 
