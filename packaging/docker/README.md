@@ -258,7 +258,8 @@ For a permanent installation on a public server, [secure your Netdata instance](
 
 Below is an example of installing Netdata with an **SSL reverse proxy** and **basic authentication** using Docker.  
 
-#### Caddyfile Setup  
+#### Caddyfile Setup
+
 Place the following `Caddyfile` in `/opt`, customizing the domain and adding your email for **Let’s Encrypt**. The certificate will renew automatically via the Caddy server.
 
 ```caddyfile
