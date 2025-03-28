@@ -31,6 +31,8 @@ int do_PerflibNetFramework(int update_every, usec_t dt);
 int do_PerflibAD(int update_every, usec_t dt);
 int do_PerflibADCS(int update_every, usec_t dt);
 int do_PerflibADFS(int update_every, usec_t dt);
+int do_PerflibHyperV(int update_every, usec_t dt);
+int do_PerflibServices(int update_every, usec_t dt);
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY
@@ -193,7 +195,5 @@ enum PERFLIB_PRIO {
     PRIO_ADFS_USER_PASS_AUTH,
     PRIO_ADFS_WSFED_TOKEN_REQUESTS
 };
-
-int do_PerflibHyperV(int update_every, usec_t dt);
 
 #endif //NETDATA_WINDOWS_PLUGIN_H
