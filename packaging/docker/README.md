@@ -330,7 +330,7 @@ to Caddyfile.
 
 ### With Docker socket proxy
 
-> **Note:** Using Netdata with a Docker socket proxy may cause some features to not work as expected. It hasn't been fully tested by the Netdata team.  
+> **Note:** Using Netdata with a Docker socket proxy may cause some features to not work as expected. It hasn't been fully tested by the Netdata team.
 
 For better security, deploy a **Docker socket proxy** with a tool like [HAProxy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md) or [CetusGuard](https://github.com/hectorm/cetusguard). This ensures the socket is **read-only** and restricted to the `/containers` endpoint.  
 
