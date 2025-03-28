@@ -558,7 +558,7 @@ Alternatively, use the **host’s hostname** by mounting `/etc/hostname` in the 
 
 ## Adding extra packages at runtime
 
-By default, Netdata’s official container images exclude some optional runtime dependencies. You can install them at runtime by setting the `NETDATA_EXTRA_DEB_PACKAGES` environment variable.  
+By default, Netdata’s official container images exclude some optional runtime dependencies. You can install them at runtime by setting the `NETDATA_EXTRA_DEB_PACKAGES` environment variable.
 
 Commonly useful packages:  
 - `apcupsd` – Monitors APC UPS devices.  
