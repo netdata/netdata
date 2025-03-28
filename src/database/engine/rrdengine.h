@@ -15,7 +15,7 @@
 #include "journalfile.h"
 #include "rrdengineapi.h"
 #include "pagecache.h"
-#include "metric.h"
+#include "mrg.h"
 #include "cache.h"
 #include "pdc.h"
 #include "page.h"
