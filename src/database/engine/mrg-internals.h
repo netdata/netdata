@@ -65,16 +65,20 @@ static inline void MRG_STATS_DUPLICATE_ADD(MRG *mrg, size_t partition) {
     mrg->index[partition].stats.additions_duplicate++;
 }
 
-static inline void MRG_STATS_ADDED_METRIC(MRG *mrg, size_t partition) {
+static inline void MRG_STATS_ADDED_METRIC(MRG *mrg, size_t partition, Word_t section) {
     mrg->index[partition].stats.entries++;
     mrg->index[partition].stats.additions++;
     mrg->index[partition].stats.size += sizeof(METRIC);
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
+    __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
 }
 
-static inline void MRG_STATS_DELETED_METRIC(MRG *mrg, size_t partition) {
+static inline void MRG_STATS_DELETED_METRIC(MRG *mrg, size_t partition, Word_t section) {
     mrg->index[partition].stats.entries--;
     mrg->index[partition].stats.size -= sizeof(METRIC);
     mrg->index[partition].stats.deletions++;
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
+    __atomic_sub_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
 }
 
 static inline void MRG_STATS_SEARCH_HIT(MRG *mrg, size_t partition) {
@@ -191,7 +195,7 @@ static void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric) {
             fatal("DBENGINE METRIC: cannot delete UUID from JudyL");
     }
 
-    MRG_STATS_DELETED_METRIC(mrg, partition);
+    MRG_STATS_DELETED_METRIC(mrg, partition, metric->section);
 
     mrg_index_write_unlock(mrg, partition);
     uuidmap_free(metric->uuid);
@@ -299,7 +303,7 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     __atomic_add_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
 
-    MRG_STATS_ADDED_METRIC(mrg, partition);
+    MRG_STATS_ADDED_METRIC(mrg, partition, metric->section);
 
     mrg_index_write_unlock(mrg, partition);
 

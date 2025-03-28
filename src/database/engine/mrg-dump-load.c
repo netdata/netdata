@@ -127,13 +127,51 @@ static ssize_t mrg_file_read_page(mrg_file_load_ctx_t *ctx, uint64_t offset, mrg
     return header->uncompressed_size;
 }
 
+DEFINE_JUDYL_TYPED(METRIC, METRIC *);
+METRIC_JudyLSet acquired_metrics = { 0 };
+size_t acquired_metrics_counter = 0;
+size_t acquired_metrics_deleted = 0;
+
+ALWAYS_INLINE
+static void mrg_metric_prepopulate(MRG *mrg, Word_t section, nd_uuid_t *uuid) {
+    MRG_ENTRY entry = {
+        .uuid = uuid,
+        .section = section,
+        .first_time_s = 0,
+        .last_time_s = 0,
+        .latest_update_every_s = 0,
+    };
+    bool added = false;
+    METRIC *metric = metric_add_and_acquire(mrg, &entry, &added);
+    if(likely(added)) {
+        METRIC_SET(&acquired_metrics, acquired_metrics_counter++, metric);
+        return;
+    }
+    mrg_metric_release(mrg, metric);
+}
+
+static void mrg_release_cb(Word_t idx __maybe_unused, METRIC *m, void *data) {
+    MRG *mrg = data;
+    if(mrg_metric_release(mrg, m))
+        acquired_metrics_deleted++;
+}
+
+void mrg_metric_prepopulate_cleanup(MRG *mrg) {
+    acquired_metrics_deleted = 0;
+    METRIC_FREE(&acquired_metrics, mrg_release_cb, mrg);
+
+    if(acquired_metrics_counter || acquired_metrics_deleted)
+        nd_log(NDLS_DAEMON, NDLP_INFO, "MRG DUMP: Prepopulated %zu metrics, released %zu, deleted %zu",
+               acquired_metrics_counter, acquired_metrics_counter - acquired_metrics_deleted, acquired_metrics_deleted);
+
+    acquired_metrics_counter = 0;
+}
+
 // Process a metric page
-static bool mrg_file_process_metric_page(MRG *mrg, mrg_file_load_ctx_t *ctx,
+static void mrg_file_process_metric_page(MRG *mrg, mrg_file_load_ctx_t *ctx __maybe_unused,
                                          mrg_page_header_t *header,
                                          void *data, size_t data_size,
                                          uint32_t *processed_metrics) {
-    time_t now_s = now_realtime_sec();
-
     // Calculate the number of metrics in the page
     size_t metrics_count = data_size / sizeof(mrg_file_metric_t);
     if (metrics_count != header->entries_count) {
@@ -159,51 +197,13 @@ static bool mrg_file_process_metric_page(MRG *mrg, mrg_file_load_ctx_t *ctx,
             continue;
         }
 
-        time_t first_time_s = ctx->header.base_time + metrics[i].first_time;
-        time_t last_time_s = ctx->header.base_time + metrics[i].last_time;
-        uint32_t update_every_s = metrics[i].update_every;
-
-        // Validate times
-        if (unlikely(first_time_s <= 0 || last_time_s <= 0)) {
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "MRG DUMP: Skipping metric with invalid times: %ld - %ld",
-                   first_time_s, last_time_s);
-            continue;
-        }
-
-        if (unlikely(first_time_s > last_time_s)) {
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "MRG DUMP: Metric has first_time > last_time: %ld > %ld, correcting",
-                   first_time_s, last_time_s);
-            first_time_s = last_time_s;
-        }
-
-        if (unlikely(last_time_s > now_s)) {
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "MRG DUMP: Metric has last_time in the future: %ld > %ld (now), correcting",
-                   last_time_s, now_s);
-            last_time_s = now_s;
-        }
-
-        // Update the metric registry
-        mrg_update_metric_retention_and_granularity_by_uuid(
-            mrg,
-            (Word_t)multidb_ctx[tier],
-            &metrics[i].uuid.uuid,
-            first_time_s,
-            last_time_s,
-            update_every_s,
-            now_s
-        );
-
+        mrg_metric_prepopulate(mrg, (Word_t)multidb_ctx[tier], &metrics[i].uuid.uuid);
         (*processed_metrics)++;
     }
-
-    return true;
 }
 
 // Process a file entry page
-static bool mrg_file_process_file_page(mrg_file_load_ctx_t *ctx,
+static void mrg_file_process_file_page(mrg_file_load_ctx_t *ctx __maybe_unused,
                                        mrg_page_header_t *header,
                                        void *data, size_t data_size,
                                        uint32_t *processed_files) {
@@ -260,8 +260,6 @@ static bool mrg_file_process_file_page(mrg_file_load_ctx_t *ctx,
 
         (*processed_files)++;
     }
-
-    return true;
 }
 
 // Traverse the chain of pages starting from the last one
@@ -293,17 +291,18 @@ static bool mrg_file_traverse_pages(MRG *mrg, mrg_file_load_ctx_t *ctx,
         }
 
         // Process page based on type
-        if (type == MRG_PAGE_TYPE_METRIC) {
-            if (!mrg_file_process_metric_page(mrg, ctx, &header, ctx->uncompressed_buffer, size, processed_metrics)) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to process metric page at offset %"PRIu64, offset);
+        switch(type) {
+            case MRG_PAGE_TYPE_METRIC:
+                mrg_file_process_metric_page(mrg, ctx, &header, ctx->uncompressed_buffer, size, processed_metrics);
+                break;
+
+            case MRG_PAGE_TYPE_FILE:
+                mrg_file_process_file_page(ctx, &header, ctx->uncompressed_buffer, size, processed_files);
+                break;
+
+            default:
+                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Invalid page type %u", type);
                 return false;
-            }
-        }
-        else if (type == MRG_PAGE_TYPE_FILE) {
-            if (!mrg_file_process_file_page(ctx, &header, ctx->uncompressed_buffer, size, processed_files)) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "MRG DUMP: Failed to process file page at offset %"PRIu64, offset);
-                return false;
-            }
         }
 
         // Move to previous page
@@ -391,12 +390,6 @@ bool mrg_dump_load(MRG *mrg) {
     nd_log(NDLS_DAEMON, NDLP_INFO,
            "MRG DUMP: Loaded %u metrics and verified %u files in %s",
            processed_metrics, processed_files, dt);
-
-    // Remove the file after successful loading to avoid double-loading on next restart
-    if (unlink(filename) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "MRG DUMP: Failed to remove file %s: %s", filename, strerror(errno));
-    }
 
     return processed_metrics > 0;
 }

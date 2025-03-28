@@ -166,8 +166,6 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
 
     bool added;
     METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
-    if (added)
-        __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
     return metric;
 }
 

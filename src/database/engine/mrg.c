@@ -21,6 +21,7 @@ inline MRG *mrg_create(void) {
     }
     pulse_aral_register_statistics(&mrg_aral_statistics, "mrg");
 
+    mrg_load(mrg);
     return mrg;
 }
 
@@ -70,8 +71,8 @@ size_t mrg_destroy(MRG *mrg) {
                     referenced++;
 
                 uuidmap_free(metric->uuid);
+                MRG_STATS_DELETED_METRIC(mrg, partition, metric->section);
                 aral_freez(mrg->index[partition].aral, metric);
-                MRG_STATS_DELETED_METRIC(mrg, partition);
             }
 
             JudyLFreeArray(&sections_judy, PJE0);
@@ -128,8 +129,8 @@ METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric) {
 }
 
 ALWAYS_INLINE
-void mrg_metric_release(MRG *mrg, METRIC *metric) {
-    metric_release(mrg, metric);
+bool mrg_metric_release(MRG *mrg, METRIC *metric) {
+    return metric_release(mrg, metric);
 }
 
 ALWAYS_INLINE
@@ -417,11 +418,11 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     METRIC *metric = mrg_metric_get_and_acquire_by_uuid(mrg, uuid, section);
     if (!metric) {
         MRG_ENTRY entry = {
-                .uuid = uuid,
-                .section = section,
-                .first_time_s = first_time_s,
-                .last_time_s = last_time_s,
-                .latest_update_every_s = update_every_s
+            .uuid = uuid,
+            .section = section,
+            .first_time_s = first_time_s,
+            .last_time_s = last_time_s,
+            .latest_update_every_s = update_every_s,
         };
         metric = mrg_metric_add_and_acquire(mrg, entry, &added);
     }
@@ -447,7 +448,6 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
             uint64_t samples = (last_time_s - first_time_s) / update_every_s;
             __atomic_add_fetch(&ctx->atomic.samples, samples, __ATOMIC_RELAXED);
         }
-        __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
     }
 
     mrg_metric_release(mrg, metric);

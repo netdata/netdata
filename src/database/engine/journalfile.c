@@ -707,10 +707,9 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
 
             bool added;
             metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
-            if(added) {
-                __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
+            if(added)
                 update_metric_time = false;
-            }
+
             if (vd.update_every_s) {
                 uint64_t samples = (vd.end_time_s - vd.start_time_s) / vd.update_every_s;
                 __atomic_add_fetch(&ctx->atomic.samples, samples, __ATOMIC_RELAXED);

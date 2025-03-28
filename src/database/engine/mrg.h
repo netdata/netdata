@@ -46,7 +46,7 @@ MRG *mrg_create(void);
 size_t mrg_destroy(MRG *mrg);
 
 METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric);
-void mrg_metric_release(MRG *mrg, METRIC *metric);
+bool mrg_metric_release(MRG *mrg, METRIC *metric);
 
 METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret);
 METRIC *mrg_metric_get_and_acquire_by_id(MRG *mrg, UUIDMAP_ID id, Word_t section);
@@ -91,5 +91,6 @@ void mrg_update_metric_retention_and_granularity_by_uuid(
 
 bool mrg_save(MRG *mrg);
 bool mrg_load(MRG *mrg);
+void mrg_metric_prepopulate_cleanup(MRG *mrg);
 
 #endif // DBENGINE_METRIC_H
