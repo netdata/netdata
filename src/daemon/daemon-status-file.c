@@ -110,6 +110,7 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
         ND_PROFILE profile;
         EXIT_REASON exit_reason;
         RRD_DB_MODE db_mode;
+        uint32_t worker_job_id;
         uint8_t db_tiers;
         bool kubernetes;
         bool sentry_available;
@@ -143,6 +144,7 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
     to_hash.sentry_fatal = ds->fatal.sentry,
     to_hash.host_id = ds->host_id,
     to_hash.machine_id = ds->machine_id,
+    to_hash.worker_job_id = ds->fatal.worker_job_id,
 
     strncpyz(to_hash.version, ds->version, sizeof(to_hash.version) - 1);
     strncpyz(to_hash.filename, ds->fatal.filename, sizeof(to_hash.filename) - 1);
@@ -304,6 +306,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             print_uint64_hex(buf, ds->fatal.fault_address);
             buffer_json_member_add_string(wb, "fault_address", buf);
         }
+
+        if(ds->v >= 23)
+            buffer_json_member_add_uint64(wb, "worker_job_id", ds->fatal.worker_job_id);
     }
     buffer_json_object_close(wb);
 
@@ -354,6 +359,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v20 = version >= 20 ? strict : false;
     bool required_v21 = version >= 21 ? strict : false;
     bool required_v22 = version >= 22 ? strict : false;
+    bool required_v23 = version >= 23 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
@@ -498,6 +504,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
             ds->fatal.fault_address = str2ull_encoded(buf);
         }
+
+        if(version >= 23)
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "worker_job_id", SIGNAL_CODE_2id_h, ds->fatal.worker_job_id, error, required_v23);
     });
 
     // Parse the last posted object
@@ -1474,6 +1483,9 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     if(stack_trace && *stack_trace && stack_trace_is_empty(&session_status))
         strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
 
+    if(!session_status.fatal.worker_job_id)
+        session_status.fatal.worker_job_id = workers_get_last_job_id();
+
     if(line)
         session_status.fatal.line = line;
 
@@ -1540,6 +1552,9 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
     if(!session_status.fatal.thread_id)
         session_status.fatal.thread_id = gettid_cached();
+
+    if(!session_status.fatal.worker_job_id)
+        session_status.fatal.worker_job_id = workers_get_last_job_id();
 
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag_async_safe());
 
@@ -1748,4 +1763,8 @@ ND_UUID daemon_status_file_get_host_id(void) {
         return session_status.host_id;
     else
         return last_session_status.host_id;
+}
+
+size_t daemon_status_file_get_fatal_worker_job_id(void) {
+    return session_status.fatal.worker_job_id;
 }
