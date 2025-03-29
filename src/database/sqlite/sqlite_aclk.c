@@ -521,7 +521,7 @@ static void node_update_timer_cb(uv_timer_t *handle)
     struct aclk_sync_cfg_t *ahc = handle->data;
     RRDHOST *host = ahc->host;
 
-    if(aclk_host_state_update_auto(host))
+    if(!host || aclk_host_state_update_auto(host))
         uv_timer_stop(&ahc->timer);
 }
 
