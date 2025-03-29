@@ -2,12 +2,14 @@
 
 #include "windows_plugin.h"
 #include "windows-internals.h"
+#include "libnetdata/os/windows-wmi/windows-wmi.h"
 
 // https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
 #define NETDATA_MAX_INSTANCE_NAME 32
 #define NETDATA_MAX_INSTANCE_OBJECT 128
 
 BOOL is_sqlexpress = FALSE;
+size_t DatabasesDictWMI = 0;
 
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
@@ -1167,10 +1169,11 @@ static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, con
         mli->rd_db_data_file_size = rrddim_add(mli->st_db_data_file_size, "size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    // FIXME: If the value cannot be retrieved, remove the chart instead of displaying a 0 value.
-    collected_number data =
-        (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE)) ? mli->MSSQLDatabaseDataFileSize.current.Data : 0;
-    rrddim_set_by_pointer(mli->st_db_data_file_size, mli->rd_db_data_file_size, data);
+    if (DatabasesDictWMI) {
+        unsigned long long *data = dictionary_get(DatabaseSize, db);
+        if (data)
+            rrddim_set_by_pointer(mli->st_db_data_file_size, mli->rd_db_data_file_size, (collected_number)((*data) * 1024));
+    }
 
     rrdset_done(mli->st_db_data_file_size);
 }
@@ -1183,9 +1186,7 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     int *update_every = data;
 
     void (*transaction_chart[])(struct mssql_db_instance *, const char *, int) = {
-        // FIXME: allegedly Netdata collects negative values (MSSQLDatabaseDataFileSize).
-        // something is wrong, perflibdump shows correct values.
-        // mssql_data_file_size_chart,
+        mssql_data_file_size_chart,
         mssql_transactions_chart,
         mssql_database_backup_restore_chart,
         mssql_database_log_flushed_chart,
@@ -1231,12 +1232,6 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
             mdi->parent = p;
         }
 
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseDataFileSize)) {
-            LONGLONG value = (LONGLONG)mdi->MSSQLDatabaseDataFileSize.current.Data;
-            if (value > 0)
-                mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE);
-        }
-
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseActiveTransactions))
             mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS);
 
@@ -1255,6 +1250,8 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseWriteTransactions))
             mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS);
     }
+
+    DatabasesDictWMI = GetSQLDataFileSizeWMI();
 
     dictionary_sorted_walkthrough_read(p->databases, dict_mssql_databases_charts_cb, &update_every);
 }
