@@ -28,6 +28,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     datafile->fileno = fileno;
     fatal_assert(0 == uv_rwlock_init(&datafile->extent_rwlock));
     datafile->ctx = ctx;
+    datafile->magic1 = datafile->magic2 = DATAFILE_MAGIC;
 
     datafile->users.available = true;
 
@@ -94,8 +95,8 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
             // count the number of pages referencing this in the open cache
             spinlock_unlock(&df->users.spinlock);
             usec_t time_to_scan_ut = now_monotonic_usec();
-            size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)df->ctx, df);
-            size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)df->ctx, df);
+            size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
+            size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
             time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
             spinlock_lock(&df->users.spinlock);
 
@@ -115,7 +116,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
                                          "%zu clean and %zu hot open cache pages "
                                          "- will be deleted shortly "
                                          "(scanned open cache in %"PRIu64" usecs)",
-                                   df->fileno, df->ctx->config.tier,
+                                   df->fileno, datafile_ctx(df)->config.tier,
                                    df->users.lockers,
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
@@ -132,7 +133,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
                                          "%zu clean and %zu hot open cache pages "
                                          "- will be deleted now "
                                          "(scanned open cache in %"PRIu64" usecs)",
-                                   df->fileno, df->ctx->config.tier,
+                                   df->fileno, datafile_ctx(df)->config.tier,
                                    df->users.lockers,
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
@@ -146,7 +147,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
                                      "has %u lockers (oc:%u, pd:%u), "
                                      "%zu clean and %zu hot open cache pages "
                                      "(scanned open cache in %"PRIu64" usecs)",
-                               df->fileno, df->ctx->config.tier,
+                               df->fileno, datafile_ctx(df)->config.tier,
                                df->users.lockers,
                                df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
                                df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
@@ -163,12 +164,12 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
     (void) snprintfz(str, maxlen - 1, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
-                    datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
+                    datafile_ctx(datafile)->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
 int close_data_file(struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile->ctx;
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
@@ -187,7 +188,7 @@ int close_data_file(struct rrdengine_datafile *datafile)
 
 int unlink_data_file(struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile->ctx;
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
@@ -208,7 +209,7 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
 
 int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile->ctx;
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
@@ -243,7 +244,7 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 
 int create_data_file(struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile->ctx;
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     uv_file file;
     int ret, fd;
@@ -321,7 +322,7 @@ static int check_data_file_superblock(uv_file file)
 
 static int load_data_file(struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile->ctx;
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     uv_file file;
     int ret, fd, error;
@@ -600,6 +601,9 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         datafile_list_delete_unsafe(ctx, datafile);
         spinlock_unlock(&datafile->writers.spinlock);
         uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+
+        memset(journalfile, 0, sizeof(*journalfile));
+        memset(datafile, 0, sizeof(*datafile));
 
         freez(journalfile);
         freez(datafile);
