@@ -66,27 +66,7 @@ enum cachestat_indexes {
 
 enum cachestat_tables { NETDATA_CACHESTAT_GLOBAL_STATS, NETDATA_CACHESTAT_PID_STATS, NETDATA_CACHESTAT_CTRL };
 
-typedef struct __attribute__((packed)) netdata_cachestat {
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
-} netdata_cachestat_t;
-
-typedef struct __attribute__((packed)) netdata_publish_cachestat {
-    uint64_t ct;
-
-    long long ratio;
-    long long dirty;
-    long long hit;
-    long long miss;
-
-    netdata_cachestat_t current;
-    netdata_cachestat_t prev;
-} netdata_publish_cachestat_t;
-
 void *ebpf_cachestat_thread(void *ptr);
-void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
 
 extern struct config cachestat_config;
 extern netdata_ebpf_targets_t cachestat_targets[];

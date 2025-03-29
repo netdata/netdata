@@ -6,7 +6,7 @@ replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/DataDog/datadog-agent/pkg/networkdevice/profile v0.65.0-devel.0.20250317105920-ce55f088ab29
+	github.com/DataDog/datadog-agent/pkg/networkdevice/profile v0.66.0-devel
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/Wing924/ltsv v0.4.0
 	github.com/apparentlymart/go-cidr v1.1.0
@@ -17,11 +17,11 @@ require (
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/docker/docker v28.0.1+incompatible
+	github.com/docker/docker v28.0.4+incompatible
 	github.com/facebook/time v0.0.0-20250211113239-e3e1421a0980
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-ldap/ldap/v3 v3.4.10
-	github.com/go-sql-driver/mysql v1.9.0
+	github.com/go-sql-driver/mysql v1.9.1
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gofrs/flock v0.12.1
 	github.com/gohugoio/hashstructure v0.5.0
@@ -30,7 +30,7 @@ require (
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.39.0
 	github.com/jackc/pgx/v4 v4.18.3
-	github.com/jackc/pgx/v5 v5.7.2
+	github.com/jackc/pgx/v5 v5.7.4
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/kanocz/fcgi_client v0.0.0-20210113082628-fff85c8adfb7
 	github.com/likexian/whois v1.15.6
@@ -38,7 +38,7 @@ require (
 	github.com/lmittmann/tint v1.0.7
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mattn/go-xmlrpc v0.0.3
-	github.com/miekg/dns v1.1.63
+	github.com/miekg/dns v1.1.64
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/prometheus-community/pro-bing v0.6.1
 	github.com/prometheus/common v0.63.0
@@ -153,13 +153,13 @@ require (
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/mod v0.22.0 // indirect
+	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	golang.org/x/tools v0.29.0 // indirect
+	golang.org/x/tools v0.30.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/cenkalti/backoff.v2 v2.2.1 // indirect

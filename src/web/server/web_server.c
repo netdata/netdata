@@ -57,16 +57,18 @@ void debug_sockets() {
 	buffer_free(wb);
 }
 
-bool api_listen_sockets_setup(void) {
-	int socks = listen_sockets_setup(&api_sockets);
+void web_server_listen_sockets_setup(void) {
+    errno_clear();
 
-	if(!socks)
-        return false;
+	int socks = listen_sockets_setup(&api_sockets);
+	if(!socks) {
+        exit_initiated_add(EXIT_REASON_ALREADY_RUNNING);
+        daemon_status_file_update_status(DAEMON_STATUS_NONE);
+        fatal("Cannot setup listen port(s). Is Netdata already running?");
+    }
 
 	if(unlikely(debug_flags & D_WEB_CLIENT))
 		debug_sockets();
-
-	return true;
 }
 
 

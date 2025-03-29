@@ -24,13 +24,6 @@
 #define NETDATA_SYSTEMD_SWAP_READ_CONTEXT "systemd.service.swap_read"
 #define NETDATA_SYSTEMD_SWAP_WRITE_CONTEXT "systemd.service.swap_write"
 
-typedef struct __attribute__((packed)) netdata_publish_swap {
-    uint64_t ct;
-
-    uint32_t read;
-    uint32_t write;
-} netdata_publish_swap_t;
-
 enum swap_tables { NETDATA_PID_SWAP_TABLE, NETDATA_SWAP_CONTROLLER, NETDATA_SWAP_GLOBAL_TABLE };
 
 enum swap_counters {

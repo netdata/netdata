@@ -15,7 +15,7 @@
 #include "journalfile.h"
 #include "rrdengineapi.h"
 #include "pagecache.h"
-#include "metric.h"
+#include "mrg.h"
 #include "cache.h"
 #include "pdc.h"
 #include "page.h"
@@ -549,5 +549,6 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx);
 void rrdeng_calculate_tier_disk_space_percentage(void);
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
+void dbengine_shutdown();
 
 #endif /* NETDATA_RRDENGINE_H */

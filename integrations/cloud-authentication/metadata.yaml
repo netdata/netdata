@@ -129,9 +129,13 @@
       This integration adheres to SCIM v2 specifications. Supported features include:
 
       - User Resource Management (urn:ietf:params:scim:schemas:core:2.0:User)
+      - Group Resource Management (urn:ietf:params:scim:schemas:core:2.0:Group)
       - Create users
       - Update user attributes
       - Deactivate users
+      - Create groups
+      - Associate users to groups
+      - Nested groups supported
       - Patch operations: Supported
       - Bulk operations: Not supported
       - Filtering: Supported (max results: 200)
@@ -160,6 +164,30 @@
       3. Click on **Configure API Integration** and check the box for **Enable API Integration**.
       4. Enter the Token (obtained in the *Netdata Configuration Steps* section) into the **API Token** field, then click **Test API Credentials** to ensure the connection is successful.
       5. If the test is successful, click **Save** to apply the configuration.
+
+      ## Setting Up Membership Rules
+
+      1. Click on the Space settings cog (located above your profile icon).
+      2. Navigate to the **User Management** section and select the **Groups** tab.
+      3. Once your SCIM client has provisioned groups to Netdata, you'll see a **Create a new rule** button.
+      4. Click this button to open the membership rule configuration panel.
+      5. For each rule, configure the following three components:
+        - **SCIM Group**: Select the SCIM group that should be mapped
+        - **Netdata Role**: Choose the role that members of this group should have in the space
+        - **Space Rooms**: (Optional) Select specific rooms that these users should be members of
+      6. Click **Save** to activate the configuration.
+      7. Repeat steps 4-6 to create additional rules as needed.
+
+      ### How Membership Rules Work
+
+      - When a user in your identity provider is assigned to a SCIM group, they will automatically be added to your Netdata Space with the role and room access defined in your rules.
+      - If a user is removed from a SCIM group, their access will be adjusted according to your rules.
+      - When users match multiple rules, they are granted the highest permission level from all their matching rules.
+      - Changes to membership rules take effect immediately for new and existing users.
+
+      **Important Considerations**
+      - If you had previously manually invited users who are now being provisioned through SCIM, their existing roles and room access will be updated to match your rules.
+      - You must create at least one rule that assigns the **Admin** role to a SCIM group. If no admin role is defined in your rules, Netdata will not implement any user membership changes and will display a warning in the workspace.
 
       ## Troubleshoot
 

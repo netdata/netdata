@@ -968,10 +968,10 @@ done:
 
 static void delete_dimension_uuid(nd_uuid_t *dimension_uuid, sqlite3_stmt **action_res __maybe_unused, bool flag __maybe_unused)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
     int rc;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, DELETE_DIMENSION_UUID, &res))
+    if (!PREPARE_STATEMENT(db_meta, DELETE_DIMENSION_UUID, &res))
         return;
 
     int param = 0;
@@ -984,16 +984,16 @@ static void delete_dimension_uuid(nd_uuid_t *dimension_uuid, sqlite3_stmt **acti
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 //
 // Store host and host system info information in the database
 static int store_host_metadata(RRDHOST *host)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_STORE_HOST_INFO, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_STORE_HOST_INFO, &res))
         return false;
 
     int param = 0;
@@ -1019,24 +1019,24 @@ static int store_host_metadata(RRDHOST *host)
     if (unlikely(store_rc != SQLITE_DONE))
         error_report("Failed to store host %s, rc = %d", rrdhost_hostname(host), store_rc);
 
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 
     return store_rc != SQLITE_DONE;
 
 bind_fail:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return 1;
 }
 
 static int add_host_sysinfo_key_value(const char *name, const char *value, nd_uuid_t *uuid)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
     if (!REQUIRE_DB(db_meta))
         return 0;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_STORE_HOST_SYSTEM_INFO_VALUES, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_STORE_HOST_SYSTEM_INFO_VALUES, &res))
         return 0;
 
     int param = 0;
@@ -1048,13 +1048,13 @@ static int add_host_sysinfo_key_value(const char *name, const char *value, nd_uu
     if (unlikely(store_rc != SQLITE_DONE))
         error_report("Failed to store host info value %s, rc = %d", name, store_rc);
 
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 
     return store_rc == SQLITE_DONE;
 
 bind_fail:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return 0;
 }
 
@@ -1984,8 +1984,11 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
             hclt[thread_index].host = host;
             rc = uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]);
             async_exec += (rc == 0);
+            // if it failed, mark the thread slot as free
+            if (rc)
+                __atomic_store_n(&hclt[thread_index].busy, false, __ATOMIC_RELAXED);
         }
-        // if single thread, thread creation failure or failure to find slot
+        // if single thread, thread creation failure or failure tofind slot
         if (rc || !thread_found) {
             sync_exec++;
             struct host_context_load_thread hclt_sync = {.host = host};
@@ -2056,6 +2059,50 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
         completion_mark_complete(wc->scan_complete);
 
     freez(data);
+}
+
+#define GET_UUID_LIST  "SELECT dim_id FROM dimension"
+size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid))
+{
+    sqlite3_stmt *res = NULL;
+    sqlite3 *local_meta_db = NULL;
+
+    char sqlite_database[FILENAME_MAX + 1];
+    snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
+    int rc = sqlite3_open_v2(sqlite_database, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+    if (rc != SQLITE_OK) {
+        sqlite3_close(local_meta_db);
+        local_meta_db = NULL;
+    }
+
+    if (local_meta_db)
+        db_execute(local_meta_db, "PRAGMA cache_size=10000");
+
+    if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
+        sqlite3_close(local_meta_db);
+        return 0;
+    }
+
+    size_t count = 0;
+
+    usec_t started_ut = now_monotonic_usec();
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        nd_uuid_t *uuid = (nd_uuid_t *)sqlite3_column_blob(res, 0);
+
+        for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++) {
+            if (unlikely(!multidb_ctx[tier]))
+                continue;
+
+            populate_cb(mrg, (Word_t)multidb_ctx[tier], uuid);
+        }
+        count++;
+    }
+
+    SQLITE_FINALIZE(res);
+    sqlite3_close(local_meta_db);
+    COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
+    nd_log_daemon(NDLP_INFO, "MRG: Loaded %zu metrics from database in %s", count, report_duration);
+    return count;
 }
 
 static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool shutting_down)
@@ -2694,15 +2741,19 @@ void metadata_sync_shutdown(void)
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Sending a shutdown command");
+    nd_log_daemon(NDLP_DEBUG, "METADATA: Sending a shutdown command");
     cmd.opcode = METADATA_SYNC_SHUTDOWN;
     metadata_enq_cmd(&metasync_worker, &cmd);
 
     /* wait for metadata thread to shut down */
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Waiting for shutdown ACK");
+    nd_log_daemon(NDLP_DEBUG, "METADATA: Waiting for shutdown ACK");
     completion_wait_for(&metasync_worker.start_stop_complete);
     completion_destroy(&metasync_worker.start_stop_complete);
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Shutdown complete");
+    int rc = uv_thread_join(&metasync_worker.thread);
+    if (rc)
+        nd_log_daemon(NDLP_ERR, "METADATA: Failed to join synchronization thread, error %s", uv_err_name(rc));
+    else
+        nd_log_daemon(NDLP_INFO, "METADATA: synchronization thread shutdown completed");
 }
 
 void metadata_sync_shutdown_prepare(void)
@@ -2762,7 +2813,15 @@ void metadata_sync_init(void)
     memset(&metasync_worker, 0, sizeof(metasync_worker));
     completion_init(&metasync_worker.start_stop_complete);
 
-    fatal_assert(0 == uv_thread_create(&metasync_worker.thread, metadata_event_loop, &metasync_worker));
+    int retries = 0;
+    int create_uv_thread_rc = create_uv_thread(&metasync_worker.thread, metadata_event_loop, &metasync_worker, &retries);
+    if (create_uv_thread_rc)
+        nd_log_daemon(NDLP_ERR, "Failed to create SQLite metadata sync thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
+
+    fatal_assert(0 == create_uv_thread_rc);
+
+    if (retries)
+        nd_log_daemon(NDLP_WARNING, "SQLite metadata sync thread was created after %d attempts", retries);
 
     completion_wait_for(&metasync_worker.start_stop_complete);
     completion_destroy(&metasync_worker.start_stop_complete);

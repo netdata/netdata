@@ -553,12 +553,13 @@ static void ebpf_update_shm_cgroup()
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
-            int pid = pids->pid;
+            uint32_t pid = pids->pid;
             netdata_publish_shm_t *out = &pids->shm;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_SHM_IDX);
-            netdata_publish_shm_t *in = local_pid->shm;
-            if (!in)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SHM_IDX);
+            if (!local_pid)
                 continue;
+
+            netdata_publish_shm_t *in = &local_pid->shm;
 
             memcpy(out, in, sizeof(netdata_publish_shm_t));
         }
@@ -589,21 +590,17 @@ static void ebpf_read_shm_apps_table(int maps_per_core)
 
         shm_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, NETDATA_EBPF_PIDS_SHM_IDX);
-        netdata_publish_shm_t *publish = local_pid->shm;
-        if (!publish)
-            local_pid->shm = publish = ebpf_shm_allocate_publish();
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_SHM_IDX);
+        if (!local_pid)
+            continue;
+        netdata_publish_shm_t *publish = &local_pid->shm;
 
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, &cv[0], sizeof(netdata_publish_shm_t));
-            local_pid->not_updated = 0;
         } else {
-            if (kill(key, 0)) { // No PID found
-                ebpf_reset_specific_pid_data(local_pid);
-            } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(local_pid, fd, key, NETDATA_EBPF_PIDS_SHM_IDX);
-                ebpf_shm_release_publish(publish);
-                local_pid->shm = NULL;
+            if (kill((pid_t)key, 0)) { // No PID found
+                if (netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_SHM_IDX))
+                    memset(publish, 0, sizeof(*publish));
             }
         }
 
@@ -667,11 +664,12 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_tar
 {
     memset(shm, 0, sizeof(netdata_publish_shm_t));
     for (; root; root = root->next) {
-        int32_t pid = root->pid;
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_SHM_IDX);
-        netdata_publish_shm_t *w = pid_stat->shm;
-        if (!w)
+        uint32_t pid = root->pid;
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SHM_IDX);
+        if (!local_pid)
             continue;
+
+        netdata_publish_shm_t *w = &local_pid->shm;
 
         shm->get += w->get;
         shm->at += w->at;
@@ -1061,12 +1059,14 @@ void ebpf_shm_send_cgroup_data(int update_every)
 void ebpf_shm_resume_apps_data()
 {
     struct ebpf_target *w;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SHM_IDX))))
             continue;
 
         ebpf_shm_sum_pids(&w->shm, w->root_pid);
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -1091,6 +1091,7 @@ void *ebpf_read_shm_thread(void *ptr)
     int counter = update_every - 1;
 
     uint32_t lifetime = em->lifetime;
+    int cgroups = em->cgroup_charts;
     uint32_t running_time = 0;
     pids_fd[NETDATA_EBPF_PIDS_SHM_IDX] = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
     heartbeat_t hb;
@@ -1100,10 +1101,13 @@ void *ebpf_read_shm_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        pthread_mutex_lock(&collect_data_mutex);
+        sem_wait(shm_mutex_ebpf_integration);
         ebpf_read_shm_apps_table(maps_per_core);
         ebpf_shm_resume_apps_data();
-        pthread_mutex_unlock(&collect_data_mutex);
+        if (cgroups && shm_ebpf_cgroup.header)
+            ebpf_update_shm_cgroup();
+
+        sem_post(shm_mutex_ebpf_integration);
 
         counter = 0;
 
@@ -1145,10 +1149,6 @@ static void shm_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_shm_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&lock);
-
-        if (cgroups && shm_ebpf_cgroup.header) {
-            ebpf_update_shm_cgroup();
-        }
 
         shm_send_global();
 

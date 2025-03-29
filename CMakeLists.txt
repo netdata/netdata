@@ -7,6 +7,11 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/Modules")
 include(NetdataVersion)
 netdata_version()
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(ENV{CMAKE_BUILD_TYPE} "RelWithDebInfo")
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+endif()
+
 project(netdata
         VERSION "${NETDATA_VERSION_MAJOR}.${NETDATA_VERSION_MINOR}.${NETDATA_VERSION_PATCH}.${NETDATA_VERSION_TWEAK}"
         HOMEPAGE_URL "https://www.netdata.cloud"
@@ -49,10 +54,6 @@ set(CMAKE_C_STANDARD_REQUIRED On)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 
 set(SIZEOF_VOID_P ${CMAKE_SIZEOF_VOID_P})
-
-if(NOT CMAKE_BUILD_TYPE)
-        set(CMAKE_BUILD_TYPE "Release")
-endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
@@ -1651,8 +1652,11 @@ if(ENABLE_DBENGINE)
             src/database/engine/page.h
             src/database/engine/cache.c
             src/database/engine/cache.h
-            src/database/engine/metric.c
-            src/database/engine/metric.h
+            src/database/engine/mrg.c
+            src/database/engine/mrg.h
+            src/database/engine/mrg-internals.h
+            src/database/engine/mrg-unittest.c
+            src/database/engine/mrg-load.c
             src/database/engine/pdc.c
             src/database/engine/pdc.h
             src/database/engine/dbengine-unittest.c

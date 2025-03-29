@@ -1804,7 +1804,16 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
 
         dbengine_initialize_structures();
 
-        fatal_assert(0 == uv_thread_create(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main));
+        int retries = 0;
+        int create_uv_thread_rc = create_uv_thread(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main, &retries);
+        if (create_uv_thread_rc)
+            nd_log_daemon(NDLP_ERR, "Failed to create DBENGINE thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
+
+        fatal_assert(0 == create_uv_thread_rc);
+
+        if (retries)
+            nd_log_daemon(NDLP_WARNING, "DBENGINE thread was created after %d attempts", retries);
+
         spawned = true;
     }
 
@@ -2087,4 +2096,15 @@ void dbengine_event_loop(void* arg) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
     (void) uv_loop_close(&main->loop);
     worker_unregister();
+}
+
+void dbengine_shutdown()
+{
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
+    int rc = uv_thread_join(&rrdeng_main.thread);
+    if (rc)
+        nd_log_daemon(NDLP_ERR, "DBENGINE: Failed to join thread, error %s", uv_err_name(rc));
+    else
+        nd_log_daemon(NDLP_INFO, "DBENGINE: thread shutdown completed");
 }
