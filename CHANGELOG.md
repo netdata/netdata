@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#19988](https://github.com/netdata/netdata/pull/19988) ([netdatabot](https://github.com/netdatabot))
+- Installation + docker, improvements [\#19987](https://github.com/netdata/netdata/pull/19987) ([kanelatechnical](https://github.com/kanelatechnical))
+- Regenerate integrations docs [\#19986](https://github.com/netdata/netdata/pull/19986) ([netdatabot](https://github.com/netdatabot))
 - perflib: do not dereference null pointer [\#19985](https://github.com/netdata/netdata/pull/19985) ([ktsaou](https://github.com/ktsaou))
 - keep errno in out of memory situations [\#19984](https://github.com/netdata/netdata/pull/19984) ([ktsaou](https://github.com/ktsaou))
 - do not allocate or access zero sized arrays [\#19983](https://github.com/netdata/netdata/pull/19983) ([ktsaou](https://github.com/ktsaou))
@@ -22,6 +25,7 @@
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.3 to 5.7.4 in /src/go [\#19968](https://github.com/netdata/netdata/pull/19968) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/docker/docker from 28.0.2+incompatible to 28.0.4+incompatible in /src/go [\#19967](https://github.com/netdata/netdata/pull/19967) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Improve ACLK sync shutdown process [\#19966](https://github.com/netdata/netdata/pull/19966) ([stelfrag](https://github.com/stelfrag))
+- Fast restart on busy parents [\#19964](https://github.com/netdata/netdata/pull/19964) ([ktsaou](https://github.com/ktsaou))
 - Set sqlite max soft and hard heap limit [\#19963](https://github.com/netdata/netdata/pull/19963) ([stelfrag](https://github.com/stelfrag))
 - fix MSI installer [\#19962](https://github.com/netdata/netdata/pull/19962) ([ktsaou](https://github.com/ktsaou))
 - Don’t skip building Go code on static builds. [\#19961](https://github.com/netdata/netdata/pull/19961) ([Ferroin](https://github.com/Ferroin))
@@ -67,6 +71,7 @@
 - new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
 - Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
 - Large-scale cleanup of static build infrastructure. [\#19852](https://github.com/netdata/netdata/pull/19852) ([Ferroin](https://github.com/Ferroin))
+- ebpf.plugin: rework memory [\#19844](https://github.com/netdata/netdata/pull/19844) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.3.1](https://github.com/netdata/netdata/tree/v2.3.1) (2025-03-24)
 
@@ -484,11 +489,6 @@
 - build\(deps\): bump github.com/sijms/go-ora/v2 from 2.8.22 to 2.8.23 in /src/go [\#19438](https://github.com/netdata/netdata/pull/19438) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump k8s.io/client-go from 0.32.0 to 0.32.1 in /src/go [\#19437](https://github.com/netdata/netdata/pull/19437) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Handle incoming ACLK traffic asynchronously [\#19436](https://github.com/netdata/netdata/pull/19436) ([stelfrag](https://github.com/stelfrag))
-- add more aclk worker jobs [\#19435](https://github.com/netdata/netdata/pull/19435) ([ktsaou](https://github.com/ktsaou))
-- fix go.d/ethtool config schema [\#19434](https://github.com/netdata/netdata/pull/19434) ([ilyam8](https://github.com/ilyam8))
-- Cleanup context check list on startup [\#19433](https://github.com/netdata/netdata/pull/19433) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations docs [\#19432](https://github.com/netdata/netdata/pull/19432) ([netdatabot](https://github.com/netdatabot))
-- Drop Fedora 39 from CI and package builds. [\#19431](https://github.com/netdata/netdata/pull/19431) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
