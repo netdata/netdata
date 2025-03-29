@@ -1249,7 +1249,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE);
 
     struct rrdengine_journalfile *journal_file;
-    unsigned deleted_bytes, journal_file_bytes, datafile_bytes;
+    size_t deleted_bytes, journal_file_bytes, datafile_bytes;
     int ret;
     char path[RRDENG_PATH_MAX];
 
@@ -1300,7 +1300,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
     freez(datafile);
 
     ctx_current_disk_space_decrease(ctx, deleted_bytes);
-    netdata_log_info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
+    netdata_log_info("DBENGINE: reclaimed %zu bytes of disk space.", deleted_bytes);
 }
 
 static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
