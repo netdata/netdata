@@ -2025,8 +2025,8 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_DATABASE_ROTATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     if (!__atomic_load_n(&ctx->atomic.now_deleting_files, __ATOMIC_RELAXED) &&
-                         ctx->datafiles.first->next != NULL &&
-                         ctx->datafiles.first->next->next != NULL &&
+                        !__atomic_load_n(&ctx->atomic.migration_to_v2_running, __ATOMIC_RELAXED) &&
+                        ctx->datafiles.first->next != NULL && ctx->datafiles.first->next->next != NULL &&
                         rrdeng_ctx_tier_cap_exceeded(ctx)) {
 
                         __atomic_store_n(&ctx->atomic.now_deleting_files, true, __ATOMIC_RELAXED);
