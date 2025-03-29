@@ -1337,7 +1337,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
 
             time_t update_every_s;
 
-            size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile->ctx);
+            size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile_ctx(datafile));
 
             time_t start_time_s = journal_start_time_s + descr->delta_start_s;
             time_t end_time_s = journal_start_time_s + descr->delta_end_s;
@@ -1345,7 +1345,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
             if(likely(points > 1))
                 update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
             else {
-                update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile->ctx->config.tier));
+                update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile_ctx(datafile)->config.tier));
                 stats->single_point_pages++;
             }
 

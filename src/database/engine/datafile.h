@@ -97,4 +97,12 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock);
 int init_data_files(struct rrdengine_instance *ctx);
 void finalize_data_files(struct rrdengine_instance *ctx);
 
+NEVERNULL ALWAYS_INLINE
+static struct rrdengine_instance *datafile_ctx(struct rrdengine_datafile *datafile) {
+    if(unlikely(!datafile->ctx))
+        fatal("DBENGINE: datafile %u of tier %u has no ctx", datafile->fileno, datafile->tier);
+
+    return datafile->ctx;
+}
+
 #endif /* NETDATA_DATAFILE_H */
