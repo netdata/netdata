@@ -155,6 +155,12 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
 }
 
 static void njfv2idx_add(struct rrdengine_datafile *datafile) {
+    if(unlikely(!datafile))
+        fatal("DBENGINE: NJFV2IDX trying to index a journal file with no datafile");
+
+    if(unlikely(!datafile->ctx))
+        fatal("DBENGINE: NJFV2IDX trying to index a journal file with no ctx");
+
     internal_fatal(datafile->journalfile->v2.last_time_s <= 0, "DBENGINE: NJFV2IDX trying to index a journal file with invalid first_time_s");
 
     rw_spinlock_write_lock(&datafile->ctx->njfv2idx.spinlock);
@@ -406,6 +412,12 @@ size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile) {
 }
 
 void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size) {
+    if(unlikely(!journalfile))
+        fatal("DBENGINE: JOURNALFILE: trying to set journal data without a journalfile");
+
+    if(unlikely(!journalfile->datafile))
+        fatal("DBENGINE: JOURNALFILE: trying to set journal data without a datafile");
+
     spinlock_lock(&journalfile->mmap.spinlock);
     spinlock_lock(&journalfile->v2.spinlock);
 
