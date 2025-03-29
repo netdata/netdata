@@ -2076,7 +2076,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     }
 
     if (local_meta_db)
-        db_execute(local_meta_db, "PRAGMA cache_size=10000");
+        (void) db_execute(local_meta_db, "PRAGMA cache_size=10000");
 
     if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
         sqlite3_close(local_meta_db);
