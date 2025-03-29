@@ -28,6 +28,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     datafile->fileno = fileno;
     fatal_assert(0 == uv_rwlock_init(&datafile->extent_rwlock));
     datafile->ctx = ctx;
+    datafile->magic1 = datafile->magic2 = DATAFILE_MAGIC;
 
     datafile->users.available = true;
 
