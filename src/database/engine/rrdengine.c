@@ -970,7 +970,7 @@ time_t find_uuid_first_time(
         return global_first_time_s;
 
     unsigned journalfile_count = 0;
-    size_t binary_match = 0;
+    size_t num_lookups = 0;
     size_t not_matching_bsearches = 0;
 
     while (datafile) {
@@ -985,22 +985,14 @@ time_t find_uuid_first_time(
         if(journal_start_time_s < global_first_time_s)
             global_first_time_s = journal_start_time_s;
 
-        struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
-        struct uuid_first_time_s *uuid_original_entry;
-
-        size_t journal_metric_count = j2_header->metric_count;
-
         for (size_t index = 0; index < count; ++index) {
-            uuid_original_entry = &uuid_first_entry_list[index];
+            struct uuid_first_time_s *uuid_original_entry = &uuid_first_entry_list[index];
 
             // Check here if we should skip this
             if (uuid_original_entry->df_matched > 3 || uuid_original_entry->pages_found > 5)
                 continue;
 
-            struct journal_metric_list *live_entry =
-                    bsearch(uuid_original_entry->uuid,uuid_list,journal_metric_count,
-                            sizeof(*uuid_list), journal_metric_uuid_compare);
-
+            struct journal_metric_list *live_entry = journalfile_v2_metrics_lookup(j2_header, uuid_original_entry->uuid);
             if (!live_entry) {
                 // Not found in this journal
                 not_matching_bsearches++;
@@ -1019,7 +1011,7 @@ time_t find_uuid_first_time(
             if (uuid_original_entry->first_time_s != old_first_time_s)
                 uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
 
-            binary_match++;
+            num_lookups++;
         }
 
         journalfile_count++;
@@ -1079,7 +1071,7 @@ time_t find_uuid_first_time(
     }
     internal_error(true,
          "DBENGINE: analyzed the retention of %zu rotated metrics of tier %d, "
-         "did %zu jv2 matching binary searches (%zu not matching, %zu overflown) in %u journal files, "
+         "did %zu jv2 lookups (%zu not matching, %zu overflown) in %u journal files, "
          "%zu metrics with entries in open cache, "
          "metrics first time found per datafile index ([not in jv2]:%zu, [1]:%zu, [2]:%zu, [3]:%zu, [4]:%zu, [5]:%zu, [6]:%zu, [7]:%zu, [8]:%zu, [bigger]: %zu), "
          "open cache found first time %zu, "
@@ -1087,7 +1079,7 @@ time_t find_uuid_first_time(
          "metrics not in MRG %zu",
          metric_count,
          ctx->config.tier,
-         binary_match,
+         num_lookups,
          not_matching_bsearches,
          not_needed_bsearches,
          journalfile_count,
@@ -1118,28 +1110,31 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.metrics_retention_started, 1, __ATOMIC_RELAXED);
 
-    struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
+    jf_metric_hash_table_t ht = jf_metric_hash_table(j2_header);
+    struct journal_metric_list *jf_metric = jf_metric_hash_table_next(&ht, NULL);
 
-    size_t count = j2_header->metric_count;
     struct uuid_first_time_s *uuid_first_t_entry;
-    struct uuid_first_time_s *uuid_first_entry_list = callocz(count, sizeof(struct uuid_first_time_s));
+    struct uuid_first_time_s *uuid_first_entry_list = callocz(j2_header->metric_count, sizeof(struct uuid_first_time_s));
 
     size_t added = 0;
-    for (size_t index = 0; index < count; ++index) {
-        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &uuid_list[index].uuid, (Word_t)ctx);
-        if (!metric)
-            continue;
+    for (size_t index = 0; index < j2_header->metric_count; ++index) {
+        internal_fatal(jf_metric == NULL, "expected a non-null journal file index metric");
 
-        uuid_first_entry_list[added].metric = metric;
-        uuid_first_entry_list[added].first_time_s = LONG_MAX;
-        uuid_first_entry_list[added].df_matched = 0;
-        uuid_first_entry_list[added].df_index_oldest = 0;
-        uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
-        added++;
+        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &jf_metric->uuid, (Word_t)ctx);
+        if (metric) {
+            uuid_first_entry_list[added].metric = metric;
+            uuid_first_entry_list[added].first_time_s = LONG_MAX;
+            uuid_first_entry_list[added].df_matched = 0;
+            uuid_first_entry_list[added].df_index_oldest = 0;
+            uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
+            added++;
+        }
+
+        jf_metric = jf_metric_hash_table_next(&ht, jf_metric);
     }
 
-    netdata_log_info("DBENGINE: recalculating tier %d retention for %zu metrics starting with datafile %u",
-         ctx->config.tier, count, first_datafile_remaining->fileno);
+    netdata_log_info("DBENGINE: recalculating tier %d retention for %u metrics starting with datafile %u",
+         ctx->config.tier, j2_header->metric_count, first_datafile_remaining->fileno);
 
     journalfile_v2_data_release(journalfile);
 
