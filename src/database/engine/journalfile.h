@@ -264,7 +264,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
                      struct rrdengine_datafile *datafile);
 void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile);
 
-void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
+bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
                                         Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
                                         size_t number_of_extents, size_t number_of_metrics, size_t number_of_pages, void *user_data);
 
