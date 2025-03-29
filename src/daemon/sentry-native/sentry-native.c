@@ -90,6 +90,7 @@ static sentry_value_t nd_sentry_on_hook(sentry_value_t event) {
     nd_sentry_set_tag_uptime();
     nd_sentry_set_tag("thread", daemon_status_file_get_fatal_thread());
     nd_sentry_set_tag_uint64("thread_id", daemon_status_file_get_fatal_thread_id());
+    nd_sentry_set_tag_uint64("worker_job_id", daemon_status_file_get_fatal_worker_job_id());
 
     // set the title of the event
     if(g_sentry_event_message[0])

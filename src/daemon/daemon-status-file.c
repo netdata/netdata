@@ -1764,3 +1764,7 @@ ND_UUID daemon_status_file_get_host_id(void) {
     else
         return last_session_status.host_id;
 }
+
+size_t daemon_status_file_get_fatal_worker_job_id(void) {
+    return session_status.fatal.worker_job_id;
+}
