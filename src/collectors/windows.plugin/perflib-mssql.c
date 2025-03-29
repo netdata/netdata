@@ -8,6 +8,12 @@
 #define NETDATA_MAX_INSTANCE_OBJECT 128
 
 BOOL is_sqlexpress = FALSE;
+static struct netdata_mssql_conn {
+    const char *hostname;
+    const char *username;
+    const char *password;
+    int port;
+} dbconn = {.hostname = "localhost", .username = NULL, .password = NULL, .port = 1433};
 
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
@@ -1428,6 +1434,14 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     return 1;
 }
 
+static void netdata_read_config_options()
+{
+    dbconn.hostname = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "hostname", dbconn.hostname);
+    dbconn.username = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "username", dbconn.username);
+    dbconn.password = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "password", dbconn.password);
+    dbconn.port = (int)inicfg_get_number(&netdata_config, "plugin:windows:PerflibMSSQL", "port", dbconn.port);
+}
+
 int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
@@ -1436,6 +1450,7 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
         if (initialize())
             return -1;
 
+        netdata_read_config_options();
         initialized = true;
     }
 
