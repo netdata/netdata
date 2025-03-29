@@ -1293,6 +1293,9 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
     }
 
+    memset(journal_file, 0, sizeof(*journal_file));
+    memset(datafile, 0, sizeof(*datafile));
+
     freez(journal_file);
     freez(datafile);
 

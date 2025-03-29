@@ -2088,6 +2088,8 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     usec_t started_ut = now_monotonic_usec();
     while (sqlite3_step(res) == SQLITE_ROW) {
         nd_uuid_t *uuid = (nd_uuid_t *)sqlite3_column_blob(res, 0);
+        if (!uuid || sqlite3_column_bytes(res, 0) != sizeof(nd_uuid_t))
+            continue;
 
         for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++) {
             if (unlikely(!multidb_ctx[tier]))
