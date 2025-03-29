@@ -8,7 +8,7 @@
 #include "database/rrd-database-mode.h"
 #include "claim/cloud-status.h"
 
-#define STATUS_FILE_VERSION 22
+#define STATUS_FILE_VERSION 23
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -93,11 +93,12 @@ typedef struct daemon_status_file {
         char function[128];
         char errno_str[64];
         char message[512];
-        char stack_trace[2048];
+        char stack_trace[4096];
         char thread[ND_THREAD_TAG_MAX + 1];
         pid_t thread_id;
         SIGNAL_CODE signal_code;
         uintptr_t fault_address;
+        uint32_t worker_job_id;
         bool sentry;        // true when the error was also reported to sentry
     } fatal;
 
