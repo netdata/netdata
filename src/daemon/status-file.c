@@ -100,7 +100,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     {
         buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid.uuid);
 
-        if(ds->v >= 24)
+        if(ds->v >= 24 && ds->host_id.last_modified_ut)
             buffer_json_member_add_datetime_rfc3339(wb, "since", ds->host_id.last_modified_ut, true);
 
         buffer_json_member_add_uuid_compact(wb, "ephemeral_id", ds->invocation.uuid);
