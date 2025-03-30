@@ -339,7 +339,6 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     char path[1024]; path[0] = '\0';
 
     DAEMON_STATUS_FILE *ds = data;
-    char datetime[RFC3339_MAX_LENGTH]; datetime[0] = '\0';
 
     // change management, version to know which fields to expect
     uint64_t version = 0;
@@ -362,9 +361,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v23 = version >= 23 ? strict : false;
 
     // Parse timestamp
-    JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
-    if(datetime[0])
-        ds->timestamp_ut = rfc3339_parse_ut(datetime, NULL);
+    JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->timestamp_ut, error, required_v1);
 
     const char *profile_key = version >= 18 ? "profile" : "ND_profile";
     const char *status_key = version >= 18 ? "status" : "ND_status";
@@ -512,11 +509,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     // Parse the last posted object
     if(version == 3) {
         JSONC_PARSE_SUBOBJECT(jobj, path, "dedup", error, required_v3, {
-            datetime[0] = '\0';
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v3);
-            if (datetime[0])
-                ds->dedup.slot[0].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
-
+            JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->dedup.slot[0].timestamp_ut, error, required_v3);
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[0].hash, error, required_v3);
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "restarts", ds->restarts, error, required_v3);
         });
@@ -526,11 +519,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             size_t i = 0;
             JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, required_v4, {
                 if(i < _countof(ds->dedup.slot)) {
-                    datetime[0] = '\0';
-                    JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v4);
-                    if (datetime[0])
-                        ds->dedup.slot[i].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
-
+                    JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->dedup.slot[i].timestamp_ut, error, required_v4);
                     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[i].hash, error, required_v4);
                     JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "sentry", ds->dedup.slot[i].sentry, error, required_v17);
                 }
