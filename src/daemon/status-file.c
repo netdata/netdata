@@ -416,7 +416,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         }
 
         if(version >= 23)
-            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "worker_job_id", SIGNAL_CODE_2id_h, ds->fatal.worker_job_id, error, required_v23);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "worker_job_id", ds->fatal.worker_job_id, error, required_v23);
     });
 
     return true;
