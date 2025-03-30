@@ -715,25 +715,39 @@ struct log_priority PRI_KILLED_HARD     = { NDLP_ERR, NDLP_WARNING };
 static bool is_ci(void) {
     // List of known CI environment variables.
     const char *ci_vars[] = {
-        "CI",             // Generic CI flag
-        "TRAVIS",         // Travis CI
-        "GITHUB_ACTIONS", // GitHub Actions
-        "GITLAB_CI",      // GitLab CI
-        "CIRCLECI",       // CircleCI
-        "APPVEYOR",       // AppVeyor
+        "CI",                       // Generic CI flag
+        "CONTINUOUS_INTEGRATION",   // Alternate generic flag
+        "BUILD_NUMBER",             // Jenkins, TeamCity
+        "RUN_ID",                   // AWS CodeBuild, some others
+        "TRAVIS",                   // Travis CI
+        "GITHUB_ACTIONS",           // GitHub Actions
+        "GITHUB_TOKEN",             // GitHub Actions
+        "GITLAB_CI",                // GitLab CI
+        "CIRCLECI",                 // CircleCI
+        "APPVEYOR",                 // AppVeyor
+        "BITBUCKET_BUILD_NUMBER",   // Bitbucket Pipelines
+        "SYSTEM_TEAMFOUNDATIONCOLLECTIONURI", // Azure DevOps
+        "TF_BUILD",                 // Azure DevOps (alternate)
+        "BAMBOO_BUILDKEY",          // Bamboo CI
+        "GO_PIPELINE_NAME",         // GoCD
+        "HUDSON_URL",               // Hudson CI
+        "TEAMCITY_VERSION",         // TeamCity
+        "CI_NAME",                  // Some environments (e.g., CodeShip)
+        "CI_WORKER",                // AppVeyor (alternate)
+        "CI_SERVER",                // Generic
+        "HEROKU_TEST_RUN_ID",       // Heroku CI
+        "BUILDKITE",                // Buildkite
+        "DRONE",                    // Drone CI
+        "SEMAPHORE",                // Semaphore CI
+        "NETLIFY",                  // Netlify CI
+        "NOW_BUILDER",              // Vercel (formerly Zeit Now)
         NULL
     };
 
     // Iterate over the CI environment variable names.
     for (const char **env = ci_vars; *env; env++) {
-        const char *val = getenv(*env);
-        if (val && *val &&
-            (strcasecmp(val, "true") == 0 ||
-             strcasecmp(val, "yes")  == 0 ||
-             strcasecmp(val, "on")   == 0 ||
-             strcasecmp(val, "1")    == 0)) {
+        if(getenv(*env))
             return true;
-        }
     }
 
     return false;
@@ -990,7 +1004,7 @@ void daemon_status_file_check_crash(void) {
         (!no_previous_status || daemon_status_file_saved) &&
 
         // we have more than 2 restarts, or this is not a CI run
-        (last_session_status.restarts > 2 || !is_ci()) &&
+        (last_session_status.restarts > 1 || !is_ci()) &&
 
         // we have not reported this
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
