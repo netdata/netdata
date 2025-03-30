@@ -7,6 +7,7 @@
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
 #include "claim/cloud-status.h"
+#include "machine-guid.h"
 
 #define STATUS_FILE_VERSION 24
 
@@ -50,9 +51,10 @@ typedef struct daemon_status_file {
     size_t posts;               // the number of posts to the backend
     ssize_t reliability;        // consecutive restarts: > 0 reliable, < 0 crashing
 
+    ND_MACHINE_GUID host_id;    // the machine guid of the system
+
     ND_UUID boot_id;            // the boot id of the system
     ND_UUID invocation;         // the netdata invocation id generated the file
-    ND_UUID host_id;            // the machine guid of the agent
     ND_UUID node_id;            // the Netdata Cloud node id of the agent
     ND_UUID claim_id;           // the Netdata Cloud claim id of the agent
     ND_UUID machine_id;         // the unique machine id of the system
@@ -151,7 +153,7 @@ long daemon_status_file_get_fatal_line(void);
 DAEMON_STATUS daemon_status_file_get_status(void);
 size_t daemon_status_file_get_restarts(void);
 ssize_t daemon_status_file_get_reliability(void);
-ND_UUID daemon_status_file_get_host_id(void);
+ND_MACHINE_GUID daemon_status_file_get_host_id(void);
 size_t daemon_status_file_get_fatal_worker_job_id(void);
 
 #endif //NETDATA_STATUS_FILE_H

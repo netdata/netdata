@@ -50,7 +50,7 @@ uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const 
         bool kubernetes;
         bool sentry_available;
         bool sentry_fatal;
-        ND_UUID host_id;
+        ND_MACHINE_GUID host_id;
         ND_UUID machine_id;
         long line;
         char version[sizeof(ds->version)];

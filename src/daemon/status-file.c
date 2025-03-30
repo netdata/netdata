@@ -98,7 +98,11 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
     buffer_json_member_add_object(wb, "agent");
     {
-        buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid);
+        buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid.uuid);
+
+        if(ds->v >= 24)
+            buffer_json_member_add_datetime_rfc3339(wb, "since", ds->host_id.last_modified_ut, true);
+
         buffer_json_member_add_uuid_compact(wb, "ephemeral_id", ds->invocation.uuid);
         buffer_json_member_add_string(wb, "version", ds->version);
 
@@ -263,6 +267,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v21 = version >= 21 ? strict : false;
     bool required_v22 = version >= 22 ? strict : false;
     bool required_v23 = version >= 23 ? strict : false;
+    bool required_v24 = version >= 24 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->timestamp_ut, error, required_v1);
@@ -282,7 +287,11 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
     // Parse agent object
     JSONC_PARSE_SUBOBJECT(jobj, path, "agent", error, required_v1, {
-        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->host_id.uuid, error, required_v1);
+        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->host_id.uuid.uuid, error, required_v1);
+
+        if(version >= 24)
+            JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "since", ds->host_id.last_modified_ut, error, required_v24);
+
         JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ephemeral_id", ds->invocation.uuid, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->version, error, required_v1);
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->uptime, error, required_v1);
@@ -453,11 +462,11 @@ static void daemon_status_file_migrate_once(void) {
     session_status.claim_id = last_session_status.claim_id;
     session_status.node_id = last_session_status.node_id;
     session_status.host_id = last_session_status.host_id;
-    if(UUIDiszero(session_status.host_id)) {
-        if(!UUIDiszero(last_session_status.host_id))
+    if(UUIDiszero(session_status.host_id.uuid)) {
+        if(!UUIDiszero(last_session_status.host_id.uuid))
             session_status.host_id = last_session_status.host_id;
         else
-            session_status.host_id = machine_guid_get()->uuid;
+            session_status.host_id = *machine_guid_get();
     }
 
     strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
@@ -520,7 +529,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(session_status.status == DAEMON_STATUS_EXITING)
         session_status.timings.exit = (time_t)((now_ut - session_status.timings.exit_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
-    session_status.host_id = machine_guid_get()->uuid;
+    session_status.host_id = *machine_guid_get();
     session_status.boottime = now_boottime_sec();
     session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
@@ -536,7 +545,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
     if(localhost) {
         if(!UUIDiszero(localhost->host_id))
-            session_status.host_id = localhost->host_id;
+            session_status.host_id.uuid = localhost->host_id;
 
         if(!UUIDiszero(localhost->node_id))
             session_status.node_id = localhost->node_id;
@@ -1349,8 +1358,8 @@ ssize_t daemon_status_file_get_reliability(void) {
     return session_status.reliability;
 }
 
-ND_UUID daemon_status_file_get_host_id(void) {
-    if(!UUIDiszero(session_status.host_id))
+ND_MACHINE_GUID daemon_status_file_get_host_id(void) {
+    if(!UUIDiszero(session_status.host_id.uuid))
         return session_status.host_id;
     else
         return last_session_status.host_id;
