@@ -166,6 +166,25 @@ static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg,
     return hash;
 }
 
+static void daemon_status_dedup_to_json(BUFFER *wb, DAEMON_STATUS_DEDUP *dp) {
+    buffer_json_member_add_array(wb, "dedup");
+    {
+        for(size_t i = 0; i < _countof(dp->slot); i++) {
+            if (dp->slot[i].timestamp_ut == 0)
+                continue;
+
+            buffer_json_add_array_item_object(wb);
+            {
+                buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", dp->slot[i].timestamp_ut, true);
+                buffer_json_member_add_uint64(wb, "hash", dp->slot[i].hash);
+                buffer_json_member_add_boolean(wb, "sentry", dp->slot[i].sentry);
+            }
+            buffer_json_object_close(wb);
+        }
+    }
+    buffer_json_array_close(wb);
+}
+
 static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
@@ -312,28 +331,31 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_array(wb, "dedup");
-    {
-        for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
-            if (ds->dedup.slot[i].timestamp_ut == 0)
-                continue;
-
-            buffer_json_add_array_item_object(wb);
-            {
-                buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup.slot[i].timestamp_ut, true);
-                buffer_json_member_add_uint64(wb, "hash", ds->dedup.slot[i].hash);
-                buffer_json_member_add_boolean(wb, "sentry", ds->dedup.slot[i].sentry);
-            }
-            buffer_json_object_close(wb);
-        }
-    }
-    buffer_json_array_close(wb);
-
+    daemon_status_dedup_to_json(wb, &ds->dedup);
     dsf_release(*ds);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 // json parsing
+
+static bool daemon_status_dedup_from_json(json_object *jobj, void *data, BUFFER *error) {
+    char path[1024]; path[0] = '\0';
+    DAEMON_STATUS_DEDUP *dp = data;
+    
+    bool required = false;
+    JSONC_PARSE_ARRAY(jobj, path, "dedup", error, required, {
+        size_t i = 0;
+        JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, required, {
+            if(i < _countof(dp->slot)) {
+                JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", dp->slot[i].timestamp_ut, error, required);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", dp->slot[i].hash, error, required);
+                JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "sentry", dp->slot[i].sentry, error, required);
+            }
+        });
+    });
+
+    return true;
+}
 
 static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *error) {
     char path[1024]; path[0] = '\0';
@@ -506,28 +528,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "worker_job_id", SIGNAL_CODE_2id_h, ds->fatal.worker_job_id, error, required_v23);
     });
 
-    // Parse the last posted object
-    if(version == 3) {
-        JSONC_PARSE_SUBOBJECT(jobj, path, "dedup", error, required_v3, {
-            JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->dedup.slot[0].timestamp_ut, error, required_v3);
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[0].hash, error, required_v3);
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "restarts", ds->restarts, error, required_v3);
-        });
-    }
-    else if(version >= 4) {
-        JSONC_PARSE_ARRAY(jobj, path, "dedup", error, required_v4, {
-            size_t i = 0;
-            JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, required_v4, {
-                if(i < _countof(ds->dedup.slot)) {
-                    JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->dedup.slot[i].timestamp_ut, error, required_v4);
-                    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[i].hash, error, required_v4);
-                    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "sentry", ds->dedup.slot[i].sentry, error, required_v17);
-                }
-            });
-        });
-    }
-
-    return true;
+    return daemon_status_dedup_from_json(jobj, &ds->dedup, error);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

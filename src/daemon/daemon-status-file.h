@@ -28,6 +28,14 @@ typedef enum {
 } DAEMON_OS_TYPE;
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(DAEMON_OS_TYPE);
 
+typedef struct {
+    struct {
+        bool sentry;
+        uint64_t hash;
+        usec_t timestamp_ut;
+    } slot[15];
+} DAEMON_STATUS_DEDUP;
+
 typedef struct daemon_status_file {
     SPINLOCK spinlock;
     uint32_t v;                 // the version of the status file
@@ -102,13 +110,7 @@ typedef struct daemon_status_file {
         bool sentry;        // true when the error was also reported to sentry
     } fatal;
 
-    struct {
-        struct {
-            bool sentry;
-            uint64_t hash;
-            usec_t timestamp_ut;
-        } slot[15];
-    } dedup;
+    DAEMON_STATUS_DEDUP dedup;
 } DAEMON_STATUS_FILE;
 
 // saves the current status
