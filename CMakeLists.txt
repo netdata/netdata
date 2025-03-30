@@ -1281,6 +1281,8 @@ set(DAEMON_FILES
         src/daemon/machine-guid.h
         src/daemon/status-file-dedup.c
         src/daemon/status-file-dedup.h
+        src/daemon/status-file-io.c
+        src/daemon/status-file-io.h
 )
 
 set(H2O_FILES

@@ -14,6 +14,7 @@
 #endif
 
 #include "status-file-dedup.h"
+#include "status-file-io.h"
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -566,42 +567,11 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// file helpers
-
-// List of fallback directories to try
-static const char *status_file_fallbacks[] = {
-    CACHE_DIR,
-    "/tmp",
-    "/run",
-    "/var/run",
-    ".",
-};
-
-static void set_dynamic_fallbacks(void) {
-    status_file_fallbacks[0] = netdata_configured_cache_dir;
-}
-
-static bool check_status_file(const char *directory, char *filename, size_t filename_size, time_t *mtime) {
-    if(!directory || !*directory)
-        return false;
-
-    snprintfz(filename, filename_size, "%s/%s", directory, STATUS_FILENAME);
-
-    // Get file metadata
-    OS_FILE_METADATA metadata = os_get_file_metadata(filename);
-    if (!OS_FILE_METADATA_OK(metadata)) {
-        *mtime = 0;
-        return false;
-    }
-
-    *mtime = metadata.modified_time;
-    return true;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
 // load a saved status
 
-static bool load_status_file(const char *filename, DAEMON_STATUS_FILE *status) {
+static bool load_status_file(const char *filename, void *data) {
+    DAEMON_STATUS_FILE *status = data;
+
     FILE *fp = fopen(filename, "r");
     if (!fp)
         return false;
@@ -629,131 +599,8 @@ static bool load_status_file(const char *filename, DAEMON_STATUS_FILE *status) {
     return json_parse_payload_or_error(wb, error, daemon_status_file_from_json, status) == HTTP_RESP_OK;
 }
 
-void daemon_status_file_load(DAEMON_STATUS_FILE *ds) {
-    char newest_filename[FILENAME_MAX] = "";
-    char current_filename[FILENAME_MAX];
-    time_t newest_mtime = 0, current_mtime;
-
-    // Check the primary directory first
-    if(check_status_file(netdata_configured_varlib_dir, current_filename, sizeof(current_filename), &current_mtime)) {
-        strncpyz(newest_filename, current_filename, sizeof(newest_filename) - 1);
-        newest_mtime = current_mtime;
-    }
-
-    // Check each fallback location
-    set_dynamic_fallbacks();
-    for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
-        if(check_status_file(status_file_fallbacks[i], current_filename, sizeof(current_filename), &current_mtime) &&
-            (!*newest_filename || current_mtime > newest_mtime)) {
-            strncpyz(newest_filename, current_filename, sizeof(newest_filename) - 1);
-            newest_mtime = current_mtime;
-        }
-    }
-
-    // Load the newest file found
-    if(*newest_filename) {
-        if(!load_status_file(newest_filename, ds))
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to load newest status file: %s", newest_filename);
-    }
-    else
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
-}
-
 // --------------------------------------------------------------------------------------------------------------------
 // save the current status
-
-static bool save_status_file(const char *directory, const char *content, size_t content_size) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
-
-    // Linux: https://man7.org/linux/man-pages/man7/signal-safety.7.html
-    // memcpy(), strlen(), open(), write(), fsync(), close(), fchmod(), rename(), unlink()
-
-    // MacOS: https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/sigaction.2.html#//apple_ref/doc/man/2/sigaction
-    // open(), write(), fsync(), close(), rename(), unlink()
-    // does not explicitly mention fchmod, memcpy(), and strlen(), but they are safe
-
-    if(!directory || !*directory)
-        return false;
-
-    static uint64_t tmp_attempt_counter = 0;
-
-    char filename[FILENAME_MAX];
-    char temp_filename[FILENAME_MAX];
-    char tid_str[UINT64_MAX_LENGTH];
-
-    print_uint64(tid_str, __atomic_add_fetch(&tmp_attempt_counter, 1, __ATOMIC_RELAXED));
-    size_t dir_len = strlen(directory);
-    size_t fil_len = strlen(STATUS_FILENAME);
-    size_t tid_len = strlen(tid_str);
-
-    if (dir_len + 1 + fil_len + 1 + tid_len + 1 >= sizeof(filename))
-        return false; // cannot fit the filename
-
-    // create the filename
-    size_t pos = 0;
-    memcpy(&filename[pos], directory, dir_len); pos += dir_len;
-    filename[pos] = '/'; pos++;
-    memcpy(&filename[pos], STATUS_FILENAME, fil_len); pos += fil_len;
-    filename[pos] = '\0';
-
-    // create the temp filename
-    memcpy(temp_filename, filename, pos);
-    temp_filename[pos] = '-'; pos++;
-    memcpy(&temp_filename[pos], tid_str, tid_len); pos += tid_len;
-    temp_filename[pos] = '\0';
-
-    // Open file with O_WRONLY, O_CREAT, and O_TRUNC flags
-    int fd = open(temp_filename, O_WRONLY | O_CREAT | O_TRUNC, 0664);
-    if (fd == -1)
-        return false;
-
-    /* Write content to file using write() */
-    size_t total_written = 0;
-
-    while (total_written < content_size) {
-        ssize_t bytes_written = write(fd, content + total_written, content_size - total_written);
-
-        if (bytes_written <= 0) {
-            if (errno == EINTR)
-                continue; /* Retry if interrupted by signal */
-
-            close(fd);
-            unlink(temp_filename);  /* Remove the temp file */
-            return false;
-        }
-
-        total_written += bytes_written;
-    }
-
-    /* Fsync to ensure data is written to disk */
-    if (fsync(fd) == -1) {
-        close(fd);
-        unlink(temp_filename);
-        return false;
-    }
-
-    /* Set permissions using chmod() */
-    if (fchmod(fd, 0664) != 0) {
-        close(fd);
-        unlink(temp_filename);
-        return false;
-    }
-
-    /* Close file */
-    if (close(fd) == -1) {
-        unlink(temp_filename);
-        return false;
-    }
-
-    /* Rename temp file to target file */
-    if (rename(temp_filename, filename) != 0) {
-        unlink(temp_filename);
-        return false;
-    }
-
-    return true;
-}
 
 static BUFFER *static_save_buffer = NULL;
 static void static_save_buffer_init(void) {
@@ -761,23 +608,6 @@ static void static_save_buffer_init(void) {
         static_save_buffer = buffer_create(16384, NULL);
 
     buffer_flush(static_save_buffer);
-}
-
-static void remove_old_status_files(const char *protected_dir) {
-    FUNCTION_RUN_ONCE();
-    
-    char filename[FILENAME_MAX];
-
-    set_dynamic_fallbacks();
-    for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
-        if(strcmp(status_file_fallbacks[i], protected_dir) == 0)
-            continue;
-
-        snprintfz(filename, sizeof(filename), "%s/%s", status_file_fallbacks[i], STATUS_FILENAME);
-        unlink(filename);
-    }
-
-    errno_clear();
 }
 
 static bool daemon_status_file_saved = false;
@@ -792,37 +622,7 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
     daemon_status_file_to_json(wb, ds);
     buffer_json_finalize(wb);
 
-    const char *content = buffer_tostring(wb);
-    size_t content_size = buffer_strlen(wb);
-
-    // Try primary directory first
-    bool saved = false;
-    if (save_status_file(netdata_configured_varlib_dir, content, content_size)) {
-        remove_old_status_files(netdata_configured_varlib_dir);
-        saved = true;
-    }
-    else {
-        if(log)
-            nd_log(NDLS_DAEMON, NDLP_DEBUG, "Failed to save status file in primary directory %s",
-                   netdata_configured_varlib_dir);
-
-        // Try each fallback directory until successful
-        set_dynamic_fallbacks();
-        for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
-            if (save_status_file(status_file_fallbacks[i], content, content_size)) {
-                if(log)
-                    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_fallbacks[i]);
-
-                saved = true;
-                break;
-            }
-        }
-    }
-
-    if (!saved && log)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to save status file in any location");
-
-    if (saved)
+    if(status_file_io_save(STATUS_FILENAME, wb, log))
         daemon_status_file_saved = true;
 }
 
@@ -982,7 +782,7 @@ static enum crash_report_t check_crash_reports_config(void) {
 void daemon_status_file_init(void) {
     static_save_buffer_init();
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
-    daemon_status_file_load(&last_session_status);
+    status_file_io_load(STATUS_FILENAME, load_status_file, &last_session_status);
     daemon_status_file_migrate_once();
 }
 
