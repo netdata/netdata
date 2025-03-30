@@ -2,7 +2,7 @@
 
 #include "daemon-shutdown.h"
 #include "daemon-service.h"
-#include "daemon-status-file.h"
+#include "status-file.h"
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"

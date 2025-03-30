@@ -968,6 +968,9 @@ done:
 
 static void delete_dimension_uuid(nd_uuid_t *dimension_uuid, sqlite3_stmt **action_res __maybe_unused, bool flag __maybe_unused)
 {
+    if(!dimension_uuid)
+        return;
+
     sqlite3_stmt *res = NULL;
     int rc;
 
@@ -1153,7 +1156,7 @@ done:
 static bool dimension_can_be_deleted(nd_uuid_t *dim_uuid __maybe_unused, sqlite3_stmt **res __maybe_unused, bool flag __maybe_unused)
 {
 #ifdef ENABLE_DBENGINE
-    if(dbengine_enabled) {
+    if(dbengine_enabled && dim_uuid) {
         bool no_retention = true;
         for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             if (!multidb_ctx[tier])

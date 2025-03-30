@@ -39,6 +39,22 @@
     }                                                                                                           \
 } while(0)
 
+#define JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {         \
+    char _datetime[RFC3339_MAX_LENGTH]; _datetime[0] = '\0';                                                    \
+    json_object *_j;                                                                                            \
+    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
+        strncpyz(_datetime, json_object_get_string(_j), sizeof(_datetime) - 1);                                 \
+        dst = rfc3339_parse_ut(_datetime, NULL);                                                                \
+    }                                                                                                           \
+    else {                                                                                                      \
+        dst = 0;                                                                                                \
+        if (required) {                                                                                         \
+            buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                  \
+            return false;                                                                                       \
+        }                                                                                                       \
+    }                                                                                                           \
+} while(0)
+
 #define JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {              \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
