@@ -52,17 +52,12 @@ OS_SYSTEM_DISK_SPACE os_disk_space(const char *path) {
 OS_SYSTEM_DISK_SPACE os_disk_space(const char *path_utf8) {
     OS_SYSTEM_DISK_SPACE space = OS_SYSTEM_DISK_SPACE_EMPTY;
 
-    // Convert the UTF-8 path to a wide-character string.
-    int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path_utf8, -1, NULL, 0);
-    if (wlen == 0) {
-        // Conversion error; optionally, GetLastError() can provide more details.
+    ssize_t wpath_size = cygwin_conv_path(CCP_POSIX_TO_WIN_W, path_utf8, NULL, 0);
+    if(wpath_size < 0)
         return space;
-    }
 
-    wchar_t *wpath = (wchar_t *)mallocz(wlen * sizeof(wchar_t));
-
-    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path_utf8, -1, wpath, wlen) == 0) {
-        // Conversion error.
+    wchar_t *wpath = mallocz(wpath_size);
+    if(cygwin_conv_path(CCP_POSIX_TO_WIN_W, path_utf8, wpath, wpath_size) != 0) {
         freez(wpath);
         return space;
     }
