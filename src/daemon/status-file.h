@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_DAEMON_STATUS_FILE_H
-#define NETDATA_DAEMON_STATUS_FILE_H
+#ifndef NETDATA_STATUS_FILE_H
+#define NETDATA_STATUS_FILE_H
 
 #include "libnetdata/libnetdata.h"
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
 #include "claim/cloud-status.h"
+#include "machine-guid.h"
 
-#define STATUS_FILE_VERSION 23
+#define STATUS_FILE_VERSION 24
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -50,9 +51,10 @@ typedef struct daemon_status_file {
     size_t posts;               // the number of posts to the backend
     ssize_t reliability;        // consecutive restarts: > 0 reliable, < 0 crashing
 
+    ND_MACHINE_GUID host_id;    // the machine guid of the system
+
     ND_UUID boot_id;            // the boot id of the system
     ND_UUID invocation;         // the netdata invocation id generated the file
-    ND_UUID host_id;            // the machine guid of the agent
     ND_UUID node_id;            // the Netdata Cloud node id of the agent
     ND_UUID claim_id;           // the Netdata Cloud claim id of the agent
     ND_UUID machine_id;         // the unique machine id of the system
@@ -101,15 +103,11 @@ typedef struct daemon_status_file {
         uint32_t worker_job_id;
         bool sentry;        // true when the error was also reported to sentry
     } fatal;
-
-    struct {
-        struct {
-            bool sentry;
-            uint64_t hash;
-            usec_t timestamp_ut;
-        } slot[15];
-    } dedup;
 } DAEMON_STATUS_FILE;
+
+// these are used instead of locks when locks cannot be used (signal handler, out of memory, etc)
+#define dsf_acquire(ds) __atomic_load_n(&(ds).v, __ATOMIC_ACQUIRE)
+#define dsf_release(ds) __atomic_store_n(&(ds).v, (ds).v, __ATOMIC_RELEASE)
 
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);
@@ -155,7 +153,7 @@ long daemon_status_file_get_fatal_line(void);
 DAEMON_STATUS daemon_status_file_get_status(void);
 size_t daemon_status_file_get_restarts(void);
 ssize_t daemon_status_file_get_reliability(void);
-ND_UUID daemon_status_file_get_host_id(void);
+ND_MACHINE_GUID daemon_status_file_get_host_id(void);
 size_t daemon_status_file_get_fatal_worker_job_id(void);
 
-#endif //NETDATA_DAEMON_STATUS_FILE_H
+#endif //NETDATA_STATUS_FILE_H

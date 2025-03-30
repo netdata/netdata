@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon-shutdown-watcher.h"
-#include "daemon-status-file.h"
+#include "status-file.h"
 
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"

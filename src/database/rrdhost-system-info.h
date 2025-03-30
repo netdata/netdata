@@ -5,7 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include "rrdlabels.h"
-#include "daemon/daemon-status-file.h"
+#include "daemon/status-file.h"
 
 #ifdef RRDHOST_SYSTEM_INFO_INTERNALS
 struct rrdhost_system_info {

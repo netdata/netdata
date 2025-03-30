@@ -164,7 +164,7 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
     nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: failed to read GUID from file '%s'", filename);
 
     // Attempt to retrieve GUID from daemon status file.
-    h.uuid = daemon_status_file_get_host_id();
+    h = daemon_status_file_get_host_id();
     if (UUIDiszero(h.uuid)) {
         // If the status file does not contain a GUID, generate a new one.
         nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: generating a new GUID");
