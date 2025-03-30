@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_DAEMON_STATUS_FILE_H
-#define NETDATA_DAEMON_STATUS_FILE_H
+#ifndef NETDATA_STATUS_FILE_H
+#define NETDATA_STATUS_FILE_H
 
 #include "libnetdata/libnetdata.h"
 #include "daemon/config/netdata-conf-profile.h"
@@ -113,6 +113,10 @@ typedef struct daemon_status_file {
     DAEMON_STATUS_DEDUP dedup;
 } DAEMON_STATUS_FILE;
 
+// these are used instead of locks when locks cannot be used (signal handler, out of memory, etc)
+#define dsf_acquire(ds) __atomic_load_n(&(ds).v, __ATOMIC_ACQUIRE)
+#define dsf_release(ds) __atomic_store_n(&(ds).v, (ds).v, __ATOMIC_RELEASE)
+
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);
 
@@ -160,4 +164,4 @@ ssize_t daemon_status_file_get_reliability(void);
 ND_UUID daemon_status_file_get_host_id(void);
 size_t daemon_status_file_get_fatal_worker_job_id(void);
 
-#endif //NETDATA_DAEMON_STATUS_FILE_H
+#endif //NETDATA_STATUS_FILE_H

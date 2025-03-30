@@ -1271,14 +1271,16 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-db-dbengine-retention.h
         src/daemon/pulse/pulse-parents.c
         src/daemon/pulse/pulse-parents.h
-        src/daemon/daemon-status-file.c
-        src/daemon/daemon-status-file.h
+        src/daemon/status-file.c
+        src/daemon/status-file.h
         src/daemon/config/netdata-conf-ssl.c
         src/daemon/config/netdata-conf-ssl.h
         src/daemon/daemon-systemd-watcher.c
         src/daemon/daemon-systemd-watcher.h
         src/daemon/machine-guid.c
         src/daemon/machine-guid.h
+        src/daemon/status-file-dedup.c
+        src/daemon/status-file-dedup.h
 )
 
 set(H2O_FILES
