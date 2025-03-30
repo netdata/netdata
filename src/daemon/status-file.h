@@ -8,7 +8,7 @@
 #include "database/rrd-database-mode.h"
 #include "claim/cloud-status.h"
 
-#define STATUS_FILE_VERSION 23
+#define STATUS_FILE_VERSION 24
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -27,14 +27,6 @@ typedef enum {
     DAEMON_OS_TYPE_WINDOWS,
 } DAEMON_OS_TYPE;
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(DAEMON_OS_TYPE);
-
-typedef struct {
-    struct {
-        bool sentry;
-        uint64_t hash;
-        usec_t timestamp_ut;
-    } slot[15];
-} DAEMON_STATUS_DEDUP;
 
 typedef struct daemon_status_file {
     SPINLOCK spinlock;
@@ -109,8 +101,6 @@ typedef struct daemon_status_file {
         uint32_t worker_job_id;
         bool sentry;        // true when the error was also reported to sentry
     } fatal;
-
-    DAEMON_STATUS_DEDUP dedup;
 } DAEMON_STATUS_FILE;
 
 // these are used instead of locks when locks cannot be used (signal handler, out of memory, etc)

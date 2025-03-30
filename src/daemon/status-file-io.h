@@ -6,7 +6,7 @@
 #include "libnetdata/libnetdata.h"
 #include "status-file.h"
 
-void status_file_io_load(const char *filename, bool (*cb)(const char *, void *), void *data);
-bool status_file_io_save(const char *filename, BUFFER *payload, bool log);
+bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *), void *data);
+bool status_file_io_save(const char *filename, const void *data, size_t size, bool log);
 
 #endif //NETDATA_STATUS_FILE_IO_H

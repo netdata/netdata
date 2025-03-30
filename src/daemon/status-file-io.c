@@ -17,10 +17,17 @@ static void status_file_io_fallback_dirs_update(void) {
 }
 
 static bool status_file_io_check(const char *directory, const char *filename, char *dst, size_t dst_size, time_t *mtime) {
-    if(!directory || !*directory)
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
+    if(!directory || !*directory || !filename || !*filename || !dst || !dst_size || !mtime)
         return false;
 
-    snprintfz(dst, dst_size, "%s/%s", directory, filename);
+    size_t len = 0;
+    len = strcatz(dst, len, dst_size, directory);
+    if(!len || dst[len - 1] != '/')
+        len = strcatz(dst, len, dst_size, "/");
+    len = strcatz(dst, len, dst_size, filename);
 
     // Get file metadata
     OS_FILE_METADATA metadata = os_get_file_metadata(dst);
@@ -34,23 +41,34 @@ static bool status_file_io_check(const char *directory, const char *filename, ch
 }
 
 static void status_file_io_remove_obsolete(const char *protected_dir, const char *filename) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
     FUNCTION_RUN_ONCE();
 
-    char buf[FILENAME_MAX];
+    char dst[FILENAME_MAX];
 
     status_file_io_fallback_dirs_update();
     for(size_t i = 0; i < _countof(status_file_io_fallback_dirs); i++) {
         if(strcmp(status_file_io_fallback_dirs[i], protected_dir) == 0)
             continue;
 
-        snprintfz(buf, sizeof(buf), "%s/%s", status_file_io_fallback_dirs[i], filename);
-        unlink(buf);
+        size_t len = 0;
+        len = strcatz(dst, len, sizeof(dst), status_file_io_fallback_dirs[i]);
+        if(!len || dst[len - 1] != '/')
+            len = strcatz(dst, len, sizeof(dst), "/");
+        len = strcatz(dst, len, sizeof(dst), filename);
+
+        unlink(dst);
     }
 
     errno_clear();
 }
 
-void status_file_io_load(const char *filename, bool (*cb)(const char *, void *), void *data) {
+bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *), void *data) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
     char newest[FILENAME_MAX] = "";
     char current[FILENAME_MAX];
     time_t newest_mtime = 0, current_mtime;
@@ -72,15 +90,14 @@ void status_file_io_load(const char *filename, bool (*cb)(const char *, void *),
     }
 
     // Load the newest file found
-    if(*newest) {
-        if(!cb(newest, data))
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to load newest status file: %s", newest);
-    }
-    else
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
+    if(*newest && cb(newest, data))
+        return true;
+
+    nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
+    return false;
 }
 
-static bool status_file_io_save_this(const char *directory, const char *filename, const char *content, size_t content_size) {
+static bool status_file_io_save_this(const char *directory, const char *filename, const uint8_t *data, size_t size) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
@@ -129,8 +146,8 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     /* Write content to file using write() */
     size_t total_written = 0;
 
-    while (total_written < content_size) {
-        ssize_t bytes_written = write(fd, content + total_written, content_size - total_written);
+    while (total_written < size) {
+        ssize_t bytes_written = write(fd, data + total_written, size - total_written);
 
         if (bytes_written <= 0) {
             if (errno == EINTR)
@@ -173,18 +190,15 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     return true;
 }
 
-bool status_file_io_save(const char *filename, BUFFER *payload, bool log) {
+bool status_file_io_save(const char *filename, const void *data, size_t size, bool log) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
     // wb should have enough space to hold the JSON content, to avoid any allocations
 
-    const char *content = buffer_tostring(payload);
-    size_t content_size = buffer_strlen(payload);
-
     // Try primary directory first
     bool saved = false;
-    if (status_file_io_save_this(netdata_configured_varlib_dir, filename, content, content_size)) {
+    if (status_file_io_save_this(netdata_configured_varlib_dir, filename, data, size)) {
         status_file_io_remove_obsolete(netdata_configured_varlib_dir, filename);
         saved = true;
     }
@@ -196,7 +210,7 @@ bool status_file_io_save(const char *filename, BUFFER *payload, bool log) {
         // Try each fallback directory until successful
         status_file_io_fallback_dirs_update();
         for(size_t i = 0; i < _countof(status_file_io_fallback_dirs); i++) {
-            if (status_file_io_save_this(status_file_io_fallback_dirs[i], filename, content, content_size)) {
+            if (status_file_io_save_this(status_file_io_fallback_dirs[i], filename, data, size)) {
                 if(log)
                     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_io_fallback_dirs[i]);
 

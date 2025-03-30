@@ -233,7 +233,6 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 
-    daemon_status_dedup_to_json(wb, &ds->dedup);
     dsf_release(*ds);
 }
 
@@ -411,7 +410,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "worker_job_id", SIGNAL_CODE_2id_h, ds->fatal.worker_job_id, error, required_v23);
     });
 
-    return daemon_status_dedup_from_json(jobj, &ds->dedup, error);
+    return true;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -485,11 +484,6 @@ static void daemon_status_file_migrate_once(void) {
     else {
         if(session_status.reliability < 0) session_status.reliability = 0;
         session_status.reliability++;
-    }
-
-    if(last_session_status.v == STATUS_FILE_VERSION) {
-        for (size_t i = 0; i < _countof(session_status.dedup.slot); i++)
-            session_status.dedup.slot[i] = last_session_status.dedup.slot[i];
     }
 
     strncpyz(session_status.stack_traces, capture_stack_trace_backend(), sizeof(session_status.stack_traces) - 1);
@@ -569,31 +563,14 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 // --------------------------------------------------------------------------------------------------------------------
 // load a saved status
 
-static bool load_status_file(const char *filename, void *data) {
+static bool status_file_load_and_parse(const char *filename, void *data) {
     DAEMON_STATUS_FILE *status = data;
-
-    FILE *fp = fopen(filename, "r");
-    if (!fp)
-        return false;
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     CLEAN_BUFFER *error = buffer_create(0, NULL);
 
-    // Get file size
-    fseek(fp, 0, SEEK_END);
-    long file_size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    // Read the file
-    buffer_need_bytes(wb, file_size + 1);
-    ssize_t read_bytes = fread(wb->buffer, 1, file_size, fp);
-    fclose(fp);
-
-    if (read_bytes == 0)
+    if(!read_txt_file_to_buffer(filename, wb, 65536))
         return false;
-
-    wb->buffer[read_bytes] = '\0';
-    wb->len = read_bytes;
 
     // Parse the JSON
     return json_parse_payload_or_error(wb, error, daemon_status_file_from_json, status) == HTTP_RESP_OK;
@@ -622,7 +599,7 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
     daemon_status_file_to_json(wb, ds);
     buffer_json_finalize(wb);
 
-    if(status_file_io_save(STATUS_FILENAME, wb, log))
+    if(status_file_io_save(STATUS_FILENAME, buffer_tostring(wb), buffer_strlen(wb), log))
         daemon_status_file_saved = true;
 }
 
@@ -697,10 +674,10 @@ static void post_status_file(struct post_status_file_thread_data *d) {
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
         daemon_status_file_startup_step("startup(crash reports dedup)");
+        session_status.posts++;
         nd_log(NDLS_DAEMON, NDLP_INFO, "Posted last status to agent-events successfully.");
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash, false);
-        session_status.posts++;
         daemon_status_file_save(wb, &session_status, true);
     }
     else
@@ -782,7 +759,7 @@ static enum crash_report_t check_crash_reports_config(void) {
 void daemon_status_file_init(void) {
     static_save_buffer_init();
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
-    status_file_io_load(STATUS_FILENAME, load_status_file, &last_session_status);
+    status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status);
     daemon_status_file_migrate_once();
 }
 
@@ -1061,6 +1038,8 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
 
         daemon_status_file_save(wb, ds, false);
     }
+
+    errno_clear();
 }
 
 // --------------------------------------------------------------------------------------------------------------------

@@ -1,10 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "status-file-dedup.h"
+#include "status-file-io.h"
+
+#define DEDUP_FILENAME "dedup-netdata.dat"
+#define DEDUP_VERSION 1
+#define DEDUP_MAGIC 0x1DEDA9F17EDA7150 // 1(x) DEDUPFILEDAT (v)1 50(entries)
 
 #define REPORT_EVENTS_EVERY (86400 - 3600) // -1 hour to tolerate cron randomness
 
+typedef struct {
+    uint64_t magic;
+    size_t v;
+    struct {
+        bool sentry;
+        uint64_t hash;
+        usec_t timestamp_ut;
+    } slot[50];
+} DAEMON_STATUS_DEDUP;
+
+static DAEMON_STATUS_DEDUP dedup = { 0 };
+
 static void stack_trace_anonymize(char *s) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
     char *p = s;
     while (*p && (p = strstr(p, "0x"))) {
         p[1] = '0';
@@ -80,60 +100,71 @@ uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const 
     return hash;
 }
 
-void daemon_status_dedup_to_json(BUFFER *wb, DAEMON_STATUS_DEDUP *dp) {
-    buffer_json_member_add_array(wb, "dedup");
-    {
-        for(size_t i = 0; i < _countof(dp->slot); i++) {
-            if (dp->slot[i].timestamp_ut == 0)
-                continue;
+// --------------------------------------------------------------------------------------------------------------------
+// read and write the dedup hashes
 
-            buffer_json_add_array_item_object(wb);
-            {
-                buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", dp->slot[i].timestamp_ut, true);
-                buffer_json_member_add_uint64(wb, "hash", dp->slot[i].hash);
-                buffer_json_member_add_boolean(wb, "sentry", dp->slot[i].sentry);
-            }
-            buffer_json_object_close(wb);
-        }
-    }
-    buffer_json_array_close(wb);
-}
+static bool status_file_dedup_load_and_parse(const char *filename, void *data __maybe_unused) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
-bool daemon_status_dedup_from_json(json_object *jobj, void *data, BUFFER *error) {
-    char path[1024]; path[0] = '\0';
-    DAEMON_STATUS_DEDUP *dp = data;
+    int fp = open(filename, O_RDONLY);
+    if(fp == -1)
+        goto failed;
 
-    bool required = false;
-    JSONC_PARSE_ARRAY(jobj, path, "dedup", error, required, {
-        size_t i = 0;
-        JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, required, {
-            if(i < _countof(dp->slot)) {
-                JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", dp->slot[i].timestamp_ut, error, required);
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", dp->slot[i].hash, error, required);
-                JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "sentry", dp->slot[i].sentry, error, required);
-            }
-        });
-    });
+    memset(&dedup, 0, sizeof(dedup));
+    ssize_t r = read(fp, &dedup, sizeof(dedup));
+    close(fp);
+
+    if(r != sizeof(dedup))
+        goto failed;
+
+    if(dedup.magic != DEDUP_MAGIC)
+        goto failed;
+
+    if(dedup.v != DEDUP_VERSION)
+        goto failed;
 
     return true;
+
+failed:
+    memset(&dedup, 0, sizeof(dedup));
+    return false;
+}
+
+bool daemon_status_dedup_load(void) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
+    return status_file_io_load(DEDUP_FILENAME, status_file_dedup_load_and_parse, NULL);
+}
+
+static bool daemon_status_dedup_save(void) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
+    dedup.magic = DEDUP_MAGIC;
+    dedup.v = DEDUP_VERSION;
+    return status_file_io_save(DEDUP_FILENAME, &dedup, sizeof(dedup), false);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 // deduplication hashes management
 
-bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
+bool dedup_already_posted(DAEMON_STATUS_FILE *ds __maybe_unused, uint64_t hash, bool sentry) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
+    daemon_status_dedup_load();
+
     usec_t now_ut = now_realtime_usec();
 
-    for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
-        if(ds->dedup.slot[i].timestamp_ut == 0)
+    for(size_t i = 0; i < _countof(dedup.slot); i++) {
+        if(dedup.slot[i].timestamp_ut == 0)
             continue;
 
-        if(hash == ds->dedup.slot[i].hash &&
-            sentry == ds->dedup.slot[i].sentry &&
-            now_ut - ds->dedup.slot[i].timestamp_ut < REPORT_EVENTS_EVERY * USEC_PER_SEC) {
+        if(hash == dedup.slot[i].hash &&
+            sentry == dedup.slot[i].sentry &&
+            now_ut - dedup.slot[i].timestamp_ut < REPORT_EVENTS_EVERY * USEC_PER_SEC) {
             // we have already posted this crash
             return true;
         }
@@ -142,38 +173,43 @@ bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
     return false;
 }
 
-void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
+void dedup_keep_hash(DAEMON_STATUS_FILE *ds __maybe_unused, uint64_t hash, bool sentry) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
+    daemon_status_dedup_load();
+
     // find the same hash
-    for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
-        if(ds->dedup.slot[i].hash == hash && ds->dedup.slot[i].sentry == sentry) {
-            ds->dedup.slot[i].hash = hash;
-            ds->dedup.slot[i].sentry = sentry;
-            ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
-            return;
+    for(size_t i = 0; i < _countof(dedup.slot); i++) {
+        if(dedup.slot[i].hash == hash && dedup.slot[i].sentry == sentry) {
+            dedup.slot[i].hash = hash;
+            dedup.slot[i].sentry = sentry;
+            dedup.slot[i].timestamp_ut = now_realtime_usec();
+            goto save;
         }
     }
 
     // find an empty slot
-    for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
-        if(!ds->dedup.slot[i].hash) {
-            ds->dedup.slot[i].hash = hash;
-            ds->dedup.slot[i].sentry = sentry;
-            ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
-            return;
+    for(size_t i = 0; i < _countof(dedup.slot); i++) {
+        if(!dedup.slot[i].hash) {
+            dedup.slot[i].hash = hash;
+            dedup.slot[i].sentry = sentry;
+            dedup.slot[i].timestamp_ut = now_realtime_usec();
+            goto save;
         }
     }
 
     // find the oldest slot
     size_t store_at_slot = 0;
-    for(size_t i = 1; i < _countof(ds->dedup.slot); i++) {
-        if(ds->dedup.slot[i].timestamp_ut < ds->dedup.slot[store_at_slot].timestamp_ut)
+    for(size_t i = 1; i < _countof(dedup.slot); i++) {
+        if(dedup.slot[i].timestamp_ut < dedup.slot[store_at_slot].timestamp_ut)
             store_at_slot = i;
     }
 
-    ds->dedup.slot[store_at_slot].hash = hash;
-    ds->dedup.slot[store_at_slot].sentry = sentry;
-    ds->dedup.slot[store_at_slot].timestamp_ut = now_realtime_usec();
+    dedup.slot[store_at_slot].hash = hash;
+    dedup.slot[store_at_slot].sentry = sentry;
+    dedup.slot[store_at_slot].timestamp_ut = now_realtime_usec();
+
+save:
+    daemon_status_dedup_save();
 }

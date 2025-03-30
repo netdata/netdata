@@ -124,5 +124,6 @@ const char *os_run_dir(bool rw) {
 
     spinlock_unlock(&spinlock);
 
+    errno_clear();
     return cached_run_dir;
 }
