@@ -12,6 +12,7 @@
 typedef struct {
     uint64_t magic;
     size_t v;
+    uint64_t hash;
     struct {
         bool sentry;
         uint64_t hash;
@@ -124,6 +125,10 @@ static bool status_file_dedup_load_and_parse(const char *filename, void *data __
     if(dedup.v != DEDUP_VERSION)
         goto failed;
 
+    uint64_t hash = fnv1a_hash_bin64(&dedup.slot, sizeof(dedup.slot));
+    if(dedup.hash != hash)
+        goto failed;
+
     return true;
 
 failed:
@@ -144,6 +149,7 @@ static bool daemon_status_dedup_save(void) {
 
     dedup.magic = DEDUP_MAGIC;
     dedup.v = DEDUP_VERSION;
+    dedup.hash = fnv1a_hash_bin64(&dedup.slot, sizeof(dedup.slot));
     return status_file_io_save(DEDUP_FILENAME, &dedup, sizeof(dedup), false);
 }
 
