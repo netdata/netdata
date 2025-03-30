@@ -13,6 +13,9 @@
 
 void *win_plugin_main(void *ptr);
 
+void netdata_initialize_MSSQL_env();
+int netdata_start_MSSQL_connection();
+
 extern char windows_shared_buffer[8192];
 
 int do_GetSystemUptime(int update_every, usec_t dt);
