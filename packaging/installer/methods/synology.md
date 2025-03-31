@@ -2,13 +2,13 @@
 
 > This community-maintained guide may not reflect the latest changes.
 > Please verify the installation steps before proceeding.
-> 
+>
 > Help improve this guide by submitting a PR with your suggestions.
 > Thank you!
 
 The [one-line installation script](/packaging/installer/methods/kickstart.md) works on Synology NAS devices with amd64 architecture. The script installs Netdata to `/opt/netdata/`.
 
-For current Synology systems (DSM 7.2.2+), the kickstart script automatically handles the complete installation process and can be managed through standard systemd commands, except it fails to create the `netdata` users and group.
+On current Synology systems (DSM 7.2.2+), the kickstart script automates the entire installation process but doesn't create the necessary `netdata` user and group. As a result, Netdata operates with root privileges instead. Once installed, it can be controlled using standard systemd commands.
 
 ### Run as netdata user
 
@@ -19,8 +19,8 @@ By default, Netdata runs as `root`. To run it as the `netdata` user instead:
     - Assign it to the netdata group
     - Set a random password
     - Grant no access permission
-    
-    or alternatively from the CLI.
+
+   or alternatively from the CLI:
     ```sh
     sudo synouser --add netdata <SomeGoodPassword> "netdata agent" 0 "" 0
     sudo synogroup --add netdata netdata
