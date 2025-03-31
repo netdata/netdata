@@ -95,6 +95,11 @@ static struct workers_globals {
 };
 
 static __thread struct worker *worker = NULL; // the current thread worker
+static __thread size_t last_job_id = 0;
+
+size_t workers_get_last_job_id() {
+    return last_job_id;
+}
 
 static ALWAYS_INLINE usec_t worker_now_monotonic_usec(void) {
 #ifdef NETDATA_WITHOUT_WORKERS_LATENCY
@@ -256,6 +261,8 @@ static void worker_is_busy_do(size_t job_id) {
 }
 
 ALWAYS_INLINE void worker_is_busy(size_t job_id) {
+    last_job_id = job_id;
+
     if(likely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 

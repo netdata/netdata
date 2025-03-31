@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- detect more CI [\#19999](https://github.com/netdata/netdata/pull/19999) ([ktsaou](https://github.com/ktsaou))
+- status file 24 [\#19996](https://github.com/netdata/netdata/pull/19996) ([ktsaou](https://github.com/ktsaou))
+- add kanelatechnical to CODEOWNERS [\#19994](https://github.com/netdata/netdata/pull/19994) ([ilyam8](https://github.com/ilyam8))
+- docs: improve Synology NAS installation documentation clarity [\#19993](https://github.com/netdata/netdata/pull/19993) ([ilyam8](https://github.com/ilyam8))
+- added worker last job id to status file [\#19992](https://github.com/netdata/netdata/pull/19992) ([ktsaou](https://github.com/ktsaou))
+- Improve shutdown and datafile rotation [\#19991](https://github.com/netdata/netdata/pull/19991) ([stelfrag](https://github.com/stelfrag))
+- Update synology.md [\#19989](https://github.com/netdata/netdata/pull/19989) ([ycdtosa](https://github.com/ycdtosa))
 - Regenerate integrations docs [\#19988](https://github.com/netdata/netdata/pull/19988) ([netdatabot](https://github.com/netdatabot))
 - Installation + docker, improvements [\#19987](https://github.com/netdata/netdata/pull/19987) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#19986](https://github.com/netdata/netdata/pull/19986) ([netdatabot](https://github.com/netdatabot))
@@ -483,12 +490,6 @@
 - Cleanup metadata event loop [\#19447](https://github.com/netdata/netdata/pull/19447) ([stelfrag](https://github.com/stelfrag))
 - Make sure ACLK synchronization event loop runs frequently [\#19446](https://github.com/netdata/netdata/pull/19446) ([stelfrag](https://github.com/stelfrag))
 - move dbengine-retention chart to pulse [\#19444](https://github.com/netdata/netdata/pull/19444) ([ktsaou](https://github.com/ktsaou))
-- Fix Child web remote access Config in Parent-Child Deployment Examples [\#19443](https://github.com/netdata/netdata/pull/19443) ([Destructio](https://github.com/Destructio))
-- build\(deps\): update go toolchain to v1.23.5 [\#19442](https://github.com/netdata/netdata/pull/19442) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/prometheus/common from 0.61.0 to 0.62.0 in /src/go [\#19439](https://github.com/netdata/netdata/pull/19439) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/sijms/go-ora/v2 from 2.8.22 to 2.8.23 in /src/go [\#19438](https://github.com/netdata/netdata/pull/19438) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump k8s.io/client-go from 0.32.0 to 0.32.1 in /src/go [\#19437](https://github.com/netdata/netdata/pull/19437) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Handle incoming ACLK traffic asynchronously [\#19436](https://github.com/netdata/netdata/pull/19436) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 

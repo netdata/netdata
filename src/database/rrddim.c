@@ -417,6 +417,9 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
 // ----------------------------------------------------------------------------
 
 time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier) {
+    if(unlikely(!rd))
+        return 0;
+
     if(unlikely(tier > nd_profile.storage_tiers || !rd->tiers[tier].smh))
         return 0;
 
@@ -425,6 +428,9 @@ time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier) {
 
 // get the timestamp of the last entry in the round-robin database
 time_t rrddim_last_entry_s(RRDDIM *rd) {
+    if(unlikely(!rd))
+        return 0;
+
     time_t latest_time_s = rrddim_last_entry_s_of_tier(rd, 0);
 
     for(size_t tier = 1; tier < nd_profile.storage_tiers;tier++) {
@@ -439,6 +445,9 @@ time_t rrddim_last_entry_s(RRDDIM *rd) {
 }
 
 time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier) {
+    if(unlikely(!rd))
+        return 0;
+
     if(unlikely(tier > nd_profile.storage_tiers || !rd->tiers[tier].smh))
         return 0;
 
@@ -446,6 +455,9 @@ time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier) {
 }
 
 time_t rrddim_first_entry_s(RRDDIM *rd) {
+    if(unlikely(!rd))
+        return 0;
+
     time_t oldest_time_s = 0;
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {

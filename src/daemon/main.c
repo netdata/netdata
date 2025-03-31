@@ -3,7 +3,7 @@
 #include "common.h"
 #include "buildinfo.h"
 #include "daemon-shutdown-watcher.h"
-#include "daemon-status-file.h"
+#include "status-file.h"
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 
