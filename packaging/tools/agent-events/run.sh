@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-stdbuf -oL /opt/agent-events/server --port=30001 2>/dev/null \
+stdbuf -oL /opt/agent-events/server --port=30001 --dedup-key agent.ephemeral_id --dedup-window 1800 2>/dev/null \
 	| stdbuf -oL log2journal json \
 		--prefix 'AE_' \
 		--inject 'SYSLOG_IDENTIFIER=agent-events' \
