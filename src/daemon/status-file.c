@@ -539,7 +539,12 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
     // we keep the highest cloud status, to know how the agent gets connected to netdata.cloud
     CLOUD_STATUS cs = cloud_status();
-    if(!session_status.cloud_status || cs == CLOUD_STATUS_BANNED || cs == CLOUD_STATUS_ONLINE || cs == CLOUD_STATUS_INDIRECT)
+    if(!session_status.cloud_status ||                              // it is ok to overwrite this
+        session_status.cloud_status == CLOUD_STATUS_AVAILABLE ||    // it is ok to overwrite this
+        session_status.cloud_status == CLOUD_STATUS_OFFLINE ||      // it is ok to overwrite this
+        cs == CLOUD_STATUS_BANNED ||                                // this is a final state
+        cs == CLOUD_STATUS_ONLINE ||                                // this is a final state
+        cs == CLOUD_STATUS_INDIRECT)                                // this is a final state
         session_status.cloud_status = cs;
 
     session_status.oom_protection = dbengine_out_of_memory_protection;
