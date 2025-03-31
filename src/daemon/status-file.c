@@ -1394,10 +1394,7 @@ ssize_t daemon_status_file_get_reliability(void) {
 }
 
 ND_MACHINE_GUID daemon_status_file_get_host_id(void) {
-    if(!UUIDiszero(session_status.host_id.uuid))
-        return session_status.host_id;
-    else
-        return last_session_status.host_id;
+    return last_session_status.host_id;
 }
 
 size_t daemon_status_file_get_fatal_worker_job_id(void) {
