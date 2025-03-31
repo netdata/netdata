@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- detect more CI [\#19999](https://github.com/netdata/netdata/pull/19999) ([ktsaou](https://github.com/ktsaou))
+- status file 24 [\#19996](https://github.com/netdata/netdata/pull/19996) ([ktsaou](https://github.com/ktsaou))
 - add kanelatechnical to CODEOWNERS [\#19994](https://github.com/netdata/netdata/pull/19994) ([ilyam8](https://github.com/ilyam8))
 - docs: improve Synology NAS installation documentation clarity [\#19993](https://github.com/netdata/netdata/pull/19993) ([ilyam8](https://github.com/ilyam8))
 - added worker last job id to status file [\#19992](https://github.com/netdata/netdata/pull/19992) ([ktsaou](https://github.com/ktsaou))
@@ -488,8 +490,6 @@
 - Cleanup metadata event loop [\#19447](https://github.com/netdata/netdata/pull/19447) ([stelfrag](https://github.com/stelfrag))
 - Make sure ACLK synchronization event loop runs frequently [\#19446](https://github.com/netdata/netdata/pull/19446) ([stelfrag](https://github.com/stelfrag))
 - move dbengine-retention chart to pulse [\#19444](https://github.com/netdata/netdata/pull/19444) ([ktsaou](https://github.com/ktsaou))
-- Fix Child web remote access Config in Parent-Child Deployment Examples [\#19443](https://github.com/netdata/netdata/pull/19443) ([Destructio](https://github.com/Destructio))
-- build\(deps\): update go toolchain to v1.23.5 [\#19442](https://github.com/netdata/netdata/pull/19442) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
