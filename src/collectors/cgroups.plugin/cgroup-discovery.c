@@ -124,6 +124,7 @@ static inline void cgroup_free(struct cgroup *cg) {
 
     rrdlabels_destroy(cg->chart_labels);
 
+    memset(cg, 0, sizeof(*cg));
     freez(cg);
 
     cgroup_root_count--;
