@@ -6,6 +6,20 @@
 
 **Merged pull requests:**
 
+- Properly clean up install paths after runtime checks in static builds. [\#20017](https://github.com/netdata/netdata/pull/20017) ([Ferroin](https://github.com/Ferroin))
+- blacklist leaked machine guids [\#20016](https://github.com/netdata/netdata/pull/20016) ([ktsaou](https://github.com/ktsaou))
+- agent-events: add deduplicating web server [\#20014](https://github.com/netdata/netdata/pull/20014) ([ktsaou](https://github.com/ktsaou))
+- Validate journal file headers to prevent invalid memory access [\#20013](https://github.com/netdata/netdata/pull/20013) ([stelfrag](https://github.com/stelfrag))
+- added agent-events backend [\#20012](https://github.com/netdata/netdata/pull/20012) ([ktsaou](https://github.com/ktsaou))
+- daemon status 24d [\#20011](https://github.com/netdata/netdata/pull/20011) ([ktsaou](https://github.com/ktsaou))
+- Update synology.md [\#20010](https://github.com/netdata/netdata/pull/20010) ([ycdtosa](https://github.com/ycdtosa))
+- fix\(go.d/megacli\): handle BBU hardware component is not present [\#20008](https://github.com/netdata/netdata/pull/20008) ([ilyam8](https://github.com/ilyam8))
+- Fix crashes No 3 [\#20007](https://github.com/netdata/netdata/pull/20007) ([ktsaou](https://github.com/ktsaou))
+- Minor changes when handling systemd integration. [\#20006](https://github.com/netdata/netdata/pull/20006) ([vkalintiris](https://github.com/vkalintiris))
+- Deployment Guides Improved [\#20004](https://github.com/netdata/netdata/pull/20004) ([kanelatechnical](https://github.com/kanelatechnical))
+- daemon status 24c [\#20003](https://github.com/netdata/netdata/pull/20003) ([ktsaou](https://github.com/ktsaou))
+- use v4 UUIDs [\#20002](https://github.com/netdata/netdata/pull/20002) ([ktsaou](https://github.com/ktsaou))
+- Update synology.md [\#20001](https://github.com/netdata/netdata/pull/20001) ([Ancairon](https://github.com/Ancairon))
 - detect more CI [\#19999](https://github.com/netdata/netdata/pull/19999) ([ktsaou](https://github.com/ktsaou))
 - status file 24 [\#19996](https://github.com/netdata/netdata/pull/19996) ([ktsaou](https://github.com/ktsaou))
 - add kanelatechnical to CODEOWNERS [\#19994](https://github.com/netdata/netdata/pull/19994) ([ilyam8](https://github.com/ilyam8))
@@ -445,11 +459,6 @@
 - streaming nodes accounting [\#19466](https://github.com/netdata/netdata/pull/19466) ([ktsaou](https://github.com/ktsaou))
 - Don’t fail fast on static builds and Docker builds. [\#19465](https://github.com/netdata/netdata/pull/19465) ([Ferroin](https://github.com/Ferroin))
 - Child should be online before initializing health [\#19463](https://github.com/netdata/netdata/pull/19463) ([stelfrag](https://github.com/stelfrag))
-- Active Directory Metrics \(Windows.plugin\) [\#19461](https://github.com/netdata/netdata/pull/19461) ([thiagoftsm](https://github.com/thiagoftsm))
-- Use aral in ACLK [\#19459](https://github.com/netdata/netdata/pull/19459) ([stelfrag](https://github.com/stelfrag))
-- Enable libunwind in native packages and Docker images. [\#19452](https://github.com/netdata/netdata/pull/19452) ([Ferroin](https://github.com/Ferroin))
-- fix rrdset name crash on rrdset obsoletion [\#19449](https://github.com/netdata/netdata/pull/19449) ([ktsaou](https://github.com/ktsaou))
-- Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
@@ -478,18 +487,6 @@
 ## [v2.2.0](https://github.com/netdata/netdata/tree/v2.2.0) (2025-01-22)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.1.1...v2.2.0)
-
-**Merged pull requests:**
-
-- control stream-info requests rate [\#19458](https://github.com/netdata/netdata/pull/19458) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d/upsd\): remove UPS load charts if UPS load not found [\#19457](https://github.com/netdata/netdata/pull/19457) ([ilyam8](https://github.com/ilyam8))
-- Simplify the rrdhost\_ingestion\_status call [\#19456](https://github.com/netdata/netdata/pull/19456) ([stelfrag](https://github.com/stelfrag))
-- Fix up handling of libunwind in CMake. [\#19451](https://github.com/netdata/netdata/pull/19451) ([Ferroin](https://github.com/Ferroin))
-- Revert libunwind being enabled in Docker and DEB builds. [\#19450](https://github.com/netdata/netdata/pull/19450) ([Ferroin](https://github.com/Ferroin))
-- Do not run queries synchronously in the event loop [\#19448](https://github.com/netdata/netdata/pull/19448) ([stelfrag](https://github.com/stelfrag))
-- Cleanup metadata event loop [\#19447](https://github.com/netdata/netdata/pull/19447) ([stelfrag](https://github.com/stelfrag))
-- Make sure ACLK synchronization event loop runs frequently [\#19446](https://github.com/netdata/netdata/pull/19446) ([stelfrag](https://github.com/stelfrag))
-- move dbengine-retention chart to pulse [\#19444](https://github.com/netdata/netdata/pull/19444) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 
