@@ -475,13 +475,7 @@ static void daemon_status_file_migrate_once(void) {
 
     session_status.claim_id = last_session_status.claim_id;
     session_status.node_id = last_session_status.node_id;
-    session_status.host_id = last_session_status.host_id;
-    if(UUIDiszero(session_status.host_id.uuid)) {
-        if(!UUIDiszero(last_session_status.host_id.uuid))
-            session_status.host_id = last_session_status.host_id;
-        else
-            session_status.host_id = *machine_guid_get();
-    }
+    session_status.host_id = *machine_guid_get();
 
     strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
     strncpyz(session_status.virtualization, last_session_status.virtualization, sizeof(session_status.virtualization) - 1);
