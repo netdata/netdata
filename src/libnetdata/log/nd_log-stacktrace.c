@@ -4,7 +4,7 @@
 
 bool nd_log_forked = false;
 
-#define NO_STACK_TRACE_PREFIX "stack trace not available: "
+#define NO_STACK_TRACE_PREFIX "info: stack trace is not available, "
 
 #if defined(HAVE_LIBBACKTRACE)
 #include "backtrace-supported.h"
