@@ -26,5 +26,7 @@ fi
 
 trap - EXIT
 
+run rm -rv "${NETDATA_INSTALL_PATH}/var/lib/netdata" "${NETDATA_INSTALL_PATH}/var/cache/netdata"
+
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true
