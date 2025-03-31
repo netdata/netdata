@@ -92,6 +92,17 @@ CLOSE nd_user_cursor
 DEALLOCATE nd_user_cursor
 GO
 ```
+
+By default, Microsoft SQL Server is installed with "integrated authentication only".
+If you want to allow connections using SQL Server authentication, you must modify the server configuration:
+
+1. Open `Microsoft Server Management Studio`.
+2. Right-click your server, and select `Properties`.
+3. In the left panel, select `Security`.
+4. Under `Server authentication`, choose `SQL Server and Windows Authentication mode`.
+5. Click `OK`.
+6. Finally, right-click your server, and select`Restart`.
+
 #### Netdata Configuration
 
 Now that the user has been created inside your server, update `netdata.conf` by adding the following section:
