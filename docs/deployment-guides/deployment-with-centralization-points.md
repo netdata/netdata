@@ -80,14 +80,14 @@ flowchart LR
         On-Prem
         having all metrics & logs
         for all Bx nodes"]
-    EMAIL{{"<b>e-mail</b>
-        notifications"}}
-    MOBILEAPP{{"<b>Netdata Mobile App</b>
-        notifications"}}
-    SLACK{{"<b>Slack</b>
-        notifications"}}
-    OTHER{{"Other
-        notifications"}}
+    EMAIL[["<b>e-mail</b>
+        notifications"]]
+    MOBILEAPP[["<b>Netdata Mobile App</b>
+        notifications"]]
+    SLACK[["<b>Slack</b>
+        notifications"]]
+    OTHER[["Other
+        notifications"]]
     PA & PB -->|alert transitions| NC -->|notification| EMAIL & MOBILEAPP & SLACK & OTHER 
     SA1 & SA2 & SAN ---|stream| PA
     SB1 & SB2 & SBN ---|stream| PB 
@@ -109,7 +109,7 @@ For Metrics:
 
 - Configure `stream.conf` at the Netdata Children to enable streaming to the configured Netdata Parents.
 
-Check the [related section in our documentation](/docs/observability-centralization-points/metrics-centralization-points/README.md) for more info
+Check the [related section in our documentation](/docs/observability-centralization-points/metrics-centralization-points/README.md) for more info.
 
 For Logs:
 
@@ -119,4 +119,4 @@ For Logs:
 
 - Configure `systemd-journal-upload` at the Netdata Children to enable transmission of their logs to the Netdata Parents.
 
-Check the [related section in our documentation](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md) for more info
+Check the [related section in our documentation](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md) for more info.

@@ -1,141 +1,102 @@
 # Standalone Deployment
 
-To help our users have a complete experience of Netdata when they install it for the first time, the Netdata Agent with default configuration is a complete monitoring solution out of the box, with features enabled and available.
+Netdata provides real-time monitoring out of the box. By default, each Netdata Agent functions as a standalone monitoring system with no additional configuration required.
 
-So, each Netdata Agent acts as a standalone monitoring system by default.
+## Standalone Agents Without Netdata Cloud
 
-## Standalone Agents, without Netdata Cloud
+Each Netdata Agent operates independently and provides its own monitoring dashboard and alerting system.
 
-|                    Feature                    |                     How it works                     |
-|:---------------------------------------------:|:----------------------------------------------------:|
-| Unified infrastructure dashboards for metrics |  No, each Netdata Agent provides its own dashboard   |
-|  Unified infrastructure dashboards for logs   |     No, each Netdata Agent exposes its own logs      |
-|          Centrally configured alerts          |  No, each Netdata has its own alerts configuration   |
-|   Centrally dispatched alert notifications    | No, each Netdata Agent sends notifications by itself |
-|         Data are exclusively on-prem          |                         Yes                          |
+### Features
 
-When using Standalone Netdata Agents, each of them offers an API and a dashboard, at its own unique URL, that looks like `http://agent-ip:19999`.
+| Feature | How it works |
+|---------|-------------|
+| **Infrastructure dashboards for metrics** | No, each Netdata Agent provides its own dashboard. |
+| **Infrastructure dashboards for logs** | No, logs are only accessible per individual Netdata Agent. |
+| **Centralized alert configuration** | No, each Netdata Agent has its own alert settings. |
+| **Centralized alert notifications** | No, each Netdata Agent sends notifications independently. |
+| **On-prem data retention** | Yes, all collected data remains on the monitored system. |
 
-So, each of the Netdata Agents has to be accessed individually and independently of the others:
+Each Netdata Agent is accessible via a unique URL: `http://agent-ip:19999`.
 
 ```mermaid
 flowchart LR
-    WEB[["Multiple
-        Independent
-        Dashboards"]]
-    S1["Standalone
-        Netdata
-         1"]
-    S2["Standalone
-        Netdata
-         2"]
-    SN["Standalone
-        Netdata
-         N"]
+    WEB["Multiple Independent Dashboards"]
+    S1["Standalone Netdata 1"]
+    S2["Standalone Netdata 2"]
+    SN["Standalone Netdata N"]
     WEB -->|URL 1| S1
     WEB -->|URL 2| S2
     WEB -->|URL N| SN
 ```
 
-The same is true for alert notifications. Each of the Netdata Agents runs its own alerts and sends notifications by itself, according to its configuration:
+Each agent also manages its own alert notifications:
 
 ```mermaid
 flowchart LR
-    S1["Standalone
-        Netdata
-         1"]
-    S2["Standalone
-        Netdata
-         2"]
-    SN["Standalone
-        Netdata
-         N"]
-    EMAIL{{"<b>e-mail</b>
-        notifications"}}
-    SLACK{{"<b>Slack</b>
-        notifications"}}
-    OTHER{{"Other
-        notifications"}}
+    S1["Standalone Netdata 1"]
+    S2["Standalone Netdata 2"]
+    SN["Standalone Netdata N"]
+    EMAIL["Email notifications"]
+    SLACK["Slack notifications"]
+    OTHER["Other notifications"]
     S1 & S2 & SN .-> SLACK
     S1 & S2 & SN ---> EMAIL
     S1 & S2 & SN ==> OTHER
 ```
 
-### Configuration steps for standalone Netdata Agents without Netdata Cloud
+### Configuration Steps
 
-No special configuration needed.
+- Install Netdata Agents on each system.
+- Access each Agent individually via its URL (`http://agent-ip:19999`).
 
-- Install Netdata Agents on all your systems, then access each of them via its own unique URL, that looks like `http://agent-ip:19999/`.
+## Standalone Agents With Netdata Cloud
 
-## Standalone Agents, with Netdata Cloud
+Connecting Netdata Agents to Netdata Cloud enables centralized monitoring while keeping collected data on-premise.
 
-|                    Feature                    |                                                                              How it works                                                                               |
-|:---------------------------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-| Unified infrastructure dashboards for metrics |                                                 Yes, via Netdata Cloud, all charts aggregate metrics from all servers.                                                  |
-|  Unified infrastructure dashboards for logs   | All logs are accessible via the same dashboard at Netdata Cloud, although they are not unified (ie. logs from different servers are not multiplexed into a single view) |
-|          Centrally configured alerts          |                                                            No, each Netdata has its own alerts configuration                                                            |
-|   Centrally dispatched alert notifications    |                                                                         Yes, via Netdata Cloud                                                                          |
-|         Data are exclusively on-prem          |                                                 Yes, Netdata Cloud queries Netdata Agents to satisfy dashboard queries.                                                 |
+### Features
 
-By [connecting all Netdata Agents to Netdata Cloud](/src/claim/README.md), you can have a unified infrastructure view of all your nodes, with aggregated charts, without configuring [observability centralization points](/docs/observability-centralization-points/README.md).
+| Feature | Description |
+|---------|-------------|
+| **Infrastructure dashboards for metrics** | Yes, Netdata Cloud provides unified charts aggregating metrics from all systems. |
+| **Infrastructure dashboards for logs** | Logs from all agents are accessible in Netdata Cloud (though not merged into a single view). |
+| **Centralized alert configuration** | No, each Netdata Agent maintains its own alert settings. |
+| **Centralized alert notifications** | Yes, Netdata Cloud manages and dispatches notifications. |
+| **On-prem data retention** | Yes, Netdata Cloud queries Netdata Agents in real time. |
+
+Connecting Netdata Agents to Netdata Cloud enables a unified monitoring view without requiring additional infrastructure setup.
 
 ```mermaid
 flowchart LR
-    WEB[["One unified
-        dashboard
-        for all nodes"]]
-    NC(["<b>Netdata Cloud</b>
-        decides which Agents
-        need to be queried"])
-    S1["Standalone
-        Netdata
-         1"]
-    S2["Standalone
-        Netdata
-         2"]
-    SN["Standalone
-        Netdata
-         N"]
+    WEB["Unified Dashboard for All Nodes"]
+    NC["Netdata Cloud"]
+    S1["Standalone Netdata 1"]
+    S2["Standalone Netdata 2"]
+    SN["Standalone Netdata N"]
     WEB -->|queries| NC
     NC -->|queries| S1 & S2 & SN
 ```
 
-Similarly for alerts, Netdata Cloud receives all alert transitions from all Agents, decides which notifications should be sent and how, applies silencing rules, maintenance windows and based on each Netdata Cloud space and user settings, dispatches notifications:
+Alert notifications are managed centrally in Netdata Cloud:
 
 ```mermaid
 flowchart LR
-    EMAIL{{"<b>e-mail</b>
-        notifications"}}
-    MOBILEAPP{{"<b>Netdata Mobile App</b>
-        notifications"}}
-    SLACK{{"<b>Slack</b>
-        notifications"}}
-    OTHER{{"Other
-        notifications"}}
-    NC(["<b>Netdata Cloud</b>
-        applies silencing
-        & user settings"])
-    S1["Standalone
-        Netdata
-         1"]
-    S2["Standalone
-        Netdata
-         2"]
-    SN["Standalone
-        Netdata
-         N"]
+    EMAIL["Email notifications"]
+    MOBILEAPP["Netdata Mobile App notifications"]
+    SLACK["Slack notifications"]
+    OTHER["Other notifications"]
+    NC["Netdata Cloud"]
+    S1["Standalone Netdata 1"]
+    S2["Standalone Netdata 2"]
+    SN["Standalone Netdata N"]
     NC -->|notification| EMAIL & MOBILEAPP & SLACK & OTHER
     S1 & S2 & SN -->|alert transition| NC
 ```
 
-> **Note**
->
-> Alerts are still triggered by Netdata Agents. Netdata Cloud only takes care of the notifications.
+> **Note:** Alerts are still triggered by Netdata Agents. Netdata Cloud manages notifications.
 
-### Configuration steps for standalone Netdata Agents with Netdata Cloud
+### Configuration Steps
 
-- Install Netdata Agents using the commands given by Netdata Cloud so that they will be automatically connected to your Space. Otherwise, install Netdata Agents and connect them via the command line or their dashboard.
-
-- Optionally: disable their direct dashboard access to secure them.
-
-- Optionally: disable their alert notifications to avoid receiving email notifications directly from them (email notifications are automatically enabled when a working MTA is found on the systems Netdata Agents are installed).
+- Install Netdata Agents using the installation commands provided by Netdata Cloud to automatically link them to your Space.
+- Alternatively, install Netdata Agents manually and connect them via the command line or dashboard.
+- **Optional:** Disable direct dashboard access for security.
+- **Optional:** Disable individual agent notifications to prevent duplicate alerts (Netdata Agents send email alerts by default if an MTA is detected).
