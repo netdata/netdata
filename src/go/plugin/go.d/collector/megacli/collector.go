@@ -38,6 +38,7 @@ func New() *Collector {
 		adapters: make(map[string]bool),
 		drives:   make(map[string]bool),
 		bbu:      make(map[string]bool),
+		doBBU:    true,
 	}
 }
 
@@ -57,6 +58,7 @@ type Collector struct {
 	adapters map[string]bool
 	drives   map[string]bool
 	bbu      map[string]bool
+	doBBU    bool
 }
 
 func (c *Collector) Configuration() any {
