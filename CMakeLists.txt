@@ -739,6 +739,11 @@ endif()
 
 netdata_detect_protobuf()
 
+if(OS_LINUX)
+        include(NetdataDetectSystemd)
+        detect_systemd()
+endif()
+
 #
 # source files
 #
@@ -1275,8 +1280,6 @@ set(DAEMON_FILES
         src/daemon/status-file.h
         src/daemon/config/netdata-conf-ssl.c
         src/daemon/config/netdata-conf-ssl.h
-        src/daemon/daemon-systemd-watcher.c
-        src/daemon/daemon-systemd-watcher.h
         src/daemon/machine-guid.c
         src/daemon/machine-guid.h
         src/daemon/status-file-dedup.c
@@ -1284,6 +1287,15 @@ set(DAEMON_FILES
         src/daemon/status-file-io.c
         src/daemon/status-file-io.h
 )
+
+set(DAEMON_SYSTEMD_WATCHER_FILES
+    src/daemon/daemon-systemd-watcher.c
+    src/daemon/daemon-systemd-watcher.h
+)
+
+if(ENABLE_SYSTEMD_DBUS)
+        list(APPEND DAEMON_FILES ${DAEMON_SYSTEMD_WATCHER_FILES})
+endif()
 
 set(H2O_FILES
         src/web/server/h2o/http_server.c
@@ -2163,11 +2175,6 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 #
 # build libnetdata
 #
-
-if(OS_LINUX)
-        include(NetdataDetectSystemd)
-        detect_systemd()
-endif()
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
