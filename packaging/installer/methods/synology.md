@@ -3,7 +3,7 @@
 > This community-maintained guide may not reflect the latest changes.
 > Please verify the installation steps before proceeding.
 > 
-> Help improve this guide by [submitting a PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md) with your suggestions.
+> Help improve this guide by submitting a PR with your suggestions.
 > Thank you!
 
 The [one-line installation script](/packaging/installer/methods/kickstart.md) works on Synology NAS devices with amd64 architecture. The script installs Netdata to `/opt/netdata/`.
