@@ -172,16 +172,16 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
 
     // Attempt to retrieve GUID from daemon status file.
     h = daemon_status_file_get_host_id();
-    if (UUIDiszero(h.uuid)) {
+    uuid_unparse_lower(h.uuid.uuid, h.txt);
+    if (UUIDiszero(h.uuid) || machine_guid_check_blacklisted(h.txt)) {
         // If the status file does not contain a GUID, generate a new one.
         nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: generating a new GUID");
         uuid_generate(h.uuid.uuid);
+        uuid_unparse_lower(h.uuid.uuid, h.txt);
     }
     else
         nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: got previous GUID from daemon status file");
 
-    // Ensure the text representation is updated.
-    uuid_unparse_lower(h.uuid.uuid, h.txt);
     h.last_modified_ut = now_realtime_usec();
     nd_machine_guid = h;
 
