@@ -228,7 +228,12 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         if(ds->v >= 18) {
             char buf[UINT64_HEX_MAX_LENGTH];
-            print_uint64_hex(buf, ds->fatal.fault_address);
+
+            if(ds->fatal.signal_code)
+                print_uint64_hex(buf, ds->fatal.fault_address);
+            else
+                buf[0] = '\0';
+
             buffer_json_member_add_string(wb, "fault_address", buf);
         }
 
@@ -412,7 +417,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
             char buf[UINT64_HEX_MAX_LENGTH];
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
-            ds->fatal.fault_address = str2ull_encoded(buf);
+            if(buf[0])
+                ds->fatal.fault_address = str2ull_encoded(buf);
+            else
+                ds->fatal.fault_address = 0;
         }
 
         if(version >= 23)
