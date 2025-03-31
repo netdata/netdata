@@ -20,6 +20,13 @@ static bool machine_guid_check_blacklisted(const char *guid) {
         }
     }
 
+    // GitHub runners leaked their machine GUIDs in the wild.
+    if(strstr(guid, "-11f0-") != NULL &&
+        strstr(guid, "-0242ac110002") != NULL) {
+        nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: blacklisted machine GUID '%s' from GitHub runner found, generating new one.", guid);
+        return true;
+    }
+
     return false;
 }
 
