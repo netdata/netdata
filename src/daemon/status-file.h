@@ -48,6 +48,7 @@ typedef struct daemon_status_file {
     time_t uptime;              // netdata uptime
     usec_t timestamp_ut;        // the timestamp of the status file
     size_t restarts;            // the number of times this agent has restarted (ever)
+    size_t crashes;             // the number of times this agent has crashed (ever)
     size_t posts;               // the number of posts to the backend
     ssize_t reliability;        // consecutive restarts: > 0 reliable, < 0 crashing
 
