@@ -1,0 +1,16 @@
+[Unit]
+Description=Netdata Agent Events
+After=network.target
+
+[Service]
+Type=simple
+User=nobody
+Group=nogroup
+LogNamespace=agent-events
+ExecStart=/opt/agent-events/run.sh
+Restart=always
+RestartSec=3
+StartLimitInterval=0
+
+[Install]
+WantedBy=multi-user.target
