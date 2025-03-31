@@ -536,7 +536,11 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
-    session_status.cloud_status = cloud_status();
+
+    // we keep the highest cloud status, to know how the agent gets connected to netdata.cloud
+    CLOUD_STATUS cs = cloud_status();
+    if(cs > session_status.cloud_status || cs == CLOUD_STATUS_BANNED)
+        session_status.cloud_status = cs;
 
     session_status.oom_protection = dbengine_out_of_memory_protection;
     session_status.netdata_max_rss = process_max_rss();
