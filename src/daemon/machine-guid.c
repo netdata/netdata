@@ -168,7 +168,7 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
     if (UUIDiszero(h.uuid)) {
         // If the status file does not contain a GUID, generate a new one.
         nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: generating a new GUID");
-        uuid_generate_time(h.uuid.uuid);
+        uuid_generate(h.uuid.uuid);
     }
     else
         nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: got previous GUID from daemon status file");
