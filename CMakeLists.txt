@@ -1704,7 +1704,6 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal.c
         src/collectors/systemd-journal.plugin/systemd-internals.h
         src/collectors/systemd-journal.plugin/systemd-main.c
-        src/collectors/systemd-journal.plugin/systemd-units.c
         src/collectors/systemd-journal.plugin/systemd-journal.c
         src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
         src/collectors/systemd-journal.plugin/systemd-journal-files.c
@@ -1714,6 +1713,10 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/libnetdata/os/system-maps/system-services.h
         src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
 )
+
+if(ENABLE_SYSTEMD_DBUS)
+        list(APPEND SYSTEMD_JOURNAL_PLUGIN_FILES src/collectors/systemd-journal.plugin/systemd-units.c)
+endif()
 
 set(STREAMING_PLUGIN_FILES
         src/streaming/stream.h
