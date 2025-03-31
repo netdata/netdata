@@ -13,10 +13,12 @@ static struct completion shutdown_begin_completion;
 static struct completion shutdown_end_completion;
 static ND_THREAD *watcher_thread;
 
+static BUFFER *steps_timings = NULL;
+
 NEVER_INLINE
 static void shutdown_timed_out(void) {
     // keep this as a separate function, to have it logged like this in sentry
-    daemon_status_file_shutdown_timeout();
+    daemon_status_file_shutdown_timeout(steps_timings);
 #ifdef ENABLE_SENTRY
     nd_sentry_add_shutdown_timeout_as_breadcrumb();
 #endif
@@ -37,6 +39,11 @@ void watcher_step_complete(watcher_step_id_t step_id) {
 
 static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdown_start_time)
 {
+    if(!steps_timings) {
+        steps_timings = buffer_create(0, NULL);
+        buffer_strcat(steps_timings, "# shutdown steps timings");
+    }
+
     usec_t step_start_time = now_monotonic_usec();
     usec_t step_start_duration = step_start_time - shutdown_start_time;
 
@@ -71,6 +78,8 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
     duration_snprintf(
         step_duration_txt, sizeof(step_duration_txt), (int64_t)(step_duration), "us", true);
 
+    buffer_sprintf(steps_timings, "\n#%u '%s': %s", step_id + 1, watcher_steps[step_id].msg, step_duration_txt);
+
     if (ok) {
         netdata_log_info("shutdown step: [%d/%d] - {at %s} finished '%s' in %s",
                          (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
@@ -94,7 +103,6 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
                 watcher_steps[step_id].msg, step_duration_txt);
 #endif
 
-        daemon_status_file_shutdown_step("sentry timeout");
         shutdown_timed_out();
     }
 }

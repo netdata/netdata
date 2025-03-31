@@ -48,6 +48,7 @@ typedef struct daemon_status_file {
     time_t uptime;              // netdata uptime
     usec_t timestamp_ut;        // the timestamp of the status file
     size_t restarts;            // the number of times this agent has restarted (ever)
+    size_t crashes;             // the number of times this agent has crashed (ever)
     size_t posts;               // the number of posts to the backend
     ssize_t reliability;        // consecutive restarts: > 0 reliable, < 0 crashing
 
@@ -123,7 +124,7 @@ bool daemon_status_file_was_incomplete_shutdown(void);
 
 void daemon_status_file_startup_step(const char *step);
 void daemon_status_file_shutdown_step(const char *step);
-void daemon_status_file_shutdown_timeout(void);
+void daemon_status_file_shutdown_timeout(BUFFER *trace);
 
 void daemon_status_file_init(void);
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
