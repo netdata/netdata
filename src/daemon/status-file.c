@@ -228,7 +228,12 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         if(ds->v >= 18) {
             char buf[UINT64_HEX_MAX_LENGTH];
-            print_uint64_hex(buf, ds->fatal.fault_address);
+
+            if(ds->fatal.signal_code)
+                print_uint64_hex(buf, ds->fatal.fault_address);
+            else
+                buf[0] = '\0';
+
             buffer_json_member_add_string(wb, "fault_address", buf);
         }
 
@@ -412,7 +417,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
             char buf[UINT64_HEX_MAX_LENGTH];
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
-            ds->fatal.fault_address = str2ull_encoded(buf);
+            if(buf[0])
+                ds->fatal.fault_address = str2ull_encoded(buf);
+            else
+                ds->fatal.fault_address = 0;
         }
 
         if(version >= 23)
@@ -536,7 +544,16 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
-    session_status.cloud_status = cloud_status();
+
+    // we keep the highest cloud status, to know how the agent gets connected to netdata.cloud
+    CLOUD_STATUS cs = cloud_status();
+    if(!session_status.cloud_status ||                              // it is ok to overwrite this
+        session_status.cloud_status == CLOUD_STATUS_AVAILABLE ||    // it is ok to overwrite this
+        session_status.cloud_status == CLOUD_STATUS_OFFLINE ||      // it is ok to overwrite this
+        cs == CLOUD_STATUS_BANNED ||                                // this is a final state
+        cs == CLOUD_STATUS_ONLINE ||                                // this is a final state
+        cs == CLOUD_STATUS_INDIRECT)                                // this is a final state
+        session_status.cloud_status = cs;
 
     session_status.oom_protection = dbengine_out_of_memory_protection;
     session_status.netdata_max_rss = process_max_rss();
