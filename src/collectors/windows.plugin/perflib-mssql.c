@@ -8,6 +8,7 @@
 #define NETDATA_MAX_INSTANCE_OBJECT 128
 
 BOOL is_sqlexpress = FALSE;
+BOOL is_connected = FALSE;
 static struct netdata_mssql_conn {
     const char *hostname;
     const char *username;
@@ -1441,7 +1442,7 @@ void netdata_mount_mssql_connection_string(char *conn, size_t length, struct net
     snprintfz(
         conn,
         length,
-        "DRIVER={SQL Server};SERVER=%s, %d;DATABASE=master;UID=%s;PWD=%s;",
+        "driver=[SQL Server];server=%s,%d;database=master;UID=%s;PWD=%s;",
         dbInput->hostname,
         dbInput->port,
         dbInput->username,
@@ -1471,7 +1472,9 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
+    is_connected = (BOOL) ~(netdata_start_MSSQL_connection(connctionString));
     dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_charts_cb, &update_every);
+    netdata_close_MSSQL_connection();
 
     return 0;
 }

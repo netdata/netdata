@@ -14,7 +14,8 @@
 void *win_plugin_main(void *ptr);
 
 void netdata_initialize_MSSQL_env();
-int netdata_start_MSSQL_connection();
+int netdata_start_MSSQL_connection(char *dbconnstr);
+void netdata_close_MSSQL_connection();
 
 extern char windows_shared_buffer[8192];
 
