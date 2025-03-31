@@ -9,8 +9,36 @@ static bool machine_guid_check_blacklisted(const char *guid) {
     // new ones.
 
     static char *blacklisted[] = {
+        // Third party packaging problems
         "8a795b0c-2311-11e6-8563-000c295076a6",
         "4aed1458-1c3e-11e6-a53f-000c290fc8f5",
+
+        // GitHub runner problems
+        "a177c1dc-09d9-11f0-a920-0242ac110002",
+        "983624e2-09d9-11f0-b90c-0242ac110002",
+        "477f97ae-09d9-11f0-903d-0242ac110002",
+        "ded81380-09e1-11f0-ae4c-0242ac110002",
+        "9abc69ec-09d9-11f0-a8a4-0242ac110002",
+        "68a2d17a-0aa2-11f0-97f3-0242ac110002",
+        "6499dbbe-0aa2-11f0-9ccd-0242ac110002",
+        "a9708cba-0aa2-11f0-98b6-0242ac110002",
+        "26903986-0aab-11f0-818e-0242ac110002",
+        "ab576242-0aa2-11f0-89c3-0242ac110002",
+        "eab387c6-0b6b-11f0-b715-0242ac110002",
+        "eaee7dfe-0b6b-11f0-870f-0242ac110002",
+        "c7d4e6b4-0b6b-11f0-878c-0242ac110002",
+        "40ac6d48-0b74-11f0-9cf4-0242ac110002",
+        "e366fc5a-0b6b-11f0-bd77-0242ac110002",
+        "c5955806-0c34-11f0-a302-0242ac110002",
+        "1d4d05d0-0c35-11f0-a01d-0242ac110002",
+        "edfc72b0-0c35-11f0-8e50-0242ac110002",
+        "536a030e-0c3d-11f0-837b-0242ac110002",
+        "10846e2e-0c35-11f0-8422-0242ac110002",
+        "4339f742-0dc7-11f0-838c-0242ac110002",
+        "3f28d7e0-0dc7-11f0-b75f-0242ac110002",
+        "41815788-0dc7-11f0-88e0-0242ac110002",
+        "104b408a-0dd0-11f0-8ca5-0242ac110002",
+        "8e45bc30-0dc7-11f0-8e50-0242ac110002",
     };
 
     for(size_t i = 0; i < _countof(blacklisted); i++) {
@@ -18,13 +46,6 @@ static bool machine_guid_check_blacklisted(const char *guid) {
             nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: blacklisted machine GUID '%s' found, generating new one.", guid);
             return true;
         }
-    }
-
-    // GitHub runners leaked their machine GUIDs in the wild.
-    if(strstr(guid, "-11f0-") != NULL &&
-        strstr(guid, "-0242ac110002") != NULL) {
-        nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: blacklisted machine GUID '%s' from GitHub runner found, generating new one.", guid);
-        return true;
     }
 
     return false;
