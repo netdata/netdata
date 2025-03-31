@@ -686,8 +686,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             last_collected_total += rd->collector.last_collected_value;
             collected_total += rd->collector.collected_value;
 
-            if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
-                netdata_log_error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
+            if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED))) {
+                netdata_log_error("Dimension %s in chart '%s' has the OBSOLETE or ARCHIVED flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
                 rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
             }
         }
