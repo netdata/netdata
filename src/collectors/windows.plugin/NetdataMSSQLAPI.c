@@ -9,14 +9,13 @@
 #include <sql.h>
 #include <sqlext.h>
 
+// We are keeping this static, beccause the current design does not expect we use SQL
 static SQLHENV netdataEnv = NULL;
 static SQLHDBC netdataDBC = NULL;
 
-static void netdata_cleanup_MSSQL_variables() {
-    if (netdataDBC) {
-        SQLDisconnect(netdataDBC);
-        SQLFreeHandle(SQL_HANDLE_DBC, netdataDBC);
-    }
+static void netdata_cleanup_MSSQL_variables()
+{
+    netdata_close_MSSQL_connection();
 
     SQLFreeHandle(SQL_HANDLE_ENV, netdataEnv);
     netdataEnv = NULL;
@@ -45,9 +44,9 @@ endMSSQLEnv:
     netdata_cleanup_MSSQL_variables();
 }
 
-int netdata_start_MSSQL_connection()
+int netdata_start_MSSQL_connection(char *dbconnstr)
 {
-    if (!netdataEnv || !netdataDBC)
+    if (!netdataEnv)
         return -1;
 
     // Allocate the connection
@@ -56,9 +55,26 @@ int netdata_start_MSSQL_connection()
         goto endConnection;
     }
 
+    SQLSetConnectAttr(netdataDBC, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
+
+    if (SQLDriverConnect(netdataDBC, NULL, (SQLCHAR *)dbconnstr, SQL_NTS, NULL, 0, NULL, SQL_DRIVER_NOPROMPT) != SQL_SUCCESS) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to the server");
+        goto endConnection;
+    }
+
     return 0;
 endConnection:
     netdata_cleanup_MSSQL_variables();
 
     return -1;
+}
+
+void netdata_close_MSSQL_connection()
+{
+    // TODO: Add keep alive message and option
+    if (netdataDBC) {
+        SQLDisconnect(netdataDBC);
+        SQLFreeHandle(SQL_HANDLE_DBC, netdataDBC);
+        netdataDBC = NULL;
+    }
 }
