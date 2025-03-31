@@ -112,6 +112,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
         buffer_json_member_add_uint64(wb, "restarts", ds->restarts);
 
+        if(ds->v >= 24)
+            buffer_json_member_add_uint64(wb, "crashes", ds->crashes);
+
         if(ds->v >= 22) {
             buffer_json_member_add_uint64(wb, "posts", ds->posts);
             buffer_json_member_add_string(wb, "aclk", CLOUD_STATUS_2str(ds->cloud_status));
@@ -316,6 +319,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 4)
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, restarts_key, ds->restarts, error, required_v4);
 
+        if(version >= 24)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "crashes", ds->crashes, error, required_v24);
+
         if(version >= 22) {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "posts", ds->posts, error, required_v22);
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "aclk", CLOUD_STATUS_2id, ds->cloud_status, error, required_v22);
@@ -492,9 +498,11 @@ static void daemon_status_file_migrate_once(void) {
 
     session_status.posts = last_session_status.posts;
     session_status.restarts = last_session_status.restarts + 1;
+    session_status.crashes = last_session_status.crashes;
     session_status.reliability = last_session_status.reliability;
 
     if(daemon_status_file_has_last_crashed(&last_session_status))  {
+        session_status.crashes++;
         if(session_status.reliability > 0) session_status.reliability = 0;
         session_status.reliability--;
     }
@@ -1228,7 +1236,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
 static SPINLOCK shutdown_timeout_spinlock = SPINLOCK_INITIALIZER;
 
-void daemon_status_file_shutdown_timeout(void) {
+void daemon_status_file_shutdown_timeout(BUFFER *trace) {
     FUNCTION_RUN_ONCE();
 
     spinlock_lock(&shutdown_timeout_spinlock);
@@ -1236,6 +1244,8 @@ void daemon_status_file_shutdown_timeout(void) {
     dsf_acquire(session_status);
     exit_initiated_add(EXIT_REASON_SHUTDOWN_TIMEOUT);
     session_status.exit_reason |= EXIT_REASON_SHUTDOWN_TIMEOUT;
+    if(trace && buffer_strlen(trace) && stack_trace_is_empty(&session_status))
+        strncpyz(session_status.fatal.stack_trace, buffer_tostring(trace), sizeof(session_status.fatal.stack_trace) - 1);
     dsf_release(session_status);
 
     strncpyz(session_status.fatal.function, "shutdown_timeout", sizeof(session_status.fatal.function) - 1);
