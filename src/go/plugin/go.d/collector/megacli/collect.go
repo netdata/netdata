@@ -15,8 +15,12 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if err := c.collectPhysDrives(mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectBBU(mx); err != nil {
-		return nil, err
+
+	if c.doBBU {
+		if err := c.collectBBU(mx); err != nil {
+			c.doBBU = false
+			c.Warningf("BBU collection failed, disabling it: %v", err)
+		}
 	}
 
 	return mx, nil

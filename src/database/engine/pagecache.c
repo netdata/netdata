@@ -514,11 +514,20 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_i
             continue;
 
         time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
+        size_t journal_v2_file_size = datafile->journalfile->mmap.size;
 
         // the datafile possibly contains useful data for this query
 
         size_t journal_metric_count = (size_t)j2_header->metric_count;
         struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
+        size_t metric_offset = (uint8_t *) uuid_list - (uint8_t *) j2_header;
+        if (metric_offset >= journal_v2_file_size) {
+            nd_log_limit_static_thread_var(erl, 60, 0);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Invalid metric list header in journalfile %u of tier %u", datafile->fileno, datafile->tier);
+            journalfile_v2_data_release(datafile->journalfile);
+            continue;
+        }
+
         struct journal_metric_list *uuid_entry = bsearch(uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
 
         if (unlikely(!uuid_entry)) {
@@ -528,6 +537,14 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_i
         }
 
         struct journal_page_header *page_list_header = (struct journal_page_header *) ((uint8_t *) j2_header + uuid_entry->page_offset);
+        size_t page_offset = (uint8_t *) page_list_header - (uint8_t *) j2_header;
+        if (page_offset >= journal_v2_file_size) {
+            nd_log_limit_static_thread_var(erl, 60, 0);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Invalid page list header in journalfile %u of tier %u", datafile->fileno, datafile->tier);
+            journalfile_v2_data_release(datafile->journalfile);
+            continue;
+        }
+
         struct journal_page_list *page_list = (struct journal_page_list *)((uint8_t *) page_list_header + sizeof(*page_list_header));
         struct journal_extent_list *extent_list = (void *)((uint8_t *)j2_header + j2_header->extent_offset);
         uint32_t extent_entries = j2_header->extent_count;

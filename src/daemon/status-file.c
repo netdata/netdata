@@ -112,6 +112,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
         buffer_json_member_add_uint64(wb, "restarts", ds->restarts);
 
+        if(ds->v >= 24)
+            buffer_json_member_add_uint64(wb, "crashes", ds->crashes);
+
         if(ds->v >= 22) {
             buffer_json_member_add_uint64(wb, "posts", ds->posts);
             buffer_json_member_add_string(wb, "aclk", CLOUD_STATUS_2str(ds->cloud_status));
@@ -228,7 +231,12 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         if(ds->v >= 18) {
             char buf[UINT64_HEX_MAX_LENGTH];
-            print_uint64_hex(buf, ds->fatal.fault_address);
+
+            if(ds->fatal.signal_code)
+                print_uint64_hex(buf, ds->fatal.fault_address);
+            else
+                buf[0] = '\0';
+
             buffer_json_member_add_string(wb, "fault_address", buf);
         }
 
@@ -310,6 +318,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
         if(version >= 4)
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, restarts_key, ds->restarts, error, required_v4);
+
+        if(version >= 24)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "crashes", ds->crashes, error, required_v24);
 
         if(version >= 22) {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "posts", ds->posts, error, required_v22);
@@ -412,7 +423,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
             char buf[UINT64_HEX_MAX_LENGTH];
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
-            ds->fatal.fault_address = str2ull_encoded(buf);
+            if(buf[0])
+                ds->fatal.fault_address = str2ull_encoded(buf);
+            else
+                ds->fatal.fault_address = 0;
         }
 
         if(version >= 23)
@@ -461,13 +475,7 @@ static void daemon_status_file_migrate_once(void) {
 
     session_status.claim_id = last_session_status.claim_id;
     session_status.node_id = last_session_status.node_id;
-    session_status.host_id = last_session_status.host_id;
-    if(UUIDiszero(session_status.host_id.uuid)) {
-        if(!UUIDiszero(last_session_status.host_id.uuid))
-            session_status.host_id = last_session_status.host_id;
-        else
-            session_status.host_id = *machine_guid_get();
-    }
+    session_status.host_id = *machine_guid_get();
 
     strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
     strncpyz(session_status.virtualization, last_session_status.virtualization, sizeof(session_status.virtualization) - 1);
@@ -484,9 +492,11 @@ static void daemon_status_file_migrate_once(void) {
 
     session_status.posts = last_session_status.posts;
     session_status.restarts = last_session_status.restarts + 1;
+    session_status.crashes = last_session_status.crashes;
     session_status.reliability = last_session_status.reliability;
 
     if(daemon_status_file_has_last_crashed(&last_session_status))  {
+        session_status.crashes++;
         if(session_status.reliability > 0) session_status.reliability = 0;
         session_status.reliability--;
     }
@@ -536,7 +546,16 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
-    session_status.cloud_status = cloud_status();
+
+    // we keep the highest cloud status, to know how the agent gets connected to netdata.cloud
+    CLOUD_STATUS cs = cloud_status();
+    if(!session_status.cloud_status ||                              // it is ok to overwrite this
+        session_status.cloud_status == CLOUD_STATUS_AVAILABLE ||    // it is ok to overwrite this
+        session_status.cloud_status == CLOUD_STATUS_OFFLINE ||      // it is ok to overwrite this
+        cs == CLOUD_STATUS_BANNED ||                                // this is a final state
+        cs == CLOUD_STATUS_ONLINE ||                                // this is a final state
+        cs == CLOUD_STATUS_INDIRECT)                                // this is a final state
+        session_status.cloud_status = cs;
 
     session_status.oom_protection = dbengine_out_of_memory_protection;
     session_status.netdata_max_rss = process_max_rss();
@@ -1211,7 +1230,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
 static SPINLOCK shutdown_timeout_spinlock = SPINLOCK_INITIALIZER;
 
-void daemon_status_file_shutdown_timeout(void) {
+void daemon_status_file_shutdown_timeout(BUFFER *trace) {
     FUNCTION_RUN_ONCE();
 
     spinlock_lock(&shutdown_timeout_spinlock);
@@ -1219,6 +1238,8 @@ void daemon_status_file_shutdown_timeout(void) {
     dsf_acquire(session_status);
     exit_initiated_add(EXIT_REASON_SHUTDOWN_TIMEOUT);
     session_status.exit_reason |= EXIT_REASON_SHUTDOWN_TIMEOUT;
+    if(trace && buffer_strlen(trace) && stack_trace_is_empty(&session_status))
+        strncpyz(session_status.fatal.stack_trace, buffer_tostring(trace), sizeof(session_status.fatal.stack_trace) - 1);
     dsf_release(session_status);
 
     strncpyz(session_status.fatal.function, "shutdown_timeout", sizeof(session_status.fatal.function) - 1);
@@ -1373,10 +1394,7 @@ ssize_t daemon_status_file_get_reliability(void) {
 }
 
 ND_MACHINE_GUID daemon_status_file_get_host_id(void) {
-    if(!UUIDiszero(session_status.host_id.uuid))
-        return session_status.host_id;
-    else
-        return last_session_status.host_id;
+    return last_session_status.host_id;
 }
 
 size_t daemon_status_file_get_fatal_worker_job_id(void) {

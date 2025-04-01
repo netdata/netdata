@@ -179,6 +179,8 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     string_freez(st->module_name);
 
     freez(st->exporting_flags);
+
+    memset(st, 0, sizeof(RRDSET));
 }
 
 // the item to be inserted, is already in the dictionary
