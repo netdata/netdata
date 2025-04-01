@@ -5,8 +5,8 @@
 #ifdef ENABLE_SYSTEMD_DBUS
 #include <systemd/sd-bus.h>
 
-#define SYSTEMD_UNITS_MAX_PARAMS 10
-#define SYSTEMD_UNITS_DBUS_TYPES "(ssssssouso)"
+#define ND_SD_UNITS_MAX_PARAMS 10
+#define ND_SD_UNITS_DBUS_TYPES "(ssssssouso)"
 
 // ----------------------------------------------------------------------------
 // copied from systemd: string-table.h
@@ -677,7 +677,7 @@ static void update_freezer_state(UnitInfo *u, UnitAttribute *ua) {
 // common helpers
 
 static void log_dbus_error(int r, const char *msg) {
-    netdata_log_error("SYSTEMD_UNITS: %s failed with error %d (%s)", msg, r, strerror(-r));
+    netdata_log_error("ND_SD_UNITS: %s failed with error %d (%s)", msg, r, strerror(-r));
 }
 
 // ----------------------------------------------------------------------------
@@ -922,7 +922,7 @@ static int bus_parse_unit_info(sd_bus_message *message, UnitInfo *u) {
 
     int r = sd_bus_message_read(
             message,
-            SYSTEMD_UNITS_DBUS_TYPES,
+            ND_SD_UNITS_DBUS_TYPES,
             &u->id,
             &u->description,
             &u->load_state,
@@ -1056,7 +1056,7 @@ static UnitInfo *systemd_units_get_all(void) {
         return base;
     }
 
-    r = sd_bus_message_enter_container(reply, SD_BUS_TYPE_ARRAY, SYSTEMD_UNITS_DBUS_TYPES);
+    r = sd_bus_message_enter_container(reply, SD_BUS_TYPE_ARRAY, ND_SD_UNITS_DBUS_TYPES);
     if (r < 0) {
         log_dbus_error(r, "sd_bus_message_enter_container()");
         return base;
@@ -1146,8 +1146,8 @@ static void netdata_systemd_units_function_help(const char *transaction) {
             "      When `info` is requested, all other parameters are ignored.\n"
             "\n"
             , program_name
-            , SYSTEMD_UNITS_FUNCTION_NAME
-            , SYSTEMD_UNITS_FUNCTION_DESCRIPTION
+            , ND_SD_UNITS_FUNCTION_NAME
+            , ND_SD_UNITS_FUNCTION_DESCRIPTION
     );
 
     netdata_mutex_lock(&stdout_mutex);
@@ -1166,7 +1166,7 @@ static void netdata_systemd_units_function_info(const char *transaction) {
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
-    buffer_json_member_add_string(wb, "help", SYSTEMD_UNITS_FUNCTION_DESCRIPTION);
+    buffer_json_member_add_string(wb, "help", ND_SD_UNITS_FUNCTION_DESCRIPTION);
 
     buffer_json_finalize(wb);
     netdata_mutex_lock(&stdout_mutex);
@@ -1604,9 +1604,9 @@ void function_systemd_units(const char *transaction, char *function,
                             usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                             BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
                             const char *source __maybe_unused, void *data __maybe_unused) {
-    char *words[SYSTEMD_UNITS_MAX_PARAMS] = { NULL };
-    size_t num_words = quoted_strings_splitter_whitespace(function, words, SYSTEMD_UNITS_MAX_PARAMS);
-    for(int i = 1; i < SYSTEMD_UNITS_MAX_PARAMS ;i++) {
+    char *words[ND_SD_UNITS_MAX_PARAMS] = { NULL };
+    size_t num_words = quoted_strings_splitter_whitespace(function, words, ND_SD_UNITS_MAX_PARAMS);
+    for(int i = 1; i < ND_SD_UNITS_MAX_PARAMS ;i++) {
         char *keyword = get_word(words, num_words, i);
         if(!keyword) break;
 
@@ -1629,7 +1629,7 @@ void function_systemd_units(const char *transaction, char *function,
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 10);
-    buffer_json_member_add_string(wb, "help", SYSTEMD_UNITS_FUNCTION_DESCRIPTION);
+    buffer_json_member_add_string(wb, "help", ND_SD_UNITS_FUNCTION_DESCRIPTION);
     buffer_json_member_add_array(wb, "data");
 
     size_t count[_UNIT_ATTRIBUTE_MAX] = { 0 };

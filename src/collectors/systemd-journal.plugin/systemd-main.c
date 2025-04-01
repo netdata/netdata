@@ -84,9 +84,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
 #ifdef ENABLE_SYSTEMD_DBUS
     functions_evloop_add_function(wg,
-                                  SYSTEMD_UNITS_FUNCTION_NAME,
+                                  ND_SD_UNITS_FUNCTION_NAME,
                                   function_systemd_units,
-                                  SYSTEMD_UNITS_DEFAULT_TIMEOUT,
+                                  ND_SD_UNITS_DEFAULT_TIMEOUT,
                                   NULL);
 #endif
 
@@ -104,7 +104,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
 #ifdef ENABLE_SYSTEMD_DBUS
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
-            SYSTEMD_UNITS_FUNCTION_NAME, SYSTEMD_UNITS_DEFAULT_TIMEOUT, SYSTEMD_UNITS_FUNCTION_DESCRIPTION,
+            ND_SD_UNITS_FUNCTION_NAME, ND_SD_UNITS_DEFAULT_TIMEOUT, ND_SD_UNITS_FUNCTION_DESCRIPTION,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
             RRDFUNCTIONS_PRIORITY_DEFAULT);
 #endif

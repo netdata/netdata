@@ -17,9 +17,9 @@
 #define ND_SD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS 250
 #define ND_SD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
 
-#define SYSTEMD_UNITS_FUNCTION_DESCRIPTION      "View the status of systemd units"
-#define SYSTEMD_UNITS_FUNCTION_NAME              "systemd-list-units"
-#define SYSTEMD_UNITS_DEFAULT_TIMEOUT            30
+#define ND_SD_UNITS_FUNCTION_DESCRIPTION      "View the status of systemd units"
+#define ND_SD_UNITS_FUNCTION_NAME              "systemd-list-units"
+#define ND_SD_UNITS_DEFAULT_TIMEOUT            30
 
 extern __thread size_t fstat_thread_calls;
 extern __thread size_t fstat_thread_cached_responses;
