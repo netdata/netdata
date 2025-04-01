@@ -1,7 +1,16 @@
 # Machine Learning and Anomaly Detection
 
-Netdata provides advanced Machine Learning features to help you identify and troubleshoot anomalies and unexpected behavior in your infrastructure before they become critical issues:
+Netdata includes advanced Machine Learning capabilities to help you detect and resolve anomalies in your infrastructure before they escalate into critical issues. These features provide real-time insights and proactive monitoring to improve system reliability.
 
-- K-means clustering [Machine Learning models](/src/ml/README.md) are trained to power the [Anomaly Advisor](/docs/dashboards-and-charts/anomaly-advisor-tab.md) on the dashboard, which allows you to identify Anomalies in your infrastructure.
-- [Metric Correlations](/docs/metric-correlations.md) are possible through the dashboard using the [Two-sample Kolmogorov Smirnov](https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Two-sample_Kolmogorov%E2%80%93Smirnov_test) statistical test and Volume heuristic measures.
-- The [Netdata Assistant](/docs/netdata-assistant.md) is able to answer your prompts when it comes to troubleshooting Alerts and Anomalies.
+## Key Features
+
+### Anomaly Detection with K-Means Clustering
+Netdata trains K-means clustering models to detect anomalies in your infrastructure. These models power the [Anomaly Advisor](/docs/dashboards-and-charts/anomaly-advisor-tab.md), which visually highlights anomalies on the dashboard, allowing you to quickly identify and investigate unexpected behavior.
+
+### Metric Correlations
+Netdata enables metric correlation analysis through the dashboard. This feature uses the [Two-sample Kolmogorov-Smirnov test](https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Two-sample_Kolmogorov%E2%80%93Smirnov_test) and volume heuristic measures to help you understand relationships between different metrics and identify potential causes of anomalies.
+
+### Netdata Assistant for Troubleshooting
+The [Netdata Assistant](/docs/netdata-assistant.md) provides AI-driven assistance for troubleshooting alerts and anomalies. You can interact with it directly to get explanations, recommendations, and next steps based on detected anomalies and system behavior.
+
+These Machine Learning features enhance observability and streamline incident response, helping you maintain system health with greater efficiency.
