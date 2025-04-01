@@ -7,6 +7,11 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/Modules")
 include(NetdataVersion)
 netdata_version()
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(ENV{CMAKE_BUILD_TYPE} "RelWithDebInfo")
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+endif()
+
 project(netdata
         VERSION "${NETDATA_VERSION_MAJOR}.${NETDATA_VERSION_MINOR}.${NETDATA_VERSION_PATCH}.${NETDATA_VERSION_TWEAK}"
         HOMEPAGE_URL "https://www.netdata.cloud"
@@ -49,10 +54,6 @@ set(CMAKE_C_STANDARD_REQUIRED On)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 
 set(SIZEOF_VOID_P ${CMAKE_SIZEOF_VOID_P})
-
-if(NOT CMAKE_BUILD_TYPE)
-        set(CMAKE_BUILD_TYPE "Release")
-endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
@@ -213,7 +214,10 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
-option(ENABLE_LIBUNWIND "Include stack traces in log output" False)
+cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
+mark_as_advanced(ENABLE_LIBBACKTRACE)
+cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
+mark_as_advanced(ENABLE_LIBUNWIND)
 
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
@@ -389,6 +393,7 @@ endif()
 
 include(NetdataJSONC)
 include(NetdataYAML)
+include(NetdataBacktrace)
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         include(NetdataEBPFLegacy)
@@ -494,6 +499,10 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
     add_link_options(-rdynamic)
     message(STATUS "Added compiler and linker flags for better stack trace support")
+endif()
+
+if(ENABLE_LIBBACKTRACE)
+    netdata_bundle_libbacktrace()
 endif()
 
 #
@@ -729,6 +738,11 @@ else()
 endif()
 
 netdata_detect_protobuf()
+
+if(OS_LINUX)
+        include(NetdataDetectSystemd)
+        detect_systemd()
+endif()
 
 #
 # source files
@@ -1262,13 +1276,26 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-db-dbengine-retention.h
         src/daemon/pulse/pulse-parents.c
         src/daemon/pulse/pulse-parents.h
-        src/daemon/daemon-status-file.c
-        src/daemon/daemon-status-file.h
+        src/daemon/status-file.c
+        src/daemon/status-file.h
         src/daemon/config/netdata-conf-ssl.c
         src/daemon/config/netdata-conf-ssl.h
-        src/daemon/daemon-systemd-watcher.c
-        src/daemon/daemon-systemd-watcher.h
+        src/daemon/machine-guid.c
+        src/daemon/machine-guid.h
+        src/daemon/status-file-dedup.c
+        src/daemon/status-file-dedup.h
+        src/daemon/status-file-io.c
+        src/daemon/status-file-io.h
 )
+
+set(DAEMON_SYSTEMD_WATCHER_FILES
+    src/daemon/daemon-systemd-watcher.c
+    src/daemon/daemon-systemd-watcher.h
+)
+
+if(ENABLE_SYSTEMD_DBUS)
+        list(APPEND DAEMON_FILES ${DAEMON_SYSTEMD_WATCHER_FILES})
+endif()
 
 set(H2O_FILES
         src/web/server/h2o/http_server.c
@@ -1641,8 +1668,11 @@ if(ENABLE_DBENGINE)
             src/database/engine/page.h
             src/database/engine/cache.c
             src/database/engine/cache.h
-            src/database/engine/metric.c
-            src/database/engine/metric.h
+            src/database/engine/mrg.c
+            src/database/engine/mrg.h
+            src/database/engine/mrg-internals.h
+            src/database/engine/mrg-unittest.c
+            src/database/engine/mrg-load.c
             src/database/engine/pdc.c
             src/database/engine/pdc.h
             src/database/engine/dbengine-unittest.c
@@ -1674,7 +1704,6 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal.c
         src/collectors/systemd-journal.plugin/systemd-internals.h
         src/collectors/systemd-journal.plugin/systemd-main.c
-        src/collectors/systemd-journal.plugin/systemd-units.c
         src/collectors/systemd-journal.plugin/systemd-journal.c
         src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
         src/collectors/systemd-journal.plugin/systemd-journal-files.c
@@ -1684,6 +1713,10 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/libnetdata/os/system-maps/system-services.h
         src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
 )
+
+if(ENABLE_SYSTEMD_DBUS)
+        list(APPEND SYSTEMD_JOURNAL_PLUGIN_FILES src/collectors/systemd-journal.plugin/systemd-units.c)
+endif()
 
 set(STREAMING_PLUGIN_FILES
         src/streaming/stream.h
@@ -2146,11 +2179,6 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build libnetdata
 #
 
-if(OS_LINUX)
-        include(NetdataDetectSystemd)
-        detect_systemd()
-endif()
-
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)
@@ -2171,6 +2199,10 @@ target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
+
+if(HAVE_LIBBACKTRACE)
+    netdata_add_libbacktrace_to_target(libnetdata)
+endif()
 
 if(OS_WINDOWS)
         set(HAVE_ETW True)

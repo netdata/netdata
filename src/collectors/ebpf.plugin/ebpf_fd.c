@@ -715,10 +715,10 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
 
         fd_apps_accumulator(fv, maps_per_core);
 
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, fv->tgid, fv->name, NETDATA_EBPF_PIDS_FD_IDX);
-        netdata_publish_fd_stat_t *publish_fd = pid_stat->fd;
-        if (!publish_fd)
-            pid_stat->fd = publish_fd = ebpf_fd_allocate_publish();
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_FD_IDX);
+        if (!local_pid)
+            continue;
+        netdata_publish_fd_stat_t *publish_fd = &local_pid->fd;
 
         if (!publish_fd->ct || publish_fd->ct != fv->ct) {
             publish_fd->ct = fv->ct;
@@ -726,15 +726,10 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
             publish_fd->close_call = fv->close_call;
             publish_fd->open_err = fv->open_err;
             publish_fd->close_err = fv->close_err;
-
-            pid_stat->not_updated = 0;
         } else {
-            if (kill(key, 0)) { // No PID found
-                ebpf_reset_specific_pid_data(pid_stat);
-            } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(pid_stat, fd, key, NETDATA_EBPF_PIDS_FD_IDX);
-                ebpf_fd_release_publish(publish_fd);
-                pid_stat->fd = NULL;
+            if (kill((pid_t)key, 0)) { // No PID found
+                if (netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_FD_IDX))
+                    memset(publish_fd, 0, sizeof(*publish_fd));
             }
         }
 
@@ -758,11 +753,11 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
     memset(fd, 0, sizeof(netdata_fd_stat_t));
 
     for (; root; root = root->next) {
-        int32_t pid = root->pid;
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_FD_IDX);
-        netdata_publish_fd_stat_t *w = pid_stat->fd;
-        if (!w)
+        uint32_t pid = root->pid;
+        netdata_ebpf_pid_stats_t *pid_stat = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_FD_IDX);
+        if (!pid_stat)
             continue;
+        netdata_publish_fd_stat_t *w = &pid_stat->fd;
 
         fd->open_call += w->open_call;
         fd->close_call += w->close_call;
@@ -778,12 +773,44 @@ void ebpf_fd_resume_apps_data()
 {
     struct ebpf_target *w;
 
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_FD_IDX))))
             continue;
 
         ebpf_fd_sum_pids(&w->fd, w->root_pid);
     }
+    pthread_mutex_unlock(&collect_data_mutex);
+}
+
+/**
+ * Update cgroup
+ *
+ * Update cgroup data collected per PID.
+ *
+ * @param maps_per_core do I need to read all cores?
+ */
+static void ebpf_update_fd_cgroup()
+{
+    ebpf_cgroup_target_t *ect;
+
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        struct pid_on_target2 *pids;
+        for (pids = ect->pids; pids; pids = pids->next) {
+            uint32_t pid = pids->pid;
+            netdata_publish_fd_stat_t *out = &pids->fd;
+
+            netdata_ebpf_pid_stats_t *pid_stat = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_FD_IDX);
+            if (!pid_stat)
+                continue;
+
+            netdata_publish_fd_stat_t *in = &pid_stat->fd;
+
+            memcpy(out, in, sizeof(netdata_publish_fd_stat_t));
+        }
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -808,6 +835,7 @@ void *ebpf_read_fd_thread(void *ptr)
     int counter = update_every - 1;
 
     uint32_t lifetime = em->lifetime;
+    int cgroups = em->cgroup_charts;
     uint32_t running_time = 0;
     pids_fd[NETDATA_EBPF_PIDS_FD_IDX] = fd_maps[NETDATA_FD_PID_STATS].map_fd;
 
@@ -818,10 +846,13 @@ void *ebpf_read_fd_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        pthread_mutex_lock(&collect_data_mutex);
+        sem_wait(shm_mutex_ebpf_integration);
         ebpf_read_fd_apps_table(maps_per_core);
         ebpf_fd_resume_apps_data();
-        pthread_mutex_unlock(&collect_data_mutex);
+        if (cgroups && shm_ebpf_cgroup.header)
+            ebpf_update_fd_cgroup();
+
+        sem_post(shm_mutex_ebpf_integration);
 
         counter = 0;
 
@@ -836,33 +867,6 @@ void *ebpf_read_fd_thread(void *ptr)
     }
 
     return NULL;
-}
-
-/**
- * Update cgroup
- *
- * Update cgroup data collected per PID.
- *
- * @param maps_per_core do I need to read all cores?
- */
-static void ebpf_update_fd_cgroup()
-{
-    ebpf_cgroup_target_t *ect;
-
-    pthread_mutex_lock(&mutex_cgroup_shm);
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        struct pid_on_target2 *pids;
-        for (pids = ect->pids; pids; pids = pids->next) {
-            int pid = pids->pid;
-            netdata_publish_fd_stat_t *out = &pids->fd;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_FD_IDX);
-            netdata_publish_fd_stat_t *in = local_pid->fd;
-            if (!in)
-                continue;
-            memcpy(out, in, sizeof(netdata_publish_fd_stat_t));
-        }
-    }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -1297,9 +1301,6 @@ static void fd_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_fd_read_global_tables(stats, maps_per_core);
-
-        if (cgroups && shm_ebpf_cgroup.header)
-            ebpf_update_fd_cgroup();
 
         pthread_mutex_lock(&lock);
 

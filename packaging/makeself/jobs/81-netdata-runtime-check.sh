@@ -4,6 +4,9 @@
 # shellcheck source=./packaging/makeself/functions.sh
 . "${NETDATA_MAKESELF_PATH}"/functions.sh "${@}" || exit 1
 
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Performing basic runtime checks" || true
+
 dump_log() {
   cat ./netdata.log
 }
@@ -22,3 +25,8 @@ fi
 "${NETDATA_SOURCE_PATH}/packaging/runtime-check.sh" || exit 1
 
 trap - EXIT
+
+run rm -rv "${NETDATA_INSTALL_PATH}/var/lib/netdata" "${NETDATA_INSTALL_PATH}/var/cache/netdata"
+
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

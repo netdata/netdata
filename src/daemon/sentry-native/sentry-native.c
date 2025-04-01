@@ -5,10 +5,13 @@
 
 #include "sentry.h"
 
-static char sentry_path[FILENAME_MAX] = "";
-static char g_sentry_event_message[512] = {0};
+static void nd_sentry_add_deadly_signal_as_breadcrumb(void);
 
-bool nd_sentry_crash_report_enabled = true;
+static char sentry_path[FILENAME_MAX] = "";
+
+static bool sentry_initialized = false;
+static bool breadcrumb_added = false;
+static bool nd_sentry_crash_report_enabled = true;
 
 const char *nd_sentry_path(void) {
     return sentry_path;
@@ -46,7 +49,7 @@ static void nd_sentry_set_tag_uint64(const char *key, uint64_t value) {
     nd_sentry_set_tag(key, buf);
 }
 
-static void nd_sentry_set_tag_uuid(const char *key, const ND_UUID uuid) {
+static inline void nd_sentry_set_tag_uuid(const char *key, const ND_UUID uuid) {
     if(UUIDiszero(uuid))
         return;
 
@@ -86,14 +89,7 @@ static sentry_value_t nd_sentry_on_hook(sentry_value_t event) {
         return sentry_value_new_null();
     }
 
-    nd_sentry_set_tag_status();
-    nd_sentry_set_tag_uptime();
-    nd_sentry_set_tag("thread", daemon_status_file_get_fatal_thread());
-    nd_sentry_set_tag_uint64("thread_id", daemon_status_file_get_fatal_thread_id());
-
-    // set the title of the event
-    if(g_sentry_event_message[0])
-        sentry_value_set_by_key(event, "message", sentry_value_new_string(g_sentry_event_message));
+    nd_sentry_add_deadly_signal_as_breadcrumb();
 
     return event;
 }
@@ -116,7 +112,7 @@ static sentry_value_t nd_sentry_before_send(
 // sentry initialization
 
 void nd_sentry_init(void) {
-    if (!analytics_check_enabled())
+    if (!analytics_check_enabled() || sentry_initialized)
         return;
 
     // path where sentry should save stuff
@@ -186,10 +182,12 @@ void nd_sentry_init(void) {
     nd_sentry_set_tag_uint64("restarts", daemon_status_file_get_restarts());
     nd_sentry_set_tag_int64("reliability", daemon_status_file_get_reliability());
     nd_sentry_set_tag("stack_traces", daemon_status_file_get_stack_trace_backend());
+
+    sentry_initialized = true;
 }
 
 void nd_sentry_fini(void) {
-    if (!analytics_check_enabled())
+    if(!sentry_initialized)
         return;
 
     sentry_close();
@@ -231,17 +229,20 @@ static void nd_sentry_add_key_value_uint64(sentry_value_t data, const char *key,
     sentry_value_set_by_key(data, key, sentry_value_new_string(buf));
 }
 
-void nd_sentry_add_fatal_message_as_breadcrumb(void) {
-    if (!analytics_check_enabled())
+void nd_sentry_add_breadcrumb(const char *category, const char *message) {
+    if(!sentry_initialized || breadcrumb_added)
         return;
+
+    nd_sentry_set_tag_status();
+    nd_sentry_set_tag_uptime();
+
+    nd_sentry_set_tag("thread", daemon_status_file_get_fatal_thread());
+    nd_sentry_set_tag_uint64("thread_id", daemon_status_file_get_fatal_thread_id());
+    nd_sentry_set_tag_uint64("worker_job_id", daemon_status_file_get_fatal_worker_job_id());
 
     const char *function = daemon_status_file_get_fatal_function();
     if(!function || !*function)
-        function = "unknown";
-    else
-        strncpyz(g_sentry_event_message, function, sizeof(g_sentry_event_message) - 1);
-
-    nd_sentry_set_tag_uptime();
+        function = category;
 
     // Set the transaction name to the function where the error occurred
     // this should be low cardinality
@@ -250,7 +251,7 @@ void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     // Set the fingerprint to the function where the error occurred
     sentry_set_fingerprint("{{ default }}", function, NULL);
 
-    sentry_value_t crumb = sentry_value_new_breadcrumb("fatal", "fatal() event details");
+    sentry_value_t crumb = sentry_value_new_breadcrumb("fatal", message);
 
     sentry_value_t data = sentry_value_new_object();
     nd_sentry_add_key_value_charp(data, "message", daemon_status_file_get_fatal_message());
@@ -262,35 +263,20 @@ void nd_sentry_add_fatal_message_as_breadcrumb(void) {
     nd_sentry_add_key_value_charp(data, "errno", daemon_status_file_get_fatal_errno());
     nd_sentry_add_key_value_charp(data, "stack_trace", daemon_status_file_get_fatal_stack_trace());
     nd_sentry_add_key_value_charp(data, "status", DAEMON_STATUS_2str(daemon_status_file_get_status()));
+    nd_sentry_add_key_value_uint64(data, "worker_job_id", daemon_status_file_get_fatal_worker_job_id());
 
     sentry_value_set_by_key(crumb, "data", data);
     sentry_add_breadcrumb(crumb);
 }
 
+void nd_sentry_add_fatal_message_as_breadcrumb(void) {
+    nd_sentry_add_breadcrumb("fatal", "fatal message event details");
+}
+
+static void nd_sentry_add_deadly_signal_as_breadcrumb(void) {
+    nd_sentry_add_breadcrumb("deadly_signal", "deadly signal event details");
+}
+
 void nd_sentry_add_shutdown_timeout_as_breadcrumb(void) {
-    if (!analytics_check_enabled())
-        return;
-
-    const char *function = "shutdown_timeout";
-    strncpyz(g_sentry_event_message, function, sizeof(g_sentry_event_message) - 1);
-
-    nd_sentry_set_tag_uptime();
-
-    // Set the transaction name to the function where the error occurred
-    // this should be low cardinality
-    sentry_set_transaction(function);
-
-    // Set the fingerprint to the function where the error occurred
-    sentry_set_fingerprint("{{ default }}", function, NULL);
-
-    sentry_value_t crumb = sentry_value_new_breadcrumb("fatal", "shutdown_timeout() event details");
-
-    sentry_value_t data = sentry_value_new_object();
-    nd_sentry_add_key_value_charp(data, "function", function);
-    nd_sentry_add_key_value_charp(data, "thread", nd_thread_tag());
-    nd_sentry_add_key_value_uint64(data, "thread_id", gettid_cached());
-    nd_sentry_add_key_value_charp(data, "status", DAEMON_STATUS_2str(daemon_status_file_get_status()));
-
-    sentry_value_set_by_key(crumb, "data", data);
-    sentry_add_breadcrumb(crumb);
+    nd_sentry_add_breadcrumb("shutdown_timeout", "shutdown timeout event details");
 }

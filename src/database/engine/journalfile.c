@@ -61,13 +61,13 @@ void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengin
 void journalfile_v2_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
     (void) snprintfz(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
-                    datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
+                    datafile_ctx(datafile)->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
 void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
     (void) snprintfz(str, maxlen - 1, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
-                    datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
+                    datafile_ctx(datafile)->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
 // ----------------------------------------------------------------------------
@@ -155,15 +155,20 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
 }
 
 static void njfv2idx_add(struct rrdengine_datafile *datafile) {
+    if(unlikely(!datafile))
+        fatal("DBENGINE: NJFV2IDX trying to index a journal file with no datafile");
+
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+
     internal_fatal(datafile->journalfile->v2.last_time_s <= 0, "DBENGINE: NJFV2IDX trying to index a journal file with invalid first_time_s");
 
-    rw_spinlock_write_lock(&datafile->ctx->njfv2idx.spinlock);
+    rw_spinlock_write_lock(&ctx->njfv2idx.spinlock);
     datafile->journalfile->njfv2idx.indexed_as = datafile->journalfile->v2.last_time_s;
 
     do {
         internal_fatal(datafile->journalfile->njfv2idx.indexed_as <= 0, "DBENGINE: NJFV2IDX journalfile is already indexed");
 
-        Pvoid_t *PValue = JudyLIns(&datafile->ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
+        Pvoid_t *PValue = JudyLIns(&ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
         if (!PValue || PValue == PJERR)
             fatal("DBENGINE: NJFV2IDX corrupted judy array");
 
@@ -177,21 +182,22 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
         }
     } while(1);
 
-    rw_spinlock_write_unlock(&datafile->ctx->njfv2idx.spinlock);
+    rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
 }
 
 static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
     internal_fatal(!datafile->journalfile->njfv2idx.indexed_as, "DBENGINE: NJFV2IDX journalfile to remove is not indexed");
 
-    rw_spinlock_write_lock(&datafile->ctx->njfv2idx.spinlock);
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    rw_spinlock_write_lock(&ctx->njfv2idx.spinlock);
 
-    int rc = JudyLDel(&datafile->ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
+    int rc = JudyLDel(&ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
     (void)rc;
     internal_fatal(!rc, "DBENGINE: NJFV2IDX cannot remove entry");
 
     datafile->journalfile->njfv2idx.indexed_as = 0;
 
-    rw_spinlock_write_unlock(&datafile->ctx->njfv2idx.spinlock);
+    rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -214,7 +220,7 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
             journalfile->v2.flags &= ~(JOURNALFILE_FLAG_IS_AVAILABLE | JOURNALFILE_FLAG_IS_MOUNTED);
             spinlock_unlock(&journalfile->v2.spinlock);
 
-            ctx_fs_error(journalfile->datafile->ctx);
+            ctx_fs_error(datafile_ctx(journalfile->datafile));
         }
         else {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_mapped, 1, __ATOMIC_RELAXED);
@@ -276,7 +282,7 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
                 journalfile_v2_generate_path(journalfile->datafile, path, sizeof(path));
                 netdata_log_error("DBENGINE: failed to unmap index file '%s'", path);
                 internal_fatal(true, "DBENGINE: failed to unmap file '%s'", path);
-                ctx_fs_error(journalfile->datafile->ctx);
+                ctx_fs_error(datafile_ctx(journalfile->datafile));
             }
             else {
                 __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_unmapped, 1, __ATOMIC_RELAXED);
@@ -406,6 +412,12 @@ size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile) {
 }
 
 void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size) {
+    if(unlikely(!journalfile))
+        fatal("DBENGINE: JOURNALFILE: trying to set journal data without a journalfile");
+
+    if(unlikely(!journalfile->datafile))
+        fatal("DBENGINE: JOURNALFILE: trying to set journal data without a datafile");
+
     spinlock_lock(&journalfile->mmap.spinlock);
     spinlock_lock(&journalfile->v2.spinlock);
 
@@ -488,7 +500,7 @@ static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)
     if (ret < 0) {
         journalfile_v1_generate_path(datafile, path, sizeof(path));
         netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(datafile->ctx);
+        ctx_fs_error(datafile_ctx(datafile));
     }
     uv_fs_req_cleanup(&req);
     return ret;
@@ -507,7 +519,7 @@ int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengin
 int journalfile_unlink(struct rrdengine_journalfile *journalfile)
 {
     struct rrdengine_datafile *datafile = journalfile->datafile;
-    struct rrdengine_instance *ctx = datafile->ctx;
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
@@ -528,7 +540,7 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
 
 int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile->ctx;
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
@@ -572,7 +584,7 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
 
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile->ctx;
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     uv_file file;
     int ret, fd;
@@ -707,10 +719,9 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
 
             bool added;
             metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
-            if(added) {
-                __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
+            if(added)
                 update_metric_time = false;
-            }
+
             if (vd.update_every_s) {
                 uint64_t samples = (vd.end_time_s - vd.start_time_s) / vd.update_every_s;
                 __atomic_add_fetch(&ctx->atomic.samples, samples, __ATOMIC_RELAXED);

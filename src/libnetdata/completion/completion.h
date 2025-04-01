@@ -12,6 +12,8 @@ struct completion {
     volatile unsigned completed_jobs;
 };
 
+void completion_reset(struct completion *p);
+
 void completion_init(struct completion *p);
 
 void completion_destroy(struct completion *p);

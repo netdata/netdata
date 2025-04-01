@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
-#include "daemon-status-file.h"
+#include "status-file.h"
 #include "buildinfo.h"
 
 #include <curl/curl.h>
@@ -9,11 +9,12 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#define REPORT_EVENTS_EVERY (86400 - 3600) // -1 hour to tolerate cron randomness
-
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
 #endif
+
+#include "status-file-dedup.h"
+#include "status-file-io.h"
 
 #define STATUS_FILENAME "status-netdata.json"
 
@@ -59,10 +60,6 @@ static DAEMON_STATUS_FILE session_status = {
 
 static void daemon_status_file_out_of_memory(void);
 
-// these are used instead of locks when locks cannot be used (signal handler, out of memory, etc)
-#define dsf_acquire(ds) __atomic_load_n(&(ds).v, __ATOMIC_ACQUIRE)
-#define dsf_release(ds) __atomic_store_n(&(ds).v, (ds).v, __ATOMIC_RELEASE)
-
 static void copy_and_clean_thread_name_if_empty(DAEMON_STATUS_FILE *ds, const char *name) {
     if(ds->fatal.thread[0] && strcmp(ds->fatal.thread, "NO_NAME") != 0)
         return;
@@ -90,69 +87,6 @@ static void set_stack_trace_message_if_empty(DAEMON_STATUS_FILE *ds, const char 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
 
-static uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const char *cause) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
-
-    struct {
-        uint32_t v;
-        DAEMON_STATUS status;
-        SIGNAL_CODE signal_code;
-        ND_PROFILE profile;
-        EXIT_REASON exit_reason;
-        RRD_DB_MODE db_mode;
-        uint8_t db_tiers;
-        bool kubernetes;
-        bool sentry_available;
-        bool sentry_fatal;
-        ND_UUID host_id;
-        ND_UUID machine_id;
-        long line;
-        char version[sizeof(ds->version)];
-        char filename[sizeof(ds->fatal.filename)];
-        char function[sizeof(ds->fatal.function)];
-        char stack_trace[sizeof(ds->fatal.stack_trace)];
-        char thread[sizeof(ds->fatal.thread)];
-        char msg[128];
-        char cause[32];
-    } to_hash;
-
-    // this is important to remove any random bytes from the structure
-    memset(&to_hash, 0, sizeof(to_hash));
-
-    dsf_acquire(*ds);
-
-    to_hash.v = ds->v,
-    to_hash.status = ds->status,
-    to_hash.signal_code = ds->fatal.signal_code,
-    to_hash.profile = ds->profile,
-    to_hash.exit_reason = ds->exit_reason,
-    to_hash.db_mode = ds->db_mode,
-    to_hash.db_tiers = ds->db_tiers,
-    to_hash.kubernetes = ds->kubernetes,
-    to_hash.sentry_available = ds->sentry_available,
-    to_hash.sentry_fatal = ds->fatal.sentry,
-    to_hash.host_id = ds->host_id,
-    to_hash.machine_id = ds->machine_id,
-
-    strncpyz(to_hash.version, ds->version, sizeof(to_hash.version) - 1);
-    strncpyz(to_hash.filename, ds->fatal.filename, sizeof(to_hash.filename) - 1);
-    strncpyz(to_hash.filename, ds->fatal.function, sizeof(to_hash.function) - 1);
-    strncpyz(to_hash.stack_trace, ds->fatal.stack_trace, sizeof(to_hash.stack_trace) - 1);
-    strncpyz(to_hash.thread, ds->fatal.thread, sizeof(to_hash.thread) - 1);
-
-    if(msg)
-        strncpyz(to_hash.msg, msg, sizeof(to_hash.msg) - 1);
-
-    if(cause)
-        strncpyz(to_hash.cause, cause, sizeof(to_hash.cause) - 1);
-
-    uint64_t hash = fnv1a_hash_bin64(&to_hash, sizeof(to_hash));
-
-    dsf_release(*ds);
-    return hash;
-}
-
 static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
@@ -164,7 +98,11 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
     buffer_json_member_add_object(wb, "agent");
     {
-        buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid);
+        buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid.uuid);
+
+        if(ds->v >= 24 && ds->host_id.last_modified_ut)
+            buffer_json_member_add_datetime_rfc3339(wb, "since", ds->host_id.last_modified_ut, true);
+
         buffer_json_member_add_uuid_compact(wb, "ephemeral_id", ds->invocation.uuid);
         buffer_json_member_add_string(wb, "version", ds->version);
 
@@ -173,6 +111,14 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_uuid(wb, "node_id", ds->node_id.uuid);
         buffer_json_member_add_uuid(wb, "claim_id", ds->claim_id.uuid);
         buffer_json_member_add_uint64(wb, "restarts", ds->restarts);
+
+        if(ds->v >= 24)
+            buffer_json_member_add_uint64(wb, "crashes", ds->crashes);
+
+        if(ds->v >= 22) {
+            buffer_json_member_add_uint64(wb, "posts", ds->posts);
+            buffer_json_member_add_string(wb, "aclk", CLOUD_STATUS_2str(ds->cloud_status));
+        }
 
         ND_PROFILE_2json(wb, "profile", ds->profile);
         buffer_json_member_add_string(wb, "status", DAEMON_STATUS_2str(ds->status));
@@ -228,6 +174,11 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         if(OS_SYSTEM_MEMORY_OK(ds->memory)) {
             buffer_json_member_add_uint64(wb, "total", ds->memory.ram_total_bytes);
             buffer_json_member_add_uint64(wb, "free", ds->memory.ram_available_bytes);
+
+            if(ds->v >= 21) {
+                buffer_json_member_add_uint64(wb, "netdata", ds->netdata_max_rss);
+                buffer_json_member_add_uint64(wb, "oom_protection", ds->oom_protection);
+            }
         }
         buffer_json_object_close(wb);
 
@@ -280,28 +231,19 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         if(ds->v >= 18) {
             char buf[UINT64_HEX_MAX_LENGTH];
-            print_uint64_hex(buf, ds->fatal.fault_address);
+
+            if(ds->fatal.signal_code)
+                print_uint64_hex(buf, ds->fatal.fault_address);
+            else
+                buf[0] = '\0';
+
             buffer_json_member_add_string(wb, "fault_address", buf);
         }
+
+        if(ds->v >= 23)
+            buffer_json_member_add_uint64(wb, "worker_job_id", ds->fatal.worker_job_id);
     }
     buffer_json_object_close(wb);
-
-    buffer_json_member_add_array(wb, "dedup");
-    {
-        for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
-            if (ds->dedup.slot[i].timestamp_ut == 0)
-                continue;
-
-            buffer_json_add_array_item_object(wb);
-            {
-                buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->dedup.slot[i].timestamp_ut, true);
-                buffer_json_member_add_uint64(wb, "hash", ds->dedup.slot[i].hash);
-                buffer_json_member_add_boolean(wb, "sentry", ds->dedup.slot[i].sentry);
-            }
-            buffer_json_object_close(wb);
-        }
-    }
-    buffer_json_array_close(wb);
 
     dsf_release(*ds);
 }
@@ -313,7 +255,6 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     char path[1024]; path[0] = '\0';
 
     DAEMON_STATUS_FILE *ds = data;
-    char datetime[RFC3339_MAX_LENGTH]; datetime[0] = '\0';
 
     // change management, version to know which fields to expect
     uint64_t version = 0;
@@ -331,11 +272,13 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v17 = version >= 17 ? strict : false;
     bool required_v18 = version >= 18 ? strict : false;
     bool required_v20 = version >= 20 ? strict : false;
+    bool required_v21 = version >= 21 ? strict : false;
+    bool required_v22 = version >= 22 ? strict : false;
+    bool required_v23 = version >= 23 ? strict : false;
+    bool required_v24 = version >= 24 ? strict : false;
 
     // Parse timestamp
-    JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v1);
-    if(datetime[0])
-        ds->timestamp_ut = rfc3339_parse_ut(datetime, NULL);
+    JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->timestamp_ut, error, required_v1);
 
     const char *profile_key = version >= 18 ? "profile" : "ND_profile";
     const char *status_key = version >= 18 ? "status" : "ND_status";
@@ -352,7 +295,11 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
     // Parse agent object
     JSONC_PARSE_SUBOBJECT(jobj, path, "agent", error, required_v1, {
-        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->host_id.uuid, error, required_v1);
+        JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->host_id.uuid.uuid, error, required_v1);
+
+        if(version >= 24)
+            JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "since", ds->host_id.last_modified_ut, error, required_v24);
+
         JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "ephemeral_id", ds->invocation.uuid, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->version, error, required_v1);
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->uptime, error, required_v1);
@@ -372,6 +319,14 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 4)
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, restarts_key, ds->restarts, error, required_v4);
 
+        if(version >= 24)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "crashes", ds->crashes, error, required_v24);
+
+        if(version >= 22) {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "posts", ds->posts, error, required_v22);
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "aclk", CLOUD_STATUS_2id, ds->cloud_status, error, required_v22);
+        }
+
         if(version >= 14) {
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, db_mode_key, rrd_memory_mode_id, ds->db_mode, error, required_v14);
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, db_tiers_key, ds->db_tiers, error, required_v14);
@@ -390,10 +345,6 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 18) {
             JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "reliability", ds->reliability, error, required_v18);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "stack_traces", ds->stack_traces, error, required_v18);
-
-            char buf[UINT64_HEX_MAX_LENGTH];
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
-            ds->fatal.fault_address = str2ull_encoded(buf);
         }
     });
 
@@ -414,6 +365,11 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, false);
             if(!OS_SYSTEM_MEMORY_OK(ds->memory))
                 ds->memory = OS_SYSTEM_MEMORY_EMPTY;
+
+            if(version >= 21) {
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "netdata", ds->netdata_max_rss, error, required_v21);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "oom_protection", ds->oom_protection, error, required_v21);
+            }
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "disk", error, required_v1, {
@@ -462,38 +418,20 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         if(version >= 17)
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "sentry", SIGNAL_CODE_2id_h, ds->fatal.sentry, error, required_v17);
 
-        if(version >= 18)
+        if(version >= 18) {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "thread_id", ds->fatal.thread_id, error, required_v18);
+
+            char buf[UINT64_HEX_MAX_LENGTH];
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "fault_address", buf, error, required_v18);
+            if(buf[0])
+                ds->fatal.fault_address = str2ull_encoded(buf);
+            else
+                ds->fatal.fault_address = 0;
+        }
+
+        if(version >= 23)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "worker_job_id", ds->fatal.worker_job_id, error, required_v23);
     });
-
-    // Parse the last posted object
-    if(version == 3) {
-        JSONC_PARSE_SUBOBJECT(jobj, path, "dedup", error, required_v3, {
-            datetime[0] = '\0';
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v3);
-            if (datetime[0])
-                ds->dedup.slot[0].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
-
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[0].hash, error, required_v3);
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "restarts", ds->restarts, error, required_v3);
-        });
-    }
-    else if(version >= 4) {
-        JSONC_PARSE_ARRAY(jobj, path, "dedup", error, required_v4, {
-            size_t i = 0;
-            JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, required_v4, {
-                if(i < _countof(ds->dedup.slot)) {
-                    datetime[0] = '\0';
-                    JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", datetime, error, required_v4);
-                    if (datetime[0])
-                        ds->dedup.slot[i].timestamp_ut = rfc3339_parse_ut(datetime, NULL);
-
-                    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "hash", ds->dedup.slot[i].hash, error, required_v4);
-                    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "sentry", ds->dedup.slot[i].sentry, error, required_v17);
-                }
-            });
-        });
-    }
 
     return true;
 }
@@ -537,14 +475,7 @@ static void daemon_status_file_migrate_once(void) {
 
     session_status.claim_id = last_session_status.claim_id;
     session_status.node_id = last_session_status.node_id;
-    session_status.host_id = last_session_status.host_id;
-    if(UUIDiszero(session_status.host_id)) {
-        const char *machine_guid = registry_get_this_machine_guid(false);
-        if(machine_guid && *machine_guid) {
-            if (uuid_parse_flexi(machine_guid, session_status.host_id.uuid) != 0)
-                session_status.host_id = UUID_ZERO;
-        }
-    }
+    session_status.host_id = *machine_guid_get();
 
     strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
     strncpyz(session_status.virtualization, last_session_status.virtualization, sizeof(session_status.virtualization) - 1);
@@ -559,21 +490,19 @@ static void daemon_status_file_migrate_once(void) {
     strncpyz(session_status.cloud_instance_type, last_session_status.cloud_instance_type, sizeof(session_status.cloud_instance_type) - 1);
     strncpyz(session_status.cloud_instance_region, last_session_status.cloud_instance_region, sizeof(session_status.cloud_instance_region) - 1);
 
+    session_status.posts = last_session_status.posts;
     session_status.restarts = last_session_status.restarts + 1;
+    session_status.crashes = last_session_status.crashes;
     session_status.reliability = last_session_status.reliability;
 
-    if(daemon_status_file_has_last_crashed())  {
+    if(daemon_status_file_has_last_crashed(&last_session_status))  {
+        session_status.crashes++;
         if(session_status.reliability > 0) session_status.reliability = 0;
         session_status.reliability--;
     }
     else {
         if(session_status.reliability < 0) session_status.reliability = 0;
         session_status.reliability++;
-    }
-
-    if(last_session_status.v == STATUS_FILE_VERSION) {
-        for (size_t i = 0; i < _countof(session_status.dedup.slot); i++)
-            session_status.dedup.slot[i] = last_session_status.dedup.slot[i];
     }
 
     strncpyz(session_status.stack_traces, capture_stack_trace_backend(), sizeof(session_status.stack_traces) - 1);
@@ -610,6 +539,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(session_status.status == DAEMON_STATUS_EXITING)
         session_status.timings.exit = (time_t)((now_ut - session_status.timings.exit_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
 
+    session_status.host_id = *machine_guid_get();
     session_status.boottime = now_boottime_sec();
     session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
@@ -617,11 +547,24 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
 
+    // we keep the highest cloud status, to know how the agent gets connected to netdata.cloud
+    CLOUD_STATUS cs = cloud_status();
+    if(!session_status.cloud_status ||                              // it is ok to overwrite this
+        session_status.cloud_status == CLOUD_STATUS_AVAILABLE ||    // it is ok to overwrite this
+        session_status.cloud_status == CLOUD_STATUS_OFFLINE ||      // it is ok to overwrite this
+        cs == CLOUD_STATUS_BANNED ||                                // this is a final state
+        cs == CLOUD_STATUS_ONLINE ||                                // this is a final state
+        cs == CLOUD_STATUS_INDIRECT)                                // this is a final state
+        session_status.cloud_status = cs;
+
+    session_status.oom_protection = dbengine_out_of_memory_protection;
+    session_status.netdata_max_rss = process_max_rss();
+
     session_status.claim_id = claim_id_get_uuid();
 
     if(localhost) {
         if(!UUIDiszero(localhost->host_id))
-            session_status.host_id = localhost->host_id;
+            session_status.host_id.uuid = localhost->host_id;
 
         if(!UUIDiszero(localhost->node_id))
             session_status.node_id = localhost->node_id;
@@ -646,194 +589,23 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// file helpers
-
-// List of fallback directories to try
-static const char *status_file_fallbacks[] = {
-    CACHE_DIR,
-    "/tmp",
-    "/run",
-    "/var/run",
-    ".",
-};
-
-static void set_dynamic_fallbacks(void) {
-    status_file_fallbacks[0] = netdata_configured_cache_dir;
-}
-
-static bool check_status_file(const char *directory, char *filename, size_t filename_size, time_t *mtime) {
-    if(!directory || !*directory)
-        return false;
-
-    snprintfz(filename, filename_size, "%s/%s", directory, STATUS_FILENAME);
-
-    // Get file metadata
-    OS_FILE_METADATA metadata = os_get_file_metadata(filename);
-    if (!OS_FILE_METADATA_OK(metadata)) {
-        *mtime = 0;
-        return false;
-    }
-
-    *mtime = metadata.modified_time;
-    return true;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
 // load a saved status
 
-static bool load_status_file(const char *filename, DAEMON_STATUS_FILE *status) {
-    FILE *fp = fopen(filename, "r");
-    if (!fp)
-        return false;
+static bool status_file_load_and_parse(const char *filename, void *data) {
+    DAEMON_STATUS_FILE *status = data;
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     CLEAN_BUFFER *error = buffer_create(0, NULL);
 
-    // Get file size
-    fseek(fp, 0, SEEK_END);
-    long file_size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    // Read the file
-    buffer_need_bytes(wb, file_size + 1);
-    ssize_t read_bytes = fread(wb->buffer, 1, file_size, fp);
-    fclose(fp);
-
-    if (read_bytes == 0)
+    if(!read_txt_file_to_buffer(filename, wb, 65536))
         return false;
-
-    wb->buffer[read_bytes] = '\0';
-    wb->len = read_bytes;
 
     // Parse the JSON
     return json_parse_payload_or_error(wb, error, daemon_status_file_from_json, status) == HTTP_RESP_OK;
 }
 
-void daemon_status_file_load(DAEMON_STATUS_FILE *ds) {
-    char newest_filename[FILENAME_MAX] = "";
-    char current_filename[FILENAME_MAX];
-    time_t newest_mtime = 0, current_mtime;
-
-    // Check the primary directory first
-    if(check_status_file(netdata_configured_varlib_dir, current_filename, sizeof(current_filename), &current_mtime)) {
-        strncpyz(newest_filename, current_filename, sizeof(newest_filename) - 1);
-        newest_mtime = current_mtime;
-    }
-
-    // Check each fallback location
-    set_dynamic_fallbacks();
-    for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
-        if(check_status_file(status_file_fallbacks[i], current_filename, sizeof(current_filename), &current_mtime) &&
-            (!*newest_filename || current_mtime > newest_mtime)) {
-            strncpyz(newest_filename, current_filename, sizeof(newest_filename) - 1);
-            newest_mtime = current_mtime;
-        }
-    }
-
-    // Load the newest file found
-    if(*newest_filename) {
-        if(!load_status_file(newest_filename, ds))
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to load newest status file: %s", newest_filename);
-    }
-    else
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
-}
-
 // --------------------------------------------------------------------------------------------------------------------
 // save the current status
-
-static bool save_status_file(const char *directory, const char *content, size_t content_size) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
-
-    // Linux: https://man7.org/linux/man-pages/man7/signal-safety.7.html
-    // memcpy(), strlen(), open(), write(), fsync(), close(), fchmod(), rename(), unlink()
-
-    // MacOS: https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/sigaction.2.html#//apple_ref/doc/man/2/sigaction
-    // open(), write(), fsync(), close(), rename(), unlink()
-    // does not explicitly mention fchmod, memcpy(), and strlen(), but they are safe
-
-    if(!directory || !*directory)
-        return false;
-
-    static uint64_t tmp_attempt_counter = 0;
-
-    char filename[FILENAME_MAX];
-    char temp_filename[FILENAME_MAX];
-    char tid_str[UINT64_MAX_LENGTH];
-
-    print_uint64(tid_str, __atomic_add_fetch(&tmp_attempt_counter, 1, __ATOMIC_RELAXED));
-    size_t dir_len = strlen(directory);
-    size_t fil_len = strlen(STATUS_FILENAME);
-    size_t tid_len = strlen(tid_str);
-
-    if (dir_len + 1 + fil_len + 1 + tid_len + 1 >= sizeof(filename))
-        return false; // cannot fit the filename
-
-    // create the filename
-    size_t pos = 0;
-    memcpy(&filename[pos], directory, dir_len); pos += dir_len;
-    filename[pos] = '/'; pos++;
-    memcpy(&filename[pos], STATUS_FILENAME, fil_len); pos += fil_len;
-    filename[pos] = '\0';
-
-    // create the temp filename
-    memcpy(temp_filename, filename, pos);
-    temp_filename[pos] = '-'; pos++;
-    memcpy(&temp_filename[pos], tid_str, tid_len); pos += tid_len;
-    temp_filename[pos] = '\0';
-
-    // Open file with O_WRONLY, O_CREAT, and O_TRUNC flags
-    int fd = open(temp_filename, O_WRONLY | O_CREAT | O_TRUNC, 0664);
-    if (fd == -1)
-        return false;
-
-    /* Write content to file using write() */
-    size_t total_written = 0;
-
-    while (total_written < content_size) {
-        ssize_t bytes_written = write(fd, content + total_written, content_size - total_written);
-
-        if (bytes_written <= 0) {
-            if (errno == EINTR)
-                continue; /* Retry if interrupted by signal */
-
-            close(fd);
-            unlink(temp_filename);  /* Remove the temp file */
-            return false;
-        }
-
-        total_written += bytes_written;
-    }
-
-    /* Fsync to ensure data is written to disk */
-    if (fsync(fd) == -1) {
-        close(fd);
-        unlink(temp_filename);
-        return false;
-    }
-
-    /* Set permissions using chmod() */
-    if (fchmod(fd, 0664) != 0) {
-        close(fd);
-        unlink(temp_filename);
-        return false;
-    }
-
-    /* Close file */
-    if (close(fd) == -1) {
-        unlink(temp_filename);
-        return false;
-    }
-
-    /* Rename temp file to target file */
-    if (rename(temp_filename, filename) != 0) {
-        unlink(temp_filename);
-        return false;
-    }
-
-    return true;
-}
 
 static BUFFER *static_save_buffer = NULL;
 static void static_save_buffer_init(void) {
@@ -841,23 +613,6 @@ static void static_save_buffer_init(void) {
         static_save_buffer = buffer_create(16384, NULL);
 
     buffer_flush(static_save_buffer);
-}
-
-static void remove_old_status_files(const char *protected_dir) {
-    FUNCTION_RUN_ONCE();
-    
-    char filename[FILENAME_MAX];
-
-    set_dynamic_fallbacks();
-    for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
-        if(strcmp(status_file_fallbacks[i], protected_dir) == 0)
-            continue;
-
-        snprintfz(filename, sizeof(filename), "%s/%s", status_file_fallbacks[i], STATUS_FILENAME);
-        unlink(filename);
-    }
-
-    errno_clear();
 }
 
 static bool daemon_status_file_saved = false;
@@ -872,98 +627,8 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
     daemon_status_file_to_json(wb, ds);
     buffer_json_finalize(wb);
 
-    const char *content = buffer_tostring(wb);
-    size_t content_size = buffer_strlen(wb);
-
-    // Try primary directory first
-    bool saved = false;
-    if (save_status_file(netdata_configured_varlib_dir, content, content_size)) {
-        remove_old_status_files(netdata_configured_varlib_dir);
-        saved = true;
-    }
-    else {
-        if(log)
-            nd_log(NDLS_DAEMON, NDLP_DEBUG, "Failed to save status file in primary directory %s",
-                   netdata_configured_varlib_dir);
-
-        // Try each fallback directory until successful
-        set_dynamic_fallbacks();
-        for(size_t i = 0; i < _countof(status_file_fallbacks); i++) {
-            if (save_status_file(status_file_fallbacks[i], content, content_size)) {
-                if(log)
-                    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_fallbacks[i]);
-
-                saved = true;
-                break;
-            }
-        }
-    }
-
-    if (!saved && log)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to save status file in any location");
-
-    if (saved)
+    if(status_file_io_save(STATUS_FILENAME, buffer_tostring(wb), buffer_strlen(wb), log))
         daemon_status_file_saved = true;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-// deduplication hashes management
-
-static bool dedup_already_posted(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
-
-    usec_t now_ut = now_realtime_usec();
-
-    for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
-        if(ds->dedup.slot[i].timestamp_ut == 0)
-            continue;
-
-        if(hash == ds->dedup.slot[i].hash &&
-            sentry == ds->dedup.slot[i].sentry &&
-            now_ut - ds->dedup.slot[i].timestamp_ut < REPORT_EVENTS_EVERY * USEC_PER_SEC) {
-            // we have already posted this crash
-            return true;
-        }
-    }
-
-    return false;
-}
-
-static void dedup_keep_hash(DAEMON_STATUS_FILE *ds, uint64_t hash, bool sentry) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
-
-    // find the same hash
-    for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
-        if(ds->dedup.slot[i].hash == hash && ds->dedup.slot[i].sentry == sentry) {
-            ds->dedup.slot[i].hash = hash;
-            ds->dedup.slot[i].sentry = sentry;
-            ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
-            return;
-        }
-    }
-
-    // find an empty slot
-    for(size_t i = 0; i < _countof(ds->dedup.slot); i++) {
-        if(!ds->dedup.slot[i].hash) {
-            ds->dedup.slot[i].hash = hash;
-            ds->dedup.slot[i].sentry = sentry;
-            ds->dedup.slot[i].timestamp_ut = now_realtime_usec();
-            return;
-        }
-    }
-
-    // find the oldest slot
-    size_t store_at_slot = 0;
-    for(size_t i = 1; i < _countof(ds->dedup.slot); i++) {
-        if(ds->dedup.slot[i].timestamp_ut < ds->dedup.slot[store_at_slot].timestamp_ut)
-            store_at_slot = i;
-    }
-
-    ds->dedup.slot[store_at_slot].hash = hash;
-    ds->dedup.slot[store_at_slot].sentry = sentry;
-    ds->dedup.slot[store_at_slot].timestamp_ut = now_realtime_usec();
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -976,7 +641,34 @@ struct post_status_file_thread_data {
     DAEMON_STATUS_FILE *status;
 };
 
-void post_status_file(struct post_status_file_thread_data *d) {
+static const char *agent_health(DAEMON_STATUS_FILE *ds) {
+    if(daemon_status_file_has_last_crashed(ds)) {
+        // it crashed
+
+        if(ds->restarts == 1)
+            return "crash-first";
+        else if(ds->reliability <= -2)
+            return "crash-loop";
+        else if(ds->reliability < 0)
+            return "crash-repeated";
+        else
+            return "crash-entered";
+    }
+
+    // it didn't crash
+    if(ds->restarts == 1)
+        return "healthy-first";
+    else if(ds->reliability >= 2)
+        return "healthy-loop";
+    else if(ds->reliability > 0)
+        return "healthy-repeated";
+    else
+        return "healthy-recovered";
+}
+
+static void post_status_file(struct post_status_file_thread_data *d) {
+    daemon_status_file_startup_step("startup(crash reports json)");
+
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_string(wb, "exit_cause", d->cause);
@@ -984,6 +676,10 @@ void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_uint64(wb, "priority", d->priority);
     buffer_json_member_add_uint64(wb, "version_saved", d->status->v);
     buffer_json_member_add_string(wb, "agent_version_now", NETDATA_VERSION);
+    buffer_json_member_add_boolean(wb, "host_memory_critical",
+                                   OS_SYSTEM_MEMORY_OK(d->status->memory) && d->status->memory.ram_available_bytes <= d->status->oom_protection);
+    buffer_json_member_add_uint64(wb, "host_memory_free_percent", (uint64_t)round(os_system_memory_available_percent(d->status->memory)));
+    buffer_json_member_add_string(wb, "agent_health", agent_health(d->status));
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
 
@@ -992,6 +688,8 @@ void post_status_file(struct post_status_file_thread_data *d) {
     CURL *curl = curl_easy_init();
     if(!curl)
         return;
+
+    daemon_status_file_startup_step("startup(crash reports curl)");
 
     curl_easy_setopt(curl, CURLOPT_URL, "https://agent-events.netdata.cloud/agent-events");
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -1003,10 +701,17 @@ void post_status_file(struct post_status_file_thread_data *d) {
 
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
+        daemon_status_file_startup_step("startup(crash reports dedup)");
+        session_status.posts++;
+        nd_log(NDLS_DAEMON, NDLP_INFO, "Posted last status to agent-events successfully.");
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash, false);
         daemon_status_file_save(wb, &session_status, true);
     }
+    else
+        nd_log(NDLS_DAEMON, NDLP_INFO, "Failed to post last status to agent-events.");
+
+    daemon_status_file_startup_step("startup(crash reports cleanup)");
 
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
@@ -1027,8 +732,44 @@ struct log_priority PRI_DEADLY_SIGNAL   = { NDLP_CRIT, NDLP_CRIT };
 struct log_priority PRI_KILLED_HARD     = { NDLP_ERR, NDLP_WARNING };
 
 static bool is_ci(void) {
-    const char *ci = getenv("CI");
-    return ci && *ci && strcasecmp(ci, "true") == 0;
+    // List of known CI environment variables.
+    const char *ci_vars[] = {
+        "CI",                       // Generic CI flag
+        "CONTINUOUS_INTEGRATION",   // Alternate generic flag
+        "BUILD_NUMBER",             // Jenkins, TeamCity
+        "RUN_ID",                   // AWS CodeBuild, some others
+        "TRAVIS",                   // Travis CI
+        "GITHUB_ACTIONS",           // GitHub Actions
+        "GITHUB_TOKEN",             // GitHub Actions
+        "GITLAB_CI",                // GitLab CI
+        "CIRCLECI",                 // CircleCI
+        "APPVEYOR",                 // AppVeyor
+        "BITBUCKET_BUILD_NUMBER",   // Bitbucket Pipelines
+        "SYSTEM_TEAMFOUNDATIONCOLLECTIONURI", // Azure DevOps
+        "TF_BUILD",                 // Azure DevOps (alternate)
+        "BAMBOO_BUILDKEY",          // Bamboo CI
+        "GO_PIPELINE_NAME",         // GoCD
+        "HUDSON_URL",               // Hudson CI
+        "TEAMCITY_VERSION",         // TeamCity
+        "CI_NAME",                  // Some environments (e.g., CodeShip)
+        "CI_WORKER",                // AppVeyor (alternate)
+        "CI_SERVER",                // Generic
+        "HEROKU_TEST_RUN_ID",       // Heroku CI
+        "BUILDKITE",                // Buildkite
+        "DRONE",                    // Drone CI
+        "SEMAPHORE",                // Semaphore CI
+        "NETLIFY",                  // Netlify CI
+        "NOW_BUILDER",              // Vercel (formerly Zeit Now)
+        NULL
+    };
+
+    // Iterate over the CI environment variable names.
+    for (const char **env = ci_vars; *env; env++) {
+        if(getenv(*env))
+            return true;
+    }
+
+    return false;
 }
 
 enum crash_report_t {
@@ -1060,7 +801,7 @@ static enum crash_report_t check_crash_reports_config(void) {
 void daemon_status_file_init(void) {
     static_save_buffer_init();
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
-    daemon_status_file_load(&last_session_status);
+    status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status);
     daemon_status_file_migrate_once();
 }
 
@@ -1238,6 +979,13 @@ void daemon_status_file_check_crash(void) {
                 msg = "Netdata was last crashed due to a fatal error";
                 pri = PRI_FATAL;
             }
+            else if (OS_SYSTEM_MEMORY_OK(last_session_status.memory) &&
+                     last_session_status.memory.ram_available_bytes <= last_session_status.oom_protection) {
+                cause = "killed hard low ram";
+                msg = "Netdata was last killed/crashed while available memory was critically low";
+                pri = PRI_KILLED_HARD;
+                this_is_a_crash = true;
+            }
             else {
                 cause = "killed hard";
                 msg = "Netdata was last killed/crashed while operating normally";
@@ -1265,6 +1013,8 @@ void daemon_status_file_check_crash(void) {
            "Last exit status: %s (%s):\n\n%s",
            NETDATA_VERSION, msg, cause, buffer_tostring(wb));
 
+    daemon_status_file_startup_step("startup(crash reports check)");
+
     enum crash_report_t r = check_crash_reports_config();
     if( // must be first for netdata.conf option to be used
         (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
@@ -1272,17 +1022,21 @@ void daemon_status_file_check_crash(void) {
         // we have a previous status, or we managed to save the current one
         (!no_previous_status || daemon_status_file_saved) &&
 
-        // we are not running in CI
-        (last_session_status.restarts >= 10 || !is_ci()) &&
+        // we have more than 2 restarts, or this is not a CI run
+        (last_session_status.restarts > 1 || !is_ci()) &&
 
-        // we have not already reported this
+        // we have not reported this
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
 
         ) {
+        daemon_status_file_startup_step("startup(crash reports prep)");
+
         netdata_conf_ssl();
 
         if(no_previous_status) {
             last_session_status = session_status;
+            last_session_status.status = DAEMON_STATUS_NONE;
+            last_session_status.exit_reason = 0;
             strncpyz(last_session_status.fatal.function, "no_status", sizeof(last_session_status.fatal.function) - 1);
         }
 
@@ -1326,6 +1080,8 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
 
         daemon_status_file_save(wb, ds, false);
     }
+
+    errno_clear();
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1360,6 +1116,9 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     if(stack_trace && *stack_trace && stack_trace_is_empty(&session_status))
         strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
 
+    if(!session_status.fatal.worker_job_id)
+        session_status.fatal.worker_job_id = workers_get_last_job_id();
+
     if(line)
         session_status.fatal.line = line;
 
@@ -1383,9 +1142,11 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
 // --------------------------------------------------------------------------------------------------------------------
 
 void daemon_status_file_update_status(DAEMON_STATUS status) {
+    int saved_errno = errno;
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     daemon_status_file_refresh(status);
     daemon_status_file_save(wb, &session_status, true);
+    errno = saved_errno;
 }
 
 static void daemon_status_file_out_of_memory(void) {
@@ -1424,6 +1185,9 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
     if(!session_status.fatal.thread_id)
         session_status.fatal.thread_id = gettid_cached();
+
+    if(!session_status.fatal.worker_job_id)
+        session_status.fatal.worker_job_id = workers_get_last_job_id();
 
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag_async_safe());
 
@@ -1466,7 +1230,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
 static SPINLOCK shutdown_timeout_spinlock = SPINLOCK_INITIALIZER;
 
-void daemon_status_file_shutdown_timeout(void) {
+void daemon_status_file_shutdown_timeout(BUFFER *trace) {
     FUNCTION_RUN_ONCE();
 
     spinlock_lock(&shutdown_timeout_spinlock);
@@ -1474,6 +1238,8 @@ void daemon_status_file_shutdown_timeout(void) {
     dsf_acquire(session_status);
     exit_initiated_add(EXIT_REASON_SHUTDOWN_TIMEOUT);
     session_status.exit_reason |= EXIT_REASON_SHUTDOWN_TIMEOUT;
+    if(trace && buffer_strlen(trace) && stack_trace_is_empty(&session_status))
+        strncpyz(session_status.fatal.stack_trace, buffer_tostring(trace), sizeof(session_status.fatal.stack_trace) - 1);
     dsf_release(session_status);
 
     strncpyz(session_status.fatal.function, "shutdown_timeout", sizeof(session_status.fatal.function) - 1);
@@ -1501,9 +1267,11 @@ void daemon_status_file_shutdown_step(const char *step) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-bool daemon_status_file_has_last_crashed(void) {
-    return (last_session_status.status != DAEMON_STATUS_NONE && last_session_status.status != DAEMON_STATUS_EXITED) ||
-           !is_exit_reason_normal(last_session_status.exit_reason);
+bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds) {
+    if(!ds) ds = &last_session_status;
+
+    return (ds->status != DAEMON_STATUS_NONE && ds->status != DAEMON_STATUS_EXITED) ||
+           !is_exit_reason_normal(ds->exit_reason);
 }
 
 bool daemon_status_file_was_incomplete_shutdown(void) {
@@ -1623,4 +1391,12 @@ size_t daemon_status_file_get_restarts(void) {
 
 ssize_t daemon_status_file_get_reliability(void) {
     return session_status.reliability;
+}
+
+ND_MACHINE_GUID daemon_status_file_get_host_id(void) {
+    return last_session_status.host_id;
+}
+
+size_t daemon_status_file_get_fatal_worker_job_id(void) {
+    return session_status.fatal.worker_job_id;
 }

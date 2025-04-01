@@ -2,7 +2,7 @@
 
 #include "daemon-shutdown.h"
 #include "daemon-service.h"
-#include "daemon-status-file.h"
+#include "status-file.h"
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"
@@ -23,6 +23,7 @@ void abort_on_fatal_enable(void) {
     abort_on_fatal = true;
 }
 
+#ifdef ENABLE_SENTRY
 NEVER_INLINE
 static bool shutdown_on_fatal(void) {
     // keep this as a separate function, to have it logged like this in sentry
@@ -31,6 +32,7 @@ static bool shutdown_on_fatal(void) {
     else
         return false;
 }
+#endif
 
 void web_client_cache_destroy(void);
 
@@ -102,13 +104,14 @@ void cancel_main_threads(void) {
     static_threads = NULL;
 }
 
+#ifdef ENABLE_DBENGINE
 static void *rrdeng_exit_background(void *ptr) {
     struct rrdengine_instance *ctx = ptr;
     rrdeng_exit(ctx);
     return NULL;
 }
 
-#ifdef ENABLE_DBENGINE
+
 static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
     static size_t starting_size_to_flush = 0;
 
@@ -204,8 +207,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
     service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS |
-                        ABILITY_STREAMING_CONNECTIONS | SERVICE_ACLK | SERVICE_SYSTEMD);
-    watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
+                        ABILITY_STREAMING_CONNECTIONS | SERVICE_SYSTEMD);
+    watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS);
 
     service_wait_exit(SERVICE_MAINTENANCE | SERVICE_SYSTEMD, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
@@ -229,7 +232,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     ml_stop_threads();
     ml_fini();
-    watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS);
+    watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS);
 
     service_wait_exit(SERVICE_CONTEXT, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_CONTEXT_THREAD);
@@ -237,8 +240,13 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     web_client_cache_destroy();
     watcher_step_complete(WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE);
 
+    aclk_synchronization_shutdown();
+    watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_SYNC_THREAD);
+
+    service_signal_exit(SERVICE_ACLK);
+
     service_wait_exit(SERVICE_ACLK, 3 * USEC_PER_SEC);
-    watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_THREADS);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD);
 
     service_wait_exit(~0, 10 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
@@ -277,7 +285,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 nd_thread_join(th[tier]);
 
-            rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+            dbengine_shutdown();
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
@@ -302,7 +310,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     sqlite_close_databases();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
-    
+
     // unlink the pid
     if(pidfile && *pidfile && unlink(pidfile) != 0)
         netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
@@ -338,6 +346,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
                 dictionaries_referenced);
 
+#ifdef ENABLE_DBENGINE
     // destroy the caches in reverse order (extent and open depend on main cache)
     fprintf(stderr, "Destroying extent cache (PGC)...\n");
     pgc_destroy(extent_cache, false);
@@ -351,6 +360,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if(metrics_referenced)
         fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
             metrics_referenced);
+#endif    
 
     fprintf(stderr, "Destroying UUIDMap...\n");
     size_t uuid_referenced = uuidmap_destroy();

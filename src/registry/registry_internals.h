@@ -45,7 +45,6 @@ struct registry {
     const char *pathname;
     const char *db_filename;
     const char *log_filename;
-    const char *machine_guid_filename;
 
     // open files
     FILE *log_fp;

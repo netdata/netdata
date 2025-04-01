@@ -2827,25 +2827,31 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         last_r = r;
 
         rrd2rrdr_set_timestamps(r);
-        r->dp = onewayalloc_callocz(owa, r->d, sizeof(*r->dp));
-        r->dview = onewayalloc_callocz(owa, r->d, sizeof(*r->dview));
-        r->dgbc = onewayalloc_callocz(owa, r->d, sizeof(*r->dgbc));
-        r->gbc = onewayalloc_callocz(owa, r->n * r->d, sizeof(*r->gbc));
-        r->dqp = onewayalloc_callocz(owa, r->d, sizeof(STORAGE_POINT));
 
-        if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)))
-            // this is where we are going to group the hidden dimensions
-            r->vh = onewayalloc_mallocz(owa, r->n * r->d * sizeof(*r->vh));
+        if(r->d) {
+            r->dp = onewayalloc_callocz(owa, r->d, sizeof(*r->dp));
+            r->dview = onewayalloc_callocz(owa, r->d, sizeof(*r->dview));
+            r->dgbc = onewayalloc_callocz(owa, r->d, sizeof(*r->dgbc));
+            r->dqp = onewayalloc_callocz(owa, r->d, sizeof(STORAGE_POINT));
 
-        if(!final_grouping)
-            // this is where we are going to store the slot in the next RRDR
-            // that we are going to group by the dimension of this RRDR
-            r->dgbs = onewayalloc_callocz(owa, r->d, sizeof(*r->dgbs));
+            if(!final_grouping)
+                // this is where we are going to store the slot in the next RRDR
+                // that we are going to group by the dimension of this RRDR
+                r->dgbs = onewayalloc_callocz(owa, r->d, sizeof(*r->dgbs));
 
-        if (label_keys) {
-            r->dl = onewayalloc_callocz(owa, r->d, sizeof(DICTIONARY *));
-            r->label_keys = label_keys;
-            label_keys = NULL;
+            if (label_keys) {
+                r->dl = onewayalloc_callocz(owa, r->d, sizeof(DICTIONARY *));
+                r->label_keys = label_keys;
+                label_keys = NULL;
+            }
+
+            if(r->n) {
+                r->gbc = onewayalloc_callocz(owa, r->n * r->d, sizeof(*r->gbc));
+
+                if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)))
+                    // this is where we are going to group the hidden dimensions
+                    r->vh = onewayalloc_mallocz(owa, r->n * r->d * sizeof(*r->vh));
+            }
         }
 
         // zero r (dimension options, names, and ids)
@@ -2873,19 +2879,21 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         r->partial_data_trimming.trimmed_after = qt->window.before;
 
         // make all values empty
-        for (size_t i = 0; i != r->n; i++) {
-            NETDATA_DOUBLE *cn = &r->v[i * r->d];
-            RRDR_VALUE_FLAGS *co = &r->o[i * r->d];
-            NETDATA_DOUBLE *ar = &r->ar[i * r->d];
-            NETDATA_DOUBLE *vh = r->vh ? &r->vh[i * r->d] : NULL;
+        if(r->n && r->d) {
+            for (size_t i = 0; i != r->n; i++) {
+                NETDATA_DOUBLE *cn = &r->v[i * r->d];
+                RRDR_VALUE_FLAGS *co = &r->o[i * r->d];
+                NETDATA_DOUBLE *ar = &r->ar[i * r->d];
+                NETDATA_DOUBLE *vh = r->vh ? &r->vh[i * r->d] : NULL;
 
-            for (size_t d = 0; d < r->d; d++) {
-                cn[d] = NAN;
-                ar[d] = 0.0;
-                co[d] = RRDR_VALUE_EMPTY;
+                for (size_t d = 0; d < r->d; d++) {
+                    cn[d] = NAN;
+                    ar[d] = 0.0;
+                    co[d] = RRDR_VALUE_EMPTY;
 
-                if(vh)
-                    vh[d] = NAN;
+                    if (vh)
+                        vh[d] = NAN;
+                }
             }
         }
     }

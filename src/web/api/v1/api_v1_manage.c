@@ -35,7 +35,7 @@ static char *get_mgmt_api_key(void) {
     if(!guid[0]) {
         nd_uuid_t uuid;
 
-        uuid_generate_time(uuid);
+        uuid_generate(uuid);
         uuid_unparse_lower(uuid, guid);
         guid[GUID_LEN] = '\0';
 

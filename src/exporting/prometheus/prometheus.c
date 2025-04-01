@@ -4,7 +4,7 @@
 
 DEFINE_JUDYL_TYPED(PROM_CONTEXT_OPTIONS, PROMETHEUS_OUTPUT_OPTIONS);
 
-static void PROM_CONTEXT_OPTIONS_free_cb(Word_t index, PROMETHEUS_OUTPUT_OPTIONS options __maybe_unused) {
+static void PROM_CONTEXT_OPTIONS_free_cb(Word_t index, PROMETHEUS_OUTPUT_OPTIONS options __maybe_unused, void *data __maybe_unused) {
     STRING *context_id = (STRING *)index;
     string_freez(context_id);
 }
@@ -985,7 +985,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     rrd_stats_api_v1_charts_allmetrics_prometheus(
         prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 0, output_options, &context_options);
 
-    PROM_CONTEXT_OPTIONS_FREE(&context_options, PROM_CONTEXT_OPTIONS_free_cb);
+    PROM_CONTEXT_OPTIONS_FREE(&context_options, PROM_CONTEXT_OPTIONS_free_cb, NULL);
 }
 
 /**
@@ -1030,5 +1030,5 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     }
     dfe_done(host);
 
-    PROM_CONTEXT_OPTIONS_FREE(&context_options, PROM_CONTEXT_OPTIONS_free_cb);
+    PROM_CONTEXT_OPTIONS_FREE(&context_options, PROM_CONTEXT_OPTIONS_free_cb, NULL);
 }

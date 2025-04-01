@@ -32,7 +32,7 @@ void metaqueue_delete_dimension_uuid(nd_uuid_t *uuid);
 void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid);
 void metaqueue_ml_load_models(RRDDIM *rd);
 void detect_machine_guid_change(nd_uuid_t *host_uuid);
-void metadata_queue_load_host_context(RRDHOST *host);
+void metadata_queue_load_host_context();
 void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc);
 
 int sql_metadata_cache_stats(int op);
@@ -60,8 +60,9 @@ void commit_alert_transitions(RRDHOST *host);
 void metadata_sync_shutdown_background(void);
 void metadata_sync_shutdown_background_wait(void);
 void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context);
-void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer, size_t *query_counter);
+void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer);
 void metadata_execute_store_statement(sqlite3_stmt *stmt);
+size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid));
 
 // UNIT TEST
 int metadata_unittest(void);

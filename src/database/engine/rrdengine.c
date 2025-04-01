@@ -1249,7 +1249,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE);
 
     struct rrdengine_journalfile *journal_file;
-    unsigned deleted_bytes, journal_file_bytes, datafile_bytes;
+    size_t deleted_bytes, journal_file_bytes, datafile_bytes;
     int ret;
     char path[RRDENG_PATH_MAX];
 
@@ -1293,11 +1293,14 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
     }
 
+    memset(journal_file, 0, sizeof(*journal_file));
+    memset(datafile, 0, sizeof(*datafile));
+
     freez(journal_file);
     freez(datafile);
 
     ctx_current_disk_space_decrease(ctx, deleted_bytes);
-    netdata_log_info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
+    netdata_log_info("DBENGINE: reclaimed %zu bytes of disk space.", deleted_bytes);
 }
 
 static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -1804,7 +1807,16 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
 
         dbengine_initialize_structures();
 
-        fatal_assert(0 == uv_thread_create(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main));
+        int retries = 0;
+        int create_uv_thread_rc = create_uv_thread(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main, &retries);
+        if (create_uv_thread_rc)
+            nd_log_daemon(NDLP_ERR, "Failed to create DBENGINE thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
+
+        fatal_assert(0 == create_uv_thread_rc);
+
+        if (retries)
+            nd_log_daemon(NDLP_WARNING, "DBENGINE thread was created after %d attempts", retries);
+
         spawned = true;
     }
 
@@ -2013,8 +2025,8 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_DATABASE_ROTATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     if (!__atomic_load_n(&ctx->atomic.now_deleting_files, __ATOMIC_RELAXED) &&
-                         ctx->datafiles.first->next != NULL &&
-                         ctx->datafiles.first->next->next != NULL &&
+                        !__atomic_load_n(&ctx->atomic.migration_to_v2_running, __ATOMIC_RELAXED) &&
+                        ctx->datafiles.first->next != NULL && ctx->datafiles.first->next->next != NULL &&
                         rrdeng_ctx_tier_cap_exceeded(ctx)) {
 
                         __atomic_store_n(&ctx->atomic.now_deleting_files, true, __ATOMIC_RELAXED);
@@ -2087,4 +2099,15 @@ void dbengine_event_loop(void* arg) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
     (void) uv_loop_close(&main->loop);
     worker_unregister();
+}
+
+void dbengine_shutdown()
+{
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
+    int rc = uv_thread_join(&rrdeng_main.thread);
+    if (rc)
+        nd_log_daemon(NDLP_ERR, "DBENGINE: Failed to join thread, error %s", uv_err_name(rc));
+    else
+        nd_log_daemon(NDLP_INFO, "DBENGINE: thread shutdown completed");
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
-#include "daemon/daemon-status-file.h"
+#include "daemon/status-file.h"
 
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
@@ -252,14 +252,35 @@ static void process_triggered_signals(void) {
     } while(found);
 }
 
+static inline bool threshold_trigger_smaller(bool *last, double threshold, double hysteresis, double free_mem) {
+    bool triggered = *last;
+
+    if (free_mem < threshold)
+        *last = true;
+
+    if (free_mem >= (threshold + hysteresis))
+        *last = false;
+
+    return !triggered && *last;
+}
+
 void nd_process_signals(void) {
     posix_unmask_my_signals();
     const usec_t save_every_ut = 15 * 60 * USEC_PER_SEC;
     usec_t last_update_mt = now_monotonic_usec();
+    bool triggered1 = false, triggered5 = false, triggered10 = false;
 
     while (true) {
+        bool save_again = false;
+        double free_mem = os_system_memory_available_percent(os_system_memory(false));
+
+        save_again =
+            threshold_trigger_smaller(&triggered1, 1.0, 1.0, free_mem) ||
+            threshold_trigger_smaller(&triggered5, 5.0, 1.0, free_mem) ||
+            threshold_trigger_smaller(&triggered10, 10.0, 1.0, free_mem);
+
         usec_t mt = now_monotonic_usec();
-        if ((mt - last_update_mt) >= save_every_ut) {
+        if ((mt - last_update_mt) >= save_every_ut || save_again) {
             daemon_status_file_update_status(DAEMON_STATUS_NONE);
             last_update_mt += save_every_ut;
         }

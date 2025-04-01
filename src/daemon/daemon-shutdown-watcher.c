@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon-shutdown-watcher.h"
-#include "daemon-status-file.h"
+#include "status-file.h"
 
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
@@ -13,10 +13,12 @@ static struct completion shutdown_begin_completion;
 static struct completion shutdown_end_completion;
 static ND_THREAD *watcher_thread;
 
+static BUFFER *steps_timings = NULL;
+
 NEVER_INLINE
 static void shutdown_timed_out(void) {
     // keep this as a separate function, to have it logged like this in sentry
-    daemon_status_file_shutdown_timeout();
+    daemon_status_file_shutdown_timeout(steps_timings);
 #ifdef ENABLE_SENTRY
     nd_sentry_add_shutdown_timeout_as_breadcrumb();
 #endif
@@ -37,6 +39,11 @@ void watcher_step_complete(watcher_step_id_t step_id) {
 
 static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdown_start_time)
 {
+    if(!steps_timings) {
+        steps_timings = buffer_create(0, NULL);
+        buffer_strcat(steps_timings, "# shutdown steps timings");
+    }
+
     usec_t step_start_time = now_monotonic_usec();
     usec_t step_start_duration = step_start_time - shutdown_start_time;
 
@@ -71,6 +78,8 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
     duration_snprintf(
         step_duration_txt, sizeof(step_duration_txt), (int64_t)(step_duration), "us", true);
 
+    buffer_sprintf(steps_timings, "\n#%u '%s': %s", step_id + 1, watcher_steps[step_id].msg, step_duration_txt);
+
     if (ok) {
         netdata_log_info("shutdown step: [%d/%d] - {at %s} finished '%s' in %s",
                          (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
@@ -94,7 +103,6 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
                 watcher_steps[step_id].msg, step_duration_txt);
 #endif
 
-        daemon_status_file_shutdown_step("sentry timeout");
         shutdown_timed_out();
     }
 }
@@ -112,15 +120,17 @@ void *watcher_main(void *arg)
     usec_t shutdown_start_time = now_monotonic_usec();
 
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK, shutdown_start_time);
+    watcher_wait_for_step(
+        WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_REPLICATION_THREADS, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_CONTEXT_THREAD, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_ACLK_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_ACLK_SYNC_THREAD, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_CANCEL_MAIN_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN, shutdown_start_time);
@@ -145,46 +155,30 @@ void *watcher_main(void *arg)
 void watcher_thread_start() {
     watcher_steps = callocz(WATCHER_STEP_ID_MAX, sizeof(watcher_step_t));
 
-    watcher_steps[WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS].msg =
-        "close webrtc connections";
-    watcher_steps[WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK].msg =
-        "disable maintenance, new queries, new web requests, new streaming connections and aclk";
-    watcher_steps[WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD].msg =
-        "stop maintenance thread";
+    watcher_steps[WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS].msg = "close webrtc connections";
+    watcher_steps[WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS]
+        .msg = "disable maintenance, new queries, new web requests, new streaming connections and aclk";
+    watcher_steps[WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD].msg = "stop maintenance thread";
     watcher_steps[WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS].msg =
         "stop exporters, health and web servers threads";
-    watcher_steps[WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS].msg =
-        "stop collectors and streaming threads";
-    watcher_steps[WATCHER_STEP_ID_STOP_REPLICATION_THREADS].msg =
-        "stop replication threads";
-    watcher_steps[WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN].msg =
-        "prepare metasync shutdown";
-    watcher_steps[WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS].msg =
-        "disable ML detection and training threads";
-    watcher_steps[WATCHER_STEP_ID_STOP_CONTEXT_THREAD].msg =
-        "stop context thread";
-    watcher_steps[WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE].msg =
-        "clear web client cache";
-    watcher_steps[WATCHER_STEP_ID_STOP_ACLK_THREADS].msg =
-        "stop aclk threads";
-    watcher_steps[WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS].msg =
-        "stop all remaining worker threads";
-    watcher_steps[WATCHER_STEP_ID_CANCEL_MAIN_THREADS].msg =
-        "cancel main threads";
-    watcher_steps[WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS].msg =
-        "stop collection for all hosts";
+    watcher_steps[WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS].msg = "stop collectors and streaming threads";
+    watcher_steps[WATCHER_STEP_ID_STOP_REPLICATION_THREADS].msg = "stop replication threads";
+    watcher_steps[WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN].msg = "prepare metasync shutdown";
+    watcher_steps[WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS].msg = "disable ML detection and training threads";
+    watcher_steps[WATCHER_STEP_ID_STOP_CONTEXT_THREAD].msg = "stop context thread";
+    watcher_steps[WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE].msg = "clear web client cache";
+    watcher_steps[WATCHER_STEP_ID_STOP_ACLK_SYNC_THREAD].msg = "stop ACLK sync thread";
+    watcher_steps[WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD].msg = "stop ACLK MQTT connection thread";
+    watcher_steps[WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS].msg = "stop all remaining worker threads";
+    watcher_steps[WATCHER_STEP_ID_CANCEL_MAIN_THREADS].msg = "cancel main threads";
+    watcher_steps[WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS].msg = "stop collection for all hosts";
     watcher_steps[WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH].msg =
         "wait for dbengine collectors to finish";
-    watcher_steps[WATCHER_STEP_ID_STOP_DBENGINE_TIERS].msg =
-        "stop dbengine tiers";
-    watcher_steps[WATCHER_STEP_ID_STOP_METASYNC_THREADS].msg =
-        "stop metasync threads";
-    watcher_steps[WATCHER_STEP_ID_CLOSE_SQL_DATABASES].msg =
-        "close SQL databases";
-    watcher_steps[WATCHER_STEP_ID_REMOVE_PID_FILE].msg =
-        "remove pid file";
-    watcher_steps[WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES].msg =
-        "free openssl structures";
+    watcher_steps[WATCHER_STEP_ID_STOP_DBENGINE_TIERS].msg = "stop dbengine tiers";
+    watcher_steps[WATCHER_STEP_ID_STOP_METASYNC_THREADS].msg = "stop metasync threads";
+    watcher_steps[WATCHER_STEP_ID_CLOSE_SQL_DATABASES].msg = "close SQL databases";
+    watcher_steps[WATCHER_STEP_ID_REMOVE_PID_FILE].msg = "remove pid file";
+    watcher_steps[WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES].msg = "free openssl structures";
 
     for (size_t i = 0; i != WATCHER_STEP_ID_MAX; i++) {
         completion_init(&watcher_steps[i].p);

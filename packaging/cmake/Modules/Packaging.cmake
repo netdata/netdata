@@ -110,7 +110,7 @@ set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/netdata/postinst"
 	  "${PKG_FILES_PATH}/deb/netdata/postrm")
 
-set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE On)
+set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE Off)
 
 #
 # dashboard

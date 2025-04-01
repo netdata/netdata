@@ -3,7 +3,7 @@
 #include "common.h"
 #include "buildinfo.h"
 #include "daemon-shutdown-watcher.h"
-#include "daemon-status-file.h"
+#include "status-file.h"
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 
@@ -767,6 +767,7 @@ int netdata_main(int argc, char **argv) {
     // initialize the logging system
     // IMPORTANT: KEEP THIS FIRST SO THAT THE REST OF NETDATA WILL LOG PROPERLY
 
+    netdata_conf_section_directories();
     netdata_conf_section_logs();
     nd_log_limits_unlimited();
     nd_log_initialize();
@@ -775,6 +776,7 @@ int netdata_main(int argc, char **argv) {
     // this MUST be before anything else - to load the old status file before saving a new one
 
     daemon_status_file_init(); // this loads the old file
+    machine_guid_get(); // after loading the old daemon status file - we may need the machine guid from it
     nd_log_register_fatal_hook_cb(daemon_status_file_register_fatal);
     nd_log_register_fatal_final_cb(fatal_status_file_save);
     exit_initiated_init();
@@ -920,15 +922,8 @@ int netdata_main(int argc, char **argv) {
     web_server_threading_selection();
 
     delta_startup_time("web server sockets");
-    if(web_server_mode != WEB_SERVER_MODE_NONE) {
-        errno_clear();
-        if (!api_listen_sockets_setup()) {
-            exit_initiated_add(EXIT_REASON_ALREADY_RUNNING);
-            daemon_status_file_update_status(DAEMON_STATUS_NONE);
-            fatal("Cannot setup listen port(s). Is Netdata already running?");
-            exit(1);
-        }
-    }
+    if(web_server_mode != WEB_SERVER_MODE_NONE)
+        web_server_listen_sockets_setup();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("sqlite");
@@ -1018,11 +1013,8 @@ int netdata_main(int argc, char **argv) {
     cloud_conf_init_after_registry();
     netdata_random_session_id_generate();
 
-    const char *guid = registry_get_this_machine_guid(true);
 #ifdef ENABLE_SENTRY
-    nd_sentry_set_user(guid);
-#else
-    UNUSED(guid);
+    nd_sentry_set_user(machine_guid_get_txt());
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -1106,7 +1098,7 @@ int netdata_main(int argc, char **argv) {
 
         analytics_statistic_t start_statistic = {"START", "-", "-"};
         analytics_statistic_send(&start_statistic);
-        if (daemon_status_file_has_last_crashed()) {
+        if (daemon_status_file_has_last_crashed(NULL)) {
             analytics_statistic_t crash_statistic = {"CRASH", "-", "-"};
             analytics_statistic_send(&crash_statistic);
         }
@@ -1132,6 +1124,11 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("webrtc");
     webrtc_initialize();
 #endif
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("mrg cleanup");
+
+    mrg_metric_prepopulate_cleanup(main_mrg);
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("done");
