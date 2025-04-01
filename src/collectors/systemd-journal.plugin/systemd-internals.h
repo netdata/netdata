@@ -39,14 +39,14 @@ typedef enum {
 } ND_SD_JOURNAL_STATUS;
 
 typedef enum {
-    SDJF_NONE               = 0,
-    SDJF_ALL                = (1 << 0),
-    SDJF_LOCAL_ALL          = (1 << 1),
-    SDJF_REMOTE_ALL         = (1 << 2),
-    SDJF_LOCAL_SYSTEM       = (1 << 3),
-    SDJF_LOCAL_USER         = (1 << 4),
-    SDJF_LOCAL_NAMESPACE    = (1 << 5),
-    SDJF_LOCAL_OTHER        = (1 << 6),
+    ND_SD_JF_NONE               = 0,
+    ND_SD_JF_ALL                = (1 << 0),
+    ND_SD_JF_LOCAL_ALL          = (1 << 1),
+    ND_SD_JF_REMOTE_ALL         = (1 << 2),
+    ND_SD_JF_LOCAL_SYSTEM       = (1 << 3),
+    ND_SD_JF_LOCAL_USER         = (1 << 4),
+    ND_SD_JF_LOCAL_NAMESPACE    = (1 << 5),
+    ND_SD_JF_LOCAL_OTHER        = (1 << 6),
 } SD_JOURNAL_FILE_SOURCE_TYPE;
 
 struct nd_journal_file {
@@ -73,13 +73,13 @@ struct nd_journal_file {
     uint64_t messages_in_file;
 };
 
-#define SDJF_SOURCE_ALL_NAME "all"
-#define SDJF_SOURCE_LOCAL_NAME "all-local-logs"
-#define SDJF_SOURCE_LOCAL_SYSTEM_NAME "all-local-system-logs"
-#define SDJF_SOURCE_LOCAL_USERS_NAME "all-local-user-logs"
-#define SDJF_SOURCE_LOCAL_OTHER_NAME "all-uncategorized"
-#define SDJF_SOURCE_NAMESPACES_NAME "all-local-namespaces"
-#define SDJF_SOURCE_REMOTES_NAME "all-remote-systems"
+#define ND_SD_JF_SOURCE_ALL_NAME "all"
+#define ND_SD_JF_SOURCE_LOCAL_NAME "all-local-logs"
+#define ND_SD_JF_SOURCE_LOCAL_SYSTEM_NAME "all-local-system-logs"
+#define ND_SD_JF_SOURCE_LOCAL_USERS_NAME "all-local-user-logs"
+#define ND_SD_JF_SOURCE_LOCAL_OTHER_NAME "all-uncategorized"
+#define ND_SD_JF_SOURCE_NAMESPACES_NAME "all-local-namespaces"
+#define ND_SD_JF_SOURCE_REMOTES_NAME "all-remote-systems"
 
 #define ND_SD_JOURNAL_OPEN_FLAGS (0)
 

@@ -378,14 +378,14 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
     struct nd_journal_file *jf = value;
     jf->filename = dictionary_acquired_item_name(item);
     jf->filename_len = strlen(jf->filename);
-    jf->source_type = SDJF_ALL;
+    jf->source_type = ND_SD_JF_ALL;
 
     // based on the filename
     // decide the source to show to the user
     const char *s = strrchr(jf->filename, '/');
     if(s) {
         if(strstr(jf->filename, "/remote/")) {
-            jf->source_type |= SDJF_REMOTE_ALL;
+            jf->source_type |= ND_SD_JF_REMOTE_ALL;
 
             if(strncmp(s, "/remote-", 8) == 0) {
                 s = &s[8]; // skip "/remote-"
@@ -416,28 +416,28 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
             }
         }
         else {
-            jf->source_type |= SDJF_LOCAL_ALL;
+            jf->source_type |= ND_SD_JF_LOCAL_ALL;
 
             const char *t = s - 1;
             while(t >= jf->filename && *t != '.' && *t != '/')
                 t--;
 
             if(t >= jf->filename && *t == '.') {
-                jf->source_type |= SDJF_LOCAL_NAMESPACE;
+                jf->source_type |= ND_SD_JF_LOCAL_NAMESPACE;
                 jf->source = string_strdupz_source(t + 1, s, ND_SD_JOURNAL_MAX_SOURCE_LEN, "namespace-");
             }
             else if(strncmp(s, "/system", 7) == 0)
-                jf->source_type |= SDJF_LOCAL_SYSTEM;
+                jf->source_type |= ND_SD_JF_LOCAL_SYSTEM;
 
             else if(strncmp(s, "/user", 5) == 0)
-                jf->source_type |= SDJF_LOCAL_USER;
+                jf->source_type |= ND_SD_JF_LOCAL_USER;
 
             else
-                jf->source_type |= SDJF_LOCAL_OTHER;
+                jf->source_type |= ND_SD_JF_LOCAL_OTHER;
         }
     }
     else
-        jf->source_type |= SDJF_LOCAL_ALL | SDJF_LOCAL_OTHER;
+        jf->source_type |= ND_SD_JF_LOCAL_ALL | ND_SD_JF_LOCAL_OTHER;
 
     jf->msg_last_ut = jf->file_last_modified_ut;
 
@@ -540,20 +540,20 @@ void available_journal_file_sources_to_json_array(BUFFER *wb) {
         t.count = 1;
         t.size = jf->size;
 
-        dictionary_set(dict, SDJF_SOURCE_ALL_NAME, &t, sizeof(t));
+        dictionary_set(dict, ND_SD_JF_SOURCE_ALL_NAME, &t, sizeof(t));
 
-        if(jf->source_type & SDJF_LOCAL_ALL)
-            dictionary_set(dict, SDJF_SOURCE_LOCAL_NAME, &t, sizeof(t));
-        if(jf->source_type & SDJF_LOCAL_SYSTEM)
-            dictionary_set(dict, SDJF_SOURCE_LOCAL_SYSTEM_NAME, &t, sizeof(t));
-        if(jf->source_type & SDJF_LOCAL_USER)
-            dictionary_set(dict, SDJF_SOURCE_LOCAL_USERS_NAME, &t, sizeof(t));
-        if(jf->source_type & SDJF_LOCAL_OTHER)
-            dictionary_set(dict, SDJF_SOURCE_LOCAL_OTHER_NAME, &t, sizeof(t));
-        if(jf->source_type & SDJF_LOCAL_NAMESPACE)
-            dictionary_set(dict, SDJF_SOURCE_NAMESPACES_NAME, &t, sizeof(t));
-        if(jf->source_type & SDJF_REMOTE_ALL)
-            dictionary_set(dict, SDJF_SOURCE_REMOTES_NAME, &t, sizeof(t));
+        if(jf->source_type & ND_SD_JF_LOCAL_ALL)
+            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_NAME, &t, sizeof(t));
+        if(jf->source_type & ND_SD_JF_LOCAL_SYSTEM)
+            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_SYSTEM_NAME, &t, sizeof(t));
+        if(jf->source_type & ND_SD_JF_LOCAL_USER)
+            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_USERS_NAME, &t, sizeof(t));
+        if(jf->source_type & ND_SD_JF_LOCAL_OTHER)
+            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_OTHER_NAME, &t, sizeof(t));
+        if(jf->source_type & ND_SD_JF_LOCAL_NAMESPACE)
+            dictionary_set(dict, ND_SD_JF_SOURCE_NAMESPACES_NAME, &t, sizeof(t));
+        if(jf->source_type & ND_SD_JF_REMOTE_ALL)
+            dictionary_set(dict, ND_SD_JF_SOURCE_REMOTES_NAME, &t, sizeof(t));
         if(jf->source)
             dictionary_set(dict, string2str(jf->source), &t, sizeof(t));
     }

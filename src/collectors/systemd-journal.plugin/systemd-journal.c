@@ -78,8 +78,8 @@ struct lqs_extension {
 #define LQS_DEFAULT_ITEMS_PER_QUERY 200
 #define LQS_DEFAULT_ITEMS_SAMPLING  1000000
 #define LQS_SOURCE_TYPE             SD_JOURNAL_FILE_SOURCE_TYPE
-#define LQS_SOURCE_TYPE_ALL         SDJF_ALL
-#define LQS_SOURCE_TYPE_NONE        SDJF_NONE
+#define LQS_SOURCE_TYPE_ALL         ND_SD_JF_ALL
+#define LQS_SOURCE_TYPE_NONE        ND_SD_JF_NONE
 #define LQS_PARAMETER_SOURCE_NAME   "Journal Sources" // this is how it is shown to users
 #define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) get_internal_source_type(value)
 #define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) available_journal_file_sources_to_json_array(wb)
@@ -219,22 +219,22 @@ struct lqs_extension {
 // ----------------------------------------------------------------------------
 
 static SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value) {
-    if(strcmp(value, SDJF_SOURCE_ALL_NAME) == 0)
-        return SDJF_ALL;
-    else if(strcmp(value, SDJF_SOURCE_LOCAL_NAME) == 0)
-        return SDJF_LOCAL_ALL;
-    else if(strcmp(value, SDJF_SOURCE_REMOTES_NAME) == 0)
-        return SDJF_REMOTE_ALL;
-    else if(strcmp(value, SDJF_SOURCE_NAMESPACES_NAME) == 0)
-        return SDJF_LOCAL_NAMESPACE;
-    else if(strcmp(value, SDJF_SOURCE_LOCAL_SYSTEM_NAME) == 0)
-        return SDJF_LOCAL_SYSTEM;
-    else if(strcmp(value, SDJF_SOURCE_LOCAL_USERS_NAME) == 0)
-        return SDJF_LOCAL_USER;
-    else if(strcmp(value, SDJF_SOURCE_LOCAL_OTHER_NAME) == 0)
-        return SDJF_LOCAL_OTHER;
+    if(strcmp(value, ND_SD_JF_SOURCE_ALL_NAME) == 0)
+        return ND_SD_JF_ALL;
+    else if(strcmp(value, ND_SD_JF_SOURCE_LOCAL_NAME) == 0)
+        return ND_SD_JF_LOCAL_ALL;
+    else if(strcmp(value, ND_SD_JF_SOURCE_REMOTES_NAME) == 0)
+        return ND_SD_JF_REMOTE_ALL;
+    else if(strcmp(value, ND_SD_JF_SOURCE_NAMESPACES_NAME) == 0)
+        return ND_SD_JF_LOCAL_NAMESPACE;
+    else if(strcmp(value, ND_SD_JF_SOURCE_LOCAL_SYSTEM_NAME) == 0)
+        return ND_SD_JF_LOCAL_SYSTEM;
+    else if(strcmp(value, ND_SD_JF_SOURCE_LOCAL_USERS_NAME) == 0)
+        return ND_SD_JF_LOCAL_USER;
+    else if(strcmp(value, ND_SD_JF_SOURCE_LOCAL_OTHER_NAME) == 0)
+        return ND_SD_JF_LOCAL_OTHER;
 
-    return SDJF_NONE;
+    return ND_SD_JF_NONE;
 }
 
 // ----------------------------------------------------------------------------
@@ -688,7 +688,7 @@ static ND_SD_JOURNAL_STATUS nd_sd_journal_query_one_file(
 
 static bool jf_is_mine(struct nd_journal_file *jf, LOGS_QUERY_STATUS *fqs) {
 
-    if((fqs->rq.source_type == SDJF_NONE && !fqs->rq.sources) || (jf->source_type & fqs->rq.source_type) ||
+    if((fqs->rq.source_type == ND_SD_JF_NONE && !fqs->rq.sources) || (jf->source_type & fqs->rq.source_type) ||
        (fqs->rq.sources && simple_pattern_matches(fqs->rq.sources, string2str(jf->source)))) {
 
         if(!jf->msg_last_ut)
