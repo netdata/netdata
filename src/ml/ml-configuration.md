@@ -8,9 +8,9 @@ To enable or disable Machine Learning capabilities on a node:
 
 1. [Edit `netdata.conf`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config).
 2. In the `[ml]` section:
-   - Set `enabled` to `yes` to enable ML.
-   - Set `enabled` to `no` to disable ML.
-   - Leave it at the default `auto` to enable ML only when [Database mode](/src/database/README.md) is set to `dbengine`.
+    - Set `enabled` to `yes` to enable ML.
+    - Set `enabled` to `no` to disable ML.
+    - Leave it at the default `auto` to enable ML only when [Database mode](/src/database/README.md) is set to `dbengine`.
 3. [Restart Netdata](/docs/netdata-agent/start-stop-restart.md).
 
 ## Available Configuration Parameters
@@ -90,9 +90,9 @@ flowchart BT
 ### General Settings
 
 - **`enabled`**: Controls whether ML is enabled.
-  - `yes` to enable.
-  - `no` to disable.
-  - `auto` lets Netdata decide based on database mode.
+    - `yes` to enable.
+    - `no` to disable.
+    - `auto` lets Netdata decide based on database mode.
 
 - **`maximum num samples to train`** (`3600` - `86400`): Defines the maximum training period. The default of `21600` trains on the last 6 hours of data.
 

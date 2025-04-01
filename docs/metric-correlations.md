@@ -51,16 +51,16 @@ Metric Correlations (MC) requests to Netdata Cloud are handled in two ways:
 ## Usage Tips
 
 - When running Metric Correlations from the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) across multiple nodes, refine your results by grouping by node:
-  1. Run MC on all nodes if you're unsure which ones are relevant.
-  2. Group the most interesting charts by node to determine whether changes affect all nodes or just a subset.
-  3. If a subset of nodes stands out, filter for those nodes and rerun MC to get more precise results.
+    1. Run MC on all nodes if you're unsure which ones are relevant.
+    2. Group the most interesting charts by node to determine whether changes affect all nodes or just a subset.
+    3. If a subset of nodes stands out, filter for those nodes and rerun MC to get more precise results.
 
 - Choose the **`Volume`** algorithm for sparse metrics (e.g., request latency with few requests). Otherwise, use **`KS2`**.
-  - **`KS2`** is ideal for detecting complex distribution changes, such as shifts in variance.
-  - **`Volume`** is better for detecting metrics that were inactive and then spiked (or vice versa).
+    - **`KS2`** is ideal for detecting complex distribution changes, such as shifts in variance.
+    - **`Volume`** is better for detecting metrics that were inactive and then spiked (or vice versa).
 
   **Example:**
-  - `Volume` can highlight network traffic suddenly turning on.
-  - `KS2` can detect entropy distribution changes missed by `Volume`.
+    - `Volume` can highlight network traffic suddenly turning on.
+    - `KS2` can detect entropy distribution changes missed by `Volume`.
 
 - Combine **`Volume`** and **`Anomaly Rate`** to identify the most anomalous metrics within a timeframe. Expand the anomaly rate chart to visualize results more clearly.

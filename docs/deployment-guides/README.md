@@ -8,7 +8,7 @@ A Netdata deployment consists of three main components:
 
 ### 1. Netdata Agents
 
-Netdata Agents collect real-time metrics from the physical or virtual nodes in your infrastructure, including applications and containers running on them. These agents are open-source and licensed under GPL v3+.
+Netdata Agents collect real-time metrics from your infrastructure's physical or virtual nodes, including applications and containers running on them. They are open-source and licensed under GPL v3+.
 
 ### 2. Netdata Parents
 

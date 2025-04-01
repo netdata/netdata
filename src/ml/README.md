@@ -16,17 +16,12 @@ At Netdata, we developed **Anomaly Advisor**, a tool designed to improve trouble
 
 Netdata’s machine learning models follow these key principles:
 
-1. **Unsupervised Learning**
-   - Models operate independently without requiring user input.
-
-2. **Real-time Performance**
-   - While ML impacts CPU usage, it won't compromise Netdata’s high-fidelity, real-time monitoring.
-
-3. **Seamless Integration**
-   - ML-based insights are fully embedded into Netdata’s existing infrastructure monitoring and troubleshooting.
-
-4. **Assistance Over Alerts**
-   - ML helps users investigate potential issues rather than triggering unnecessary alerts. It won’t wake you up at 3 AM for minor anomalies.
+| Principle                  | Description                                                                                                                              |
+|----------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| **Unsupervised Learning**  | Models operate independently without requiring user input.                                                                               |
+| **Real-time Performance**  | While ML impacts CPU usage, it won't compromise Netdata's high-fidelity, real-time monitoring.                                           |
+| **Seamless Integration**   | ML-based insights are fully embedded into Netdata's existing infrastructure monitoring and troubleshooting.                              |
+| **Assistance Over Alerts** | ML helps users investigate potential issues rather than triggering unnecessary alerts. It won't wake you up at 3 AM for minor anomalies. |
 
 ---
 
@@ -55,6 +50,7 @@ To reduce false positives, Netdata trains multiple models per time-series, cover
 Each trained model assigns an **anomaly score** at every time step based on how far the data deviates from learned clusters. If the score exceeds the 99th percentile of training data, the **anomaly bit** is set to `true` (100); otherwise, it remains `false` (0).
 
 **Key benefits:**
+
 - No additional storage overhead since the anomaly bit is embedded in Netdata’s floating point number format.
 - The query engine automatically computes anomaly rates without requiring extra queries.
 
@@ -62,18 +58,18 @@ Each trained model assigns an **anomaly score** at every time step based on how 
 
 Netdata calculates **Node Anomaly Rate (NAR)** and **Dimension Anomaly Rate (DAR)** based on anomaly bits. Here’s an example matrix:
 
-| Time | d1  | d2  | d3  | d4  | d5  | **NAR** |
-|------|-----|-----|-----|-----|-----|---------|
-| t1   | 0   | 0   | 0   | 0   | 0   | **0%**  |
-| t2   | 0   | 0   | 0   | 0   | 100 | **20%** |
-| t3   | 0   | 0   | 0   | 0   | 0   | **0%**  |
-| t4   | 0   | 100 | 0   | 0   | 0   | **20%** |
-| t5   | 100 | 0   | 0   | 0   | 0   | **20%** |
-| t6   | 0   | 100 | 100 | 0   | 100 | **60%** |
-| t7   | 0   | 100 | 0   | 100 | 0   | **40%** |
-| t8   | 0   | 0   | 0   | 0   | 100 | **20%** |
-| t9   | 0   | 0   | 100 | 100 | 0   | **40%** |
-| t10  | 0   | 0   | 0   | 0   | 0   | **0%**  |
+| Time    | d1      | d2      | d3      | d4      | d5      | **NAR**               |
+|---------|---------|---------|---------|---------|---------|-----------------------|
+| t1      | 0       | 0       | 0       | 0       | 0       | **0%**                |
+| t2      | 0       | 0       | 0       | 0       | 100     | **20%**               |
+| t3      | 0       | 0       | 0       | 0       | 0       | **0%**                |
+| t4      | 0       | 100     | 0       | 0       | 0       | **20%**               |
+| t5      | 100     | 0       | 0       | 0       | 0       | **20%**               |
+| t6      | 0       | 100     | 100     | 0       | 100     | **60%**               |
+| t7      | 0       | 100     | 0       | 100     | 0       | **40%**               |
+| t8      | 0       | 0       | 0       | 0       | 100     | **20%**               |
+| t9      | 0       | 0       | 100     | 100     | 0       | **40%**               |
+| t10     | 0       | 0       | 0       | 0       | 0       | **0%**                |
 | **DAR** | **10%** | **30%** | **20%** | **20%** | **30%** | **_NAR_t1-10 = 22%_** |
 
 - **DAR (Dimension Anomaly Rate):** Average anomalies for a specific metric over time.
@@ -103,5 +99,6 @@ These insights help you quickly assess potential issues and take action before t
 Netdata’s machine learning models provide reliable, real-time anomaly detection with minimal false positives. By embedding ML within existing observability workflows, Netdata enhances troubleshooting and ensures proactive monitoring without unnecessary alerts.
 
 For more details, check out:
+
 - [Anomaly Advisor](/docs/dashboards-and-charts/anomaly-advisor-tab.md)
 - [ML Configuration Guide](/src/ml/ml-configuration.md)
