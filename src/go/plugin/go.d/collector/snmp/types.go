@@ -83,8 +83,6 @@ type parsedSymbolMetric struct {
 	options             map[string]string
 	extractValuePattern *regexp.Regexp
 	baseoid             string //TODO consider changing this to OID, it will not have nested OIDs as it is a symbol
-	unit                string
-	description         string
 }
 
 type parsedTableMetric struct {
@@ -150,6 +148,4 @@ type processedMetric struct {
 	value       interface{}
 	metric_type gosnmp.Asn1BER
 	tableName   string
-	unit        string
-	description string
 }

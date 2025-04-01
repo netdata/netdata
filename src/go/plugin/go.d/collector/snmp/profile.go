@@ -47,10 +47,8 @@ func (c *Collector) parseMetricsFromProfiles(matchingProfiles []*ddsnmp.Profile)
 							metricName := s.name
 							metricType := response.Variables[0].Type
 							metricValue := response.Variables[0].Value
-							metricUnit := s.unit
-							metricDescription := s.description
 
-							metricMap[oid] = processedMetric{oid: oid, name: metricName, value: metricValue, metric_type: metricType, unit: metricUnit, description: metricDescription}
+							metricMap[oid] = processedMetric{oid: oid, name: metricName, value: metricValue, metric_type: metricType}
 						}
 					}
 				}

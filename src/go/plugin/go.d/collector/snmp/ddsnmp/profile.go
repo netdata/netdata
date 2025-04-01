@@ -5,9 +5,7 @@ package ddsnmp
 import (
 	"errors"
 
-	// "github.com/DataDog/datadog-agent/pkg/networkdevice/profile/profiledefinition"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/profiledefinition"
+	"github.com/DataDog/datadog-agent/pkg/networkdevice/profile/profiledefinition"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
