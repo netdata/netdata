@@ -19,6 +19,8 @@ on:
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
+env:
+  DISABLE_TELEMETRY: 1 # Disable telemetry reporting from the agent in our CI.
 jobs:
   file-check: # Check what files changed if we’re being run in a PR or on a push.
     name: Check Modified Files
