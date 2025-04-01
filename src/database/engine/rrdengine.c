@@ -1249,7 +1249,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE);
 
     struct rrdengine_journalfile *journal_file;
-    unsigned deleted_bytes, journal_file_bytes, datafile_bytes;
+    size_t deleted_bytes, journal_file_bytes, datafile_bytes;
     int ret;
     char path[RRDENG_PATH_MAX];
 
@@ -1293,11 +1293,14 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
     }
 
+    memset(journal_file, 0, sizeof(*journal_file));
+    memset(datafile, 0, sizeof(*datafile));
+
     freez(journal_file);
     freez(datafile);
 
     ctx_current_disk_space_decrease(ctx, deleted_bytes);
-    netdata_log_info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
+    netdata_log_info("DBENGINE: reclaimed %zu bytes of disk space.", deleted_bytes);
 }
 
 static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -2022,8 +2025,8 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_DATABASE_ROTATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     if (!__atomic_load_n(&ctx->atomic.now_deleting_files, __ATOMIC_RELAXED) &&
-                         ctx->datafiles.first->next != NULL &&
-                         ctx->datafiles.first->next->next != NULL &&
+                        !__atomic_load_n(&ctx->atomic.migration_to_v2_running, __ATOMIC_RELAXED) &&
+                        ctx->datafiles.first->next != NULL && ctx->datafiles.first->next->next != NULL &&
                         rrdeng_ctx_tier_cap_exceeded(ctx)) {
 
                         __atomic_store_n(&ctx->atomic.now_deleting_files, true, __ATOMIC_RELAXED);

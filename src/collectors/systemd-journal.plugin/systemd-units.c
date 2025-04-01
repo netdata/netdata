@@ -49,7 +49,7 @@ static inline bool streq_ptr(const sd_char *a, const sd_char *b) {
     return strcmp_ptr(a, b) == 0;
 }
 
-ssize_t string_table_lookup(const char * const *table, size_t len, const char *key) {
+static ssize_t string_table_lookup(const char * const *table, size_t len, const char *key) {
     if (!key || !*key)
         return -EINVAL;
 
@@ -487,7 +487,7 @@ typedef void (*attribute_handler_t)(struct UnitInfo *u, UnitAttribute *ua);
 
 static void update_freezer_state(struct UnitInfo *u, UnitAttribute *ua);
 
-struct {
+static const struct {
     const char *member;
     char value_type;
 
@@ -855,10 +855,8 @@ static int systemd_unit_get_all_properties(sd_bus *bus, UnitInfo *u) {
         return r;
     }
 
-    int c = 0;
     while ((r = sd_bus_message_enter_container(m, SD_BUS_TYPE_DICT_ENTRY, "sv")) > 0) {
         const char *member, *contents;
-        c++;
 
         r = sd_bus_message_read_basic(m, SD_BUS_TYPE_STRING, &member);
         if (r < 0) {
@@ -916,7 +914,7 @@ static void systemd_units_get_all_properties(sd_bus *bus, UnitInfo *base) {
 // ----------------------------------------------------------------------------
 // main unit info
 
-int bus_parse_unit_info(sd_bus_message *message, UnitInfo *u) {
+static int bus_parse_unit_info(sd_bus_message *message, UnitInfo *u) {
     assert(message);
     assert(u);
 
@@ -1105,7 +1103,7 @@ static UnitInfo *systemd_units_get_all(void) {
     return base;
 }
 
-void systemd_units_free_all(UnitInfo *base) {
+static void systemd_units_free_all(UnitInfo *base) {
     while(base) {
         UnitInfo *u = base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(base, u, prev, next);
@@ -1227,7 +1225,7 @@ static inline FACET_ROW_SEVERITY if_normal(FACET_ROW_SEVERITY current, FACET_ROW
     return wanted;
 }
 
-FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
+static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
     FACET_ROW_SEVERITY severity, max_severity;
 
     switch(u->UnitLoadState) {
@@ -1577,14 +1575,14 @@ FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
     return severity;
 }
 
-int unit_info_compar(const void *a, const void *b) {
+static int unit_info_compar(const void *a, const void *b) {
     UnitInfo *u1 = *((UnitInfo **)a);
     UnitInfo *u2 = *((UnitInfo **)b);
 
     return strcasecmp(u1->id, u2->id);
 }
 
-void systemd_units_assign_priority(UnitInfo *base) {
+static void systemd_units_assign_priority(UnitInfo *base) {
     size_t units = 0, c = 0, prio = 0;
     for(UnitInfo *u = base; u ; u = u->next)
         units++;

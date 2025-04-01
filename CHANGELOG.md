@@ -6,6 +6,30 @@
 
 **Merged pull requests:**
 
+- Properly clean up install paths after runtime checks in static builds. [\#20017](https://github.com/netdata/netdata/pull/20017) ([Ferroin](https://github.com/Ferroin))
+- blacklist leaked machine guids [\#20016](https://github.com/netdata/netdata/pull/20016) ([ktsaou](https://github.com/ktsaou))
+- agent-events: add deduplicating web server [\#20014](https://github.com/netdata/netdata/pull/20014) ([ktsaou](https://github.com/ktsaou))
+- Validate journal file headers to prevent invalid memory access [\#20013](https://github.com/netdata/netdata/pull/20013) ([stelfrag](https://github.com/stelfrag))
+- added agent-events backend [\#20012](https://github.com/netdata/netdata/pull/20012) ([ktsaou](https://github.com/ktsaou))
+- daemon status 24d [\#20011](https://github.com/netdata/netdata/pull/20011) ([ktsaou](https://github.com/ktsaou))
+- Update synology.md [\#20010](https://github.com/netdata/netdata/pull/20010) ([ycdtosa](https://github.com/ycdtosa))
+- fix\(go.d/megacli\): handle BBU hardware component is not present [\#20008](https://github.com/netdata/netdata/pull/20008) ([ilyam8](https://github.com/ilyam8))
+- Fix crashes No 3 [\#20007](https://github.com/netdata/netdata/pull/20007) ([ktsaou](https://github.com/ktsaou))
+- Minor changes when handling systemd integration. [\#20006](https://github.com/netdata/netdata/pull/20006) ([vkalintiris](https://github.com/vkalintiris))
+- Deployment Guides Improved [\#20004](https://github.com/netdata/netdata/pull/20004) ([kanelatechnical](https://github.com/kanelatechnical))
+- daemon status 24c [\#20003](https://github.com/netdata/netdata/pull/20003) ([ktsaou](https://github.com/ktsaou))
+- use v4 UUIDs [\#20002](https://github.com/netdata/netdata/pull/20002) ([ktsaou](https://github.com/ktsaou))
+- Update synology.md [\#20001](https://github.com/netdata/netdata/pull/20001) ([Ancairon](https://github.com/Ancairon))
+- detect more CI [\#19999](https://github.com/netdata/netdata/pull/19999) ([ktsaou](https://github.com/ktsaou))
+- status file 24 [\#19996](https://github.com/netdata/netdata/pull/19996) ([ktsaou](https://github.com/ktsaou))
+- add kanelatechnical to CODEOWNERS [\#19994](https://github.com/netdata/netdata/pull/19994) ([ilyam8](https://github.com/ilyam8))
+- docs: improve Synology NAS installation documentation clarity [\#19993](https://github.com/netdata/netdata/pull/19993) ([ilyam8](https://github.com/ilyam8))
+- added worker last job id to status file [\#19992](https://github.com/netdata/netdata/pull/19992) ([ktsaou](https://github.com/ktsaou))
+- Improve shutdown and datafile rotation [\#19991](https://github.com/netdata/netdata/pull/19991) ([stelfrag](https://github.com/stelfrag))
+- Update synology.md [\#19989](https://github.com/netdata/netdata/pull/19989) ([ycdtosa](https://github.com/ycdtosa))
+- Regenerate integrations docs [\#19988](https://github.com/netdata/netdata/pull/19988) ([netdatabot](https://github.com/netdatabot))
+- Installation + docker, improvements [\#19987](https://github.com/netdata/netdata/pull/19987) ([kanelatechnical](https://github.com/kanelatechnical))
+- Regenerate integrations docs [\#19986](https://github.com/netdata/netdata/pull/19986) ([netdatabot](https://github.com/netdatabot))
 - perflib: do not dereference null pointer [\#19985](https://github.com/netdata/netdata/pull/19985) ([ktsaou](https://github.com/ktsaou))
 - keep errno in out of memory situations [\#19984](https://github.com/netdata/netdata/pull/19984) ([ktsaou](https://github.com/ktsaou))
 - do not allocate or access zero sized arrays [\#19983](https://github.com/netdata/netdata/pull/19983) ([ktsaou](https://github.com/ktsaou))
@@ -22,6 +46,7 @@
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.3 to 5.7.4 in /src/go [\#19968](https://github.com/netdata/netdata/pull/19968) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/docker/docker from 28.0.2+incompatible to 28.0.4+incompatible in /src/go [\#19967](https://github.com/netdata/netdata/pull/19967) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Improve ACLK sync shutdown process [\#19966](https://github.com/netdata/netdata/pull/19966) ([stelfrag](https://github.com/stelfrag))
+- Fast restart on busy parents [\#19964](https://github.com/netdata/netdata/pull/19964) ([ktsaou](https://github.com/ktsaou))
 - Set sqlite max soft and hard heap limit [\#19963](https://github.com/netdata/netdata/pull/19963) ([stelfrag](https://github.com/stelfrag))
 - fix MSI installer [\#19962](https://github.com/netdata/netdata/pull/19962) ([ktsaou](https://github.com/ktsaou))
 - Don’t skip building Go code on static builds. [\#19961](https://github.com/netdata/netdata/pull/19961) ([Ferroin](https://github.com/Ferroin))
@@ -67,6 +92,7 @@
 - new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
 - Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
 - Large-scale cleanup of static build infrastructure. [\#19852](https://github.com/netdata/netdata/pull/19852) ([Ferroin](https://github.com/Ferroin))
+- ebpf.plugin: rework memory [\#19844](https://github.com/netdata/netdata/pull/19844) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.3.1](https://github.com/netdata/netdata/tree/v2.3.1) (2025-03-24)
 
@@ -433,11 +459,6 @@
 - streaming nodes accounting [\#19466](https://github.com/netdata/netdata/pull/19466) ([ktsaou](https://github.com/ktsaou))
 - Don’t fail fast on static builds and Docker builds. [\#19465](https://github.com/netdata/netdata/pull/19465) ([Ferroin](https://github.com/Ferroin))
 - Child should be online before initializing health [\#19463](https://github.com/netdata/netdata/pull/19463) ([stelfrag](https://github.com/stelfrag))
-- Active Directory Metrics \(Windows.plugin\) [\#19461](https://github.com/netdata/netdata/pull/19461) ([thiagoftsm](https://github.com/thiagoftsm))
-- Use aral in ACLK [\#19459](https://github.com/netdata/netdata/pull/19459) ([stelfrag](https://github.com/stelfrag))
-- Enable libunwind in native packages and Docker images. [\#19452](https://github.com/netdata/netdata/pull/19452) ([Ferroin](https://github.com/Ferroin))
-- fix rrdset name crash on rrdset obsoletion [\#19449](https://github.com/netdata/netdata/pull/19449) ([ktsaou](https://github.com/ktsaou))
-- Pulse stream-parents [\#19445](https://github.com/netdata/netdata/pull/19445) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
@@ -466,29 +487,6 @@
 ## [v2.2.0](https://github.com/netdata/netdata/tree/v2.2.0) (2025-01-22)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.1.1...v2.2.0)
-
-**Merged pull requests:**
-
-- control stream-info requests rate [\#19458](https://github.com/netdata/netdata/pull/19458) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d/upsd\): remove UPS load charts if UPS load not found [\#19457](https://github.com/netdata/netdata/pull/19457) ([ilyam8](https://github.com/ilyam8))
-- Simplify the rrdhost\_ingestion\_status call [\#19456](https://github.com/netdata/netdata/pull/19456) ([stelfrag](https://github.com/stelfrag))
-- Fix up handling of libunwind in CMake. [\#19451](https://github.com/netdata/netdata/pull/19451) ([Ferroin](https://github.com/Ferroin))
-- Revert libunwind being enabled in Docker and DEB builds. [\#19450](https://github.com/netdata/netdata/pull/19450) ([Ferroin](https://github.com/Ferroin))
-- Do not run queries synchronously in the event loop [\#19448](https://github.com/netdata/netdata/pull/19448) ([stelfrag](https://github.com/stelfrag))
-- Cleanup metadata event loop [\#19447](https://github.com/netdata/netdata/pull/19447) ([stelfrag](https://github.com/stelfrag))
-- Make sure ACLK synchronization event loop runs frequently [\#19446](https://github.com/netdata/netdata/pull/19446) ([stelfrag](https://github.com/stelfrag))
-- move dbengine-retention chart to pulse [\#19444](https://github.com/netdata/netdata/pull/19444) ([ktsaou](https://github.com/ktsaou))
-- Fix Child web remote access Config in Parent-Child Deployment Examples [\#19443](https://github.com/netdata/netdata/pull/19443) ([Destructio](https://github.com/Destructio))
-- build\(deps\): update go toolchain to v1.23.5 [\#19442](https://github.com/netdata/netdata/pull/19442) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/prometheus/common from 0.61.0 to 0.62.0 in /src/go [\#19439](https://github.com/netdata/netdata/pull/19439) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/sijms/go-ora/v2 from 2.8.22 to 2.8.23 in /src/go [\#19438](https://github.com/netdata/netdata/pull/19438) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump k8s.io/client-go from 0.32.0 to 0.32.1 in /src/go [\#19437](https://github.com/netdata/netdata/pull/19437) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Handle incoming ACLK traffic asynchronously [\#19436](https://github.com/netdata/netdata/pull/19436) ([stelfrag](https://github.com/stelfrag))
-- add more aclk worker jobs [\#19435](https://github.com/netdata/netdata/pull/19435) ([ktsaou](https://github.com/ktsaou))
-- fix go.d/ethtool config schema [\#19434](https://github.com/netdata/netdata/pull/19434) ([ilyam8](https://github.com/ilyam8))
-- Cleanup context check list on startup [\#19433](https://github.com/netdata/netdata/pull/19433) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations docs [\#19432](https://github.com/netdata/netdata/pull/19432) ([netdatabot](https://github.com/netdatabot))
-- Drop Fedora 39 from CI and package builds. [\#19431](https://github.com/netdata/netdata/pull/19431) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.1.1](https://github.com/netdata/netdata/tree/v2.1.1) (2025-01-07)
 

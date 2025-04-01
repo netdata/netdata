@@ -44,8 +44,12 @@ typedef struct {
     struct extent_page_details_list *base;
 } EPDL_EXTENT;
 
+#define DATAFILE_MAGIC 0xDA7AF11E
+
 /* only one event loop is supported for now */
 struct rrdengine_datafile {
+    uint32_t magic1;
+
     unsigned tier;
     unsigned fileno;
     uv_file file;
@@ -79,6 +83,8 @@ struct rrdengine_datafile {
         RW_SPINLOCK spinlock;
         Pvoid_t epdl_per_extent;
     } extent_epdl;
+
+    uint32_t magic2;
 };
 
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
@@ -96,5 +102,16 @@ int create_data_file(struct rrdengine_datafile *datafile);
 int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock);
 int init_data_files(struct rrdengine_instance *ctx);
 void finalize_data_files(struct rrdengine_instance *ctx);
+
+NEVERNULL ALWAYS_INLINE
+static struct rrdengine_instance *datafile_ctx(struct rrdengine_datafile *datafile) {
+    if(unlikely(!datafile->ctx))
+        fatal("DBENGINE: datafile %u of tier %u has no ctx", datafile->fileno, datafile->tier);
+
+    if(unlikely(datafile->magic1 != DATAFILE_MAGIC || datafile->magic2 != DATAFILE_MAGIC))
+        fatal("DBENGINE: datafile %u of tier %u has invalid magic", datafile->fileno, datafile->tier);
+
+    return datafile->ctx;
+}
 
 #endif /* NETDATA_DATAFILE_H */

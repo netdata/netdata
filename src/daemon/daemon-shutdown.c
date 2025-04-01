@@ -2,7 +2,7 @@
 
 #include "daemon-shutdown.h"
 #include "daemon-service.h"
-#include "daemon-status-file.h"
+#include "status-file.h"
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"
@@ -310,7 +310,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     sqlite_close_databases();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
-    
+
     // unlink the pid
     if(pidfile && *pidfile && unlink(pidfile) != 0)
         netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
