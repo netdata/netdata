@@ -578,7 +578,7 @@ portable_del_user_from_group() {
 
     # Set the new list of members
     # shellcheck disable=SC2086
-    run synogroup --member "${groupname}" "${current_members}" && return 0
+    run synogroup --member "${groupname}" ${current_members} && return 0
   fi
 
   error "Failed to delete user ${username} from group ${groupname} !"
