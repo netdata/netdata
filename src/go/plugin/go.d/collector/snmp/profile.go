@@ -3,12 +3,9 @@ package snmp
 import (
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/gosnmp/gosnmp"
-	"gopkg.in/yaml.v3"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
 func (s *SysObjectIDs) UnmarshalYAML(unmarshal func(any) error) error {
@@ -27,10 +24,11 @@ func (s *SysObjectIDs) UnmarshalYAML(unmarshal func(any) error) error {
 	return fmt.Errorf("invalid sysobjectid format")
 }
 
-func (c *Collector) parseMetricsFromProfiles(matchingProfiles []*Profile) (map[string]processedMetric, error) {
+func (c *Collector) parseMetricsFromProfiles(matchingProfiles []*ddsnmp.Profile) (map[string]processedMetric, error) {
 	metricMap := map[string]processedMetric{}
 	for _, profile := range matchingProfiles {
-		results, err := parseMetrics(profile.Metrics)
+		profileDef := profile.Definition
+		results, err := parseMetrics(profileDef.Metrics)
 		if err != nil {
 			return nil, err
 		}
@@ -49,8 +47,10 @@ func (c *Collector) parseMetricsFromProfiles(matchingProfiles []*Profile) (map[s
 							metricName := s.name
 							metricType := response.Variables[0].Type
 							metricValue := response.Variables[0].Value
+							metricUnit := s.unit
+							metricDescription := s.description
 
-							metricMap[oid] = processedMetric{oid: oid, name: metricName, value: metricValue, metric_type: metricType}
+							metricMap[oid] = processedMetric{oid: oid, name: metricName, value: metricValue, metric_type: metricType, unit: metricUnit, description: metricDescription}
 						}
 					}
 				}
@@ -85,99 +85,4 @@ func (c *Collector) parseMetricsFromProfiles(matchingProfiles []*Profile) (map[s
 
 	}
 	return metricMap, nil
-}
-
-func (s *Symbol) UnmarshalYAML(node *yaml.Node) error {
-	// If scalar node, assume the value is the name.
-	if node.Kind == yaml.ScalarNode {
-		s.Name = node.Value
-		return nil
-	}
-
-	// Otherwise, decode normally
-	type plainSymbol Symbol
-	var ps plainSymbol
-	if err := node.Decode(&ps); err != nil {
-		return err
-	}
-	*s = Symbol(ps)
-	return nil
-}
-
-func LoadAllProfiles(profileDir string) (map[string]*Profile, error) {
-	profiles := make(map[string]*Profile)
-	err := filepath.Walk(profileDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if strings.HasSuffix(info.Name(), ".yaml") {
-			profile, err := LoadYAML(path, profileDir)
-			if err == nil {
-				profiles[path] = profile
-			} else {
-				log.Printf("Skipping invalid YAML: %s (%v)\n", path, err)
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return profiles, nil
-}
-
-func LoadYAML(filename string, basePath string) (*Profile, error) {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	var profile Profile
-	err = yaml.Unmarshal(data, &profile)
-	if err != nil {
-		return nil, err
-	}
-
-	// If the profile extends other files, load and merge them
-	for _, parentFile := range profile.Extends {
-		parentProfile, err := LoadYAML(filepath.Join(basePath, parentFile), basePath)
-		if err != nil {
-			return nil, err
-		}
-		MergeProfiles(&profile, parentProfile)
-	}
-
-	return &profile, nil
-}
-
-// Merge two profiles, giving priority to the child profile
-func MergeProfiles(child, parent *Profile) {
-	if child.Metadata.Device.Fields == nil {
-		child.Metadata.Device.Fields = make(map[string]Symbol)
-	}
-
-	for key, value := range parent.Metadata.Device.Fields {
-		if _, exists := child.Metadata.Device.Fields[key]; !exists {
-			child.Metadata.Device.Fields[key] = value
-		}
-	}
-	child.Metrics = append(parent.Metrics, child.Metrics...)
-}
-
-// Find the matching profile based on sysObjectID
-func FindMatchingProfiles(profiles map[string]*Profile, deviceOID string) []*Profile {
-	var matchedProfiles []*Profile
-
-	for _, profile := range profiles {
-		for _, oidPattern := range profile.SysObjectID {
-			if strings.HasPrefix(deviceOID, strings.Split(oidPattern, "*")[0]) {
-				matchedProfiles = append(matchedProfiles, profile)
-				break
-			}
-		}
-	}
-
-	return matchedProfiles
 }

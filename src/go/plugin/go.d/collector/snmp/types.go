@@ -12,83 +12,7 @@ type snmpPDU struct {
 	metric_type gosnmp.Asn1BER
 }
 
-type Profile struct {
-	Extends     []string     `yaml:"extends"`
-	SysObjectID SysObjectIDs `yaml:"sysobjectid"`
-	Metadata    Metadata     `yaml:"metadata"`
-	Metrics     []Metric     `yaml:"metrics"`
-}
-
 type SysObjectIDs []string
-
-type Metadata struct {
-	Device DeviceMetadata `yaml:"device"`
-}
-
-type DeviceMetadata struct {
-	Fields map[string]Symbol `yaml:"fields"`
-}
-
-type Symbol struct {
-	OID          string `yaml:"OID,omitempty"`
-	Name         string `yaml:"name,omitempty"`
-	MatchPattern string `yaml:"match_pattern,omitempty"`
-	MatchValue   string `yaml:"match_value,omitempty"`
-	ExtractValue string `yaml:"extract_value,omitempty"`
-}
-
-// superset of OIDMetric, SymbolMetric and TableMetric
-type Metric struct {
-	Name string `yaml:"name,omitempty"`
-	OID  string `yaml:"OID,omitempty"`
-	//TODO check for only name existing in metric tag, as there is some case for that
-	MetricTags []TableMetricTag `yaml:"metric_tags,omitempty"`
-	MetricType string           `yaml:"metric_type,omitempty"`
-	Options    map[string]string
-
-	MIB    string `yaml:"MIB,omitempty"`
-	Symbol Symbol `yaml:"symbol,omitempty"` //can be either string or Symbol
-
-	Table   interface{} `yaml:"table,omitempty"` // can be either a string or Symbol
-	Symbols []Symbol    `yaml:"symbols,omitempty"`
-}
-
-type TableMetricTag struct {
-	Index   int            `yaml:"index"`
-	Mapping map[int]string `yaml:"mapping"`
-
-	Tag string `yaml:"tag"`
-
-	MIB            string       `yaml:"mib"`
-	Symbol         Symbol       `yaml:"symbol"`
-	Table          string       `yaml:"table"`
-	IndexTransform []IndexSlice `yaml:"index_transform"`
-}
-
-type oidMetric struct {
-	name       string
-	oid        string
-	metricTags []string
-	forcedType string
-	options    map[string]string
-}
-
-type symbolMetric struct {
-	mib        string
-	symbol     interface{} //can be either string or Symbol
-	forcedType string
-	metricTags []string
-	options    map[string]string
-}
-
-type tableMetric struct {
-	mib        string
-	table      interface{} // can be either a string or Symbol
-	symbols    []Symbol
-	forcedType string
-	metricTags []TableMetricTag
-	options    map[string]string
-}
 
 type parsedResult struct {
 	oids           []string
@@ -159,6 +83,8 @@ type parsedSymbolMetric struct {
 	options             map[string]string
 	extractValuePattern *regexp.Regexp
 	baseoid             string //TODO consider changing this to OID, it will not have nested OIDs as it is a symbol
+	unit                string
+	description         string
 }
 
 type parsedTableMetric struct {
@@ -213,17 +139,6 @@ type metricParseResult struct {
 	parsedMetrics []parsedMetric
 }
 
-type MetricTag struct {
-	OID    string
-	MIB    string
-	Symbol Symbol
-	// simple tag
-	Tag string
-	// regex matching
-	Match string
-	Tags  []string
-}
-
 type IndexSlice struct {
 	Start int
 	End   int
@@ -235,4 +150,6 @@ type processedMetric struct {
 	value       interface{}
 	metric_type gosnmp.Asn1BER
 	tableName   string
+	unit        string
+	description string
 }

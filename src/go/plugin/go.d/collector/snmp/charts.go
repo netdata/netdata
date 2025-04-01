@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	prioNetIfaceTraffic = module.Priority + iota
+	priosnmp = module.Priority + iota
+	prioNetIfaceTraffic
 	prioNetIfaceUnicast
 	prioNetIfaceMulticast
 	prioNetIfaceBroadcast
@@ -31,6 +32,20 @@ var netIfaceChartsTmpl = module.Charts{
 	netIfaceAdminStatusChartTmpl.Copy(),
 	netIfaceOperStatusChartTmpl.Copy(),
 }
+
+var (
+	snmpChartTemplate = module.Chart{
+		ID:       "%s",
+		Title:    "%s",
+		Units:    "%s",
+		Fam:      "%s",
+		Ctx:      "snmp.%s",
+		Priority: priosnmp,
+		Dims: module.Dims{
+			{ID: "%s", Name: "%s"},
+		},
+	}
+)
 
 var (
 	netIfaceTrafficChartTmpl = module.Chart{
@@ -175,6 +190,53 @@ func (c *Collector) addNetIfaceCharts(iface *netInterface) {
 
 	if err := c.Charts().Add(*charts...); err != nil {
 		c.Warning(err)
+	}
+}
+
+func (c *Collector) addSNMPChart(processedMetric processedMetric) {
+	if processedMetric.tableName == "" {
+		chart := snmpChartTemplate.Copy()
+
+		chart.ID = fmt.Sprintf(chart.ID, processedMetric.name)
+		if processedMetric.description == "" {
+			chart.Title = fmt.Sprintf(chart.Title, "TBD Description")
+		} else {
+			chart.Title = fmt.Sprintf(chart.Title, processedMetric.description)
+		}
+		if processedMetric.unit == "" {
+			chart.Units = fmt.Sprintf(chart.Units, "TBD unit")
+		} else {
+			chart.Units = fmt.Sprintf(chart.Units, processedMetric.unit)
+		}
+		chart.Ctx = fmt.Sprintf(chart.Ctx, processedMetric.name)
+		chart.Fam = fmt.Sprintf(chart.Fam, processedMetric.name)
+		chart.Dims = append(chart.Dims, &module.Dim{ID: processedMetric.name, Name: processedMetric.name})
+
+		if err := c.Charts().Add(chart); err != nil {
+			c.Warning(err)
+		}
+	}
+	// else {}
+
+	// chart.Labels = []module.Label{
+	// 	{Key: "vendor", Value: c.sysInfo.Organization},
+	// 	{Key: "sysName", Value: c.sysInfo.Name},
+	// 	{Key: "ifDescr", Value: iface.ifDescr},
+	// 	{Key: "ifName", Value: iface.ifName},
+	// 	{Key: "ifType", Value: ifTypeMapping[iface.ifType]},
+	// }
+	// for _, dim := range chart.Dims {
+	// 	dim.ID = fmt.Sprintf(dim.ID, iface.ifName)
+	// }
+
+}
+
+func (c *Collector) removeSNMPChart(name string) {
+	for _, chart := range *c.Charts() {
+		if chart.ID == name {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
 	}
 }
 
