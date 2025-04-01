@@ -263,14 +263,14 @@ void remove_directory_watch(Watcher *watcher, int inotifyFd, const char *dirPath
         }
     }
 
-    struct nd_journal_file *jf;
-    dfe_start_write(journal_files_registry, jf) {
-        if(is_subpath(dirPath, jf->filename))
-            dictionary_del(journal_files_registry, jf->filename);
+    struct nd_journal_file *njf;
+    dfe_start_write(nd_journal_files_registry, njf) {
+        if(is_subpath(dirPath, njf->filename))
+            dictionary_del(nd_journal_files_registry, njf->filename);
     }
-    dfe_done(jf);
+    dfe_done(njf);
 
-    dictionary_garbage_collect(journal_files_registry);
+    dictionary_garbage_collect(nd_journal_files_registry);
 }
 
 void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event) {
@@ -432,7 +432,7 @@ static void process_pending(Watcher *watcher) {
                    "JOURNAL WATCHER: file '%s' no longer exists, removing it from the registry",
                    fullPath);
 
-            dictionary_del(journal_files_registry, fullPath);
+            dictionary_del(nd_journal_files_registry, fullPath);
         }
         else if(S_ISREG(info.st_mode)) {
 //            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
@@ -446,7 +446,7 @@ static void process_pending(Watcher *watcher) {
                     .size = info.st_size,
                     .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
             };
-            struct nd_journal_file *jf = dictionary_set(journal_files_registry, fullPath, &t, sizeof(t));
+            struct nd_journal_file *jf = dictionary_set(nd_journal_files_registry, fullPath, &t, sizeof(t));
             nd_journal_file_update_header(jf->filename, jf);
         }
 

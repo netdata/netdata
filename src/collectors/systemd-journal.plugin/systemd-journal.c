@@ -216,8 +216,6 @@ struct lqs_extension {
                                                 \
     ""
 
-// ----------------------------------------------------------------------------
-
 static SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value) {
     if(strcmp(value, ND_SD_JF_SOURCE_ALL_NAME) == 0)
         return ND_SD_JF_ALL;
@@ -237,8 +235,6 @@ static SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value) {
     return ND_SD_JF_NONE;
 }
 
-// ----------------------------------------------------------------------------
-
 static inline bool nd_sd_journal_seek_to(sd_journal *j, usec_t timestamp) {
     if(sd_journal_seek_realtime_usec(j, timestamp) < 0) {
         netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to %" PRIu64, timestamp);
@@ -252,8 +248,6 @@ static inline bool nd_sd_journal_seek_to(sd_journal *j, usec_t timestamp) {
 }
 
 #define JD_SOURCE_REALTIME_TIMESTAMP "_SOURCE_REALTIME_TIMESTAMP"
-
-// ----------------------------------------------------------------------------
 
 static inline size_t nd_sd_journal_process_row(sd_journal *j, FACETS *facets, struct nd_journal_file *njf, usec_t *msg_ut) {
     const void *data;
@@ -720,16 +714,16 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     lqs->c.bytes_read = 0;
 
     size_t files_used = 0;
-    size_t files_max = dictionary_entries(journal_files_registry);
+    size_t files_max = dictionary_entries(nd_journal_files_registry);
     const DICTIONARY_ITEM *file_items[files_max];
 
     // count the files
     bool files_are_newer = false;
-    dfe_start_read(journal_files_registry, njf) {
+    dfe_start_read(nd_journal_files_registry, njf) {
         if(!jf_is_mine(njf, lqs))
             continue;
 
-        file_items[files_used++] = dictionary_acquired_item_dup(journal_files_registry, njf_dfe.item);
+        file_items[files_used++] = dictionary_acquired_item_dup(nd_journal_files_registry, njf_dfe.item);
 
         if(njf->msg_last_ut > lqs->rq.if_modified_since)
             files_are_newer = true;
@@ -741,7 +735,7 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     if(lqs->rq.if_modified_since && !files_are_newer) {
         // release the files
         for(size_t f = 0; f < files_used ;f++)
-            dictionary_acquired_item_release(journal_files_registry, file_items[f]);
+            dictionary_acquired_item_release(nd_journal_files_registry, file_items[f]);
 
         return rrd_call_function_error(wb, "No new data since the previous call.", HTTP_RESP_NOT_MODIFIED);
     }
@@ -783,7 +777,6 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
         }
 
         lqs->c.file_working++;
-        // fqs->cached_count = 0;
 
         size_t fs_calls = fstat_thread_calls;
         size_t fs_cached = fstat_thread_cached_responses;
@@ -795,18 +788,6 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
         sampling_file_init(lqs, njf);
 
         ND_SD_JOURNAL_STATUS tmp_status = nd_sd_journal_query_one_file(filename, wb, facets, njf, lqs);
-
-//        nd_log(NDLS_COLLECTORS, NDLP_INFO,
-//               "JOURNAL ESTIMATION FINAL: '%s' "
-//               "total lines %zu [sampled=%zu, unsampled=%zu, estimated=%zu], "
-//               "file [%"PRIu64" - %"PRIu64", duration %"PRId64", known lines in file %zu], "
-//               "query [%"PRIu64" - %"PRIu64", duration %"PRId64"], "
-//               , jf->filename
-//               , fqs->samples_per_file.sampled + fqs->samples_per_file.unsampled + fqs->samples_per_file.estimated
-//               , fqs->samples_per_file.sampled, fqs->samples_per_file.unsampled, fqs->samples_per_file.estimated
-//               , jf->msg_first_ut, jf->msg_last_ut, jf->msg_last_ut - jf->msg_first_ut, jf->messages_in_file
-//               , fqs->query_file.start_ut, fqs->query_file.stop_ut, fqs->query_file.stop_ut - fqs->query_file.start_ut
-//        );
 
         rows_useful = lqs->c.rows_useful - rows_useful;
         rows_read = lqs->c.rows_read - rows_read;
@@ -896,7 +877,7 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
 
     // release the files
     for(size_t f = 0; f < files_used ;f++)
-        dictionary_acquired_item_release(journal_files_registry, file_items[f]);
+        dictionary_acquired_item_release(nd_journal_files_registry, file_items[f]);
 
     switch (status) {
         case ND_SD_JOURNAL_OK:
@@ -1043,12 +1024,6 @@ static void systemd_journal_register_transformations(LOGS_QUERY_STATUS *lqs) {
         facets, "MESSAGE",
         FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT |
             FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
-
-    //    facets_register_dynamic_key_name(
-    //        facets, "MESSAGE",
-    //        FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_RICH_TEXT |
-    //            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS,
-    //        nd_sd_journal_rich_message, NULL);
 
     facets_register_key_name_transformation(
         facets, "PRIORITY",

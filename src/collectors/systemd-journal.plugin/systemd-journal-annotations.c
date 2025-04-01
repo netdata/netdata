@@ -2,8 +2,6 @@
 
 #include "systemd-internals.h"
 
-// ----------------------------------------------------------------------------
-
 const char *errno_map[] = {
         [1] = "1 (EPERM)",          // "Operation not permitted",
         [2] = "2 (ENOENT)",         // "No such file or directory",
@@ -292,8 +290,6 @@ void nd_sd_journal_transform_errno(FACETS *facets __maybe_unused, BUFFER *wb, FA
     }
 }
 
-// ----------------------------------------------------------------------------
-
 DICTIONARY *boot_ids_to_first_ut = NULL;
 
 void nd_sd_journal_transform_boot_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
@@ -319,7 +315,7 @@ void nd_sd_journal_transform_boot_id(FACETS *facets __maybe_unused, BUFFER *wb, 
                     continue;
                 }
 
-                ut = journal_file_update_annotation_boot_id(j, njf, boot_id);
+                ut = nd_journal_file_update_annotation_boot_id(j, njf, boot_id);
                 sd_journal_close(j);
             }
             dfe_done(njf);
@@ -415,8 +411,6 @@ void nd_sd_journal_transform_timestamp_usec(FACETS *facets __maybe_unused, BUFFE
     }
 }
 
-// ----------------------------------------------------------------------------
-
 void nd_sd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
     FACET_ROW_KEY_VALUE *pid_rkv = dictionary_get(row->dict, "_PID");
     const char *pid = pid_rkv ? buffer_tostring(pid_rkv->wb) : FACET_VALUE_UNSET;
@@ -449,9 +443,6 @@ void nd_sd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *json_ar
 
     buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
 }
-
-
-// ----------------------------------------------------------------------------
 
 struct message_id_info {
     const char *msg;
@@ -646,8 +637,6 @@ void nd_sd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *w
     }
 }
 
-// ----------------------------------------------------------------------------
-
 void nd_sd_journal_annotations_init(void) {
     cached_usernames_init();
     cached_groupnames_init();
@@ -655,11 +644,3 @@ void nd_sd_journal_annotations_init(void) {
     update_cached_host_groups();
     nd_sd_journal_message_ids_init();
 }
-
-// ----------------------------------------------------------------------------
-
-//static void nd_sd_journal_rich_message(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row __maybe_unused, void *data __maybe_unused) {
-//    buffer_json_add_array_item_object(json_array);
-//    buffer_json_member_add_string(json_array, "value", buffer_tostring(rkv->wb));
-//    buffer_json_object_close(json_array);
-//}

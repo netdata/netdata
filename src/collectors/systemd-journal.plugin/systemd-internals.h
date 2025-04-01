@@ -86,7 +86,7 @@ struct nd_journal_file {
 #define JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT (5 * USEC_PER_SEC) // assume a 5-seconds latency
 #define JOURNAL_VS_REALTIME_DELTA_MAX_UT (2 * 60 * USEC_PER_SEC) // up to 2-minutes latency
 
-extern DICTIONARY *journal_files_registry;
+extern DICTIONARY *nd_journal_files_registry;
 extern DICTIONARY *used_hashes_registry;
 extern DICTIONARY *boot_ids_to_first_ut;
 
@@ -110,7 +110,7 @@ void nd_sd_journal_transform_gid(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATI
 void nd_sd_journal_transform_cap_effective(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 void nd_sd_journal_transform_timestamp_usec(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 
-usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file *njf, const char *boot_id);
+usec_t nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file *njf, const char *boot_id);
 
 #define MAX_JOURNAL_DIRECTORIES 100
 struct journal_directory {

@@ -6,7 +6,7 @@
 #define VAR_LOG_JOURNAL_MAX_DEPTH 10
 
 struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES] = { 0 };
-DICTIONARY *journal_files_registry = NULL;
+DICTIONARY *nd_journal_files_registry = NULL;
 DICTIONARY *used_hashes_registry = NULL;
 
 static usec_t systemd_journal_session = 0;
@@ -15,7 +15,7 @@ void buffer_json_journal_versions(BUFFER *wb) {
     buffer_json_member_add_object(wb, "versions");
     {
         buffer_json_member_add_uint64(wb, "sources",
-                systemd_journal_session + dictionary_version(journal_files_registry));
+                systemd_journal_session + dictionary_version(nd_journal_files_registry));
     }
     buffer_json_object_close(wb);
 }
@@ -39,74 +39,7 @@ static bool journal_sd_id128_parse(const char *in, sd_id128_t *ret) {
     return false;
 }
 
-//static void journal_file_get_header_from_journalctl(const char *filename, struct journal_file *jf) {
-//    // unfortunately, our capabilities are not inheritted by journalctl
-//    // so, it fails to give us the information we need.
-//
-//    bool read_writer = false, read_head = false, read_tail = false;
-//
-//    char cmd[FILENAME_MAX * 2];
-//    snprintfz(cmd, sizeof(cmd), "journalctl --header --file '%s'", filename);
-//    CLEAN_BUFFER *wb = run_command_and_get_output_to_buffer(cmd, 1024);
-//    if(wb) {
-//        const char *s = buffer_tostring(wb);
-//
-//        const char *sequential_id_header = "Sequential Number ID:";
-//        const char *sequential_id_data = strcasestr(s, sequential_id_header);
-//        if(sequential_id_data) {
-//            sequential_id_data += strlen(sequential_id_header);
-//            if(journal_sd_id128_parse(sequential_id_data, &jf->first_writer_id))
-//                read_writer = true;
-//        }
-//
-//        const char *head_sequential_number_header = "Head sequential number:";
-//        const char *head_sequential_number_data = strcasestr(s, head_sequential_number_header);
-//        if(head_sequential_number_data) {
-//            head_sequential_number_data += strlen(head_sequential_number_header);
-//
-//            while(isspace(*head_sequential_number_data))
-//                head_sequential_number_data++;
-//
-//            if(isdigit(*head_sequential_number_data)) {
-//                jf->first_seqnum = strtoul(head_sequential_number_data, NULL, 10);
-//                if(jf->first_seqnum)
-//                    read_head = true;
-//            }
-//        }
-//
-//        const char *tail_sequential_number_header = "Tail sequential number:";
-//        const char *tail_sequential_number_data = strcasestr(s, tail_sequential_number_header);
-//        if(tail_sequential_number_data) {
-//            tail_sequential_number_data += strlen(tail_sequential_number_header);
-//
-//            while(isspace(*tail_sequential_number_data))
-//                tail_sequential_number_data++;
-//
-//            if(isdigit(*tail_sequential_number_data)) {
-//                jf->last_seqnum = strtoul(tail_sequential_number_data, NULL, 10);
-//                if(jf->last_seqnum)
-//                    read_tail = true;
-//            }
-//        }
-//
-//        if(read_head && read_tail && jf->last_seqnum > jf->first_seqnum)
-//            jf->messages_in_file = jf->last_seqnum - jf->first_seqnum;
-//    }
-//
-//    if(!jf->logged_journalctl_failure && (!read_head || !read_tail)) {
-//
-//        nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
-//               "Failed to read %s%s%s from journalctl's output on filename '%s', using the command: %s",
-//               read_writer?"":"writer id,",
-//               read_head?"":"head id,",
-//               read_tail?"":"tail id,",
-//               filename, cmd);
-//
-//        jf->logged_journalctl_failure = true;
-//    }
-//}
-
-usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file *njf __maybe_unused, const char *boot_id) {
+usec_t nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file *njf __maybe_unused, const char *boot_id) {
     usec_t ut = UINT64_MAX;
     int r;
 
@@ -163,7 +96,7 @@ usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_f
     return UINT64_MAX;
 }
 
-static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, struct nd_journal_file *njf __maybe_unused) {
+static void nd_journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, struct nd_journal_file *njf __maybe_unused) {
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
     sd_journal_flush_matches(j);
 
@@ -202,7 +135,7 @@ static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, s
 
     void *nothing;
     dfe_start_read(dict, nothing){
-        journal_file_update_annotation_boot_id(j, njf, nothing_dfe.name);
+        nd_journal_file_update_annotation_boot_id(j, njf, nothing_dfe.name);
     }
     dfe_done(nothing);
 
@@ -335,18 +268,11 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
     else
         njf->messages_in_file = 0;
 
-//    if(!jf->messages_in_file)
-//        journal_file_get_header_from_journalctl(filename, jf);
-
-    journal_file_get_boot_id_annotations(j, njf);
+    nd_journal_file_get_boot_id_annotations(j, njf);
     sd_journal_close(j);
     fstat_cache_disable_on_thread();
 
     njf->last_scan_header_vs_last_modified_ut = njf->file_last_modified_ut;
-
-//    nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-//           "Journal file header updated '%s'",
-//           jf->filename);
 }
 
 static STRING *string_strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix) {
@@ -458,16 +384,12 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unuse
         njf_old->size = njf_new->size;
 
         njf_old->msg_last_ut = njf_old->file_last_modified_ut;
-
-//        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-//               "Journal file updated to the journal files registry '%s'",
-//               jf->filename);
     }
 
     return false;
 }
 
-struct journal_file_source {
+struct nd_journal_file_source {
     usec_t first_ut;
     usec_t last_ut;
     size_t count;
@@ -484,8 +406,8 @@ struct journal_file_source {
     } \
 } while(0)
 
-static int journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry, void *data) {
-    struct journal_file_source *jfs = entry;
+static int nd_journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry, void *data) {
+    struct nd_journal_file_source *nd_jfs = entry;
     BUFFER *wb = data;
 
     const char *name = dictionary_acquired_item_name(item);
@@ -493,15 +415,15 @@ static int journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *entr
     buffer_json_add_array_item_object(wb);
     {
         char size_for_humans[128];
-        size_snprintf(size_for_humans, sizeof(size_for_humans), jfs->size, "B", false);
+        size_snprintf(size_for_humans, sizeof(size_for_humans), nd_jfs->size, "B", false);
 
         char duration_for_humans[128];
         duration_snprintf(duration_for_humans, sizeof(duration_for_humans),
-                          (time_t)((jfs->last_ut - jfs->first_ut) / USEC_PER_SEC), "s", true);
+                          (time_t)((nd_jfs->last_ut - nd_jfs->first_ut) / USEC_PER_SEC), "s", true);
 
         char info[1024];
         snprintfz(info, sizeof(info), "%zu files, with a total size of %s, covering %s",
-                jfs->count, size_for_humans, duration_for_humans);
+                nd_jfs->count, size_for_humans, duration_for_humans);
 
         buffer_json_member_add_string(wb, "id", name);
         buffer_json_member_add_string(wb, "name", name);
@@ -513,8 +435,8 @@ static int journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *entr
     return 1;
 }
 
-static bool journal_file_merge_sizes(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value , void *data __maybe_unused) {
-    struct journal_file_source *jfs = old_value, *njfs = new_value;
+static bool nd_journal_file_merge_sizes(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value , void *data __maybe_unused) {
+    struct nd_journal_file_source *jfs = old_value, *njfs = new_value;
     jfs->count += njfs->count;
     jfs->size += njfs->size;
 
@@ -529,37 +451,37 @@ static bool journal_file_merge_sizes(const DICTIONARY_ITEM *item __maybe_unused,
 
 void available_journal_file_sources_to_json_array(BUFFER *wb) {
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_NAME_LINK_DONT_CLONE|DICT_OPTION_DONT_OVERWRITE_VALUE);
-    dictionary_register_conflict_callback(dict, journal_file_merge_sizes, NULL);
+    dictionary_register_conflict_callback(dict, nd_journal_file_merge_sizes, NULL);
 
-    struct journal_file_source t = { 0 };
+    struct nd_journal_file_source njfs_tmp = { 0 };
 
     struct nd_journal_file *njf;
-    dfe_start_read(journal_files_registry, njf) {
-        t.first_ut = njf->msg_first_ut;
-        t.last_ut = njf->msg_last_ut;
-        t.count = 1;
-        t.size = njf->size;
+    dfe_start_read(nd_journal_files_registry, njf) {
+        njfs_tmp.first_ut = njf->msg_first_ut;
+        njfs_tmp.last_ut = njf->msg_last_ut;
+        njfs_tmp.count = 1;
+        njfs_tmp.size = njf->size;
 
-        dictionary_set(dict, ND_SD_JF_SOURCE_ALL_NAME, &t, sizeof(t));
+        dictionary_set(dict, ND_SD_JF_SOURCE_ALL_NAME, &njfs_tmp, sizeof(njfs_tmp));
 
         if(njf->source_type & ND_SD_JF_LOCAL_ALL)
-            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_NAME, &t, sizeof(t));
+            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_NAME, &njfs_tmp, sizeof(njfs_tmp));
         if(njf->source_type & ND_SD_JF_LOCAL_SYSTEM)
-            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_SYSTEM_NAME, &t, sizeof(t));
+            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_SYSTEM_NAME, &njfs_tmp, sizeof(njfs_tmp));
         if(njf->source_type & ND_SD_JF_LOCAL_USER)
-            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_USERS_NAME, &t, sizeof(t));
+            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_USERS_NAME, &njfs_tmp, sizeof(njfs_tmp));
         if(njf->source_type & ND_SD_JF_LOCAL_OTHER)
-            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_OTHER_NAME, &t, sizeof(t));
+            dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_OTHER_NAME, &njfs_tmp, sizeof(njfs_tmp));
         if(njf->source_type & ND_SD_JF_LOCAL_NAMESPACE)
-            dictionary_set(dict, ND_SD_JF_SOURCE_NAMESPACES_NAME, &t, sizeof(t));
+            dictionary_set(dict, ND_SD_JF_SOURCE_NAMESPACES_NAME, &njfs_tmp, sizeof(njfs_tmp));
         if(njf->source_type & ND_SD_JF_REMOTE_ALL)
-            dictionary_set(dict, ND_SD_JF_SOURCE_REMOTES_NAME, &t, sizeof(t));
+            dictionary_set(dict, ND_SD_JF_SOURCE_REMOTES_NAME, &njfs_tmp, sizeof(njfs_tmp));
         if(njf->source)
-            dictionary_set(dict, string2str(njf->source), &t, sizeof(t));
+            dictionary_set(dict, string2str(njf->source), &njfs_tmp, sizeof(njfs_tmp));
     }
     dfe_done(jf);
 
-    dictionary_sorted_walkthrough_read(dict, journal_file_to_json_array_cb, wb);
+    dictionary_sorted_walkthrough_read(dict, nd_journal_file_to_json_array_cb, wb);
 
     dictionary_destroy(dict);
 }
@@ -664,9 +586,9 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
     closedir(dir);
 }
 
-static size_t journal_files_scans = 0;
+static size_t nd_journal_files_scans = 0;
 bool nd_journal_files_completed_once(void) {
-    return journal_files_scans > 0;
+    return nd_journal_files_scans > 0;
 }
 
 int filenames_compar(const void *a, const void *b) {
@@ -742,7 +664,7 @@ void nd_journal_files_registry_update(void) {
                     .size = info.st_size,
                     .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
             };
-            struct nd_journal_file *njf = dictionary_set(journal_files_registry, full_path, &njf_tmp, sizeof(njf_tmp));
+            struct nd_journal_file *njf = dictionary_set(nd_journal_files_registry, full_path, &njf_tmp, sizeof(njf_tmp));
             nd_journal_file_update_header(njf->filename, njf);
         }
         freez(array);
@@ -750,14 +672,14 @@ void nd_journal_files_registry_update(void) {
         dictionary_destroy(dirs);
 
         struct nd_journal_file *njf;
-        dfe_start_write(journal_files_registry, njf){
+        dfe_start_write(nd_journal_files_registry, njf){
             if(njf->last_scan_monotonic_ut < scan_monotonic_ut)
-                dictionary_del(journal_files_registry, njf_dfe.name);
+                dictionary_del(nd_journal_files_registry, njf_dfe.name);
         }
         dfe_done(njf);
-        dictionary_garbage_collect(journal_files_registry);
+        dictionary_garbage_collect(nd_journal_files_registry);
 
-        journal_files_scans++;
+        nd_journal_files_scans++;
         spinlock_unlock(&spinlock);
 
         internal_error(true,
@@ -840,18 +762,17 @@ void nd_journal_init_files_and_directories(void) {
 
     systemd_journal_session = (now_realtime_usec() / USEC_PER_SEC) * USEC_PER_SEC;
 
-    journal_files_registry = dictionary_create_advanced(
+    nd_journal_files_registry = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(struct nd_journal_file));
 
-    dictionary_register_insert_callback(journal_files_registry, files_registry_insert_cb, NULL);
-    dictionary_register_delete_callback(journal_files_registry, files_registry_delete_cb, NULL);
-    dictionary_register_conflict_callback(journal_files_registry, files_registry_conflict_cb, NULL);
+    dictionary_register_insert_callback(nd_journal_files_registry, files_registry_insert_cb, NULL);
+    dictionary_register_delete_callback(nd_journal_files_registry, files_registry_delete_cb, NULL);
+    dictionary_register_conflict_callback(nd_journal_files_registry, files_registry_conflict_cb, NULL);
 
     boot_ids_to_first_ut = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(usec_t));
 
     dictionary_register_conflict_callback(boot_ids_to_first_ut, boot_id_conflict_cb, NULL);
-
 }
