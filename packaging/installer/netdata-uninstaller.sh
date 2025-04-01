@@ -577,7 +577,8 @@ portable_del_user_from_group() {
     current_members=$(echo "${current_members_list}" | grep -oP '\[\K[^\]]+' | tr '\n' ' ' | sed 's/ $//')
 
     # Set the new list of members
-    run synogroup --member "${groupname}" ${current_members} && return 0
+    # shellcheck disable=SC2086
+    run synogroup --member "${groupname}" "${current_members}" && return 0
   fi
 
   error "Failed to delete user ${username} from group ${groupname} !"
