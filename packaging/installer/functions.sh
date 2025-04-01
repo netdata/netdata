@@ -1144,7 +1144,8 @@ portable_add_user_to_group() {
       fi
 
       # Set the member list
-      run synogroup --member "${groupname}" "${new_members}" && return 0
+      # shellcheck disable SC2086
+      run synogroup --member "${groupname}" ${new_members} && return 0
     fi
 
     warning >&2 "Failed to add user ${username} to group ${groupname}!"
