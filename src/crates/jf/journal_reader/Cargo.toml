@@ -1,0 +1,9 @@
+[package]
+name = "journal_reader"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+error = { path = "../error" }
+journal_file = { path = "../journal_file" }
+window_manager = { path = "../window_manager" }

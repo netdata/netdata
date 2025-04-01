@@ -255,7 +255,7 @@ static inline size_t sampling_running_file_query_estimate_remaining_lines_by_tim
 }
 
 static inline size_t sampling_running_file_query_estimate_remaining_lines(
-    sd_journal *j __maybe_unused,
+    NsdJournal *j __maybe_unused,
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
     FACETS_ANCHOR_DIRECTION direction,
@@ -267,10 +267,10 @@ static inline size_t sampling_running_file_query_estimate_remaining_lines(
     size_t expected_matching_logs_by_seqnum = 0;
     double proportion_by_seqnum = 0.0;
     uint64_t current_msg_seqnum;
-    sd_id128_t current_msg_writer;
-    if (!lqs->c.query_file.first_msg_seqnum || sd_journal_get_seqnum(j, &current_msg_seqnum, &current_msg_writer) < 0) {
+    NsdId128 current_msg_writer;
+    if (!lqs->c.query_file.first_msg_seqnum || nsd_journal_get_seqnum(j, &current_msg_seqnum, &current_msg_writer) < 0) {
         lqs->c.query_file.first_msg_seqnum = 0;
-        lqs->c.query_file.first_msg_writer = SD_ID128_NULL;
+        lqs->c.query_file.first_msg_writer = NSD_ID128_NULL;
     } else if (jf->messages_in_file) {
         size_t scanned_lines = sampling_file_lines_scanned_so_far(lqs);
 
@@ -303,7 +303,7 @@ static inline size_t sampling_running_file_query_estimate_remaining_lines(
 }
 
 static inline void sampling_decide_file_sampling_every(
-    sd_journal *j,
+    NsdJournal *j,
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
     FACETS_ANCHOR_DIRECTION direction,
@@ -331,7 +331,7 @@ typedef enum {
 } sampling_t;
 
 static inline sampling_t is_row_in_sample(
-    sd_journal *j,
+    NsdJournal *j,
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
     usec_t msg_ut,
@@ -397,7 +397,7 @@ static inline sampling_t is_row_in_sample(
 
 static inline void sampling_update_running_query_file_estimates(
     FACETS *facets,
-    sd_journal *j,
+    NsdJournal *j,
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
     usec_t msg_ut,

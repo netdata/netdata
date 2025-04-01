@@ -195,6 +195,7 @@ cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collecti
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocator monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "Enable systemd journal log collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_UNITS "Enable systemd units information collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_XENSTAT "Enable Xen domain monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 
 # Metrics exporters
@@ -226,6 +227,10 @@ mark_as_advanced(ENABLE_LIBUNWIND)
 
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
+
+option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False)
+option(ENABLE_NETDATA_JOURNAL_FILE_READER_BENCHMARKS "Enable netdata's journal file reader implementation benchmarks" False)
+option(ENABLE_LIBSYSTEMD_JOURNAL_FILE_READER "Enable libsystemd's journal file reader implementation" True)
 
 option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
 
@@ -1758,13 +1763,16 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
         src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
         src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
+        src/collectors/systemd-journal.plugin/provider/netdata_provider.c
+        src/collectors/systemd-journal.plugin/provider/netdata_provider.h
+        src/collectors/systemd-journal.plugin/provider/rust_provider.h
         src/libnetdata/os/system-maps/system-services.h
         src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
 )
 
-if(ENABLE_SYSTEMD_DBUS)
-        list(APPEND SYSTEMD_JOURNAL_PLUGIN_FILES src/collectors/systemd-journal.plugin/systemd-units.c)
-endif()
+set(SYSTEMD_UNITS_PLUGIN_FILES
+        src/collectors/systemd-units.plugin/plugin_systemd_units.c
+)
 
 set(STREAMING_PLUGIN_FILES
         src/streaming/stream.h
@@ -2799,12 +2807,47 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
+# Enable rust implementation if we don't have systemd and we want the journal plugin
+if(ENABLE_PLUGIN_SYSTEMD_JOURNAL AND NOT SYSTEMD_FOUND)
+        if (NOT ENABLE_NETDATA_JOURNAL_FILE_READER)
+                message(WARNING "Systemd journal package not found, will try netdata's journal reader which requires cargo.")
+                set(ENABLE_NETDATA_JOURNAL_FILE_READER True)
+        endif()
+endif()
+
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
-        if(NOT SYSTEMD_FOUND)
-                message(FATAL_ERROR "Systemd journal plugin requires systemd, but systemd was not found.")
+        add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
+
+        if(ENABLE_NETDATA_JOURNAL_FILE_READER)
+                include(FetchContent)
+                FetchContent_Declare(
+                    Corrosion
+                    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+                    GIT_TAG v0.5
+                )
+                FetchContent_MakeAvailable(Corrosion)
+
+                corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml)
+                target_compile_definitions(systemd-journal.plugin PRIVATE HAVE_RUST_PROVIDER)
+                target_link_libraries(systemd-journal.plugin journal_reader_ffi)
+
+                if(ENABLE_NETDATA_JOURNAL_FILE_READER_BENCHMARKS)
+                        set(JF_BENCHMARK_FILES src/crates/jf/benchmark/main.c
+                                               src/collectors/systemd-journal.plugin/provider/netdata_provider.c
+                                               src/collectors/systemd-journal.plugin/provider/netdata_provider.h
+                        )
+
+                        add_executable(jfr.bench ${JF_BENCHMARK_FILES})
+                        target_compile_definitions(jfr.bench PRIVATE HAVE_RUST_PROVIDER)
+                        target_include_directories(jfr.bench PRIVATE "${CMAKE_SOURCE_DIR}/src")
+                        target_link_libraries(jfr.bench journal_reader_ffi)
+
+                        add_executable(jfc.bench ${JF_BENCHMARK_FILES})
+                        target_include_directories(jfc.bench PRIVATE "${CMAKE_SOURCE_DIR}/src")
+                        target_link_libraries(jfc.bench "${SYSTEMD_LDFLAGS}")
+                endif()
         endif()
 
-        add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
         target_link_libraries(systemd-journal.plugin libnetdata)
 
         install(TARGETS systemd-journal.plugin
@@ -2816,6 +2859,28 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-systemd-journal
                         DESTINATION usr/share/doc/netdata-plugin-systemd-journal)
+        endif()
+endif()
+
+if(ENABLE_PLUGIN_SYSTEMD_UNITS)
+        if(NOT SYSTEMD_FOUND)
+                message(FATAL_ERROR "Systemd units plugin requires systemd, but systemd was not found.")
+        endif()
+
+        include(FetchContent)
+
+        add_executable(systemd-units.plugin ${SYSTEMD_UNITS_PLUGIN_FILES})
+        target_link_libraries(systemd-units.plugin libnetdata)
+
+        install(TARGETS systemd-units.plugin
+                COMPONENT plugin-systemd-units
+                DESTINATION usr/libexec/netdata/plugins.d)
+
+        if(BUILD_FOR_PACKAGING)
+                install(FILES
+                        ${PKG_FILES_PATH}/copyright
+                        COMPONENT plugin-systemd-units
+                        DESTINATION usr/share/doc/netdata-plugin-systemd-units)
         endif()
 endif()
 

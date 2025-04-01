@@ -1,0 +1,18 @@
+[package]
+name = "journal_reader_ffi"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+error = { path = "../error" }
+journal_reader = { path = "../journal_reader" }
+journal_file = { path = "../journal_file" }
+memmap2 = { workspace = true }
+serde_json = { workspace = true }
+sigbus = { path = "../sigbus" }
+
+[build-dependencies]
+cbindgen = "0.28.0"
+
+[lib]
+crate-type = ["staticlib"]

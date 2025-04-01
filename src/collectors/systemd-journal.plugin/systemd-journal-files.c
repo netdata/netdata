@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "collectors/systemd-journal.plugin/provider/netdata_provider.h"
 #include "systemd-internals.h"
 
 #define ND_SD_JOURNAL_MAX_SOURCE_LEN 64
@@ -21,7 +22,7 @@ void buffer_json_journal_versions(BUFFER *wb)
     buffer_json_object_close(wb);
 }
 
-static bool journal_sd_id128_parse(const char *in, sd_id128_t *ret)
+static bool journal_sd_id128_parse(const char *in, NsdId128 *ret)
 {
     while (isspace(*in))
         in++;
@@ -31,8 +32,8 @@ static bool journal_sd_id128_parse(const char *in, sd_id128_t *ret)
     uuid[32] = '\0';
 
     if (strlen(uuid) == 32) {
-        sd_id128_t read;
-        if (sd_id128_from_string(uuid, &read) == 0) {
+        NsdId128 read;
+        if (nsd_id128_from_string(uuid, &read) == 0) {
             *ret = read;
             return true;
         }
@@ -42,7 +43,7 @@ static bool journal_sd_id128_parse(const char *in, sd_id128_t *ret)
 }
 
 usec_t
-nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file *njf __maybe_unused, const char *boot_id)
+nd_journal_file_update_annotation_boot_id(NsdJournal *j, struct nd_journal_file *njf __maybe_unused, const char *boot_id)
 {
     usec_t ut = UINT64_MAX;
     int r;
@@ -50,9 +51,9 @@ nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file 
     char m[100];
     size_t len = snprintfz(m, sizeof(m), "_BOOT_ID=%s", boot_id);
 
-    sd_journal_flush_matches(j);
+    nsd_journal_flush_matches(j);
 
-    r = sd_journal_add_match(j, m, len);
+    r = nsd_journal_add_match(j, m, len);
     if (r < 0) {
         errno = -r;
         internal_error(
@@ -66,7 +67,7 @@ nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file 
         return UINT64_MAX;
     }
 
-    r = sd_journal_seek_head(j);
+    r = nsd_journal_seek_head(j);
     if (r < 0) {
         errno = -r;
         internal_error(
@@ -79,7 +80,7 @@ nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file 
         return UINT64_MAX;
     }
 
-    r = sd_journal_next(j);
+    r = nsd_journal_next(j);
     if (r < 0) {
         errno = -r;
         internal_error(
@@ -90,9 +91,18 @@ nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file 
             njf->filename,
             r);
         return UINT64_MAX;
+    } else if (r == 0) {
+        internal_error(
+            true,
+            "GVD: while looking for the first timestamp of boot_id '%s', "
+            "sd_journal_next() on file '%s' returned %d",
+            boot_id,
+            njf->filename,
+            r);
+        return UINT64_MAX;
     }
 
-    r = sd_journal_get_realtime_usec(j, &ut);
+    r = nsd_journal_get_realtime_usec(j, &ut);
     if (r < 0 || !ut || ut == UINT64_MAX) {
         errno = -r;
         internal_error(
@@ -114,12 +124,12 @@ nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file 
 }
 
 static void
-nd_journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, struct nd_journal_file *njf __maybe_unused)
+nd_journal_file_get_boot_id_annotations(NsdJournal *j __maybe_unused, struct nd_journal_file *njf __maybe_unused)
 {
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
-    sd_journal_flush_matches(j);
+    nsd_journal_flush_matches(j);
 
-    int r = sd_journal_query_unique(j, "_BOOT_ID");
+    int r = nsd_journal_query_unique(j, "_BOOT_ID");
     if (r < 0) {
         errno = -r;
         internal_error(
@@ -137,7 +147,7 @@ nd_journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, struct nd_
 
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
-    SD_JOURNAL_FOREACH_UNIQUE(j, data, data_length)
+    NSD_JOURNAL_FOREACH_UNIQUE(j, data, data_length)
     {
         const char *key, *value;
         size_t key_length, value_length;
@@ -178,8 +188,8 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
         [1] = NULL,
     };
 
-    sd_journal *j = NULL;
-    if (sd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
+    NsdJournal *j = NULL;
+    if (nsd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
         netdata_log_error("JOURNAL: cannot open file '%s' to update msg_ut", filename);
         fstat_cache_disable_on_thread();
 
@@ -197,16 +207,16 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
 
     usec_t first_ut = 0, last_ut = 0;
     uint64_t first_seqnum = 0, last_seqnum = 0;
-    sd_id128_t first_writer_id = SD_ID128_NULL, last_writer_id = SD_ID128_NULL;
+    NsdId128 first_writer_id = NSD_ID128_NULL, last_writer_id = NSD_ID128_NULL;
 
-    if (sd_journal_seek_head(j) < 0 || sd_journal_next(j) < 0 || sd_journal_get_realtime_usec(j, &first_ut) < 0 ||
+    if (nsd_journal_seek_head(j) < 0 || nsd_journal_next(j) < 0 || nsd_journal_get_realtime_usec(j, &first_ut) < 0 ||
         !first_ut) {
         internal_error(true, "cannot find the timestamp of the first message in '%s'", filename);
         first_ut = 0;
     }
 #ifdef HAVE_SD_JOURNAL_GET_SEQNUM
     else {
-        if (sd_journal_get_seqnum(j, &first_seqnum, &first_writer_id) < 0 || !first_seqnum) {
+        if (nsd_journal_get_seqnum(j, &first_seqnum, &first_writer_id) < 0 || !first_seqnum) {
             internal_error(true, "cannot find the first seqnums of the first message in '%s'", filename);
             first_seqnum = 0;
             memset(&first_writer_id, 0, sizeof(first_writer_id));
@@ -214,14 +224,14 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
     }
 #endif
 
-    if (sd_journal_seek_tail(j) < 0 || sd_journal_previous(j) < 0 || sd_journal_get_realtime_usec(j, &last_ut) < 0 ||
+    if (nsd_journal_seek_tail(j) < 0 || nsd_journal_previous(j) < 0 || nsd_journal_get_realtime_usec(j, &last_ut) < 0 ||
         !last_ut) {
         internal_error(true, "cannot find the timestamp of the last message in '%s'", filename);
         last_ut = njf->file_last_modified_ut;
     }
 #ifdef HAVE_SD_JOURNAL_GET_SEQNUM
     else {
-        if (sd_journal_get_seqnum(j, &last_seqnum, &last_writer_id) < 0 || !last_seqnum) {
+        if (nsd_journal_get_seqnum(j, &last_seqnum, &last_writer_id) < 0 || !last_seqnum) {
             internal_error(true, "cannot find the last seqnums of the first message in '%s'", filename);
             last_seqnum = 0;
             memset(&last_writer_id, 0, sizeof(last_writer_id));
@@ -249,7 +259,7 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
                     if (is_journal_file(filename, -1, &dot_journal) && dot_journal && dot_journal > dash_first_msg_ut) {
                         if (dash_seqnum - at - 1 == 32 && dash_first_msg_ut - dash_seqnum - 1 == 16 &&
                             dot_journal - dash_first_msg_ut - 1 == 16) {
-                            sd_id128_t writer;
+                            NsdId128 writer;
                             if (journal_sd_id128_parse(at + 1, &writer)) {
                                 char *endptr = NULL;
                                 uint64_t seqnum = strtoul(dash_seqnum + 1, &endptr, 16);
@@ -282,7 +292,7 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
         njf->msg_last_ut = njf->file_last_modified_ut;
 
     if (last_seqnum > first_seqnum) {
-        if (!sd_id128_equal(first_writer_id, last_writer_id)) {
+        if (!nsd_id128_equal(first_writer_id, last_writer_id)) {
             njf->messages_in_file = 0;
             nd_log(
                 NDLS_COLLECTORS,
@@ -295,7 +305,7 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
         njf->messages_in_file = 0;
 
     nd_journal_file_get_boot_id_annotations(j, njf);
-    sd_journal_close(j);
+    nsd_journal_close(j);
     fstat_cache_disable_on_thread();
 
     njf->last_scan_header_vs_last_modified_ut = njf->file_last_modified_ut;
