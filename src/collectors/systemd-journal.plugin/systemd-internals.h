@@ -90,13 +90,13 @@ extern DICTIONARY *journal_files_registry;
 extern DICTIONARY *used_hashes_registry;
 extern DICTIONARY *boot_ids_to_first_ut;
 
-int journal_file_dict_items_backward_compar(const void *a, const void *b);
-int journal_file_dict_items_forward_compar(const void *a, const void *b);
+int nd_journal_file_dict_items_backward_compar(const void *a, const void *b);
+int nd_journal_file_dict_items_forward_compar(const void *a, const void *b);
 void buffer_json_journal_versions(BUFFER *wb);
 void available_journal_file_sources_to_json_array(BUFFER *wb);
-bool journal_files_completed_once(void);
-void journal_files_registry_update(void);
-void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, const char *dirname, int depth);
+bool nd_journal_files_completed_once(void);
+void nd_journal_files_registry_update(void);
+void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, const char *dirname, int depth);
 
 FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets, FACET_ROW *row, void *data);
 
@@ -118,15 +118,15 @@ struct journal_directory {
 };
 extern struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES];
 
-void journal_init_files_and_directories(void);
+void nd_journal_init_files_and_directories(void);
 void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused, const char *source, void *data);
-void journal_file_update_header(const char *filename, struct nd_journal_file *jf);
+void nd_journal_file_update_header(const char *filename, struct nd_journal_file *jf);
 
 void nd_sd_journal_annotations_init(void);
 void nd_sd_journal_transform_message_id(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 
-void *journal_watcher_main(void *arg);
-void journal_watcher_restart(void);
+void *nd_journal_watcher_main(void *arg);
+void nd_journal_watcher_restart(void);
 
 #ifdef ENABLE_SYSTEMD_DBUS
 void function_systemd_units(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused, const char *source, void *data);
@@ -151,7 +151,7 @@ static inline bool parse_journal_field(const char *data, size_t data_length, con
     return true;
 }
 
-void systemd_journal_dyncfg_init(struct functions_evloop_globals *wg);
+void nd_systemd_journal_dyncfg_init(struct functions_evloop_globals *wg);
 
 bool is_journal_file(const char *filename, ssize_t len, const char **start_of_extension);
 

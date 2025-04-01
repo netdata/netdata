@@ -215,7 +215,7 @@ static void watch_directory_and_subdirectories(Watcher *watcher, int inotifyFd, 
         strncpyz(real_path, basePath, sizeof(real_path));
     }
 
-    journal_directory_scan_recursively(NULL, dirs, real_path, 0);
+    nd_journal_directory_scan_recursively(NULL, dirs, real_path, 0);
 
     void *x;
     dfe_start_read(dirs, x) {
@@ -447,7 +447,7 @@ static void process_pending(Watcher *watcher) {
                     .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
             };
             struct nd_journal_file *jf = dictionary_set(journal_files_registry, fullPath, &t, sizeof(t));
-            journal_file_update_header(jf->filename, jf);
+            nd_journal_file_update_header(jf->filename, jf);
         }
 
         dictionary_del(watcher->pending, fullPath);
@@ -459,7 +459,7 @@ static void process_pending(Watcher *watcher) {
 
 size_t journal_watcher_wanted_session_id = 0;
 
-void journal_watcher_restart(void) {
+void nd_journal_watcher_restart(void) {
     __atomic_add_fetch(&journal_watcher_wanted_session_id, 1, __ATOMIC_RELAXED);
 }
 
@@ -509,7 +509,7 @@ static bool process_inotify_events(struct buffered_reader *reader, Watcher *watc
     return unmount_event;
 }
 
-void *journal_watcher_main(void *arg __maybe_unused) {
+void *nd_journal_watcher_main(void *arg __maybe_unused) {
     while(1) {
         size_t journal_watcher_session_id = __atomic_load_n(&journal_watcher_wanted_session_id, __ATOMIC_RELAXED);
 
@@ -572,7 +572,7 @@ void *journal_watcher_main(void *arg __maybe_unused) {
         free_symlinked_dirs(&watcher);
 
         // this will scan the directories and cleanup the registry
-        journal_files_registry_update();
+        nd_journal_files_registry_update();
 
         sleep_usec(2 * USEC_PER_SEC);
     }

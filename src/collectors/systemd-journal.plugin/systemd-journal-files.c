@@ -210,7 +210,7 @@ static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, s
 #endif
 }
 
-void journal_file_update_header(const char *filename, struct nd_journal_file *jf) {
+void nd_journal_file_update_header(const char *filename, struct nd_journal_file *jf) {
     if(jf->last_scan_header_vs_last_modified_ut == jf->file_last_modified_ut)
         return;
 
@@ -604,7 +604,7 @@ bool is_journal_file(const char *filename, ssize_t len, const char **start_of_ex
     return false;
 }
 
-void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, const char *dirname, int depth) {
+void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, const char *dirname, int depth) {
     if (depth > VAR_LOG_JOURNAL_MAX_DEPTH)
         return;
 
@@ -632,7 +632,7 @@ void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, con
         ssize_t len = snprintfz(full_path, sizeof(full_path), "%s/%s", dirname, entry->d_name);
 
         if (entry->d_type == DT_DIR) {
-            journal_directory_scan_recursively(files, dirs, full_path, depth++);
+            nd_journal_directory_scan_recursively(files, dirs, full_path, depth++);
         }
         else if (entry->d_type == DT_REG && is_journal_file(full_path, len, NULL)) {
             if(files)
@@ -649,7 +649,7 @@ void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, con
                 // The symbolic link points to a directory
                 char resolved_path[FILENAME_MAX + 1];
                 if (realpath(full_path, resolved_path) != NULL) {
-                    journal_directory_scan_recursively(files, dirs, resolved_path, depth++);
+                    nd_journal_directory_scan_recursively(files, dirs, resolved_path, depth++);
                 }
             }
             else if(S_ISREG(info.st_mode) && is_journal_file(full_path, len, NULL)) {
@@ -665,7 +665,7 @@ void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, con
 }
 
 static size_t journal_files_scans = 0;
-bool journal_files_completed_once(void) {
+bool nd_journal_files_completed_once(void) {
     return journal_files_scans > 0;
 }
 
@@ -703,7 +703,7 @@ int filenames_compar(const void *a, const void *b) {
     return -strcmp(p1, p2);
 }
 
-void journal_files_registry_update(void) {
+void nd_journal_files_registry_update(void) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
     if(spinlock_trylock(&spinlock)) {
@@ -714,7 +714,7 @@ void journal_files_registry_update(void) {
 
         for(unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES; i++) {
             if(!journal_directories[i].path) break;
-            journal_directory_scan_recursively(files, dirs, string2str(journal_directories[i].path), 0);
+            nd_journal_directory_scan_recursively(files, dirs, string2str(journal_directories[i].path), 0);
         }
 
         const char **array = mallocz(sizeof(const char *) * dictionary_entries(files));
@@ -743,7 +743,7 @@ void journal_files_registry_update(void) {
                     .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
             };
             struct nd_journal_file *jf = dictionary_set(journal_files_registry, full_path, &t, sizeof(t));
-            journal_file_update_header(jf->filename, jf);
+            nd_journal_file_update_header(jf->filename, jf);
         }
         freez(array);
         dictionary_destroy(files);
@@ -768,7 +768,7 @@ void journal_files_registry_update(void) {
 
 // ----------------------------------------------------------------------------
 
-int journal_file_dict_items_backward_compar(const void *a, const void *b) {
+int nd_journal_file_dict_items_backward_compar(const void *a, const void *b) {
     const DICTIONARY_ITEM **ad = (const DICTIONARY_ITEM **)a, **bd = (const DICTIONARY_ITEM **)b;
     struct nd_journal_file *jfa = dictionary_acquired_item_value(*ad);
     struct nd_journal_file *jfb = dictionary_acquired_item_value(*bd);
@@ -797,8 +797,8 @@ int journal_file_dict_items_backward_compar(const void *a, const void *b) {
     return 0;
 }
 
-int journal_file_dict_items_forward_compar(const void *a, const void *b) {
-    return -journal_file_dict_items_backward_compar(a, b);
+int nd_journal_file_dict_items_forward_compar(const void *a, const void *b) {
+    return -nd_journal_file_dict_items_backward_compar(a, b);
 }
 
 static bool boot_id_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
@@ -813,7 +813,7 @@ static bool boot_id_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     return false;
 }
 
-void journal_init_files_and_directories(void) {
+void nd_journal_init_files_and_directories(void) {
     unsigned d = 0;
 
     // ------------------------------------------------------------------------

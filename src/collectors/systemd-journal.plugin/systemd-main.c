@@ -29,7 +29,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // initialization
 
     nd_sd_journal_annotations_init();
-    journal_init_files_and_directories();
+    nd_journal_init_files_and_directories();
 
     if (!journal_data_directories_exist()) {
         nd_log_collector(NDLP_INFO, "unable to locate journal data directories. Exiting...");
@@ -42,7 +42,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // debug
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
-        journal_files_registry_update();
+        nd_journal_files_registry_update();
 
         bool cancelled = false;
         usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
@@ -68,7 +68,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ------------------------------------------------------------------------
     // watcher thread
 
-    nd_thread_create("SDWATCH", NETDATA_THREAD_OPTION_DONT_LOG, journal_watcher_main, NULL);
+    nd_thread_create("SDWATCH", NETDATA_THREAD_OPTION_DONT_LOG, nd_journal_watcher_main, NULL);
 
     // ------------------------------------------------------------------------
     // the event loop for functions
@@ -90,7 +90,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
                                   NULL);
 #endif
 
-    systemd_journal_dyncfg_init(wg);
+    nd_systemd_journal_dyncfg_init(wg);
 
     // ------------------------------------------------------------------------
     // register functions to netdata
@@ -123,7 +123,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     while(!plugin_should_exit) {
 
         if(since_last_scan_ut > ND_SD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC) {
-            journal_files_registry_update();
+            nd_journal_files_registry_update();
             since_last_scan_ut = 0;
         }
 

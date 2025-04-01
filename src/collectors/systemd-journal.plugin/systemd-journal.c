@@ -750,10 +750,10 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     if(files_used >= 2) {
         if (lqs->rq.direction == FACETS_ANCHOR_DIRECTION_BACKWARD)
             qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *),
-                  journal_file_dict_items_backward_compar);
+                  nd_journal_file_dict_items_backward_compar);
         else
             qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *),
-                  journal_file_dict_items_forward_compar);
+                  nd_journal_file_dict_items_forward_compar);
     }
 
     bool partial = false;
@@ -934,7 +934,7 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
         CLEAN_BUFFER *msg_description = buffer_create(0, NULL);
         ND_LOG_FIELD_PRIORITY msg_priority = NDLP_INFO;
 
-        if(!journal_files_completed_once()) {
+        if(!nd_journal_files_completed_once()) {
             buffer_strcat(msg, "Journals are still being scanned. ");
             buffer_strcat(msg_description
                           , "LIBRARY SCAN: The journal files are still being scanned, you are probably viewing incomplete data. ");

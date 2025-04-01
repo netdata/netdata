@@ -99,7 +99,7 @@ static int systemd_journal_directories_dyncfg_update(BUFFER *result, BUFFER *pay
         }
     }
 
-    journal_watcher_restart();
+    nd_journal_watcher_restart();
 
     return dyncfg_default_response(result, HTTP_RESP_OK, not_found ? "added, but some directories are not found in the filesystem" : "");
 }
@@ -150,7 +150,7 @@ static int systemd_journal_directories_dyncfg_cb(const char *transaction,
 
 // ----------------------------------------------------------------------------
 
-void systemd_journal_dyncfg_init(struct functions_evloop_globals *wg) {
+void nd_systemd_journal_dyncfg_init(struct functions_evloop_globals *wg) {
     functions_evloop_dyncfg_add(
         wg,
         "systemd-journal:monitored-directories",
