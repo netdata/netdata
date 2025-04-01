@@ -239,7 +239,7 @@ static SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value) {
 
 // ----------------------------------------------------------------------------
 
-static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timestamp) {
+static inline bool nd_sd_journal_seek_to(sd_journal *j, usec_t timestamp) {
     if(sd_journal_seek_realtime_usec(j, timestamp) < 0) {
         netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to %" PRIu64, timestamp);
         if(sd_journal_seek_tail(j) < 0) {
@@ -255,7 +255,7 @@ static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timesta
 
 // ----------------------------------------------------------------------------
 
-static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *facets, struct journal_file *jf, usec_t *msg_ut) {
+static inline size_t nd_sd_journal_process_row(sd_journal *j, FACETS *facets, struct journal_file *jf, usec_t *msg_ut) {
     const void *data;
     size_t length, bytes = 0;
 
@@ -321,7 +321,7 @@ static inline ND_SD_JOURNAL_STATUS check_stop(const bool *cancelled, const usec_
     return ND_SD_JOURNAL_OK;
 }
 
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
+ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
         struct journal_file *jf,
     LOGS_QUERY_STATUS *fqs) {
@@ -335,7 +335,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     fqs->c.query_file.start_ut = start_ut;
     fqs->c.query_file.stop_ut = stop_ut;
 
-    if(!netdata_systemd_journal_seek_to(j, start_ut))
+    if(!nd_sd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
@@ -383,7 +383,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
                                         facets_row_candidate_to_keep(facets, msg_ut));
 
         if(sample == SAMPLING_FULL) {
-            bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
+            bytes += nd_sd_journal_process_row(j, facets, jf, &msg_ut);
 
             // make sure each line gets a unique timestamp
             if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
@@ -436,7 +436,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     return status;
 }
 
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
+ND_SD_JOURNAL_STATUS nd_sd_journal_query_forward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
         struct journal_file *jf,
     LOGS_QUERY_STATUS *fqs) {
@@ -450,7 +450,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     fqs->c.query_file.start_ut = start_ut;
     fqs->c.query_file.stop_ut = stop_ut;
 
-    if(!netdata_systemd_journal_seek_to(j, start_ut))
+    if(!nd_sd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
@@ -491,7 +491,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
                                         facets_row_candidate_to_keep(facets, msg_ut));
 
         if(sample == SAMPLING_FULL) {
-            bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
+            bytes += nd_sd_journal_process_row(j, facets, jf, &msg_ut);
 
             // make sure each line gets a unique timestamp
             if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
@@ -544,13 +544,13 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     return status;
 }
 
-bool netdata_systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_to, usec_t last_modified) {
+bool nd_sd_journal_check_if_modified_since(sd_journal *j, usec_t seek_to, usec_t last_modified) {
     // return true, if data have been modified since the timestamp
 
     if(!last_modified || !seek_to)
         return false;
 
-    if(!netdata_systemd_journal_seek_to(j, seek_to))
+    if(!nd_sd_journal_seek_to(j, seek_to))
         return false;
 
     usec_t first_msg_ut = 0;
@@ -636,7 +636,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
 }
 #endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
-static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
+static ND_SD_JOURNAL_STATUS nd_sd_journal_query_one_file(
         const char *filename, BUFFER *wb, FACETS *facets,
         struct journal_file *jf,
     LOGS_QUERY_STATUS *fqs) {
@@ -673,9 +673,9 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 
     if(matches_filters) {
         if(fqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-            status = netdata_systemd_journal_query_forward(j, wb, facets, jf, fqs);
+            status = nd_sd_journal_query_forward(j, wb, facets, jf, fqs);
         else
-            status = netdata_systemd_journal_query_backward(j, wb, facets, jf, fqs);
+            status = nd_sd_journal_query_backward(j, wb, facets, jf, fqs);
     }
     else
         status = ND_SD_JOURNAL_NO_FILE_MATCHED;
@@ -707,7 +707,7 @@ static bool jf_is_mine(struct journal_file *jf, LOGS_QUERY_STATUS *fqs) {
     return false;
 }
 
-static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
+static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     FACETS *facets = lqs->facets;
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_NO_FILE_MATCHED;
@@ -794,7 +794,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
 
         sampling_file_init(lqs, jf);
 
-        ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file(filename, wb, facets, jf, lqs);
+        ND_SD_JOURNAL_STATUS tmp_status = nd_sd_journal_query_one_file(filename, wb, facets, jf, lqs);
 
 //        nd_log(NDLS_COLLECTORS, NDLP_INFO,
 //               "JOURNAL ESTIMATION FINAL: '%s' "
@@ -1037,7 +1037,7 @@ static void systemd_journal_register_transformations(LOGS_QUERY_STATUS *lqs) {
     facets_register_dynamic_key_name(
         facets, JOURNAL_KEY_ND_JOURNAL_PROCESS,
         FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_VISIBLE,
-        netdata_systemd_journal_dynamic_row_id, NULL);
+        nd_sd_journal_dynamic_row_id, NULL);
 
     facets_register_key_name(
         facets, "MESSAGE",
@@ -1048,24 +1048,24 @@ static void systemd_journal_register_transformations(LOGS_QUERY_STATUS *lqs) {
     //        facets, "MESSAGE",
     //        FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_RICH_TEXT |
     //            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS,
-    //        netdata_systemd_journal_rich_message, NULL);
+    //        nd_sd_journal_rich_message, NULL);
 
     facets_register_key_name_transformation(
         facets, "PRIORITY",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
             FACET_KEY_OPTION_EXPANDED_FILTER,
-        netdata_systemd_journal_transform_priority, NULL);
+        nd_sd_journal_transform_priority, NULL);
 
     facets_register_key_name_transformation(
         facets, "SYSLOG_FACILITY",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
             FACET_KEY_OPTION_EXPANDED_FILTER,
-        netdata_systemd_journal_transform_syslog_facility, NULL);
+        nd_sd_journal_transform_syslog_facility, NULL);
 
     facets_register_key_name_transformation(
         facets, "ERRNO",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_errno, NULL);
+        nd_sd_journal_transform_errno, NULL);
 
     facets_register_key_name(
         facets, JOURNAL_KEY_ND_JOURNAL_FILE,
@@ -1084,62 +1084,62 @@ static void systemd_journal_register_transformations(LOGS_QUERY_STATUS *lqs) {
         facets, "MESSAGE_ID",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
             FACET_KEY_OPTION_EXPANDED_FILTER,
-        netdata_systemd_journal_transform_message_id, NULL);
+        nd_sd_journal_transform_message_id, NULL);
 
     facets_register_key_name_transformation(
         facets, "_BOOT_ID",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_boot_id, NULL);
+        nd_sd_journal_transform_boot_id, NULL);
 
     facets_register_key_name_transformation(
         facets, "_SYSTEMD_OWNER_UID",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_uid, NULL);
+        nd_sd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "_UID",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_uid, NULL);
+        nd_sd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "OBJECT_SYSTEMD_OWNER_UID",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_uid, NULL);
+        nd_sd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "OBJECT_UID",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_uid, NULL);
+        nd_sd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "_GID",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_gid, NULL);
+        nd_sd_journal_transform_gid, NULL);
 
     facets_register_key_name_transformation(
         facets, "OBJECT_GID",
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_gid, NULL);
+        nd_sd_journal_transform_gid, NULL);
 
     facets_register_key_name_transformation(
         facets, "_CAP_EFFECTIVE",
         FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_cap_effective, NULL);
+        nd_sd_journal_transform_cap_effective, NULL);
 
     facets_register_key_name_transformation(
         facets, "_AUDIT_LOGINUID",
         FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_uid, NULL);
+        nd_sd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "OBJECT_AUDIT_LOGINUID",
         FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_uid, NULL);
+        nd_sd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "_SOURCE_REALTIME_TIMESTAMP",
         FACET_KEY_OPTION_TRANSFORM_VIEW,
-        netdata_systemd_journal_transform_timestamp_usec, NULL);
+        nd_sd_journal_transform_timestamp_usec, NULL);
 }
 
 void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
@@ -1189,7 +1189,7 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
         if (lqs->rq.info)
             lqs_info_response(wb, lqs->facets);
         else {
-            netdata_systemd_journal_query(wb, lqs);
+            nd_sd_journal_query(wb, lqs);
             if (wb->response_code == HTTP_RESP_OK)
                 buffer_json_finalize(wb);
         }

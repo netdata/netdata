@@ -28,7 +28,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ------------------------------------------------------------------------
     // initialization
 
-    netdata_systemd_journal_annotations_init();
+    nd_sd_journal_annotations_init();
     journal_init_files_and_directories();
 
     if (!journal_data_directories_exist()) {

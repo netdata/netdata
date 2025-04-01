@@ -248,7 +248,7 @@ FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets __maybe_unus
     return FACET_ROW_SEVERITY_NORMAL;
 }
 
-void netdata_systemd_journal_transform_syslog_facility(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+void nd_sd_journal_transform_syslog_facility(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         int facility = str2i(buffer_tostring(wb));
@@ -260,7 +260,7 @@ void netdata_systemd_journal_transform_syslog_facility(FACETS *facets __maybe_un
     }
 }
 
-void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+void nd_sd_journal_transform_priority(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     if(scope == FACETS_TRANSFORM_FACET_SORT)
         return;
 
@@ -275,7 +275,7 @@ void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_unused, B
     }
 }
 
-void netdata_systemd_journal_transform_errno(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+void nd_sd_journal_transform_errno(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     if(scope == FACETS_TRANSFORM_FACET_SORT)
         return;
 
@@ -296,7 +296,7 @@ void netdata_systemd_journal_transform_errno(FACETS *facets __maybe_unused, BUFF
 
 DICTIONARY *boot_ids_to_first_ut = NULL;
 
-void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+void nd_sd_journal_transform_boot_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *boot_id = buffer_tostring(wb);
     if(*boot_id && isxdigit(*boot_id)) {
         usec_t ut = UINT64_MAX;
@@ -350,7 +350,7 @@ void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unused, BU
     }
 }
 
-void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+void nd_sd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     if(scope == FACETS_TRANSFORM_FACET_SORT)
         return;
 
@@ -363,7 +363,7 @@ void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER
     }
 }
 
-void netdata_systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+void nd_sd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     if(scope == FACETS_TRANSFORM_FACET_SORT)
         return;
 
@@ -376,7 +376,7 @@ void netdata_systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER
     }
 }
 
-void netdata_systemd_journal_transform_cap_effective(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+void nd_sd_journal_transform_cap_effective(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     if(scope == FACETS_TRANSFORM_FACET_SORT)
         return;
 
@@ -400,7 +400,7 @@ void netdata_systemd_journal_transform_cap_effective(FACETS *facets __maybe_unus
     }
 }
 
-void netdata_systemd_journal_transform_timestamp_usec(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+void nd_sd_journal_transform_timestamp_usec(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     if(scope == FACETS_TRANSFORM_FACET_SORT)
         return;
 
@@ -417,7 +417,7 @@ void netdata_systemd_journal_transform_timestamp_usec(FACETS *facets __maybe_unu
 
 // ----------------------------------------------------------------------------
 
-void netdata_systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
+void nd_sd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
     FACET_ROW_KEY_VALUE *pid_rkv = dictionary_get(row->dict, "_PID");
     const char *pid = pid_rkv ? buffer_tostring(pid_rkv->wb) : FACET_VALUE_UNSET;
 
@@ -464,7 +464,7 @@ static DICTIONARY *known_journal_messages_ids = NULL;
         dictionary_set(known_journal_messages_ids, uuid, &i, sizeof(i));    \
     } while(0)
 
-static void netdata_systemd_journal_message_ids_init(void) {
+static void nd_sd_journal_message_ids_init(void) {
     known_journal_messages_ids = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
     struct message_id_info i = { 0 };
 
@@ -623,7 +623,7 @@ static void netdata_systemd_journal_message_ids_init(void) {
     msgid_into_dict("4fdf40816c124623a032b7fe73beacb8", "Netdata dynamic configuration");
 }
 
-void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+void nd_sd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *message_id = buffer_tostring(wb);
     struct message_id_info *i = dictionary_get(known_journal_messages_ids, message_id);
 
@@ -648,17 +648,17 @@ void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused,
 
 // ----------------------------------------------------------------------------
 
-void netdata_systemd_journal_annotations_init(void) {
+void nd_sd_journal_annotations_init(void) {
     cached_usernames_init();
     cached_groupnames_init();
     update_cached_host_users();
     update_cached_host_groups();
-    netdata_systemd_journal_message_ids_init();
+    nd_sd_journal_message_ids_init();
 }
 
 // ----------------------------------------------------------------------------
 
-//static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row __maybe_unused, void *data __maybe_unused) {
+//static void nd_sd_journal_rich_message(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row __maybe_unused, void *data __maybe_unused) {
 //    buffer_json_add_array_item_object(json_array);
 //    buffer_json_member_add_string(json_array, "value", buffer_tostring(rkv->wb));
 //    buffer_json_object_close(json_array);

@@ -100,15 +100,15 @@ void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, con
 
 FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets, FACET_ROW *row, void *data);
 
-void netdata_systemd_journal_dynamic_row_id(FACETS *facets, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data);
-void netdata_systemd_journal_transform_priority(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
-void netdata_systemd_journal_transform_syslog_facility(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
-void netdata_systemd_journal_transform_errno(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
-void netdata_systemd_journal_transform_boot_id(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
-void netdata_systemd_journal_transform_uid(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
-void netdata_systemd_journal_transform_gid(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
-void netdata_systemd_journal_transform_cap_effective(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
-void netdata_systemd_journal_transform_timestamp_usec(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
+void nd_sd_journal_dynamic_row_id(FACETS *facets, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data);
+void nd_sd_journal_transform_priority(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
+void nd_sd_journal_transform_syslog_facility(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
+void nd_sd_journal_transform_errno(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
+void nd_sd_journal_transform_boot_id(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
+void nd_sd_journal_transform_uid(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
+void nd_sd_journal_transform_gid(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
+void nd_sd_journal_transform_cap_effective(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
+void nd_sd_journal_transform_timestamp_usec(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 
 usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct journal_file *jf, const char *boot_id);
 
@@ -122,8 +122,8 @@ void journal_init_files_and_directories(void);
 void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused, const char *source, void *data);
 void journal_file_update_header(const char *filename, struct journal_file *jf);
 
-void netdata_systemd_journal_annotations_init(void);
-void netdata_systemd_journal_transform_message_id(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
+void nd_sd_journal_annotations_init(void);
+void nd_sd_journal_transform_message_id(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 
 void *journal_watcher_main(void *arg);
 void journal_watcher_restart(void);
