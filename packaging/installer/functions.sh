@@ -1136,13 +1136,15 @@ portable_add_user_to_group() {
       current_members_list=$(synogroup --get "${groupname}" | grep '^[0-9]')
       current_members=$(echo "${current_members_list}" | grep -oP '\[\K[^\]]+' | tr '\n' ' ' | sed 's/ $//')
 
-      # Update the list only if the user is not a member
-      if echo "${current_members}" | grep -w -q "${username}"; then
-        return 0
-      else
+      # Append username to the list
+      if [ -n "$current_members" ]; then
         new_members="${current_members} ${username}"
-        synogroup --member "${groupname}" ${new_members} 1>/dev/null && return 0
+      else
+        new_members="${username}"
       fi
+
+      # Set the member list
+      synogroup --member "${groupname}" ${new_members} 1>/dev/null && return 0
     fi
 
     warning >&2 "Failed to add user ${username} to group ${groupname}!"
