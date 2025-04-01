@@ -43,8 +43,7 @@ ENUM_STR_MAP_DEFINE(INOTIFY_MASK) = {
     {.id = IN_ONESHOT, .name = "IN_ONESHOT"},
 
     // terminator
-    {.id = 0, .name = NULL}
-};
+    {.id = 0, .name = NULL}};
 
 BITMAP_STR_DEFINE_FUNCTIONS(INOTIFY_MASK, 0, "UNKNOWN");
 
@@ -53,8 +52,8 @@ DEFINE_JUDYL_TYPED(SYMLINKED_DIRS, STRING *);
 typedef struct watch_entry {
     int slot;
 
-    int wd;             // Watch descriptor
-    char *path;         // Dynamically allocated path
+    int wd;     // Watch descriptor
+    char *path; // Dynamically allocated path
 
     struct watch_entry *next; // for the free list
 } WatchEntry;
@@ -71,7 +70,8 @@ typedef struct {
     DICTIONARY *pending;
 } Watcher;
 
-static WatchEntry *get_slot(Watcher *watcher) {
+static WatchEntry *get_slot(Watcher *watcher)
+{
     WatchEntry *t;
 
     if (watcher->freeList != NULL) {
@@ -87,10 +87,10 @@ static WatchEntry *get_slot(Watcher *watcher) {
     }
 
     watcher->watchList[watcher->watchCount] = (WatchEntry){
-            .slot = watcher->watchCount,
-            .wd = -1,
-            .path = NULL,
-            .next = NULL,
+        .slot = watcher->watchCount,
+        .wd = -1,
+        .path = NULL,
+        .next = NULL,
     };
     t = &watcher->watchList[watcher->watchCount];
     watcher->watchCount++;
@@ -98,7 +98,8 @@ static WatchEntry *get_slot(Watcher *watcher) {
     return t;
 }
 
-static void free_slot(Watcher *watcher, WatchEntry *t) {
+static void free_slot(Watcher *watcher, WatchEntry *t)
+{
     t->wd = -1;
     freez(t->path);
     t->path = NULL;
@@ -108,48 +109,45 @@ static void free_slot(Watcher *watcher, WatchEntry *t) {
     watcher->freeList = t;
 }
 
-static int add_watch(Watcher *watcher, int inotifyFd, const char *path) {
+static int add_watch(Watcher *watcher, int inotifyFd, const char *path)
+{
     WatchEntry *t = get_slot(watcher);
 
     errno_clear();
     t->wd = inotify_add_watch(inotifyFd, path, WATCH_FOR);
     if (t->wd == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "JOURNAL WATCHER: cannot watch directory: '%s'",
-               path);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "JOURNAL WATCHER: cannot watch directory: '%s'", path);
 
         free_slot(watcher, t);
 
         struct stat info;
-        if(stat(path, &info) == 0 && S_ISDIR(info.st_mode)) {
+        if (stat(path, &info) == 0 && S_ISDIR(info.st_mode)) {
             // the directory exists, but we failed to add the watch
             // increase errors
             watcher->errors++;
         }
-    }
-    else {
+    } else {
         t->path = strdupz(path);
 
-        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-               "JOURNAL WATCHER: watching directory: '%s'",
-               path);
-
+        nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "JOURNAL WATCHER: watching directory: '%s'", path);
     }
     return t->wd;
 }
 
-static void remove_watch(Watcher *watcher, int inotifyFd, int wd) {
+static void remove_watch(Watcher *watcher, int inotifyFd, int wd)
+{
     errno_clear();
 
     int i;
     for (i = 0; i < watcher->watchCount; ++i) {
         if (watcher->watchList[i].wd == wd) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_DEBUG,
+                "JOURNAL WATCHER: removing watch from directory: '%s'",
+                watcher->watchList[i].path);
 
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                   "JOURNAL WATCHER: removing watch from directory: '%s'",
-                   watcher->watchList[i].path);
-
-            if(inotify_rm_watch(inotifyFd, watcher->watchList[i].wd) == -1)
+            if (inotify_rm_watch(inotifyFd, watcher->watchList[i].wd) == -1)
                 nd_log(NDLS_COLLECTORS, NDLP_ERR, "JOURNAL WATCHER: inotify_rm_watch() returned -1");
 
             free_slot(watcher, &watcher->watchList[i]);
@@ -157,15 +155,14 @@ static void remove_watch(Watcher *watcher, int inotifyFd, int wd) {
         }
     }
 
-    nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-           "JOURNAL WATCHER: cannot find directory watch %d to remove.",
-           wd);
+    nd_log(NDLS_COLLECTORS, NDLP_WARNING, "JOURNAL WATCHER: cannot find directory watch %d to remove.", wd);
 }
 
-static void free_watches(Watcher *watcher, int inotifyFd) {
+static void free_watches(Watcher *watcher, int inotifyFd)
+{
     for (int i = 0; i < watcher->watchCount; ++i) {
         if (watcher->watchList[i].wd != -1) {
-            if(inotify_rm_watch(inotifyFd, watcher->watchList[i].wd) == -1)
+            if (inotify_rm_watch(inotifyFd, watcher->watchList[i].wd) == -1)
                 nd_log(NDLS_COLLECTORS, NDLP_ERR, "JOURNAL WATCHER: inotify_rm_watch() returned -1");
             free_slot(watcher, &watcher->watchList[i]);
         }
@@ -177,10 +174,11 @@ static void free_watches(Watcher *watcher, int inotifyFd) {
     watcher->pending = NULL;
 }
 
-static void free_symlinked_dirs(Watcher *watcher) {
+static void free_symlinked_dirs(Watcher *watcher)
+{
     Word_t idx = 0;
     STRING *value;
-    while((value = SYMLINKED_DIRS_FIRST(&watcher->symlinkedDirs, &idx))) {
+    while ((value = SYMLINKED_DIRS_FIRST(&watcher->symlinkedDirs, &idx))) {
         SYMLINKED_DIRS_DEL(&watcher->symlinkedDirs, idx);
         STRING *key = (STRING *)idx;
         string_freez(key);
@@ -188,7 +186,8 @@ static void free_symlinked_dirs(Watcher *watcher) {
     }
 }
 
-static char* get_path_from_wd(Watcher *watcher, int wd) {
+static char *get_path_from_wd(Watcher *watcher, int wd)
+{
     for (int i = 0; i < watcher->watchCount; ++i) {
         if (watcher->watchList[i].wd == wd)
             return watcher->watchList[i].path;
@@ -196,7 +195,8 @@ static char* get_path_from_wd(Watcher *watcher, int wd) {
     return NULL;
 }
 
-static bool is_directory_watched(Watcher *watcher, const char *path) {
+static bool is_directory_watched(Watcher *watcher, const char *path)
+{
     for (int i = 0; i < watcher->watchCount; ++i) {
         if (watcher->watchList[i].wd != -1 && strcmp(watcher->watchList[i].path, path) == 0) {
             return true;
@@ -205,7 +205,8 @@ static bool is_directory_watched(Watcher *watcher, const char *path) {
     return false;
 }
 
-static void watch_directory_and_subdirectories(Watcher *watcher, int inotifyFd, const char *basePath) {
+static void watch_directory_and_subdirectories(Watcher *watcher, int inotifyFd, const char *basePath)
+{
     DICTIONARY *dirs = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     // First resolve any symlinks in the base path
@@ -215,10 +216,11 @@ static void watch_directory_and_subdirectories(Watcher *watcher, int inotifyFd, 
         strncpyz(real_path, basePath, sizeof(real_path));
     }
 
-    journal_directory_scan_recursively(NULL, dirs, real_path, 0);
+    nd_journal_directory_scan_recursively(NULL, dirs, real_path, 0);
 
     void *x;
-    dfe_start_read(dirs, x) {
+    dfe_start_read(dirs, x)
+    {
         const char *dirname = x_dfe.name;
         char resolved_path[PATH_MAX];
 
@@ -240,7 +242,8 @@ static void watch_directory_and_subdirectories(Watcher *watcher, int inotifyFd, 
     dictionary_destroy(dirs);
 }
 
-static bool is_subpath(const char *path, const char *subpath) {
+static bool is_subpath(const char *path, const char *subpath)
+{
     // Use strncmp to compare the paths
     if (strncmp(path, subpath, strlen(path)) == 0) {
         // Ensure that the next character is a '/' or '\0'
@@ -251,48 +254,61 @@ static bool is_subpath(const char *path, const char *subpath) {
     return false;
 }
 
-void remove_directory_watch(Watcher *watcher, int inotifyFd, const char *dirPath) {
+void remove_directory_watch(Watcher *watcher, int inotifyFd, const char *dirPath)
+{
     for (int i = 0; i < watcher->watchCount; ++i) {
         WatchEntry *t = &watcher->watchList[i];
         if (t->wd != -1 && is_subpath(dirPath, t->path)) {
-            if(inotify_rm_watch(inotifyFd, t->wd) == -1)
-                nd_log(NDLS_COLLECTORS, NDLP_ERR, "JOURNAL WATCHER: inotify_rm_watch() on path '%s' returned -1", t->path);
+            if (inotify_rm_watch(inotifyFd, t->wd) == -1)
+                nd_log(
+                    NDLS_COLLECTORS, NDLP_ERR, "JOURNAL WATCHER: inotify_rm_watch() on path '%s' returned -1", t->path);
             else
                 nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "JOURNAL WATCHER: stopped watching directory '%s'", t->path);
             free_slot(watcher, t);
         }
     }
 
-    struct journal_file *jf;
-    dfe_start_write(journal_files_registry, jf) {
-        if(is_subpath(dirPath, jf->filename))
-            dictionary_del(journal_files_registry, jf->filename);
+    struct nd_journal_file *njf;
+    dfe_start_write(nd_journal_files_registry, njf)
+    {
+        if (is_subpath(dirPath, njf->filename))
+            dictionary_del(nd_journal_files_registry, njf->filename);
     }
-    dfe_done(jf);
+    dfe_done(njf);
 
-    dictionary_garbage_collect(journal_files_registry);
+    dictionary_garbage_collect(nd_journal_files_registry);
 }
 
-void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event) {
+void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
+{
     errno_clear();
 
-    if(!event->len) {
+    if (!event->len) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         INOTIFY_MASK_2buffer(wb, event->mask, ", ");
-        nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
-               "JOURNAL WATCHER: received event with mask %u (%s) and len %u (this is zero) - ignoring it.",
-               event->mask, buffer_tostring(wb), event->len);
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_NOTICE,
+            "JOURNAL WATCHER: received event with mask %u (%s) and len %u (this is zero) - ignoring it.",
+            event->mask,
+            buffer_tostring(wb),
+            event->len);
         return;
     }
 
     char *dirPath = get_path_from_wd(watcher, event->wd);
-    if(!dirPath) {
+    if (!dirPath) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         INOTIFY_MASK_2buffer(wb, event->mask, ", ");
-        nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
-               "JOURNAL WATCHER: received event with mask %u (%s) and len %u for path: '%s' - "
-               "but we can't find its watch descriptor - ignoring it.",
-               event->mask, buffer_tostring(wb), event->len, event->name);
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_NOTICE,
+            "JOURNAL WATCHER: received event with mask %u (%s) and len %u for path: '%s' - "
+            "but we can't find its watch descriptor - ignoring it.",
+            event->mask,
+            buffer_tostring(wb),
+            event->len,
+            event->name);
         return;
     }
 
@@ -306,7 +322,7 @@ void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
     }
 #endif
 
-    if(event->mask & IN_DELETE_SELF) {
+    if (event->mask & IN_DELETE_SELF) {
         remove_watch(watcher, inotifyFd, event->wd);
         return;
     }
@@ -341,31 +357,35 @@ void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
 
                             // we leave fullPathString allocated, as it's now in the JudyL set
 
-                            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                                   "JOURNAL WATCHER: New symlinked directory created: '%s' -> '%s'",
-                                   fullPath, resolved_path);
-                        }
-                        else if (string_strcmp(symlinked, resolved_path) != 0) {
+                            nd_log(
+                                NDLS_COLLECTORS,
+                                NDLP_DEBUG,
+                                "JOURNAL WATCHER: New symlinked directory created: '%s' -> '%s'",
+                                fullPath,
+                                resolved_path);
+                        } else if (string_strcmp(symlinked, resolved_path) != 0) {
                             SYMLINKED_DIRS_SET(
                                 &watcher->symlinkedDirs, (uintptr_t)fullPathString, string_strdupz(resolved_path));
 
-                            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                                   "JOURNAL WATCHER: Updated symlinked directory: '%s' -> '%s' (was '%s')",
-                                   fullPath, resolved_path, string2str(symlinked));
+                            nd_log(
+                                NDLS_COLLECTORS,
+                                NDLP_DEBUG,
+                                "JOURNAL WATCHER: Updated symlinked directory: '%s' -> '%s' (was '%s')",
+                                fullPath,
+                                resolved_path,
+                                string2str(symlinked));
 
                             string_freez(symlinked);
 
                             // we need to free this, since it was already in the JudyL set
                             string_freez(fullPathString);
-                        }
-                        else
+                        } else
                             string_freez(fullPathString); // we don't need it anymore
                     }
                 }
             }
         }
-    }
-    else if(event->mask & IN_DELETE) {
+    } else if (event->mask & IN_DELETE) {
         // Check if it was a symlink
         STRING *fullPathString = string_strdupz(fullPath);
         STRING *symlinked = SYMLINKED_DIRS_GET(&watcher->symlinkedDirs, (uintptr_t)fullPathString);
@@ -377,77 +397,84 @@ void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
             string_freez(symlinked);
             is_dir = true;
 
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                   "JOURNAL WATCHER: Deleted symlinked directory: '%s' -> '%s'",
-                   fullPath, resolved_path);
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_DEBUG,
+                "JOURNAL WATCHER: Deleted symlinked directory: '%s' -> '%s'",
+                fullPath,
+                resolved_path);
         }
         string_freez(fullPathString); // the one we allocated above
     }
 
-    if(is_dir) {
+    if (is_dir) {
         if (event->mask & (IN_DELETE | IN_MOVED_FROM)) {
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                   "JOURNAL WATCHER: Directory deleted or moved out: '%s'",
-                   path_to_use);
+            nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "JOURNAL WATCHER: Directory deleted or moved out: '%s'", path_to_use);
 
             remove_directory_watch(watcher, inotifyFd, path_to_use);
-        }
-        else if (event->mask & (IN_CREATE | IN_MOVED_TO)) {
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                   "JOURNAL WATCHER: New directory created or moved in: '%s'",
-                   path_to_use);
+        } else if (event->mask & (IN_CREATE | IN_MOVED_TO)) {
+            nd_log(
+                NDLS_COLLECTORS, NDLP_DEBUG, "JOURNAL WATCHER: New directory created or moved in: '%s'", path_to_use);
 
             watch_directory_and_subdirectories(watcher, inotifyFd, path_to_use);
-        }
-        else {
+        } else {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             INOTIFY_MASK_2buffer(wb, event->mask, ", ");
-            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-                   "JOURNAL WATCHER: Received unhandled event with mask %u (%s) for directory '%s'",
-                   event->mask, buffer_tostring(wb), path_to_use);
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_WARNING,
+                "JOURNAL WATCHER: Received unhandled event with mask %u (%s) for directory '%s'",
+                event->mask,
+                buffer_tostring(wb),
+                path_to_use);
         }
-    }
-    else if(is_journal_file(event->name, (ssize_t)strlen(event->name), NULL)) {
+    } else if (is_journal_file(event->name, (ssize_t)strlen(event->name), NULL)) {
         dictionary_set(watcher->pending, path_to_use, NULL, 0);
-    }
-    else {
+    } else {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         INOTIFY_MASK_2buffer(wb, event->mask, ", ");
-        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-               "JOURNAL WATCHER: ignoring event with mask %u (%s) for file '%s' ('%s')",
-               event->mask, buffer_tostring(wb), path_to_use, fullPath);
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_DEBUG,
+            "JOURNAL WATCHER: ignoring event with mask %u (%s) for file '%s' ('%s')",
+            event->mask,
+            buffer_tostring(wb),
+            path_to_use,
+            fullPath);
     }
 }
 
-static void process_pending(Watcher *watcher) {
+static void process_pending(Watcher *watcher)
+{
     errno_clear();
 
     void *x;
-    dfe_start_write(watcher->pending, x) {
+    dfe_start_write(watcher->pending, x)
+    {
         struct stat info;
         const char *fullPath = x_dfe.name;
 
-        if(stat(fullPath, &info) != 0) {
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                   "JOURNAL WATCHER: file '%s' no longer exists, removing it from the registry",
-                   fullPath);
+        if (stat(fullPath, &info) != 0) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_DEBUG,
+                "JOURNAL WATCHER: file '%s' no longer exists, removing it from the registry",
+                fullPath);
 
-            dictionary_del(journal_files_registry, fullPath);
-        }
-        else if(S_ISREG(info.st_mode)) {
-//            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-//                    "JOURNAL WATCHER: file '%s' has been added/updated, updating the registry",
-//                    fullPath);
+            dictionary_del(nd_journal_files_registry, fullPath);
+        } else if (S_ISREG(info.st_mode)) {
+            //            nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+            //                    "JOURNAL WATCHER: file '%s' has been added/updated, updating the registry",
+            //                    fullPath);
 
-            struct journal_file t = {
-                    .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC +
-                                             info.st_mtim.tv_nsec / NSEC_PER_USEC,
-                    .last_scan_monotonic_ut = now_monotonic_usec(),
-                    .size = info.st_size,
-                    .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
+            struct nd_journal_file t = {
+                .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC + info.st_mtim.tv_nsec / NSEC_PER_USEC,
+                .last_scan_monotonic_ut = now_monotonic_usec(),
+                .size = info.st_size,
+                .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
             };
-            struct journal_file *jf = dictionary_set(journal_files_registry, fullPath, &t, sizeof(t));
-            journal_file_update_header(jf->filename, jf);
+            struct nd_journal_file *jf = dictionary_set(nd_journal_files_registry, fullPath, &t, sizeof(t));
+            nd_journal_file_update_header(jf->filename, jf);
         }
 
         dictionary_del(watcher->pending, fullPath);
@@ -459,11 +486,13 @@ static void process_pending(Watcher *watcher) {
 
 size_t journal_watcher_wanted_session_id = 0;
 
-void journal_watcher_restart(void) {
+void nd_journal_watcher_restart(void)
+{
     __atomic_add_fetch(&journal_watcher_wanted_session_id, 1, __ATOMIC_RELAXED);
 }
 
-static bool process_inotify_events(struct buffered_reader *reader, Watcher *watcher, int inotifyFd) {
+static bool process_inotify_events(struct buffered_reader *reader, Watcher *watcher, int inotifyFd)
+{
     errno_clear();
 
     bool unmount_event = false;
@@ -473,20 +502,22 @@ static bool process_inotify_events(struct buffered_reader *reader, Watcher *watc
     while (processed + (ssize_t)sizeof(struct inotify_event) <= reader->read_len) {
         struct inotify_event *event = (struct inotify_event *)(reader->read_buffer + processed);
 
-        if(event->len > NAME_MAX + 1) {
+        if (event->len > NAME_MAX + 1) {
             // The event length is impossibly large
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "JOURNAL WATCHER: received impossibly large event length %u - restarting",
-                   event->len);
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "JOURNAL WATCHER: received impossibly large event length %u - restarting",
+                event->len);
             return true; // force a restart
         }
 
         // Check if we have the complete event including the name
         ssize_t total_size = (ssize_t)sizeof(struct inotify_event) + event->len;
         if (processed + total_size > reader->read_len)
-            break;  // Wait for more data
+            break; // Wait for more data
 
-        if(event->mask & IN_UNMOUNT) {
+        if (event->mask & IN_UNMOUNT) {
             unmount_event = true;
             break;
         }
@@ -497,20 +528,18 @@ static bool process_inotify_events(struct buffered_reader *reader, Watcher *watc
 
     // If we have unprocessed data, move it to the start
     if (processed < reader->read_len) {
-        memmove(reader->read_buffer,
-                reader->read_buffer + processed,
-                reader->read_len - processed);
+        memmove(reader->read_buffer, reader->read_buffer + processed, reader->read_len - processed);
         reader->read_len -= processed;
-    }
-    else
+    } else
         reader->read_len = 0;
 
     reader->read_buffer[reader->read_len] = '\0';
     return unmount_event;
 }
 
-void *journal_watcher_main(void *arg __maybe_unused) {
-    while(1) {
+void *nd_journal_watcher_main(void *arg __maybe_unused)
+{
+    while (1) {
         size_t journal_watcher_session_id = __atomic_load_n(&journal_watcher_wanted_session_id, __ATOMIC_RELAXED);
 
         Watcher watcher = {
@@ -518,7 +547,7 @@ void *journal_watcher_main(void *arg __maybe_unused) {
             .freeList = NULL,
             .watchCount = 0,
             .watchListSize = INITIAL_WATCHES,
-            .pending = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE|DICT_OPTION_SINGLE_THREADED),
+            .pending = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED),
             .errors = 0,
         };
 
@@ -530,7 +559,8 @@ void *journal_watcher_main(void *arg __maybe_unused) {
         }
 
         for (unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES; i++) {
-            if (!journal_directories[i].path) break;
+            if (!journal_directories[i].path)
+                break;
             watch_directory_and_subdirectories(&watcher, inotifyFd, string2str(journal_directories[i].path));
         }
 
@@ -539,31 +569,35 @@ void *journal_watcher_main(void *arg __maybe_unused) {
         buffered_reader_init(&reader);
 
         while (journal_watcher_session_id == __atomic_load_n(&journal_watcher_wanted_session_id, __ATOMIC_RELAXED)) {
-            buffered_reader_ret_t rc = buffered_reader_read_timeout(
-                    &reader, inotifyFd, SYSTEMD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS, false);
+            buffered_reader_ret_t rc =
+                buffered_reader_read_timeout(&reader, inotifyFd, ND_SD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS, false);
 
-            if(rc == BUFFERED_READER_READ_OK || rc == BUFFERED_READER_READ_BUFFER_FULL) {
+            if (rc == BUFFERED_READER_READ_OK || rc == BUFFERED_READER_READ_BUFFER_FULL) {
                 if (process_inotify_events(&reader, &watcher, inotifyFd))
                     break;
-            }
-            else if (rc != BUFFERED_READER_READ_POLL_TIMEOUT) {
-                nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                       "JOURNAL WATCHER: cannot read inotify events, buffered_reader_read_timeout() returned %d - "
-                       "restarting the watcher.",
-                       rc);
+            } else if (rc != BUFFERED_READER_READ_POLL_TIMEOUT) {
+                nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_ERR,
+                    "JOURNAL WATCHER: cannot read inotify events, buffered_reader_read_timeout() returned %d - "
+                    "restarting the watcher.",
+                    rc);
                 break;
             }
 
             usec_t ut = now_monotonic_usec();
-            if (dictionary_entries(watcher.pending) && (rc == BUFFERED_READER_READ_POLL_TIMEOUT ||
-                last_headers_update_ut + (SYSTEMD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS * USEC_PER_MS) <= ut)) {
+            if (dictionary_entries(watcher.pending) &&
+                (rc == BUFFERED_READER_READ_POLL_TIMEOUT ||
+                 last_headers_update_ut + (ND_SD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS * USEC_PER_MS) <= ut)) {
                 process_pending(&watcher);
                 last_headers_update_ut = ut;
             }
 
-            if(watcher.errors) {
-                nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
-                       "JOURNAL WATCHER: there were errors in setting up inotify watches - restarting the watcher.");
+            if (watcher.errors) {
+                nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_NOTICE,
+                    "JOURNAL WATCHER: there were errors in setting up inotify watches - restarting the watcher.");
             }
         }
 
@@ -572,7 +606,7 @@ void *journal_watcher_main(void *arg __maybe_unused) {
         free_symlinked_dirs(&watcher);
 
         // this will scan the directories and cleanup the registry
-        journal_files_registry_update();
+        nd_journal_files_registry_update();
 
         sleep_usec(2 * USEC_PER_SEC);
     }
