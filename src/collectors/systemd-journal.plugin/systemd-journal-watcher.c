@@ -263,7 +263,7 @@ void remove_directory_watch(Watcher *watcher, int inotifyFd, const char *dirPath
         }
     }
 
-    struct journal_file *jf;
+    struct nd_journal_file *jf;
     dfe_start_write(journal_files_registry, jf) {
         if(is_subpath(dirPath, jf->filename))
             dictionary_del(journal_files_registry, jf->filename);
@@ -439,14 +439,14 @@ static void process_pending(Watcher *watcher) {
 //                    "JOURNAL WATCHER: file '%s' has been added/updated, updating the registry",
 //                    fullPath);
 
-            struct journal_file t = {
+            struct nd_journal_file t = {
                     .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC +
                                              info.st_mtim.tv_nsec / NSEC_PER_USEC,
                     .last_scan_monotonic_ut = now_monotonic_usec(),
                     .size = info.st_size,
                     .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
             };
-            struct journal_file *jf = dictionary_set(journal_files_registry, fullPath, &t, sizeof(t));
+            struct nd_journal_file *jf = dictionary_set(journal_files_registry, fullPath, &t, sizeof(t));
             journal_file_update_header(jf->filename, jf);
         }
 

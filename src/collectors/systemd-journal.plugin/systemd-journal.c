@@ -255,7 +255,7 @@ static inline bool nd_sd_journal_seek_to(sd_journal *j, usec_t timestamp) {
 
 // ----------------------------------------------------------------------------
 
-static inline size_t nd_sd_journal_process_row(sd_journal *j, FACETS *facets, struct journal_file *jf, usec_t *msg_ut) {
+static inline size_t nd_sd_journal_process_row(sd_journal *j, FACETS *facets, struct nd_journal_file *jf, usec_t *msg_ut) {
     const void *data;
     size_t length, bytes = 0;
 
@@ -323,7 +323,7 @@ static inline ND_SD_JOURNAL_STATUS check_stop(const bool *cancelled, const usec_
 
 ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
-        struct journal_file *jf,
+        struct nd_journal_file *jf,
     LOGS_QUERY_STATUS *fqs) {
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
@@ -438,7 +438,7 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
 
 ND_SD_JOURNAL_STATUS nd_sd_journal_query_forward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
-        struct journal_file *jf,
+        struct nd_journal_file *jf,
     LOGS_QUERY_STATUS *fqs) {
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
@@ -638,7 +638,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
 
 static ND_SD_JOURNAL_STATUS nd_sd_journal_query_one_file(
         const char *filename, BUFFER *wb, FACETS *facets,
-        struct journal_file *jf,
+        struct nd_journal_file *jf,
     LOGS_QUERY_STATUS *fqs) {
 
     sd_journal *j = NULL;
@@ -686,7 +686,7 @@ static ND_SD_JOURNAL_STATUS nd_sd_journal_query_one_file(
     return status;
 }
 
-static bool jf_is_mine(struct journal_file *jf, LOGS_QUERY_STATUS *fqs) {
+static bool jf_is_mine(struct nd_journal_file *jf, LOGS_QUERY_STATUS *fqs) {
 
     if((fqs->rq.source_type == SDJF_NONE && !fqs->rq.sources) || (jf->source_type & fqs->rq.source_type) ||
        (fqs->rq.sources && simple_pattern_matches(fqs->rq.sources, string2str(jf->source)))) {
@@ -711,7 +711,7 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     FACETS *facets = lqs->facets;
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_NO_FILE_MATCHED;
-    struct journal_file *jf;
+    struct nd_journal_file *jf;
 
     lqs->c.files_matched = 0;
     lqs->c.file_working = 0;

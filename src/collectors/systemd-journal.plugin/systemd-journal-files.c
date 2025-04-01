@@ -106,7 +106,7 @@ static bool journal_sd_id128_parse(const char *in, sd_id128_t *ret) {
 //    }
 //}
 
-usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct journal_file *jf __maybe_unused, const char *boot_id) {
+usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file *jf __maybe_unused, const char *boot_id) {
     usec_t ut = UINT64_MAX;
     int r;
 
@@ -163,7 +163,7 @@ usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct journal_file
     return UINT64_MAX;
 }
 
-static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, struct journal_file *jf __maybe_unused) {
+static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, struct nd_journal_file *jf __maybe_unused) {
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
     sd_journal_flush_matches(j);
 
@@ -210,7 +210,7 @@ static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, s
 #endif
 }
 
-void journal_file_update_header(const char *filename, struct journal_file *jf) {
+void journal_file_update_header(const char *filename, struct nd_journal_file *jf) {
     if(jf->last_scan_header_vs_last_modified_ut == jf->file_last_modified_ut)
         return;
 
@@ -375,7 +375,7 @@ static STRING *string_strdupz_source(const char *s, const char *e, size_t max_le
 }
 
 static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
-    struct journal_file *jf = value;
+    struct nd_journal_file *jf = value;
     jf->filename = dictionary_acquired_item_name(item);
     jf->filename_len = strlen(jf->filename);
     jf->source_type = SDJF_ALL;
@@ -447,8 +447,8 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
 }
 
 static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
-    struct journal_file *jf = old_value;
-    struct journal_file *njf = new_value;
+    struct nd_journal_file *jf = old_value;
+    struct nd_journal_file *njf = new_value;
 
     if(njf->last_scan_monotonic_ut > jf->last_scan_monotonic_ut)
         jf->last_scan_monotonic_ut = njf->last_scan_monotonic_ut;
@@ -533,7 +533,7 @@ void available_journal_file_sources_to_json_array(BUFFER *wb) {
 
     struct journal_file_source t = { 0 };
 
-    struct journal_file *jf;
+    struct nd_journal_file *jf;
     dfe_start_read(journal_files_registry, jf) {
         t.first_ut = jf->msg_first_ut;
         t.last_ut = jf->msg_last_ut;
@@ -565,7 +565,7 @@ void available_journal_file_sources_to_json_array(BUFFER *wb) {
 }
 
 static void files_registry_delete_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
-    struct journal_file *jf = value; (void)jf;
+    struct nd_journal_file *jf = value; (void)jf;
     const char *filename = dictionary_acquired_item_name(item); (void)filename;
 
     internal_error(true, "removed journal file '%s'", filename);
@@ -736,20 +736,20 @@ void journal_files_registry_update(void) {
             if (stat(full_path, &info) == -1)
                 continue;
 
-            struct journal_file t = {
+            struct nd_journal_file t = {
                     .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC + info.st_mtim.tv_nsec / NSEC_PER_USEC,
                     .last_scan_monotonic_ut = scan_monotonic_ut,
                     .size = info.st_size,
                     .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
             };
-            struct journal_file *jf = dictionary_set(journal_files_registry, full_path, &t, sizeof(t));
+            struct nd_journal_file *jf = dictionary_set(journal_files_registry, full_path, &t, sizeof(t));
             journal_file_update_header(jf->filename, jf);
         }
         freez(array);
         dictionary_destroy(files);
         dictionary_destroy(dirs);
 
-        struct journal_file *jf;
+        struct nd_journal_file *jf;
         dfe_start_write(journal_files_registry, jf){
             if(jf->last_scan_monotonic_ut < scan_monotonic_ut)
                 dictionary_del(journal_files_registry, jf_dfe.name);
@@ -770,8 +770,8 @@ void journal_files_registry_update(void) {
 
 int journal_file_dict_items_backward_compar(const void *a, const void *b) {
     const DICTIONARY_ITEM **ad = (const DICTIONARY_ITEM **)a, **bd = (const DICTIONARY_ITEM **)b;
-    struct journal_file *jfa = dictionary_acquired_item_value(*ad);
-    struct journal_file *jfb = dictionary_acquired_item_value(*bd);
+    struct nd_journal_file *jfa = dictionary_acquired_item_value(*ad);
+    struct nd_journal_file *jfb = dictionary_acquired_item_value(*bd);
 
     // compare the last message timestamps
     if(jfa->msg_last_ut < jfb->msg_last_ut)
@@ -842,7 +842,7 @@ void journal_init_files_and_directories(void) {
 
     journal_files_registry = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(struct journal_file));
+            NULL, sizeof(struct nd_journal_file));
 
     dictionary_register_insert_callback(journal_files_registry, files_registry_insert_cb, NULL);
     dictionary_register_delete_callback(journal_files_registry, files_registry_delete_cb, NULL);

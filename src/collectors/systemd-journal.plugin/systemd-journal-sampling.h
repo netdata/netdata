@@ -69,7 +69,7 @@ static inline void sampling_query_init(LOGS_QUERY_STATUS *lqs, FACETS *facets) {
         lqs->c.samples_per_time_slot.enable_after_samples = lqs->rq.entries;
 }
 
-static inline void sampling_file_init(LOGS_QUERY_STATUS *lqs, struct journal_file *jf __maybe_unused) {
+static inline void sampling_file_init(LOGS_QUERY_STATUS *lqs, struct nd_journal_file *jf __maybe_unused) {
     lqs->c.samples_per_file.sampled = 0;
     lqs->c.samples_per_file.unsampled = 0;
     lqs->c.samples_per_file.estimated = 0;
@@ -85,7 +85,7 @@ static inline size_t sampling_file_lines_scanned_so_far(LOGS_QUERY_STATUS *lqs) 
 }
 
 static inline void sampling_running_file_query_overlapping_timeframe_ut(
-    LOGS_QUERY_STATUS *lqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
+    LOGS_QUERY_STATUS *lqs, struct nd_journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
     usec_t msg_ut, usec_t *after_ut, usec_t *before_ut) {
 
     // find the overlap of the query and file timeframes
@@ -126,7 +126,7 @@ static inline void sampling_running_file_query_overlapping_timeframe_ut(
 }
 
 static inline double sampling_running_file_query_progress_by_time(
-    LOGS_QUERY_STATUS *lqs, struct journal_file *jf,
+    LOGS_QUERY_STATUS *lqs, struct nd_journal_file *jf,
     FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
 
     usec_t after_ut, before_ut, elapsed_ut;
@@ -144,7 +144,7 @@ static inline double sampling_running_file_query_progress_by_time(
 }
 
 static inline usec_t sampling_running_file_query_remaining_time(
-    LOGS_QUERY_STATUS *lqs, struct journal_file *jf,
+    LOGS_QUERY_STATUS *lqs, struct nd_journal_file *jf,
     FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut,
     usec_t *total_time_ut, usec_t *remaining_start_ut,
     usec_t *remaining_end_ut) {
@@ -186,7 +186,7 @@ static inline usec_t sampling_running_file_query_remaining_time(
 
 static inline size_t sampling_running_file_query_estimate_remaining_lines_by_time(
     LOGS_QUERY_STATUS *lqs,
-    struct journal_file *jf,
+    struct nd_journal_file *jf,
     FACETS_ANCHOR_DIRECTION direction,
     usec_t msg_ut) {
     size_t scanned_lines = sampling_file_lines_scanned_so_far(lqs);
@@ -237,7 +237,7 @@ static inline size_t sampling_running_file_query_estimate_remaining_lines_by_tim
 }
 
 static inline size_t sampling_running_file_query_estimate_remaining_lines(
-    sd_journal *j __maybe_unused, LOGS_QUERY_STATUS *lqs, struct journal_file *jf,
+    sd_journal *j __maybe_unused, LOGS_QUERY_STATUS *lqs, struct nd_journal_file *jf,
     FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
     size_t remaining_logs_by_seqnum = 0;
 
@@ -281,7 +281,7 @@ static inline size_t sampling_running_file_query_estimate_remaining_lines(
 }
 
 static inline void sampling_decide_file_sampling_every(sd_journal *j,
-                                                       LOGS_QUERY_STATUS *lqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
+                                                       LOGS_QUERY_STATUS *lqs, struct nd_journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
     size_t files_matched = lqs->c.files_matched;
     if(!files_matched) files_matched = 1;
 
@@ -302,7 +302,7 @@ typedef enum {
 } sampling_t;
 
 static inline sampling_t is_row_in_sample(
-    sd_journal *j, LOGS_QUERY_STATUS *lqs, struct journal_file *jf,
+    sd_journal *j, LOGS_QUERY_STATUS *lqs, struct nd_journal_file *jf,
     usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction, bool candidate_to_keep) {
     if(!lqs->rq.sampling || candidate_to_keep)
         return SAMPLING_FULL;
@@ -365,7 +365,7 @@ static inline sampling_t is_row_in_sample(
 
 static inline void sampling_update_running_query_file_estimates(
     FACETS *facets, sd_journal *j,
-    LOGS_QUERY_STATUS *lqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction) {
+    LOGS_QUERY_STATUS *lqs, struct nd_journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction) {
     usec_t total_time_ut, remaining_start_ut, remaining_end_ut;
     sampling_running_file_query_remaining_time(
         lqs, jf, direction, msg_ut, &total_time_ut, &remaining_start_ut, &remaining_end_ut);

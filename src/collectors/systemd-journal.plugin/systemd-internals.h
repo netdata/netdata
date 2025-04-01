@@ -49,7 +49,7 @@ typedef enum {
     SDJF_LOCAL_OTHER        = (1 << 6),
 } SD_JOURNAL_FILE_SOURCE_TYPE;
 
-struct journal_file {
+struct nd_journal_file {
     const char *filename;
     size_t filename_len;
     STRING *source;
@@ -110,7 +110,7 @@ void nd_sd_journal_transform_gid(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATI
 void nd_sd_journal_transform_cap_effective(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 void nd_sd_journal_transform_timestamp_usec(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 
-usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct journal_file *jf, const char *boot_id);
+usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file *jf, const char *boot_id);
 
 #define MAX_JOURNAL_DIRECTORIES 100
 struct journal_directory {
@@ -120,7 +120,7 @@ extern struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES];
 
 void journal_init_files_and_directories(void);
 void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused, const char *source, void *data);
-void journal_file_update_header(const char *filename, struct journal_file *jf);
+void journal_file_update_header(const char *filename, struct nd_journal_file *jf);
 
 void nd_sd_journal_annotations_init(void);
 void nd_sd_journal_transform_message_id(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);

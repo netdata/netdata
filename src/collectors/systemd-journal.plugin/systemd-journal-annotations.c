@@ -303,7 +303,7 @@ void nd_sd_journal_transform_boot_id(FACETS *facets __maybe_unused, BUFFER *wb, 
         usec_t *p_ut = dictionary_get(boot_ids_to_first_ut, boot_id);
         if(!p_ut) {
 #ifndef HAVE_SD_JOURNAL_RESTART_FIELDS
-            struct journal_file *jf;
+            struct nd_journal_file *jf;
             dfe_start_read(journal_files_registry, jf) {
                 const char *files[2] = {
                         [0] = jf_dfe.name,
