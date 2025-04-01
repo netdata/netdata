@@ -74,12 +74,14 @@ typedef struct facet_row {
 typedef struct facets FACETS;
 typedef struct facet_key FACET_KEY;
 
+typedef const char * (*facets_key_value_color_t)(FACETS *facets, const char *value, void *data);
 typedef void (*facets_key_transformer_t)(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 typedef void (*facet_dynamic_row_t)(FACETS *facets, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data);
 typedef FACET_ROW_SEVERITY (*facet_row_severity_t)(FACETS *facets, FACET_ROW *row, void *data);
 FACET_KEY *facets_register_dynamic_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facet_dynamic_row_t cb, void *data);
 FACET_KEY *facets_register_key_name_transformation(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facets_key_transformer_t cb, void *data);
 void facets_register_row_severity(FACETS *facets, facet_row_severity_t cb, void *data);
+FACET_KEY *facets_register_key_name_color(FACETS *facets, const char *key, facets_key_value_color_t cb, void *data);
 
 typedef enum __attribute__((packed)) {
     FACETS_OPTION_ALL_FACETS_VISIBLE            = (1 << 0), // all facets should be visible by default in the table

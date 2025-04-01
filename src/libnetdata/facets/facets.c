@@ -215,6 +215,11 @@ struct facet_key {
         void *data;
     } transform;
 
+    struct {
+        facets_key_value_color_t cb;
+        void *data;
+    } color_transform;
+
     struct facet_key *prev, *next;
 };
 
@@ -1112,7 +1117,12 @@ static inline void facets_histogram_value_colors(BUFFER *wb, FACETS *facets __ma
         if(k && k->values.enabled) {
             FACET_VALUE *v;
             foreach_value_in_key(k, v) {
-                buffer_json_add_array_item_string(wb, v->color);
+                const char *color = v->color;
+
+                if (!color && k->color_transform.cb)
+                    color = k->color_transform.cb(k->facets, v->name, k->color_transform.data);
+
+                buffer_json_add_array_item_string(wb, color);
             }
             foreach_value_in_key_done(v);
         }
@@ -1774,6 +1784,13 @@ inline FACET_KEY *facets_register_dynamic_key_name(FACETS *facets, const char *k
     FACET_KEY *k = facets_register_key_name(facets, key, options);
     k->dynamic.cb = cb;
     k->dynamic.data = data;
+    return k;
+}
+
+FACET_KEY *facets_register_key_name_color(FACETS *facets, const char *key, facets_key_value_color_t cb, void *data) {
+    FACET_KEY *k = facets_register_key_name(facets, key, 0);
+    k->color_transform.cb = cb;
+    k->color_transform.data = data;
     return k;
 }
 
@@ -2651,6 +2668,12 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                                 // buffer_json_member_add_string(wb, "raw", v->name);
                                 buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
                                 buffer_json_member_add_uint64(wb, "order", v->order);
+
+                                const char *color = v->color;
+                                if(!v->color && k->color_transform.cb)
+                                    color = k->color_transform.cb(facets, v->name, k->color_transform.data);
+
+                                buffer_json_member_add_string(wb, "color", color);
                             }
                             buffer_json_object_close(wb);
                         }

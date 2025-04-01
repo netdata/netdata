@@ -1022,6 +1022,49 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     return wb->response_code;
 }
 
+static const char *systemd_journal_priority_color(FACETS *facets __maybe_unused, const char *value, void *data __maybe_unused) {
+    // First try to parse as a number
+    if (value && *value) {
+        char *endptr = NULL;
+        unsigned long priority = strtoul(value, &endptr, 10);
+
+        // If endptr points to the null terminator, the entire string was parsed
+        if (endptr && *endptr == '\0') {
+            switch (priority) {
+                case 0: return "#9c27b0"; // Emergency/panic - purple
+                case 1: return "#d32f2f"; // Alert - dark red
+                case 2: return "#c62828"; // Critical - deeper red
+                case 3: return "#f44336"; // Error - red
+                case 4: return "#ffc107"; // Warning - yellow
+                case 5: return "#ffffff"; // Notice - bright white
+                case 6: return "#e0e0e0"; // Info - white
+                case 7: return "#9e9e9e"; // Debug - gray
+                default: return NULL;     // Default color
+            }
+        }
+    }
+
+    // Fall back to string comparison
+    if (strcmp(value, "panic") == 0)
+        return "#9c27b0"; // Emergency/panic - purple
+    else if (strcmp(value, "alert") == 0)
+        return "#d32f2f"; // Alert - dark red
+    else if (strcmp(value, "critical") == 0)
+        return "#c62828"; // Critical - deeper red
+    else if (strcmp(value, "error") == 0)
+        return "#f44336"; // Error - red
+    else if (strcmp(value, "warning") == 0)
+        return "#ffc107"; // Warning - yellow
+    else if (strcmp(value, "notice") == 0)
+        return "#ffffff"; // Notice - bright white
+    else if (strcmp(value, "info") == 0)
+        return "#e0e0e0"; // Info - white
+    else if (strcmp(value, "debug") == 0)
+        return "#9e9e9e"; // Debug - gray
+
+    return NULL; // Default color
+}
+
 static void systemd_journal_register_transformations(LOGS_QUERY_STATUS *lqs) {
     FACETS *facets = lqs->facets;
     LOGS_QUERY_REQUEST *rq = &lqs->rq;
@@ -1055,6 +1098,10 @@ static void systemd_journal_register_transformations(LOGS_QUERY_STATUS *lqs) {
         rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
             FACET_KEY_OPTION_EXPANDED_FILTER,
         netdata_systemd_journal_transform_priority, NULL);
+
+    facets_register_key_name_color(
+        facets, "PRIORITY",
+        systemd_journal_priority_color, NULL);
 
     facets_register_key_name_transformation(
         facets, "SYSLOG_FACILITY",
