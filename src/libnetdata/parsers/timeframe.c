@@ -12,7 +12,7 @@ TIMEFRAME timeframe_parse(const char *txt) {
 char buf[strlen(txt) + 1];
 memcpy(buf, txt, strlen(txt) + 1);
 char *s = trim_all(buf);
-if(!s)
+if(!s || !*s)
     return TIMEFRAME_INVALID;
 
 while(isspace(*s)) s++;

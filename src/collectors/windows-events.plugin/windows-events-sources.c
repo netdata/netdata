@@ -580,8 +580,9 @@ void wevt_sources_scan(void) {
                 char buf[sizeof(WEVT_SOURCE_ALL_OF_PROVIDER_PREFIX) + strlen(provider)]; // sizeof() includes terminator
                 snprintf(buf, sizeof(buf), WEVT_SOURCE_ALL_OF_PROVIDER_PREFIX "%s", provider);
 
-                if(trim_all(buf) != NULL) {
-                    for (size_t i = 0; i < sizeof(buf) - 1; i++) {
+                trim_all(buf);
+                if(buf[0]) {
+                    for (size_t i = 0; i < sizeof(buf) - 1 && buf[i]; i++) {
                         // remove character that may interfere with our parsing
                         if (isspace((uint8_t) buf[i]) || buf[i] == '%' || buf[i] == '+' || buf[i] == '|' || buf[i] == ':')
                             buf[i] = '_';

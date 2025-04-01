@@ -127,11 +127,7 @@ static void dmi_info(const char *file, const char *alt, char *dst, size_t dst_si
         return;
     }
 
-    char *s = trim_all(dst);
-    if(!s)
-        dst[0] = '\0';
-    else if(s != dst)
-        memmove(dst, s, strlen(s) + 1);
+    trim_all(dst);
 
     struct {
         const char *found;
@@ -145,10 +141,12 @@ static void dmi_info(const char *file, const char *alt, char *dst, size_t dst_si
         {"System UUID", ""},
     };
 
-    for(size_t i = 0; i < _countof(replacements) ;i++) {
-        if(strcasecmp(dst, replacements[i].found) == 0) {
-            strncpyz(dst, replacements[i].replace, dst_size - 1);
-            break;
+    if(dst[0]) {
+        for (size_t i = 0; i < _countof(replacements); i++) {
+            if (strcasecmp(dst, replacements[i].found) == 0) {
+                strncpyz(dst, replacements[i].replace, dst_size - 1);
+                break;
+            }
         }
     }
 }
