@@ -354,7 +354,7 @@ void nd_sd_journal_transform_boot_id(
         if (!p_ut) {
 #ifndef HAVE_SD_JOURNAL_RESTART_FIELDS
             struct nd_journal_file *njf;
-            dfe_start_read(journal_files_registry, njf)
+            dfe_start_read(nd_journal_files_registry, njf)
             {
                 const char *files[2] = {
                     [0] = njf_dfe.name,
