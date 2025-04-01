@@ -106,7 +106,7 @@ static bool journal_sd_id128_parse(const char *in, sd_id128_t *ret) {
 //    }
 //}
 
-usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file *jf __maybe_unused, const char *boot_id) {
+usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file *njf __maybe_unused, const char *boot_id) {
     usec_t ut = UINT64_MAX;
     int r;
 
@@ -163,7 +163,7 @@ usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_f
     return UINT64_MAX;
 }
 
-static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, struct nd_journal_file *jf __maybe_unused) {
+static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, struct nd_journal_file *njf __maybe_unused) {
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
     sd_journal_flush_matches(j);
 
@@ -202,7 +202,7 @@ static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, s
 
     void *nothing;
     dfe_start_read(dict, nothing){
-        journal_file_update_annotation_boot_id(j, jf, nothing_dfe.name);
+        journal_file_update_annotation_boot_id(j, njf, nothing_dfe.name);
     }
     dfe_done(nothing);
 
@@ -210,8 +210,8 @@ static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, s
 #endif
 }
 
-void nd_journal_file_update_header(const char *filename, struct nd_journal_file *jf) {
-    if(jf->last_scan_header_vs_last_modified_ut == jf->file_last_modified_ut)
+void nd_journal_file_update_header(const char *filename, struct nd_journal_file *njf) {
+    if(njf->last_scan_header_vs_last_modified_ut == njf->file_last_modified_ut)
         return;
 
     fstat_cache_enable_on_thread();
@@ -226,14 +226,14 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
         netdata_log_error("JOURNAL: cannot open file '%s' to update msg_ut", filename);
         fstat_cache_disable_on_thread();
 
-        if(!jf->logged_failure) {
+        if(!njf->logged_failure) {
             netdata_log_error("cannot open journal file '%s', using file timestamps to understand time-frame.", filename);
-            jf->logged_failure = true;
+            njf->logged_failure = true;
         }
 
-        jf->msg_first_ut = 0;
-        jf->msg_last_ut = jf->file_last_modified_ut;
-        jf->last_scan_header_vs_last_modified_ut = jf->file_last_modified_ut;
+        njf->msg_first_ut = 0;
+        njf->msg_last_ut = njf->file_last_modified_ut;
+        njf->last_scan_header_vs_last_modified_ut = njf->file_last_modified_ut;
         return;
     }
 
@@ -257,7 +257,7 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
 
     if(sd_journal_seek_tail(j) < 0 || sd_journal_previous(j) < 0 || sd_journal_get_realtime_usec(j, &last_ut) < 0 || !last_ut) {
         internal_error(true, "cannot find the timestamp of the last message in '%s'", filename);
-        last_ut = jf->file_last_modified_ut;
+        last_ut = njf->file_last_modified_ut;
     }
 #ifdef HAVE_SD_JOURNAL_GET_SEQNUM
     else {
@@ -310,39 +310,39 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
         }
     }
 
-    jf->first_seqnum = first_seqnum;
-    jf->last_seqnum = last_seqnum;
+    njf->first_seqnum = first_seqnum;
+    njf->last_seqnum = last_seqnum;
 
-    jf->first_writer_id = first_writer_id;
-    jf->last_writer_id = last_writer_id;
+    njf->first_writer_id = first_writer_id;
+    njf->last_writer_id = last_writer_id;
 
-    jf->msg_first_ut = first_ut;
-    jf->msg_last_ut = last_ut;
+    njf->msg_first_ut = first_ut;
+    njf->msg_last_ut = last_ut;
 
-    if(!jf->msg_last_ut)
-        jf->msg_last_ut = jf->file_last_modified_ut;
+    if(!njf->msg_last_ut)
+        njf->msg_last_ut = njf->file_last_modified_ut;
 
     if(last_seqnum > first_seqnum) {
         if(!sd_id128_equal(first_writer_id, last_writer_id)) {
-            jf->messages_in_file = 0;
+            njf->messages_in_file = 0;
             nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
                     "The writers of the first and the last message in file '%s' differ."
                    , filename);
         }
         else
-            jf->messages_in_file = last_seqnum - first_seqnum + 1;
+            njf->messages_in_file = last_seqnum - first_seqnum + 1;
     }
     else
-        jf->messages_in_file = 0;
+        njf->messages_in_file = 0;
 
 //    if(!jf->messages_in_file)
 //        journal_file_get_header_from_journalctl(filename, jf);
 
-    journal_file_get_boot_id_annotations(j, jf);
+    journal_file_get_boot_id_annotations(j, njf);
     sd_journal_close(j);
     fstat_cache_disable_on_thread();
 
-    jf->last_scan_header_vs_last_modified_ut = jf->file_last_modified_ut;
+    njf->last_scan_header_vs_last_modified_ut = njf->file_last_modified_ut;
 
 //    nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
 //           "Journal file header updated '%s'",
@@ -375,17 +375,17 @@ static STRING *string_strdupz_source(const char *s, const char *e, size_t max_le
 }
 
 static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
-    struct nd_journal_file *jf = value;
-    jf->filename = dictionary_acquired_item_name(item);
-    jf->filename_len = strlen(jf->filename);
-    jf->source_type = ND_SD_JF_ALL;
+    struct nd_journal_file *njf = value;
+    njf->filename = dictionary_acquired_item_name(item);
+    njf->filename_len = strlen(njf->filename);
+    njf->source_type = ND_SD_JF_ALL;
 
     // based on the filename
     // decide the source to show to the user
-    const char *s = strrchr(jf->filename, '/');
+    const char *s = strrchr(njf->filename, '/');
     if(s) {
-        if(strstr(jf->filename, "/remote/")) {
-            jf->source_type |= ND_SD_JF_REMOTE_ALL;
+        if(strstr(njf->filename, "/remote/")) {
+            njf->source_type |= ND_SD_JF_REMOTE_ALL;
 
             if(strncmp(s, "/remote-", 8) == 0) {
                 s = &s[8]; // skip "/remote-"
@@ -404,60 +404,60 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
                         ip[e - s] = '\0';
                         char buf[ND_SD_JOURNAL_MAX_SOURCE_LEN];
                         if(ip_to_hostname(ip, buf, sizeof(buf)))
-                            jf->source = string_strdupz_source(buf, &buf[strlen(buf)], ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
+                            njf->source = string_strdupz_source(buf, &buf[strlen(buf)], ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
                         else {
                             internal_error(true, "Cannot find the hostname for IP '%s'", ip);
-                            jf->source = string_strdupz_source(s, e, ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
+                            njf->source = string_strdupz_source(s, e, ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
                         }
                     }
                     else
-                        jf->source = string_strdupz_source(s, e, ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
+                        njf->source = string_strdupz_source(s, e, ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
                 }
             }
         }
         else {
-            jf->source_type |= ND_SD_JF_LOCAL_ALL;
+            njf->source_type |= ND_SD_JF_LOCAL_ALL;
 
             const char *t = s - 1;
-            while(t >= jf->filename && *t != '.' && *t != '/')
+            while(t >= njf->filename && *t != '.' && *t != '/')
                 t--;
 
-            if(t >= jf->filename && *t == '.') {
-                jf->source_type |= ND_SD_JF_LOCAL_NAMESPACE;
-                jf->source = string_strdupz_source(t + 1, s, ND_SD_JOURNAL_MAX_SOURCE_LEN, "namespace-");
+            if(t >= njf->filename && *t == '.') {
+                njf->source_type |= ND_SD_JF_LOCAL_NAMESPACE;
+                njf->source = string_strdupz_source(t + 1, s, ND_SD_JOURNAL_MAX_SOURCE_LEN, "namespace-");
             }
             else if(strncmp(s, "/system", 7) == 0)
-                jf->source_type |= ND_SD_JF_LOCAL_SYSTEM;
+                njf->source_type |= ND_SD_JF_LOCAL_SYSTEM;
 
             else if(strncmp(s, "/user", 5) == 0)
-                jf->source_type |= ND_SD_JF_LOCAL_USER;
+                njf->source_type |= ND_SD_JF_LOCAL_USER;
 
             else
-                jf->source_type |= ND_SD_JF_LOCAL_OTHER;
+                njf->source_type |= ND_SD_JF_LOCAL_OTHER;
         }
     }
     else
-        jf->source_type |= ND_SD_JF_LOCAL_ALL | ND_SD_JF_LOCAL_OTHER;
+        njf->source_type |= ND_SD_JF_LOCAL_ALL | ND_SD_JF_LOCAL_OTHER;
 
-    jf->msg_last_ut = jf->file_last_modified_ut;
+    njf->msg_last_ut = njf->file_last_modified_ut;
 
     nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
            "Journal file added to the journal files registry: '%s'",
-           jf->filename);
+           njf->filename);
 }
 
 static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
-    struct nd_journal_file *jf = old_value;
-    struct nd_journal_file *njf = new_value;
+    struct nd_journal_file *njf_old = old_value;
+    struct nd_journal_file *njf_new = new_value;
 
-    if(njf->last_scan_monotonic_ut > jf->last_scan_monotonic_ut)
-        jf->last_scan_monotonic_ut = njf->last_scan_monotonic_ut;
+    if(njf_new->last_scan_monotonic_ut > njf_old->last_scan_monotonic_ut)
+        njf_old->last_scan_monotonic_ut = njf_new->last_scan_monotonic_ut;
 
-    if(njf->file_last_modified_ut > jf->file_last_modified_ut) {
-        jf->file_last_modified_ut = njf->file_last_modified_ut;
-        jf->size = njf->size;
+    if(njf_new->file_last_modified_ut > njf_old->file_last_modified_ut) {
+        njf_old->file_last_modified_ut = njf_new->file_last_modified_ut;
+        njf_old->size = njf_new->size;
 
-        jf->msg_last_ut = jf->file_last_modified_ut;
+        njf_old->msg_last_ut = njf_old->file_last_modified_ut;
 
 //        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
 //               "Journal file updated to the journal files registry '%s'",
@@ -533,29 +533,29 @@ void available_journal_file_sources_to_json_array(BUFFER *wb) {
 
     struct journal_file_source t = { 0 };
 
-    struct nd_journal_file *jf;
-    dfe_start_read(journal_files_registry, jf) {
-        t.first_ut = jf->msg_first_ut;
-        t.last_ut = jf->msg_last_ut;
+    struct nd_journal_file *njf;
+    dfe_start_read(journal_files_registry, njf) {
+        t.first_ut = njf->msg_first_ut;
+        t.last_ut = njf->msg_last_ut;
         t.count = 1;
-        t.size = jf->size;
+        t.size = njf->size;
 
         dictionary_set(dict, ND_SD_JF_SOURCE_ALL_NAME, &t, sizeof(t));
 
-        if(jf->source_type & ND_SD_JF_LOCAL_ALL)
+        if(njf->source_type & ND_SD_JF_LOCAL_ALL)
             dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_NAME, &t, sizeof(t));
-        if(jf->source_type & ND_SD_JF_LOCAL_SYSTEM)
+        if(njf->source_type & ND_SD_JF_LOCAL_SYSTEM)
             dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_SYSTEM_NAME, &t, sizeof(t));
-        if(jf->source_type & ND_SD_JF_LOCAL_USER)
+        if(njf->source_type & ND_SD_JF_LOCAL_USER)
             dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_USERS_NAME, &t, sizeof(t));
-        if(jf->source_type & ND_SD_JF_LOCAL_OTHER)
+        if(njf->source_type & ND_SD_JF_LOCAL_OTHER)
             dictionary_set(dict, ND_SD_JF_SOURCE_LOCAL_OTHER_NAME, &t, sizeof(t));
-        if(jf->source_type & ND_SD_JF_LOCAL_NAMESPACE)
+        if(njf->source_type & ND_SD_JF_LOCAL_NAMESPACE)
             dictionary_set(dict, ND_SD_JF_SOURCE_NAMESPACES_NAME, &t, sizeof(t));
-        if(jf->source_type & ND_SD_JF_REMOTE_ALL)
+        if(njf->source_type & ND_SD_JF_REMOTE_ALL)
             dictionary_set(dict, ND_SD_JF_SOURCE_REMOTES_NAME, &t, sizeof(t));
-        if(jf->source)
-            dictionary_set(dict, string2str(jf->source), &t, sizeof(t));
+        if(njf->source)
+            dictionary_set(dict, string2str(njf->source), &t, sizeof(t));
     }
     dfe_done(jf);
 
@@ -565,11 +565,11 @@ void available_journal_file_sources_to_json_array(BUFFER *wb) {
 }
 
 static void files_registry_delete_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
-    struct nd_journal_file *jf = value; (void)jf;
+    struct nd_journal_file *njf = value;
     const char *filename = dictionary_acquired_item_name(item); (void)filename;
 
     internal_error(true, "removed journal file '%s'", filename);
-    string_freez(jf->source);
+    string_freez(njf->source);
 }
 
 #define EXT_DOT_JOURNAL ".journal"
@@ -736,25 +736,25 @@ void nd_journal_files_registry_update(void) {
             if (stat(full_path, &info) == -1)
                 continue;
 
-            struct nd_journal_file t = {
+            struct nd_journal_file njf_tmp = {
                     .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC + info.st_mtim.tv_nsec / NSEC_PER_USEC,
                     .last_scan_monotonic_ut = scan_monotonic_ut,
                     .size = info.st_size,
                     .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
             };
-            struct nd_journal_file *jf = dictionary_set(journal_files_registry, full_path, &t, sizeof(t));
-            nd_journal_file_update_header(jf->filename, jf);
+            struct nd_journal_file *njf = dictionary_set(journal_files_registry, full_path, &njf_tmp, sizeof(njf_tmp));
+            nd_journal_file_update_header(njf->filename, njf);
         }
         freez(array);
         dictionary_destroy(files);
         dictionary_destroy(dirs);
 
-        struct nd_journal_file *jf;
-        dfe_start_write(journal_files_registry, jf){
-            if(jf->last_scan_monotonic_ut < scan_monotonic_ut)
-                dictionary_del(journal_files_registry, jf_dfe.name);
+        struct nd_journal_file *njf;
+        dfe_start_write(journal_files_registry, njf){
+            if(njf->last_scan_monotonic_ut < scan_monotonic_ut)
+                dictionary_del(journal_files_registry, njf_dfe.name);
         }
-        dfe_done(jf);
+        dfe_done(njf);
         dictionary_garbage_collect(journal_files_registry);
 
         journal_files_scans++;
@@ -770,28 +770,28 @@ void nd_journal_files_registry_update(void) {
 
 int nd_journal_file_dict_items_backward_compar(const void *a, const void *b) {
     const DICTIONARY_ITEM **ad = (const DICTIONARY_ITEM **)a, **bd = (const DICTIONARY_ITEM **)b;
-    struct nd_journal_file *jfa = dictionary_acquired_item_value(*ad);
-    struct nd_journal_file *jfb = dictionary_acquired_item_value(*bd);
+    struct nd_journal_file *njf_lhs = dictionary_acquired_item_value(*ad);
+    struct nd_journal_file *njf_rhs = dictionary_acquired_item_value(*bd);
 
     // compare the last message timestamps
-    if(jfa->msg_last_ut < jfb->msg_last_ut)
+    if(njf_lhs->msg_last_ut < njf_rhs->msg_last_ut)
         return 1;
 
-    if(jfa->msg_last_ut > jfb->msg_last_ut)
+    if(njf_lhs->msg_last_ut > njf_rhs->msg_last_ut)
         return -1;
 
     // compare the file last modification timestamps
-    if(jfa->file_last_modified_ut < jfb->file_last_modified_ut)
+    if(njf_lhs->file_last_modified_ut < njf_rhs->file_last_modified_ut)
         return 1;
 
-    if(jfa->file_last_modified_ut > jfb->file_last_modified_ut)
+    if(njf_lhs->file_last_modified_ut > njf_rhs->file_last_modified_ut)
         return -1;
 
     // compare the first message timestamps
-    if(jfa->msg_first_ut < jfb->msg_first_ut)
+    if(njf_lhs->msg_first_ut < njf_rhs->msg_first_ut)
         return 1;
 
-    if(jfa->msg_first_ut > jfb->msg_first_ut)
+    if(njf_lhs->msg_first_ut > njf_rhs->msg_first_ut)
         return -1;
 
     return 0;

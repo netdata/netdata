@@ -303,10 +303,10 @@ void nd_sd_journal_transform_boot_id(FACETS *facets __maybe_unused, BUFFER *wb, 
         usec_t *p_ut = dictionary_get(boot_ids_to_first_ut, boot_id);
         if(!p_ut) {
 #ifndef HAVE_SD_JOURNAL_RESTART_FIELDS
-            struct nd_journal_file *jf;
-            dfe_start_read(journal_files_registry, jf) {
+            struct nd_journal_file *njf;
+            dfe_start_read(journal_files_registry, njf) {
                 const char *files[2] = {
-                        [0] = jf_dfe.name,
+                        [0] = njf_dfe.name,
                         [1] = NULL,
                 };
 
@@ -319,10 +319,10 @@ void nd_sd_journal_transform_boot_id(FACETS *facets __maybe_unused, BUFFER *wb, 
                     continue;
                 }
 
-                ut = journal_file_update_annotation_boot_id(j, jf, boot_id);
+                ut = journal_file_update_annotation_boot_id(j, njf, boot_id);
                 sd_journal_close(j);
             }
-            dfe_done(jf);
+            dfe_done(njf);
 #endif
         }
         else

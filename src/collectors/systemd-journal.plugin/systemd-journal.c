@@ -255,11 +255,11 @@ static inline bool nd_sd_journal_seek_to(sd_journal *j, usec_t timestamp) {
 
 // ----------------------------------------------------------------------------
 
-static inline size_t nd_sd_journal_process_row(sd_journal *j, FACETS *facets, struct nd_journal_file *jf, usec_t *msg_ut) {
+static inline size_t nd_sd_journal_process_row(sd_journal *j, FACETS *facets, struct nd_journal_file *njf, usec_t *msg_ut) {
     const void *data;
     size_t length, bytes = 0;
 
-    facets_add_key_value_length(facets, JOURNAL_KEY_ND_JOURNAL_FILE, sizeof(JOURNAL_KEY_ND_JOURNAL_FILE) - 1, jf->filename, jf->filename_len);
+    facets_add_key_value_length(facets, JOURNAL_KEY_ND_JOURNAL_FILE, sizeof(JOURNAL_KEY_ND_JOURNAL_FILE) - 1, njf->filename, njf->filename_len);
 
     SD_JOURNAL_FOREACH_DATA(j, data, length) {
         const char *key, *value;
@@ -282,11 +282,11 @@ static inline size_t nd_sd_journal_process_row(sd_journal *j, FACETS *facets, st
                     delta = JOURNAL_VS_REALTIME_DELTA_MAX_UT;
 
                 // update max_journal_vs_realtime_delta_ut if the delta increased
-                usec_t expected = jf->max_journal_vs_realtime_delta_ut;
+                usec_t expected = njf->max_journal_vs_realtime_delta_ut;
                 do {
                     if(delta <= expected)
                         break;
-                } while(!__atomic_compare_exchange_n(&jf->max_journal_vs_realtime_delta_ut, &expected, delta, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+                } while(!__atomic_compare_exchange_n(&njf->max_journal_vs_realtime_delta_ut, &expected, delta, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 
                 internal_error(delta > expected,
                                "increased max_journal_vs_realtime_delta_ut from %"PRIu64" to %"PRIu64", "
@@ -323,10 +323,10 @@ static inline ND_SD_JOURNAL_STATUS check_stop(const bool *cancelled, const usec_
 
 ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
-        struct nd_journal_file *jf,
+        struct nd_journal_file *njf,
     LOGS_QUERY_STATUS *fqs) {
 
-    usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+    usec_t anchor_delta = __atomic_load_n(&njf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
     lqs_query_timeframe(fqs, anchor_delta);
     usec_t start_ut = fqs->query.start_ut;
     usec_t stop_ut = fqs->query.stop_ut;
@@ -378,12 +378,12 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
 #endif
         }
 
-        sampling_t sample = is_row_in_sample(j, fqs, jf, msg_ut,
+        sampling_t sample = is_row_in_sample(j, fqs, njf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_BACKWARD,
                                         facets_row_candidate_to_keep(facets, msg_ut));
 
         if(sample == SAMPLING_FULL) {
-            bytes += nd_sd_journal_process_row(j, facets, jf, &msg_ut);
+            bytes += nd_sd_journal_process_row(j, facets, njf, &msg_ut);
 
             // make sure each line gets a unique timestamp
             if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
@@ -417,7 +417,7 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
         else if(sample == SAMPLING_SKIP_FIELDS)
             facets_row_finished_unsampled(facets, msg_ut);
         else {
-            sampling_update_running_query_file_estimates(facets, j, fqs, jf, msg_ut, FACETS_ANCHOR_DIRECTION_BACKWARD);
+            sampling_update_running_query_file_estimates(facets, j, fqs, njf, msg_ut, FACETS_ANCHOR_DIRECTION_BACKWARD);
             break;
         }
     }
@@ -438,10 +438,10 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
 
 ND_SD_JOURNAL_STATUS nd_sd_journal_query_forward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
-        struct nd_journal_file *jf,
+        struct nd_journal_file *njf,
     LOGS_QUERY_STATUS *fqs) {
 
-    usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+    usec_t anchor_delta = __atomic_load_n(&njf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
     lqs_query_timeframe(fqs, anchor_delta);
     usec_t start_ut = fqs->query.start_ut;
     usec_t stop_ut = fqs->query.stop_ut;
@@ -486,12 +486,12 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_forward(
             fqs->c.query_file.first_msg_ut = msg_ut;
         }
 
-        sampling_t sample = is_row_in_sample(j, fqs, jf, msg_ut,
+        sampling_t sample = is_row_in_sample(j, fqs, njf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_FORWARD,
                                         facets_row_candidate_to_keep(facets, msg_ut));
 
         if(sample == SAMPLING_FULL) {
-            bytes += nd_sd_journal_process_row(j, facets, jf, &msg_ut);
+            bytes += nd_sd_journal_process_row(j, facets, njf, &msg_ut);
 
             // make sure each line gets a unique timestamp
             if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
@@ -525,7 +525,7 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_forward(
         else if(sample == SAMPLING_SKIP_FIELDS)
             facets_row_finished_unsampled(facets, msg_ut);
         else {
-            sampling_update_running_query_file_estimates(facets, j, fqs, jf, msg_ut, FACETS_ANCHOR_DIRECTION_FORWARD);
+            sampling_update_running_query_file_estimates(facets, j, fqs, njf, msg_ut, FACETS_ANCHOR_DIRECTION_FORWARD);
             break;
         }
     }
@@ -638,7 +638,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
 
 static ND_SD_JOURNAL_STATUS nd_sd_journal_query_one_file(
         const char *filename, BUFFER *wb, FACETS *facets,
-        struct nd_journal_file *jf,
+        struct nd_journal_file *njf,
     LOGS_QUERY_STATUS *fqs) {
 
     sd_journal *j = NULL;
@@ -673,9 +673,9 @@ static ND_SD_JOURNAL_STATUS nd_sd_journal_query_one_file(
 
     if(matches_filters) {
         if(fqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-            status = nd_sd_journal_query_forward(j, wb, facets, jf, fqs);
+            status = nd_sd_journal_query_forward(j, wb, facets, njf, fqs);
         else
-            status = nd_sd_journal_query_backward(j, wb, facets, jf, fqs);
+            status = nd_sd_journal_query_backward(j, wb, facets, njf, fqs);
     }
     else
         status = ND_SD_JOURNAL_NO_FILE_MATCHED;
@@ -686,19 +686,19 @@ static ND_SD_JOURNAL_STATUS nd_sd_journal_query_one_file(
     return status;
 }
 
-static bool jf_is_mine(struct nd_journal_file *jf, LOGS_QUERY_STATUS *fqs) {
+static bool jf_is_mine(struct nd_journal_file *njf, LOGS_QUERY_STATUS *fqs) {
 
-    if((fqs->rq.source_type == ND_SD_JF_NONE && !fqs->rq.sources) || (jf->source_type & fqs->rq.source_type) ||
-       (fqs->rq.sources && simple_pattern_matches(fqs->rq.sources, string2str(jf->source)))) {
+    if((fqs->rq.source_type == ND_SD_JF_NONE && !fqs->rq.sources) || (njf->source_type & fqs->rq.source_type) ||
+       (fqs->rq.sources && simple_pattern_matches(fqs->rq.sources, string2str(njf->source)))) {
 
-        if(!jf->msg_last_ut)
+        if(!njf->msg_last_ut)
             // the file is not scanned yet, or the timestamps have not been updated,
             // so we don't know if it can contribute or not - let's add it.
             return true;
 
         usec_t anchor_delta = JOURNAL_VS_REALTIME_DELTA_MAX_UT;
-        usec_t first_ut = jf->msg_first_ut - anchor_delta;
-        usec_t last_ut = jf->msg_last_ut + anchor_delta;
+        usec_t first_ut = njf->msg_first_ut - anchor_delta;
+        usec_t last_ut = njf->msg_last_ut + anchor_delta;
 
         if(last_ut >= fqs->rq.after_ut && first_ut <= fqs->rq.before_ut)
             return true;
@@ -711,7 +711,7 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     FACETS *facets = lqs->facets;
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_NO_FILE_MATCHED;
-    struct nd_journal_file *jf;
+    struct nd_journal_file *njf;
 
     lqs->c.files_matched = 0;
     lqs->c.file_working = 0;
@@ -725,13 +725,13 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
 
     // count the files
     bool files_are_newer = false;
-    dfe_start_read(journal_files_registry, jf) {
-        if(!jf_is_mine(jf, lqs))
+    dfe_start_read(journal_files_registry, njf) {
+        if(!jf_is_mine(njf, lqs))
             continue;
 
-        file_items[files_used++] = dictionary_acquired_item_dup(journal_files_registry, jf_dfe.item);
+        file_items[files_used++] = dictionary_acquired_item_dup(journal_files_registry, njf_dfe.item);
 
-        if(jf->msg_last_ut > lqs->rq.if_modified_since)
+        if(njf->msg_last_ut > lqs->rq.if_modified_since)
             files_are_newer = true;
     }
     dfe_done(jf);
@@ -768,9 +768,9 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     buffer_json_member_add_array(wb, "_journal_files");
     for(size_t f = 0; f < files_used ;f++) {
         const char *filename = dictionary_acquired_item_name(file_items[f]);
-        jf = dictionary_acquired_item_value(file_items[f]);
+        njf = dictionary_acquired_item_value(file_items[f]);
 
-        if(!jf_is_mine(jf, lqs))
+        if(!jf_is_mine(njf, lqs))
             continue;
 
         started_ut = ended_ut;
@@ -792,9 +792,9 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
         size_t bytes_read = lqs->c.bytes_read;
         size_t matches_setup_ut = lqs->c.matches_setup_ut;
 
-        sampling_file_init(lqs, jf);
+        sampling_file_init(lqs, njf);
 
-        ND_SD_JOURNAL_STATUS tmp_status = nd_sd_journal_query_one_file(filename, wb, facets, jf, lqs);
+        ND_SD_JOURNAL_STATUS tmp_status = nd_sd_journal_query_one_file(filename, wb, facets, njf, lqs);
 
 //        nd_log(NDLS_COLLECTORS, NDLP_INFO,
 //               "JOURNAL ESTIMATION FINAL: '%s' "
@@ -833,12 +833,12 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
         {
             // information about the file
             buffer_json_member_add_string(wb, "_filename", filename);
-            buffer_json_member_add_uint64(wb, "_source_type", jf->source_type);
-            buffer_json_member_add_string(wb, "_source", string2str(jf->source));
-            buffer_json_member_add_uint64(wb, "_last_modified_ut", jf->file_last_modified_ut);
-            buffer_json_member_add_uint64(wb, "_msg_first_ut", jf->msg_first_ut);
-            buffer_json_member_add_uint64(wb, "_msg_last_ut", jf->msg_last_ut);
-            buffer_json_member_add_uint64(wb, "_journal_vs_realtime_delta_ut", jf->max_journal_vs_realtime_delta_ut);
+            buffer_json_member_add_uint64(wb, "_source_type", njf->source_type);
+            buffer_json_member_add_string(wb, "_source", string2str(njf->source));
+            buffer_json_member_add_uint64(wb, "_last_modified_ut", njf->file_last_modified_ut);
+            buffer_json_member_add_uint64(wb, "_msg_first_ut", njf->msg_first_ut);
+            buffer_json_member_add_uint64(wb, "_msg_last_ut", njf->msg_last_ut);
+            buffer_json_member_add_uint64(wb, "_journal_vs_realtime_delta_ut", njf->max_journal_vs_realtime_delta_ut);
 
             // information about the current use of the file
             buffer_json_member_add_uint64(wb, "duration_ut", ended_ut - started_ut);
