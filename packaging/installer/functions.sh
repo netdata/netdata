@@ -1132,9 +1132,19 @@ portable_add_user_to_group() {
     elif command -v dseditgroup 1> /dev/null 2>&1; then
       dseditgroup -u "${username}" "${groupname}" && return 0
     elif command -v synogroup 1> /dev/null 2>&1; then
-      # this command does not add, but replaces the list of members
-      run synogroup --member "${groupname}" "${username}" && return 0
+      # Get current members of the group
+      current_members_list=$(synogroup --get "${groupname}" | grep '^[0-9]')
+      current_members=$(echo "${current_members_list}" | grep -oP '\[\K[^\]]+' | tr '\n' ' ' | sed 's/ $//')
+
+      # Update the list only if the user is not a member
+      if echo "${current_members}" | grep -w -q "${username}"; then
+        return 0
+      else
+        new_members="${current_members} ${username}"
+        synogroup --member "${groupname}" ${new_members} 1>/dev/null && return 0
+      fi
     fi
+  fi
 
     warning >&2 "Failed to add user ${username} to group ${groupname}!"
     return 1
