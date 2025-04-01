@@ -10,16 +10,16 @@
 #include <systemd/sd-journal.h>
 #include <syslog.h>
 
-#define ND_SD_JOURNAL_FUNCTION_DESCRIPTION    "View, search and analyze systemd journal entries."
-#define ND_SD_JOURNAL_FUNCTION_NAME           "systemd-journal"
-#define ND_SD_JOURNAL_DEFAULT_TIMEOUT         60
+#define ND_SD_JOURNAL_FUNCTION_DESCRIPTION "View, search and analyze systemd journal entries."
+#define ND_SD_JOURNAL_FUNCTION_NAME "systemd-journal"
+#define ND_SD_JOURNAL_DEFAULT_TIMEOUT 60
 #define ND_SD_JOURNAL_ENABLE_ESTIMATIONS_FILE_PERCENTAGE 0.01
 #define ND_SD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS 250
 #define ND_SD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
 
-#define ND_SD_UNITS_FUNCTION_DESCRIPTION      "View the status of systemd units"
-#define ND_SD_UNITS_FUNCTION_NAME              "systemd-list-units"
-#define ND_SD_UNITS_DEFAULT_TIMEOUT            30
+#define ND_SD_UNITS_FUNCTION_DESCRIPTION "View the status of systemd units"
+#define ND_SD_UNITS_FUNCTION_NAME "systemd-list-units"
+#define ND_SD_UNITS_DEFAULT_TIMEOUT 30
 
 extern __thread size_t fstat_thread_calls;
 extern __thread size_t fstat_thread_cached_responses;
@@ -39,14 +39,14 @@ typedef enum {
 } ND_SD_JOURNAL_STATUS;
 
 typedef enum {
-    ND_SD_JF_NONE               = 0,
-    ND_SD_JF_ALL                = (1 << 0),
-    ND_SD_JF_LOCAL_ALL          = (1 << 1),
-    ND_SD_JF_REMOTE_ALL         = (1 << 2),
-    ND_SD_JF_LOCAL_SYSTEM       = (1 << 3),
-    ND_SD_JF_LOCAL_USER         = (1 << 4),
-    ND_SD_JF_LOCAL_NAMESPACE    = (1 << 5),
-    ND_SD_JF_LOCAL_OTHER        = (1 << 6),
+    ND_SD_JF_NONE = 0,
+    ND_SD_JF_ALL = (1 << 0),
+    ND_SD_JF_LOCAL_ALL = (1 << 1),
+    ND_SD_JF_REMOTE_ALL = (1 << 2),
+    ND_SD_JF_LOCAL_SYSTEM = (1 << 3),
+    ND_SD_JF_LOCAL_USER = (1 << 4),
+    ND_SD_JF_LOCAL_NAMESPACE = (1 << 5),
+    ND_SD_JF_LOCAL_OTHER = (1 << 6),
 } SD_JOURNAL_FILE_SOURCE_TYPE;
 
 struct nd_journal_file {
@@ -83,7 +83,7 @@ struct nd_journal_file {
 
 #define ND_SD_JOURNAL_OPEN_FLAGS (0)
 
-#define JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT (5 * USEC_PER_SEC) // assume a 5-seconds latency
+#define JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT (5 * USEC_PER_SEC)  // assume a 5-seconds latency
 #define JOURNAL_VS_REALTIME_DELTA_MAX_UT (2 * 60 * USEC_PER_SEC) // up to 2-minutes latency
 
 extern DICTIONARY *nd_journal_files_registry;
@@ -100,7 +100,12 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
 
 FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets, FACET_ROW *row, void *data);
 
-void nd_sd_journal_dynamic_row_id(FACETS *facets, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data);
+void nd_sd_journal_dynamic_row_id(
+    FACETS *facets,
+    BUFFER *json_array,
+    FACET_ROW_KEY_VALUE *rkv,
+    FACET_ROW *row,
+    void *data);
 void nd_sd_journal_transform_priority(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 void nd_sd_journal_transform_syslog_facility(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 void nd_sd_journal_transform_errno(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
@@ -119,7 +124,15 @@ struct journal_directory {
 extern struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES];
 
 void nd_journal_init_files_and_directories(void);
-void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused, const char *source, void *data);
+void function_systemd_journal(
+    const char *transaction,
+    char *function,
+    usec_t *stop_monotonic_ut,
+    bool *cancelled,
+    BUFFER *payload,
+    HTTP_ACCESS access __maybe_unused,
+    const char *source,
+    void *data);
 void nd_journal_file_update_header(const char *filename, struct nd_journal_file *njf);
 
 void nd_sd_journal_annotations_init(void);
@@ -129,13 +142,28 @@ void *nd_journal_watcher_main(void *arg);
 void nd_journal_watcher_restart(void);
 
 #ifdef ENABLE_SYSTEMD_DBUS
-void function_systemd_units(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused, const char *source, void *data);
+void function_systemd_units(
+    const char *transaction,
+    char *function,
+    usec_t *stop_monotonic_ut,
+    bool *cancelled,
+    BUFFER *payload,
+    HTTP_ACCESS access __maybe_unused,
+    const char *source,
+    void *data);
 #endif
 
-static inline bool parse_journal_field(const char *data, size_t data_length, const char **key, size_t *key_length, const char **value, size_t *value_length) {
+static inline bool parse_journal_field(
+    const char *data,
+    size_t data_length,
+    const char **key,
+    size_t *key_length,
+    const char **value,
+    size_t *value_length)
+{
     const char *k = data;
     const char *equal = strchr(k, '=');
-    if(unlikely(!equal))
+    if (unlikely(!equal))
         return false;
 
     size_t kl = equal - k;
