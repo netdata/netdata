@@ -18,5 +18,5 @@ Visit our [Pricing](https://www.netdata.cloud/pricing/) page to compare features
 
 To learn more about installing Netdata Cloud in your own infrastructure:
 
-1. Review the [Architecture Diagram](/docs/netdata-cloud/netdata-cloud-on-prem/README.md) to understand the system components.
-2. Follow the [Deployment Guide](/docs/netdata-cloud/netdata-cloud-on-prem/installation.md) for detailed installation instructions
+1. Review the [Architecture Diagram](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md) to understand the system components.
+2. Follow the [Deployment Guide](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/installation.md) for detailed installation instructions
