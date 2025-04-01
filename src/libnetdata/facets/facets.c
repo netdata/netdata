@@ -1067,6 +1067,25 @@ static inline void facets_key_value_transformed(FACETS *facets, FACET_KEY *k, FA
         buffer_strcat(dst, facets_key_value_cached(k, v, facets->report.used_hashes_registry));
 }
 
+static inline void facets_histogram_value_ids(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, const char *first_key) {
+    CLEAN_BUFFER *tb = buffer_create(0, NULL);
+
+    buffer_json_member_add_array(wb, key);
+    {
+        if(first_key)
+            buffer_json_add_array_item_string(wb, first_key);
+
+        if(k && k->values.enabled) {
+            FACET_VALUE *v;
+            foreach_value_in_key(k, v) {
+                buffer_json_add_array_item_string(wb, facets_key_value_id(k ,v));
+            }
+            foreach_value_in_key_done(v);
+        }
+    }
+    buffer_json_array_close(wb); // key
+}
+
 static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, const char *first_key) {
     CLEAN_BUFFER *tb = buffer_create(0, NULL);
 
@@ -1377,8 +1396,9 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
 
                 buffer_json_add_array_item_object(wb); // dimension
                 {
+                    buffer_json_member_add_string(wb, "id", facets_key_value_id(k, v));
+
                     facets_key_value_transformed(facets, k, v, tmp, FACETS_TRANSFORM_HISTOGRAM);
-                    buffer_json_member_add_string(wb, "id", buffer_tostring(tmp));
                     buffer_json_member_add_string(wb, "nm", buffer_tostring(tmp));
                     buffer_json_member_add_object(wb, "ds");
                     {
@@ -1498,7 +1518,8 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
         buffer_json_member_add_string(wb, "units", "events");
         buffer_json_member_add_object(wb, "dimensions");
         {
-            facets_histogram_value_names(wb, facets, k, "ids", NULL);
+            facets_histogram_value_ids(wb, facets, k, "ids", NULL);
+            facets_histogram_value_names(wb, facets, k, "names", NULL);
             facets_histogram_value_units(wb, facets, k, "units");
 
             buffer_json_member_add_object(wb, "sts");
@@ -1552,7 +1573,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
             }
             buffer_json_array_close(wb); // grouped_by
 
-            facets_histogram_value_names(wb, facets, k, "ids", NULL);
+            facets_histogram_value_ids(wb, facets, k, "ids", NULL);
             facets_histogram_value_names(wb, facets, k, "names", NULL);
             facets_histogram_value_colors(wb, facets, k, "colors");
             facets_histogram_value_units(wb, facets, k, "units");
