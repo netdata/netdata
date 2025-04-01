@@ -1066,7 +1066,7 @@ portable_add_user() {
       return 0
     fi
   elif command -v synouser 1> /dev/null 2>&1; then
-    run synouser -add ${username} "" "netdata agent" 0 "" 0 && return 0
+    run synouser -add "${username}" "" "netdata agent" 0 "" 0 && return 0
   fi
 
   warning "Failed to add ${username} user account!"
