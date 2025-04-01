@@ -61,7 +61,7 @@ nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file 
             "sd_journal_add_match('%s') on file '%s' returned %d",
             boot_id,
             m,
-            jf->filename,
+            njf->filename,
             r);
         return UINT64_MAX;
     }
@@ -74,7 +74,7 @@ nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file 
             "JOURNAL: while looking for the first timestamp of boot_id '%s', "
             "sd_journal_seek_head() on file '%s' returned %d",
             boot_id,
-            jf->filename,
+            njf->filename,
             r);
         return UINT64_MAX;
     }
@@ -87,7 +87,7 @@ nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file 
             "JOURNAL: while looking for the first timestamp of boot_id '%s', "
             "sd_journal_next() on file '%s' returned %d",
             boot_id,
-            jf->filename,
+            njf->filename,
             r);
         return UINT64_MAX;
     }
@@ -100,7 +100,7 @@ nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file 
             "JOURNAL: while looking for the first timestamp of boot_id '%s', "
             "sd_journal_get_realtime_usec() on file '%s' returned %d",
             boot_id,
-            jf->filename,
+            njf->filename,
             r);
         return UINT64_MAX;
     }
@@ -126,7 +126,7 @@ nd_journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, struct nd_
             true,
             "JOURNAL: while querying for the unique _BOOT_ID values, "
             "sd_journal_query_unique() on file '%s' returned %d",
-            jf->filename,
+            njf->filename,
             r);
         errno = -r;
         return;
