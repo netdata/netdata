@@ -230,43 +230,6 @@ static void wevt_lazy_load_message(
         buffer_json_add_array_item_string(json_array, d->log->ops.event.data);
 }
 
-static const char *windows_events_level_color(FACETS *facets __maybe_unused, const char *value, void *data __maybe_unused) {
-    // First try to parse as a number
-    if (value && *value) {
-        char *endptr = NULL;
-        unsigned long level = strtoul(value, &endptr, 10);
-
-        // If endptr points to the null terminator, the entire string was parsed
-        if (endptr && *endptr == '\0') {
-            switch (level) {
-                case 0: return "#673ab7"; // None - deep purple
-                case 1: return "#c62828"; // Critical - deeper red
-                case 2: return "#f44336"; // Error - red
-                case 3: return "#ffc107"; // Warning - yellow
-                case 4: return "#e0e0e0"; // Information - white
-                case 5: return "#9e9e9e"; // Verbose - gray
-                default: return NULL;     // Default color
-            }
-        }
-    }
-
-    // Fall back to string comparison
-    if (strcmp(value, WEVT_LEVEL_NAME_NONE) == 0)
-        return "#673ab7"; // None - deep purple
-    else if (strcmp(value, WEVT_LEVEL_NAME_CRITICAL) == 0)
-        return "#c62828"; // Critical - deeper red
-    else if (strcmp(value, WEVT_LEVEL_NAME_ERROR) == 0)
-        return "#f44336"; // Error - red
-    else if (strcmp(value, WEVT_LEVEL_NAME_WARNING) == 0)
-        return "#ffc107"; // Warning - yellow
-    else if (strcmp(value, WEVT_LEVEL_NAME_INFORMATION) == 0)
-        return "#e0e0e0"; // Information - white
-    else if (strcmp(value, WEVT_LEVEL_NAME_VERBOSE) == 0)
-        return "#9e9e9e"; // Verbose - gray
-
-    return NULL; // Default color
-}
-
 static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
     // the order of the fields here, controls the order of the fields at the table presented
 
@@ -313,10 +276,6 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             facets, WEVT_FIELD_LEVEL,
             rq->default_facet | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_EXPANDED_FILTER);
 
-    facets_register_key_name_color(
-        facets, WEVT_FIELD_LEVEL,
-        windows_events_level_color, NULL);
-
     facets_register_key_name(
             facets, WEVT_FIELD_LEVEL "ID",
             FACET_KEY_OPTION_NONE);
@@ -324,10 +283,6 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
     facets_register_key_name(
             facets, WEVT_FIELD_PROCESSID,
             FACET_KEY_OPTION_FTS);
-
-    facets_register_key_name_color(
-        facets, WEVT_FIELD_LEVEL "ID",
-        windows_events_level_color, NULL);
 
     facets_register_key_name(
             facets, WEVT_FIELD_THREADID,
