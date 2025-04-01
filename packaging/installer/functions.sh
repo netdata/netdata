@@ -1144,7 +1144,7 @@ portable_add_user_to_group() {
       fi
 
       # Set the member list
-      synogroup --member "${groupname}" ${new_members} 1>/dev/null && return 0
+      synogroup --member "${groupname}" "${new_members}" 1>/dev/null && return 0
     fi
 
     warning >&2 "Failed to add user ${username} to group ${groupname}!"
