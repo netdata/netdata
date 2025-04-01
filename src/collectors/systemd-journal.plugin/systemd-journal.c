@@ -8,10 +8,10 @@
 
 #include "systemd-internals.h"
 
-#define SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION    "View, search and analyze systemd journal entries."
-#define SYSTEMD_JOURNAL_FUNCTION_NAME           "systemd-journal"
-#define SYSTEMD_JOURNAL_SAMPLING_SLOTS 1000
-#define SYSTEMD_JOURNAL_SAMPLING_RECALIBRATE 10000
+#define ND_SD_JOURNAL_FUNCTION_DESCRIPTION    "View, search and analyze systemd journal entries."
+#define ND_SD_JOURNAL_FUNCTION_NAME           "systemd-journal"
+#define ND_SD_JOURNAL_SAMPLING_SLOTS 1000
+#define ND_SD_JOURNAL_SAMPLING_RECALIBRATE 10000
 
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
 #define LQS_DEFAULT_SLICE_MODE 1
@@ -56,8 +56,8 @@ struct lqs_extension {
         usec_t end_ut;
         usec_t step_ut;
         uint32_t enable_after_samples;
-        uint32_t sampled[SYSTEMD_JOURNAL_SAMPLING_SLOTS];
-        uint32_t unsampled[SYSTEMD_JOURNAL_SAMPLING_SLOTS];
+        uint32_t sampled[ND_SD_JOURNAL_SAMPLING_SLOTS];
+        uint32_t unsampled[ND_SD_JOURNAL_SAMPLING_SLOTS];
     } samples_per_time_slot;
 
     // per file progress info
@@ -73,8 +73,8 @@ struct lqs_extension {
 };
 
 // prepare LQS
-#define LQS_FUNCTION_NAME           SYSTEMD_JOURNAL_FUNCTION_NAME
-#define LQS_FUNCTION_DESCRIPTION    SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION
+#define LQS_FUNCTION_NAME           ND_SD_JOURNAL_FUNCTION_NAME
+#define LQS_FUNCTION_DESCRIPTION    ND_SD_JOURNAL_FUNCTION_DESCRIPTION
 #define LQS_DEFAULT_ITEMS_PER_QUERY 200
 #define LQS_DEFAULT_ITEMS_SAMPLING  1000000
 #define LQS_SOURCE_TYPE             SD_JOURNAL_FILE_SOURCE_TYPE
@@ -88,8 +88,8 @@ struct lqs_extension {
 #include "systemd-journal-sampling.h"
 
 #define FACET_MAX_VALUE_LENGTH                  8192
-#define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT         60
-#define SYSTEMD_JOURNAL_PROGRESS_EVERY_UT       (250 * USEC_PER_MS)
+#define ND_SD_JOURNAL_DEFAULT_TIMEOUT         60
+#define ND_SD_JOURNAL_PROGRESS_EVERY_UT       (250 * USEC_PER_MS)
 #define JOURNAL_KEY_ND_JOURNAL_FILE             "ND_JOURNAL_FILE"
 #define JOURNAL_KEY_ND_JOURNAL_PROCESS          "ND_JOURNAL_PROCESS"
 #define JOURNAL_DEFAULT_DIRECTION               FACETS_ANCHOR_DIRECTION_BACKWARD
@@ -822,7 +822,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
             max_duration_ut = duration_ut;
 
         progress_duration_ut += duration_ut;
-        if(progress_duration_ut >= SYSTEMD_JOURNAL_PROGRESS_EVERY_UT) {
+        if(progress_duration_ut >= ND_SD_JOURNAL_PROGRESS_EVERY_UT) {
             progress_duration_ut = 0;
             netdata_mutex_lock(&stdout_mutex);
             pluginsd_function_progress_to_stdout(lqs->rq.transaction, f + 1, files_used);
@@ -988,7 +988,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
 
     if(!lqs->rq.data_only) {
         buffer_json_member_add_time_t(wb, "update_every", 1);
-        buffer_json_member_add_string(wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
+        buffer_json_member_add_string(wb, "help", ND_SD_JOURNAL_FUNCTION_DESCRIPTION);
     }
 
     if(!lqs->rq.data_only || lqs->rq.tail)

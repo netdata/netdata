@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_SYSTEMD_JOURNAL_SAMPLING_H
-#define NETDATA_SYSTEMD_JOURNAL_SAMPLING_H
+#ifndef NETDATA_ND_SD_JOURNAL_SAMPLING_H
+#define NETDATA_ND_SD_JOURNAL_SAMPLING_H
 
 // ----------------------------------------------------------------------------
 // sampling support
@@ -34,8 +34,8 @@ static inline void sampling_query_init(LOGS_QUERY_STATUS *lqs, FACETS *facets) {
     lqs->c.samples.slots = facets_histogram_slots(facets);
     if(lqs->c.samples.slots < 2)
         lqs->c.samples.slots = 2;
-    if(lqs->c.samples.slots > SYSTEMD_JOURNAL_SAMPLING_SLOTS)
-        lqs->c.samples.slots = SYSTEMD_JOURNAL_SAMPLING_SLOTS;
+    if(lqs->c.samples.slots > ND_SD_JOURNAL_SAMPLING_SLOTS)
+        lqs->c.samples.slots = ND_SD_JOURNAL_SAMPLING_SLOTS;
 
     if(!lqs->rq.after_ut || !lqs->rq.before_ut || lqs->rq.after_ut >= lqs->rq.before_ut) {
         // we don't have enough information for sampling
@@ -323,7 +323,7 @@ static inline sampling_t is_row_in_sample(
         lqs->c.samples_per_time_slot.sampled[slot] < lqs->c.samples_per_time_slot.enable_after_samples)
         should_sample = true;
 
-    else if(lqs->c.samples_per_file.recalibrate >= SYSTEMD_JOURNAL_SAMPLING_RECALIBRATE || !lqs->c.samples_per_file.every) {
+    else if(lqs->c.samples_per_file.recalibrate >= ND_SD_JOURNAL_SAMPLING_RECALIBRATE || !lqs->c.samples_per_file.every) {
         // this is the first to be unsampled for this file
         sampling_decide_file_sampling_every(j, lqs, jf, direction, msg_ut);
         lqs->c.samples_per_file.recalibrate = 0;
@@ -356,7 +356,7 @@ static inline sampling_t is_row_in_sample(
     if(lqs->c.samples_per_file.unsampled > lqs->c.samples_per_file.sampled) {
         double progress_by_time = sampling_running_file_query_progress_by_time(lqs, jf, direction, msg_ut);
 
-        if(progress_by_time > SYSTEMD_JOURNAL_ENABLE_ESTIMATIONS_FILE_PERCENTAGE)
+        if(progress_by_time > ND_SD_JOURNAL_ENABLE_ESTIMATIONS_FILE_PERCENTAGE)
             return SAMPLING_STOP_AND_ESTIMATE;
     }
 
@@ -375,4 +375,4 @@ static inline void sampling_update_running_query_file_estimates(
     lqs->c.samples_per_file.estimated += remaining_lines;
 }
 
-#endif //NETDATA_SYSTEMD_JOURNAL_SAMPLING_H
+#endif //NETDATA_ND_SD_JOURNAL_SAMPLING_H

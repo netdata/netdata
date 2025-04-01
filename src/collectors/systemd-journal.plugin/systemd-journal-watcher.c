@@ -540,7 +540,7 @@ void *journal_watcher_main(void *arg __maybe_unused) {
 
         while (journal_watcher_session_id == __atomic_load_n(&journal_watcher_wanted_session_id, __ATOMIC_RELAXED)) {
             buffered_reader_ret_t rc = buffered_reader_read_timeout(
-                    &reader, inotifyFd, SYSTEMD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS, false);
+                    &reader, inotifyFd, ND_SD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS, false);
 
             if(rc == BUFFERED_READER_READ_OK || rc == BUFFERED_READER_READ_BUFFER_FULL) {
                 if (process_inotify_events(&reader, &watcher, inotifyFd))
@@ -556,7 +556,7 @@ void *journal_watcher_main(void *arg __maybe_unused) {
 
             usec_t ut = now_monotonic_usec();
             if (dictionary_entries(watcher.pending) && (rc == BUFFERED_READER_READ_POLL_TIMEOUT ||
-                last_headers_update_ut + (SYSTEMD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS * USEC_PER_MS) <= ut)) {
+                last_headers_update_ut + (ND_SD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS * USEC_PER_MS) <= ut)) {
                 process_pending(&watcher);
                 last_headers_update_ut = ut;
             }

@@ -10,12 +10,12 @@
 #include <systemd/sd-journal.h>
 #include <syslog.h>
 
-#define SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION    "View, search and analyze systemd journal entries."
-#define SYSTEMD_JOURNAL_FUNCTION_NAME           "systemd-journal"
-#define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT         60
-#define SYSTEMD_JOURNAL_ENABLE_ESTIMATIONS_FILE_PERCENTAGE 0.01
-#define SYSTEMD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS 250
-#define SYSTEMD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
+#define ND_SD_JOURNAL_FUNCTION_DESCRIPTION    "View, search and analyze systemd journal entries."
+#define ND_SD_JOURNAL_FUNCTION_NAME           "systemd-journal"
+#define ND_SD_JOURNAL_DEFAULT_TIMEOUT         60
+#define ND_SD_JOURNAL_ENABLE_ESTIMATIONS_FILE_PERCENTAGE 0.01
+#define ND_SD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS 250
+#define ND_SD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
 
 #define SYSTEMD_UNITS_FUNCTION_DESCRIPTION      "View the status of systemd units"
 #define SYSTEMD_UNITS_FUNCTION_NAME              "systemd-list-units"

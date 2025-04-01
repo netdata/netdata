@@ -2,7 +2,7 @@
 
 #include "systemd-internals.h"
 
-#define SYSTEMD_JOURNAL_MAX_SOURCE_LEN 64
+#define ND_SD_JOURNAL_MAX_SOURCE_LEN 64
 #define VAR_LOG_JOURNAL_MAX_DEPTH 10
 
 struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES] = { 0 };
@@ -402,16 +402,16 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
                         char ip[e - s + 1];
                         memcpy(ip, s, e - s);
                         ip[e - s] = '\0';
-                        char buf[SYSTEMD_JOURNAL_MAX_SOURCE_LEN];
+                        char buf[ND_SD_JOURNAL_MAX_SOURCE_LEN];
                         if(ip_to_hostname(ip, buf, sizeof(buf)))
-                            jf->source = string_strdupz_source(buf, &buf[strlen(buf)], SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
+                            jf->source = string_strdupz_source(buf, &buf[strlen(buf)], ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
                         else {
                             internal_error(true, "Cannot find the hostname for IP '%s'", ip);
-                            jf->source = string_strdupz_source(s, e, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
+                            jf->source = string_strdupz_source(s, e, ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
                         }
                     }
                     else
-                        jf->source = string_strdupz_source(s, e, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
+                        jf->source = string_strdupz_source(s, e, ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
                 }
             }
         }
@@ -424,7 +424,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
 
             if(t >= jf->filename && *t == '.') {
                 jf->source_type |= SDJF_LOCAL_NAMESPACE;
-                jf->source = string_strdupz_source(t + 1, s, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "namespace-");
+                jf->source = string_strdupz_source(t + 1, s, ND_SD_JOURNAL_MAX_SOURCE_LEN, "namespace-");
             }
             else if(strncmp(s, "/system", 7) == 0)
                 jf->source_type |= SDJF_LOCAL_SYSTEM;

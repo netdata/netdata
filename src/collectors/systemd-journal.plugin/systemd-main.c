@@ -3,7 +3,7 @@
 #include "systemd-internals.h"
 #include "libnetdata/required_dummies.h"
 
-#define SYSTEMD_JOURNAL_WORKER_THREADS          5
+#define ND_SD_JOURNAL_WORKER_THREADS          5
 
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
@@ -74,12 +74,12 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // the event loop for functions
 
     struct functions_evloop_globals *wg =
-            functions_evloop_init(SYSTEMD_JOURNAL_WORKER_THREADS, "SDJ", &stdout_mutex, &plugin_should_exit);
+            functions_evloop_init(ND_SD_JOURNAL_WORKER_THREADS, "SDJ", &stdout_mutex, &plugin_should_exit);
 
     functions_evloop_add_function(wg,
-                                  SYSTEMD_JOURNAL_FUNCTION_NAME,
+                                  ND_SD_JOURNAL_FUNCTION_NAME,
                                   function_systemd_journal,
-                                  SYSTEMD_JOURNAL_DEFAULT_TIMEOUT,
+                                  ND_SD_JOURNAL_DEFAULT_TIMEOUT,
                                   NULL);
 
 #ifdef ENABLE_SYSTEMD_DBUS
@@ -98,7 +98,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     netdata_mutex_lock(&stdout_mutex);
 
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" "HTTP_ACCESS_FORMAT" %d\n",
-            SYSTEMD_JOURNAL_FUNCTION_NAME, SYSTEMD_JOURNAL_DEFAULT_TIMEOUT, SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION,
+            ND_SD_JOURNAL_FUNCTION_NAME, ND_SD_JOURNAL_DEFAULT_TIMEOUT, ND_SD_JOURNAL_FUNCTION_DESCRIPTION,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
             RRDFUNCTIONS_PRIORITY_DEFAULT);
 
@@ -115,14 +115,14 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ------------------------------------------------------------------------
 
     usec_t send_newline_ut = 0;
-    usec_t since_last_scan_ut = SYSTEMD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC * 2; // something big to trigger scanning at start
+    usec_t since_last_scan_ut = ND_SD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC * 2; // something big to trigger scanning at start
     const bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     while(!plugin_should_exit) {
 
-        if(since_last_scan_ut > SYSTEMD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC) {
+        if(since_last_scan_ut > ND_SD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC) {
             journal_files_registry_update();
             since_last_scan_ut = 0;
         }
