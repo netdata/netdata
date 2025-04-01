@@ -739,6 +739,11 @@ endif()
 
 netdata_detect_protobuf()
 
+if(OS_LINUX)
+        include(NetdataDetectSystemd)
+        detect_systemd()
+endif()
+
 #
 # source files
 #
@@ -1271,15 +1276,26 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-db-dbengine-retention.h
         src/daemon/pulse/pulse-parents.c
         src/daemon/pulse/pulse-parents.h
-        src/daemon/daemon-status-file.c
-        src/daemon/daemon-status-file.h
+        src/daemon/status-file.c
+        src/daemon/status-file.h
         src/daemon/config/netdata-conf-ssl.c
         src/daemon/config/netdata-conf-ssl.h
-        src/daemon/daemon-systemd-watcher.c
-        src/daemon/daemon-systemd-watcher.h
         src/daemon/machine-guid.c
         src/daemon/machine-guid.h
+        src/daemon/status-file-dedup.c
+        src/daemon/status-file-dedup.h
+        src/daemon/status-file-io.c
+        src/daemon/status-file-io.h
 )
+
+set(DAEMON_SYSTEMD_WATCHER_FILES
+    src/daemon/daemon-systemd-watcher.c
+    src/daemon/daemon-systemd-watcher.h
+)
+
+if(ENABLE_SYSTEMD_DBUS)
+        list(APPEND DAEMON_FILES ${DAEMON_SYSTEMD_WATCHER_FILES})
+endif()
 
 set(H2O_FILES
         src/web/server/h2o/http_server.c
@@ -1652,8 +1668,11 @@ if(ENABLE_DBENGINE)
             src/database/engine/page.h
             src/database/engine/cache.c
             src/database/engine/cache.h
-            src/database/engine/metric.c
-            src/database/engine/metric.h
+            src/database/engine/mrg.c
+            src/database/engine/mrg.h
+            src/database/engine/mrg-internals.h
+            src/database/engine/mrg-unittest.c
+            src/database/engine/mrg-load.c
             src/database/engine/pdc.c
             src/database/engine/pdc.h
             src/database/engine/dbengine-unittest.c
@@ -1685,7 +1704,6 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal.c
         src/collectors/systemd-journal.plugin/systemd-internals.h
         src/collectors/systemd-journal.plugin/systemd-main.c
-        src/collectors/systemd-journal.plugin/systemd-units.c
         src/collectors/systemd-journal.plugin/systemd-journal.c
         src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
         src/collectors/systemd-journal.plugin/systemd-journal-files.c
@@ -1695,6 +1713,10 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/libnetdata/os/system-maps/system-services.h
         src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
 )
+
+if(ENABLE_SYSTEMD_DBUS)
+        list(APPEND SYSTEMD_JOURNAL_PLUGIN_FILES src/collectors/systemd-journal.plugin/systemd-units.c)
+endif()
 
 set(STREAMING_PLUGIN_FILES
         src/streaming/stream.h
@@ -2156,11 +2178,6 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 #
 # build libnetdata
 #
-
-if(OS_LINUX)
-        include(NetdataDetectSystemd)
-        detect_systemd()
-endif()
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 

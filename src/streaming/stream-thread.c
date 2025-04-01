@@ -625,7 +625,7 @@ void *stream_thread(void *ptr) {
     // cleanup receiver and dispatcher
     stream_sender_cleanup(sth);
     stream_receiver_cleanup(sth);
-    META_FREE(&sth->run.meta, NULL);
+    META_FREE(&sth->run.meta, NULL, NULL);
 
     // cleanup the thread structures
     spinlock_lock(&sth->messages.spinlock);

@@ -244,12 +244,14 @@ static void ebpf_update_process_cgroup()
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
-            int pid = pids->pid;
+            uint32_t pid = pids->pid;
             ebpf_publish_process_t *out = &pids->ps;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_PROCESS_IDX);
-            ebpf_publish_process_t *in = local_pid->process;
-            if (!in)
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
+            if (!local_pid)
                 continue;
+
+            ebpf_publish_process_t *in = &local_pid->process;
 
             memcpy(out, in, sizeof(ebpf_publish_process_t));
         }
@@ -1234,6 +1236,123 @@ void ebpf_process_update_cgroup_algorithm()
 }
 
 /**
+ * Process Accumulator
+ *
+ * Sum all values read from kernel and store in the first address.
+ *
+ * @param out the vector with read values.
+ * @param maps_per_core do I need to read all cores?
+ */
+void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
+{
+    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
+    ebpf_process_stat_t *total = &out[0];
+    uint64_t ct = total->ct;
+    for (i = 1; i < end; i++) {
+        ebpf_process_stat_t *w = &out[i];
+        total->exit_call += w->exit_call;
+        total->task_err += w->task_err;
+        total->create_thread += w->create_thread;
+        total->create_process += w->create_process;
+        total->release_call += w->release_call;
+
+        if (w->ct > ct)
+            ct = w->ct;
+    }
+    total->ct = ct;
+}
+
+/**
+ * Sum values for pid
+ *
+ * @param structure to store result.
+ * @param root the structure with all available PIDs
+ */
+void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_pid_on_target *root)
+{
+    memset(process, 0, sizeof(ebpf_process_stat_t));
+    for (; root; root = root->next) {
+        uint32_t pid = root->pid;
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
+        if (!local_pid)
+            continue;
+
+        ebpf_publish_process_t *in = &local_pid->process;
+
+        process->task_err += in->task_err;
+        process->release_call += in->release_call;
+        process->exit_call += in->exit_call;
+        process->create_thread += in->create_thread;
+        process->create_process += in->create_process;
+    }
+}
+
+/**
+ * Collect data for all process
+ *
+ * Read data from hash table and store it in appropriate vectors.
+ * It also creates the link between targets and PIDs.
+ *
+ * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
+ * @param maps_per_core         do I have hash maps per core?
+ */
+void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
+{
+    if (tbl_pid_stats_fd == -1)
+        return;
+
+    pids_fd[NETDATA_EBPF_PIDS_PROCESS_IDX] = tbl_pid_stats_fd;
+    size_t length = sizeof(ebpf_process_stat_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
+
+    if (tbl_pid_stats_fd != -1) {
+        uint32_t key = 0, next_key = 0;
+        while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
+            if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
+                goto end_process_loop;
+            }
+
+            ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
+
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_PROCESS_IDX);
+            if (!local_pid)
+                continue;
+
+            ebpf_publish_process_t *w = &local_pid->process;
+
+            if (!w->ct || w->ct != process_stat_vector[0].ct) {
+                w->ct = process_stat_vector[0].ct;
+                w->create_thread = process_stat_vector[0].create_thread;
+                w->exit_call = process_stat_vector[0].exit_call;
+                w->create_thread = process_stat_vector[0].create_thread;
+                w->create_process = process_stat_vector[0].create_process;
+                w->release_call = process_stat_vector[0].release_call;
+                w->task_err = process_stat_vector[0].task_err;
+            } else {
+                if (kill((pid_t)key, 0)) { // No PID found
+                    if (netdata_ebpf_reset_shm_pointer_unsafe(tbl_pid_stats_fd, key, NETDATA_EBPF_PIDS_CACHESTAT_IDX))
+                        memset(w, 0, sizeof(*w));
+                }
+            }
+
+        end_process_loop:
+            memset(process_stat_vector, 0, length);
+            key = next_key;
+        }
+    }
+
+    struct ebpf_target *w;
+    for (w = apps_groups_root_target; w; w = w->next) {
+        if (unlikely(!(w->processes)))
+            continue;
+
+        ebpf_process_sum_values_for_pids(&w->process, w->root_pid);
+    }
+}
+
+/**
  * Main loop for this collector.
  *
  * @param em   the structure with thread information
@@ -1257,6 +1376,7 @@ static void process_collector(ebpf_module_t *em)
     memset(stats, 0, sizeof(em->hash_table_stats));
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
+    int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
 
@@ -1269,12 +1389,17 @@ static void process_collector(ebpf_module_t *em)
             ebpf_read_process_hash_global_tables(stats, maps_per_core);
 
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
-            pthread_mutex_lock(&collect_data_mutex);
 
             if (ebpf_all_pids_count > 0) {
+                sem_wait(shm_mutex_ebpf_integration);
+                pthread_mutex_lock(&collect_data_mutex);
+                collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
+
                 if (cgroups && shm_ebpf_cgroup.header) {
                     ebpf_update_process_cgroup();
                 }
+                pthread_mutex_unlock(&collect_data_mutex);
+                sem_post(shm_mutex_ebpf_integration);
             }
 
             pthread_mutex_lock(&lock);
@@ -1283,6 +1408,7 @@ static void process_collector(ebpf_module_t *em)
                 ebpf_process_send_data(em);
             }
 
+            pthread_mutex_lock(&collect_data_mutex);
             if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
                 ebpf_process_send_apps_data(apps_groups_root_target, em);
             }
@@ -1291,8 +1417,8 @@ static void process_collector(ebpf_module_t *em)
                 ebpf_process_send_cgroup_data(em);
             }
 
-            pthread_mutex_unlock(&lock);
             pthread_mutex_unlock(&collect_data_mutex);
+            pthread_mutex_unlock(&lock);
 
             pthread_mutex_lock(&ebpf_exit_cleanup);
             if (running_time && !em->running_time)

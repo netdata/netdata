@@ -3,7 +3,7 @@
 #include "common.h"
 #include "buildinfo.h"
 #include "daemon-shutdown-watcher.h"
-#include "daemon-status-file.h"
+#include "status-file.h"
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 
@@ -1124,6 +1124,11 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("webrtc");
     webrtc_initialize();
 #endif
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("mrg cleanup");
+
+    mrg_metric_prepopulate_cleanup(main_mrg);
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("done");
