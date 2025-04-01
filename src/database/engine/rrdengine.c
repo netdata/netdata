@@ -913,7 +913,7 @@ static void *extent_write_tp_worker(
 
     extent_flush_to_open(ctx, xt_io_descr, df_write_error);
 
-     if(ctx_is_available_for_queries(ctx))
+     if(ctx_is_available_for_queries(ctx) && rrdeng_ctx_tier_cap_exceeded(ctx))
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 done:
     if(completion)
