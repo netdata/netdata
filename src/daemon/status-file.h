@@ -9,7 +9,7 @@
 #include "claim/cloud-status.h"
 #include "machine-guid.h"
 
-#define STATUS_FILE_VERSION 24
+#define STATUS_FILE_VERSION 25
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -86,6 +86,38 @@ typedef struct daemon_status_file {
     char cloud_instance_type[32];
     char cloud_instance_region[32];
     bool read_system_info;
+
+    struct {
+        struct {
+            char vendor[64];
+        } sys;
+
+        struct {
+            char name[64];
+            char version[64];
+            char sku[64];
+            char family[64];
+        } product;
+
+        struct {
+            char name[64];
+            char version[64];
+            char vendor[64];
+        } board;
+
+        struct {
+            char type[64];
+            char vendor[64];
+            char version[64];
+        } chassis;
+
+        struct {
+            char date[16];
+            char release[64];
+            char version[64];
+            char vendor[64];
+        } bios;
+    } hw;
 
     char stack_traces[63];   // the backend for capturing stack traces
 
