@@ -442,7 +442,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, void *data,
                 else {
                     // Call facets_register_facet_id_filter for each value
                     facets_register_facet_filter(
-                        facets, key, value, FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
+                        facets, key, value, FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
 
                     rq->filters++;
                 }
@@ -643,7 +643,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
 
                     facets_register_facet_filter_id(
                         facets, keyword, value,
-                        FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
+                        FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
 
                     buffer_json_add_array_item_string(wb, value);
                     rq->filters++;

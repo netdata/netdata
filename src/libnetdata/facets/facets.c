@@ -1840,17 +1840,21 @@ inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, F
 
 void facets_register_facet_filter_id(FACETS *facets, const char *key_id, const char *value_id, FACET_KEY_OPTIONS options) {
     FACET_KEY *k = facets_register_facet_id(facets, key_id, options);
-    if(k) {
-        if(is_valid_string_hash(value_id)) {
-            k->default_selected_for_values = false;
-            FACET_VALUE_ADD_OR_UPDATE_SELECTED(k, NULL, str_to_facets_hash(value_id));
-        }
+    if(k && is_valid_string_hash(value_id)) {
+        if(!(k->options & FACET_KEY_OPTION_FACET))
+            k->options |= FACET_KEY_OPTION_FILTER_ONLY;
+
+        k->default_selected_for_values = false;
+        FACET_VALUE_ADD_OR_UPDATE_SELECTED(k, NULL, str_to_facets_hash(value_id));
     }
 }
 
 void facets_register_facet_filter(FACETS *facets, const char *key, const char *value, FACET_KEY_OPTIONS options) {
     FACET_KEY *k = facets_register_facet(facets, key, options);
     if(k) {
+        if(!(k->options & FACET_KEY_OPTION_FACET))
+            k->options |= FACET_KEY_OPTION_FILTER_ONLY;
+
         FACETS_HASH hash = FACETS_HASH_FUNCTION(value, strlen(value));
         k->default_selected_for_values = false;
         FACET_VALUE_ADD_OR_UPDATE_SELECTED(k, value, hash);
@@ -2591,7 +2595,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
             CLEAN_BUFFER *tb = buffer_create(0, NULL);
             FACET_KEY *k;
             foreach_key_in_facets(facets, k) {
-                if(!k->values.enabled || k->options & FACET_KEY_OPTION_HIDDEN)
+                if(!k->values.enabled || k->options & (FACET_KEY_OPTION_HIDDEN|FACET_KEY_OPTION_FILTER_ONLY))
                     continue;
 
                 facets_sort_and_reorder_values(k);
