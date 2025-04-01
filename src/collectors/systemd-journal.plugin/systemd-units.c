@@ -5,79 +5,80 @@
 #ifdef ENABLE_SYSTEMD_DBUS
 #include <systemd/sd-bus.h>
 
-#define SYSTEMD_UNITS_MAX_PARAMS 10
-#define SYSTEMD_UNITS_DBUS_TYPES "(ssssssouso)"
+#define ND_SD_UNITS_MAX_PARAMS 10
+#define ND_SD_UNITS_DBUS_TYPES "(ssssssouso)"
 
 // ----------------------------------------------------------------------------
 // copied from systemd: string-table.h
 
 typedef char sd_char;
-#define XCONCATENATE(x, y) x ## y
+#define XCONCATENATE(x, y) x##y
 #define CONCATENATE(x, y) XCONCATENATE(x, y)
 
 #ifndef __COVERITY__
-#  define VOID_0 ((void)0)
+#define VOID_0 ((void)0)
 #else
-#  define VOID_0 ((void*)0)
+#define VOID_0 ((void *)0)
 #endif
 
-#define ELEMENTSOF(x)                                                   \
-        (__builtin_choose_expr(                                         \
-                !__builtin_types_compatible_p(typeof(x), typeof(&*(x))), \
-                sizeof(x)/sizeof((x)[0]),                               \
-                VOID_0))
+#define ELEMENTSOF(x)                                                                                                  \
+    (__builtin_choose_expr(!__builtin_types_compatible_p(typeof(x), typeof(&*(x))), sizeof(x) / sizeof((x)[0]), VOID_0))
 
 #define UNIQ_T(x, uniq) CONCATENATE(__unique_prefix_, CONCATENATE(x, uniq))
 #define UNIQ __COUNTER__
-#define __CMP(aq, a, bq, b)                             \
-        ({                                              \
-                const typeof(a) UNIQ_T(A, aq) = (a);    \
-                const typeof(b) UNIQ_T(B, bq) = (b);    \
-                UNIQ_T(A, aq) < UNIQ_T(B, bq) ? -1 :    \
-                UNIQ_T(A, aq) > UNIQ_T(B, bq) ? 1 : 0;  \
-        })
+#define __CMP(aq, a, bq, b)                                                                                            \
+    ({                                                                                                                 \
+        const typeof(a) UNIQ_T(A, aq) = (a);                                                                           \
+        const typeof(b) UNIQ_T(B, bq) = (b);                                                                           \
+        UNIQ_T(A, aq)<UNIQ_T(B, bq) ? -1 : UNIQ_T(A, aq)> UNIQ_T(B, bq) ? 1 : 0;                                       \
+    })
 #define CMP(a, b) __CMP(UNIQ, (a), UNIQ, (b))
 
-static inline int strcmp_ptr(const sd_char *a, const sd_char *b) {
+static inline int strcmp_ptr(const sd_char *a, const sd_char *b)
+{
     if (a && b)
         return strcmp(a, b);
 
     return CMP(a, b);
 }
 
-static inline bool streq_ptr(const sd_char *a, const sd_char *b) {
+static inline bool streq_ptr(const sd_char *a, const sd_char *b)
+{
     return strcmp_ptr(a, b) == 0;
 }
 
-static ssize_t string_table_lookup(const char * const *table, size_t len, const char *key) {
+static ssize_t string_table_lookup(const char *const *table, size_t len, const char *key)
+{
     if (!key || !*key)
         return -EINVAL;
 
     for (size_t i = 0; i < len; ++i)
         if (streq_ptr(table[i], key))
-            return (ssize_t) i;
+            return (ssize_t)i;
 
     return -EINVAL;
 }
 
 /* For basic lookup tables with strictly enumerated entries */
-#define _DEFINE_STRING_TABLE_LOOKUP_TO_STRING(name,type,scope)          \
-        scope const char *name##_to_string(type i) {                    \
-                if (i < 0 || i >= (type) ELEMENTSOF(name##_table))      \
-                        return NULL;                                    \
-                return name##_table[i];                                 \
-        }
+#define _DEFINE_STRING_TABLE_LOOKUP_TO_STRING(name, type, scope)                                                       \
+    scope const char *name##_to_string(type i)                                                                         \
+    {                                                                                                                  \
+        if (i < 0 || i >= (type)ELEMENTSOF(name##_table))                                                              \
+            return NULL;                                                                                               \
+        return name##_table[i];                                                                                        \
+    }
 
-#define _DEFINE_STRING_TABLE_LOOKUP_FROM_STRING(name,type,scope)        \
-        scope type name##_from_string(const char *s) {                  \
-                return (type) string_table_lookup(name##_table, ELEMENTSOF(name##_table), s); \
-        }
+#define _DEFINE_STRING_TABLE_LOOKUP_FROM_STRING(name, type, scope)                                                     \
+    scope type name##_from_string(const char *s)                                                                       \
+    {                                                                                                                  \
+        return (type)string_table_lookup(name##_table, ELEMENTSOF(name##_table), s);                                   \
+    }
 
-#define _DEFINE_STRING_TABLE_LOOKUP(name,type,scope)                    \
-        _DEFINE_STRING_TABLE_LOOKUP_TO_STRING(name,type,scope)          \
-        _DEFINE_STRING_TABLE_LOOKUP_FROM_STRING(name,type,scope)
+#define _DEFINE_STRING_TABLE_LOOKUP(name, type, scope)                                                                 \
+    _DEFINE_STRING_TABLE_LOOKUP_TO_STRING(name, type, scope)                                                           \
+    _DEFINE_STRING_TABLE_LOOKUP_FROM_STRING(name, type, scope)
 
-#define DEFINE_STRING_TABLE_LOOKUP(name,type) _DEFINE_STRING_TABLE_LOOKUP(name,type,)
+#define DEFINE_STRING_TABLE_LOOKUP(name, type) _DEFINE_STRING_TABLE_LOOKUP(name, type, )
 
 // ----------------------------------------------------------------------------
 // copied from systemd: unit-def.h
@@ -101,9 +102,9 @@ typedef enum UnitType {
 typedef enum UnitLoadState {
     UNIT_STUB,
     UNIT_LOADED,
-    UNIT_NOT_FOUND,    /* error condition #1: unit file not found */
-    UNIT_BAD_SETTING,  /* error condition #2: we couldn't parse some essential unit file setting */
-    UNIT_ERROR,        /* error condition #3: other "system" error, catchall for the rest */
+    UNIT_NOT_FOUND,   /* error condition #1: unit file not found */
+    UNIT_BAD_SETTING, /* error condition #2: we couldn't parse some essential unit file setting */
+    UNIT_ERROR,       /* error condition #3: other "system" error, catchall for the rest */
     UNIT_MERGED,
     UNIT_MASKED,
     _UNIT_LOAD_STATE_MAX,
@@ -141,8 +142,8 @@ typedef enum DeviceState {
 
 typedef enum MountState {
     MOUNT_DEAD,
-    MOUNT_MOUNTING,               /* /usr/bin/mount is running, but the mount is not done yet. */
-    MOUNT_MOUNTING_DONE,          /* /usr/bin/mount is running, and the mount is done. */
+    MOUNT_MOUNTING,      /* /usr/bin/mount is running, but the mount is not done yet. */
+    MOUNT_MOUNTING_DONE, /* /usr/bin/mount is running, and the mount is done. */
     MOUNT_MOUNTED,
     MOUNT_REMOUNTING,
     MOUNT_UNMOUNTING,
@@ -184,22 +185,22 @@ typedef enum ServiceState {
     SERVICE_START,
     SERVICE_START_POST,
     SERVICE_RUNNING,
-    SERVICE_EXITED,            /* Nothing is running anymore, but RemainAfterExit is true hence this is OK */
-    SERVICE_RELOAD,            /* Reloading via ExecReload= */
-    SERVICE_RELOAD_SIGNAL,     /* Reloading via SIGHUP requested */
-    SERVICE_RELOAD_NOTIFY,     /* Waiting for READY=1 after RELOADING=1 notify */
-    SERVICE_STOP,              /* No STOP_PRE state, instead just register multiple STOP executables */
+    SERVICE_EXITED,        /* Nothing is running anymore, but RemainAfterExit is true hence this is OK */
+    SERVICE_RELOAD,        /* Reloading via ExecReload= */
+    SERVICE_RELOAD_SIGNAL, /* Reloading via SIGHUP requested */
+    SERVICE_RELOAD_NOTIFY, /* Waiting for READY=1 after RELOADING=1 notify */
+    SERVICE_STOP,          /* No STOP_PRE state, instead just register multiple STOP executables */
     SERVICE_STOP_WATCHDOG,
     SERVICE_STOP_SIGTERM,
     SERVICE_STOP_SIGKILL,
     SERVICE_STOP_POST,
-    SERVICE_FINAL_WATCHDOG,    /* In case the STOP_POST executable needs to be aborted. */
-    SERVICE_FINAL_SIGTERM,     /* In case the STOP_POST executable hangs, we shoot that down, too */
+    SERVICE_FINAL_WATCHDOG, /* In case the STOP_POST executable needs to be aborted. */
+    SERVICE_FINAL_SIGTERM,  /* In case the STOP_POST executable hangs, we shoot that down, too */
     SERVICE_FINAL_SIGKILL,
     SERVICE_FAILED,
     SERVICE_DEAD_BEFORE_AUTO_RESTART,
     SERVICE_FAILED_BEFORE_AUTO_RESTART,
-    SERVICE_DEAD_RESOURCES_PINNED,  /* Like SERVICE_DEAD, but with pinned resources */
+    SERVICE_DEAD_RESOURCES_PINNED, /* Like SERVICE_DEAD, but with pinned resources */
     SERVICE_AUTO_RESTART,
     SERVICE_AUTO_RESTART_QUEUED,
     SERVICE_CLEANING,
@@ -235,8 +236,8 @@ typedef enum SocketState {
 
 typedef enum SwapState {
     SWAP_DEAD,
-    SWAP_ACTIVATING,               /* /sbin/swapon is running, but the swap not yet enabled. */
-    SWAP_ACTIVATING_DONE,          /* /sbin/swapon is running, and the swap is done. */
+    SWAP_ACTIVATING,      /* /sbin/swapon is running, but the swap not yet enabled. */
+    SWAP_ACTIVATING_DONE, /* /sbin/swapon is running, and the swap is done. */
     SWAP_ACTIVE,
     SWAP_DEACTIVATING,
     SWAP_DEACTIVATING_SIGTERM,
@@ -276,193 +277,180 @@ typedef enum FreezerState {
 // ----------------------------------------------------------------------------
 // copied from systemd: unit-def.c
 
-static const char* const unit_type_table[_UNIT_TYPE_MAX] = {
-        [UNIT_SERVICE]   = "service",
-        [UNIT_SOCKET]    = "socket",
-        [UNIT_TARGET]    = "target",
-        [UNIT_DEVICE]    = "device",
-        [UNIT_MOUNT]     = "mount",
-        [UNIT_AUTOMOUNT] = "automount",
-        [UNIT_SWAP]      = "swap",
-        [UNIT_TIMER]     = "timer",
-        [UNIT_PATH]      = "path",
-        [UNIT_SLICE]     = "slice",
-        [UNIT_SCOPE]     = "scope",
+static const char *const unit_type_table[_UNIT_TYPE_MAX] = {
+    [UNIT_SERVICE] = "service",
+    [UNIT_SOCKET] = "socket",
+    [UNIT_TARGET] = "target",
+    [UNIT_DEVICE] = "device",
+    [UNIT_MOUNT] = "mount",
+    [UNIT_AUTOMOUNT] = "automount",
+    [UNIT_SWAP] = "swap",
+    [UNIT_TIMER] = "timer",
+    [UNIT_PATH] = "path",
+    [UNIT_SLICE] = "slice",
+    [UNIT_SCOPE] = "scope",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(unit_type, UnitType);
 
-static const char* const unit_load_state_table[_UNIT_LOAD_STATE_MAX] = {
-        [UNIT_STUB]        = "stub",
-        [UNIT_LOADED]      = "loaded",
-        [UNIT_NOT_FOUND]   = "not-found",
-        [UNIT_BAD_SETTING] = "bad-setting",
-        [UNIT_ERROR]       = "error",
-        [UNIT_MERGED]      = "merged",
-        [UNIT_MASKED]      = "masked"
-};
+static const char *const unit_load_state_table[_UNIT_LOAD_STATE_MAX] = {
+    [UNIT_STUB] = "stub",
+    [UNIT_LOADED] = "loaded",
+    [UNIT_NOT_FOUND] = "not-found",
+    [UNIT_BAD_SETTING] = "bad-setting",
+    [UNIT_ERROR] = "error",
+    [UNIT_MERGED] = "merged",
+    [UNIT_MASKED] = "masked"};
 
 DEFINE_STRING_TABLE_LOOKUP(unit_load_state, UnitLoadState);
 
-static const char* const unit_active_state_table[_UNIT_ACTIVE_STATE_MAX] = {
-        [UNIT_ACTIVE]       = "active",
-        [UNIT_RELOADING]    = "reloading",
-        [UNIT_INACTIVE]     = "inactive",
-        [UNIT_FAILED]       = "failed",
-        [UNIT_ACTIVATING]   = "activating",
-        [UNIT_DEACTIVATING] = "deactivating",
-        [UNIT_MAINTENANCE]  = "maintenance",
+static const char *const unit_active_state_table[_UNIT_ACTIVE_STATE_MAX] = {
+    [UNIT_ACTIVE] = "active",
+    [UNIT_RELOADING] = "reloading",
+    [UNIT_INACTIVE] = "inactive",
+    [UNIT_FAILED] = "failed",
+    [UNIT_ACTIVATING] = "activating",
+    [UNIT_DEACTIVATING] = "deactivating",
+    [UNIT_MAINTENANCE] = "maintenance",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(unit_active_state, UnitActiveState);
 
-static const char* const automount_state_table[_AUTOMOUNT_STATE_MAX] = {
-        [AUTOMOUNT_DEAD]    = "dead",
-        [AUTOMOUNT_WAITING] = "waiting",
-        [AUTOMOUNT_RUNNING] = "running",
-        [AUTOMOUNT_FAILED]  = "failed"
-};
+static const char *const automount_state_table[_AUTOMOUNT_STATE_MAX] = {
+    [AUTOMOUNT_DEAD] = "dead",
+    [AUTOMOUNT_WAITING] = "waiting",
+    [AUTOMOUNT_RUNNING] = "running",
+    [AUTOMOUNT_FAILED] = "failed"};
 
 DEFINE_STRING_TABLE_LOOKUP(automount_state, AutomountState);
 
-static const char* const device_state_table[_DEVICE_STATE_MAX] = {
-        [DEVICE_DEAD]      = "dead",
-        [DEVICE_TENTATIVE] = "tentative",
-        [DEVICE_PLUGGED]   = "plugged",
+static const char *const device_state_table[_DEVICE_STATE_MAX] = {
+    [DEVICE_DEAD] = "dead",
+    [DEVICE_TENTATIVE] = "tentative",
+    [DEVICE_PLUGGED] = "plugged",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(device_state, DeviceState);
 
-static const char* const mount_state_table[_MOUNT_STATE_MAX] = {
-        [MOUNT_DEAD]               = "dead",
-        [MOUNT_MOUNTING]           = "mounting",
-        [MOUNT_MOUNTING_DONE]      = "mounting-done",
-        [MOUNT_MOUNTED]            = "mounted",
-        [MOUNT_REMOUNTING]         = "remounting",
-        [MOUNT_UNMOUNTING]         = "unmounting",
-        [MOUNT_REMOUNTING_SIGTERM] = "remounting-sigterm",
-        [MOUNT_REMOUNTING_SIGKILL] = "remounting-sigkill",
-        [MOUNT_UNMOUNTING_SIGTERM] = "unmounting-sigterm",
-        [MOUNT_UNMOUNTING_SIGKILL] = "unmounting-sigkill",
-        [MOUNT_FAILED]             = "failed",
-        [MOUNT_CLEANING]           = "cleaning",
+static const char *const mount_state_table[_MOUNT_STATE_MAX] = {
+    [MOUNT_DEAD] = "dead",
+    [MOUNT_MOUNTING] = "mounting",
+    [MOUNT_MOUNTING_DONE] = "mounting-done",
+    [MOUNT_MOUNTED] = "mounted",
+    [MOUNT_REMOUNTING] = "remounting",
+    [MOUNT_UNMOUNTING] = "unmounting",
+    [MOUNT_REMOUNTING_SIGTERM] = "remounting-sigterm",
+    [MOUNT_REMOUNTING_SIGKILL] = "remounting-sigkill",
+    [MOUNT_UNMOUNTING_SIGTERM] = "unmounting-sigterm",
+    [MOUNT_UNMOUNTING_SIGKILL] = "unmounting-sigkill",
+    [MOUNT_FAILED] = "failed",
+    [MOUNT_CLEANING] = "cleaning",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(mount_state, MountState);
 
-static const char* const path_state_table[_PATH_STATE_MAX] = {
-        [PATH_DEAD]    = "dead",
-        [PATH_WAITING] = "waiting",
-        [PATH_RUNNING] = "running",
-        [PATH_FAILED]  = "failed"
-};
+static const char *const path_state_table[_PATH_STATE_MAX] =
+    {[PATH_DEAD] = "dead", [PATH_WAITING] = "waiting", [PATH_RUNNING] = "running", [PATH_FAILED] = "failed"};
 
 DEFINE_STRING_TABLE_LOOKUP(path_state, PathState);
 
-static const char* const scope_state_table[_SCOPE_STATE_MAX] = {
-        [SCOPE_DEAD]         = "dead",
-        [SCOPE_START_CHOWN]  = "start-chown",
-        [SCOPE_RUNNING]      = "running",
-        [SCOPE_ABANDONED]    = "abandoned",
-        [SCOPE_STOP_SIGTERM] = "stop-sigterm",
-        [SCOPE_STOP_SIGKILL] = "stop-sigkill",
-        [SCOPE_FAILED]       = "failed",
+static const char *const scope_state_table[_SCOPE_STATE_MAX] = {
+    [SCOPE_DEAD] = "dead",
+    [SCOPE_START_CHOWN] = "start-chown",
+    [SCOPE_RUNNING] = "running",
+    [SCOPE_ABANDONED] = "abandoned",
+    [SCOPE_STOP_SIGTERM] = "stop-sigterm",
+    [SCOPE_STOP_SIGKILL] = "stop-sigkill",
+    [SCOPE_FAILED] = "failed",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(scope_state, ScopeState);
 
-static const char* const service_state_table[_SERVICE_STATE_MAX] = {
-        [SERVICE_DEAD]                       = "dead",
-        [SERVICE_CONDITION]                  = "condition",
-        [SERVICE_START_PRE]                  = "start-pre",
-        [SERVICE_START]                      = "start",
-        [SERVICE_START_POST]                 = "start-post",
-        [SERVICE_RUNNING]                    = "running",
-        [SERVICE_EXITED]                     = "exited",
-        [SERVICE_RELOAD]                     = "reload",
-        [SERVICE_RELOAD_SIGNAL]              = "reload-signal",
-        [SERVICE_RELOAD_NOTIFY]              = "reload-notify",
-        [SERVICE_STOP]                       = "stop",
-        [SERVICE_STOP_WATCHDOG]              = "stop-watchdog",
-        [SERVICE_STOP_SIGTERM]               = "stop-sigterm",
-        [SERVICE_STOP_SIGKILL]               = "stop-sigkill",
-        [SERVICE_STOP_POST]                  = "stop-post",
-        [SERVICE_FINAL_WATCHDOG]             = "final-watchdog",
-        [SERVICE_FINAL_SIGTERM]              = "final-sigterm",
-        [SERVICE_FINAL_SIGKILL]              = "final-sigkill",
-        [SERVICE_FAILED]                     = "failed",
-        [SERVICE_DEAD_BEFORE_AUTO_RESTART]   = "dead-before-auto-restart",
-        [SERVICE_FAILED_BEFORE_AUTO_RESTART] = "failed-before-auto-restart",
-        [SERVICE_DEAD_RESOURCES_PINNED]      = "dead-resources-pinned",
-        [SERVICE_AUTO_RESTART]               = "auto-restart",
-        [SERVICE_AUTO_RESTART_QUEUED]        = "auto-restart-queued",
-        [SERVICE_CLEANING]                   = "cleaning",
+static const char *const service_state_table[_SERVICE_STATE_MAX] = {
+    [SERVICE_DEAD] = "dead",
+    [SERVICE_CONDITION] = "condition",
+    [SERVICE_START_PRE] = "start-pre",
+    [SERVICE_START] = "start",
+    [SERVICE_START_POST] = "start-post",
+    [SERVICE_RUNNING] = "running",
+    [SERVICE_EXITED] = "exited",
+    [SERVICE_RELOAD] = "reload",
+    [SERVICE_RELOAD_SIGNAL] = "reload-signal",
+    [SERVICE_RELOAD_NOTIFY] = "reload-notify",
+    [SERVICE_STOP] = "stop",
+    [SERVICE_STOP_WATCHDOG] = "stop-watchdog",
+    [SERVICE_STOP_SIGTERM] = "stop-sigterm",
+    [SERVICE_STOP_SIGKILL] = "stop-sigkill",
+    [SERVICE_STOP_POST] = "stop-post",
+    [SERVICE_FINAL_WATCHDOG] = "final-watchdog",
+    [SERVICE_FINAL_SIGTERM] = "final-sigterm",
+    [SERVICE_FINAL_SIGKILL] = "final-sigkill",
+    [SERVICE_FAILED] = "failed",
+    [SERVICE_DEAD_BEFORE_AUTO_RESTART] = "dead-before-auto-restart",
+    [SERVICE_FAILED_BEFORE_AUTO_RESTART] = "failed-before-auto-restart",
+    [SERVICE_DEAD_RESOURCES_PINNED] = "dead-resources-pinned",
+    [SERVICE_AUTO_RESTART] = "auto-restart",
+    [SERVICE_AUTO_RESTART_QUEUED] = "auto-restart-queued",
+    [SERVICE_CLEANING] = "cleaning",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(service_state, ServiceState);
 
-static const char* const slice_state_table[_SLICE_STATE_MAX] = {
-        [SLICE_DEAD]   = "dead",
-        [SLICE_ACTIVE] = "active"
-};
+static const char *const slice_state_table[_SLICE_STATE_MAX] = {[SLICE_DEAD] = "dead", [SLICE_ACTIVE] = "active"};
 
 DEFINE_STRING_TABLE_LOOKUP(slice_state, SliceState);
 
-static const char* const socket_state_table[_SOCKET_STATE_MAX] = {
-        [SOCKET_DEAD]             = "dead",
-        [SOCKET_START_PRE]        = "start-pre",
-        [SOCKET_START_CHOWN]      = "start-chown",
-        [SOCKET_START_POST]       = "start-post",
-        [SOCKET_LISTENING]        = "listening",
-        [SOCKET_RUNNING]          = "running",
-        [SOCKET_STOP_PRE]         = "stop-pre",
-        [SOCKET_STOP_PRE_SIGTERM] = "stop-pre-sigterm",
-        [SOCKET_STOP_PRE_SIGKILL] = "stop-pre-sigkill",
-        [SOCKET_STOP_POST]        = "stop-post",
-        [SOCKET_FINAL_SIGTERM]    = "final-sigterm",
-        [SOCKET_FINAL_SIGKILL]    = "final-sigkill",
-        [SOCKET_FAILED]           = "failed",
-        [SOCKET_CLEANING]         = "cleaning",
+static const char *const socket_state_table[_SOCKET_STATE_MAX] = {
+    [SOCKET_DEAD] = "dead",
+    [SOCKET_START_PRE] = "start-pre",
+    [SOCKET_START_CHOWN] = "start-chown",
+    [SOCKET_START_POST] = "start-post",
+    [SOCKET_LISTENING] = "listening",
+    [SOCKET_RUNNING] = "running",
+    [SOCKET_STOP_PRE] = "stop-pre",
+    [SOCKET_STOP_PRE_SIGTERM] = "stop-pre-sigterm",
+    [SOCKET_STOP_PRE_SIGKILL] = "stop-pre-sigkill",
+    [SOCKET_STOP_POST] = "stop-post",
+    [SOCKET_FINAL_SIGTERM] = "final-sigterm",
+    [SOCKET_FINAL_SIGKILL] = "final-sigkill",
+    [SOCKET_FAILED] = "failed",
+    [SOCKET_CLEANING] = "cleaning",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(socket_state, SocketState);
 
-static const char* const swap_state_table[_SWAP_STATE_MAX] = {
-        [SWAP_DEAD]                 = "dead",
-        [SWAP_ACTIVATING]           = "activating",
-        [SWAP_ACTIVATING_DONE]      = "activating-done",
-        [SWAP_ACTIVE]               = "active",
-        [SWAP_DEACTIVATING]         = "deactivating",
-        [SWAP_DEACTIVATING_SIGTERM] = "deactivating-sigterm",
-        [SWAP_DEACTIVATING_SIGKILL] = "deactivating-sigkill",
-        [SWAP_FAILED]               = "failed",
-        [SWAP_CLEANING]             = "cleaning",
+static const char *const swap_state_table[_SWAP_STATE_MAX] = {
+    [SWAP_DEAD] = "dead",
+    [SWAP_ACTIVATING] = "activating",
+    [SWAP_ACTIVATING_DONE] = "activating-done",
+    [SWAP_ACTIVE] = "active",
+    [SWAP_DEACTIVATING] = "deactivating",
+    [SWAP_DEACTIVATING_SIGTERM] = "deactivating-sigterm",
+    [SWAP_DEACTIVATING_SIGKILL] = "deactivating-sigkill",
+    [SWAP_FAILED] = "failed",
+    [SWAP_CLEANING] = "cleaning",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(swap_state, SwapState);
 
-static const char* const target_state_table[_TARGET_STATE_MAX] = {
-        [TARGET_DEAD]   = "dead",
-        [TARGET_ACTIVE] = "active"
-};
+static const char *const target_state_table[_TARGET_STATE_MAX] = {[TARGET_DEAD] = "dead", [TARGET_ACTIVE] = "active"};
 
 DEFINE_STRING_TABLE_LOOKUP(target_state, TargetState);
 
-static const char* const timer_state_table[_TIMER_STATE_MAX] = {
-        [TIMER_DEAD]    = "dead",
-        [TIMER_WAITING] = "waiting",
-        [TIMER_RUNNING] = "running",
-        [TIMER_ELAPSED] = "elapsed",
-        [TIMER_FAILED]  = "failed"
-};
+static const char *const timer_state_table[_TIMER_STATE_MAX] = {
+    [TIMER_DEAD] = "dead",
+    [TIMER_WAITING] = "waiting",
+    [TIMER_RUNNING] = "running",
+    [TIMER_ELAPSED] = "elapsed",
+    [TIMER_FAILED] = "failed"};
 
 DEFINE_STRING_TABLE_LOOKUP(timer_state, TimerState);
 
-static const char* const freezer_state_table[_FREEZER_STATE_MAX] = {
-        [FREEZER_RUNNING]  = "running",
-        [FREEZER_FREEZING] = "freezing",
-        [FREEZER_FROZEN]   = "frozen",
-        [FREEZER_THAWING]  = "thawing",
+static const char *const freezer_state_table[_FREEZER_STATE_MAX] = {
+    [FREEZER_RUNNING] = "running",
+    [FREEZER_FREEZING] = "freezing",
+    [FREEZER_FROZEN] = "frozen",
+    [FREEZER_THAWING] = "thawing",
 };
 
 DEFINE_STRING_TABLE_LOOKUP(freezer_state, FreezerState);
@@ -505,28 +493,32 @@ static const struct {
         .info = "Service Type",
         .options = RRDF_FIELD_OPTS_VISIBLE,
         .filter = RRDF_FIELD_FILTER_MULTISELECT,
-        }, {
+    },
+    {
         .member = "Result",
         .value_type = SD_BUS_TYPE_STRING,
         .show_as = "Result",
         .info = "Result",
         .options = RRDF_FIELD_OPTS_VISIBLE,
         .filter = RRDF_FIELD_FILTER_MULTISELECT,
-        }, {
+    },
+    {
         .member = "UnitFileState",
         .value_type = SD_BUS_TYPE_STRING,
         .show_as = "Enabled",
         .info = "Unit File State",
         .options = RRDF_FIELD_OPTS_NONE,
         .filter = RRDF_FIELD_FILTER_MULTISELECT,
-        }, {
+    },
+    {
         .member = "UnitFilePreset",
         .value_type = SD_BUS_TYPE_STRING,
         .show_as = "Preset",
         .info = "Unit File Preset",
         .options = RRDF_FIELD_OPTS_NONE,
         .filter = RRDF_FIELD_FILTER_MULTISELECT,
-        }, {
+    },
+    {
         .member = "FreezerState",
         .value_type = SD_BUS_TYPE_STRING,
         .show_as = "FreezerState",
@@ -534,97 +526,97 @@ static const struct {
         .options = RRDF_FIELD_OPTS_NONE,
         .filter = RRDF_FIELD_FILTER_MULTISELECT,
         .handler = update_freezer_state,
-        },
-//    { .member = "Id",                             .signature = "s",               },
-//    { .member = "LoadState",                      .signature = "s",               },
-//    { .member = "ActiveState",                    .signature = "s",               },
-//    { .member = "SubState",                       .signature = "s",               },
-//    { .member = "Description",                    .signature = "s",               },
-//    { .member = "Following",                      .signature = "s",               },
-//    { .member = "Documentation",                  .signature = "as",              },
-//    { .member = "FragmentPath",                   .signature = "s",               },
-//    { .member = "SourcePath",                     .signature = "s",               },
-//    { .member = "ControlGroup",                   .signature = "s",               },
-//    { .member = "DropInPaths",                    .signature = "as",              },
-//    { .member = "LoadError",                      .signature = "(ss)",            },
-//    { .member = "TriggeredBy",                    .signature = "as",              },
-//    { .member = "Triggers",                       .signature = "as",              },
-//    { .member = "InactiveExitTimestamp",          .signature = "t",               },
-//    { .member = "InactiveExitTimestampMonotonic", .signature = "t",               },
-//    { .member = "ActiveEnterTimestamp",           .signature = "t",               },
-//    { .member = "ActiveExitTimestamp",            .signature = "t",               },
-//    { .member = "RuntimeMaxUSec",                 .signature = "t",               },
-//    { .member = "InactiveEnterTimestamp",         .signature = "t",               },
-//    { .member = "NeedDaemonReload",               .signature = "b",               },
-//    { .member = "Transient",                      .signature = "b",               },
-//    { .member = "ExecMainPID",                    .signature = "u",               },
-//    { .member = "MainPID",                        .signature = "u",               },
-//    { .member = "ControlPID",                     .signature = "u",               },
-//    { .member = "StatusText",                     .signature = "s",               },
-//    { .member = "PIDFile",                        .signature = "s",               },
-//    { .member = "StatusErrno",                    .signature = "i",               },
-//    { .member = "FileDescriptorStoreMax",         .signature = "u",               },
-//    { .member = "NFileDescriptorStore",           .signature = "u",               },
-//    { .member = "ExecMainStartTimestamp",         .signature = "t",               },
-//    { .member = "ExecMainExitTimestamp",          .signature = "t",               },
-//    { .member = "ExecMainCode",                   .signature = "i",               },
-//    { .member = "ExecMainStatus",                 .signature = "i",               },
-//    { .member = "LogNamespace",                   .signature = "s",               },
-//    { .member = "ConditionTimestamp",             .signature = "t",               },
-//    { .member = "ConditionResult",                .signature = "b",               },
-//    { .member = "Conditions",                     .signature = "a(sbbsi)",        },
-//    { .member = "AssertTimestamp",                .signature = "t",               },
-//    { .member = "AssertResult",                   .signature = "b",               },
-//    { .member = "Asserts",                        .signature = "a(sbbsi)",        },
-//    { .member = "NextElapseUSecRealtime",         .signature = "t",               },
-//    { .member = "NextElapseUSecMonotonic",        .signature = "t",               },
-//    { .member = "NAccepted",                      .signature = "u",               },
-//    { .member = "NConnections",                   .signature = "u",               },
-//    { .member = "NRefused",                       .signature = "u",               },
-//    { .member = "Accept",                         .signature = "b",               },
-//    { .member = "Listen",                         .signature = "a(ss)",           },
-//    { .member = "SysFSPath",                      .signature = "s",               },
-//    { .member = "Where",                          .signature = "s",               },
-//    { .member = "What",                           .signature = "s",               },
-//    { .member = "MemoryCurrent",                  .signature = "t",               },
-//    { .member = "MemoryAvailable",                .signature = "t",               },
-//    { .member = "DefaultMemoryMin",               .signature = "t",               },
-//    { .member = "DefaultMemoryLow",               .signature = "t",               },
-//    { .member = "DefaultStartupMemoryLow",        .signature = "t",               },
-//    { .member = "MemoryMin",                      .signature = "t",               },
-//    { .member = "MemoryLow",                      .signature = "t",               },
-//    { .member = "StartupMemoryLow",               .signature = "t",               },
-//    { .member = "MemoryHigh",                     .signature = "t",               },
-//    { .member = "StartupMemoryHigh",              .signature = "t",               },
-//    { .member = "MemoryMax",                      .signature = "t",               },
-//    { .member = "StartupMemoryMax",               .signature = "t",               },
-//    { .member = "MemorySwapMax",                  .signature = "t",               },
-//    { .member = "StartupMemorySwapMax",           .signature = "t",               },
-//    { .member = "MemoryZSwapMax",                 .signature = "t",               },
-//    { .member = "StartupMemoryZSwapMax",          .signature = "t",               },
-//    { .member = "MemoryLimit",                    .signature = "t",               },
-//    { .member = "CPUUsageNSec",                   .signature = "t",               },
-//    { .member = "TasksCurrent",                   .signature = "t",               },
-//    { .member = "TasksMax",                       .signature = "t",               },
-//    { .member = "IPIngressBytes",                 .signature = "t",               },
-//    { .member = "IPEgressBytes",                  .signature = "t",               },
-//    { .member = "IOReadBytes",                    .signature = "t",               },
-//    { .member = "IOWriteBytes",                   .signature = "t",               },
-//    { .member = "ExecCondition",                  .signature = "a(sasbttttuii)",  },
-//    { .member = "ExecConditionEx",                .signature = "a(sasasttttuii)", },
-//    { .member = "ExecStartPre",                   .signature = "a(sasbttttuii)",  },
-//    { .member = "ExecStartPreEx",                 .signature = "a(sasasttttuii)", },
-//    { .member = "ExecStart",                      .signature = "a(sasbttttuii)",  },
-//    { .member = "ExecStartEx",                    .signature = "a(sasasttttuii)", },
-//    { .member = "ExecStartPost",                  .signature = "a(sasbttttuii)",  },
-//    { .member = "ExecStartPostEx",                .signature = "a(sasasttttuii)", },
-//    { .member = "ExecReload",                     .signature = "a(sasbttttuii)",  },
-//    { .member = "ExecReloadEx",                   .signature = "a(sasasttttuii)", },
-//    { .member = "ExecStopPre",                    .signature = "a(sasbttttuii)",  },
-//    { .member = "ExecStop",                       .signature = "a(sasbttttuii)",  },
-//    { .member = "ExecStopEx",                     .signature = "a(sasasttttuii)", },
-//    { .member = "ExecStopPost",                   .signature = "a(sasbttttuii)",  },
-//    { .member = "ExecStopPostEx",                 .signature = "a(sasasttttuii)", },
+    },
+    //    { .member = "Id",                             .signature = "s",               },
+    //    { .member = "LoadState",                      .signature = "s",               },
+    //    { .member = "ActiveState",                    .signature = "s",               },
+    //    { .member = "SubState",                       .signature = "s",               },
+    //    { .member = "Description",                    .signature = "s",               },
+    //    { .member = "Following",                      .signature = "s",               },
+    //    { .member = "Documentation",                  .signature = "as",              },
+    //    { .member = "FragmentPath",                   .signature = "s",               },
+    //    { .member = "SourcePath",                     .signature = "s",               },
+    //    { .member = "ControlGroup",                   .signature = "s",               },
+    //    { .member = "DropInPaths",                    .signature = "as",              },
+    //    { .member = "LoadError",                      .signature = "(ss)",            },
+    //    { .member = "TriggeredBy",                    .signature = "as",              },
+    //    { .member = "Triggers",                       .signature = "as",              },
+    //    { .member = "InactiveExitTimestamp",          .signature = "t",               },
+    //    { .member = "InactiveExitTimestampMonotonic", .signature = "t",               },
+    //    { .member = "ActiveEnterTimestamp",           .signature = "t",               },
+    //    { .member = "ActiveExitTimestamp",            .signature = "t",               },
+    //    { .member = "RuntimeMaxUSec",                 .signature = "t",               },
+    //    { .member = "InactiveEnterTimestamp",         .signature = "t",               },
+    //    { .member = "NeedDaemonReload",               .signature = "b",               },
+    //    { .member = "Transient",                      .signature = "b",               },
+    //    { .member = "ExecMainPID",                    .signature = "u",               },
+    //    { .member = "MainPID",                        .signature = "u",               },
+    //    { .member = "ControlPID",                     .signature = "u",               },
+    //    { .member = "StatusText",                     .signature = "s",               },
+    //    { .member = "PIDFile",                        .signature = "s",               },
+    //    { .member = "StatusErrno",                    .signature = "i",               },
+    //    { .member = "FileDescriptorStoreMax",         .signature = "u",               },
+    //    { .member = "NFileDescriptorStore",           .signature = "u",               },
+    //    { .member = "ExecMainStartTimestamp",         .signature = "t",               },
+    //    { .member = "ExecMainExitTimestamp",          .signature = "t",               },
+    //    { .member = "ExecMainCode",                   .signature = "i",               },
+    //    { .member = "ExecMainStatus",                 .signature = "i",               },
+    //    { .member = "LogNamespace",                   .signature = "s",               },
+    //    { .member = "ConditionTimestamp",             .signature = "t",               },
+    //    { .member = "ConditionResult",                .signature = "b",               },
+    //    { .member = "Conditions",                     .signature = "a(sbbsi)",        },
+    //    { .member = "AssertTimestamp",                .signature = "t",               },
+    //    { .member = "AssertResult",                   .signature = "b",               },
+    //    { .member = "Asserts",                        .signature = "a(sbbsi)",        },
+    //    { .member = "NextElapseUSecRealtime",         .signature = "t",               },
+    //    { .member = "NextElapseUSecMonotonic",        .signature = "t",               },
+    //    { .member = "NAccepted",                      .signature = "u",               },
+    //    { .member = "NConnections",                   .signature = "u",               },
+    //    { .member = "NRefused",                       .signature = "u",               },
+    //    { .member = "Accept",                         .signature = "b",               },
+    //    { .member = "Listen",                         .signature = "a(ss)",           },
+    //    { .member = "SysFSPath",                      .signature = "s",               },
+    //    { .member = "Where",                          .signature = "s",               },
+    //    { .member = "What",                           .signature = "s",               },
+    //    { .member = "MemoryCurrent",                  .signature = "t",               },
+    //    { .member = "MemoryAvailable",                .signature = "t",               },
+    //    { .member = "DefaultMemoryMin",               .signature = "t",               },
+    //    { .member = "DefaultMemoryLow",               .signature = "t",               },
+    //    { .member = "DefaultStartupMemoryLow",        .signature = "t",               },
+    //    { .member = "MemoryMin",                      .signature = "t",               },
+    //    { .member = "MemoryLow",                      .signature = "t",               },
+    //    { .member = "StartupMemoryLow",               .signature = "t",               },
+    //    { .member = "MemoryHigh",                     .signature = "t",               },
+    //    { .member = "StartupMemoryHigh",              .signature = "t",               },
+    //    { .member = "MemoryMax",                      .signature = "t",               },
+    //    { .member = "StartupMemoryMax",               .signature = "t",               },
+    //    { .member = "MemorySwapMax",                  .signature = "t",               },
+    //    { .member = "StartupMemorySwapMax",           .signature = "t",               },
+    //    { .member = "MemoryZSwapMax",                 .signature = "t",               },
+    //    { .member = "StartupMemoryZSwapMax",          .signature = "t",               },
+    //    { .member = "MemoryLimit",                    .signature = "t",               },
+    //    { .member = "CPUUsageNSec",                   .signature = "t",               },
+    //    { .member = "TasksCurrent",                   .signature = "t",               },
+    //    { .member = "TasksMax",                       .signature = "t",               },
+    //    { .member = "IPIngressBytes",                 .signature = "t",               },
+    //    { .member = "IPEgressBytes",                  .signature = "t",               },
+    //    { .member = "IOReadBytes",                    .signature = "t",               },
+    //    { .member = "IOWriteBytes",                   .signature = "t",               },
+    //    { .member = "ExecCondition",                  .signature = "a(sasbttttuii)",  },
+    //    { .member = "ExecConditionEx",                .signature = "a(sasasttttuii)", },
+    //    { .member = "ExecStartPre",                   .signature = "a(sasbttttuii)",  },
+    //    { .member = "ExecStartPreEx",                 .signature = "a(sasasttttuii)", },
+    //    { .member = "ExecStart",                      .signature = "a(sasbttttuii)",  },
+    //    { .member = "ExecStartEx",                    .signature = "a(sasasttttuii)", },
+    //    { .member = "ExecStartPost",                  .signature = "a(sasbttttuii)",  },
+    //    { .member = "ExecStartPostEx",                .signature = "a(sasasttttuii)", },
+    //    { .member = "ExecReload",                     .signature = "a(sasbttttuii)",  },
+    //    { .member = "ExecReloadEx",                   .signature = "a(sasasttttuii)", },
+    //    { .member = "ExecStopPre",                    .signature = "a(sasbttttuii)",  },
+    //    { .member = "ExecStop",                       .signature = "a(sasbttttuii)",  },
+    //    { .member = "ExecStopEx",                     .signature = "a(sasasttttuii)", },
+    //    { .member = "ExecStopPost",                   .signature = "a(sasbttttuii)",  },
+    //    { .member = "ExecStopPostEx",                 .signature = "a(sasasttttuii)", },
 };
 
 #define _UNIT_ATTRIBUTE_MAX (sizeof(unit_attributes) / sizeof(unit_attributes[0]))
@@ -669,40 +661,45 @@ typedef struct UnitInfo {
     struct UnitInfo *prev, *next;
 } UnitInfo;
 
-static void update_freezer_state(UnitInfo *u, UnitAttribute *ua) {
+static void update_freezer_state(UnitInfo *u, UnitAttribute *ua)
+{
     u->FreezerState = freezer_state_from_string(ua->str);
 }
 
 // ----------------------------------------------------------------------------
 // common helpers
 
-static void log_dbus_error(int r, const char *msg) {
-    netdata_log_error("SYSTEMD_UNITS: %s failed with error %d (%s)", msg, r, strerror(-r));
+static void log_dbus_error(int r, const char *msg)
+{
+    netdata_log_error("ND_SD_UNITS: %s failed with error %d (%s)", msg, r, strerror(-r));
 }
 
 // ----------------------------------------------------------------------------
 // attributes management
 
-static inline ssize_t unit_property_slot_from_string(const char *s) {
-    if(!s || !*s)
+static inline ssize_t unit_property_slot_from_string(const char *s)
+{
+    if (!s || !*s)
         return -EINVAL;
 
-    for(size_t i = 0; i < _UNIT_ATTRIBUTE_MAX ;i++)
-        if(streq_ptr(unit_attributes[i].member, s))
+    for (size_t i = 0; i < _UNIT_ATTRIBUTE_MAX; i++)
+        if (streq_ptr(unit_attributes[i].member, s))
             return (ssize_t)i;
 
     return -EINVAL;
 }
 
-static inline const char *unit_property_name_to_string_from_slot(ssize_t i) {
-    if(i >= 0 && i < (ssize_t)_UNIT_ATTRIBUTE_MAX)
+static inline const char *unit_property_name_to_string_from_slot(ssize_t i)
+{
+    if (i >= 0 && i < (ssize_t)_UNIT_ATTRIBUTE_MAX)
         return unit_attributes[i].member;
 
     return NULL;
 }
 
-static inline void systemd_unit_free_property(char type, struct UnitAttribute *at) {
-    switch(type) {
+static inline void systemd_unit_free_property(char type, struct UnitAttribute *at)
+{
+    switch (type) {
         case SD_BUS_TYPE_STRING:
         case SD_BUS_TYPE_OBJECT_PATH:
             freez(at->str);
@@ -714,18 +711,19 @@ static inline void systemd_unit_free_property(char type, struct UnitAttribute *a
     }
 }
 
-static int systemd_unit_get_property(sd_bus_message *m, UnitInfo *u, const char *name) {
+static int systemd_unit_get_property(sd_bus_message *m, UnitInfo *u, const char *name)
+{
     int r;
     char type;
 
     r = sd_bus_message_peek_type(m, &type, NULL);
-    if(r < 0) {
+    if (r < 0) {
         log_dbus_error(r, "sd_bus_message_peek_type()");
         return r;
     }
 
     ssize_t slot = unit_property_slot_from_string(name);
-    if(slot < 0) {
+    if (slot < 0) {
         // internal_error(true, "unused attribute '%s' for unit '%s'", name, u->id);
         sd_bus_message_skip(m, NULL);
         return 0;
@@ -733,9 +731,12 @@ static int systemd_unit_get_property(sd_bus_message *m, UnitInfo *u, const char 
 
     systemd_unit_free_property(unit_attributes[slot].value_type, &u->attributes[slot]);
 
-    if(unit_attributes[slot].value_type != type) {
-        netdata_log_error("Type of field '%s' expected to be '%c' but found '%c'. Ignoring field.",
-                unit_attributes[slot].member, unit_attributes[slot].value_type, type);
+    if (unit_attributes[slot].value_type != type) {
+        netdata_log_error(
+            "Type of field '%s' expected to be '%c' but found '%c'. Ignoring field.",
+            unit_attributes[slot].member,
+            unit_attributes[slot].value_type,
+            type);
         sd_bus_message_skip(m, NULL);
         return 0;
     }
@@ -746,104 +747,90 @@ static int systemd_unit_get_property(sd_bus_message *m, UnitInfo *u, const char 
             char *s;
 
             r = sd_bus_message_read_basic(m, type, &s);
-            if(r < 0) {
+            if (r < 0) {
                 log_dbus_error(r, "sd_bus_message_read_basic()");
                 return r;
             }
 
-            if(s && *s)
+            if (s && *s)
                 u->attributes[slot].str = strdupz(s);
-        }
-            break;
+        } break;
 
         case SD_BUS_TYPE_BOOLEAN: {
             r = sd_bus_message_read_basic(m, type, &u->attributes[slot].boolean);
-            if(r < 0) {
+            if (r < 0) {
                 log_dbus_error(r, "sd_bus_message_read_basic()");
                 return r;
             }
-        }
-            break;
+        } break;
 
         case SD_BUS_TYPE_UINT64: {
             r = sd_bus_message_read_basic(m, type, &u->attributes[slot].uint64);
-            if(r < 0) {
+            if (r < 0) {
                 log_dbus_error(r, "sd_bus_message_read_basic()");
                 return r;
             }
-        }
-            break;
+        } break;
 
         case SD_BUS_TYPE_INT64: {
             r = sd_bus_message_read_basic(m, type, &u->attributes[slot].int64);
-            if(r < 0) {
+            if (r < 0) {
                 log_dbus_error(r, "sd_bus_message_read_basic()");
                 return r;
             }
-        }
-            break;
+        } break;
 
         case SD_BUS_TYPE_UINT32: {
             r = sd_bus_message_read_basic(m, type, &u->attributes[slot].uint32);
-            if(r < 0) {
+            if (r < 0) {
                 log_dbus_error(r, "sd_bus_message_read_basic()");
                 return r;
             }
-        }
-            break;
+        } break;
 
         case SD_BUS_TYPE_INT32: {
             r = sd_bus_message_read_basic(m, type, &u->attributes[slot].int32);
-            if(r < 0) {
+            if (r < 0) {
                 log_dbus_error(r, "sd_bus_message_read_basic()");
                 return r;
             }
-        }
-            break;
+        } break;
 
         case SD_BUS_TYPE_DOUBLE: {
             r = sd_bus_message_read_basic(m, type, &u->attributes[slot].dbl);
-            if(r < 0) {
+            if (r < 0) {
                 log_dbus_error(r, "sd_bus_message_read_basic()");
                 return r;
             }
-        }
-            break;
+        } break;
 
         case SD_BUS_TYPE_ARRAY: {
             internal_error(true, "member '%s' is an array", name);
             sd_bus_message_skip(m, NULL);
             return 0;
-        }
-            break;
+        } break;
 
         default: {
             internal_error(true, "unknown field type '%c' for key '%s'", type, name);
             sd_bus_message_skip(m, NULL);
             return 0;
-        }
-            break;
+        } break;
     }
 
-    if(unit_attributes[slot].handler)
+    if (unit_attributes[slot].handler)
         unit_attributes[slot].handler(u, &u->attributes[slot]);
 
     return 0;
 }
 
-static int systemd_unit_get_all_properties(sd_bus *bus, UnitInfo *u) {
+static int systemd_unit_get_all_properties(sd_bus *bus, UnitInfo *u)
+{
     _cleanup_(sd_bus_message_unrefp) sd_bus_message *m = NULL;
     _cleanup_(sd_bus_error_free) sd_bus_error error = SD_BUS_ERROR_NULL;
     int r;
 
-    r = sd_bus_call_method(bus,
-            "org.freedesktop.systemd1",
-            u->unit_path,
-            "org.freedesktop.DBus.Properties",
-            "GetAll",
-            &error,
-            &m,
-            "s", "");
+    r = sd_bus_call_method(
+        bus, "org.freedesktop.systemd1", u->unit_path, "org.freedesktop.DBus.Properties", "GetAll", &error, &m, "s", "");
     if (r < 0) {
         log_dbus_error(r, "sd_bus_call_method(p1)");
         return r;
@@ -879,24 +866,24 @@ static int systemd_unit_get_all_properties(sd_bus *bus, UnitInfo *u) {
         systemd_unit_get_property(m, u, member);
 
         r = sd_bus_message_exit_container(m);
-        if(r < 0) {
+        if (r < 0) {
             log_dbus_error(r, "sd_bus_message_exit_container(p6)");
             return r;
         }
 
         r = sd_bus_message_exit_container(m);
-        if(r < 0) {
+        if (r < 0) {
             log_dbus_error(r, "sd_bus_message_exit_container(p7)");
             return r;
         }
     }
-    if(r < 0) {
+    if (r < 0) {
         log_dbus_error(r, "sd_bus_message_enter_container(p8)");
         return r;
     }
 
     r = sd_bus_message_exit_container(m);
-    if(r < 0) {
+    if (r < 0) {
         log_dbus_error(r, "sd_bus_message_exit_container(p9)");
         return r;
     }
@@ -904,41 +891,41 @@ static int systemd_unit_get_all_properties(sd_bus *bus, UnitInfo *u) {
     return 0;
 }
 
-static void systemd_units_get_all_properties(sd_bus *bus, UnitInfo *base) {
-    for(UnitInfo *u = base ; u ;u = u->next)
+static void systemd_units_get_all_properties(sd_bus *bus, UnitInfo *base)
+{
+    for (UnitInfo *u = base; u; u = u->next)
         systemd_unit_get_all_properties(bus, u);
 }
-
-
 
 // ----------------------------------------------------------------------------
 // main unit info
 
-static int bus_parse_unit_info(sd_bus_message *message, UnitInfo *u) {
+static int bus_parse_unit_info(sd_bus_message *message, UnitInfo *u)
+{
     assert(message);
     assert(u);
 
     u->type = NULL;
 
     int r = sd_bus_message_read(
-            message,
-            SYSTEMD_UNITS_DBUS_TYPES,
-            &u->id,
-            &u->description,
-            &u->load_state,
-            &u->active_state,
-            &u->sub_state,
-            &u->following,
-            &u->unit_path,
-            &u->job_id,
-            &u->job_type,
-            &u->job_path);
+        message,
+        ND_SD_UNITS_DBUS_TYPES,
+        &u->id,
+        &u->description,
+        &u->load_state,
+        &u->active_state,
+        &u->sub_state,
+        &u->following,
+        &u->unit_path,
+        &u->job_id,
+        &u->job_type,
+        &u->job_path);
 
-    if(r <= 0)
+    if (r <= 0)
         return r;
 
     char *dot;
-    if(u->id && (dot = strrchr(u->id, '.')) != NULL)
+    if (u->id && (dot = strrchr(u->id, '.')) != NULL)
         u->type = &dot[1];
     else
         u->type = "unknown";
@@ -947,7 +934,7 @@ static int bus_parse_unit_info(sd_bus_message *message, UnitInfo *u) {
     u->UnitLoadState = unit_load_state_from_string(u->load_state);
     u->UnitActiveState = unit_active_state_from_string(u->active_state);
 
-    switch(u->UnitType) {
+    switch (u->UnitType) {
         case UNIT_SERVICE:
             u->ServiceState = service_state_from_string(u->sub_state);
             break;
@@ -999,35 +986,40 @@ static int bus_parse_unit_info(sd_bus_message *message, UnitInfo *u) {
     return r;
 }
 
-static int hex_to_int(char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+static int hex_to_int(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
     return 0;
 }
 
 // un-escape hex sequences (\xNN) in id
-static void txt_decode(char *txt) {
-    if(!txt || !*txt)
+static void txt_decode(char *txt)
+{
+    if (!txt || !*txt)
         return;
 
     char *src = txt, *dst = txt;
 
     size_t id_len = strlen(src);
     size_t s = 0, d = 0;
-    for(; s < id_len ; s++) {
-        if(src[s] == '\\' && src[s + 1] == 'x' && isxdigit(src[s + 2]) && isxdigit(src[s + 3])) {
+    for (; s < id_len; s++) {
+        if (src[s] == '\\' && src[s + 1] == 'x' && isxdigit(src[s + 2]) && isxdigit(src[s + 3])) {
             int value = (hex_to_int(src[s + 2]) << 4) + hex_to_int(src[s + 3]);
             dst[d++] = (char)value;
             s += 3;
-        }
-        else
+        } else
             dst[d++] = src[s];
     }
     dst[d] = '\0';
 }
 
-static UnitInfo *systemd_units_get_all(void) {
+static UnitInfo *systemd_units_get_all(void)
+{
     _cleanup_(sd_bus_unrefp) sd_bus *bus = NULL;
     _cleanup_(sd_bus_error_free) sd_bus_error error = SD_BUS_ERROR_NULL;
     _cleanup_(sd_bus_message_unrefp) sd_bus_message *reply = NULL;
@@ -1043,20 +1035,21 @@ static UnitInfo *systemd_units_get_all(void) {
 
     // This calls the ListUnits method of the org.freedesktop.systemd1.Manager interface
     // Replace "ListUnits" with "ListUnitsFiltered" to get specific units based on filters
-    r = sd_bus_call_method(bus,
-            "org.freedesktop.systemd1",           /* service to contact */
-            "/org/freedesktop/systemd1",          /* object path */
-            "org.freedesktop.systemd1.Manager",   /* interface name */
-            "ListUnits",                          /* method name */
-            &error,                               /* object to return error in */
-            &reply,                               /* return message on success */
-            NULL);                                /* input signature */
+    r = sd_bus_call_method(
+        bus,
+        "org.freedesktop.systemd1",         /* service to contact */
+        "/org/freedesktop/systemd1",        /* object path */
+        "org.freedesktop.systemd1.Manager", /* interface name */
+        "ListUnits",                        /* method name */
+        &error,                             /* object to return error in */
+        &reply,                             /* return message on success */
+        NULL);                              /* input signature */
     if (r < 0) {
         log_dbus_error(r, "sd_bus_call_method()");
         return base;
     }
 
-    r = sd_bus_message_enter_container(reply, SD_BUS_TYPE_ARRAY, SYSTEMD_UNITS_DBUS_TYPES);
+    r = sd_bus_message_enter_container(reply, SD_BUS_TYPE_ARRAY, ND_SD_UNITS_DBUS_TYPES);
     if (r < 0) {
         log_dbus_error(r, "sd_bus_message_enter_container()");
         return base;
@@ -1103,8 +1096,9 @@ static UnitInfo *systemd_units_get_all(void) {
     return base;
 }
 
-static void systemd_units_free_all(UnitInfo *base) {
-    while(base) {
+static void systemd_units_free_all(UnitInfo *base)
+{
+    while (base) {
         UnitInfo *u = base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(base, u, prev, next);
         freez((void *)u->id);
@@ -1118,7 +1112,7 @@ static void systemd_units_free_all(UnitInfo *base) {
         freez((void *)u->job_type);
         freez((void *)u->job_path);
 
-        for(int i = 0; i < (ssize_t)_UNIT_ATTRIBUTE_MAX ;i++)
+        for (int i = 0; i < (ssize_t)_UNIT_ATTRIBUTE_MAX; i++)
             systemd_unit_free_property(unit_attributes[i].value_type, &u->attributes[i]);
 
         freez(u);
@@ -1127,28 +1121,29 @@ static void systemd_units_free_all(UnitInfo *base) {
 
 // ----------------------------------------------------------------------------
 
-static void netdata_systemd_units_function_help(const char *transaction) {
+static void netdata_systemd_units_function_help(const char *transaction)
+{
     BUFFER *wb = buffer_create(0, NULL);
-    buffer_sprintf(wb,
-            "%s / %s\n"
-            "\n"
-            "%s\n"
-            "\n"
-            "The following parameters are supported:\n"
-            "\n"
-            "   help\n"
-            "      Shows this help message.\n"
-            "\n"
-            "   info\n"
-            "      Request initial configuration information about the plugin.\n"
-            "      The key entity returned is the required_params array, which includes\n"
-            "      all the available systemd journal sources.\n"
-            "      When `info` is requested, all other parameters are ignored.\n"
-            "\n"
-            , program_name
-            , SYSTEMD_UNITS_FUNCTION_NAME
-            , SYSTEMD_UNITS_FUNCTION_DESCRIPTION
-    );
+    buffer_sprintf(
+        wb,
+        "%s / %s\n"
+        "\n"
+        "%s\n"
+        "\n"
+        "The following parameters are supported:\n"
+        "\n"
+        "   help\n"
+        "      Shows this help message.\n"
+        "\n"
+        "   info\n"
+        "      Request initial configuration information about the plugin.\n"
+        "      The key entity returned is the required_params array, which includes\n"
+        "      all the available systemd journal sources.\n"
+        "      When `info` is requested, all other parameters are ignored.\n"
+        "\n",
+        program_name,
+        ND_SD_UNITS_FUNCTION_NAME,
+        ND_SD_UNITS_FUNCTION_DESCRIPTION);
 
     netdata_mutex_lock(&stdout_mutex);
     wb->response_code = HTTP_RESP_OK;
@@ -1160,13 +1155,14 @@ static void netdata_systemd_units_function_help(const char *transaction) {
     buffer_free(wb);
 }
 
-static void netdata_systemd_units_function_info(const char *transaction) {
+static void netdata_systemd_units_function_info(const char *transaction)
+{
     BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
-    buffer_json_member_add_string(wb, "help", SYSTEMD_UNITS_FUNCTION_DESCRIPTION);
+    buffer_json_member_add_string(wb, "help", ND_SD_UNITS_FUNCTION_DESCRIPTION);
 
     buffer_json_finalize(wb);
     netdata_mutex_lock(&stdout_mutex);
@@ -1181,10 +1177,11 @@ static void netdata_systemd_units_function_info(const char *transaction) {
 
 // ----------------------------------------------------------------------------
 
-static void systemd_unit_priority(UnitInfo *u, size_t units) {
+static void systemd_unit_priority(UnitInfo *u, size_t units)
+{
     uint32_t prio;
 
-    switch(u->severity) {
+    switch (u->severity) {
         case FACET_ROW_SEVERITY_CRITICAL:
             prio = 0;
             break;
@@ -1211,24 +1208,28 @@ static void systemd_unit_priority(UnitInfo *u, size_t units) {
     u->prio = (prio * units) + u->prio;
 }
 
-static inline FACET_ROW_SEVERITY if_less(FACET_ROW_SEVERITY current, FACET_ROW_SEVERITY max, FACET_ROW_SEVERITY target) {
+static inline FACET_ROW_SEVERITY if_less(FACET_ROW_SEVERITY current, FACET_ROW_SEVERITY max, FACET_ROW_SEVERITY target)
+{
     FACET_ROW_SEVERITY wanted = current;
-    if(current < target)
+    if (current < target)
         wanted = target > max ? max : target;
     return wanted;
 }
 
-static inline FACET_ROW_SEVERITY if_normal(FACET_ROW_SEVERITY current, FACET_ROW_SEVERITY max, FACET_ROW_SEVERITY target) {
+static inline FACET_ROW_SEVERITY
+if_normal(FACET_ROW_SEVERITY current, FACET_ROW_SEVERITY max, FACET_ROW_SEVERITY target)
+{
     FACET_ROW_SEVERITY wanted = current;
-    if(current == FACET_ROW_SEVERITY_NORMAL)
+    if (current == FACET_ROW_SEVERITY_NORMAL)
         wanted = target > max ? max : target;
     return wanted;
 }
 
-static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
+static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u)
+{
     FACET_ROW_SEVERITY severity, max_severity;
 
-    switch(u->UnitLoadState) {
+    switch (u->UnitLoadState) {
         case UNIT_ERROR:
         case UNIT_BAD_SETTING:
             severity = FACET_ROW_SEVERITY_CRITICAL;
@@ -1258,7 +1259,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
     }
 
-    switch(u->UnitActiveState) {
+    switch (u->UnitActiveState) {
         case UNIT_FAILED:
             severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_CRITICAL);
             break;
@@ -1282,7 +1283,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
     }
 
-    switch(u->FreezerState) {
+    switch (u->FreezerState) {
         default:
         case FREEZER_FROZEN:
         case FREEZER_FREEZING:
@@ -1294,9 +1295,9 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
     }
 
-    switch(u->UnitType) {
+    switch (u->UnitType) {
         case UNIT_SERVICE:
-            switch(u->ServiceState) {
+            switch (u->ServiceState) {
                 case SERVICE_FAILED:
                 case SERVICE_FAILED_BEFORE_AUTO_RESTART:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_CRITICAL);
@@ -1340,7 +1341,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         case UNIT_MOUNT:
-            switch(u->MountState) {
+            switch (u->MountState) {
                 case MOUNT_FAILED:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_CRITICAL);
                     break;
@@ -1371,7 +1372,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         case UNIT_SWAP:
-            switch(u->SwapState) {
+            switch (u->SwapState) {
                 case SWAP_FAILED:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_CRITICAL);
                     break;
@@ -1399,7 +1400,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         case UNIT_SOCKET:
-            switch(u->SocketState) {
+            switch (u->SocketState) {
                 case SOCKET_FAILED:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_CRITICAL);
                     break;
@@ -1431,7 +1432,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         case UNIT_TARGET:
-            switch(u->TargetState) {
+            switch (u->TargetState) {
                 default:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_WARNING);
                     break;
@@ -1446,7 +1447,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         case UNIT_DEVICE:
-            switch(u->DeviceState) {
+            switch (u->DeviceState) {
                 default:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_WARNING);
                     break;
@@ -1465,7 +1466,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         case UNIT_AUTOMOUNT:
-            switch(u->AutomountState) {
+            switch (u->AutomountState) {
                 case AUTOMOUNT_FAILED:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_CRITICAL);
                     break;
@@ -1485,7 +1486,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         case UNIT_TIMER:
-            switch(u->TimerState) {
+            switch (u->TimerState) {
                 case TIMER_FAILED:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_CRITICAL);
                     break;
@@ -1506,7 +1507,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         case UNIT_PATH:
-            switch(u->PathState) {
+            switch (u->PathState) {
                 case PATH_FAILED:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_CRITICAL);
                     break;
@@ -1526,7 +1527,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         case UNIT_SLICE:
-            switch(u->SliceState) {
+            switch (u->SliceState) {
                 default:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_WARNING);
                     break;
@@ -1541,7 +1542,7 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         case UNIT_SCOPE:
-            switch(u->ScopeState) {
+            switch (u->ScopeState) {
                 case SCOPE_FAILED:
                     severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_CRITICAL);
                     break;
@@ -1575,46 +1576,54 @@ static FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
     return severity;
 }
 
-static int unit_info_compar(const void *a, const void *b) {
+static int unit_info_compar(const void *a, const void *b)
+{
     UnitInfo *u1 = *((UnitInfo **)a);
     UnitInfo *u2 = *((UnitInfo **)b);
 
     return strcasecmp(u1->id, u2->id);
 }
 
-static void systemd_units_assign_priority(UnitInfo *base) {
+static void systemd_units_assign_priority(UnitInfo *base)
+{
     size_t units = 0, c = 0, prio = 0;
-    for(UnitInfo *u = base; u ; u = u->next)
+    for (UnitInfo *u = base; u; u = u->next)
         units++;
 
     UnitInfo *array[units];
-    for(UnitInfo *u = base; u ; u = u->next)
+    for (UnitInfo *u = base; u; u = u->next)
         array[c++] = u;
 
     qsort(array, units, sizeof(UnitInfo *), unit_info_compar);
 
-    for(c = 0; c < units ; c++) {
+    for (c = 0; c < units; c++) {
         array[c]->prio = prio++;
         system_unit_severity(array[c]);
         systemd_unit_priority(array[c], units);
     }
 }
 
-void function_systemd_units(const char *transaction, char *function,
-                            usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
-                            BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
-                            const char *source __maybe_unused, void *data __maybe_unused) {
-    char *words[SYSTEMD_UNITS_MAX_PARAMS] = { NULL };
-    size_t num_words = quoted_strings_splitter_whitespace(function, words, SYSTEMD_UNITS_MAX_PARAMS);
-    for(int i = 1; i < SYSTEMD_UNITS_MAX_PARAMS ;i++) {
+void function_systemd_units(
+    const char *transaction,
+    char *function,
+    usec_t *stop_monotonic_ut __maybe_unused,
+    bool *cancelled __maybe_unused,
+    BUFFER *payload __maybe_unused,
+    HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused,
+    void *data __maybe_unused)
+{
+    char *words[ND_SD_UNITS_MAX_PARAMS] = {NULL};
+    size_t num_words = quoted_strings_splitter_whitespace(function, words, ND_SD_UNITS_MAX_PARAMS);
+    for (int i = 1; i < ND_SD_UNITS_MAX_PARAMS; i++) {
         char *keyword = get_word(words, num_words, i);
-        if(!keyword) break;
+        if (!keyword)
+            break;
 
-        if(strcmp(keyword, "info") == 0) {
+        if (strcmp(keyword, "info") == 0) {
             netdata_systemd_units_function_info(transaction);
             return;
-        }
-        else if(strcmp(keyword, "help") == 0) {
+        } else if (strcmp(keyword, "help") == 0) {
             netdata_systemd_units_function_help(transaction);
             return;
         }
@@ -1629,13 +1638,13 @@ void function_systemd_units(const char *transaction, char *function,
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 10);
-    buffer_json_member_add_string(wb, "help", SYSTEMD_UNITS_FUNCTION_DESCRIPTION);
+    buffer_json_member_add_string(wb, "help", ND_SD_UNITS_FUNCTION_DESCRIPTION);
     buffer_json_member_add_array(wb, "data");
 
-    size_t count[_UNIT_ATTRIBUTE_MAX] = { 0 };
+    size_t count[_UNIT_ATTRIBUTE_MAX] = {0};
     struct UnitAttribute max[_UNIT_ATTRIBUTE_MAX];
 
-    for(UnitInfo *u = base; u ;u = u->next) {
+    for (UnitInfo *u = base; u; u = u->next) {
         buffer_json_add_array_item_array(wb);
         {
             buffer_json_add_array_item_string(wb, u->id);
@@ -1657,40 +1666,46 @@ void function_systemd_units(const char *transaction, char *function,
             buffer_json_add_array_item_string(wb, u->job_type);
             buffer_json_add_array_item_string(wb, u->job_path);
 
-            for(ssize_t i = 0; i < (ssize_t)_UNIT_ATTRIBUTE_MAX ;i++) {
-                switch(unit_attributes[i].value_type) {
+            for (ssize_t i = 0; i < (ssize_t)_UNIT_ATTRIBUTE_MAX; i++) {
+                switch (unit_attributes[i].value_type) {
                     case SD_BUS_TYPE_OBJECT_PATH:
                     case SD_BUS_TYPE_STRING:
-                        buffer_json_add_array_item_string(wb, u->attributes[i].str && *u->attributes[i].str ? u->attributes[i].str : "-");
+                        buffer_json_add_array_item_string(
+                            wb, u->attributes[i].str && *u->attributes[i].str ? u->attributes[i].str : "-");
                         break;
 
                     case SD_BUS_TYPE_UINT64:
                         buffer_json_add_array_item_uint64(wb, u->attributes[i].uint64);
-                        if(!count[i]++) max[i].uint64 = 0;
+                        if (!count[i]++)
+                            max[i].uint64 = 0;
                         max[i].uint64 = MAX(max[i].uint64, u->attributes[i].uint64);
                         break;
 
                     case SD_BUS_TYPE_UINT32:
                         buffer_json_add_array_item_uint64(wb, u->attributes[i].uint32);
-                        if(!count[i]++) max[i].uint32 = 0;
+                        if (!count[i]++)
+                            max[i].uint32 = 0;
                         max[i].uint32 = MAX(max[i].uint32, u->attributes[i].uint32);
                         break;
 
                     case SD_BUS_TYPE_INT64:
                         buffer_json_add_array_item_uint64(wb, u->attributes[i].int64);
-                        if(!count[i]++) max[i].uint64 = 0;
+                        if (!count[i]++)
+                            max[i].uint64 = 0;
                         max[i].int64 = MAX(max[i].int64, u->attributes[i].int64);
                         break;
 
                     case SD_BUS_TYPE_INT32:
                         buffer_json_add_array_item_uint64(wb, u->attributes[i].int32);
-                        if(!count[i]++) max[i].int32 = 0;
+                        if (!count[i]++)
+                            max[i].int32 = 0;
                         max[i].int32 = MAX(max[i].int32, u->attributes[i].int32);
                         break;
 
                     case SD_BUS_TYPE_DOUBLE:
                         buffer_json_add_array_item_double(wb, u->attributes[i].dbl);
-                        if(!count[i]++) max[i].dbl = 0.0;
+                        if (!count[i]++)
+                            max[i].dbl = 0.0;
                         max[i].dbl = MAX(max[i].dbl, u->attributes[i].dbl);
                         break;
 
@@ -1715,105 +1730,231 @@ void function_systemd_units(const char *transaction, char *function,
     {
         size_t field_id = 0;
 
-        buffer_rrdf_table_add_field(wb, field_id++, "id", "Unit ID",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "id",
+            "Unit ID",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
+            NULL);
 
         buffer_rrdf_table_add_field(
-                wb, field_id++,
-                "rowOptions", "rowOptions",
-                RRDF_FIELD_TYPE_NONE,
-                RRDR_FIELD_VISUAL_ROW_OPTIONS,
-                RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                RRDF_FIELD_SORT_FIXED,
-                NULL,
-                RRDF_FIELD_SUMMARY_COUNT,
-                RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_DUMMY,
-                NULL);
+            wb,
+            field_id++,
+            "rowOptions",
+            "rowOptions",
+            RRDF_FIELD_TYPE_NONE,
+            RRDR_FIELD_VISUAL_ROW_OPTIONS,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_FIXED,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_DUMMY,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "type", "Unit Type",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "type",
+            "Unit Type",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "description", "Unit Description",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "description",
+            "Unit Description",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "loadState", "Unit Load State",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "loadState",
+            "Unit Load State",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "activeState", "Unit Active State",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "activeState",
+            "Unit Active State",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "subState", "Unit Sub State",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "subState",
+            "Unit Sub State",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "following", "Unit Following",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_WRAP,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "following",
+            "Unit Following",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_WRAP,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "path", "Unit Path",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "path",
+            "Unit Path",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "jobId", "Unit Job ID",
-                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "jobId",
+            "Unit Job ID",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_NONE,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "jobType", "Unit Job Type",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "jobType",
+            "Unit Job Type",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_NONE,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "jobPath", "Unit Job Path",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "jobPath",
+            "Unit Job Path",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
+            NULL);
 
-        for(ssize_t i = 0; i < (ssize_t)_UNIT_ATTRIBUTE_MAX ;i++) {
+        for (ssize_t i = 0; i < (ssize_t)_UNIT_ATTRIBUTE_MAX; i++) {
             char key[256], name[256];
 
-            if(unit_attributes[i].show_as)
+            if (unit_attributes[i].show_as)
                 snprintfz(key, sizeof(key), "%s", unit_attributes[i].show_as);
             else
                 snprintfz(key, sizeof(key), "attribute%s", unit_property_name_to_string_from_slot(i));
 
-            if(unit_attributes[i].info)
+            if (unit_attributes[i].info)
                 snprintfz(name, sizeof(name), "%s", unit_attributes[i].info);
             else
                 snprintfz(name, sizeof(name), "Attribute %s", unit_property_name_to_string_from_slot(i));
@@ -1821,15 +1962,26 @@ void function_systemd_units(const char *transaction, char *function,
             RRDF_FIELD_OPTIONS options = unit_attributes[i].options;
             RRDF_FIELD_FILTER filter = unit_attributes[i].filter;
 
-            switch(unit_attributes[i].value_type) {
+            switch (unit_attributes[i].value_type) {
                 case SD_BUS_TYPE_OBJECT_PATH:
                 case SD_BUS_TYPE_STRING:
-                    buffer_rrdf_table_add_field(wb, field_id++, key, name,
-                            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                            RRDF_FIELD_SUMMARY_COUNT, filter,
-                            RRDF_FIELD_OPTS_WRAP | options,
-                            NULL);
+                    buffer_rrdf_table_add_field(
+                        wb,
+                        field_id++,
+                        key,
+                        name,
+                        RRDF_FIELD_TYPE_STRING,
+                        RRDF_FIELD_VISUAL_VALUE,
+                        RRDF_FIELD_TRANSFORM_NONE,
+                        0,
+                        NULL,
+                        NAN,
+                        RRDF_FIELD_SORT_ASCENDING,
+                        NULL,
+                        RRDF_FIELD_SUMMARY_COUNT,
+                        filter,
+                        RRDF_FIELD_OPTS_WRAP | options,
+                        NULL);
                     break;
 
                 case SD_BUS_TYPE_INT32:
@@ -1837,61 +1989,114 @@ void function_systemd_units(const char *transaction, char *function,
                 case SD_BUS_TYPE_INT64:
                 case SD_BUS_TYPE_UINT64: {
                     double m = 0.0;
-                    if(unit_attributes[i].value_type == SD_BUS_TYPE_UINT64)
+                    if (unit_attributes[i].value_type == SD_BUS_TYPE_UINT64)
                         m = (double)max[i].uint64;
-                    else if(unit_attributes[i].value_type == SD_BUS_TYPE_INT64)
+                    else if (unit_attributes[i].value_type == SD_BUS_TYPE_INT64)
                         m = (double)max[i].int64;
-                    else if(unit_attributes[i].value_type == SD_BUS_TYPE_UINT32)
+                    else if (unit_attributes[i].value_type == SD_BUS_TYPE_UINT32)
                         m = (double)max[i].uint32;
-                    else if(unit_attributes[i].value_type == SD_BUS_TYPE_INT32)
+                    else if (unit_attributes[i].value_type == SD_BUS_TYPE_INT32)
                         m = (double)max[i].int32;
 
-                    buffer_rrdf_table_add_field(wb, field_id++, key, name,
-                            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                            0, NULL, m, RRDF_FIELD_SORT_ASCENDING, NULL,
-                            RRDF_FIELD_SUMMARY_SUM, filter,
-                            RRDF_FIELD_OPTS_WRAP | options,
-                            NULL);
-                }
-                    break;
+                    buffer_rrdf_table_add_field(
+                        wb,
+                        field_id++,
+                        key,
+                        name,
+                        RRDF_FIELD_TYPE_INTEGER,
+                        RRDF_FIELD_VISUAL_VALUE,
+                        RRDF_FIELD_TRANSFORM_NONE,
+                        0,
+                        NULL,
+                        m,
+                        RRDF_FIELD_SORT_ASCENDING,
+                        NULL,
+                        RRDF_FIELD_SUMMARY_SUM,
+                        filter,
+                        RRDF_FIELD_OPTS_WRAP | options,
+                        NULL);
+                } break;
 
                 case SD_BUS_TYPE_DOUBLE:
-                    buffer_rrdf_table_add_field(wb, field_id++, key, name,
-                            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                            2, NULL, max[i].dbl, RRDF_FIELD_SORT_ASCENDING, NULL,
-                            RRDF_FIELD_SUMMARY_SUM, filter,
-                            RRDF_FIELD_OPTS_WRAP | options,
-                            NULL);
+                    buffer_rrdf_table_add_field(
+                        wb,
+                        field_id++,
+                        key,
+                        name,
+                        RRDF_FIELD_TYPE_INTEGER,
+                        RRDF_FIELD_VISUAL_VALUE,
+                        RRDF_FIELD_TRANSFORM_NONE,
+                        2,
+                        NULL,
+                        max[i].dbl,
+                        RRDF_FIELD_SORT_ASCENDING,
+                        NULL,
+                        RRDF_FIELD_SUMMARY_SUM,
+                        filter,
+                        RRDF_FIELD_OPTS_WRAP | options,
+                        NULL);
                     break;
 
                 case SD_BUS_TYPE_BOOLEAN:
-                    buffer_rrdf_table_add_field(wb, field_id++, key, name,
-                            RRDF_FIELD_TYPE_BOOLEAN, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                            RRDF_FIELD_SUMMARY_COUNT, filter,
-                            RRDF_FIELD_OPTS_WRAP | options,
-                            NULL);
+                    buffer_rrdf_table_add_field(
+                        wb,
+                        field_id++,
+                        key,
+                        name,
+                        RRDF_FIELD_TYPE_BOOLEAN,
+                        RRDF_FIELD_VISUAL_VALUE,
+                        RRDF_FIELD_TRANSFORM_NONE,
+                        0,
+                        NULL,
+                        NAN,
+                        RRDF_FIELD_SORT_ASCENDING,
+                        NULL,
+                        RRDF_FIELD_SUMMARY_COUNT,
+                        filter,
+                        RRDF_FIELD_OPTS_WRAP | options,
+                        NULL);
                     break;
 
                 default:
                     break;
             }
-
         }
 
-        buffer_rrdf_table_add_field(wb, field_id++, "priority", "Priority",
-                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "priority",
+            "Priority",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_NONE,
+            NULL);
 
-        buffer_rrdf_table_add_field(wb, field_id++, "count", "Count",
-                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
+        buffer_rrdf_table_add_field(
+            wb,
+            field_id++,
+            "count",
+            "Count",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_NONE,
+            NULL);
     }
 
     buffer_json_object_close(wb); // columns
