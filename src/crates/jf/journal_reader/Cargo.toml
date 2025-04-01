@@ -1,0 +1,11 @@
+[package]
+name = "journal_reader"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+window_manager = { path = "../window_manager" }
+object_file = { path = "../object_file" }
+error = { path = "../error" }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

@@ -1,12 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "systemd-internals.h"
+#include "collectors/all.h"
+#include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
 
-#ifdef ENABLE_SYSTEMD_DBUS
+#include <linux/capability.h>
+#include <syslog.h>
 #include <systemd/sd-bus.h>
+
+#define ND_SD_JOURNAL_WORKER_THREADS 2
+#define ND_SD_UNITS_FUNCTION_DESCRIPTION "View the status of systemd units"
+#define ND_SD_UNITS_FUNCTION_NAME "systemd-list-units"
+#define ND_SD_UNITS_DEFAULT_TIMEOUT 30
 
 #define ND_SD_UNITS_MAX_PARAMS 10
 #define ND_SD_UNITS_DBUS_TYPES "(ssssssouso)"
+
+netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 
 // ----------------------------------------------------------------------------
 // copied from systemd: string-table.h
@@ -2177,4 +2187,71 @@ void function_systemd_units(
     systemd_units_free_all(base);
 }
 
-#endif // ENABLE_SYSTEMD_DBUS
+static bool plugin_should_exit = false;
+
+int main(int argc __maybe_unused, char **argv __maybe_unused)
+{
+    nd_thread_tag_set("sd-unit.plugin");
+    nd_log_initialize_for_external_plugins("systemd-units.plugin");
+    netdata_threads_init_for_external_plugins(0);
+
+    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if (verify_netdata_host_prefix(true) == -1)
+        exit(1);
+
+    // ------------------------------------------------------------------------
+    // debug
+
+    if (argc == 2 && strcmp(argv[1], "debug-units") == 0) {
+        bool cancelled = false;
+        usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
+        function_systemd_units(
+            "123", "systemd-units", &stop_monotonic_ut, &cancelled, NULL, HTTP_ACCESS_ALL, NULL, NULL);
+        exit(1);
+    }
+
+    // ------------------------------------------------------------------------
+    // the event loop for functions
+
+    struct functions_evloop_globals *wg =
+        functions_evloop_init(ND_SD_JOURNAL_WORKER_THREADS, "SDU", &stdout_mutex, &plugin_should_exit);
+
+    functions_evloop_add_function(
+        wg, ND_SD_UNITS_FUNCTION_NAME, function_systemd_units, ND_SD_UNITS_DEFAULT_TIMEOUT, NULL);
+
+    // ------------------------------------------------------------------------
+    // register functions to netdata
+
+    netdata_mutex_lock(&stdout_mutex);
+
+    fprintf(
+        stdout,
+        PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
+        ND_SD_UNITS_FUNCTION_NAME,
+        ND_SD_UNITS_DEFAULT_TIMEOUT,
+        ND_SD_UNITS_FUNCTION_DESCRIPTION,
+        (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
+        RRDFUNCTIONS_PRIORITY_DEFAULT);
+
+    fflush(stdout);
+    netdata_mutex_unlock(&stdout_mutex);
+
+    // ------------------------------------------------------------------------
+
+    usec_t send_newline_ut = 0;
+    const bool tty = isatty(fileno(stdout)) == 1;
+
+    heartbeat_t hb;
+    heartbeat_init(&hb, USEC_PER_SEC);
+    while (!plugin_should_exit) {
+        usec_t dt_ut = heartbeat_next(&hb);
+        send_newline_ut += dt_ut;
+
+        if (!tty && send_newline_ut > USEC_PER_SEC) {
+            send_newline_and_flush(&stdout_mutex);
+            send_newline_ut = 0;
+        }
+    }
+
+    exit(0);
+}
