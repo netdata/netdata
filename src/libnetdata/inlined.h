@@ -687,16 +687,18 @@ static inline char *trim(char *s) {
     return s;
 }
 
-// like trim(), but also remove duplicate spaces inside the string; may return NULL
+// like trim(), but also remove duplicate spaces inside the string
 static inline char *trim_all(char *buffer) {
     char *d = buffer, *s = buffer;
 
     // skip spaces
-    while(isspace((uint8_t)*s)) s++;
+    while(isspace((uint8_t)*s))
+        s++;
 
     while(*s) {
         // copy the non-space part
-        while(*s && !isspace((uint8_t)*s)) *d++ = *s++;
+        while(*s && !isspace((uint8_t)*s))
+            *d++ = *s++;
 
         // add a space if we have to
         if(*s && isspace((uint8_t)*s)) {
@@ -715,7 +717,6 @@ static inline char *trim_all(char *buffer) {
         if(isspace((uint8_t)*d)) *d = '\0';
     }
 
-    if(!buffer[0]) return NULL;
     return buffer;
 }
 

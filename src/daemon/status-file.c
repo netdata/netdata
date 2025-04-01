@@ -128,7 +128,7 @@ static void dmi_info(const char *file, const char *alt, char *dst, size_t dst_si
     }
 
     char *s = trim_all(dst);
-    if(!s)
+    if(!s || !*s)
         dst[0] = '\0';
     else if(s != dst)
         memmove(dst, s, strlen(s) + 1);
