@@ -3,6 +3,7 @@ package journaldexporter
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -11,7 +12,8 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 )
 
-func logsToJournaldMessages(ld plog.Logs, buf *bytes.Buffer) {
+func (e *journaldExporter) logsToJournaldMessages(ld plog.Logs, buf *bytes.Buffer) {
+	receivedAt := fmt.Sprintf("%d", time.Now().UnixNano()/1000)
 	rls := ld.ResourceLogs()
 	for i := 0; i < rls.Len(); i++ {
 		rl := rls.At(i)
@@ -26,8 +28,18 @@ func logsToJournaldMessages(ld plog.Logs, buf *bytes.Buffer) {
 			for k := 0; k < logRecords.Len(); k++ {
 				lr := logRecords.At(k)
 
+				writeField(buf, "__REALTIME_TIMESTAMP", receivedAt)
+				writeField(buf, "SYSLOG_IDENTIFIER", e.fields.syslogID)
+				writeField(buf, "_PID", e.fields.pid)
+				writeField(buf, "_UID", e.fields.uid)
+				writeField(buf, "_BOOT_ID", e.fields.bootID)
+				writeField(buf, "_MACHINE_ID", e.fields.machineID)
+				writeField(buf, "_HOSTNAME", e.fields.hostname)
+				writeField(buf, "PRIORITY", strconv.Itoa(mapSeverityToJournaldPriority(lr.SeverityNumber())))
+				writeField(buf, "MESSAGE", bodyToString(lr.Body()))
+
 				resource.Attributes().Range(func(k string, v pcommon.Value) bool {
-					writeField(buf, "RESOURCE_"+k, v.AsString())
+					writeField(buf, "OTEL_RESOURCE_ATTR_"+k, v.AsString())
 					return true
 				})
 
@@ -40,7 +52,7 @@ func logsToJournaldMessages(ld plog.Logs, buf *bytes.Buffer) {
 
 				if lr.Timestamp() != 0 {
 					ts := time.Unix(0, int64(lr.Timestamp()))
-					writeField(buf, "REALTIME_TIMESTAMP", strconv.FormatInt(ts.UnixMicro(), 10))
+					writeField(buf, "OTEL_TIMESTAMP", strconv.FormatInt(ts.UnixMicro(), 10))
 				}
 
 				if lr.ObservedTimestamp() != 0 && lr.ObservedTimestamp() != lr.Timestamp() {
@@ -48,34 +60,26 @@ func logsToJournaldMessages(ld plog.Logs, buf *bytes.Buffer) {
 					writeField(buf, "OTEL_OBSERVED_TIMESTAMP", strconv.FormatInt(ts.UnixMicro(), 10))
 				}
 
-				priority := mapSeverityToJournaldPriority(lr.SeverityNumber())
-				writeField(buf, "PRIORITY", strconv.Itoa(priority))
-
 				if lr.SeverityText() != "" {
-					writeField(buf, "LEVEL", lr.SeverityText())
+					writeField(buf, "OTEL_SEVERITY_LEVEL", lr.SeverityText())
 				}
 
 				if !lr.TraceID().IsEmpty() {
-					writeField(buf, "TRACE_ID", lr.TraceID().String())
+					writeField(buf, "OTEL_TRACE_ID", lr.TraceID().String())
 					if !lr.SpanID().IsEmpty() {
-						writeField(buf, "SPAN_ID", lr.SpanID().String())
+						writeField(buf, "OTEL_SPAN_ID", lr.SpanID().String())
 					}
 					if lr.Flags() != 0 {
-						writeField(buf, "TRACE_FLAGS", strconv.FormatUint(uint64(lr.Flags()), 16))
+						writeField(buf, "OTEL_TRACE_FLAGS", strconv.FormatUint(uint64(lr.Flags()), 16))
 					}
 				}
 
 				if lr.EventName() != "" {
-					writeField(buf, "EVENT_NAME", lr.EventName())
-				}
-
-				bodyStr := bodyToString(lr.Body())
-				if bodyStr != "" {
-					writeField(buf, "MESSAGE", bodyStr)
+					writeField(buf, "OTEL_EVENT_NAME", lr.EventName())
 				}
 
 				lr.Attributes().Range(func(k string, v pcommon.Value) bool {
-					writeField(buf, "ATTR_"+k, v.AsString())
+					writeField(buf, "OTEL_ATTR_"+k, v.AsString())
 					return true
 				})
 
