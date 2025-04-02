@@ -401,114 +401,289 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
     linux_get_dmi_field("chassis_type", NULL, ds->hw.chassis.type, sizeof(ds->hw.chassis.type));
 }
 #elif defined(OS_MACOS)
+
 #include <IOKit/IOKitLib.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <sys/sysctl.h>
 
-static void macos_get_string_property(io_registry_entry_t entry, CFStringRef key, char *dst, size_t dst_size) {
+// Helper function to get string from CF object
+static void cf_string_to_cstr(CFTypeRef cf_val, char *buffer, size_t buffer_size) {
+    if (!cf_val || !buffer || buffer_size == 0) {
+        if (buffer && buffer_size > 0)
+            buffer[0] = '\0';
+        return;
+    }
+
+    buffer[0] = '\0';
+
+    if (CFGetTypeID(cf_val) == CFStringGetTypeID()) {
+        CFStringRef str_ref = (CFStringRef)cf_val;
+        if (!CFStringGetCString(str_ref, buffer, buffer_size, kCFStringEncodingUTF8)) {
+            buffer[0] = '\0';
+        }
+    } else if (CFGetTypeID(cf_val) == CFDataGetTypeID()) {
+        CFDataRef data_ref = (CFDataRef)cf_val;
+        CFIndex length = CFDataGetLength(data_ref);
+        if (length > 0 && length < buffer_size) {
+            const UInt8 *bytes = CFDataGetBytePtr(data_ref);
+            memcpy(buffer, bytes, length);
+            buffer[length] = '\0';
+        }
+    }
+
+    dmi_clean_field(buffer, buffer_size);
+}
+
+// Get a string property from an IOKit registry entry
+static void get_iokit_string_property(io_registry_entry_t entry, CFStringRef key,
+                                      char *buffer, size_t buffer_size) {
     CFTypeRef property = IORegistryEntryCreateCFProperty(entry, key, kCFAllocatorDefault, 0);
     if (property) {
-        if (CFGetTypeID(property) == CFStringGetTypeID()) {
-            CFStringRef stringRef = (CFStringRef)property;
-            if (!CFStringGetCString(stringRef, dst, dst_size, kCFStringEncodingUTF8)) {
-                dst[0] = '\0';
-            }
-        }
+        cf_string_to_cstr(property, buffer, buffer_size);
         CFRelease(property);
     }
 }
 
-void os_dmi_info(DAEMON_STATUS_FILE *ds) {
-    // Get system information from IOKit
-    io_registry_entry_t platformExpert = IORegistryEntryFromPath(
-        kIOMasterPortDefault, "IOService:/IOResources/IOPlatformExpertDevice"
-    );
+// Get a string property from an IOKit registry entry's parent
+static void get_parent_iokit_string_property(io_registry_entry_t entry, CFStringRef key,
+                                             char *buffer, size_t buffer_size,
+                                             const io_name_t plane) {
+    io_registry_entry_t parent;
 
-    if (!platformExpert) {
-        return;
+    if (IORegistryEntryGetParentEntry(entry, plane, &parent) == KERN_SUCCESS) {
+        get_iokit_string_property(parent, key, buffer, buffer_size);
+        IOObjectRelease(parent);
     }
+}
 
-    // System vendor (usually Apple)
-    macos_get_string_property(platformExpert, CFSTR("manufacturer"), ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
+// Get hardware info from IODeviceTree
+static void get_devicetree_info(DAEMON_STATUS_FILE *ds) {
+    io_registry_entry_t device_tree = IORegistryEntryFromPath(kIOMasterPortDefault, "IODeviceTree:/");
+    if (device_tree) {
+        // Get model information
+        get_iokit_string_property(device_tree, CFSTR("model"), ds->hw.product.name, sizeof(ds->hw.product.name));
 
-    // Product information
-    macos_get_string_property(platformExpert, CFSTR("model"), ds->hw.product.name, sizeof(ds->hw.product.name));
-    macos_get_string_property(platformExpert, CFSTR("version"), ds->hw.product.version, sizeof(ds->hw.product.version));
+        // Get board ID if available
+        get_iokit_string_property(device_tree, CFSTR("board-id"), ds->hw.board.name, sizeof(ds->hw.board.name));
 
-    // If product name is empty, try to get machine model
-    if (!ds->hw.product.name[0]) {
-        char model[256] = "";
-        size_t len = sizeof(model);
-        if (sysctlbyname("hw.model", model, &len, NULL, 0) == 0) {
-            dmi_clean_field(model, sizeof(model));
-            strncpyz(ds->hw.product.name, model, sizeof(ds->hw.product.name) - 1);
+        // Look for platform information
+        io_registry_entry_t platform = IORegistryEntryFromPath(kIOMasterPortDefault, "IODeviceTree:/platform");
+        if (platform) {
+            // Platform information can sometimes have manufacturer info
+            get_iokit_string_property(platform, CFSTR("manufacturer"), ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
+
+            // Check compatible property for additional info
+            char compatible[256] = {0};
+            get_iokit_string_property(platform, CFSTR("compatible"), compatible, sizeof(compatible));
+
+            // Parse for product family
+            if (compatible[0]) {
+                char *family = strstr(compatible, ",");
+                if (family) {
+                    family++; // Skip the comma
+                    strncpyz(ds->hw.product.family, family, sizeof(ds->hw.product.family) - 1);
+                    dmi_clean_field(ds->hw.product.family, sizeof(ds->hw.product.family));
+                }
+            }
+
+            IOObjectRelease(platform);
         }
+
+        IOObjectRelease(device_tree);
     }
+}
 
-    // Determine chassis type based on product name
-    // Use IOPlatformExpertDevice to determine device type
-    CFTypeRef deviceTypeProperty = IORegistryEntryCreateCFProperty(
-        platformExpert, CFSTR("device_type"), kCFAllocatorDefault, 0
-    );
+// Get hardware info from IOPlatformExpertDevice
+static void get_platform_expert_info(DAEMON_STATUS_FILE *ds) {
+    io_registry_entry_t platform_expert = IORegistryEntryFromPath(
+        kIOMasterPortDefault, "IOService:/IOResources/IOPlatformExpertDevice");
 
-    if (deviceTypeProperty && CFGetTypeID(deviceTypeProperty) == CFStringGetTypeID()) {
-        char device_type[256];
-        if (CFStringGetCString((CFStringRef)deviceTypeProperty, device_type, sizeof(device_type), kCFStringEncodingUTF8)) {
-            // Set chassis type based on device type
-            if (strstr(device_type, "MacBook") != NULL) {
-                strncpyz(ds->hw.chassis.type, "laptop", sizeof(ds->hw.chassis.type) - 1);
-            } else if (strstr(device_type, "iMac") != NULL) {
-                strncpyz(ds->hw.chassis.type, "desktop", sizeof(ds->hw.chassis.type) - 1);
-            } else if (strstr(device_type, "Mac") != NULL && strstr(device_type, "Pro") != NULL) {
-                strncpyz(ds->hw.chassis.type, "desktop", sizeof(ds->hw.chassis.type) - 1);
-            } else if (strstr(device_type, "Xserve") != NULL) {
-                strncpyz(ds->hw.chassis.type, "server", sizeof(ds->hw.chassis.type) - 1);
-            } else {
-                strncpyz(ds->hw.chassis.type, "unknown", sizeof(ds->hw.chassis.type) - 1);
+    if (platform_expert) {
+        // System vendor - almost always "Apple Inc." for Macs
+        get_iokit_string_property(platform_expert, CFSTR("manufacturer"),
+                                  ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
+
+        // Product name
+        get_iokit_string_property(platform_expert, CFSTR("model"),
+                                  ds->hw.product.name, sizeof(ds->hw.product.name));
+
+        // Model number - can be used as product version
+        get_iokit_string_property(platform_expert, CFSTR("model-number"),
+                                  ds->hw.product.version, sizeof(ds->hw.product.version));
+
+        // Board name sometimes available
+        get_iokit_string_property(platform_expert, CFSTR("board-id"),
+                                  ds->hw.board.name, sizeof(ds->hw.board.name));
+
+        // Hardware UUID can be useful to include
+        char uuid_str[64] = {0};
+        get_iokit_string_property(platform_expert, CFSTR("IOPlatformUUID"), uuid_str, sizeof(uuid_str));
+
+        // Get device type to determine chassis type
+        char device_type[64] = {0};
+        get_iokit_string_property(platform_expert, CFSTR("device_type"), device_type, sizeof(device_type));
+
+        // Set chassis type based on device_type
+        if (device_type[0]) {
+            if (strcasestr(device_type, "laptop") || strcasestr(device_type, "book")) {
+                strncpyz(ds->hw.chassis.type, "9", sizeof(ds->hw.chassis.type) - 1); // Laptop
+            } else if (strcasestr(device_type, "server")) {
+                strncpyz(ds->hw.chassis.type, "17", sizeof(ds->hw.chassis.type) - 1); // Server
+            } else if (strcasestr(device_type, "imac")) {
+                strncpyz(ds->hw.chassis.type, "13", sizeof(ds->hw.chassis.type) - 1); // All-in-one
+            } else if (strcasestr(device_type, "mac")) {
+                strncpyz(ds->hw.chassis.type, "3", sizeof(ds->hw.chassis.type) - 1); // Desktop
             }
         }
-        CFRelease(deviceTypeProperty);
+
+        // If chassis type not set, guess based on product name
+        if (!ds->hw.chassis.type[0] && ds->hw.product.name[0]) {
+            if (strcasestr(ds->hw.product.name, "book")) {
+                strncpyz(ds->hw.chassis.type, "9", sizeof(ds->hw.chassis.type) - 1); // Laptop
+            } else if (strcasestr(ds->hw.product.name, "imac")) {
+                strncpyz(ds->hw.chassis.type, "13", sizeof(ds->hw.chassis.type) - 1); // All-in-one
+            } else if (strcasestr(ds->hw.product.name, "mac") &&
+                       strcasestr(ds->hw.product.name, "pro")) {
+                strncpyz(ds->hw.chassis.type, "3", sizeof(ds->hw.chassis.type) - 1); // Desktop
+            } else if (strcasestr(ds->hw.product.name, "mac") &&
+                       strcasestr(ds->hw.product.name, "mini")) {
+                strncpyz(ds->hw.chassis.type, "35", sizeof(ds->hw.chassis.type) - 1); // Mini PC
+            }
+        }
+
+        IOObjectRelease(platform_expert);
+    }
+}
+
+// Get SMC revision and system firmware info
+static void get_firmware_info(DAEMON_STATUS_FILE *ds) {
+    io_registry_entry_t smc = IOServiceGetMatchingService(
+        kIOMasterPortDefault, IOServiceMatching("AppleSMC"));
+
+    if (smc) {
+        // SMC revision - can be useful for firmware info
+        char smc_version[64] = {0};
+        get_iokit_string_property(smc, CFSTR("smc-version"), smc_version, sizeof(smc_version));
+
+        if (smc_version[0]) {
+            strncpyz(ds->hw.bios.version, smc_version, sizeof(ds->hw.bios.version) - 1);
+            dmi_clean_field(ds->hw.bios.version, sizeof(ds->hw.bios.version));
+        }
+
+        IOObjectRelease(smc);
     }
 
-    // BIOS information (on Mac this is firmware/SMC info)
-    io_registry_entry_t romEntry = IORegistryEntryFromPath(
-        kIOMasterPortDefault, "IODeviceTree:/rom"
-    );
+    // Check for BIOS information in IODeviceTree:/rom
+    io_registry_entry_t rom = IORegistryEntryFromPath(kIOMasterPortDefault, "IODeviceTree:/rom");
+    if (rom) {
+        // "version" contains firmware version
+        get_iokit_string_property(rom, CFSTR("version"), ds->hw.bios.version, sizeof(ds->hw.bios.version));
 
-    if (romEntry) {
-        macos_get_string_property(romEntry, CFSTR("vendor"), ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
-        macos_get_string_property(romEntry, CFSTR("version"), ds->hw.bios.version, sizeof(ds->hw.bios.version));
-        macos_get_string_property(romEntry, CFSTR("release-date"), ds->hw.bios.date, sizeof(ds->hw.bios.date));
-        IOObjectRelease(romEntry);
+        // Apple is the vendor for all Mac firmware
+        strncpyz(ds->hw.bios.vendor, "Apple", sizeof(ds->hw.bios.vendor) - 1);
+
+        // "release-date" can sometimes be found
+        get_iokit_string_property(rom, CFSTR("release-date"), ds->hw.bios.date, sizeof(ds->hw.bios.date));
+
+        IOObjectRelease(rom);
     }
 
-    // Default Apple as vendor if not set
-    if (!ds->hw.sys.vendor[0]) {
-        strncpyz(ds->hw.sys.vendor, "Apple", sizeof(ds->hw.sys.vendor) - 1);
+    // If we still don't have BIOS version, check system version from sysctl
+    if (!ds->hw.bios.version[0]) {
+        char firmware_version[256] = {0};
+        size_t len = sizeof(firmware_version);
+        if (sysctlbyname("machdep.cpu.brand_string", firmware_version, &len, NULL, 0) == 0) {
+            // Extract firmware info if present
+            char *firmware_info = strstr(firmware_version, "SMC:");
+            if (firmware_info) {
+                strncpyz(ds->hw.bios.version, firmware_info, sizeof(ds->hw.bios.version) - 1);
+                dmi_clean_field(ds->hw.bios.version, sizeof(ds->hw.bios.version));
+            }
+        }
+    }
+}
+
+// Get system hardware information using sysctl
+static void get_sysctl_info(DAEMON_STATUS_FILE *ds) {
+    // Get model identifier using sysctl
+    if (!ds->hw.product.name[0]) {
+        char model[256] = {0};
+        size_t len = sizeof(model);
+        if (sysctlbyname("hw.model", model, &len, NULL, 0) == 0) {
+            strncpyz(ds->hw.product.name, model, sizeof(ds->hw.product.name) - 1);
+            dmi_clean_field(ds->hw.product.name, sizeof(ds->hw.product.name));
+
+            // If chassis type is still not set, guess from model
+            if (!ds->hw.chassis.type[0]) {
+                if (strncasecmp(model, "MacBook", 7) == 0) {
+                    strncpyz(ds->hw.chassis.type, "9", sizeof(ds->hw.chassis.type) - 1); // Laptop
+                } else if (strncasecmp(model, "iMac", 4) == 0) {
+                    strncpyz(ds->hw.chassis.type, "13", sizeof(ds->hw.chassis.type) - 1); // All-in-one
+                } else if (strncasecmp(model, "Mac", 3) == 0 &&
+                           strcasestr(model, "Pro") != NULL) {
+                    strncpyz(ds->hw.chassis.type, "3", sizeof(ds->hw.chassis.type) - 1); // Desktop
+                } else if (strncasecmp(model, "Mac", 3) == 0 &&
+                           strcasestr(model, "mini") != NULL) {
+                    strncpyz(ds->hw.chassis.type, "35", sizeof(ds->hw.chassis.type) - 1); // Mini PC
+                } else {
+                    strncpyz(ds->hw.chassis.type, "3", sizeof(ds->hw.chassis.type) - 1); // Default to desktop
+                }
+            }
+        }
     }
 
-    // Board info is generally not available on macOS
-    // Use product name for board name if empty
-    if (!ds->hw.board.name[0] && ds->hw.product.name[0]) {
-        strncpyz(ds->hw.board.name, ds->hw.product.name, sizeof(ds->hw.board.name) - 1);
+    // Get CPU information
+    if (!ds->hw.board.name[0]) {
+        char cpu_brand[256] = {0};
+        size_t len = sizeof(cpu_brand);
+        if (sysctlbyname("machdep.cpu.brand_string", cpu_brand, &len, NULL, 0) == 0) {
+            // Use CPU information as part of board info if not available
+            strncpyz(ds->hw.board.name, cpu_brand, sizeof(ds->hw.board.name) - 1);
+            dmi_clean_field(ds->hw.board.name, sizeof(ds->hw.board.name));
+        }
     }
+}
 
+// Main function to get hardware info
+void os_dmi_info(DAEMON_STATUS_FILE *ds) {
+    // Always set Apple as default vendor
+    strncpyz(ds->hw.sys.vendor, "Apple", sizeof(ds->hw.sys.vendor) - 1);
+
+    // Get info from IOPlatformExpertDevice
+    get_platform_expert_info(ds);
+
+    // Get info from IODeviceTree
+    get_devicetree_info(ds);
+
+    // Get firmware information
+    get_firmware_info(ds);
+
+    // Get additional info from sysctl
+    get_sysctl_info(ds);
+
+    // Set board vendor to match system vendor if not set
     if (!ds->hw.board.vendor[0] && ds->hw.sys.vendor[0]) {
         strncpyz(ds->hw.board.vendor, ds->hw.sys.vendor, sizeof(ds->hw.board.vendor) - 1);
     }
 
-    // Clean up fields
-    dmi_clean_field(ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
-    dmi_clean_field(ds->hw.product.name, sizeof(ds->hw.product.name));
-    dmi_clean_field(ds->hw.product.version, sizeof(ds->hw.product.version));
-    dmi_clean_field(ds->hw.chassis.type, sizeof(ds->hw.chassis.type));
-    dmi_clean_field(ds->hw.board.name, sizeof(ds->hw.board.name));
-    dmi_clean_field(ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
-    dmi_clean_field(ds->hw.bios.version, sizeof(ds->hw.bios.version));
-    dmi_clean_field(ds->hw.bios.date, sizeof(ds->hw.bios.date));
+    // Set chassis vendor to match system vendor if not set
+    if (!ds->hw.chassis.vendor[0] && ds->hw.sys.vendor[0]) {
+        strncpyz(ds->hw.chassis.vendor, ds->hw.sys.vendor, sizeof(ds->hw.chassis.vendor) - 1);
+    }
 
-    IOObjectRelease(platformExpert);
+    // Default product name if all methods failed
+    if (!ds->hw.product.name[0]) {
+        strncpyz(ds->hw.product.name, "Mac", sizeof(ds->hw.product.name) - 1);
+    }
+
+    // Default chassis type if we couldn't determine it
+    if (!ds->hw.chassis.type[0]) {
+        strncpyz(ds->hw.chassis.type, "3", sizeof(ds->hw.chassis.type) - 1); // Desktop
+    }
 }
+
 #elif defined(OS_FREEBSD)
+
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <kenv.h>
@@ -574,6 +749,7 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
         freebsd_get_sysctl_str("hw.model", ds->hw.product.name, sizeof(ds->hw.product.name));
     }
 }
+
 #elif defined(OS_WINDOWS)
 
 #include <windows.h>
