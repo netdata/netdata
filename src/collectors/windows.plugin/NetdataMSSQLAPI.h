@@ -18,7 +18,7 @@ struct netdata_mssql_conn {
 };
 
 SQLHENV netdata_MSSQL_initialize_env();
-SQLHDBC netdata_MSSQL_start_connection(SQLHENV hEnv, char *dbconnstr);
+SQLHDBC netdata_MSSQL_start_connection(SQLHENV hEnv, SQLCHAR *dbconnstr);
 void netdata_MSSQL_cleanup_env(SQLHENV hEnv);
 void netdata_MSSQL_close_connection(SQLHDBC netdataDBC);
 
