@@ -401,17 +401,504 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
     linux_get_dmi_field("chassis_type", NULL, ds->hw.chassis.type, sizeof(ds->hw.chassis.type));
 }
 #elif defined(OS_MACOS)
+#include <IOKit/IOKitLib.h>
+#include <CoreFoundation/CoreFoundation.h>
+
+static void macos_get_string_property(io_registry_entry_t entry, CFStringRef key, char *dst, size_t dst_size) {
+    CFTypeRef property = IORegistryEntryCreateCFProperty(entry, key, kCFAllocatorDefault, 0);
+    if (property) {
+        if (CFGetTypeID(property) == CFStringGetTypeID()) {
+            CFStringRef stringRef = (CFStringRef)property;
+            if (!CFStringGetCString(stringRef, dst, dst_size, kCFStringEncodingUTF8)) {
+                dst[0] = '\0';
+            }
+        }
+        CFRelease(property);
+    }
+}
+
 void os_dmi_info(DAEMON_STATUS_FILE *ds) {
-    ;
+    // Get system information from IOKit
+    io_registry_entry_t platformExpert = IORegistryEntryFromPath(
+        kIOMasterPortDefault, "IOService:/IOResources/IOPlatformExpertDevice"
+    );
+
+    if (!platformExpert) {
+        return;
+    }
+
+    // System vendor (usually Apple)
+    macos_get_string_property(platformExpert, CFSTR("manufacturer"), ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
+
+    // Product information
+    macos_get_string_property(platformExpert, CFSTR("model"), ds->hw.product.name, sizeof(ds->hw.product.name));
+    macos_get_string_property(platformExpert, CFSTR("version"), ds->hw.product.version, sizeof(ds->hw.product.version));
+
+    // If product name is empty, try to get machine model
+    if (!ds->hw.product.name[0]) {
+        char model[256] = "";
+        size_t len = sizeof(model);
+        if (sysctlbyname("hw.model", model, &len, NULL, 0) == 0) {
+            dmi_clean_field(model, sizeof(model));
+            strncpyz(ds->hw.product.name, model, sizeof(ds->hw.product.name) - 1);
+        }
+    }
+
+    // Determine chassis type based on product name
+    // Use IOPlatformExpertDevice to determine device type
+    CFTypeRef deviceTypeProperty = IORegistryEntryCreateCFProperty(
+        platformExpert, CFSTR("device_type"), kCFAllocatorDefault, 0
+    );
+
+    if (deviceTypeProperty && CFGetTypeID(deviceTypeProperty) == CFStringGetTypeID()) {
+        char device_type[256];
+        if (CFStringGetCString((CFStringRef)deviceTypeProperty, device_type, sizeof(device_type), kCFStringEncodingUTF8)) {
+            // Set chassis type based on device type
+            if (strstr(device_type, "MacBook") != NULL) {
+                strncpyz(ds->hw.chassis.type, "laptop", sizeof(ds->hw.chassis.type) - 1);
+            } else if (strstr(device_type, "iMac") != NULL) {
+                strncpyz(ds->hw.chassis.type, "desktop", sizeof(ds->hw.chassis.type) - 1);
+            } else if (strstr(device_type, "Mac") != NULL && strstr(device_type, "Pro") != NULL) {
+                strncpyz(ds->hw.chassis.type, "desktop", sizeof(ds->hw.chassis.type) - 1);
+            } else if (strstr(device_type, "Xserve") != NULL) {
+                strncpyz(ds->hw.chassis.type, "server", sizeof(ds->hw.chassis.type) - 1);
+            } else {
+                strncpyz(ds->hw.chassis.type, "unknown", sizeof(ds->hw.chassis.type) - 1);
+            }
+        }
+        CFRelease(deviceTypeProperty);
+    }
+
+    // BIOS information (on Mac this is firmware/SMC info)
+    io_registry_entry_t romEntry = IORegistryEntryFromPath(
+        kIOMasterPortDefault, "IODeviceTree:/rom"
+    );
+
+    if (romEntry) {
+        macos_get_string_property(romEntry, CFSTR("vendor"), ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
+        macos_get_string_property(romEntry, CFSTR("version"), ds->hw.bios.version, sizeof(ds->hw.bios.version));
+        macos_get_string_property(romEntry, CFSTR("release-date"), ds->hw.bios.date, sizeof(ds->hw.bios.date));
+        IOObjectRelease(romEntry);
+    }
+
+    // Default Apple as vendor if not set
+    if (!ds->hw.sys.vendor[0]) {
+        strncpyz(ds->hw.sys.vendor, "Apple", sizeof(ds->hw.sys.vendor) - 1);
+    }
+
+    // Board info is generally not available on macOS
+    // Use product name for board name if empty
+    if (!ds->hw.board.name[0] && ds->hw.product.name[0]) {
+        strncpyz(ds->hw.board.name, ds->hw.product.name, sizeof(ds->hw.board.name) - 1);
+    }
+
+    if (!ds->hw.board.vendor[0] && ds->hw.sys.vendor[0]) {
+        strncpyz(ds->hw.board.vendor, ds->hw.sys.vendor, sizeof(ds->hw.board.vendor) - 1);
+    }
+
+    // Clean up fields
+    dmi_clean_field(ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
+    dmi_clean_field(ds->hw.product.name, sizeof(ds->hw.product.name));
+    dmi_clean_field(ds->hw.product.version, sizeof(ds->hw.product.version));
+    dmi_clean_field(ds->hw.chassis.type, sizeof(ds->hw.chassis.type));
+    dmi_clean_field(ds->hw.board.name, sizeof(ds->hw.board.name));
+    dmi_clean_field(ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
+    dmi_clean_field(ds->hw.bios.version, sizeof(ds->hw.bios.version));
+    dmi_clean_field(ds->hw.bios.date, sizeof(ds->hw.bios.date));
+
+    IOObjectRelease(platformExpert);
 }
 #elif defined(OS_FREEBSD)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <kenv.h>
+
+static void freebsd_get_sysctl_str(const char *name, char *dst, size_t dst_size) {
+    size_t len = dst_size;
+    if (sysctlbyname(name, dst, &len, NULL, 0) == 0) {
+        dst[len] = '\0';  // Ensure null termination
+        dmi_clean_field(dst, dst_size);
+    } else {
+        dst[0] = '\0';
+    }
+}
+
+static void freebsd_get_kenv_str(const char *name, char *dst, size_t dst_size) {
+    if (kenv(KENV_GET, name, dst, dst_size) == -1) {
+        dst[0] = '\0';
+    } else {
+        dmi_clean_field(dst, dst_size);
+    }
+}
+
 void os_dmi_info(DAEMON_STATUS_FILE *ds) {
-    ;
+    // System information from SMBIOS
+    freebsd_get_sysctl_str("hw.vendor", ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
+    freebsd_get_sysctl_str("hw.product", ds->hw.product.name, sizeof(ds->hw.product.name));
+    freebsd_get_sysctl_str("hw.version", ds->hw.product.version, sizeof(ds->hw.product.version));
+
+    // Try using kenv for additional information
+    freebsd_get_kenv_str("smbios.system.maker", ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
+    freebsd_get_kenv_str("smbios.system.product", ds->hw.product.name, sizeof(ds->hw.product.name));
+    freebsd_get_kenv_str("smbios.system.version", ds->hw.product.version, sizeof(ds->hw.product.version));
+    freebsd_get_kenv_str("smbios.system.sku", ds->hw.product.sku, sizeof(ds->hw.product.sku));
+    freebsd_get_kenv_str("smbios.system.family", ds->hw.product.family, sizeof(ds->hw.product.family));
+
+    // Board information
+    freebsd_get_kenv_str("smbios.planar.maker", ds->hw.board.vendor, sizeof(ds->hw.board.vendor));
+    freebsd_get_kenv_str("smbios.planar.product", ds->hw.board.name, sizeof(ds->hw.board.name));
+    freebsd_get_kenv_str("smbios.planar.version", ds->hw.board.version, sizeof(ds->hw.board.version));
+
+    // BIOS information
+    freebsd_get_kenv_str("smbios.bios.vendor", ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
+    freebsd_get_kenv_str("smbios.bios.version", ds->hw.bios.version, sizeof(ds->hw.bios.version));
+    freebsd_get_kenv_str("smbios.bios.reldate", ds->hw.bios.date, sizeof(ds->hw.bios.date));
+    freebsd_get_kenv_str("smbios.bios.release", ds->hw.bios.release, sizeof(ds->hw.bios.release));
+
+    // Chassis information
+    freebsd_get_kenv_str("smbios.chassis.maker", ds->hw.chassis.vendor, sizeof(ds->hw.chassis.vendor));
+    freebsd_get_kenv_str("smbios.chassis.version", ds->hw.chassis.version, sizeof(ds->hw.chassis.version));
+
+    // Chassis type
+    char chassis_type[16] = "";
+    freebsd_get_kenv_str("smbios.chassis.type", chassis_type, sizeof(chassis_type));
+    if (chassis_type[0]) {
+        int type = atoi(chassis_type);
+        if (type > 0) {
+            snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", type);
+        }
+    }
+
+    // If we couldn't get system information from SMBIOS, try to use model
+    if (!ds->hw.product.name[0]) {
+        freebsd_get_sysctl_str("hw.model", ds->hw.product.name, sizeof(ds->hw.product.name));
+    }
 }
 #elif defined(OS_WINDOWS)
-void os_dmi_info(DAEMON_STATUS_FILE *ds) {
-    ;
+
+#include <windows.h>
+#include <wbemidl.h>
+#include <oleauto.h>
+#include <comdef.h>
+
+#pragma comment(lib, "wbemuuid.lib")
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "oleaut32.lib")
+
+// Helper function to initialize COM and WMI
+static HRESULT windows_init_wmi(IWbemServices **services) {
+    HRESULT hr;
+    IWbemLocator *locator = NULL;
+
+    // Initialize COM
+    hr = CoInitializeEx(0, COINIT_MULTITHREADED);
+    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
+        return hr;
+    }
+
+    // Set security levels
+    hr = CoInitializeSecurity(
+        NULL,
+        -1,
+        NULL,
+        NULL,
+        RPC_C_AUTHN_LEVEL_DEFAULT,
+        RPC_C_IMP_LEVEL_IMPERSONATE,
+        NULL,
+        EOAC_NONE,
+        NULL
+    );
+
+    if (FAILED(hr) && hr != RPC_E_TOO_LATE) {
+        CoUninitialize();
+        return hr;
+    }
+
+    // Create WMI locator
+    hr = CoCreateInstance(
+        &CLSID_WbemLocator,
+        0,
+        CLSCTX_INPROC_SERVER,
+        &IID_IWbemLocator,
+        (LPVOID *)&locator
+    );
+
+    if (FAILED(hr)) {
+        CoUninitialize();
+        return hr;
+    }
+
+    // Connect to WMI namespace
+    hr = locator->lpVtbl->ConnectServer(
+        locator,
+        L"ROOT\\CIMV2",
+        NULL,
+        NULL,
+        0,
+        0,
+        0,
+        NULL,
+        services
+    );
+
+    locator->lpVtbl->Release(locator);
+
+    if (FAILED(hr)) {
+        CoUninitialize();
+        return hr;
+    }
+
+    // Set proxy security
+    hr = CoSetProxyBlanket(
+        (IUnknown *)*services,
+        RPC_C_AUTHN_WINNT,
+        RPC_C_AUTHZ_NONE,
+        NULL,
+        RPC_C_AUTHN_LEVEL_CALL,
+        RPC_C_IMP_LEVEL_IMPERSONATE,
+        NULL,
+        EOAC_NONE
+    );
+
+    if (FAILED(hr)) {
+        (*services)->lpVtbl->Release(*services);
+        CoUninitialize();
+        return hr;
+    }
+
+    return S_OK;
 }
+
+// Helper function to cleanup WMI resources
+static void windows_cleanup_wmi(IWbemServices *services) {
+    if (services) {
+        services->lpVtbl->Release(services);
+    }
+    CoUninitialize();
+}
+
+// Convert BSTR to UTF-8 or ASCII
+static void bstr_to_utf8(BSTR bstr, char *dst, size_t dst_size) {
+    if (!bstr || !dst || dst_size == 0) {
+        if (dst && dst_size > 0)
+            dst[0] = '\0';
+        return;
+    }
+
+    // Get required size for UTF-8 conversion
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, bstr, -1, NULL, 0, NULL, NULL);
+
+    if (size_needed <= 0) {
+        dst[0] = '\0';
+        return;
+    }
+
+    // Perform conversion to UTF-8
+    if (WideCharToMultiByte(CP_UTF8, 0, bstr, -1, dst, dst_size, NULL, NULL) <= 0) {
+        dst[0] = '\0';
+    }
+}
+
+// Helper function to execute a WMI query and retrieve a string property
+static void windows_wmi_query_string(IWbemServices *services, const wchar_t *query,
+                                     const wchar_t *property, char *dst, size_t dst_size) {
+    HRESULT hr;
+    IEnumWbemClassObject *enumerator = NULL;
+    IWbemClassObject *object = NULL;
+    ULONG returned = 0;
+    VARIANT value;
+
+    // Set empty result by default
+    dst[0] = '\0';
+
+    // Execute the WMI query
+    hr = services->lpVtbl->ExecQuery(
+        services,
+        L"WQL",
+        (BSTR)query,
+        WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+        NULL,
+        &enumerator
+    );
+
+    if (FAILED(hr)) {
+        return;
+    }
+
+    // Get the first object
+    hr = enumerator->lpVtbl->Next(enumerator, WBEM_INFINITE, 1, &object, &returned);
+
+    // If we got an object, get the property
+    if (SUCCEEDED(hr) && returned > 0) {
+        VariantInit(&value);
+        hr = object->lpVtbl->Get(object, property, 0, &value, NULL, NULL);
+
+        if (SUCCEEDED(hr) && value.vt == VT_BSTR) {
+            // Convert BSTR to UTF-8
+            bstr_to_utf8(value.bstrVal, dst, dst_size);
+            dmi_clean_field(dst, dst_size);
+        }
+
+        VariantClear(&value);
+        object->lpVtbl->Release(object);
+    }
+
+    enumerator->lpVtbl->Release(enumerator);
+}
+
+// Helper function to get a numeric chassis type from WMI
+static int windows_wmi_get_chassis_type(IWbemServices *services) {
+    HRESULT hr;
+    IEnumWbemClassObject *enumerator = NULL;
+    IWbemClassObject *object = NULL;
+    ULONG returned = 0;
+    VARIANT value;
+    int chassis_type = 0;
+
+    // Execute the WMI query for chassis type
+    hr = services->lpVtbl->ExecQuery(
+        services,
+        L"WQL",
+        L"SELECT ChassisTypes FROM Win32_SystemEnclosure",
+        WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+        NULL,
+        &enumerator
+    );
+
+    if (FAILED(hr)) {
+        return 0;
+    }
+
+    // Get the first object
+    hr = enumerator->lpVtbl->Next(enumerator, WBEM_INFINITE, 1, &object, &returned);
+
+    // If we got an object, get the ChassisTypes property (which is an array)
+    if (SUCCEEDED(hr) && returned > 0) {
+        VariantInit(&value);
+        hr = object->lpVtbl->Get(object, L"ChassisTypes", 0, &value, NULL, NULL);
+
+        if (SUCCEEDED(hr) && value.vt == (VT_ARRAY | VT_I4)) {
+            // Get the first value from the array
+            SAFEARRAY *array = value.parray;
+            long lowerBound, upperBound;
+            SafeArrayGetLBound(array, 1, &lowerBound);
+            SafeArrayGetUBound(array, 1, &upperBound);
+
+            if (lowerBound <= upperBound) {
+                LONG* pData;
+                hr = SafeArrayAccessData(array, (void**)&pData);
+                if (SUCCEEDED(hr)) {
+                    chassis_type = pData[0];
+                    SafeArrayUnaccessData(array);
+                }
+            }
+        }
+
+        VariantClear(&value);
+        object->lpVtbl->Release(object);
+    }
+
+    enumerator->lpVtbl->Release(enumerator);
+    return chassis_type;
+}
+
+// Function to parse a BIOS date in format YYYYMMDD to MM/DD/YYYY
+static void windows_format_bios_date(char *date, size_t date_size) {
+    if (strlen(date) >= 8) {
+        char year[5] = {0};
+        char month[3] = {0};
+        char day[3] = {0};
+
+        // Extract components
+        strncpy(year, date, 4);
+        strncpy(month, date + 4, 2);
+        strncpy(day, date + 6, 2);
+
+        // Create formatted date
+        char formatted[16];
+        snprintf(formatted, sizeof(formatted), "%s/%s/%s", month, day, year);
+
+        strncpyz(date, formatted, date_size - 1);
+    }
+}
+
+void os_dmi_info(DAEMON_STATUS_FILE *ds) {
+    IWbemServices *services = NULL;
+    HRESULT hr = windows_init_wmi(&services);
+
+    if (FAILED(hr)) {
+        // WMI initialization failed, set defaults
+        strncpyz(ds->hw.sys.vendor, "Unknown", sizeof(ds->hw.sys.vendor) - 1);
+        strncpyz(ds->hw.product.name, "Unknown", sizeof(ds->hw.product.name) - 1);
+        return;
+    }
+
+    // System and manufacturer info
+    windows_wmi_query_string(services,
+                             L"SELECT Manufacturer, Model FROM Win32_ComputerSystem",
+                             L"Manufacturer", ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
+
+    windows_wmi_query_string(services,
+                             L"SELECT Manufacturer, Model FROM Win32_ComputerSystem",
+                             L"Model", ds->hw.product.name, sizeof(ds->hw.product.name));
+
+    // Motherboard information
+    windows_wmi_query_string(services,
+                             L"SELECT Manufacturer, Product, Version FROM Win32_BaseBoard",
+                             L"Manufacturer", ds->hw.board.vendor, sizeof(ds->hw.board.vendor));
+
+    windows_wmi_query_string(services,
+                             L"SELECT Manufacturer, Product, Version FROM Win32_BaseBoard",
+                             L"Product", ds->hw.board.name, sizeof(ds->hw.board.name));
+
+    windows_wmi_query_string(services,
+                             L"SELECT Manufacturer, Product, Version FROM Win32_BaseBoard",
+                             L"Version", ds->hw.board.version, sizeof(ds->hw.board.version));
+
+    // BIOS information
+    windows_wmi_query_string(services,
+                             L"SELECT Manufacturer, SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS",
+                             L"Manufacturer", ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
+
+    windows_wmi_query_string(services,
+                             L"SELECT Manufacturer, SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS",
+                             L"SMBIOSBIOSVersion", ds->hw.bios.version, sizeof(ds->hw.bios.version));
+
+    windows_wmi_query_string(services,
+                             L"SELECT Manufacturer, SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS",
+                             L"ReleaseDate", ds->hw.bios.date, sizeof(ds->hw.bios.date));
+
+    // Format BIOS date if needed
+    windows_format_bios_date(ds->hw.bios.date, sizeof(ds->hw.bios.date));
+
+    // Chassis information
+    windows_wmi_query_string(services,
+                             L"SELECT Manufacturer, Version FROM Win32_SystemEnclosure",
+                             L"Manufacturer", ds->hw.chassis.vendor, sizeof(ds->hw.chassis.vendor));
+
+    windows_wmi_query_string(services,
+                             L"SELECT Manufacturer, Version FROM Win32_SystemEnclosure",
+                             L"Version", ds->hw.chassis.version, sizeof(ds->hw.chassis.version));
+
+    // Get chassis type
+    int chassis_type = windows_wmi_get_chassis_type(services);
+    if (chassis_type > 0) {
+        snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", chassis_type);
+    }
+
+    // Additional product information if available
+    windows_wmi_query_string(services,
+                             L"SELECT SKU, Family FROM Win32_ComputerSystem",
+                             L"SKU", ds->hw.product.sku, sizeof(ds->hw.product.sku));
+
+    windows_wmi_query_string(services,
+                             L"SELECT SKU, Family FROM Win32_ComputerSystem",
+                             L"Family", ds->hw.product.family, sizeof(ds->hw.product.family));
+
+    // Cleanup WMI resources
+    windows_cleanup_wmi(services);
+}
+
 #else
 void os_dmi_info(DAEMON_STATUS_FILE *ds) {
     ;
