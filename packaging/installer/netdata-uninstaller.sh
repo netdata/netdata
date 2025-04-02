@@ -452,6 +452,16 @@ portable_del_group() {
     fi
   fi
 
+  # DMS ( Synology )
+  if command -v synogroup 1> /dev/null 2>&1; then
+    if get_group "${groupname}" > /dev/null 2>&1; then
+      run synogroup --del "${groupname}" && return 0
+    else
+      info "Could not find group ${groupname}, nothing to do"
+      return 0
+    fi;
+  fi
+
   error "Group ${groupname} was not automatically removed, you might have to remove it manually"
   return 1
 }
@@ -515,6 +525,11 @@ portable_del_user() {
     run sysadminctl -deleteUser "${username}" && return 0
   fi
 
+  # DMS ( Synology )
+  if command -v synouser 1> /dev/null 2>&1; then
+    run synouser --del "${username}" && return 0
+  fi
+
   error "User ${username} could not be deleted from system, you might have to remove it manually"
   return 1
 }
@@ -553,6 +568,17 @@ portable_del_user_from_group() {
   # mac OS
   if command -v dseditgroup 1> /dev/null 2>&1; then
     run dseditgroup -o delete -u "${username}" "${groupname}" && return 0
+  fi
+
+  # DSM ( Synology )
+  if command -v synogroup 1> /dev/null 2>&1; then
+    # Get current members of the group removing username
+    current_members_list=$(synogroup --get "${groupname}" | grep -v "\[${username}\]" | grep '^[0-9]' )
+    current_members=$(echo "${current_members_list}" | grep -oP '\[\K[^\]]+' | tr '\n' ' ' | sed 's/ $//')
+
+    # Set the new list of members
+    # shellcheck disable=SC2086
+    run synogroup --member "${groupname}" ${current_members} && return 0
   fi
 
   error "Failed to delete user ${username} from group ${groupname} !"
