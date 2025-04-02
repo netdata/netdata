@@ -414,17 +414,14 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
 
 // Helper function to safely convert CF types to C strings
 static void cf_string_to_cstr(CFTypeRef cf_val, char *buffer, size_t buffer_size) {
-    // Initialize buffer to empty string
-    if (!buffer || buffer_size == 0) {
+    if (!buffer || buffer_size == 0)
         return;
-    }
 
     buffer[0] = '\0';
 
     // Safety check for null CF reference
-    if (!cf_val) {
+    if (!cf_val)
         return;
-    }
 
     // Pre-set the last byte to ensure termination even if conversion fails
     buffer[buffer_size - 1] = '\0';
@@ -432,10 +429,10 @@ static void cf_string_to_cstr(CFTypeRef cf_val, char *buffer, size_t buffer_size
     if (CFGetTypeID(cf_val) == CFStringGetTypeID()) {
         CFStringRef str_ref = (CFStringRef)cf_val;
         // Use CFStringGetCString with len-1 to ensure space for null terminator
-        if (!CFStringGetCString(str_ref, buffer, buffer_size - 1, kCFStringEncodingUTF8)) {
+        if (!CFStringGetCString(str_ref, buffer, buffer_size - 1, kCFStringEncodingUTF8))
             buffer[0] = '\0'; // Reset on failure
-        }
-    } else if (CFGetTypeID(cf_val) == CFDataGetTypeID()) {
+    }
+    else if (CFGetTypeID(cf_val) == CFDataGetTypeID()) {
         CFDataRef data_ref = (CFDataRef)cf_val;
         CFIndex length = CFDataGetLength(data_ref);
         if (length > 0 && length < buffer_size - 1) {
@@ -449,13 +446,12 @@ static void cf_string_to_cstr(CFTypeRef cf_val, char *buffer, size_t buffer_size
 }
 
 // Get a string property from an IOKit registry entry safely
-static void get_iokit_string_property(io_registry_entry_t entry, CFStringRef key,
-                                      char *buffer, size_t buffer_size) {
+static void get_iokit_string_property(io_registry_entry_t entry, CFStringRef key, char *buffer, size_t buffer_size) {
     // Initialize buffer to empty
     if (!buffer || buffer_size == 0 || !entry || !key) {
-        if (buffer && buffer_size > 0) {
+        if (buffer && buffer_size > 0)
             buffer[0] = '\0';
-        }
+
         return;
     }
 
@@ -475,9 +471,9 @@ static void get_parent_iokit_string_property(io_registry_entry_t entry, CFString
                                              const io_name_t plane) {
     // Initialize buffer to empty
     if (!buffer || buffer_size == 0 || !entry || !key || !plane) {
-        if (buffer && buffer_size > 0) {
+        if (buffer && buffer_size > 0)
             buffer[0] = '\0';
-        }
+
         return;
     }
 
@@ -496,9 +492,8 @@ static void get_parent_iokit_string_property(io_registry_entry_t entry, CFString
 // Get hardware info from IODeviceTree
 static void get_devicetree_info(DAEMON_STATUS_FILE *ds) {
     // Initialize all relevant fields to empty
-    if (!ds) {
+    if (!ds)
         return;
-    }
 
     ds->hw.product.name[0] = '\0';
     ds->hw.board.name[0] = '\0';
@@ -507,9 +502,8 @@ static void get_devicetree_info(DAEMON_STATUS_FILE *ds) {
 
     // Get the device tree
     io_registry_entry_t device_tree = IORegistryEntryFromPath(kIOMasterPortDefault, "IODeviceTree:/");
-    if (!device_tree) {
+    if (!device_tree)
         return;
-    }
 
     // Get model information - only operate if device_tree is valid
     get_iokit_string_property(device_tree, CFSTR("model"), ds->hw.product.name, sizeof(ds->hw.product.name));
@@ -545,23 +539,14 @@ static void get_devicetree_info(DAEMON_STATUS_FILE *ds) {
 
 // Get hardware info from IOPlatformExpertDevice
 static void get_platform_expert_info(DAEMON_STATUS_FILE *ds) {
-    if (!ds) {
+    if (!ds)
         return;
-    }
-
-    // Initialize relevant fields if not already set
-    if (ds->hw.sys.vendor[0] == '\0') ds->hw.sys.vendor[0] = '\0';
-    if (ds->hw.product.name[0] == '\0') ds->hw.product.name[0] = '\0';
-    if (ds->hw.product.version[0] == '\0') ds->hw.product.version[0] = '\0';
-    if (ds->hw.board.name[0] == '\0') ds->hw.board.name[0] = '\0';
-    if (ds->hw.chassis.type[0] == '\0') ds->hw.chassis.type[0] = '\0';
 
     io_registry_entry_t platform_expert = IORegistryEntryFromPath(
         kIOMasterPortDefault, "IOService:/IOResources/IOPlatformExpertDevice");
 
-    if (!platform_expert) {
+    if (!platform_expert)
         return;
-    }
 
     // System vendor - almost always "Apple Inc." for Macs
     get_iokit_string_property(platform_expert, CFSTR("manufacturer"),
@@ -589,30 +574,26 @@ static void get_platform_expert_info(DAEMON_STATUS_FILE *ds) {
 
     // Set chassis type based on device_type safely
     if (device_type[0]) {
-        if (strcasestr(device_type, "laptop") || strcasestr(device_type, "book")) {
+        if (strcasestr(device_type, "laptop") || strcasestr(device_type, "book"))
             safecpy(ds->hw.chassis.type, "9");
-        } else if (strcasestr(device_type, "server")) {
+        else if (strcasestr(device_type, "server"))
             safecpy(ds->hw.chassis.type, "17");
-        } else if (strcasestr(device_type, "imac")) {
+        else if (strcasestr(device_type, "imac"))
             safecpy(ds->hw.chassis.type, "13");
-        } else if (strcasestr(device_type, "mac")) {
+        else if (strcasestr(device_type, "mac"))
             safecpy(ds->hw.chassis.type, "3");
-        }
     }
 
     // If chassis type not set, guess based on product name
     if (!ds->hw.chassis.type[0] && ds->hw.product.name[0]) {
-        if (strcasestr(ds->hw.product.name, "book")) {
+        if (strcasestr(ds->hw.product.name, "book"))
             safecpy(ds->hw.chassis.type, "9");
-        } else if (strcasestr(ds->hw.product.name, "imac")) {
+        else if (strcasestr(ds->hw.product.name, "imac"))
             safecpy(ds->hw.chassis.type, "13");
-        } else if (strcasestr(ds->hw.product.name, "mac") &&
-                   strcasestr(ds->hw.product.name, "pro")) {
+        else if (strcasestr(ds->hw.product.name, "mac") && strcasestr(ds->hw.product.name, "pro"))
             safecpy(ds->hw.chassis.type, "3");
-        } else if (strcasestr(ds->hw.product.name, "mac") &&
-                   strcasestr(ds->hw.product.name, "mini")) {
+        else if (strcasestr(ds->hw.product.name, "mac") && strcasestr(ds->hw.product.name, "mini"))
             safecpy(ds->hw.chassis.type, "35");
-        }
     }
 
     IOObjectRelease(platform_expert);
@@ -620,14 +601,8 @@ static void get_platform_expert_info(DAEMON_STATUS_FILE *ds) {
 
 // Get SMC revision and system firmware info
 static void get_firmware_info(DAEMON_STATUS_FILE *ds) {
-    if (!ds) {
+    if (!ds)
         return;
-    }
-
-    // Initialize fields if not already set
-    if (ds->hw.bios.version[0] == '\0') ds->hw.bios.version[0] = '\0';
-    if (ds->hw.bios.vendor[0] == '\0') ds->hw.bios.vendor[0] = '\0';
-    if (ds->hw.bios.date[0] == '\0') ds->hw.bios.date[0] = '\0';
 
     io_registry_entry_t smc = IOServiceGetMatchingService(
         kIOMasterPortDefault, IOServiceMatching("AppleSMC"));
@@ -680,38 +655,31 @@ static void get_firmware_info(DAEMON_STATUS_FILE *ds) {
 
 // Get system hardware information using sysctl
 static void get_sysctl_info(DAEMON_STATUS_FILE *ds) {
-    if (!ds) {
+    if (!ds)
         return;
-    }
 
     // Get model identifier using sysctl if not already set
     if (!ds->hw.product.name[0]) {
-        char model[256] = {0};
+        char model[256] = { 0 };
         size_t len = sizeof(model) - 1;
 
         if (sysctlbyname("hw.model", model, &len, NULL, 0) == 0) {
-            model[len] = '\0'; // Ensure null termination
+            model[len] = '\0';
             safecpy(ds->hw.product.name, model);
             dmi_clean_field(ds->hw.product.name, sizeof(ds->hw.product.name));
 
             // If chassis type is still not set, guess from model
             if (!ds->hw.chassis.type[0]) {
-                if (strncasecmp(model, "MacBook", 7) == 0) {
+                if (strncasecmp(model, "MacBook", 7) == 0)
                     safecpy(ds->hw.chassis.type, "9");
-                } else if (strncasecmp(model, "iMac", 4) == 0) {
+                else if (strncasecmp(model, "iMac", 4) == 0)
                     safecpy(ds->hw.chassis.type, "13");
-                } else if (strncasecmp(model, "Mac", 3) == 0 &&
-                           strcasestr(model, "Pro") != NULL) {
-                    strncpy(ds->hw.chassis.type, "3", sizeof(ds->hw.chassis.type) - 1);
-                    ds->hw.chassis.type[sizeof(ds->hw.chassis.type) - 1] = '\0';
-                } else if (strncasecmp(model, "Mac", 3) == 0 &&
-                           strcasestr(model, "mini") != NULL) {
-                    strncpy(ds->hw.chassis.type, "35", sizeof(ds->hw.chassis.type) - 1);
-                    ds->hw.chassis.type[sizeof(ds->hw.chassis.type) - 1] = '\0';
-                } else {
-                    strncpy(ds->hw.chassis.type, "3", sizeof(ds->hw.chassis.type) - 1); // Default to desktop
-                    ds->hw.chassis.type[sizeof(ds->hw.chassis.type) - 1] = '\0';
-                }
+                else if (strncasecmp(model, "Mac", 3) == 0 && strcasestr(model, "Pro") != NULL)
+                    safecpy(ds->hw.chassis.type, "3");
+                else if (strncasecmp(model, "Mac", 3) == 0 && strcasestr(model, "mini") != NULL)
+                    safecpy(ds->hw.chassis.type, "35");
+                else
+                    safecpy(ds->hw.chassis.type, "3"); // Default to desktop
             }
         }
     }
@@ -724,8 +692,7 @@ static void get_sysctl_info(DAEMON_STATUS_FILE *ds) {
         if (sysctlbyname("machdep.cpu.brand_string", cpu_brand, &len, NULL, 0) == 0) {
             cpu_brand[len] = '\0'; // Ensure null termination
             // Use CPU information as part of board info if not available
-            strncpy(ds->hw.board.name, cpu_brand, sizeof(ds->hw.board.name) - 1);
-            ds->hw.board.name[sizeof(ds->hw.board.name) - 1] = '\0';
+            safecpy(ds->hw.board.name, cpu_brand);
             dmi_clean_field(ds->hw.board.name, sizeof(ds->hw.board.name));
         }
     }
@@ -733,13 +700,10 @@ static void get_sysctl_info(DAEMON_STATUS_FILE *ds) {
 
 // Main function to get hardware info
 void os_dmi_info(DAEMON_STATUS_FILE *ds) {
-    if (!ds) {
-        return;
-    }
+    if (!ds) return;
 
     // Always set Apple as default vendor
-    strncpy(ds->hw.sys.vendor, "Apple", sizeof(ds->hw.sys.vendor) - 1);
-    ds->hw.sys.vendor[sizeof(ds->hw.sys.vendor) - 1] = '\0';
+    safecpy(ds->hw.sys.vendor, "Apple");
 
     // Get info from IOPlatformExpertDevice
     get_platform_expert_info(ds);
@@ -754,28 +718,24 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
     get_sysctl_info(ds);
 
     // Set board vendor to match system vendor if not set
-    if (!ds->hw.board.vendor[0] && ds->hw.sys.vendor[0]) {
-        strncpy(ds->hw.board.vendor, ds->hw.sys.vendor, sizeof(ds->hw.board.vendor) - 1);
-        ds->hw.board.vendor[sizeof(ds->hw.board.vendor) - 1] = '\0';
-    }
+    if (!ds->hw.board.vendor[0] && ds->hw.sys.vendor[0])
+        safecpy(ds->hw.board.vendor, ds->hw.sys.vendor);
 
     // Set chassis vendor to match system vendor if not set
-    if (!ds->hw.chassis.vendor[0] && ds->hw.sys.vendor[0]) {
-        strncpy(ds->hw.chassis.vendor, ds->hw.sys.vendor, sizeof(ds->hw.chassis.vendor) - 1);
-        ds->hw.chassis.vendor[sizeof(ds->hw.chassis.vendor) - 1] = '\0';
-    }
+    if (!ds->hw.chassis.vendor[0] && ds->hw.sys.vendor[0])
+        safecpy(ds->hw.chassis.vendor, ds->hw.sys.vendor);
+
+    // Set bios vendor to match system vendor if not set
+    if (!ds->hw.bios.vendor[0] && ds->hw.sys.vendor[0])
+        safecpy(ds->hw.bios.vendor, ds->hw.sys.vendor);
 
     // Default product name if all methods failed
-    if (!ds->hw.product.name[0]) {
-        strncpy(ds->hw.product.name, "Mac", sizeof(ds->hw.product.name) - 1);
-        ds->hw.product.name[sizeof(ds->hw.product.name) - 1] = '\0';
-    }
+    if (!ds->hw.product.name[0])
+        safecpy(ds->hw.product.name, "Mac");
 
     // Default chassis type if we couldn't determine it
-    if (!ds->hw.chassis.type[0]) {
-        strncpy(ds->hw.chassis.type, "3", sizeof(ds->hw.chassis.type) - 1); // Desktop
-        ds->hw.chassis.type[sizeof(ds->hw.chassis.type) - 1] = '\0';
-    }
+    if (!ds->hw.chassis.type[0])
+        safecpy(ds->hw.chassis.type, "3"); // Desktop
 }
 
 #elif defined(OS_FREEBSD)
@@ -789,16 +749,17 @@ static void freebsd_get_sysctl_str(const char *name, char *dst, size_t dst_size)
     if (sysctlbyname(name, dst, &len, NULL, 0) == 0 && len < dst_size) {
         dst[len] = '\0';  // Ensure null termination
         dmi_clean_field(dst, dst_size);
-    } else {
-        dst[0] = '\0';
     }
+    else
+        dst[0] = '\0';
 }
 
 static void freebsd_get_kenv_str(const char *name, char *dst, size_t dst_size) {
-    if (kenv(KENV_GET, name, dst, dst_size - 1) == -1) {
+    dst[0] = '\0';
+    if (kenv(KENV_GET, name, dst, dst_size - 1) == -1)
         dst[0] = '\0';
-    } else {
-        dst[dst_size - 1] = '\0'; // Force null termination
+    else {
+        dst[dst_size - 1] = '\0';
         dmi_clean_field(dst, dst_size);
     }
 }
@@ -836,15 +797,13 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
     freebsd_get_kenv_str("smbios.chassis.type", chassis_type, sizeof(chassis_type));
     if (chassis_type[0]) {
         int type = atoi(chassis_type);
-        if (type > 0) {
+        if (type > 0)
             snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", type);
-        }
     }
 
     // If we couldn't get system information from SMBIOS, try to use model
-    if (!ds->hw.product.name[0]) {
+    if (!ds->hw.product.name[0])
         freebsd_get_sysctl_str("hw.model", ds->hw.product.name, sizeof(ds->hw.product.name));
-    }
 }
 
 #elif defined(OS_WINDOWS)
@@ -862,17 +821,16 @@ static void windows_read_registry_string(HKEY key_base, const char *subkey_path,
     dst[0] = '\0';
 
     // Open the registry key
-    if (RegOpenKeyExA(key_base, subkey_path, 0, KEY_READ, &key) != ERROR_SUCCESS) {
+    if (RegOpenKeyExA(key_base, subkey_path, 0, KEY_READ, &key) != ERROR_SUCCESS)
         return;
-    }
 
     // Read the registry value
     if (RegQueryValueExA(key, value_name, NULL, &type, (LPBYTE)dst, &size) == ERROR_SUCCESS) {
         if ((type == REG_SZ || type == REG_EXPAND_SZ || type == REG_MULTI_SZ) && size > 0) {
-            // Ensure data is properly null-terminated
-            if (size >= dst_size) {
+
+            if (size >= dst_size)
                 size = dst_size - 1;
-            }
+
             dst[size] = '\0';
             dmi_clean_field(dst, dst_size);
         }
@@ -893,9 +851,8 @@ static char *get_smbios_string(char *start, int index, char *buffer, size_t buff
     buffer[0] = '\0';
 
     // Check if start pointer is within bounds
-    if (start < (char*)smbios_data || start >= (char*)(smbios_data + smbios_size)) {
+    if (start < (char*)smbios_data || start >= (char*)(smbios_data + smbios_size))
         return NULL;
-    }
 
     // Find the indexed string
     char *s = start;
@@ -907,23 +864,21 @@ static char *get_smbios_string(char *start, int index, char *buffer, size_t buff
 
     while (i < index && iterations < MAX_ITERATIONS) {
         // Check if current position is valid
-        if (s < (char*)smbios_data || s >= (char*)(smbios_data + smbios_size - 1)) {
+        if (s < (char*)smbios_data || s >= (char*)(smbios_data + smbios_size - 1))
             return NULL;
-        }
 
         // Find end of current string
         while (*s != '\0') {
-            if (s >= (char*)(smbios_data + smbios_size - 1)) {
+            if (s >= (char*)(smbios_data + smbios_size - 1))
                 return NULL; // Hit end of buffer
-            }
+
             s++;
         }
 
         // Move to next string
         s++;
-        if (*s == '\0') {
+        if (*s == '\0')
             return NULL; // End of strings section
-        }
 
         i++;
         iterations++;
@@ -935,9 +890,9 @@ static char *get_smbios_string(char *start, int index, char *buffer, size_t buff
         size_t j = 0;
         while (j < buffer_size - 1 && *s) {
             // Ensure we're not reading past the end of smbios_data
-            if (s >= (char*)(smbios_data + smbios_size)) {
+            if (s >= (char*)(smbios_data + smbios_size))
                 break;
-            }
+
             buffer[j++] = *s++;
         }
         buffer[j] = '\0';
@@ -954,15 +909,13 @@ static void windows_get_smbios_info(DAEMON_STATUS_FILE *ds) {
 
     // Request SMBIOS data size
     DWORD smbios_size = GetSystemFirmwareTable('RSMB', 0, NULL, 0);
-    if (smbios_size == 0 || smbios_size > 1024*1024) { // Sanity check on size
+    if (smbios_size == 0 || smbios_size > 1024*1024) // Sanity check on size
         return;
-    }
 
     // Allocate memory for SMBIOS data
     smbios_data = (BYTE *)malloc(smbios_size);
-    if (!smbios_data) {
+    if (!smbios_data)
         return;
-    }
 
     // Get the SMBIOS data
     DWORD result = GetSystemFirmwareTable('RSMB', 0, smbios_data, smbios_size);
@@ -992,9 +945,8 @@ static void windows_get_smbios_info(DAEMON_STATUS_FILE *ds) {
         BYTE length = ptr[1];
 
         // Sanity checks
-        if (length < 4 || ptr + length > end_ptr) {
+        if (length < 4 || ptr + length > end_ptr)
             break;
-        }
 
         // Skip if we've already processed this type
         if (visited_types[type]) {
@@ -1003,18 +955,18 @@ static void windows_get_smbios_info(DAEMON_STATUS_FILE *ds) {
             int found_terminator = 0;
 
             while (str_ptr + 1 < end_ptr && !found_terminator) {
-                if (str_ptr[0] == 0 && str_ptr[1] == 0) {
+                if (str_ptr[0] == 0 && str_ptr[1] == 0)
                     found_terminator = 1;
-                }
+
                 str_ptr++;
             }
 
             if (found_terminator) {
                 ptr = str_ptr + 1;
                 continue;
-            } else {
-                break; // Corrupt data
             }
+            else
+                break; // Corrupt data
         }
 
         // Mark this type as visited
@@ -1022,90 +974,76 @@ static void windows_get_smbios_info(DAEMON_STATUS_FILE *ds) {
 
         // Calculate string table offset
         char *string_table = (char*)(ptr + length);
-        if (string_table >= (char*)end_ptr) {
+        if (string_table >= (char*)end_ptr)
             break;
-        }
 
         switch (type) {
             case 0: // BIOS Information
                 if (length >= 18) { // Minimum size for BIOS info
                     // BIOS Vendor (string index at offset 4)
-                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.bios.vendor, temp_str);
-                    }
 
                     // BIOS Version (string index at offset 5)
-                    if (ptr[5] > 0 && get_smbios_string(string_table, ptr[5], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[5] > 0 && get_smbios_string(string_table, ptr[5], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.bios.version, temp_str);
-                    }
 
                     // BIOS Release Date (string index at offset 8)
-                    if (ptr[8] > 0 && get_smbios_string(string_table, ptr[8], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[8] > 0 && get_smbios_string(string_table, ptr[8], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.bios.date, temp_str);
-                    }
                 }
                 break;
 
             case 1: // System Information
                 if (length >= 8) { // Minimum size for System info
                     // Manufacturer (string index at offset 4)
-                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.sys.vendor, temp_str);
-                    }
 
                     // Product Name (string index at offset 5)
-                    if (ptr[5] > 0 && get_smbios_string(string_table, ptr[5], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[5] > 0 && get_smbios_string(string_table, ptr[5], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.product.name, temp_str);
-                    }
 
                     // Version (string index at offset 6)
-                    if (ptr[6] > 0 && get_smbios_string(string_table, ptr[6], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[6] > 0 && get_smbios_string(string_table, ptr[6], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.product.version, temp_str);
-                    }
 
                     // If structure is long enough for family (SMBIOS 2.1+)
-                    if (length >= 25 && ptr[21] > 0 && get_smbios_string(string_table, ptr[21], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (length >= 25 && ptr[21] > 0 && get_smbios_string(string_table, ptr[21], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.product.family, temp_str);
-                    }
                 }
                 break;
 
             case 2: // Baseboard Information
                 if (length >= 8) { // Minimum size for Baseboard info
                     // Manufacturer (string index at offset 4)
-                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.board.vendor, temp_str);
-                    }
 
                     // Product (string index at offset 5)
-                    if (ptr[5] > 0 && get_smbios_string(string_table, ptr[5], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[5] > 0 && get_smbios_string(string_table, ptr[5], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.board.name, temp_str);
-                    }
 
                     // Version (string index at offset 6)
-                    if (ptr[6] > 0 && get_smbios_string(string_table, ptr[6], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[6] > 0 && get_smbios_string(string_table, ptr[6], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.board.version, temp_str);
-                    }
                 }
                 break;
 
             case 3: // Chassis Information
                 if (length >= 9) { // Minimum size for Chassis info
                     // Manufacturer (string index at offset 4)
-                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.chassis.vendor, temp_str);
-                    }
 
                     // Type (numerical value at offset 5)
                     BYTE chassis_type = ptr[5] & 0x7F; // Mask out MSB
-                    if (chassis_type > 0 && chassis_type < 36) { // Valid range check
+                    if (chassis_type > 0 && chassis_type < 36) // Valid range check
                         snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", chassis_type);
-                    }
 
                     // Version (string index at offset 6)
-                    if (ptr[6] > 0 && get_smbios_string(string_table, ptr[6], temp_str, sizeof(temp_str), smbios_data, smbios_size)) {
+                    if (ptr[6] > 0 && get_smbios_string(string_table, ptr[6], temp_str, sizeof(temp_str), smbios_data, smbios_size))
                         safecpy(ds->hw.chassis.version, temp_str);
-                    }
                 }
                 break;
         }
@@ -1119,24 +1057,22 @@ static void windows_get_smbios_info(DAEMON_STATUS_FILE *ds) {
         int string_search_count = 0;
 
         while (str_end + 1 < (char*)end_ptr && !found_term && string_search_count < MAX_STRING_SEARCH) {
-            if (str_end[0] == 0 && str_end[1] == 0) {
+            if (str_end[0] == 0 && str_end[1] == 0)
                 found_term = 1;
-            }
+
             str_end++;
             string_search_count++;
         }
 
-        if (!found_term) {
+        if (!found_term)
             break; // Corrupt data
-        }
 
         // Move to next structure
         ptr = (BYTE*)(str_end + 1);
 
         // Check if we've reached the end of the table
-        if (ptr >= end_ptr || *ptr == 127) {
+        if (ptr >= end_ptr || *ptr == 127)
             break;
-        }
     }
 
     free(smbios_data);
@@ -1214,23 +1150,6 @@ static void windows_get_registry_info(DAEMON_STATUS_FILE *ds) {
 
 // Main function to get hardware information
 void os_dmi_info(DAEMON_STATUS_FILE *ds) {
-    // Initialize all strings to empty for safety
-    ds->hw.sys.vendor[0] = '\0';
-    ds->hw.product.name[0] = '\0';
-    ds->hw.product.version[0] = '\0';
-    ds->hw.product.sku[0] = '\0';
-    ds->hw.product.family[0] = '\0';
-    ds->hw.board.vendor[0] = '\0';
-    ds->hw.board.name[0] = '\0';
-    ds->hw.board.version[0] = '\0';
-    ds->hw.bios.vendor[0] = '\0';
-    ds->hw.bios.version[0] = '\0';
-    ds->hw.bios.date[0] = '\0';
-    ds->hw.bios.release[0] = '\0';
-    ds->hw.chassis.vendor[0] = '\0';
-    ds->hw.chassis.version[0] = '\0';
-    ds->hw.chassis.type[0] = '\0';
-
     // First try SMBIOS data through firmware table API
     windows_get_smbios_info(ds);
 
@@ -1253,15 +1172,6 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
         else {
             safecpy(ds->hw.chassis.type, "3");  // Desktop
         }
-    }
-
-    // Set defaults for missing values
-    if (!ds->hw.sys.vendor[0]) {
-        safecpy(ds->hw.sys.vendor, "Unknown");
-    }
-
-    if (!ds->hw.product.name[0]) {
-        safecpy(ds->hw.product.name, "Unknown");
     }
 }
 
@@ -1286,6 +1196,22 @@ void finalize_vendor_product_vm(DAEMON_STATUS_FILE *ds) {
 }
 
 void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
+    ds->hw.sys.vendor[0] = '\0';
+    ds->hw.product.name[0] = '\0';
+    ds->hw.product.version[0] = '\0';
+    ds->hw.product.sku[0] = '\0';
+    ds->hw.product.family[0] = '\0';
+    ds->hw.board.vendor[0] = '\0';
+    ds->hw.board.name[0] = '\0';
+    ds->hw.board.version[0] = '\0';
+    ds->hw.bios.vendor[0] = '\0';
+    ds->hw.bios.version[0] = '\0';
+    ds->hw.bios.date[0] = '\0';
+    ds->hw.bios.release[0] = '\0';
+    ds->hw.chassis.vendor[0] = '\0';
+    ds->hw.chassis.version[0] = '\0';
+    ds->hw.chassis.type[0] = '\0';
+
     os_dmi_info(ds);
 
     dmi_normalize_vendor_field(ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
