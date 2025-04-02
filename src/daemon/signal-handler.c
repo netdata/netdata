@@ -83,20 +83,20 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
             // log it
             char b[1024];
             size_t len = 0;
-            len = strcatz(b, len, sizeof(b), "SIGNAL HANDLER: received deadly signal: ");
-            len = strcatz(b, len, sizeof(b), signals_waiting[i].name);
+            len = strcatz(b, len, "SIGNAL HANDLER: received deadly signal: ", sizeof(b));
+            len = strcatz(b, len, signals_waiting[i].name, sizeof(b));
             if(sc) {
                 char buf[128];
                 SIGNAL_CODE_2str_h(sc, buf, sizeof(buf));
-                len = strcatz(b, len, sizeof(b), " (");
-                len = strcatz(b, len, sizeof(b), buf);
-                len = strcatz(b, len, sizeof(b), ")");
+                len = strcatz(b, len, " (", sizeof(b));
+                len = strcatz(b, len, buf, sizeof(b));
+                len = strcatz(b, len, ")", sizeof(b));
             }
-            len = strcatz(b, len, sizeof(b), " in thread ");
+            len = strcatz(b, len, " in thread ", sizeof(b));
             print_uint64(&b[len], gettid_cached());
-            len = strcatz(b, len, sizeof(b), " ");
-            len = strcatz(b, len, sizeof(b), nd_thread_tag_async_safe());
-            len = strcatz(b, len, sizeof(b), "!\n");
+            len = strcatz(b, len, " ", sizeof(b));
+            len = strcatz(b, len, nd_thread_tag_async_safe(), sizeof(b));
+            len = strcatz(b, len, "!\n", sizeof(b));
 
             if(write(STDERR_FILENO, b, strlen(b)) == -1) {
                 // nothing to do - we cannot write but there is no way to complain about it

@@ -24,10 +24,10 @@ static bool status_file_io_check(const char *directory, const char *filename, ch
         return false;
 
     size_t len = 0;
-    len = strcatz(dst, len, dst_size, directory);
+    len = strcatz(dst, len, directory, dst_size);
     if(!len || dst[len - 1] != '/')
-        len = strcatz(dst, len, dst_size, "/");
-    len = strcatz(dst, len, dst_size, filename);
+        len = strcatz(dst, len, "/", dst_size);
+    len = strcatz(dst, len, filename, dst_size);
 
     // Get file metadata
     OS_FILE_METADATA metadata = os_get_file_metadata(dst);
@@ -54,10 +54,10 @@ static void status_file_io_remove_obsolete(const char *protected_dir, const char
             continue;
 
         size_t len = 0;
-        len = strcatz(dst, len, sizeof(dst), status_file_io_fallback_dirs[i]);
+        len = strcatz(dst, len, status_file_io_fallback_dirs[i], sizeof(dst));
         if(!len || dst[len - 1] != '/')
-            len = strcatz(dst, len, sizeof(dst), "/");
-        len = strcatz(dst, len, sizeof(dst), filename);
+            len = strcatz(dst, len, "/", sizeof(dst));
+        len = strcatz(dst, len, filename, sizeof(dst));
 
         unlink(dst);
     }

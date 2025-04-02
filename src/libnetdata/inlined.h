@@ -422,7 +422,7 @@ static inline char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1
 
 // append src to dst, but only if there is space for it
 // dst is always null terminated
-static inline size_t strcatz(char *dst, size_t len, size_t size, const char *src) {
+static inline size_t strcatz(char *dst, size_t len, const char *src, size_t size) {
     // If starting offset is out of bounds, do nothing.
     if (len >= size) {
         dst[size - 1] = '\0';
