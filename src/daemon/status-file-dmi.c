@@ -577,326 +577,331 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
 #elif defined(OS_WINDOWS)
 
 #include <windows.h>
-#include <wbemidl.h>
-#include <oleauto.h>
-#include <comdef.h>
 
-#pragma comment(lib, "wbemuuid.lib")
-#pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "oleaut32.lib")
+// Since we can't use WMI directly in C mode, we'll use registry queries
+// and the GetSystemFirmwareTable API for SMBIOS data
 
-// Helper function to initialize COM and WMI
-static HRESULT windows_init_wmi(IWbemServices **services) {
-    HRESULT hr;
-    IWbemLocator *locator = NULL;
+// Helper function to read a registry string value
+static void windows_read_registry_string(HKEY key_base, const char *subkey_path,
+                                         const char *value_name, char *dst, size_t dst_size) {
+    HKEY key;
+    DWORD type;
+    DWORD size = dst_size;
 
-    // Initialize COM
-    hr = CoInitializeEx(0, COINIT_MULTITHREADED);
-    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
-        return hr;
-    }
-
-    // Set security levels
-    hr = CoInitializeSecurity(
-        NULL,
-        -1,
-        NULL,
-        NULL,
-        RPC_C_AUTHN_LEVEL_DEFAULT,
-        RPC_C_IMP_LEVEL_IMPERSONATE,
-        NULL,
-        EOAC_NONE,
-        NULL
-    );
-
-    if (FAILED(hr) && hr != RPC_E_TOO_LATE) {
-        CoUninitialize();
-        return hr;
-    }
-
-    // Create WMI locator
-    hr = CoCreateInstance(
-        &CLSID_WbemLocator,
-        0,
-        CLSCTX_INPROC_SERVER,
-        &IID_IWbemLocator,
-        (LPVOID *)&locator
-    );
-
-    if (FAILED(hr)) {
-        CoUninitialize();
-        return hr;
-    }
-
-    // Connect to WMI namespace
-    hr = locator->lpVtbl->ConnectServer(
-        locator,
-        L"ROOT\\CIMV2",
-        NULL,
-        NULL,
-        0,
-        0,
-        0,
-        NULL,
-        services
-    );
-
-    locator->lpVtbl->Release(locator);
-
-    if (FAILED(hr)) {
-        CoUninitialize();
-        return hr;
-    }
-
-    // Set proxy security
-    hr = CoSetProxyBlanket(
-        (IUnknown *)*services,
-        RPC_C_AUTHN_WINNT,
-        RPC_C_AUTHZ_NONE,
-        NULL,
-        RPC_C_AUTHN_LEVEL_CALL,
-        RPC_C_IMP_LEVEL_IMPERSONATE,
-        NULL,
-        EOAC_NONE
-    );
-
-    if (FAILED(hr)) {
-        (*services)->lpVtbl->Release(*services);
-        CoUninitialize();
-        return hr;
-    }
-
-    return S_OK;
-}
-
-// Helper function to cleanup WMI resources
-static void windows_cleanup_wmi(IWbemServices *services) {
-    if (services) {
-        services->lpVtbl->Release(services);
-    }
-    CoUninitialize();
-}
-
-// Convert BSTR to UTF-8 or ASCII
-static void bstr_to_utf8(BSTR bstr, char *dst, size_t dst_size) {
-    if (!bstr || !dst || dst_size == 0) {
-        if (dst && dst_size > 0)
-            dst[0] = '\0';
-        return;
-    }
-
-    // Get required size for UTF-8 conversion
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, bstr, -1, NULL, 0, NULL, NULL);
-
-    if (size_needed <= 0) {
-        dst[0] = '\0';
-        return;
-    }
-
-    // Perform conversion to UTF-8
-    if (WideCharToMultiByte(CP_UTF8, 0, bstr, -1, dst, dst_size, NULL, NULL) <= 0) {
-        dst[0] = '\0';
-    }
-}
-
-// Helper function to execute a WMI query and retrieve a string property
-static void windows_wmi_query_string(IWbemServices *services, const wchar_t *query,
-                                     const wchar_t *property, char *dst, size_t dst_size) {
-    HRESULT hr;
-    IEnumWbemClassObject *enumerator = NULL;
-    IWbemClassObject *object = NULL;
-    ULONG returned = 0;
-    VARIANT value;
-
-    // Set empty result by default
+    // Initialize the output buffer
     dst[0] = '\0';
 
-    // Execute the WMI query
-    hr = services->lpVtbl->ExecQuery(
-        services,
-        L"WQL",
-        (BSTR)query,
-        WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
-        NULL,
-        &enumerator
-    );
-
-    if (FAILED(hr)) {
+    // Open the registry key
+    if (RegOpenKeyExA(key_base, subkey_path, 0, KEY_READ, &key) != ERROR_SUCCESS) {
         return;
     }
 
-    // Get the first object
-    hr = enumerator->lpVtbl->Next(enumerator, WBEM_INFINITE, 1, &object, &returned);
-
-    // If we got an object, get the property
-    if (SUCCEEDED(hr) && returned > 0) {
-        VariantInit(&value);
-        hr = object->lpVtbl->Get(object, property, 0, &value, NULL, NULL);
-
-        if (SUCCEEDED(hr) && value.vt == VT_BSTR) {
-            // Convert BSTR to UTF-8
-            bstr_to_utf8(value.bstrVal, dst, dst_size);
+    // Read the registry value
+    if (RegQueryValueExA(key, value_name, NULL, &type, (LPBYTE)dst, &size) == ERROR_SUCCESS) {
+        if (type == REG_SZ || type == REG_EXPAND_SZ || type == REG_MULTI_SZ) {
+            // Ensure null termination
+            if (size > 0 && size <= dst_size) {
+                dst[size - 1] = '\0';
+            }
             dmi_clean_field(dst, dst_size);
+        } else {
+            // Not a string type
+            dst[0] = '\0';
         }
-
-        VariantClear(&value);
-        object->lpVtbl->Release(object);
     }
 
-    enumerator->lpVtbl->Release(enumerator);
+    RegCloseKey(key);
 }
 
-// Helper function to get a numeric chassis type from WMI
-static int windows_wmi_get_chassis_type(IWbemServices *services) {
-    HRESULT hr;
-    IEnumWbemClassObject *enumerator = NULL;
-    IWbemClassObject *object = NULL;
-    ULONG returned = 0;
-    VARIANT value;
-    int chassis_type = 0;
+// Helper to read SMBIOS data
+static void windows_get_smbios_info(DAEMON_STATUS_FILE *ds) {
+    // Request SMBIOS data from the firmware tables
+    DWORD smbios_size = GetSystemFirmwareTable('RSMB', 0, NULL, 0);
 
-    // Execute the WMI query for chassis type
-    hr = services->lpVtbl->ExecQuery(
-        services,
-        L"WQL",
-        L"SELECT ChassisTypes FROM Win32_SystemEnclosure",
-        WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
-        NULL,
-        &enumerator
-    );
-
-    if (FAILED(hr)) {
-        return 0;
+    if (smbios_size == 0) {
+        return;  // SMBIOS data not available
     }
 
-    // Get the first object
-    hr = enumerator->lpVtbl->Next(enumerator, WBEM_INFINITE, 1, &object, &returned);
+    BYTE *smbios_data = malloc(smbios_size);
+    if (!smbios_data) {
+        return;  // Memory allocation failed
+    }
 
-    // If we got an object, get the ChassisTypes property (which is an array)
-    if (SUCCEEDED(hr) && returned > 0) {
-        VariantInit(&value);
-        hr = object->lpVtbl->Get(object, L"ChassisTypes", 0, &value, NULL, NULL);
+    // Get the SMBIOS data
+    DWORD result = GetSystemFirmwareTable('RSMB', 0, smbios_data, smbios_size);
+    if (result == 0) {
+        free(smbios_data);
+        return;  // Failed to get SMBIOS data
+    }
 
-        if (SUCCEEDED(hr) && value.vt == (VT_ARRAY | VT_I4)) {
-            // Get the first value from the array
-            SAFEARRAY *array = value.parray;
-            long lowerBound, upperBound;
-            SafeArrayGetLBound(array, 1, &lowerBound);
-            SafeArrayGetUBound(array, 1, &upperBound);
+    // The SMBIOS data structure is complex and requires careful parsing
+    // For simplicity, we'll extract basic information for now
 
-            if (lowerBound <= upperBound) {
-                LONG* pData;
-                hr = SafeArrayAccessData(array, (void**)&pData);
-                if (SUCCEEDED(hr)) {
-                    chassis_type = pData[0];
-                    SafeArrayUnaccessData(array);
-                }
+    // SMBIOS header is at the beginning
+    BYTE *ptr = smbios_data;
+
+    // Skip the header to get to the table data
+    ptr += 8;  // Size of SMBIOS header
+
+    // Parse the SMBIOS tables
+    // This is a simplified approach - a full parser would need to handle all DMI structures
+
+    while ((ptr - smbios_data) < smbios_size) {
+        BYTE type = *ptr;
+        BYTE length = *(ptr + 1);
+
+        if (type == 0 && length >= 8) {  // BIOS Information
+            // BIOS Vendor is typically the first string after the formatted structure
+            char *vendor = (char *)(ptr + length);
+            if (vendor[0] != '\0') {
+                strncpyz(ds->hw.bios.vendor, vendor, sizeof(ds->hw.bios.vendor) - 1);
+                dmi_clean_field(ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
+            }
+
+            // BIOS Version is the second string
+            char *version = vendor;
+            while (*version != '\0') version++;
+            version++;
+            if (*version != '\0') {
+                strncpyz(ds->hw.bios.version, version, sizeof(ds->hw.bios.version) - 1);
+                dmi_clean_field(ds->hw.bios.version, sizeof(ds->hw.bios.version));
+            }
+
+            // BIOS Release Date is the third string
+            char *date = version;
+            while (*date != '\0') date++;
+            date++;
+            if (*date != '\0') {
+                strncpyz(ds->hw.bios.date, date, sizeof(ds->hw.bios.date) - 1);
+                dmi_clean_field(ds->hw.bios.date, sizeof(ds->hw.bios.date));
+            }
+        }
+        else if (type == 1 && length >= 8) {  // System Information
+            // System Manufacturer is the first string
+            char *manufacturer = (char *)(ptr + length);
+            if (manufacturer[0] != '\0') {
+                strncpyz(ds->hw.sys.vendor, manufacturer, sizeof(ds->hw.sys.vendor) - 1);
+                dmi_clean_field(ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
+            }
+
+            // Product Name is the second string
+            char *product = manufacturer;
+            while (*product != '\0') product++;
+            product++;
+            if (*product != '\0') {
+                strncpyz(ds->hw.product.name, product, sizeof(ds->hw.product.name) - 1);
+                dmi_clean_field(ds->hw.product.name, sizeof(ds->hw.product.name));
+            }
+
+            // Version is the third string
+            char *version = product;
+            while (*version != '\0') version++;
+            version++;
+            if (*version != '\0') {
+                strncpyz(ds->hw.product.version, version, sizeof(ds->hw.product.version) - 1);
+                dmi_clean_field(ds->hw.product.version, sizeof(ds->hw.product.version));
+            }
+
+            // Serial number is the fourth string (skip)
+            char *serial = version;
+            while (*serial != '\0') serial++;
+            serial++;
+
+            // SKU is the fifth string
+            char *sku = serial;
+            while (*sku != '\0') sku++;
+            sku++;
+            if (*sku != '\0') {
+                strncpyz(ds->hw.product.sku, sku, sizeof(ds->hw.product.sku) - 1);
+                dmi_clean_field(ds->hw.product.sku, sizeof(ds->hw.product.sku));
+            }
+
+            // Family is the sixth string
+            char *family = sku;
+            while (*family != '\0') family++;
+            family++;
+            if (*family != '\0') {
+                strncpyz(ds->hw.product.family, family, sizeof(ds->hw.product.family) - 1);
+                dmi_clean_field(ds->hw.product.family, sizeof(ds->hw.product.family));
+            }
+        }
+        else if (type == 2 && length >= 8) {  // Baseboard Information
+            // Board Manufacturer is the first string
+            char *manufacturer = (char *)(ptr + length);
+            if (manufacturer[0] != '\0') {
+                strncpyz(ds->hw.board.vendor, manufacturer, sizeof(ds->hw.board.vendor) - 1);
+                dmi_clean_field(ds->hw.board.vendor, sizeof(ds->hw.board.vendor));
+            }
+
+            // Board Product Name is the second string
+            char *product = manufacturer;
+            while (*product != '\0') product++;
+            product++;
+            if (*product != '\0') {
+                strncpyz(ds->hw.board.name, product, sizeof(ds->hw.board.name) - 1);
+                dmi_clean_field(ds->hw.board.name, sizeof(ds->hw.board.name));
+            }
+
+            // Board Version is the third string
+            char *version = product;
+            while (*version != '\0') version++;
+            version++;
+            if (*version != '\0') {
+                strncpyz(ds->hw.board.version, version, sizeof(ds->hw.board.version) - 1);
+                dmi_clean_field(ds->hw.board.version, sizeof(ds->hw.board.version));
+            }
+        }
+        else if (type == 3 && length >= 8) {  // Chassis Information
+            // Type is at offset 5
+            BYTE chassis_type = *(ptr + 5) & 0x7F;  // Mask out MSB
+            snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", chassis_type);
+
+            // Manufacturer is the first string
+            char *manufacturer = (char *)(ptr + length);
+            if (manufacturer[0] != '\0') {
+                strncpyz(ds->hw.chassis.vendor, manufacturer, sizeof(ds->hw.chassis.vendor) - 1);
+                dmi_clean_field(ds->hw.chassis.vendor, sizeof(ds->hw.chassis.vendor));
+            }
+
+            // Version is the third string (skip the second which is usually asset tag)
+            char *version = manufacturer;
+            while (*version != '\0') version++;
+            version++; // Skip first terminator
+            while (*version != '\0') version++;
+            version++; // Skip second terminator
+
+            if (*version != '\0') {
+                strncpyz(ds->hw.chassis.version, version, sizeof(ds->hw.chassis.version) - 1);
+                dmi_clean_field(ds->hw.chassis.version, sizeof(ds->hw.chassis.version));
             }
         }
 
-        VariantClear(&value);
-        object->lpVtbl->Release(object);
+        // Find the end of the strings section (double null terminator)
+        char *strings_end = (char *)(ptr + length);
+        while (!(strings_end[0] == '\0' && strings_end[1] == '\0')) {
+            strings_end++;
+            if ((BYTE *)strings_end - smbios_data >= smbios_size - 1) {
+                break;  // Avoid buffer overrun
+            }
+        }
+
+        // Move to the next structure
+        ptr = (BYTE *)(strings_end + 2);
+
+        // Check if we've reached the end of the table
+        if (ptr - smbios_data >= smbios_size || *ptr == 127) {
+            break;
+        }
     }
 
-    enumerator->lpVtbl->Release(enumerator);
-    return chassis_type;
+    free(smbios_data);
 }
 
-// Function to parse a BIOS date in format YYYYMMDD to MM/DD/YYYY
-static void windows_format_bios_date(char *date, size_t date_size) {
-    if (strlen(date) >= 8) {
-        char year[5] = {0};
-        char month[3] = {0};
-        char day[3] = {0};
+// Fallback method using registry for cases where SMBIOS data is not available
+static void windows_get_registry_info(DAEMON_STATUS_FILE *ds) {
+    // System manufacturer and model from registry
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "SystemManufacturer",
+        ds->hw.sys.vendor,
+        sizeof(ds->hw.sys.vendor)
+    );
 
-        // Extract components
-        strncpy(year, date, 4);
-        strncpy(month, date + 4, 2);
-        strncpy(day, date + 6, 2);
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "SystemProductName",
+        ds->hw.product.name,
+        sizeof(ds->hw.product.name)
+    );
 
-        // Create formatted date
-        char formatted[16];
-        snprintf(formatted, sizeof(formatted), "%s/%s/%s", month, day, year);
+    // BIOS information
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "BIOSVendor",
+        ds->hw.bios.vendor,
+        sizeof(ds->hw.bios.vendor)
+    );
 
-        strncpyz(date, formatted, date_size - 1);
-    }
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "BIOSVersion",
+        ds->hw.bios.version,
+        sizeof(ds->hw.bios.version)
+    );
+
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "BIOSReleaseDate",
+        ds->hw.bios.date,
+        sizeof(ds->hw.bios.date)
+    );
+
+    // Board information
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "BaseBoardManufacturer",
+        ds->hw.board.vendor,
+        sizeof(ds->hw.board.vendor)
+    );
+
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "BaseBoardProduct",
+        ds->hw.board.name,
+        sizeof(ds->hw.board.name)
+    );
+
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "BaseBoardVersion",
+        ds->hw.board.version,
+        sizeof(ds->hw.board.version)
+    );
 }
 
 void os_dmi_info(DAEMON_STATUS_FILE *ds) {
-    IWbemServices *services = NULL;
-    HRESULT hr = windows_init_wmi(&services);
+    // First try SMBIOS data through firmware table API
+    windows_get_smbios_info(ds);
 
-    if (FAILED(hr)) {
-        // WMI initialization failed, set defaults
+    // If we couldn't get all the data, try registry as a fallback
+    if (!ds->hw.sys.vendor[0] || !ds->hw.product.name[0]) {
+        windows_get_registry_info(ds);
+    }
+
+    // If chassis type is not set or not a valid number, try to determine it
+    if (!ds->hw.chassis.type[0] || atoi(ds->hw.chassis.type) <= 0) {
+        // Check common system names for laptops
+        if (strcasestr(ds->hw.product.name, "notebook") != NULL ||
+            strcasestr(ds->hw.product.name, "laptop") != NULL ||
+            strcasestr(ds->hw.product.name, "book") != NULL) {
+            strncpyz(ds->hw.chassis.type, "9", sizeof(ds->hw.chassis.type) - 1);  // Laptop
+        }
+        // Check for servers
+        else if (strcasestr(ds->hw.product.name, "server") != NULL) {
+            strncpyz(ds->hw.chassis.type, "17", sizeof(ds->hw.chassis.type) - 1);  // Server
+        }
+        // Default to desktop
+        else {
+            strncpyz(ds->hw.chassis.type, "3", sizeof(ds->hw.chassis.type) - 1);  // Desktop
+        }
+    }
+
+    // Set defaults for missing values
+    if (!ds->hw.sys.vendor[0]) {
         strncpyz(ds->hw.sys.vendor, "Unknown", sizeof(ds->hw.sys.vendor) - 1);
+    }
+
+    if (!ds->hw.product.name[0]) {
         strncpyz(ds->hw.product.name, "Unknown", sizeof(ds->hw.product.name) - 1);
-        return;
     }
-
-    // System and manufacturer info
-    windows_wmi_query_string(services,
-                             L"SELECT Manufacturer, Model FROM Win32_ComputerSystem",
-                             L"Manufacturer", ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
-
-    windows_wmi_query_string(services,
-                             L"SELECT Manufacturer, Model FROM Win32_ComputerSystem",
-                             L"Model", ds->hw.product.name, sizeof(ds->hw.product.name));
-
-    // Motherboard information
-    windows_wmi_query_string(services,
-                             L"SELECT Manufacturer, Product, Version FROM Win32_BaseBoard",
-                             L"Manufacturer", ds->hw.board.vendor, sizeof(ds->hw.board.vendor));
-
-    windows_wmi_query_string(services,
-                             L"SELECT Manufacturer, Product, Version FROM Win32_BaseBoard",
-                             L"Product", ds->hw.board.name, sizeof(ds->hw.board.name));
-
-    windows_wmi_query_string(services,
-                             L"SELECT Manufacturer, Product, Version FROM Win32_BaseBoard",
-                             L"Version", ds->hw.board.version, sizeof(ds->hw.board.version));
-
-    // BIOS information
-    windows_wmi_query_string(services,
-                             L"SELECT Manufacturer, SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS",
-                             L"Manufacturer", ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
-
-    windows_wmi_query_string(services,
-                             L"SELECT Manufacturer, SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS",
-                             L"SMBIOSBIOSVersion", ds->hw.bios.version, sizeof(ds->hw.bios.version));
-
-    windows_wmi_query_string(services,
-                             L"SELECT Manufacturer, SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS",
-                             L"ReleaseDate", ds->hw.bios.date, sizeof(ds->hw.bios.date));
-
-    // Format BIOS date if needed
-    windows_format_bios_date(ds->hw.bios.date, sizeof(ds->hw.bios.date));
-
-    // Chassis information
-    windows_wmi_query_string(services,
-                             L"SELECT Manufacturer, Version FROM Win32_SystemEnclosure",
-                             L"Manufacturer", ds->hw.chassis.vendor, sizeof(ds->hw.chassis.vendor));
-
-    windows_wmi_query_string(services,
-                             L"SELECT Manufacturer, Version FROM Win32_SystemEnclosure",
-                             L"Version", ds->hw.chassis.version, sizeof(ds->hw.chassis.version));
-
-    // Get chassis type
-    int chassis_type = windows_wmi_get_chassis_type(services);
-    if (chassis_type > 0) {
-        snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", chassis_type);
-    }
-
-    // Additional product information if available
-    windows_wmi_query_string(services,
-                             L"SELECT SKU, Family FROM Win32_ComputerSystem",
-                             L"SKU", ds->hw.product.sku, sizeof(ds->hw.product.sku));
-
-    windows_wmi_query_string(services,
-                             L"SELECT SKU, Family FROM Win32_ComputerSystem",
-                             L"Family", ds->hw.product.family, sizeof(ds->hw.product.family));
-
-    // Cleanup WMI resources
-    windows_cleanup_wmi(services);
 }
 
 #else
