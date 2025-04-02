@@ -839,243 +839,372 @@ static void windows_read_registry_string(HKEY key_base, const char *subkey_path,
     RegCloseKey(key);
 }
 
-// Helper to safely parse SMBIOS strings
-static char *get_smbios_string(char *start, int index, char *buffer, size_t buffer_size,
-                               BYTE *smbios_data, DWORD smbios_size) {
-    if (!start || !buffer || buffer_size == 0 || index <= 0) {
-        buffer[0] = '\0';
+// SMBIOS structure header definition
+typedef struct {
+    uint8_t type;
+    uint8_t length;
+    uint16_t handle;
+    // Remaining fields are variable
+} smbios_header_t;
+
+// SMBIOS data container
+typedef struct {
+    BYTE *data;           // The raw SMBIOS data buffer
+    DWORD size;           // Size of the data buffer
+    DWORD entries_count;  // Number of valid structure entries found
+    bool valid;           // Whether the data is valid
+} smbios_data_t;
+
+// Helper to safely parse SMBIOS strings with improved bounds checking
+static char *get_smbios_string(const BYTE *table_start, DWORD table_size, 
+                             const char *string_start, uint8_t index, 
+                             char *buffer, size_t buffer_size) {
+    if (!string_start || !buffer || buffer_size == 0 || index == 0) {
+        if (buffer && buffer_size > 0)
+            buffer[0] = '\0';
         return NULL;
     }
-
-    // Initialize buffer
+    
     buffer[0] = '\0';
-
-    // Check if start pointer is within bounds
-    if (start < (char*)smbios_data || start >= (char*)(smbios_data + smbios_size))
+    
+    // Check if string_start is within bounds of the table
+    if (string_start < (const char*)table_start || 
+        string_start >= (const char*)(table_start + table_size)) {
         return NULL;
-
-    // Find the indexed string
-    char *s = start;
-    int i = 1; // SMBIOS strings are 1-based
-
-    // Maximum limit to prevent infinite loops with corrupted data
+    }
+    
+    // Navigate to the indexed string
+    const char *s = string_start;
+    const char *end = (const char*)(table_start + table_size);
+    uint8_t current_index = 1;
+    
+    // Set a reasonable limit to prevent infinite loops with corrupted data
     const int MAX_ITERATIONS = 100;
     int iterations = 0;
-
-    while (i < index && iterations < MAX_ITERATIONS) {
-        // Check if current position is valid
-        if (s < (char*)smbios_data || s >= (char*)(smbios_data + smbios_size - 1))
-            return NULL;
-
-        // Find end of current string
-        while (*s != '\0') {
-            if (s >= (char*)(smbios_data + smbios_size - 1))
-                return NULL; // Hit end of buffer
-
+    
+    while (current_index < index && s < end && iterations < MAX_ITERATIONS) {
+        // Skip to end of current string
+        while (s < end && *s != '\0')
             s++;
-        }
-
-        // Move to next string
-        s++;
-        if (*s == '\0')
-            return NULL; // End of strings section
-
-        i++;
+            
+        // Skip past terminating null
+        if (s < end)
+            s++;
+            
+        // If we hit the end of strings section (double null) or table boundary
+        if (s >= end || *s == '\0')
+            return NULL;
+            
+        current_index++;
         iterations++;
     }
-
-    // If we found the string and it's not empty
-    if (i == index && *s) {
-        // Copy safely with bounds checking
-        size_t j = 0;
-        while (j < buffer_size - 1 && *s) {
-            // Ensure we're not reading past the end of smbios_data
-            if (s >= (char*)(smbios_data + smbios_size))
-                break;
-
-            buffer[j++] = *s++;
+    
+    // If we found our string
+    if (current_index == index && s < end && *s != '\0') {
+        // Copy safely with explicit bounds checking
+        size_t i = 0;
+        while (s < end && *s != '\0' && i < buffer_size - 1) {
+            buffer[i++] = *s++;
         }
-        buffer[j] = '\0';
+        buffer[i] = '\0';
+        
         dmi_clean_field(buffer, buffer_size);
         return buffer;
     }
-
+    
     return NULL;
 }
 
-// Helper to get SMBIOS data
-static void windows_get_smbios_info(DAEMON_STATUS_FILE *ds) {
-    BYTE *smbios_data = NULL;
-
+// Get SMBIOS data with proper memory management
+static smbios_data_t get_smbios_data(void) {
+    smbios_data_t result = {NULL, 0, 0, false};
+    
     // Request SMBIOS data size
-    DWORD smbios_size = GetSystemFirmwareTable('RSMB', 0, NULL, 0);
-    if (smbios_size == 0 || smbios_size > 1024*1024) // Sanity check on size
-        return;
-
-    // Allocate memory for SMBIOS data
-    smbios_data = (BYTE *)malloc(smbios_size);
-    if (!smbios_data)
-        return;
-
+    DWORD size = GetSystemFirmwareTable('RSMB', 0, NULL, 0);
+    if (size == 0 || size > 1024*1024) // Sanity check on size
+        return result;
+        
+    // Allocate memory with zero initialization
+    result.data = (BYTE *)mallocz(size);
+    if (!result.data)
+        return result;
+        
+    result.size = size;
+    
     // Get the SMBIOS data
-    DWORD result = GetSystemFirmwareTable('RSMB', 0, smbios_data, smbios_size);
-    if (result == 0 || result > smbios_size) {
-        free(smbios_data);
-        return;
+    DWORD bytes_read = GetSystemFirmwareTable('RSMB', 0, result.data, result.size);
+    if (bytes_read == 0 || bytes_read > result.size) {
+        freez(result.data);
+        result.data = NULL;
+        result.size = 0;
+        return result;
     }
+    
+    result.valid = true;
+    return result;
+}
 
+// Process BIOS Information (Type 0)
+static void process_smbios_bios_info(const smbios_header_t *header,
+                                  DAEMON_STATUS_FILE *ds,
+                                  const char *string_table,
+                                  const BYTE *smbios_data,
+                                  DWORD smbios_size) {
+    if (header->length < 18) // Minimum size for BIOS info
+        return;
+        
+    const BYTE *data = (const BYTE *)header;
+    char temp_str[256];
+    
+    // BIOS Vendor (string index at offset 4)
+    if (data[4] > 0 && get_smbios_string(smbios_data, smbios_size, string_table, 
+                                     data[4], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.bios.vendor, temp_str);
+    }
+    
+    // BIOS Version (string index at offset 5)
+    if (data[5] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[5], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.bios.version, temp_str);
+    }
+    
+    // BIOS Release Date (string index at offset 8)
+    if (data[8] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[8], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.bios.date, temp_str);
+    }
+}
+
+// Process System Information (Type 1)
+static void process_smbios_system_info(const smbios_header_t *header,
+                                    DAEMON_STATUS_FILE *ds,
+                                    const char *string_table,
+                                    const BYTE *smbios_data,
+                                    DWORD smbios_size) {
+    if (header->length < 8) // Minimum size for System info
+        return;
+        
+    const BYTE *data = (const BYTE *)header;
+    char temp_str[256];
+    
+    // Manufacturer (string index at offset 4)
+    if (data[4] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[4], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.sys.vendor, temp_str);
+    }
+    
+    // Product Name (string index at offset 5)
+    if (data[5] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[5], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.product.name, temp_str);
+    }
+    
+    // Version (string index at offset 6)
+    if (data[6] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[6], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.product.version, temp_str);
+    }
+    
+    // If structure is long enough for family (SMBIOS 2.1+)
+    if (header->length >= 25 && data[21] > 0 && 
+        get_smbios_string(smbios_data, smbios_size, string_table,
+                       data[21], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.product.family, temp_str);
+    }
+}
+
+// Process Baseboard Information (Type 2)
+static void process_smbios_baseboard_info(const smbios_header_t *header,
+                                       DAEMON_STATUS_FILE *ds,
+                                       const char *string_table,
+                                       const BYTE *smbios_data,
+                                       DWORD smbios_size) {
+    if (header->length < 8) // Minimum size for Baseboard info
+        return;
+        
+    const BYTE *data = (const BYTE *)header;
+    char temp_str[256];
+    
+    // Manufacturer (string index at offset 4)
+    if (data[4] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[4], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.board.vendor, temp_str);
+    }
+    
+    // Product (string index at offset 5)
+    if (data[5] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[5], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.board.name, temp_str);
+    }
+    
+    // Version (string index at offset 6)
+    if (data[6] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[6], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.board.version, temp_str);
+    }
+}
+
+// Process Chassis Information (Type 3)
+static void process_smbios_chassis_info(const smbios_header_t *header,
+                                     DAEMON_STATUS_FILE *ds,
+                                     const char *string_table,
+                                     const BYTE *smbios_data,
+                                     DWORD smbios_size) {
+    if (header->length < 9) // Minimum size for Chassis info
+        return;
+        
+    const BYTE *data = (const BYTE *)header;
+    char temp_str[256];
+    
+    // Manufacturer (string index at offset 4)
+    if (data[4] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[4], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.chassis.vendor, temp_str);
+    }
+    
+    // Type (numerical value at offset 5)
+    BYTE chassis_type = data[5] & 0x7F; // Mask out MSB
+    if (chassis_type > 0 && chassis_type < 36) // Valid range check
+        snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", chassis_type);
+    
+    // Version (string index at offset 6)
+    if (data[6] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[6], temp_str, sizeof(temp_str))) {
+        safecpy(ds->hw.chassis.version, temp_str);
+    }
+}
+
+// Process a complete SMBIOS structure
+static void process_smbios_structure(const smbios_header_t *header, 
+                                  DAEMON_STATUS_FILE *ds,
+                                  const char *string_table,
+                                  const BYTE *smbios_data,
+                                  DWORD smbios_size) {
+    switch (header->type) {
+        case 0: // BIOS Information
+            process_smbios_bios_info(header, ds, string_table, smbios_data, smbios_size);
+            break;
+            
+        case 1: // System Information
+            process_smbios_system_info(header, ds, string_table, smbios_data, smbios_size);
+            break;
+            
+        case 2: // Baseboard Information
+            process_smbios_baseboard_info(header, ds, string_table, smbios_data, smbios_size);
+            break;
+            
+        case 3: // Chassis Information
+            process_smbios_chassis_info(header, ds, string_table, smbios_data, smbios_size);
+            break;
+    }
+}
+
+// Parse all SMBIOS structures with robust error handling
+static void parse_smbios_structures(const smbios_data_t smbios, DAEMON_STATUS_FILE *ds) {
+    if (!smbios.valid || !smbios.data || smbios.size < 8)
+        return;
+        
+    // The SMBIOS header is at offset 8
+    const BYTE *current = smbios.data + 8;
+    const BYTE *end = smbios.data + smbios.size;
+    
+    // Track already visited types to avoid duplicates in corrupted tables
+    uint8_t visited[256] = {0};
+    int structures_parsed = 0;
+    
     // Temporary buffer for string parsing
     char temp_str[256];
-
-    // The SMBIOS header is at offset 8
-    if (smbios_size < 8 + 4) { // Need at least header plus structure header
-        free(smbios_data);
-        return;
-    }
-
-    BYTE *ptr = smbios_data + 8;
-    BYTE *end_ptr = smbios_data + smbios_size;
-
-    // Track already visited types to avoid duplicates in corrupted tables
-    unsigned char visited_types[256] = {0};
-
-    // Parse the tables
-    while (ptr + 4 <= end_ptr) { // Need at least type, length, handle
-        BYTE type = ptr[0];
-        BYTE length = ptr[1];
-
-        // Sanity checks
-        if (length < 4 || ptr + length > end_ptr)
-            break;
-
-        // Skip if we've already processed this type
-        if (visited_types[type]) {
-            // Find string terminator (double NULL)
-            BYTE *str_ptr = ptr + length;
-            int found_terminator = 0;
-
-            while (str_ptr + 1 < end_ptr && !found_terminator) {
-                if (str_ptr[0] == 0 && str_ptr[1] == 0)
-                    found_terminator = 1;
-
-                str_ptr++;
+    
+    while (current + sizeof(smbios_header_t) <= end) {
+        const smbios_header_t *header = (const smbios_header_t *)current;
+        
+        // Basic sanity checks
+        if (header->length < sizeof(smbios_header_t) || current + header->length > end) {
+            break; // Invalid structure
+        }
+        
+        // If we've already seen this type and want to skip duplicates
+        if (visited[header->type]) {
+            // Find the string terminator (double NULL)
+            const char *strings = (const char *)(current + header->length);
+            const char *str_end = strings;
+            bool found_terminator = false;
+            
+            // Set a reasonable limit to prevent infinite loops
+            const int MAX_STRING_SEARCH = 1000;
+            int search_count = 0;
+            
+            // Search with explicit bounds check for string terminator
+            while (str_end + 1 < (const char *)end && !found_terminator && search_count < MAX_STRING_SEARCH) {
+                if (str_end[0] == 0 && str_end[1] == 0) {
+                    found_terminator = true;
+                    break;
+                }
+                str_end++;
+                search_count++;
             }
-
+            
             if (found_terminator) {
-                ptr = str_ptr + 1;
+                // Advance to next structure
+                current = (const BYTE *)(str_end + 1);
                 continue;
-            }
-            else
+            } else {
                 break; // Corrupt data
+            }
         }
-
-        // Mark this type as visited
-        visited_types[type] = 1;
-
-        // Calculate string table offset
-        char *string_table = (char*)(ptr + length);
-        if (string_table >= (char*)end_ptr)
-            break;
-
-        switch (type) {
-            case 0: // BIOS Information
-                if (length >= 18) { // Minimum size for BIOS info
-                    // BIOS Vendor (string index at offset 4)
-                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.bios.vendor, temp_str);
-
-                    // BIOS Version (string index at offset 5)
-                    if (ptr[5] > 0 && get_smbios_string(string_table, ptr[5], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.bios.version, temp_str);
-
-                    // BIOS Release Date (string index at offset 8)
-                    if (ptr[8] > 0 && get_smbios_string(string_table, ptr[8], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.bios.date, temp_str);
-                }
-                break;
-
-            case 1: // System Information
-                if (length >= 8) { // Minimum size for System info
-                    // Manufacturer (string index at offset 4)
-                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.sys.vendor, temp_str);
-
-                    // Product Name (string index at offset 5)
-                    if (ptr[5] > 0 && get_smbios_string(string_table, ptr[5], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.product.name, temp_str);
-
-                    // Version (string index at offset 6)
-                    if (ptr[6] > 0 && get_smbios_string(string_table, ptr[6], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.product.version, temp_str);
-
-                    // If structure is long enough for family (SMBIOS 2.1+)
-                    if (length >= 25 && ptr[21] > 0 && get_smbios_string(string_table, ptr[21], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.product.family, temp_str);
-                }
-                break;
-
-            case 2: // Baseboard Information
-                if (length >= 8) { // Minimum size for Baseboard info
-                    // Manufacturer (string index at offset 4)
-                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.board.vendor, temp_str);
-
-                    // Product (string index at offset 5)
-                    if (ptr[5] > 0 && get_smbios_string(string_table, ptr[5], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.board.name, temp_str);
-
-                    // Version (string index at offset 6)
-                    if (ptr[6] > 0 && get_smbios_string(string_table, ptr[6], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.board.version, temp_str);
-                }
-                break;
-
-            case 3: // Chassis Information
-                if (length >= 9) { // Minimum size for Chassis info
-                    // Manufacturer (string index at offset 4)
-                    if (ptr[4] > 0 && get_smbios_string(string_table, ptr[4], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.chassis.vendor, temp_str);
-
-                    // Type (numerical value at offset 5)
-                    BYTE chassis_type = ptr[5] & 0x7F; // Mask out MSB
-                    if (chassis_type > 0 && chassis_type < 36) // Valid range check
-                        snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", chassis_type);
-
-                    // Version (string index at offset 6)
-                    if (ptr[6] > 0 && get_smbios_string(string_table, ptr[6], temp_str, sizeof(temp_str), smbios_data, smbios_size))
-                        safecpy(ds->hw.chassis.version, temp_str);
-                }
-                break;
+        
+        // Mark this type as processed
+        visited[header->type] = 1;
+        structures_parsed++;
+        
+        // Process the structure based on type
+        const char *string_table = (const char *)(current + header->length);
+        if (string_table < (const char *)end) {
+            process_smbios_structure(header, ds, string_table, smbios.data, smbios.size);
         }
-
-        // Find end of strings section (double null terminator)
-        char *str_end = string_table;
-        int found_term = 0;
-
-        // Set a reasonable limit to avoid infinite loops with corrupted data
-        const int MAX_STRING_SEARCH = 10000;
-        int string_search_count = 0;
-
-        while (str_end + 1 < (char*)end_ptr && !found_term && string_search_count < MAX_STRING_SEARCH) {
-            if (str_end[0] == 0 && str_end[1] == 0)
-                found_term = 1;
-
+        
+        // Find string table end (double null terminator)
+        const char *str_end = string_table;
+        bool found_terminator = false;
+        
+        // Set a reasonable limit to prevent infinite loops
+        const int MAX_STRING_SEARCH = 1000;
+        int search_count = 0;
+        
+        // Search for end of strings with explicit bounds check
+        const char *end_char = (const char *)end;
+        while (str_end + 1 < end_char && !found_terminator && search_count < MAX_STRING_SEARCH) {
+            if (str_end[0] == 0 && str_end[1] == 0) {
+                found_terminator = true;
+                break;
+            }
             str_end++;
-            string_search_count++;
+            search_count++;
         }
-
-        if (!found_term)
+        
+        if (!found_terminator) {
             break; // Corrupt data
-
-        // Move to next structure
-        ptr = (BYTE*)(str_end + 1);
-
-        // Check if we've reached the end of the table
-        if (ptr >= end_ptr || *ptr == 127)
+        }
+        
+        // Move to the next structure
+        current = (const BYTE *)(str_end + 1);
+        
+        // Check for end marker or out of bounds
+        if (current >= end || *current == 127)
             break;
     }
-
-    free(smbios_data);
+}
+static void windows_get_smbios_info(DAEMON_STATUS_FILE *ds) {
+    // Get SMBIOS data using our improved container structure
+    smbios_data_t smbios = get_smbios_data();
+    if (!smbios.valid)
+        return;
+        
+    // Process the SMBIOS data with our improved parser
+    parse_smbios_structures(smbios, ds);
+    
+    // Clean up
+    freez(smbios.data);
 }
 
 // Fallback method using registry
