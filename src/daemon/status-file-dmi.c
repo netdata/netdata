@@ -605,13 +605,13 @@ static void get_platform_expert_info(DAEMON_STATUS_FILE *ds) {
         if (strcasestr(ds->hw.product.name, "book")) {
             safecpy(ds->hw.chassis.type, "9");
         } else if (strcasestr(ds->hw.product.name, "imac")) {
-            safecpy(ds->hw.chassis.type, 0, "13");
+            safecpy(ds->hw.chassis.type, "13");
         } else if (strcasestr(ds->hw.product.name, "mac") &&
                    strcasestr(ds->hw.product.name, "pro")) {
-            safecpy(ds->hw.chassis.type, 0, "3");
+            safecpy(ds->hw.chassis.type, "3");
         } else if (strcasestr(ds->hw.product.name, "mac") &&
                    strcasestr(ds->hw.product.name, "mini")) {
-            safecpy(ds->hw.chassis.type, 0, "35");
+            safecpy(ds->hw.chassis.type, "35");
         }
     }
 
