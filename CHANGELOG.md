@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- trim-all [\#20029](https://github.com/netdata/netdata/pull/20029) ([ktsaou](https://github.com/ktsaou))
+- fix crash [\#20028](https://github.com/netdata/netdata/pull/20028) ([ktsaou](https://github.com/ktsaou))
+- logs enhancements [\#20027](https://github.com/netdata/netdata/pull/20027) ([ktsaou](https://github.com/ktsaou))
+- daemon status 25 [\#20026](https://github.com/netdata/netdata/pull/20026) ([ktsaou](https://github.com/ktsaou))
+- kickstart.sh: add missing option --offline-install-source to USAGE [\#20025](https://github.com/netdata/netdata/pull/20025) ([ycdtosa](https://github.com/ycdtosa))
+- on prem files moved to their own repo [\#20023](https://github.com/netdata/netdata/pull/20023) ([Ancairon](https://github.com/Ancairon))
+- Series of NFCs to make the code more maintainable. [\#20022](https://github.com/netdata/netdata/pull/20022) ([vkalintiris](https://github.com/vkalintiris))
+- Windows installer + ML \(all\) improved [\#20021](https://github.com/netdata/netdata/pull/20021) ([kanelatechnical](https://github.com/kanelatechnical))
+- Additional checks then creating a v2 journal file [\#20018](https://github.com/netdata/netdata/pull/20018) ([stelfrag](https://github.com/stelfrag))
 - Properly clean up install paths after runtime checks in static builds. [\#20017](https://github.com/netdata/netdata/pull/20017) ([Ferroin](https://github.com/Ferroin))
 - blacklist leaked machine guids [\#20016](https://github.com/netdata/netdata/pull/20016) ([ktsaou](https://github.com/ktsaou))
 - agent-events: add deduplicating web server [\#20014](https://github.com/netdata/netdata/pull/20014) ([ktsaou](https://github.com/ktsaou))
@@ -13,6 +22,7 @@
 - added agent-events backend [\#20012](https://github.com/netdata/netdata/pull/20012) ([ktsaou](https://github.com/ktsaou))
 - daemon status 24d [\#20011](https://github.com/netdata/netdata/pull/20011) ([ktsaou](https://github.com/ktsaou))
 - Update synology.md [\#20010](https://github.com/netdata/netdata/pull/20010) ([ycdtosa](https://github.com/ycdtosa))
+- More completely disable our own telemetry in CI. [\#20009](https://github.com/netdata/netdata/pull/20009) ([Ferroin](https://github.com/Ferroin))
 - fix\(go.d/megacli\): handle BBU hardware component is not present [\#20008](https://github.com/netdata/netdata/pull/20008) ([ilyam8](https://github.com/ilyam8))
 - Fix crashes No 3 [\#20007](https://github.com/netdata/netdata/pull/20007) ([ktsaou](https://github.com/ktsaou))
 - Minor changes when handling systemd integration. [\#20006](https://github.com/netdata/netdata/pull/20006) ([vkalintiris](https://github.com/vkalintiris))
@@ -451,14 +461,6 @@
 - build\(deps\): bump github.com/prometheus-community/pro-bing from 0.5.0 to 0.6.0 in /src/go [\#19477](https://github.com/netdata/netdata/pull/19477) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/docker/docker from 27.5.0+incompatible to 27.5.1+incompatible in /src/go [\#19476](https://github.com/netdata/netdata/pull/19476) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/miekg/dns from 1.1.62 to 1.1.63 in /src/go [\#19475](https://github.com/netdata/netdata/pull/19475) ([dependabot[bot]](https://github.com/apps/dependabot))
-- optimized rrdhost\_status [\#19472](https://github.com/netdata/netdata/pull/19472) ([ktsaou](https://github.com/ktsaou))
-- Unregister node from the agent to run in a worker thread [\#19471](https://github.com/netdata/netdata/pull/19471) ([stelfrag](https://github.com/stelfrag))
-- Make handling of cross-platform emulation for static builds smarter. [\#19470](https://github.com/netdata/netdata/pull/19470) ([Ferroin](https://github.com/Ferroin))
-- Use QEMU from the runner environment instead of an external copy. [\#19468](https://github.com/netdata/netdata/pull/19468) ([Ferroin](https://github.com/Ferroin))
-- fix crash when cleaning up virtual nodes [\#19467](https://github.com/netdata/netdata/pull/19467) ([ktsaou](https://github.com/ktsaou))
-- streaming nodes accounting [\#19466](https://github.com/netdata/netdata/pull/19466) ([ktsaou](https://github.com/ktsaou))
-- Don’t fail fast on static builds and Docker builds. [\#19465](https://github.com/netdata/netdata/pull/19465) ([Ferroin](https://github.com/Ferroin))
-- Child should be online before initializing health [\#19463](https://github.com/netdata/netdata/pull/19463) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
