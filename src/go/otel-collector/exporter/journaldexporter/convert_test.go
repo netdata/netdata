@@ -3,6 +3,7 @@ package journaldexporter
 import (
 	"bytes"
 	"encoding/binary"
+	"strings"
 	"testing"
 	"time"
 
@@ -41,16 +42,23 @@ func TestLogsToJournaldMessages(t *testing.T) {
 
 				return logs
 			},
-			expected: `RESOURCE_SERVICE_NAME=test-service
-RESOURCE_SERVICE_INSTANCE_ID=instance-1
+			expected: `__REALTIME_TIMESTAMP=
+SYSLOG_IDENTIFIER=test-syslog-id
+_PID=test-pid
+_UID=test-uid
+_BOOT_ID=test-boot-id
+_MACHINE_ID=test-machine-id
+_HOSTNAME=test-hostname
+PRIORITY=6
+MESSAGE=This is a test message
+OTEL_RESOURCE_ATTR_SERVICE_NAME=test-service
+OTEL_RESOURCE_ATTR_SERVICE_INSTANCE_ID=instance-1
 OTEL_SCOPE_NAME=test-scope
 OTEL_SCOPE_VERSION=v1.0.0
-REALTIME_TIMESTAMP=1617030613000000
-PRIORITY=6
-LEVEL=INFO
-MESSAGE=This is a test message
-ATTR_HTTP_METHOD=GET
-ATTR_HTTP_STATUS_CODE=200
+OTEL_TIMESTAMP=1617030613000000
+OTEL_SEVERITY_LEVEL=INFO
+OTEL_ATTR_HTTP_METHOD=GET
+OTEL_ATTR_HTTP_STATUS_CODE=200
 
 `,
 		},
@@ -73,12 +81,19 @@ ATTR_HTTP_STATUS_CODE=200
 
 				return logs
 			},
-			expected: `PRIORITY=3
-LEVEL=ERROR
-TRACE_ID=0102030405060708090a0b0c0d0e0f10
-SPAN_ID=0102030405060708
-TRACE_FLAGS=1
+			expected: `__REALTIME_TIMESTAMP=
+SYSLOG_IDENTIFIER=test-syslog-id
+_PID=test-pid
+_UID=test-uid
+_BOOT_ID=test-boot-id
+_MACHINE_ID=test-machine-id
+_HOSTNAME=test-hostname
+PRIORITY=3
 MESSAGE=Connection failed
+OTEL_SEVERITY_LEVEL=ERROR
+OTEL_TRACE_ID=0102030405060708090a0b0c0d0e0f10
+OTEL_SPAN_ID=0102030405060708
+OTEL_TRACE_FLAGS=1
 
 `,
 		},
@@ -96,6 +111,13 @@ MESSAGE=Connection failed
 			},
 			expected: func() string {
 				var buf bytes.Buffer
+				buf.WriteString("__REALTIME_TIMESTAMP=\n")
+				buf.WriteString("SYSLOG_IDENTIFIER=test-syslog-id\n")
+				buf.WriteString("_PID=test-pid\n")
+				buf.WriteString("_UID=test-uid\n")
+				buf.WriteString("_BOOT_ID=test-boot-id\n")
+				buf.WriteString("_MACHINE_ID=test-machine-id\n")
+				buf.WriteString("_HOSTNAME=test-hostname\n")
 				buf.WriteString("PRIORITY=3\n")
 				buf.WriteString("MESSAGE\n")
 				multilineMsg := "Error occurred:\nStack trace:\n  at function1()\n  at function2()\n  at main()"
@@ -110,9 +132,21 @@ MESSAGE=Connection failed
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			var buf bytes.Buffer
-			logsToJournaldMessages(tc.logsFn(), &buf)
+			e := journaldExporter{fields: commonFields{
+				syslogID:  "test-syslog-id",
+				pid:       "test-pid",
+				uid:       "test-uid",
+				hostname:  "test-hostname",
+				bootID:    "test-boot-id",
+				machineID: "test-machine-id",
+			}}
 
-			assert.Equal(t, tc.expected, buf.String())
+			e.logsToJournaldMessages(tc.logsFn(), &buf)
+
+			ts, _, _ := strings.Cut(buf.String(), "\n")
+			_, expected, _ := strings.Cut(tc.expected, "\n")
+
+			assert.Equal(t, ts+"\n"+expected, buf.String())
 		})
 	}
 }
