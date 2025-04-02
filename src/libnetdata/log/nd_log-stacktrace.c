@@ -90,14 +90,14 @@ static void bt_error_handler(void *data, const char *msg, int errnum) {
 
     // Add the error message
     if (msg)
-        len = strcatz(error_buf, len, sizeof(error_buf), msg);
+        len = strcatz(error_buf, len, msg, sizeof(error_buf));
 
     // Add the error number description if available
     if (errnum > 0) {
         if (msg) {
-            len = strcatz(error_buf, len, sizeof(error_buf), ": ");
+            len = strcatz(error_buf, len, ": ", sizeof(error_buf));
         }
-        len = strcatz(error_buf, len, sizeof(error_buf), strerror(errnum));
+        len = strcatz(error_buf, len, strerror(errnum), sizeof(error_buf));
     }
 
     add_stack_frame(bt_data, 0, function, error_buf, 0);

@@ -9,7 +9,7 @@
 #include "claim/cloud-status.h"
 #include "machine-guid.h"
 
-#define STATUS_FILE_VERSION 25
+#define STATUS_FILE_VERSION 26
 
 typedef enum {
     DAEMON_STATUS_NONE,
