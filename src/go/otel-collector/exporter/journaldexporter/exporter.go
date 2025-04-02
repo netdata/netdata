@@ -6,16 +6,18 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/plog"
-	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.uber.org/zap"
 )
 
 type journaldExporter struct {
-	metricsMarshaler pmetric.Marshaler
+	log  *zap.Logger
+	conf *Config
 }
 
-func newMyExporter() *journaldExporter {
+func newJournaldExporter(cfg component.Config, logger *zap.Logger) *journaldExporter {
 	return &journaldExporter{
-		metricsMarshaler: &pmetric.JSONMarshaler{},
+		log:  logger,
+		conf: cfg.(*Config),
 	}
 }
 
