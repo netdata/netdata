@@ -827,14 +827,14 @@ int netdata_main(int argc, char **argv) {
     netdata_threads_set_stack_size(default_stacksize);
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("crash reports");
-
-    daemon_status_file_check_crash();
-
-    // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("temp spawn server");
 
     netdata_main_spawn_server_init("init", argc, (const char **)argv);
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("crash reports");
+
+    daemon_status_file_check_crash();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("ssl");
