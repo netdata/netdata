@@ -2471,7 +2471,7 @@ static void start_metadata_hosts(uv_work_t *req)
 
 
     COMPUTE_DURATION(report_duration, "us", all_started_ut, now_monotonic_usec());
-    nd_log_daemon(NDLP_DEBUG, "Checking all hots completed in %s", report_duration);
+    nd_log_daemon(NDLP_DEBUG, "Checking all hosts completed in %s", report_duration);
 
     do_pending_uuid_deletion(wc, (struct judy_list_t *)data->pending_uuid_deletion);
 
