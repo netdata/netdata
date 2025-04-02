@@ -6,75 +6,60 @@
 // Codes
 // https://learn.microsoft.com/en-us/sql/connect/odbc/cpp-code-example-app-connect-access-sql-db?view=sql-server-ver16
 
-#include <sql.h>
-#include <sqlext.h>
-
-// We are keeping this static, beccause the current design does not expect we use SQL
-static SQLHENV netdataEnv = NULL;
-static SQLHDBC netdataDBC = NULL;
-
-static void netdata_cleanup_MSSQL_variables()
+void netdata_MSSQL_cleanup_env(SQLHENV hEnv)
 {
-    netdata_close_MSSQL_connection();
-
-    SQLFreeHandle(SQL_HANDLE_ENV, netdataEnv);
-    netdataEnv = NULL;
-    netdataDBC = NULL;
+    if (hEnv) {
+        SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
+    }
 }
 
-void netdata_initialize_MSSQL_env()
+SQLHENV netdata_MSSQL_initialize_env()
 {
-    if (netdataEnv && netdataDBC)
-        return;
-
+    SQLHENV hEnv = SQL_NULL_HENV;
     // Allocate an environment
-    if (SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &netdataEnv) != SQL_SUCCESS) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Unable to allocate an environment handle");
-        goto endMSSQLEnv;
+    SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &hEnv);
+    if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) {
+        // Register application
+        ret = SQLSetEnvAttr(hEnv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, 0);
+        if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) {
+            return hEnv;
+        }
+    } else {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Unable to allocate MSSQL environment handle. Error %d", ret);
+        return SQL_NULL_HENV;
     }
 
-    // Register application
-    if (SQLSetEnvAttr(netdataEnv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, 0) != SQL_SUCCESS) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot register MSSQL application");
-        goto endMSSQLEnv;
-    }
-
-    return;
-endMSSQLEnv:
-    netdata_cleanup_MSSQL_variables();
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot register MSSQL application. Error %d", ret);
+    return SQL_NULL_HENV;
 }
 
-int netdata_start_MSSQL_connection(char *dbconnstr)
+SQLHDBC netdata_MSSQL_start_connection(SQLHENV hEnv, char *dbconnstr)
 {
-    if (!netdataEnv)
-        return -1;
+    if (!hEnv)
+        return SQL_NULL_HDBC;
 
     // Allocate the connection
-    if (SQLAllocHandle(SQL_HANDLE_DBC, netdataEnv, &netdataDBC) != SQL_SUCCESS) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot Allocate connection");
-        goto endConnection;
+    SQLHDBC netdataDBC = SQL_NULL_HDBC;
+    SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_DBC, hEnv, &netdataDBC);
+    if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) {
+        ret = SQLDriverConnect(hEnv, NULL, dbconnstr, SQL_NTS, NULL, 0, NULL, SQL_DRIVER_NOPROMPT);
+        if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) {
+            return netdataDBC;
+        }
+    } else {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot allocate MSSQL connection. Error %d", ret);
+        return SQL_NULL_HDBC;
     }
 
-    SQLSetConnectAttr(netdataDBC, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
-
-    if (SQLDriverConnect(netdataDBC, NULL, (SQLCHAR *)dbconnstr, SQL_NTS, NULL, 0, NULL, SQL_DRIVER_NOPROMPT) != SQL_SUCCESS) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to the server");
-        goto endConnection;
-    }
-
-    return 0;
-endConnection:
-    netdata_cleanup_MSSQL_variables();
-
-    return -1;
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to MSSQL server. Error %d", ret);
+    return SQL_NULL_HDBC;
 }
 
-void netdata_close_MSSQL_connection()
+void netdata_MSSQL_close_connection(SQLHDBC hDBC)
 {
     // TODO: Add keep alive message and option
-    if (netdataDBC) {
-        SQLDisconnect(netdataDBC);
-        SQLFreeHandle(SQL_HANDLE_DBC, netdataDBC);
-        netdataDBC = NULL;
+    if (hDBC != SQL_NULL_HDBC) {
+ //       SQLDisconnect(netdataDBC);
+        SQLFreeHandle(SQL_HANDLE_DBC, hDBC);
     }
 }

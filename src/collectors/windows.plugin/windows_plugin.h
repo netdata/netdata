@@ -11,11 +11,22 @@
 // 2^24
 #define WINDOWS_MAX_KERNEL_OBJECT 16777216
 
+#include <sql.h>
+#include <sqlext.h>
+
 void *win_plugin_main(void *ptr);
 
-void netdata_initialize_MSSQL_env();
-int netdata_start_MSSQL_connection(char *dbconnstr);
-void netdata_close_MSSQL_connection();
+struct netdata_mssql_conn {
+    const char *hostname;
+    const char *username;
+    const char *password;
+    int port;
+};
+
+SQLHENV netdata_MSSQL_initialize_env();
+SQLHDBC netdata_MSSQL_start_connection(SQLHENV hEnv, char *dbconnstr);
+void netdata_MSSQL_cleanup_env(SQLHENV hEnv);
+void netdata_MSSQL_close_connection(SQLHDBC netdataDBC);
 
 extern char windows_shared_buffer[8192];
 

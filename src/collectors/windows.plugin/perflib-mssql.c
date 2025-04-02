@@ -9,12 +9,9 @@
 
 BOOL is_sqlexpress = FALSE;
 BOOL is_connected = FALSE;
-static struct netdata_mssql_conn {
-    const char *hostname;
-    const char *username;
-    const char *password;
-    int port;
-} dbconn = {.hostname = "localhost", .username = NULL, .password = NULL, .port = 1433};
+SQLHENV netdataEnv = SQL_NULL_HENV;
+SQLHDBC netdataHdbc = SQL_NULL_HDBC;
+static struct netdata_mssql_conn dbconn = {.hostname = "localhost", .username = NULL, .password = NULL, .port = 1433};
 
 char connctionString[1024];
 
@@ -1468,13 +1465,13 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
             return -1;
 
         netdata_read_config_options();
-        netdata_initialize_MSSQL_env();
+        netdataEnv = netdata_MSSQL_initialize_env();
         initialized = true;
     }
 
-    is_connected = (BOOL) ~(netdata_start_MSSQL_connection(connctionString));
+    netdataHdbc = netdata_MSSQL_start_connection(netdataEnv, connctionString);
     dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_charts_cb, &update_every);
-    netdata_close_MSSQL_connection();
+    netdata_MSSQL_close_connection(netdataHdbc);
 
     return 0;
 }
