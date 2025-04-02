@@ -1144,7 +1144,7 @@ portable_add_user_to_group() {
       fi
 
       # Set the member list
-      # shellcheck disable SC2086
+      # shellcheck disable=SC2086
       run synogroup --member "${groupname}" ${new_members} && return 0
     fi
 
