@@ -313,11 +313,7 @@ func (j *Job) Cleanup() {
 	}
 
 	if !j.vnodeCreated && j.vnode.GUID != "" {
-		j.api.HOSTINFO(netdataapi.HostInfo{
-			GUID:     j.vnode.GUID,
-			Hostname: j.vnode.Hostname,
-			Labels:   j.vnode.Labels,
-		})
+		j.sendVnodeHostInfo()
 		j.vnodeCreated = true
 	}
 	j.api.HOST(j.vnode.GUID)
@@ -435,11 +431,7 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 			}
 		}
 		if j.vnode.GUID != "" {
-			j.api.HOSTINFO(netdataapi.HostInfo{
-				GUID:     j.vnode.GUID,
-				Hostname: j.vnode.Hostname,
-				Labels:   j.vnode.Labels,
-			})
+			j.sendVnodeHostInfo()
 			j.vnodeCreated = true
 		}
 	}
@@ -496,6 +488,21 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 	j.updateChart(j.collectDurationChart, map[string]int64{"duration": elapsed}, sinceLastRun)
 
 	return true
+}
+
+func (j *Job) sendVnodeHostInfo() {
+	if j.vnode.Labels == nil {
+		j.vnode.Labels = make(map[string]string)
+	}
+	if _, ok := j.vnode.Labels["_hostname"]; !ok {
+		j.vnode.Labels["_hostname"] = j.vnode.Hostname
+	}
+
+	j.api.HOSTINFO(netdataapi.HostInfo{
+		GUID:     j.vnode.GUID,
+		Hostname: j.vnode.Hostname,
+		Labels:   j.vnode.Labels,
+	})
 }
 
 func (j *Job) createChart(chart *Chart) {
