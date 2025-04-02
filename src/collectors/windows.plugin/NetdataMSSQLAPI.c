@@ -35,7 +35,9 @@ SQLHENV netdata_MSSQL_initialize_env()
 
 SQLHDBC netdata_MSSQL_start_connection(SQLHENV hEnv, char *dbconnstr)
 {
-    if (!hEnv)
+#define NETDATA_MSSQL_MAX_CONNECTION_TRY (5)
+    static int limit = 0;
+    if (!hEnv || limit >= NETDATA_MSSQL_MAX_CONNECTION_TRY)
         return SQL_NULL_HDBC;
 
     // Allocate the connection
@@ -44,6 +46,7 @@ SQLHDBC netdata_MSSQL_start_connection(SQLHENV hEnv, char *dbconnstr)
     if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) {
         ret = SQLDriverConnect(hEnv, NULL, dbconnstr, SQL_NTS, NULL, 0, NULL, SQL_DRIVER_NOPROMPT);
         if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) {
+            limit = 0;
             return netdataDBC;
         }
     } else {
@@ -51,7 +54,9 @@ SQLHDBC netdata_MSSQL_start_connection(SQLHENV hEnv, char *dbconnstr)
         return SQL_NULL_HDBC;
     }
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to MSSQL server. Error %d", ret);
+    limit++;
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to MSSQL server (Try %d/%d. Error %d", limit, NETDATA_MSSQL_MAX_CONNECTION_TRY, ret);
+
     return SQL_NULL_HDBC;
 }
 
