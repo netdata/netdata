@@ -528,15 +528,6 @@ static void node_update_timer_cb(uv_timer_t *handle)
         uv_timer_stop(&ahc->timer);
 }
 
-static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
-{
-    if (handle->type == UV_TIMER) {
-        uv_timer_stop((uv_timer_t *)handle);
-    }
-
-    uv_close(handle, NULL);  // Automatically close and free the handle
-}
-
 static void after_start_alert_push(uv_work_t *req, int status __maybe_unused)
 {
     struct worker_data *data = req->data;
@@ -881,9 +872,7 @@ static void aclk_synchronization_event_loop(void *arg)
         uv_close((uv_handle_t *)&config->timer_req, NULL);
 
     uv_close((uv_handle_t *)&config->async, NULL);
-    uv_run(loop, UV_RUN_NOWAIT);
-
-    uv_walk(loop, (uv_walk_cb) close_callback, NULL);
+    uv_walk(loop, libuv_close_callback, NULL);
     uv_run(loop, UV_RUN_NOWAIT);
 
     (void) uv_loop_close(loop);
