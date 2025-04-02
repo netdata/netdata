@@ -519,6 +519,9 @@ static void do_unregister_node(uv_work_t *req)
 static void node_update_timer_cb(uv_timer_t *handle)
 {
     struct aclk_sync_cfg_t *ahc = handle->data;
+    if (unlikely(!ahc))
+        return;
+
     RRDHOST *host = ahc->host;
 
     if(!host || aclk_host_state_update_auto(host))
@@ -950,8 +953,15 @@ void create_aclk_config(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __may
 
 void destroy_aclk_config(RRDHOST *host)
 {
-    if (!host || !host->aclk_config)
+    struct aclk_sync_cfg_t *ahc;
+    if (!host || !(ahc = host->aclk_config))
         return;
+
+    if (ahc->timer_initialized) {
+        if (uv_is_active((uv_handle_t *)&ahc->timer))
+            uv_timer_stop(&ahc->timer);
+        uv_close((uv_handle_t *)&ahc->timer, NULL);
+    }
 
     freez(host->aclk_config);
     host->aclk_config = NULL;
