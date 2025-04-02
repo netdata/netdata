@@ -518,17 +518,6 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 // --------------------------------------------------------------------------------------------------------------------
 // get the current status
 
-static void fix_vendor_product_vm(DAEMON_STATUS_FILE *ds) {
-    if(ds->cloud_provider_type[0] && strcmp(ds->cloud_provider_type, "unknown") != 0)
-        strncpyz(ds->hw.sys.vendor, ds->cloud_provider_type, sizeof(ds->hw.sys.vendor) - 1);
-
-    if(ds->cloud_instance_type[0] && strcmp(ds->cloud_instance_type, "unknown") != 0)
-        strncpyz(ds->hw.product.name, ds->cloud_instance_type, sizeof(ds->hw.product.name) - 1);
-
-    if(ds->virtualization[0] && strcmp(ds->virtualization, "none") != 0 && strcmp(ds->virtualization, "unknown") != 0)
-        strncpyz(ds->hw.chassis.type, "vm", sizeof(ds->hw.product.version) - 1);
-}
-
 static void daemon_status_file_migrate_once(void) {
     FUNCTION_RUN_ONCE();
 
@@ -598,7 +587,6 @@ static void daemon_status_file_migrate_once(void) {
     strncpyz(session_status.stack_traces, capture_stack_trace_backend(), sizeof(session_status.stack_traces) - 1);
 
     fill_dmi_info(&session_status);
-    fix_vendor_product_vm(&session_status);
 
     dsf_release(last_session_status);
     dsf_release(session_status);
@@ -664,7 +652,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     }
 
     if(get_daemon_status_fields_from_system_info(&session_status))
-        fix_vendor_product_vm(&session_status);
+        finalize_vendor_product_vm(&session_status);
 
     if(netdata_configured_timezone)
         strncpyz(session_status.timezone, netdata_configured_timezone, sizeof(session_status.timezone) - 1);
@@ -897,10 +885,8 @@ void daemon_status_file_init(void) {
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
     status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status);
-    if(last_session_status.v < 25) {
+    if(last_session_status.v < 25)
         fill_dmi_info(&last_session_status);
-        fix_vendor_product_vm(&last_session_status);
-    }
 
     daemon_status_file_migrate_once();
 }
