@@ -913,7 +913,7 @@ static void *extent_write_tp_worker(
 
     extent_flush_to_open(ctx, xt_io_descr, df_write_error);
 
-     if(ctx_is_available_for_queries(ctx))
+     if(ctx_is_available_for_queries(ctx) && rrdeng_ctx_tier_cap_exceeded(ctx))
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 done:
     if(completion)
@@ -1655,13 +1655,22 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
     return data;
 }
 
-uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx)
+uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock)
 {
     uint64_t active_space = 0;
+
+    if (!having_lock)
+        uv_rwlock_rdlock(&ctx->datafiles.rwlock);
 
     if (ctx->datafiles.first && ctx->datafiles.first->prev)
         active_space = ctx->datafiles.first->prev->pos;
 
+    if (!having_lock)
+        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    // calculate the estimated disk space based on the expected final size of the datafile
+    // We cant know the final v1/v2 journal size -- we let the current v1 size be part of the calculation by not
+    // including it in the active_space
     uint64_t estimated_disk_space = ctx_current_disk_space_get(ctx) + rrdeng_target_data_file_size(ctx) - active_space;
 
     uint64_t database_space = get_total_database_space();
@@ -1688,15 +1697,17 @@ static time_t get_tier_retention(struct rrdengine_instance *ctx)
 // Check if disk or retention time cap reached
 bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx)
 {
-    if(!ctx->datafiles.first)
-        // no datafiles available
-        return false;
 
-    if(!ctx->datafiles.first->next)
-        // only 1 datafile available
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    if (!ctx->datafiles.first || !ctx->datafiles.first->next) {
+        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
         return false;
+    }
 
-    uint64_t estimated_disk_space = rrdeng_get_used_disk_space(ctx);
+    uint64_t estimated_disk_space = rrdeng_get_used_disk_space(ctx, true);
+
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
     time_t retention = get_tier_retention(ctx);
 
     if (ctx->config.max_retention_s && retention > ctx->config.max_retention_s)
