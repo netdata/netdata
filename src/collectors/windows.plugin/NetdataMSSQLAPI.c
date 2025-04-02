@@ -33,7 +33,7 @@ SQLHENV netdata_MSSQL_initialize_env()
     return SQL_NULL_HENV;
 }
 
-SQLHDBC netdata_MSSQL_start_connection(SQLHENV hEnv, char *dbconnstr)
+SQLHDBC netdata_MSSQL_start_connection(SQLHENV hEnv, SQLCHAR *dbconnstr)
 {
 #define NETDATA_MSSQL_MAX_CONNECTION_TRY (5)
     static int limit = 0;

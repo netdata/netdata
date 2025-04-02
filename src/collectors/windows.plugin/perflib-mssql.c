@@ -13,7 +13,7 @@ SQLHENV netdataEnv = SQL_NULL_HENV;
 SQLHDBC netdataHdbc = SQL_NULL_HDBC;
 static struct netdata_mssql_conn dbconn = {.hostname = "localhost", .username = NULL, .password = NULL, .port = 1433};
 
-char connctionString[1024];
+SQLCHAR connectionString[1024];
 
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
@@ -1434,14 +1434,13 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     return 1;
 }
 
-void netdata_mount_mssql_connection_string(char *conn, size_t length, struct netdata_mssql_conn *dbInput)
+void netdata_mount_mssql_connection_string(SQLCHAR *conn, size_t length, struct netdata_mssql_conn *dbInput)
 {
     snprintfz(
-        conn,
+        (char *)conn,
         length,
-        "driver=[SQL Server];server=%s,%d;database=master;UID=%s;PWD=%s;",
+        "driver={ODBC Driver 18 for SQL Server};SERVER=%s;UID=%s;PWD=%s;",
         dbInput->hostname,
-        dbInput->port,
         dbInput->username,
         dbInput->password);
 }
@@ -1453,7 +1452,7 @@ static void netdata_read_config_options()
     dbconn.password = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "password", dbconn.password);
     dbconn.port = (int)inicfg_get_number(&netdata_config, "plugin:windows:PerflibMSSQL", "port", dbconn.port);
 
-    netdata_mount_mssql_connection_string(connctionString, sizeof(connctionString)-1, &dbconn);
+    netdata_mount_mssql_connection_string(connectionString, sizeof(connectionString)-1, &dbconn);
 }
 
 int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
@@ -1469,7 +1468,7 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    netdataHdbc = netdata_MSSQL_start_connection(netdataEnv, connctionString);
+    netdataHdbc = netdata_MSSQL_start_connection(netdataEnv, connectionString);
     dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_charts_cb, &update_every);
     netdata_MSSQL_close_connection(netdataHdbc);
 
