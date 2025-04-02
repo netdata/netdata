@@ -619,13 +619,14 @@ void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_
     }
 }
 
-void get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
-    if(ds->read_system_info) return;
+bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
+    if(ds->read_system_info)
+        return false;
 
     struct rrdhost_system_info *ri = (localhost && localhost->system_info) ? localhost->system_info : NULL;
     if(!ri) {
         // nothing we can do, let it be
-        return;
+        return false;
     }
 
     if(ri->architecture)
@@ -669,4 +670,6 @@ void get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
         strncpyz(ds->cloud_instance_region, ri->cloud_instance_region, sizeof(ds->cloud_instance_region) - 1);
 
     ds->read_system_info = true;
+
+    return true;
 }

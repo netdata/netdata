@@ -8,6 +8,7 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
+#include "status-file-dmi.h"
 
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
@@ -82,144 +83,6 @@ static bool stack_trace_is_empty(DAEMON_STATUS_FILE *ds) {
 static void set_stack_trace_message_if_empty(DAEMON_STATUS_FILE *ds, const char *msg) {
     if(stack_trace_is_empty(ds))
         strncpyz(ds->fatal.stack_trace, msg, sizeof(ds->fatal.stack_trace) - 1);
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-// DMI data
-
-static void dmi_info(const char *file, const char *alt, char *dst, size_t dst_size) {
-    char filename[FILENAME_MAX];
-
-    if(netdata_configured_host_prefix && *netdata_configured_host_prefix) {
-        snprintfz(filename, sizeof(filename), "%s/sys/class/dmi/id/%s", netdata_configured_host_prefix, file);
-        if(access(filename, R_OK) != 0) {
-            snprintfz(filename, sizeof(filename), "%s/sys/devices/virtual/dmi/id/%s", netdata_configured_host_prefix, file);
-            if (access(filename, R_OK) != 0)
-                filename[0] = '\0';
-        }
-    }
-    else
-        filename[0] = '\0';
-
-    if(!filename[0]) {
-        snprintfz(filename, sizeof(filename), "/sys/class/dmi/id/%s", file);
-        if (access(filename, R_OK) != 0) {
-            snprintfz(filename, sizeof(filename), "/sys/devices/virtual/dmi/id/%s", file);
-            if (access(filename, R_OK) != 0) {
-                if (alt && *alt) {
-                    strncpyz(filename, alt, sizeof(filename) - 1);
-                    if (access(filename, R_OK) != 0)
-                        filename[0] = '\0';
-                }
-                else
-                    filename[0] = '\0';
-            }
-        }
-    }
-
-    if(!filename[0]) {
-        dst[0] = '\0';
-        return;
-    }
-
-    if(read_txt_file(filename, dst, dst_size) != 0) {
-        dst[0] = '\0';
-        return;
-    }
-
-    trim_all(dst);
-
-    struct {
-        const char *found;
-        const char *replace;
-    } replacements[] = {
-        {"Default string", ""},
-        {"To be filled by O.E.M.", ""},
-        {"x.x", ""},
-        {"System Product Name", ""},
-        {"System Version", ""},
-        {"System UUID", ""},
-    };
-
-    if(dst[0]) {
-        for (size_t i = 0; i < _countof(replacements); i++) {
-            if (strcasecmp(dst, replacements[i].found) == 0) {
-                strncpyz(dst, replacements[i].replace, dst_size - 1);
-                break;
-            }
-        }
-    }
-}
-
-static void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
-    dmi_info("sys_vendor", NULL, ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
-    
-    dmi_info("product_name", "/proc/device-tree/model", ds->hw.product.name, sizeof(ds->hw.product.name));
-    dmi_info("product_version", NULL, ds->hw.product.version, sizeof(ds->hw.product.version));
-    dmi_info("product_sku", NULL, ds->hw.product.sku, sizeof(ds->hw.product.sku));
-    dmi_info("product_family", NULL, ds->hw.product.family, sizeof(ds->hw.product.family));
-    
-    dmi_info("chassis_type", NULL, ds->hw.chassis.type, sizeof(ds->hw.chassis.type));
-    dmi_info("chassis_vendor", NULL, ds->hw.chassis.vendor, sizeof(ds->hw.chassis.vendor));
-    dmi_info("chassis_version", NULL, ds->hw.chassis.version, sizeof(ds->hw.chassis.version));
-    
-    dmi_info("board_vendor", NULL, ds->hw.board.vendor, sizeof(ds->hw.board.vendor));
-    dmi_info("board_name", NULL, ds->hw.board.name, sizeof(ds->hw.board.name));
-    dmi_info("board_version", NULL, ds->hw.board.version, sizeof(ds->hw.board.version));
-    
-    dmi_info("bios_vendor", NULL, ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
-    dmi_info("bios_version", NULL, ds->hw.bios.version, sizeof(ds->hw.bios.version));
-    dmi_info("bios_date", NULL, ds->hw.bios.date, sizeof(ds->hw.bios.date));
-    dmi_info("bios_release", NULL, ds->hw.bios.release, sizeof(ds->hw.bios.release));
-
-    struct {
-        const char *found;
-        const char *replace;
-    } chassis_types[] = {
-        {"1", "other"},
-        {"2", "unknown"},
-        {"3", "desktop"},
-        {"4", "low-profile-desktop"},
-        {"5", "pizza-box"},
-        {"6", "mini-tower-desktop"},
-        {"7", "tower-desktop"},
-        {"8", "portable"},
-        {"9", "laptop"},
-        {"10", "notebook"},
-        {"11", "hand-held"},
-        {"12", "docking-station"},
-        {"13", "all-in-one"},
-        {"14", "sub-notebook"},
-        {"15", "space-saving-desktop"},
-        {"16", "lunch-box"},
-        {"17", "main-server-chassis"},
-        {"18", "expansion-chassis"},
-        {"19", "sub-chassis"},
-        {"20", "bus-expansion-chassis"},
-        {"21", "peripheral-chassis"},
-        {"22", "raid-chassis"},
-        {"23", "rack-mount-server"},
-        {"24", "sealed-desktop"},
-        {"25", "multi-chassis"},
-        {"26", "compact-pci"},
-        {"27", "advanced-tca"},
-        {"28", "blade"},
-        {"29", "blade-enclosure"},
-        {"30", "tablet"},
-        {"31", "convertible"},
-        {"32", "detachable"},
-        {"33", "iot-gateway"},
-        {"34", "embedded-pc"},
-        {"35", "mini-pc"},
-        {"36", "stick-pc"},
-    };
-
-    for(size_t i = 0; i < _countof(chassis_types) ;i++) {
-        if(strcasecmp(ds->hw.chassis.type, chassis_types[i].found) == 0) {
-            strncpyz(ds->hw.chassis.type, chassis_types[i].replace, sizeof(ds->hw.chassis.type) - 1);
-            break;
-        }
-    }
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -655,6 +518,17 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 // --------------------------------------------------------------------------------------------------------------------
 // get the current status
 
+static void fix_vendor_product_vm(DAEMON_STATUS_FILE *ds) {
+    if(ds->cloud_provider_type[0] && strcmp(ds->cloud_provider_type, "unknown") != 0)
+        strncpyz(ds->hw.sys.vendor, ds->cloud_provider_type, sizeof(ds->hw.sys.vendor) - 1);
+
+    if(ds->cloud_instance_type[0] && strcmp(ds->cloud_instance_type, "unknown") != 0)
+        strncpyz(ds->hw.product.name, ds->cloud_instance_type, sizeof(ds->hw.product.name) - 1);
+
+    if(ds->virtualization[0] && strcmp(ds->virtualization, "none") != 0 && strcmp(ds->virtualization, "unknown") != 0)
+        strncpyz(ds->hw.chassis.type, "vm", sizeof(ds->hw.product.version) - 1);
+}
+
 static void daemon_status_file_migrate_once(void) {
     FUNCTION_RUN_ONCE();
 
@@ -724,6 +598,7 @@ static void daemon_status_file_migrate_once(void) {
     strncpyz(session_status.stack_traces, capture_stack_trace_backend(), sizeof(session_status.stack_traces) - 1);
 
     fill_dmi_info(&session_status);
+    fix_vendor_product_vm(&session_status);
 
     dsf_release(last_session_status);
     dsf_release(session_status);
@@ -788,7 +663,8 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
             session_status.node_id = localhost->node_id;
     }
 
-    get_daemon_status_fields_from_system_info(&session_status);
+    if(get_daemon_status_fields_from_system_info(&session_status))
+        fix_vendor_product_vm(&session_status);
 
     if(netdata_configured_timezone)
         strncpyz(session_status.timezone, netdata_configured_timezone, sizeof(session_status.timezone) - 1);
@@ -1021,8 +897,10 @@ void daemon_status_file_init(void) {
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
     status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status);
-    if(last_session_status.v < 25)
+    if(last_session_status.v < 25) {
         fill_dmi_info(&last_session_status);
+        fix_vendor_product_vm(&last_session_status);
+    }
 
     daemon_status_file_migrate_once();
 }
