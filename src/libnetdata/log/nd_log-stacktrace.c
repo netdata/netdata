@@ -72,7 +72,8 @@ static inline bool contains_logging_function(const char *text) {
 static inline bool is_netdata_function(const char *function, const char *filename) {
     return function && *function && filename && *filename &&
            strstr(filename, "/src/") &&
-           !strstr(filename, "/vendored/");
+           !strstr(filename, "/vendored/") &&
+           !contains_logging_function(function);
 }
 
 // Exact match check if a function is the signal handler (strcmp)
@@ -143,7 +144,7 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
         root_cause_function[0] = '\0';
         return; // Skip adding the signal handler itself
     }
-    
+
     // Check for logging functions, but only if we haven't found a signal handler yet
     // This prevents double resets when crashing inside logging code
     if (!bt_data->found_signal_handler && is_logging_function(function)) {
@@ -545,7 +546,11 @@ bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
     in_stack_trace = true;
 
     root_cause_function[0] = '\0';
+
     capture_stack_trace(wb);
+
+    if(!root_cause_function[0])
+        strncpyz(root_cause_function, "unknown_root_cause_function", sizeof(root_cause_function) - 1);
 
     in_stack_trace = false; // Ensure the flag is reset
     return true;
