@@ -885,7 +885,7 @@ void daemon_status_file_init(void) {
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
     status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status);
-    if(last_session_status.v < 25)
+    if(last_session_status.v <= 26)
         fill_dmi_info(&last_session_status);
 
     daemon_status_file_migrate_once();
