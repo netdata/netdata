@@ -2,18 +2,25 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.3.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.3.2...HEAD)
 
 **Merged pull requests:**
 
+- chore\(otel/journaldexporter\): add trusted journald fields [\#20038](https://github.com/netdata/netdata/pull/20038) ([ilyam8](https://github.com/ilyam8))
+- daemon status 26 - dmi strings [\#20037](https://github.com/netdata/netdata/pull/20037) ([ktsaou](https://github.com/ktsaou))
+- chore\(otel/journaldexporter\): convert logs to journald format [\#20033](https://github.com/netdata/netdata/pull/20033) ([ilyam8](https://github.com/ilyam8))
+- Check for host timer validity in ACLK synchronization [\#20031](https://github.com/netdata/netdata/pull/20031) ([stelfrag](https://github.com/stelfrag))
+- improvement\(go.d\): add `_hostname` label for virtual nodes [\#20030](https://github.com/netdata/netdata/pull/20030) ([ilyam8](https://github.com/ilyam8))
 - trim-all [\#20029](https://github.com/netdata/netdata/pull/20029) ([ktsaou](https://github.com/ktsaou))
 - fix crash [\#20028](https://github.com/netdata/netdata/pull/20028) ([ktsaou](https://github.com/ktsaou))
 - logs enhancements [\#20027](https://github.com/netdata/netdata/pull/20027) ([ktsaou](https://github.com/ktsaou))
 - daemon status 25 [\#20026](https://github.com/netdata/netdata/pull/20026) ([ktsaou](https://github.com/ktsaou))
 - kickstart.sh: add missing option --offline-install-source to USAGE [\#20025](https://github.com/netdata/netdata/pull/20025) ([ycdtosa](https://github.com/ycdtosa))
+- Improve kickstart so it can add the netdata user/group on Synology DSM [\#20024](https://github.com/netdata/netdata/pull/20024) ([ycdtosa](https://github.com/ycdtosa))
 - on prem files moved to their own repo [\#20023](https://github.com/netdata/netdata/pull/20023) ([Ancairon](https://github.com/Ancairon))
 - Series of NFCs to make the code more maintainable. [\#20022](https://github.com/netdata/netdata/pull/20022) ([vkalintiris](https://github.com/vkalintiris))
 - Windows installer + ML \(all\) improved [\#20021](https://github.com/netdata/netdata/pull/20021) ([kanelatechnical](https://github.com/kanelatechnical))
+- Improve estimated disk space usage for data file rotation [\#20019](https://github.com/netdata/netdata/pull/20019) ([stelfrag](https://github.com/stelfrag))
 - Additional checks then creating a v2 journal file [\#20018](https://github.com/netdata/netdata/pull/20018) ([stelfrag](https://github.com/stelfrag))
 - Properly clean up install paths after runtime checks in static builds. [\#20017](https://github.com/netdata/netdata/pull/20017) ([Ferroin](https://github.com/Ferroin))
 - blacklist leaked machine guids [\#20016](https://github.com/netdata/netdata/pull/20016) ([ktsaou](https://github.com/ktsaou))
@@ -103,6 +110,10 @@
 - Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
 - Large-scale cleanup of static build infrastructure. [\#19852](https://github.com/netdata/netdata/pull/19852) ([Ferroin](https://github.com/Ferroin))
 - ebpf.plugin: rework memory [\#19844](https://github.com/netdata/netdata/pull/19844) ([thiagoftsm](https://github.com/thiagoftsm))
+
+## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.3.1...v2.3.2)
 
 ## [v2.3.1](https://github.com/netdata/netdata/tree/v2.3.1) (2025-03-24)
 
@@ -454,13 +465,6 @@
 - protection against extreme cardinality [\#19486](https://github.com/netdata/netdata/pull/19486) ([ktsaou](https://github.com/ktsaou))
 - add agent name and version in streaming function [\#19485](https://github.com/netdata/netdata/pull/19485) ([ktsaou](https://github.com/ktsaou))
 - Coverity fixes [\#19484](https://github.com/netdata/netdata/pull/19484) ([ktsaou](https://github.com/ktsaou))
-- add system-info columns to streaming function [\#19482](https://github.com/netdata/netdata/pull/19482) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#19481](https://github.com/netdata/netdata/pull/19481) ([netdatabot](https://github.com/netdatabot))
-- chore\(go.d/ping\): set privileged by default for dyncfg jobs [\#19480](https://github.com/netdata/netdata/pull/19480) ([ilyam8](https://github.com/ilyam8))
-- Improve metadata cleanup [\#19479](https://github.com/netdata/netdata/pull/19479) ([stelfrag](https://github.com/stelfrag))
-- build\(deps\): bump github.com/prometheus-community/pro-bing from 0.5.0 to 0.6.0 in /src/go [\#19477](https://github.com/netdata/netdata/pull/19477) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/docker/docker from 27.5.0+incompatible to 27.5.1+incompatible in /src/go [\#19476](https://github.com/netdata/netdata/pull/19476) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/miekg/dns from 1.1.62 to 1.1.63 in /src/go [\#19475](https://github.com/netdata/netdata/pull/19475) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
@@ -704,15 +708,15 @@
 
 ## [v1.33.0](https://github.com/netdata/netdata/tree/v1.33.0) (2022-01-26)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/1.32.1...v1.33.0)
-
-## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
-
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.32.1...1.32.1)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.32.1...v1.33.0)
 
 ## [v1.32.1](https://github.com/netdata/netdata/tree/v1.32.1) (2021-12-14)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.32.0...v1.32.1)
+[Full Changelog](https://github.com/netdata/netdata/compare/1.32.1...v1.32.1)
+
+## [1.32.1](https://github.com/netdata/netdata/tree/1.32.1) (2021-12-14)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.32.0...1.32.1)
 
 ## [v1.32.0](https://github.com/netdata/netdata/tree/v1.32.0) (2021-11-30)
 
