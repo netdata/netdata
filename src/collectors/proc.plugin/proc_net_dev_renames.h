@@ -19,7 +19,6 @@ struct rename_task {
     const char *ctx_prefix;
     RRDLABELS *chart_labels;
     const DICTIONARY_ITEM *cgroup_netdev_link;
-    XXH64_hash_t checksum;
 };
 
 #define freez_and_set_to_null(p) do { \
@@ -28,8 +27,6 @@ struct rename_task {
 } while(0)
 
 void netdev_renames_init(void);
-
-void rename_task_verify_checksum(struct rename_task *r);
 
 void cgroup_netdev_reset_all(void);
 void cgroup_netdev_release(const DICTIONARY_ITEM *link);
