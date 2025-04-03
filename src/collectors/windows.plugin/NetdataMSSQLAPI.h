@@ -11,10 +11,12 @@
 #include <sqlext.h>
 
 struct netdata_mssql_conn {
-    const char *hostname;
+    const char *driver;
+    const char *server;
+    const char *address;
     const char *username;
     const char *password;
-    int port;
+    bool windows_auth;
 };
 
 SQLHENV netdata_MSSQL_initialize_env();

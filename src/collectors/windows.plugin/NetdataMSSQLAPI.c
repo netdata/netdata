@@ -35,6 +35,9 @@ SQLHENV netdata_MSSQL_initialize_env()
 
 SQLHDBC netdata_MSSQL_start_connection(SQLHENV hEnv, SQLCHAR *dbconnstr)
 {
+    if (!dbconnstr || dbconnstr[0] == '\0')
+        return SQL_NULL_HDBC;
+
 #define NETDATA_MSSQL_MAX_CONNECTION_TRY (5)
     static int limit = 0;
     if (!hEnv || limit >= NETDATA_MSSQL_MAX_CONNECTION_TRY)
@@ -64,7 +67,7 @@ void netdata_MSSQL_close_connection(SQLHDBC hDBC)
 {
     // TODO: Add keep alive message and option
     if (hDBC != SQL_NULL_HDBC) {
- //       SQLDisconnect(netdataDBC);
+ //       SQLDisconnect(hDBC);
         SQLFreeHandle(SQL_HANDLE_DBC, hDBC);
     }
 }
