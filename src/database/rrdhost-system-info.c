@@ -241,9 +241,9 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
     if (system_info->prebuilt_dist)
         rrdlabels_add(labels, "_prebuilt_dist", system_info->prebuilt_dist, RRDLABEL_SRC_AUTO);
 
-    rrdlabels_add(labels, "_system_vendor", daemon_status_file_get_hw_sys_vendor(), RRDLABEL_SRC_AUTO);
-    rrdlabels_add(labels, "_product_name", daemon_status_file_get_hw_product_name(), RRDLABEL_SRC_AUTO);
-    rrdlabels_add(labels, "_product_type", daemon_status_file_get_hw_chassis_type(), RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_hw_sys_vendor", daemon_status_file_get_hw_sys_vendor(), RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_hw_product_name", daemon_status_file_get_hw_product_name(), RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_hw_product_type", daemon_status_file_get_hw_chassis_type(), RRDLABEL_SRC_AUTO);
 }
 
 int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
