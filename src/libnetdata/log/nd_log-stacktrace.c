@@ -9,9 +9,104 @@ bool nd_log_forked = false;
 // The signal handler function name to filter out in stack traces
 static const char *signal_handler_function = "nd_signal_handler";
 
+// List of auxiliary functions that should not be reported as root cause
+static const char *auxiliary_functions[] = {
+    "nd_uuid_copy",
+    "out_of_memory",
+    "shutdown_timed_out",
+    NULL  // Terminator
+};
+
+// List of logging functions to filter out
+static const char *logging_functions[] = {
+    "netdata_logger",
+    "netdata_logger_with_limit",
+    "netdata_logger_fatal",
+    NULL  // Terminator
+};
+
 // Set the signal handler function name to filter out in stack traces
 void capture_stack_trace_set_signal_handler_function(const char *function_name) {
     signal_handler_function = function_name;
+}
+
+// Exact match check if a function is in the auxiliary list (strcmp)
+static inline bool is_auxiliary_function(const char *function) {
+    if (!function || !*function)
+        return false;
+        
+    for (int i = 0; auxiliary_functions[i]; i++) {
+        if (strcmp(function, auxiliary_functions[i]) == 0)
+            return true;
+    }
+    
+    return false;
+}
+
+// Exact match check if a function is a logging function (strcmp)
+static inline bool is_logging_function(const char *function) {
+    if (!function || !*function)
+        return false;
+        
+    for (int i = 0; logging_functions[i]; i++) {
+        if (strcmp(function, logging_functions[i]) == 0)
+            return true;
+    }
+    
+    return false;
+}
+
+// Substring check if a function contains a logging function name (strstr)
+static inline bool contains_logging_function(const char *text) {
+    if (!text || !*text)
+        return false;
+        
+    for (int i = 0; logging_functions[i]; i++) {
+        if (strstr(text, logging_functions[i]) != NULL)
+            return true;
+    }
+    
+    return false;
+}
+
+static inline bool is_netdata_function(const char *function, const char *filename) {
+    return function && *function && filename && *filename &&
+           strstr(filename, "/src/") &&
+           !strstr(filename, "/vendored/");
+}
+
+// Exact match check if a function is the signal handler (strcmp)
+static inline bool is_signal_handler_function(const char *function) {
+    return function && *function &&
+           signal_handler_function && *signal_handler_function &&
+           strcmp(function, signal_handler_function) == 0;
+}
+
+// Substring check if a function contains the signal handler name (strstr)
+static inline bool contains_signal_handler_function(const char *text) {
+    return text && *text &&
+           signal_handler_function && *signal_handler_function &&
+           strstr(text, signal_handler_function) != NULL;
+}
+
+// Thread-local buffer to store the first netdata function encountered in a stack trace
+static __thread char root_cause_function[48];
+
+// Returns the first netdata function found in the stack trace
+const char *capture_stack_trace_root_cause_function(void) {
+    return root_cause_function[0] ? root_cause_function : NULL;
+}
+
+// Store a function name as the first netdata function found
+static inline void keep_first_root_cause_function(const char *function) {
+    if (!function || !*function || root_cause_function[0])
+        return;  // Already have a function or null input
+    
+    // Skip auxiliary functions and logging functions   
+    if (is_auxiliary_function(function) || is_logging_function(function))
+        return;
+
+    strncpyz(root_cause_function, function, sizeof(root_cause_function) - 1);
 }
 
 #if defined(HAVE_LIBBACKTRACE)
@@ -27,7 +122,6 @@ typedef struct {
     BUFFER *wb;             // Buffer to write to
     size_t frame_count;     // Number of frames processed
     bool first_frame;       // Is this the first frame?
-    bool filter_signal_handler; // Should we filter the signal handler?
     bool found_signal_handler;  // Have we found the signal handler frame?
 } backtrace_data_t;
 
@@ -40,16 +134,31 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
         return;
 
     // Check if we found the signal handler frame
-    if (bt_data->filter_signal_handler && !bt_data->found_signal_handler && 
-        function && signal_handler_function && strcmp(function, signal_handler_function) == 0) {
-        
-        // We found the signal handler, reset the buffer
+    if (!bt_data->found_signal_handler && is_signal_handler_function(function)) {
+        // We found the signal handler, reset the buffer and clear function name
         buffer_flush(wb);
         bt_data->frame_count = 0;
         bt_data->first_frame = true;
         bt_data->found_signal_handler = true;
+        root_cause_function[0] = '\0';
         return; // Skip adding the signal handler itself
     }
+    
+    // Check for logging functions, but only if we haven't found a signal handler yet
+    // This prevents double resets when crashing inside logging code
+    if (!bt_data->found_signal_handler && is_logging_function(function)) {
+        // Found a logging function, reset the buffer and clear function name
+        buffer_flush(wb);
+        bt_data->frame_count = 0;
+        bt_data->first_frame = true;
+        root_cause_function[0] = '\0';
+        return; // Skip adding the logging function itself
+    }
+
+    // Check if this is a netdata source file and store the function name if it is
+    // (but only if we haven't already stored one)
+    if (!root_cause_function[0] && is_netdata_function(function, filename))
+        keep_first_root_cause_function(function);
 
     // Add a newline between frames
     if (!bt_data->first_frame)
@@ -196,7 +305,6 @@ void capture_stack_trace(BUFFER *wb) {
         .wb = wb,
         .frame_count = 0,
         .first_frame = true,
-        .filter_signal_handler = (signal_handler_function && *signal_handler_function),
         .found_signal_handler = false
     };
 
@@ -253,7 +361,6 @@ void capture_stack_trace(BUFFER *wb) {
 
     size_t added = 0;
     bool found_signal_handler = false;
-    bool filter = (signal_handler_function && *signal_handler_function);
 
     while (unw_step(&cursor) > 0) {
         unw_word_t offset, pc;
@@ -270,15 +377,22 @@ void capture_stack_trace(BUFFER *wb) {
         }
 
         // Check if we found the signal handler frame
-        if (filter && !found_signal_handler && 
-            strcmp(name, signal_handler_function) == 0) {
-            
+        if (!found_signal_handler && is_signal_handler_function(name)) {
             // We found the signal handler, reset the buffer
             buffer_flush(wb);
             added = 0;
             frames = 0;
             found_signal_handler = true;
             continue; // Skip adding the signal handler itself
+        }
+        
+        // Check for logging functions, but only if we haven't found a signal handler yet
+        if (!found_signal_handler && is_logging_function(name)) {
+            // Found a logging function, reset the buffer
+            buffer_flush(wb);
+            added = 0;
+            frames = 0;
+            continue; // Skip adding the logging function itself
         }
 
         if (frames++)
@@ -338,20 +452,25 @@ void capture_stack_trace(BUFFER *wb) {
 
     size_t added = 0;
     bool found_signal_handler = false;
-    bool filter = (signal_handler_function && *signal_handler_function);
 
     // Format the stack trace (removing the address part)
     for (i = 0; i < size; i++) {
         if(messages[i] && *messages[i]) {
             // Check if we found the signal handler frame
-            if (filter && !found_signal_handler && 
-                strstr(messages[i], signal_handler_function) != NULL) {
-                
+            if (!found_signal_handler && contains_signal_handler_function(messages[i])) {
                 // We found the signal handler, reset the buffer
                 buffer_flush(wb);
                 added = 0;
                 found_signal_handler = true;
                 continue; // Skip adding the signal handler itself
+            }
+            
+            // Check for logging functions, but only if we haven't found a signal handler yet
+            if (!found_signal_handler && contains_logging_function(messages[i])) {
+                // Found a logging function, reset the buffer
+                buffer_flush(wb);
+                added = 0;
+                continue; // Skip adding the logging function itself
             }
 
             if(added)
@@ -420,6 +539,7 @@ bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
 
     in_stack_trace = true;
 
+    root_cause_function[0] = '\0';
     capture_stack_trace(wb);
 
     in_stack_trace = false; // Ensure the flag is reset

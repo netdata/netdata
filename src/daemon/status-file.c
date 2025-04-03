@@ -1159,6 +1159,11 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
     
     capture_stack_trace(wb);
 
+    // Store the first netdata function from the stack trace if available
+    const char *first_nd_fn = capture_stack_trace_root_cause_function();
+    if (first_nd_fn && *first_nd_fn && !ds->fatal.function[0])
+        strncpyz(ds->fatal.function, first_nd_fn, sizeof(ds->fatal.function) - 1);
+
     if(buffer_strlen(wb) > 0) {
         strncpyz(
             ds->fatal.stack_trace,
