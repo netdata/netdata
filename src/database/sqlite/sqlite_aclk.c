@@ -946,11 +946,6 @@ void destroy_aclk_config(RRDHOST *host)
     if (!host || !(ahc = host->aclk_config))
         return;
 
-//    if (ahc->timer_initialized) {
-//        if (uv_is_active((uv_handle_t *)&ahc->timer))
-//            uv_timer_stop(&ahc->timer);
-//    }
-
     freez(host->aclk_config);
     host->aclk_config = NULL;
 }
