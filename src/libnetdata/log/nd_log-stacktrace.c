@@ -310,7 +310,7 @@ void capture_stack_trace(BUFFER *wb) {
     };
 
     // Skip one frame to hide capture_stack_trace() itself
-    backtrace_full(backtrace_state, 1, bt_full_handler,
+    backtrace_full(backtrace_state, 0, bt_full_handler,
                    bt_error_handler, &bt_data);
 
     // If no frames were reported
