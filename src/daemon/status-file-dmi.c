@@ -51,6 +51,8 @@ static void dmi_clean_field_placeholder(char *buf, size_t buf_size) {
         {"unspecified", ""},
         {"x.x", ""},
         {"(null)", ""},
+        {"0123456789", ""},
+        {"SKU", ""},
     };
 
     for (size_t i = 0; i < _countof(placeholders); i++) {
@@ -273,7 +275,7 @@ static const char *dmi_chassis_type_to_string(int chassis_type) {
         case 22: return "raid";
         case 23: return "server"; /* "rack-mount-server" */
         case 24: return "desktop"; /* "sealed-desktop" */
-        case 25: return "multimount-chassis";
+        case 25: return "server"; /* "multimount-chassis" */
         case 26: return "compact-pci";
         case 27: return "blade"; /* "advanced-tca" */
         case 28: return "blade";
@@ -308,21 +310,24 @@ static void dmi_clean_field(char *buf, size_t buf_size) {
     if(!buf || !buf_size) return;
 
     // replace non-ascii characters and control characters with spaces
-    for (size_t i = 0; i < sizeof(buf) && buf[i]; i++) {
+    for (size_t i = 0; i < buf_size && buf[i]; i++) {
         if (!isascii((uint8_t)buf[i]) || iscntrl((uint8_t)buf[i]))
             buf[i] = ' ';
     }
 
     // detect if all characters are symbols
     bool contains_alnum = false;
-    for (size_t i = 0; i < sizeof(buf) && buf[i]; i++) {
+    for (size_t i = 0; i < buf_size && buf[i]; i++) {
         if (isalnum((uint8_t)buf[i])) {
             contains_alnum = true;
             break;
         }
     }
-    if (!contains_alnum || !buf[0])
+
+    if (!contains_alnum || !buf[0]) {
+        buf[0] = '\0';
         return;
+    }
 
     // remove leading, trailing and duplicate spaces
     trim_all(buf);
@@ -368,7 +373,7 @@ static void linux_get_dmi_field(const char *field, const char *alt, char *dst, s
     if (!filename[0])
         return;
 
-    char buf[256];
+    char buf[MAX(256, dst_size)];
     if (read_txt_file(filename, buf, sizeof(buf)) != 0)
         return;
 
@@ -1357,6 +1362,10 @@ void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
         safecpy(ds->hw.sys.vendor, ds->hw.chassis.vendor);
     if(!ds->hw.sys.vendor[0])
         safecpy(ds->hw.sys.vendor, ds->hw.bios.vendor);
+    if(!ds->hw.sys.vendor[0] && strstr(ds->hw.product.name, "Raspberry") != NULL)
+        safecpy(ds->hw.sys.vendor, "Raspberry");
+    if(!ds->hw.sys.vendor[0] && (strstr(ds->hw.product.name, "VirtualMac") != NULL || strstr(ds->hw.board.name, "Apple") != NULL))
+        safecpy(ds->hw.sys.vendor, "Apple");
     if(!ds->hw.sys.vendor[0])
         safecpy(ds->hw.sys.vendor, "Unknown");
 
@@ -1365,6 +1374,10 @@ void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
         safecpy(ds->hw.product.name, ds->hw.board.name);
     if(!ds->hw.product.name[0])
         safecpy(ds->hw.product.name, "Unknown");
+
+    // make sure we have a chassis type
+    if(!ds->hw.chassis.type[0])
+        safecpy(ds->hw.chassis.type, "Unknown");
 
     // make sure the cloud provider and cloud instance loaded from system-info.sh are preferred
     finalize_vendor_product_vm(ds);
