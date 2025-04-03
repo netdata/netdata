@@ -72,7 +72,6 @@ func (c *Collector) getSysObjectID(oid string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	return strings.Replace(resp.Variables[0].Value.(string), ".", "", 1), nil
 }
 
