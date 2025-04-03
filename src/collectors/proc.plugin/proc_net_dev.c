@@ -383,9 +383,7 @@ static netdata_mutex_t netdev_mutex = NETDATA_MUTEX_INITIALIZER;
 
 // ----------------------------------------------------------------------------
 
-static inline void netdev_rename(struct netdev *d, struct rename_task *r) {
-    rename_task_verify_checksum(r);
-
+static inline void netdev_rename_unsafe(struct netdev *d, struct rename_task *r) {
     collector_info("CGROUP: renaming network interface '%s' as '%s' under '%s'", d->name, r->container_device, r->container_name);
 
     netdev_charts_release(d);
@@ -474,7 +472,9 @@ static void netdev_rename_this_device(struct netdev *d) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(netdev_renames, d->name);
     if(item) {
         struct rename_task *r = dictionary_acquired_item_value(item);
-        netdev_rename(d, r);
+        spinlock_lock(&r->spinlock);
+        netdev_rename_unsafe(d, r);
+        spinlock_unlock(&r->spinlock);
         dictionary_acquired_item_release(netdev_renames, item);
     }
 }
