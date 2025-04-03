@@ -1349,6 +1349,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     if(!data_start)
         out_of_memory(__FUNCTION__, total_file_size, path);
 
+    fatal_assert(extent_offset <= total_file_size);
     memset(data_start, 0, extent_offset);
 
     // Write header
