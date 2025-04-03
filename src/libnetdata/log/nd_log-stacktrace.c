@@ -152,7 +152,7 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
         bt_data->frame_count = 0;
         bt_data->first_frame = true;
         root_cause_function[0] = '\0';
-        return; // Skip adding the logging function itself
+        // continue to add the function to the stack trace
     }
 
     // Check if this is a netdata source file and store the function name if it is
@@ -394,7 +394,7 @@ void capture_stack_trace(BUFFER *wb) {
             buffer_flush(wb);
             added = 0;
             frames = 0;
-            continue; // Skip adding the logging function itself
+            // continue to add the function to the stack trace
         }
 
         if (frames++)
@@ -473,7 +473,7 @@ void capture_stack_trace(BUFFER *wb) {
                 // Found a logging function, reset the buffer
                 buffer_flush(wb);
                 added = 0;
-                continue; // Skip adding the logging function itself
+                // continue to add the function to the stack trace
             }
 
             if(added)
