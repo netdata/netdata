@@ -33,7 +33,8 @@ const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 const char *nd_log_method_for_external_plugins(const char *s);
 ND_UUID nd_log_get_invocation_id(void);
 
-void capture_stack_trace(BUFFER *wb);
+NEVER_INLINE
+void capture_stack_trace(BUFFER *wb, int skip_frames);
 void capture_stack_trace_init(void);
 void capture_stack_trace_flush(void);
 bool capture_stack_trace_available(void);

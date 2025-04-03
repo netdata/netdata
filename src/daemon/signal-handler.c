@@ -47,6 +47,7 @@ static struct {
 static void (*original_handlers[NSIG])(int) = {0};
 static void (*original_sigactions[NSIG])(int, siginfo_t *, void *) = {0};
 
+NEVER_INLINE
 void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused) {
 
     for(size_t i = 0; i < _countof(signals_waiting) ; i++) {
@@ -71,7 +72,8 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
             if (info && (signo == SIGSEGV || signo == SIGBUS || signo == SIGILL || signo == SIGFPE))
                 fault_address = info->si_addr;
 
-            if(daemon_status_file_deadly_signal_received(signals_waiting[i].reason, sc, fault_address, chained_handler)) {
+            // Tell daemon_status_file_deadly_signal_received to skip the nd_signal_handler frame
+            if(daemon_status_file_deadly_signal_received(signals_waiting[i].reason, sc, fault_address, chained_handler, 1)) {
                 // this is a duplicate event, do not send it to sentry
 #ifdef ENABLE_SENTRY
                 nd_sentry_crash_report(false);

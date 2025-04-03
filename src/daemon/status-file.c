@@ -1140,7 +1140,8 @@ void daemon_status_file_check_crash(void) {
     }
 }
 
-static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool force) {
+NEVER_INLINE
+static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool force, int skip_frames) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
@@ -1156,7 +1157,8 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
         return;
 
     buffer_flush(wb);
-    capture_stack_trace(wb);
+    // Pass the skip_frames parameter
+    capture_stack_trace(wb, skip_frames);
 
     if(buffer_strlen(wb) > 0) {
         strncpyz(
@@ -1212,7 +1214,8 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     dsf_release(session_status);
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    daemon_status_file_save_twice_if_we_can_get_stack_trace(wb, &session_status, false);
+    // Add 1 to skip daemon_status_file_register_fatal frame
+    daemon_status_file_save_twice_if_we_can_get_stack_trace(wb, &session_status, false, 1);
 
     freez((void *)filename);
     freez((void *)function);
@@ -1248,10 +1251,12 @@ static void daemon_status_file_out_of_memory(void) {
     session_status.exit_reason |= EXIT_REASON_OUT_OF_MEMORY;
     dsf_release(session_status);
 
-    daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
+    // Add 1 to skip daemon_status_file_out_of_memory frame
+    daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true, 1);
 }
 
-bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, void *fault_address, bool chained_handler) {
+NEVER_INLINE
+bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, void *fault_address, bool chained_handler, int skip_frames) {
     FUNCTION_RUN_ONCE_RET(true);
 
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
@@ -1297,8 +1302,13 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     bool get_stack_trace = capture_stack_trace_available() && safe_to_get_stack_trace && stack_trace_is_empty(&session_status);
 
     // save it
-    if(get_stack_trace)
-        daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
+    if(get_stack_trace) {
+        // Skip frames:
+        // 1. daemon_status_file_deadly_signal_received itself (always skipped)
+        // 2. Plus any additional frames requested by the caller (e.g., nd_signal_handler)
+        // This way we'll see the actual function that caused the signal
+        daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true, 1 + skip_frames);
+    }
     else {
         if (!capture_stack_trace_available())
             set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");

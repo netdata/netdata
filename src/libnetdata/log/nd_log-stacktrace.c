@@ -164,7 +164,8 @@ bool capture_stack_trace_available(void) {
     return backtrace_state != NULL && BACKTRACE_SUPPORTED;
 }
 
-void capture_stack_trace(BUFFER *wb) {
+NEVER_INLINE
+void capture_stack_trace(BUFFER *wb, int skip_frames) {
     if (!backtrace_state) {
         buffer_strcat(wb, NO_STACK_TRACE_PREFIX "libbacktrace not initialized");
         return;
@@ -176,8 +177,10 @@ void capture_stack_trace(BUFFER *wb) {
         .first_frame = true
     };
 
-    // Skip one frame to hide capture_stack_trace() itself
-    backtrace_full(backtrace_state, 1, bt_full_handler,
+    // Skip frame(s) to hide capture_stack_trace() itself and any additional frames requested
+    // Always skip at least 1 frame to hide capture_stack_trace() itself
+    int frames_to_skip = 1 + skip_frames;
+    backtrace_full(backtrace_state, frames_to_skip, bt_full_handler,
                    bt_error_handler, &bt_data);
 
     // If no frames were reported
@@ -216,7 +219,8 @@ bool capture_stack_trace_available(void) {
     return true;
 }
 
-void capture_stack_trace(BUFFER *wb) {
+NEVER_INLINE
+void capture_stack_trace(BUFFER *wb, int skip_frames) {
     // this function is async-signal-safe, if the buffer has enough space to hold the stack trace
 
     unw_cursor_t cursor;
@@ -226,6 +230,15 @@ void capture_stack_trace(BUFFER *wb) {
     // Initialize context for current thread
     unw_getcontext(&context);
     unw_init_local(&cursor, &context);
+
+    // Always skip at least 1 frame (capture_stack_trace itself)
+    int frames_to_skip = 1 + skip_frames;
+    
+    // Skip requested number of frames
+    for (int i = 0; i < frames_to_skip; i++) {
+        if (unw_step(&cursor) <= 0)
+            break;
+    }
 
     size_t added = 0;
     while (unw_step(&cursor) > 0) {
@@ -242,7 +255,7 @@ void capture_stack_trace(BUFFER *wb) {
             offset = 0;
         }
 
-        if (frames++)
+        if (added > 0)
             buffer_putc(wb, '\n');
 
         buffer_putc(wb, '#');
@@ -284,7 +297,8 @@ bool capture_stack_trace_is_async_signal_safe(void) {
     return false;
 }
 
-void capture_stack_trace(BUFFER *wb) {
+NEVER_INLINE
+void capture_stack_trace(BUFFER *wb, int skip_frames) {
     void *array[50];
     char **messages;
     int size, i;
@@ -297,15 +311,24 @@ void capture_stack_trace(BUFFER *wb) {
         return;
     }
 
+    // Always skip at least 1 frame (capture_stack_trace itself)
+    int frames_to_skip = 1 + skip_frames;
+    if (frames_to_skip >= size) {
+        // Too many frames to skip, not enough frames available
+        buffer_strcat(wb, NO_STACK_TRACE_PREFIX "too many frames to skip");
+        free(messages);
+        return;
+    }
+
     size_t added = 0;
     // Format the stack trace (removing the address part)
-    for (i = 0; i < size; i++) {
+    for (i = frames_to_skip; i < size; i++) {
         if(messages[i] && *messages[i]) {
             if(added)
                 buffer_putc(wb, '\n');
 
             buffer_putc(wb, '#');
-            buffer_print_uint64(wb, i);
+            buffer_print_uint64(wb, added);
             buffer_putc(wb, ' ');
             buffer_strcat(wb, messages[i]);
             added++;
@@ -340,7 +363,7 @@ bool capture_stack_trace_is_async_signal_safe(void) {
     return false;
 }
 
-void capture_stack_trace(BUFFER *wb) {
+void capture_stack_trace(BUFFER *wb, int skip_frames __maybe_unused) {
     buffer_strcat(wb, NO_STACK_TRACE_PREFIX "no back-end available");
 
     // probably we can have something like this?
@@ -350,6 +373,7 @@ void capture_stack_trace(BUFFER *wb) {
 
 #endif
 
+NEVER_INLINE
 bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
     static __thread bool in_stack_trace = false;
 
@@ -367,7 +391,8 @@ bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
 
     in_stack_trace = true;
 
-    capture_stack_trace(wb);
+    // Skip 1 frame for the stack_trace_formatter itself
+    capture_stack_trace(wb, 1);
 
     in_stack_trace = false; // Ensure the flag is reset
     return true;
