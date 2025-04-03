@@ -487,15 +487,30 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
 
 // ----------------------------------------------------------------------------
 
+typedef struct {
+    size_t uuid_lookup_hits;
+    size_t uuid_lookup_misses;
+    size_t page_entries_scanned;
+    size_t page_entries_matched;
+} journal_index_lookup_stats_t;
+
 typedef void (*page_found_callback_t)(PGC_PAGE *page, void *data);
-static ALWAYS_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data) {
+
+static ALWAYS_INLINE_HOT journal_index_lookup_stats_t
+get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data)
+{
+    journal_index_lookup_stats_t stats = {
+        .uuid_lookup_hits = 0,
+        .uuid_lookup_misses = 0,
+        .page_entries_scanned = 0,
+        .page_entries_matched = 0,
+    };
+
     nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
     time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
-
-    size_t pages_found = 0;
 
     NJFV2IDX_FIND_STATE state = {
             .init = false,
@@ -513,12 +528,8 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_i
         if (unlikely(!j2_header))
             continue;
 
-        time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
         size_t journal_v2_file_size = datafile->journalfile->mmap.size;
 
-        // the datafile possibly contains useful data for this query
-
-        size_t journal_metric_count = (size_t)j2_header->metric_count;
         struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
         size_t metric_offset = (uint8_t *) uuid_list - (uint8_t *) j2_header;
         if (metric_offset >= journal_v2_file_size) {
@@ -528,13 +539,13 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_i
             continue;
         }
 
-        struct journal_metric_list *uuid_entry = bsearch(uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
-
-        if (unlikely(!uuid_entry)) {
-            // our UUID is not in this datafile
+        const struct journal_metric_list *uuid_entry = journalfile_v2_metrics_lookup(j2_header, uuid);
+        if (!uuid_entry) {
+            stats.uuid_lookup_misses += 1;
             journalfile_v2_data_release(datafile->journalfile);
             continue;
         }
+        stats.uuid_lookup_hits += 1;
 
         struct journal_page_header *page_list_header = (struct journal_page_header *) ((uint8_t *) j2_header + uuid_entry->page_offset);
         size_t page_offset = (uint8_t *) page_list_header - (uint8_t *) j2_header;
@@ -550,7 +561,11 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_i
         uint32_t extent_entries = j2_header->extent_count;
         uint32_t uuid_page_entries = page_list_header->entries;
 
+        time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
+
         for (uint32_t index = 0; index < uuid_page_entries; index++) {
+            stats.page_entries_scanned += 1;
+
             struct journal_page_list *page_entry_in_journal = &page_list[index];
 
             time_t page_first_time_s = page_entry_in_journal->delta_start_s + journal_start_time_s;
@@ -603,14 +618,14 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_i
 
                 pgc_page_release(open_cache, page);
 
-                pages_found++;
+                stats.page_entries_matched++;
             }
         }
 
         journalfile_v2_data_release(datafile->journalfile);
     }
 
-    return pages_found;
+    return stats;
 }
 
 void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
@@ -727,10 +742,10 @@ static ALWAYS_INLINE_HOT Pvoid_t get_page_list(
     // PASS 3: Check Journal v2 to fill the gaps
 
     pass3_ut = now_monotonic_usec();
-    size_t pages_pass3 = get_page_list_from_journal_v2(ctx, metric, start_time_ut, end_time_ut,
+    journal_index_lookup_stats_t pass3_stats = get_page_list_from_journal_v2(ctx, metric, start_time_ut, end_time_ut,
                                                        add_page_details_from_journal_v2, &JudyL_page_array);
-    pages_found_in_journals_v2 += pages_pass3;
-    pages_total += pages_pass3;
+    pages_found_in_journals_v2 += pass3_stats.page_entries_matched;
+    pages_total += pass3_stats.page_entries_matched;
     done_v2 = true;
 
     // --------------------------------------------------------------
@@ -761,6 +776,12 @@ we_are_done:
     if(done_v2) {
         time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_in_journal_v2_lookup, pass3_ut);
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
+
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_index_lookups, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_index_uuid_lookup_hits, pass3_stats.uuid_lookup_hits, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_index_uuid_lookup_misses, pass3_stats.uuid_lookup_misses, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_index_page_entries_scanned, pass3_stats.page_entries_scanned, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_index_page_entries_matched, pass3_stats.page_entries_matched, __ATOMIC_RELAXED);
     }
 
     if(done_pass4) {

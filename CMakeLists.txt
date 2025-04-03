@@ -1657,6 +1657,8 @@ if(ENABLE_DBENGINE)
             src/database/engine/rrddiskprotocol.h
             src/database/engine/datafile.c
             src/database/engine/datafile.h
+            src/database/engine/journalfile_metric_hash_table.h
+            src/database/engine/journalfile_metric_hash_table.cc
             src/database/engine/journalfile.c
             src/database/engine/journalfile.h
             src/database/engine/rrdenginelib.c
