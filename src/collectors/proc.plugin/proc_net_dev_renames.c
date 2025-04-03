@@ -4,14 +4,40 @@
 
 DICTIONARY *netdev_renames = NULL;
 
+static XXH64_hash_t rename_task_hash(struct rename_task *r) {
+    struct rename_task local_copy = *r;
+    local_copy.checksum = 0;
+    return XXH3_64bits(&local_copy, sizeof(local_copy));
+}
+
+// Set the checksum for a rename_task
+static void rename_task_set_checksum(struct rename_task *r) {
+    r->checksum = rename_task_hash(r);
+}
+
+// Verify the checksum for a rename_task
+void rename_task_verify_checksum(struct rename_task *r) {
+    if(r->checksum != rename_task_hash(r))
+        fatal("MEMORY CORRUPTION DETECTED in rename_task structure. "
+              "Expected checksum: 0x%016" PRIx64 ", "
+              "Calculated checksum: 0x%016" PRIx64,
+              r->checksum, rename_task_hash(r));
+}
+
 static void dictionary_netdev_rename_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct rename_task *r = value;
 
+    rename_task_verify_checksum(r);
+
     cgroup_netdev_release(r->cgroup_netdev_link);
+    r->cgroup_netdev_link = NULL;
+
     rrdlabels_destroy(r->chart_labels);
-    freez((void *) r->container_name);
-    freez((void *) r->container_device);
-    freez((void *) r->ctx_prefix);
+    r->chart_labels = NULL;
+
+    freez_and_set_to_null(r->container_name);
+    freez_and_set_to_null(r->container_device);
+    freez_and_set_to_null(r->ctx_prefix);
 }
 
 void netdev_renames_init(void) {
@@ -41,8 +67,12 @@ void cgroup_rename_task_add(
         .ctx_prefix       = strdupz(ctx_prefix),
         .chart_labels     = rrdlabels_create(),
         .cgroup_netdev_link = cgroup_netdev_link,
+        .checksum = 0, // Will be set below
     };
     rrdlabels_migrate_to_these(tmp.chart_labels, labels);
+    
+    // Set the checksum after all fields are initialized
+    rename_task_set_checksum(&tmp);
 
     dictionary_set(netdev_renames, host_device, &tmp, sizeof(tmp));
 }
