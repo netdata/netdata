@@ -47,6 +47,7 @@ static struct {
 static void (*original_handlers[NSIG])(int) = {0};
 static void (*original_sigactions[NSIG])(int, siginfo_t *, void *) = {0};
 
+NEVER_INLINE
 void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused) {
 
     for(size_t i = 0; i < _countof(signals_waiting) ; i++) {
@@ -168,6 +169,9 @@ void nd_cleanup_deadly_signals(void) {
 
 void nd_initialize_signals(bool chain_existing) {
     signals_block_all_except_deadly();
+    
+    // Set the signal handler name for stack trace filtering
+    capture_stack_trace_set_signal_handler_function("nd_signal_handler");
 
     struct sigaction act;
     memset(&act, 0, sizeof(struct sigaction));
@@ -206,6 +210,7 @@ void nd_initialize_signals(bool chain_existing) {
     }
 }
 
+NEVER_INLINE
 static void process_triggered_signals(void) {
     size_t found;
     do {
@@ -264,6 +269,7 @@ static inline bool threshold_trigger_smaller(bool *last, double threshold, doubl
     return !triggered && *last;
 }
 
+NEVER_INLINE
 void nd_process_signals(void) {
     posix_unmask_my_signals();
     const usec_t save_every_ut = 15 * 60 * USEC_PER_SEC;
