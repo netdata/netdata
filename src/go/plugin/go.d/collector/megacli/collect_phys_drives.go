@@ -55,6 +55,10 @@ func (c *Collector) collectPhysDrives(mx map[string]int64) error {
 	var drives int
 
 	for _, ad := range adapters {
+		if len(ad.physDrives) == 0 {
+			continue
+		}
+
 		if !c.adapters[ad.number] {
 			c.adapters[ad.number] = true
 			c.addAdapterCharts(ad)
