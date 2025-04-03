@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package journaldexporter
 
 import (
@@ -14,20 +16,14 @@ import (
 
 func (e *journaldExporter) logsToJournaldMessages(ld plog.Logs, buf *bytes.Buffer) {
 	receivedAt := fmt.Sprintf("%d", time.Now().UnixNano()/1000)
-	rls := ld.ResourceLogs()
-	for i := 0; i < rls.Len(); i++ {
-		rl := rls.At(i)
+
+	for _, rl := range ld.ResourceLogs().All() {
 		resource := rl.Resource()
 
-		scopeLogs := rl.ScopeLogs()
-		for j := 0; j < scopeLogs.Len(); j++ {
-			sl := scopeLogs.At(j)
+		for _, sl := range rl.ScopeLogs().All() {
 			scope := sl.Scope()
 
-			logRecords := sl.LogRecords()
-			for k := 0; k < logRecords.Len(); k++ {
-				lr := logRecords.At(k)
-
+			for _, lr := range sl.LogRecords().All() {
 				writeField(buf, "__REALTIME_TIMESTAMP", receivedAt)
 				writeField(buf, "SYSLOG_IDENTIFIER", e.fields.syslogID)
 				writeField(buf, "_PID", e.fields.pid)
@@ -38,31 +34,23 @@ func (e *journaldExporter) logsToJournaldMessages(ld plog.Logs, buf *bytes.Buffe
 				writeField(buf, "PRIORITY", strconv.Itoa(mapSeverityToJournaldPriority(lr.SeverityNumber())))
 				writeField(buf, "MESSAGE", bodyToString(lr.Body()))
 
-				resource.Attributes().Range(func(k string, v pcommon.Value) bool {
+				for k, v := range resource.Attributes().All() {
 					writeField(buf, "OTEL_RESOURCE_ATTR_"+k, v.AsString())
-					return true
-				})
+				}
 
-				if scope.Name() != "" {
-					writeField(buf, "OTEL_SCOPE_NAME", scope.Name())
-				}
-				if scope.Version() != "" {
-					writeField(buf, "OTEL_SCOPE_VERSION", scope.Version())
-				}
+				writeField(buf, "OTEL_SCOPE_NAME", scope.Name())
+				writeField(buf, "OTEL_SCOPE_VERSION", scope.Version())
 
 				if lr.Timestamp() != 0 {
 					ts := time.Unix(0, int64(lr.Timestamp()))
 					writeField(buf, "OTEL_TIMESTAMP", strconv.FormatInt(ts.UnixMicro(), 10))
 				}
-
-				if lr.ObservedTimestamp() != 0 && lr.ObservedTimestamp() != lr.Timestamp() {
+				if lr.ObservedTimestamp() != 0 {
 					ts := time.Unix(0, int64(lr.ObservedTimestamp()))
 					writeField(buf, "OTEL_OBSERVED_TIMESTAMP", strconv.FormatInt(ts.UnixMicro(), 10))
 				}
 
-				if lr.SeverityText() != "" {
-					writeField(buf, "OTEL_SEVERITY_LEVEL", lr.SeverityText())
-				}
+				writeField(buf, "OTEL_SEVERITY_LEVEL", lr.SeverityText())
 
 				if !lr.TraceID().IsEmpty() {
 					writeField(buf, "OTEL_TRACE_ID", lr.TraceID().String())
@@ -74,14 +62,11 @@ func (e *journaldExporter) logsToJournaldMessages(ld plog.Logs, buf *bytes.Buffe
 					}
 				}
 
-				if lr.EventName() != "" {
-					writeField(buf, "OTEL_EVENT_NAME", lr.EventName())
-				}
+				writeField(buf, "OTEL_EVENT_NAME", lr.EventName())
 
-				lr.Attributes().Range(func(k string, v pcommon.Value) bool {
+				for k, v := range lr.Attributes().All() {
 					writeField(buf, "OTEL_ATTR_"+k, v.AsString())
-					return true
-				})
+				}
 
 				buf.WriteByte('\n') // extra newline
 			}

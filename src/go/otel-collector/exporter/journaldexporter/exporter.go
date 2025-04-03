@@ -1,6 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package journaldexporter
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -17,7 +20,14 @@ type (
 		log    *zap.Logger
 		conf   *Config
 		fields commonFields
+		s      sender
+		buf    bytes.Buffer
 	}
+	sender interface {
+		sendMessage(ctx context.Context, msg []byte) error
+		shutdown(ctx context.Context) error
+	}
+
 	commonFields struct {
 		syslogID  string
 		pid       string
@@ -35,9 +45,21 @@ func newJournaldExporter(cfg component.Config, logger *zap.Logger) *journaldExpo
 	}
 }
 
-func (e *journaldExporter) consumeLogs(_ context.Context, ld plog.Logs) error {
-	fmt.Println("consume logs")
-	return nil
+func (e *journaldExporter) consumeLogs(ctx context.Context, ld plog.Logs) error {
+	if e.s == nil {
+		return nil
+	}
+
+	e.buf.Reset()
+
+	e.logsToJournaldMessages(ld, &e.buf)
+
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+		return e.s.sendMessage(ctx, e.buf.Bytes())
+	}
 }
 
 func (e *journaldExporter) Start(_ context.Context, _ component.Host) error {
