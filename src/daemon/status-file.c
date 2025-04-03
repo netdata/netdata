@@ -1156,6 +1156,7 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
         return;
 
     buffer_flush(wb);
+    
     capture_stack_trace(wb);
 
     if(buffer_strlen(wb) > 0) {

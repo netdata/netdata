@@ -168,6 +168,9 @@ void nd_cleanup_deadly_signals(void) {
 
 void nd_initialize_signals(bool chain_existing) {
     signals_block_all_except_deadly();
+    
+    // Set the signal handler name for stack trace filtering
+    capture_stack_trace_set_signal_handler_function("nd_signal_handler");
 
     struct sigaction act;
     memset(&act, 0, sizeof(struct sigaction));

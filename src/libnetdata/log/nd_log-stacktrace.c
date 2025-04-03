@@ -6,6 +6,14 @@ bool nd_log_forked = false;
 
 #define NO_STACK_TRACE_PREFIX "info: stack trace is not available, "
 
+// The signal handler function name to filter out in stack traces
+static const char *signal_handler_function = "nd_signal_handler";
+
+// Set the signal handler function name to filter out in stack traces
+void capture_stack_trace_set_signal_handler_function(const char *function_name) {
+    signal_handler_function = function_name;
+}
+
 #if defined(HAVE_LIBBACKTRACE)
 #include "backtrace-supported.h"
 #endif
@@ -16,9 +24,11 @@ bool nd_log_forked = false;
 static struct backtrace_state *backtrace_state = NULL;
 
 typedef struct {
-    BUFFER *wb;       // Buffer to write to
-    size_t frame_count; // Number of frames processed
-    bool first_frame;   // Is this the first frame?
+    BUFFER *wb;             // Buffer to write to
+    size_t frame_count;     // Number of frames processed
+    bool first_frame;       // Is this the first frame?
+    bool filter_signal_handler; // Should we filter the signal handler?
+    bool found_signal_handler;  // Have we found the signal handler frame?
 } backtrace_data_t;
 
 // Common function to format and add a stack frame to the buffer
@@ -28,6 +38,18 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
 
     if (!wb)
         return;
+
+    // Check if we found the signal handler frame
+    if (bt_data->filter_signal_handler && !bt_data->found_signal_handler && 
+        function && signal_handler_function && strcmp(function, signal_handler_function) == 0) {
+        
+        // We found the signal handler, reset the buffer
+        buffer_flush(wb);
+        bt_data->frame_count = 0;
+        bt_data->first_frame = true;
+        bt_data->found_signal_handler = true;
+        return; // Skip adding the signal handler itself
+    }
 
     // Add a newline between frames
     if (!bt_data->first_frame)
@@ -173,7 +195,9 @@ void capture_stack_trace(BUFFER *wb) {
     backtrace_data_t bt_data = {
         .wb = wb,
         .frame_count = 0,
-        .first_frame = true
+        .first_frame = true,
+        .filter_signal_handler = (signal_handler_function && *signal_handler_function),
+        .found_signal_handler = false
     };
 
     // Skip one frame to hide capture_stack_trace() itself
@@ -228,6 +252,9 @@ void capture_stack_trace(BUFFER *wb) {
     unw_init_local(&cursor, &context);
 
     size_t added = 0;
+    bool found_signal_handler = false;
+    bool filter = (signal_handler_function && *signal_handler_function);
+
     while (unw_step(&cursor) > 0) {
         unw_word_t offset, pc;
         char sym[256];
@@ -240,6 +267,18 @@ void capture_stack_trace(BUFFER *wb) {
         if (unw_get_proc_name(&cursor, sym, sizeof(sym), &offset) != 0) {
             name = "<unknown>";
             offset = 0;
+        }
+
+        // Check if we found the signal handler frame
+        if (filter && !found_signal_handler && 
+            strcmp(name, signal_handler_function) == 0) {
+            
+            // We found the signal handler, reset the buffer
+            buffer_flush(wb);
+            added = 0;
+            frames = 0;
+            found_signal_handler = true;
+            continue; // Skip adding the signal handler itself
         }
 
         if (frames++)
@@ -298,14 +337,28 @@ void capture_stack_trace(BUFFER *wb) {
     }
 
     size_t added = 0;
+    bool found_signal_handler = false;
+    bool filter = (signal_handler_function && *signal_handler_function);
+
     // Format the stack trace (removing the address part)
     for (i = 0; i < size; i++) {
         if(messages[i] && *messages[i]) {
+            // Check if we found the signal handler frame
+            if (filter && !found_signal_handler && 
+                strstr(messages[i], signal_handler_function) != NULL) {
+                
+                // We found the signal handler, reset the buffer
+                buffer_flush(wb);
+                added = 0;
+                found_signal_handler = true;
+                continue; // Skip adding the signal handler itself
+            }
+
             if(added)
                 buffer_putc(wb, '\n');
 
             buffer_putc(wb, '#');
-            buffer_print_uint64(wb, i);
+            buffer_print_uint64(wb, added);
             buffer_putc(wb, ' ');
             buffer_strcat(wb, messages[i]);
             added++;
