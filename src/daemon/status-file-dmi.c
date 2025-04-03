@@ -70,6 +70,8 @@ static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
         const char *found;
         const char *replace;
     } vendors[] = {
+        {"QEMU", "KVM"},
+
         // Major vendors with multiple variations
         {"AMD Corporation", "AMD"},
         {"Advanced Micro Devices, Inc.", "AMD"},
@@ -131,6 +133,7 @@ static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
         {"Gigabyte Tecohnology Co., Ltd.", "Gigabyte"},
 
         {"GOOGLE", "Google"},
+        {"Google Inc", "Google"},
 
         {"HC Technology.,Ltd.", "HC Tech"},
 
@@ -165,9 +168,13 @@ static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
         {"Micro-Star International Co., Ltd", "MSI"},
         {"Micro-Star International Co., Ltd.", "MSI"},
 
+        {"MICROSOFT", "Microsoft"},
         {"Microsoft Corporation", "Microsoft"},
 
         {"nVIDIA", "NVIDIA"},
+
+        {"OPENSTACK", "OpenStack"},
+        {"OpenStack Foundation", "OpenStack"},
 
         {"ORACLE CORPORATI", "Oracle"},
         {"Oracle Corporation", "Oracle"},
@@ -188,6 +195,8 @@ static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
         {"RED HAT", "Red Hat"},
 
         {"SAMSUNG ELECTRONICS CO., LTD.", "Samsung"},
+
+        {"SUN MICROSYSTEMS", "Sun"},
 
         {"SuperMicro", "Supermicro"},
         {"Supermicro Corporation", "Supermicro"},
@@ -1362,8 +1371,10 @@ void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
         safecpy(ds->hw.sys.vendor, ds->hw.chassis.vendor);
     if(!ds->hw.sys.vendor[0])
         safecpy(ds->hw.sys.vendor, ds->hw.bios.vendor);
-    if(!ds->hw.sys.vendor[0] && strstr(ds->hw.product.name, "Raspberry") != NULL)
+    if(!ds->hw.sys.vendor[0] && strstr(ds->hw.product.name, "Raspberry") != NULL) {
         safecpy(ds->hw.sys.vendor, "Raspberry");
+        safecpy(ds->hw.chassis.type, "mini-pc");
+    }
     if(!ds->hw.sys.vendor[0] && (strstr(ds->hw.product.name, "VirtualMac") != NULL || strstr(ds->hw.board.name, "Apple") != NULL))
         safecpy(ds->hw.sys.vendor, "Apple");
     if(!ds->hw.sys.vendor[0])
