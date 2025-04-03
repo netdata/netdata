@@ -1140,6 +1140,7 @@ void daemon_status_file_check_crash(void) {
     }
 }
 
+NEVER_INLINE
 static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool force) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
@@ -1179,6 +1180,7 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
 // --------------------------------------------------------------------------------------------------------------------
 // ng_log() hook for receiving fatal message information
 
+NEVER_INLINE
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line) {
     FUNCTION_RUN_ONCE();
 
@@ -1257,6 +1259,7 @@ static void daemon_status_file_out_of_memory(void) {
     daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
 }
 
+NEVER_INLINE
 bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, void *fault_address, bool chained_handler) {
     FUNCTION_RUN_ONCE_RET(true);
 
@@ -1322,6 +1325,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
 static SPINLOCK shutdown_timeout_spinlock = SPINLOCK_INITIALIZER;
 
+NEVER_INLINE
 void daemon_status_file_shutdown_timeout(BUFFER *trace) {
     FUNCTION_RUN_ONCE();
 

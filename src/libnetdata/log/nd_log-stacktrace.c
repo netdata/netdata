@@ -295,6 +295,7 @@ bool capture_stack_trace_available(void) {
     return backtrace_state != NULL && BACKTRACE_SUPPORTED;
 }
 
+NEVER_INLINE
 void capture_stack_trace(BUFFER *wb) {
     if (!backtrace_state) {
         buffer_strcat(wb, NO_STACK_TRACE_PREFIX "libbacktrace not initialized");
@@ -348,6 +349,7 @@ bool capture_stack_trace_available(void) {
     return true;
 }
 
+NEVER_INLINE
 void capture_stack_trace(BUFFER *wb) {
     // this function is async-signal-safe, if the buffer has enough space to hold the stack trace
 
@@ -437,6 +439,7 @@ bool capture_stack_trace_is_async_signal_safe(void) {
     return false;
 }
 
+NEVER_INLINE
 void capture_stack_trace(BUFFER *wb) {
     void *array[50];
     char **messages;
@@ -512,6 +515,7 @@ bool capture_stack_trace_is_async_signal_safe(void) {
     return false;
 }
 
+NEVER_INLINE
 void capture_stack_trace(BUFFER *wb) {
     buffer_strcat(wb, NO_STACK_TRACE_PREFIX "no back-end available");
 
@@ -522,6 +526,7 @@ void capture_stack_trace(BUFFER *wb) {
 
 #endif
 
+NEVER_INLINE
 bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
     static __thread bool in_stack_trace = false;
 
