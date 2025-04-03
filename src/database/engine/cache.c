@@ -2552,7 +2552,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
     pgc_queue_unlock(cache, &cache->hot);
 
     // callback
-    cb(section, datafile_fileno, type, JudyL_metrics, JudyL_extents_pos, count_of_unique_extents, count_of_unique_metrics, count_of_unique_pages, data);
+    bool success = cb(section, datafile_fileno, type, JudyL_metrics, JudyL_extents_pos, count_of_unique_extents, count_of_unique_metrics, count_of_unique_pages, data);
 
     {
         Pvoid_t *PValue1;
@@ -2567,12 +2567,14 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
             while ((PValue2 = JudyLFirstThenNext(mi->JudyL_pages_by_start_time, &start_time, &start_time_first))) {
                 struct jv2_page_info *pi = *PValue2;
 
-                // balance-parents: transition from hot to clean directly
                 yield_the_processor(); // do not lock too aggressively
-                page_set_clean(cache, pi->page, true, false, PGC_QUEUE_LOCK_PRIO_LOW);
-                page_transition_unlock(cache, pi->page);
-                page_release(cache, pi->page, true);
+                if (likely(success))
+                    page_set_clean(cache, pi->page, true, false, PGC_QUEUE_LOCK_PRIO_LOW);
+                else
+                    page_flag_clear(pi->page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
 
+                page_transition_unlock(cache, pi->page);
+                page_release(cache, pi->page, success);
                 // before balance-parents:
                 // page_transition_unlock(cache, pi->page);
                 // pgc_page_hot_to_dirty_and_release(cache, pi->page, true);
