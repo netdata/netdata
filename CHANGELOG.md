@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- trace crashes No 4 [\#20043](https://github.com/netdata/netdata/pull/20043) ([ktsaou](https://github.com/ktsaou))
+- daemon status 26b [\#20041](https://github.com/netdata/netdata/pull/20041) ([ktsaou](https://github.com/ktsaou))
+- Update netdata-updater-daily.in [\#20039](https://github.com/netdata/netdata/pull/20039) ([dave818](https://github.com/dave818))
 - chore\(otel/journaldexporter\): add trusted journald fields [\#20038](https://github.com/netdata/netdata/pull/20038) ([ilyam8](https://github.com/ilyam8))
 - daemon status 26 - dmi strings [\#20037](https://github.com/netdata/netdata/pull/20037) ([ktsaou](https://github.com/ktsaou))
+- Fix ACLK synchronization fatal on shutdown [\#20034](https://github.com/netdata/netdata/pull/20034) ([stelfrag](https://github.com/stelfrag))
 - chore\(otel/journaldexporter\): convert logs to journald format [\#20033](https://github.com/netdata/netdata/pull/20033) ([ilyam8](https://github.com/ilyam8))
 - Check for host timer validity in ACLK synchronization [\#20031](https://github.com/netdata/netdata/pull/20031) ([stelfrag](https://github.com/stelfrag))
 - improvement\(go.d\): add `_hostname` label for virtual nodes [\#20030](https://github.com/netdata/netdata/pull/20030) ([ilyam8](https://github.com/ilyam8))
@@ -63,6 +67,7 @@
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.3 to 5.7.4 in /src/go [\#19968](https://github.com/netdata/netdata/pull/19968) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/docker/docker from 28.0.2+incompatible to 28.0.4+incompatible in /src/go [\#19967](https://github.com/netdata/netdata/pull/19967) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Improve ACLK sync shutdown process [\#19966](https://github.com/netdata/netdata/pull/19966) ([stelfrag](https://github.com/stelfrag))
+- Handle journal\_v2 file creation failure due to OOM [\#19965](https://github.com/netdata/netdata/pull/19965) ([stelfrag](https://github.com/stelfrag))
 - Fast restart on busy parents [\#19964](https://github.com/netdata/netdata/pull/19964) ([ktsaou](https://github.com/ktsaou))
 - Set sqlite max soft and hard heap limit [\#19963](https://github.com/netdata/netdata/pull/19963) ([stelfrag](https://github.com/stelfrag))
 - fix MSI installer [\#19962](https://github.com/netdata/netdata/pull/19962) ([ktsaou](https://github.com/ktsaou))
@@ -460,11 +465,6 @@
 - proc.plugin: remove traces of /proc/spl/kstat/zfs/pool/state [\#19491](https://github.com/netdata/netdata/pull/19491) ([intelfx](https://github.com/intelfx))
 - cgroups.plugin: fixes to cgroup path validation [\#19490](https://github.com/netdata/netdata/pull/19490) ([intelfx](https://github.com/intelfx))
 - Further improve alert processing [\#19489](https://github.com/netdata/netdata/pull/19489) ([stelfrag](https://github.com/stelfrag))
-- LTO Benchmark [\#19488](https://github.com/netdata/netdata/pull/19488) ([ktsaou](https://github.com/ktsaou))
-- Improve alert transition processing [\#19487](https://github.com/netdata/netdata/pull/19487) ([stelfrag](https://github.com/stelfrag))
-- protection against extreme cardinality [\#19486](https://github.com/netdata/netdata/pull/19486) ([ktsaou](https://github.com/ktsaou))
-- add agent name and version in streaming function [\#19485](https://github.com/netdata/netdata/pull/19485) ([ktsaou](https://github.com/ktsaou))
-- Coverity fixes [\#19484](https://github.com/netdata/netdata/pull/19484) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
