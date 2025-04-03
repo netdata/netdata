@@ -181,6 +181,10 @@ const char *daemon_status_file_get_fatal_errno(void);
 const char *daemon_status_file_get_fatal_stack_trace(void);
 const char *daemon_status_file_get_fatal_thread(void);
 const char *daemon_status_file_get_stack_trace_backend(void);
+const char *daemon_status_file_get_hw_sys_vendor(void);
+const char *daemon_status_file_get_hw_product_name(void);
+const char *daemon_status_file_get_hw_chassis_type(void);
+
 pid_t daemon_status_file_get_fatal_thread_id(void);
 long daemon_status_file_get_fatal_line(void);
 DAEMON_STATUS daemon_status_file_get_status(void);

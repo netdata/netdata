@@ -1459,6 +1459,18 @@ const char *daemon_status_file_get_fatal_thread(void) {
     return session_status.fatal.thread;
 }
 
+const char *daemon_status_file_get_hw_sys_vendor(void) {
+    return session_status.hw.sys.vendor;
+}
+
+const char *daemon_status_file_get_hw_product_name(void) {
+    return session_status.hw.product.name;
+}
+
+const char *daemon_status_file_get_hw_chassis_type(void) {
+    return session_status.hw.chassis.type;
+}
+
 pid_t daemon_status_file_get_fatal_thread_id(void) {
     return session_status.fatal.thread_id;
 }
