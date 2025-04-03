@@ -942,8 +942,7 @@ void create_aclk_config(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __may
 
 void destroy_aclk_config(RRDHOST *host)
 {
-    struct aclk_sync_cfg_t *ahc;
-    if (!host || !(ahc = host->aclk_config))
+    if (!host || !host->aclk_config)
         return;
 
     freez(host->aclk_config);
