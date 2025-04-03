@@ -1400,11 +1400,14 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     while ((PValue = JudyLFirstThenNext(JudyL_metrics, &Index, &first_then_next))) {
         metric_info = *PValue;
 
+        fatal_assert(metric_info != NULL);
         fatal_assert(count < number_of_metrics);
         uuid_list[count++].metric_info = metric_info;
         min_time_s = MIN(min_time_s, metric_info->first_time_s);
         max_time_s = MAX(max_time_s, metric_info->last_time_s);
     }
+
+    fatal_assert(count == number_of_metrics);
 
     // Check if not properly set in the loop above to prevent overflow
     if (min_time_s == LONG_MAX)
