@@ -1450,7 +1450,10 @@ void netdata_mount_mssql_connection_string(SQLCHAR *conn, size_t length, struct 
     char auth[512];
 
     if (dbInput->server && dbInput->address) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Collector is not expecting server and address defined together, please, select one of them.");
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "Collector is not expecting server and address defined together, please, select one of them.");
         conn[0] = '\0';
         return;
     }
@@ -1464,25 +1467,19 @@ void netdata_mount_mssql_connection_string(SQLCHAR *conn, size_t length, struct 
     }
 
     if (dbInput->windows_auth)
-        snprintfz(auth, sizeof(auth)-1, "Trusted_Connection = yes");
+        snprintfz(auth, sizeof(auth) - 1, "Trusted_Connection = yes");
     else if (!dbInput->username || !dbInput->password) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "You are not using Windows Authentication. Thus, it is necessary to specify user and password.");
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "You are not using Windows Authentication. Thus, it is necessary to specify user and password.");
         conn[0] = '\0';
         return;
     } else {
-        snprintfz(auth, sizeof(auth)-1, "UID=%s;PWD=%s;",
-                  dbInput->username,
-                  dbInput->password);
+        snprintfz(auth, sizeof(auth) - 1, "UID=%s;PWD=%s;", dbInput->username, dbInput->password);
     }
 
-    snprintfz(
-        (char *)conn,
-        length,
-        "Driver={%s};%s=%s;%s",
-        dbInput->driver,
-        serverAddress,
-        serverAddressArg,
-        auth);
+    snprintfz((char *)conn, length, "Driver={%s};%s=%s;%s", dbInput->driver, serverAddress, serverAddressArg, auth);
 }
 
 static void netdata_read_config_options()
@@ -1490,8 +1487,8 @@ static void netdata_read_config_options()
     dbconn.driver = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "driver", dbconn.driver);
     dbconn.server = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "server", dbconn.server);
     dbconn.address = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "address", dbconn.address);
-    dbconn.username = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "username", dbconn.username);
-    dbconn.password = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "password", dbconn.password);
+    dbconn.username = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "uid", dbconn.username);
+    dbconn.password = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "pwd", dbconn.password);
     dbconn.windows_auth = inicfg_get_boolean(
         &netdata_config, "plugin:windows:PerflibMSSQL", "windows authentication", dbconn.windows_auth);
 

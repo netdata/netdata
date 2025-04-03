@@ -5,13 +5,11 @@ This internal plugin is only available for Microsoft Windows operating systems.
 ## The Collector
 
 This plugin primarily collects metrics from Microsoft Windows [Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new). All detected metrics are automatically displayed without requiring additional configuration.
+=======
+Most of the metrics collected by this plugin originate from Microsoft Windows
+[Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new).
 
-## Configuration File
-
-The Windows plugin doesn't use a separate configuration file. Instead, configure it through Netdata's main configuration file located at:
-`C:\Program Files\Netdata\etc\netdata\netdata.conf`.
-
-### Enabling or Disabling Collection
+These metrics are always displayed when detected, requiring no additional configuration.
 
 By default, all collector threads are enabled except for `PerflibThermalZone` and `PerflibServices`. You can enable these or disable others by modifying options in the `[plugin:windows]` section of the configuration file.
 
@@ -40,8 +38,8 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
 
 ### MSSQL
 
-To collect certain metrics for [Microsoft SQL Server](https://www.microsoft.com/en-us/sql-server), Netdata needs
-access to internal server data.
+To collect certain metrics for [Microsoft SQL Server](https://www.microsoft.com/en-us/sql-server),
+Netdata needs access to internal server data.
 
 #### Windows Defender Firewall with Advanced Security
 
@@ -52,9 +50,11 @@ This port is typically blocked by Windows Defender, so you must allow access bef
 2. Right-click `Inbound Rules` and select `New Rule...`.
 3. Select `Port`, then click `Next`.
 4. Choose `TCP`, then enter `1433` in the `Specific local ports:`. Click `Next`.
-5. Select an appropriate action based on your network policy. For example, `Allow the connection`. Click `Next`.
+5. Select an appropriate action based on your network policy. For example, `Allow the connection`.
+   Click `Next`.
 6. Choose where the rule will be applied (Domain, Private, or Public).
-7. Finally, provide a `Name` and an optional `Description` for the new rule, then click `Finish`.
+7. Finally, provide a `Name` and an optional `Description` for the new rule,
+   then click `Finish`.
 
 #### Microsoft SQL Server
 
@@ -69,7 +69,8 @@ GRANT CONNECT SQL TO netdata_user;
 GRANT VIEW SERVER STATE TO netdata_user;
 ```
 
-In addition to creating the user, you must enable the [query store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16),
+In addition to creating the user, you must enable the
+[query store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16),
 on each database you wish to monitor.
 
 ```sql
@@ -107,10 +108,16 @@ If you want to allow connections using SQL Server authentication, you must modif
 
 Now that the user has been created inside your server, update `netdata.conf` by adding the following section:
 
-```
+```text
 [plugin:windows:PerflibMSSQL]
-        username = netdata_user
-        password = AReallyStrongPasswordShouldBeInsertedHere
-        hostname = localhost
-        port = 1433
+        driver = SQL Server Native Client 11.0
+        server = (localhost)
+        #address = [protocol:]Address[,port |\pipe\pipename]
+        uid = netdata_user
+        pwd = AReallyStrongPasswordShouldBeInsertedHere
+        #windows authentication = no
 ```
+
+For additional information on how to set these parameters, refer to the
+[Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16)
+
