@@ -4,7 +4,8 @@ This is an internal plugin available only for Microsoft Windows operating system
 
 ## The Collector
 
-Most of the metrics collected by this plugin originate from Microsoft Windows [Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new).
+Most of the metrics collected by this plugin originate from Microsoft Windows
+[Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new).
 These metrics are always displayed when detected, requiring no additional configuration.
 
 ## Configuration File
@@ -14,11 +15,11 @@ The Windows plugin does not have a separate configuration file. To configure it,
 
 ### Enabling or Disabling Collection
 
-With the exception of the `PerflibThermalZone` thread, all other threads are enabled by default. You can enable it
-or disable others by modifying a specific option for a thread inside the `[plugin:windows]` section. To do this,
-remove the comment symbol (`#`) at the beginning of the line and then change the boolean value after the equals sign.
+With the exception of the `PerflibThermalZone` thread, all other threads are enabled by default.
+You can enable it or disable others by modifying a specific option for a thread inside the `[plugin:windows]` section.
+To do this, remove the comment symbol (`#`) at the beginning of the line and then change the boolean value after the equals sign.
 
-``` 
+```text
 [plugin:windows]
         # GetSystemUptime = yes
         # GetSystemRAM = yes
@@ -40,8 +41,8 @@ remove the comment symbol (`#`) at the beginning of the line and then change the
 
 ### MSSQL
 
-To collect certain metrics for [Microsoft SQL Server](https://www.microsoft.com/en-us/sql-server), Netdata needs
-access to internal server data.
+To collect certain metrics for [Microsoft SQL Server](https://www.microsoft.com/en-us/sql-server),
+Netdata needs access to internal server data.
 
 #### Windows Defender Firewall with Advanced Security
 
@@ -52,9 +53,11 @@ This port is typically blocked by Windows Defender, so you must allow access bef
 2. Right-click `Inbound Rules` and select `New Rule...`.
 3. Select `Port`, then click `Next`.
 4. Choose `TCP`, then enter `1433` in the `Specific local ports:`. Click `Next`.
-5. Select an appropriate action based on your network policy. For example, `Allow the connection`. Click `Next`.
+5. Select an appropriate action based on your network policy. For example, `Allow the connection`.
+   Click `Next`.
 6. Choose where the rule will be applied (Domain, Private, or Public).
-7. Finally, provide a `Name` and an optional `Description` for the new rule, then click `Finish`.
+7. Finally, provide a `Name` and an optional `Description` for the new rule,
+   then click `Finish`.
 
 #### Microsoft SQL Server
 
@@ -69,7 +72,8 @@ GRANT CONNECT SQL TO netdata_user;
 GRANT VIEW SERVER STATE TO netdata_user;
 ```
 
-In addition to creating the user, you must enable the [query store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16),
+In addition to creating the user, you must enable the
+[query store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16),
 on each database you wish to monitor.
 
 ```sql
@@ -107,10 +111,15 @@ If you want to allow connections using SQL Server authentication, you must modif
 
 Now that the user has been created inside your server, update `netdata.conf` by adding the following section:
 
-```
+```text
 [plugin:windows:PerflibMSSQL]
-        username = netdata_user
-        password = AReallyStrongPasswordShouldBeInsertedHere
-        hostname = localhost
-        port = 1433
+        driver = SQL Server Native Client 11.0
+        server = (localhost)
+        #address = [protocol:]Address[,port |\pipe\pipename]
+        uid = netdata_user
+        pwd = AReallyStrongPasswordShouldBeInsertedHere
+        #windows authentication = no
 ```
+
+For additional information on how to set these parameters, refer to the
+[Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16)
