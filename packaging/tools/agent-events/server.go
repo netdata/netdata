@@ -170,7 +170,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if shouldProcess {
-		var fullData interface{}
+		// Always create a fresh map to prevent field reuse between requests
+		fullData := make(map[string]interface{})
+		
 		if err := json.Unmarshal(body, &fullData); err != nil {
 			http.Error(w, "Invalid JSON for full parsing", http.StatusBadRequest)
 			bodyDetail := ""
@@ -178,12 +180,15 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Discarded: Failed to fully parse JSON (post-dedup): %v%s", err, bodyDetail)
 			return
 		}
+		
+		// Marshal the map back to JSON
 		outputBytes, err := json.Marshal(fullData)
 		if err != nil {
 			http.Error(w, "Internal Server Error during output marshal", http.StatusInternalServerError)
 			log.Printf("Discarded: Failed to marshal JSON for output: %v", err)
 			return
 		}
+		
 		fmt.Println(string(outputBytes))
 		if _, err := w.Write([]byte("OK")); err != nil { log.Printf("Error writing OK response: %v", err) }
 	}
