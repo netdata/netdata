@@ -28,6 +28,7 @@ jobs:
     outputs:
       run: ${{ steps.check-run.outputs.run }}
       skip-go: ${{ steps.check-go.outputs.skip-go }}
+      static-native: ${{ steps.check-static.outputs.static-native }}
     steps:
       - name: Checkout
         id: checkout
@@ -80,6 +81,21 @@ jobs:
           files_ignore: |
             **/*.md
             packaging/repoconfig/
+      - name: Check static build files
+        id: check-static-build-files
+        uses: step-security/changed-files@v45
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            .github/data/distros.yml
+            .github/workflows/build.yml
+            .github/scripts/build-static.sh
+            .github/scripts/get-static-cache-key.sh
+            .github/scripts/gen-matrix-static.py
+            packaging/makeself/
+          files_ignore: |
+            **/*.md
+            packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
         if: github.event_name != 'workflow_dispatch'
@@ -109,6 +125,18 @@ jobs:
             fi
           else
             echo 'skip-go=' >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Check Static
+        id: check-static
+        run: |
+          if [ '${{ github.event_name }}' == 'pull_request' ]; then
+            if [ "${{ steps.check-static-build-files.outputs.any_modified }}" == "true" ] || [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/non-native') }}" = "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+              echo 'static-native=0' >> "${GITHUB_OUTPUT}"
+            else
+              echo 'static-native=1' >> "${GITHUB_OUTPUT}"
+            fi
+          else
+            echo 'static-native=0' >> "${GITHUB_OUTPUT}"
           fi
 
   build-dist: # Build the distribution tarball and store it as an artifact.
@@ -187,6 +215,8 @@ jobs:
   static-matrix: # Generate the static build matrix.
     name: Prepare Build Matrix
     runs-on: ubuntu-latest
+    needs:
+      - file-check
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -201,7 +231,7 @@ jobs:
       - name: Read build matrix
         id: set-matrix
         run: |
-          matrix="$(.github/scripts/gen-matrix-static.py)"
+          matrix="$(.github/scripts/gen-matrix-static.py ${{ needs.file-check.outputs.static-native }})"
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
