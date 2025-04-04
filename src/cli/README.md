@@ -18,7 +18,12 @@ Available commands:
 | `ping`                                                                 | Checks the Agent's status. If the Agent is alive, it exits with status code 0 and prints 'pong' to standard output. Exits with status code 255 otherwise.                        |
 | `aclk-state [json]`                                                    | Return the current state of ACLK and Cloud connection. Optionally in JSON.                                                                                                       |
 | `dumpconfig`                                                           | Display the current netdata.conf configuration.                                                                                                                                  |
-| `remove-stale-node <node_id \| machine_guid \| hostname \| ALL_NODES>` | Un-registers a stale child Node, removing it from the parent Node's UI and Netdata Cloud. This is useful for ephemeral Nodes that may stop streaming and remain visible as stale. |
+| `mark-stale-nodes-ephemeral <node_id \| machine_guid \| hostname \| ALL_NODES>` | Marks one or all disconnected nodes, including virtual nodes, as [ephemeral](/docs/node-ephemerality.md), while keeping their previously collected metrics data available for queries on both this Netdata Agent dashboard and Netdata Cloud.[^1][^2] |
+| `remove-stale-node <node_id \| machine_guid \| hostname \| ALL_NODES>` | Marks one or all disconnected nodes, including virtual nodes, as [ephemeral](/docs/nodes-ephemerality.md), and removes them so that they are no longer available for queries, from both this Netdata Agent dashboard and Netdata Cloud. This is useful to remove decommissioned nodes that have stopped streaming, but for which the Agent still holds metric data.[^1][^3]|
 | `version`                                                              | Display the Netdata Agent version.                                                                                                                                               |
 
 See also the Netdata daemon [command line options](/src/daemon/README.md#command-line-options).
+
+[^1]: This also clears any active alerts.
+[^2]: The Agent may be configured to [automatically clean up ephemeral nodes](/docs/nodes-ephemerality.md#automatic-ephemeral-nodes-cleanup) when they have been offline for longer than the configured time interval.
+[^3]: If a node is represented by multiple Parent Agents in a HA setup, this command must be issued on all these Parent Agents.
