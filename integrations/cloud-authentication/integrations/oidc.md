@@ -45,9 +45,6 @@ The access settings for your client are the following:
     - **Issuer URL** the Authorization Server Issuer URL, e.g. `https://my-auth-server.com/`
     - **Client ID** the Client ID from the created client
     - **Client Secret** the Client Secret from the created client
-    - **Authorization URL** the Authorization Server authorization URL, e.g. `https://my-auth-server.com/openid-connect/auth`
-    - **Token URL** the Authorization Server token URL, e.g. `https://my-auth-server.com/openid-connect/token`
-    - **User URL** the Authorization Server user info URL, e.g. `https://my-auth-server.com/openid-connect/userinfo`
 
 ### Supported features
 * SP-initiated SSO (Single Sign-On)
