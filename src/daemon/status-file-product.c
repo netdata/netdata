@@ -320,13 +320,51 @@ void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
     if(ds->cloud_instance_type[0] && strcasecmp(ds->cloud_instance_type, "unknown") != 0)
         safecpy(ds->product.name, ds->cloud_instance_type);
     else {
-        if(ds->hw.product.family[0])
-            safecpy(ds->product.name, ds->hw.product.family);
-        else if(ds->hw.product.name[0])
-            safecpy(ds->product.name, ds->hw.product.name);
-        else if(ds->hw.board.name[0])
-            safecpy(ds->product.name, ds->hw.board.name);
-        else
+        // copy the product family
+        size_t len = strcatz(ds->product.name, 0, ds->hw.product.family, sizeof(ds->product.name));
+
+        // append the product name, if it is not included already
+        if(ds->hw.product.name[0] && !strcasestr(ds->product.name, ds->hw.product.name)) {
+            if(ds->product.name[0]) {
+                bool includes_family = strcasestr(ds->hw.product.name, ds->hw.product.family) != NULL;
+
+                if(includes_family) {
+                    // the product name includes the product family we have in buf
+                    // we can clear the family and add only the product name
+                    len = 0;
+                }
+                else {
+                    // the product name is not included in the product family
+                    // we append a separator, and later the name
+                    len = strcatz(ds->product.name, len, " / ", sizeof(ds->product.name));
+                }
+            }
+
+            len = strcatz(ds->product.name, len, ds->hw.product.name, sizeof(ds->product.name));
+        }
+
+        // append the board name, if it is not included already
+        if(ds->hw.board.name[0] && !strcasestr(ds->product.name, ds->hw.board.name)) {
+            if(ds->product.name[0]) {
+                bool includes_family = !ds->hw.product.family[0] || strcasestr(ds->hw.board.name, ds->hw.product.family) != NULL;
+                bool includes_product = !ds->hw.product.name[0] || strcasestr(ds->hw.board.name, ds->hw.product.name) != NULL;
+
+                if(includes_family && includes_product) {
+                    // the board name includes both the product and the family
+                    // we can clear buf and add only the board name
+                    len = 0;
+                }
+                else {
+                    // the board name is not included in buf
+                    // we append a separator, and later the name
+                    len = strcatz(ds->product.name, len, " / ", sizeof(ds->product.name));
+                }
+            }
+
+            len = strcatz(ds->product.name, len, ds->hw.board.name, sizeof(ds->product.name));
+        }
+
+        if(!ds->product.name[0])
             safecpy(ds->product.name, "unknown");
     }
 
