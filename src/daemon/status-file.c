@@ -67,7 +67,7 @@ static void copy_and_clean_thread_name_if_empty(DAEMON_STATUS_FILE *ds, const ch
 
     if(!name || !*name) name = "NO_NAME";
 
-    strncpyz(ds->fatal.thread, name, sizeof(ds->fatal.thread) - 1);
+    safecpy(ds->fatal.thread, name);
 
     // remove the variable part from the thread by removing [XXX] from it
     unsigned char *p = (unsigned char *)strchr(ds->fatal.thread, '[');
@@ -82,7 +82,7 @@ static bool stack_trace_is_empty(DAEMON_STATUS_FILE *ds) {
 
 static void set_stack_trace_message_if_empty(DAEMON_STATUS_FILE *ds, const char *msg) {
     if(stack_trace_is_empty(ds))
-        strncpyz(ds->fatal.stack_trace, msg, sizeof(ds->fatal.stack_trace) - 1);
+        safecpy(ds->fatal.stack_trace, msg);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -524,7 +524,7 @@ static void daemon_status_file_migrate_once(void) {
     dsf_acquire(last_session_status);
     dsf_acquire(session_status);
 
-    strncpyz(session_status.version, NETDATA_VERSION, sizeof(session_status.version) - 1);
+    safecpy(session_status.version, NETDATA_VERSION);
     session_status.machine_id = os_machine_id();
 
     {
@@ -532,7 +532,7 @@ static void daemon_status_file_migrate_once(void) {
         get_install_type_internal(&install_type, &prebuilt_arch, &prebuilt_dist);
 
         if(install_type)
-            strncpyz(session_status.install_type, install_type, sizeof(session_status.install_type) - 1);
+            safecpy(session_status.install_type, install_type);
 
         freez(prebuilt_arch);
         freez(prebuilt_dist);
@@ -556,18 +556,18 @@ static void daemon_status_file_migrate_once(void) {
     session_status.node_id = last_session_status.node_id;
     session_status.host_id = *machine_guid_get();
 
-    strncpyz(session_status.architecture, last_session_status.architecture, sizeof(session_status.architecture) - 1);
-    strncpyz(session_status.virtualization, last_session_status.virtualization, sizeof(session_status.virtualization) - 1);
-    strncpyz(session_status.container, last_session_status.container, sizeof(session_status.container) - 1);
-    strncpyz(session_status.kernel_version, last_session_status.kernel_version, sizeof(session_status.kernel_version) - 1);
-    strncpyz(session_status.os_name, last_session_status.os_name, sizeof(session_status.os_name) - 1);
-    strncpyz(session_status.os_version, last_session_status.os_version, sizeof(session_status.os_version) - 1);
-    strncpyz(session_status.os_id, last_session_status.os_id, sizeof(session_status.os_id) - 1);
-    strncpyz(session_status.os_id_like, last_session_status.os_id_like, sizeof(session_status.os_id_like) - 1);
-    strncpyz(session_status.timezone, last_session_status.timezone, sizeof(session_status.timezone) - 1);
-    strncpyz(session_status.cloud_provider_type, last_session_status.cloud_provider_type, sizeof(session_status.cloud_provider_type) - 1);
-    strncpyz(session_status.cloud_instance_type, last_session_status.cloud_instance_type, sizeof(session_status.cloud_instance_type) - 1);
-    strncpyz(session_status.cloud_instance_region, last_session_status.cloud_instance_region, sizeof(session_status.cloud_instance_region) - 1);
+    safecpy(session_status.architecture, last_session_status.architecture);
+    safecpy(session_status.virtualization, last_session_status.virtualization);
+    safecpy(session_status.container, last_session_status.container);
+    safecpy(session_status.kernel_version, last_session_status.kernel_version);
+    safecpy(session_status.os_name, last_session_status.os_name);
+    safecpy(session_status.os_version, last_session_status.os_version);
+    safecpy(session_status.os_id, last_session_status.os_id);
+    safecpy(session_status.os_id_like, last_session_status.os_id_like);
+    safecpy(session_status.timezone, last_session_status.timezone);
+    safecpy(session_status.cloud_provider_type, last_session_status.cloud_provider_type);
+    safecpy(session_status.cloud_instance_type, last_session_status.cloud_instance_type);
+    safecpy(session_status.cloud_instance_region, last_session_status.cloud_instance_region);
 
     session_status.posts = last_session_status.posts;
     session_status.restarts = last_session_status.restarts + 1;
@@ -584,7 +584,7 @@ static void daemon_status_file_migrate_once(void) {
         session_status.reliability++;
     }
 
-    strncpyz(session_status.stack_traces, capture_stack_trace_backend(), sizeof(session_status.stack_traces) - 1);
+    safecpy(session_status.stack_traces, capture_stack_trace_backend());
 
     fill_dmi_info(&session_status);
 
@@ -655,7 +655,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         finalize_vendor_product_vm(&session_status);
 
     if(netdata_configured_timezone)
-        strncpyz(session_status.timezone, netdata_configured_timezone, sizeof(session_status.timezone) - 1);
+        safecpy(session_status.timezone, netdata_configured_timezone);
 
     session_status.exit_reason = exit_initiated_get();
     session_status.profile = nd_profile_detect_and_configure(false);
@@ -1123,7 +1123,7 @@ void daemon_status_file_check_crash(void) {
             last_session_status = session_status;
             last_session_status.status = DAEMON_STATUS_NONE;
             last_session_status.exit_reason = 0;
-            strncpyz(last_session_status.fatal.function, "no_status", sizeof(last_session_status.fatal.function) - 1);
+            safecpy(last_session_status.fatal.function, "no_status");
         }
 
         struct post_status_file_thread_data d = {
@@ -1163,13 +1163,10 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
     // Store the first netdata function from the stack trace if available
     const char *first_nd_fn = capture_stack_trace_root_cause_function();
     if (first_nd_fn && *first_nd_fn && !ds->fatal.function[0])
-        strncpyz(ds->fatal.function, first_nd_fn, sizeof(ds->fatal.function) - 1);
+        safecpy(ds->fatal.function, first_nd_fn);
 
     if(buffer_strlen(wb) > 0) {
-        strncpyz(
-            ds->fatal.stack_trace,
-            buffer_tostring(wb),
-            sizeof(ds->fatal.stack_trace) - 1);
+        safecpy(ds->fatal.stack_trace, buffer_tostring(wb));
 
         daemon_status_file_save(wb, ds, false);
     }
@@ -1196,19 +1193,19 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag());
 
     if(filename && *filename)
-        strncpyz(session_status.fatal.filename, filename, sizeof(session_status.fatal.filename) - 1);
+        safecpy(session_status.fatal.filename, filename);
 
     if(function && *function)
-        strncpyz(session_status.fatal.function, function, sizeof(session_status.fatal.function) - 1);
+        safecpy(session_status.fatal.function, function);
 
     if(message && *message)
-        strncpyz(session_status.fatal.message, message, sizeof(session_status.fatal.message) - 1);
+        safecpy(session_status.fatal.message, message);
 
     if(errno_str && *errno_str)
-        strncpyz(session_status.fatal.errno_str, errno_str, sizeof(session_status.fatal.errno_str) - 1);
+        safecpy(session_status.fatal.errno_str, errno_str);
 
     if(stack_trace && *stack_trace && stack_trace_is_empty(&session_status))
-        strncpyz(session_status.fatal.stack_trace, stack_trace, sizeof(session_status.fatal.stack_trace) - 1);
+        safecpy(session_status.fatal.stack_trace, stack_trace);
 
     if(!session_status.fatal.worker_job_id)
         session_status.fatal.worker_job_id = workers_get_last_job_id();
@@ -1335,10 +1332,10 @@ void daemon_status_file_shutdown_timeout(BUFFER *trace) {
     exit_initiated_add(EXIT_REASON_SHUTDOWN_TIMEOUT);
     session_status.exit_reason |= EXIT_REASON_SHUTDOWN_TIMEOUT;
     if(trace && buffer_strlen(trace) && stack_trace_is_empty(&session_status))
-        strncpyz(session_status.fatal.stack_trace, buffer_tostring(trace), sizeof(session_status.fatal.stack_trace) - 1);
+        safecpy(session_status.fatal.stack_trace, buffer_tostring(trace));
     dsf_release(session_status);
 
-    strncpyz(session_status.fatal.function, "shutdown_timeout", sizeof(session_status.fatal.function) - 1);
+    safecpy(session_status.fatal.function, "shutdown_timeout");
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     daemon_status_file_save(wb, &session_status, false);
@@ -1383,7 +1380,7 @@ void daemon_status_file_startup_step(const char *step) {
         return;
 
     if(step != NULL)
-        strncpyz(session_status.fatal.function, step, sizeof(session_status.fatal.function) - 1);
+        safecpy(session_status.fatal.function, step);
     else
         session_status.fatal.function[0] = '\0';
 

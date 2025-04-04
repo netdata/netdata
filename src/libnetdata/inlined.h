@@ -424,8 +424,16 @@ static inline char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1
 // dst is always null terminated
 static inline size_t strcatz(char *dst, size_t len, const char *src, size_t size) {
     // If starting offset is out of bounds, do nothing.
-    if (len >= size) {
-        dst[size - 1] = '\0';
+    if (unlikely(len >= size)) {
+        if(size > 0)
+            dst[size - 1] = '\0';
+
+        return len;
+    }
+
+    // If the source is not valid or empty, do nothing.
+    if(unlikely(!src || !*src)) {
+        dst[len] = '\0';
         return len;
     }
 
