@@ -6,7 +6,6 @@
 // Service data
 struct win_service {
     char *service_name;
-    char *display_name;
 
     RRDSET *st_service_state;
     RRDDIM *rd_service_state_running;
@@ -30,8 +29,6 @@ void dict_win_service_insert_cb(const DICTIONARY_ITEM *item, void *value, void *
     LPENUM_SERVICE_STATUS_PROCESS service = data;
 
     ptr->service_name = strdupz(name);
-    netdata_fix_chart_name(ptr->service_name);
-    ptr->display_name = strdupz(service->lpDisplayName);
 }
 
 static void initialize(void)
@@ -96,8 +93,99 @@ endServiceCollection:
     return ret;
 }
 
+static RRDDIM *win_service_select_dim(struct win_service *p, uint32_t selector)
+{
+    // Values defined according to https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_status
+    switch (selector) {
+        case 1:
+            return p->rd_service_state_stopped;
+        case 2:
+            return p->rd_service_state_start_pending;
+        case 3:
+            return p->rd_service_state_stop_pending;
+        case 4:
+            return p->rd_service_state_running;
+        case 5:
+            return p->rd_service_state_continue_pending;
+        case 6:
+            return p->rd_service_state_pause_pending;
+        case 7:
+            return p->rd_service_state_paused;
+        default:
+            return p->rd_service_state_unknown;
+    }
+}
+
+static int dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct win_service *p = value;
+    int *update_every = data;
+
+    if (!p->st_service_state) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "service_%s_state", p->service_name);
+        netdata_fix_chart_name(id);
+        p->st_service_state = rrdset_create_localhost(
+            "service",
+            id,
+            NULL,
+            "service",
+            "windows.service_state",
+            "Service state",
+            "state",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibbService",
+            PRIO_SERVICE_STATE,
+            *update_every,
+            RRDSET_TYPE_LINE);
+
+        p->rd_service_state_running = rrddim_add(
+            p->st_service_state, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->rd_service_state_stopped =
+            rrddim_add(p->st_service_state, "stopped", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->rd_service_state_start_pending =
+            rrddim_add(p->st_service_state, "start_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->rd_service_state_stop_pending =
+            rrddim_add(p->st_service_state, "stop_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->rd_service_state_continue_pending =
+            rrddim_add(p->st_service_state, "continue_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->rd_service_state_pause_pending = rrddim_add(
+            p->st_service_state, "pause_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->rd_service_state_paused = rrddim_add(
+            p->st_service_state, "paused", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        p->rd_service_state_unknown = rrddim_add(
+            p->st_service_state, "unknown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            p->st_service_state->rrdlabels,
+            "service",
+            p->service_name,
+            RRDLABEL_SRC_AUTO);
+    }
+
+#define NETDATA_WINDOWS_SERVICE_STATE_TOTAL_STATES (8)
+    uint32_t current_state = (uint32_t)p->ServiceState.current.Data;
+    for (uint32_t i = 1; i <= NETDATA_WINDOWS_SERVICE_STATE_TOTAL_STATES; i++) {
+        RRDDIM *dim = win_service_select_dim(p, i);
+        uint32_t chart_value = (current_state == i) ? 1 : 0;
+
+        rrddim_set_by_pointer(p->st_service_state, dim, (collected_number)chart_value);
+    }
+
+    rrdset_done(p->st_service_state);
+}
+
 int do_PerflibServices(int update_every, usec_t dt __maybe_unused)
 {
+#define NETDATA_SERVICE_MAX_TRY (5)
+    static int limit = 0;
     static bool initialized = false;
 
     if (unlikely(!initialized)) {
@@ -105,8 +193,15 @@ int do_PerflibServices(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    if (!fill_dictionary_with_content())
+    if (!fill_dictionary_with_content()) {
+        if (++limit == NETDATA_SERVICE_MAX_TRY) {
+            return -1;
+        }
         return 0;
+    }
+
+    limit = 0;
+    dictionary_sorted_walkthrough_read(win_services, dict_win_services_charts_cb, &update_every);
 
     return 0;
 }
