@@ -171,6 +171,5 @@ size_t daemon_status_file_get_restarts(void);
 ssize_t daemon_status_file_get_reliability(void);
 ND_MACHINE_GUID daemon_status_file_get_host_id(void);
 size_t daemon_status_file_get_fatal_worker_job_id(void);
-pid_t daemon_status_file_get_pid(void);
 
 #endif //NETDATA_STATUS_FILE_H

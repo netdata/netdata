@@ -228,9 +228,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_object(wb, "sys");
         {
             buffer_json_member_add_string(wb, "vendor", ds->hw.sys.vendor);
-            buffer_json_member_add_string(wb, "serial", ds->hw.sys.serial);
             buffer_json_member_add_string(wb, "uuid", ds->hw.sys.uuid);
-            buffer_json_member_add_string(wb, "asset_tag", ds->hw.sys.asset_tag);
+            // buffer_json_member_add_string(wb, "serial", ds->hw.sys.serial);
+            // buffer_json_member_add_string(wb, "asset_tag", ds->hw.sys.asset_tag);
         }
         buffer_json_object_close(wb);
 
@@ -248,8 +248,8 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string(wb, "name", ds->hw.board.name);
             buffer_json_member_add_string(wb, "version", ds->hw.board.version);
             buffer_json_member_add_string(wb, "vendor", ds->hw.board.vendor);
-            buffer_json_member_add_string(wb, "serial", ds->hw.board.serial);
-            buffer_json_member_add_string(wb, "asset_tag", ds->hw.board.asset_tag);
+            // buffer_json_member_add_string(wb, "serial", ds->hw.board.serial);
+            // buffer_json_member_add_string(wb, "asset_tag", ds->hw.board.asset_tag);
         }
         buffer_json_object_close(wb);
 
@@ -258,8 +258,8 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string(wb, "type", ds->hw.chassis.type);
             buffer_json_member_add_string(wb, "vendor", ds->hw.chassis.vendor);
             buffer_json_member_add_string(wb, "version", ds->hw.chassis.version);
-            buffer_json_member_add_string(wb, "serial", ds->hw.chassis.serial);
-            buffer_json_member_add_string(wb, "asset_tag", ds->hw.chassis.asset_tag);
+            // buffer_json_member_add_string(wb, "serial", ds->hw.chassis.serial);
+            // buffer_json_member_add_string(wb, "asset_tag", ds->hw.chassis.asset_tag);
         }
         buffer_json_object_close(wb);
 
@@ -488,9 +488,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     JSONC_PARSE_SUBOBJECT(jobj, path, "hw", error, required_v25, {
         JSONC_PARSE_SUBOBJECT(jobj, path, "sys", error, required_v25, {
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->hw.sys.vendor, error, required_v25);
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "serial", ds->hw.sys.serial, error, required_v26);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "uuid", ds->hw.sys.uuid, error, required_v27);
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "asset_tag", ds->hw.sys.asset_tag, error, required_v27);
+            // JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "serial", ds->hw.sys.serial, error, required_v26);
+            // JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "asset_tag", ds->hw.sys.asset_tag, error, required_v27);
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "product", error, required_v25, {
@@ -504,16 +504,16 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "name", ds->hw.board.name, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->hw.board.version, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->hw.board.vendor, error, required_v25);
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "serial", ds->hw.board.serial, error, required_v26);
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "asset_tag", ds->hw.board.asset_tag, error, required_v27);
+            // JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "serial", ds->hw.board.serial, error, required_v26);
+            // JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "asset_tag", ds->hw.board.asset_tag, error, required_v27);
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "chassis", error, required_v25, {
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "type", ds->hw.chassis.type, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->hw.chassis.vendor, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->hw.chassis.version, error, required_v25);
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "serial", ds->hw.chassis.serial, error, required_v26);
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "asset_tag", ds->hw.chassis.asset_tag, error, required_v27);
+            // JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "serial", ds->hw.chassis.serial, error, required_v26);
+            // JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "asset_tag", ds->hw.chassis.asset_tag, error, required_v27);
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "bios", error, required_v25, {
@@ -811,6 +811,7 @@ static void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_uint64(wb, "priority", d->priority);
     buffer_json_member_add_uint64(wb, "version_saved", d->status->v);
     buffer_json_member_add_string(wb, "agent_version_now", NETDATA_VERSION);
+    buffer_json_member_add_uint64(wb, "agent_pid_now", getpid());
     buffer_json_member_add_boolean(wb, "host_memory_critical",
                                    OS_SYSTEM_MEMORY_OK(d->status->memory) && d->status->memory.ram_available_bytes <= d->status->oom_protection);
     buffer_json_member_add_uint64(wb, "host_memory_free_percent", (uint64_t)round(os_system_memory_available_percent(d->status->memory)));
@@ -1557,8 +1558,4 @@ ND_MACHINE_GUID daemon_status_file_get_host_id(void) {
 
 size_t daemon_status_file_get_fatal_worker_job_id(void) {
     return session_status.fatal.worker_job_id;
-}
-
-pid_t daemon_status_file_get_pid(void) {
-    return session_status.pid;
 }
