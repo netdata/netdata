@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- daemon status 26e [\#20051](https://github.com/netdata/netdata/pull/20051) ([ktsaou](https://github.com/ktsaou))
+- fix cgroup netdev renames [\#20050](https://github.com/netdata/netdata/pull/20050) ([ktsaou](https://github.com/ktsaou))
+- added checksum to detect corruption in netdev rename tasks [\#20048](https://github.com/netdata/netdata/pull/20048) ([ktsaou](https://github.com/ktsaou))
+- daemon status 26d [\#20047](https://github.com/netdata/netdata/pull/20047) ([ktsaou](https://github.com/ktsaou))
+- fix\(go.d/megacli\): handle Adapters with no drives [\#20046](https://github.com/netdata/netdata/pull/20046) ([ilyam8](https://github.com/ilyam8))
+- Fix releasing statements after databases are closed [\#20045](https://github.com/netdata/netdata/pull/20045) ([stelfrag](https://github.com/stelfrag))
+- daemon status 26c [\#20044](https://github.com/netdata/netdata/pull/20044) ([ktsaou](https://github.com/ktsaou))
 - trace crashes No 4 [\#20043](https://github.com/netdata/netdata/pull/20043) ([ktsaou](https://github.com/ktsaou))
 - daemon status 26b [\#20041](https://github.com/netdata/netdata/pull/20041) ([ktsaou](https://github.com/ktsaou))
 - Update netdata-updater-daily.in [\#20039](https://github.com/netdata/netdata/pull/20039) ([dave818](https://github.com/dave818))
@@ -455,16 +462,6 @@
 - Regenerate integrations docs [\#19502](https://github.com/netdata/netdata/pull/19502) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/postgres\): add config example with unix socket + custom port [\#19501](https://github.com/netdata/netdata/pull/19501) ([ilyam8](https://github.com/ilyam8))
 - Create impact-on-resources.md [\#19499](https://github.com/netdata/netdata/pull/19499) ([ktsaou](https://github.com/ktsaou))
-- Add worker for alert queue processing [\#19498](https://github.com/netdata/netdata/pull/19498) ([stelfrag](https://github.com/stelfrag))
-- fix absolute injection again [\#19497](https://github.com/netdata/netdata/pull/19497) ([ktsaou](https://github.com/ktsaou))
-- fix absolute injection [\#19496](https://github.com/netdata/netdata/pull/19496) ([ktsaou](https://github.com/ktsaou))
-- max data file size [\#19495](https://github.com/netdata/netdata/pull/19495) ([ktsaou](https://github.com/ktsaou))
-- proc.plugin: add `ifb4*` to excluded interface name patterns [\#19494](https://github.com/netdata/netdata/pull/19494) ([intelfx](https://github.com/intelfx))
-- build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.8.0 to 4.8.1 in /src/go [\#19493](https://github.com/netdata/netdata/pull/19493) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Active Directory Certification Service \(windows.plugin\) [\#19492](https://github.com/netdata/netdata/pull/19492) ([thiagoftsm](https://github.com/thiagoftsm))
-- proc.plugin: remove traces of /proc/spl/kstat/zfs/pool/state [\#19491](https://github.com/netdata/netdata/pull/19491) ([intelfx](https://github.com/intelfx))
-- cgroups.plugin: fixes to cgroup path validation [\#19490](https://github.com/netdata/netdata/pull/19490) ([intelfx](https://github.com/intelfx))
-- Further improve alert processing [\#19489](https://github.com/netdata/netdata/pull/19489) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
