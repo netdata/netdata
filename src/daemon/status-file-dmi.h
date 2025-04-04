@@ -46,9 +46,10 @@ typedef struct dmi_info {
 
 #include "status-file.h"
 
-bool dmi_is_virtual_machine(const DMI_INFO *dmi);
-void dmi_normalize_vendor_field(char *buf, size_t buf_size);
+// Initialize DMI_INFO structure
+void dmi_info_init(DMI_INFO *dmi);
 
-void fill_dmi_info(DAEMON_STATUS_FILE *ds);
+// Platform-specific function to get DMI info 
+void os_dmi_info_get(DMI_INFO *dmi);
 
 #endif //NETDATA_STATUS_FILE_DMI_H

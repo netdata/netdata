@@ -86,6 +86,14 @@ static void set_stack_trace_message_if_empty(DAEMON_STATUS_FILE *ds, const char 
         safecpy(ds->fatal.stack_trace, msg);
 }
 
+static void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
+    if(!ds) return;
+
+    dmi_info_init(&ds->hw);
+    os_dmi_info_get(&ds->hw);
+    product_name_vendor_type(ds);
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
 

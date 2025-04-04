@@ -3,6 +3,202 @@
 #include "status-file-dmi.h"
 #include "status-file-product.h"
 
+static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
+    if(!buf || !buf_size) return;
+
+    struct {
+        const char *found;
+        const char *replace;
+    } vendors[] = {
+        {"QEMU", "KVM"},
+
+        // Major vendors with multiple variations
+        {"AMD Corporation", "AMD"},
+        {"Advanced Micro Devices, Inc.", "AMD"},
+
+        {"AMI Corp.", "AMI"},
+        {"AMI Corporation", "AMI"},
+        {"American Megatrends", "AMI"},
+        {"American Megatrends Inc.", "AMI"},
+        {"American Megatrends International", "AMI"},
+        {"American Megatrends International, LLC.", "AMI"},
+
+        {"AOPEN", "AOpen"},
+        {"AOPEN Inc.", "AOpen"},
+
+        {"Apache Software Foundation", "Apache"},
+
+        {"Apple Inc.", "Apple"},
+
+        {"ASRock Industrial", "ASRock"},
+        {"ASRockRack", "ASRock"},
+        {"AsrockRack", "ASRock"},
+
+        {"ASUS", "ASUSTeK"},
+        {"ASUSTeK COMPUTER INC.", "ASUSTeK"},
+        {"ASUSTeK COMPUTER INC. (Licensed from AMI)", "ASUSTeK"},
+        {"ASUSTeK Computer INC.", "ASUSTeK"},
+        {"ASUSTeK Computer Inc.", "ASUSTeK"},
+        {"ASUSTek Computer INC.", "ASUSTeK"},
+
+        {"Apache Software Foundation", "Apache"},
+
+        {"BESSTAR (HK) LIMITED", "Besstar"},
+        {"BESSTAR TECH", "Besstar"},
+        {"BESSTAR TECH LIMITED", "Besstar"},
+        {"BESSTAR Tech", "Besstar"},
+
+        {"CHUWI", "Chuwi"},
+        {"CHUWI Innovation And Technology(ShenZhen)co.,Ltd", "Chuwi"},
+
+        {"Cisco Systems Inc", "Cisco"},
+        {"Cisco Systems, Inc.", "Cisco"},
+
+        {"DELL", "Dell"},
+        {"Dell Computer Corporation", "Dell"},
+        {"Dell Inc.", "Dell"},
+
+        {"FUJITSU", "Fujitsu"},
+        {"FUJITSU CLIENT COMPUTING LIMITED", "Fujitsu"},
+        {"FUJITSU SIEMENS", "Fujitsu"},
+        {"FUJITSU SIEMENS // Phoenix Technologies Ltd.", "Fujitsu"},
+        {"FUJITSU // American Megatrends Inc.", "Fujitsu"},
+        {"FUJITSU // American Megatrends International, LLC.", "Fujitsu"},
+        {"FUJITSU // Insyde Software Corp.", "Fujitsu"},
+        {"FUJITSU // Phoenix Technologies Ltd.", "Fujitsu"},
+
+        {"GIGABYTE", "Gigabyte"},
+        {"Giga Computing", "Gigabyte"},
+        {"Gigabyte Technology Co., Ltd.", "Gigabyte"},
+        {"Gigabyte Tecohnology Co., Ltd.", "Gigabyte"},
+
+        {"GOOGLE", "Google"},
+        {"Google Inc", "Google"},
+
+        {"HC Technology.,Ltd.", "HC Tech"},
+
+        {"HP-Pavilion", "HP"},
+        {"HPE", "HP"},
+        {"Hewlett Packard Enterprise", "HP"},
+        {"Hewlett-Packard", "HP"},
+
+        {"HUAWEI", "Huawei"},
+        {"Huawei Technologies Co., Ltd.", "Huawei"},
+
+        {"IBM Corp.", "IBM"},
+
+        {"INSYDE", "Insyde"},
+        {"INSYDE Corp.", "Insyde"},
+        {"Insyde Corp.", "Insyde"},
+
+        {"INTEL", "Intel"},
+        {"INTEL Corporation", "Intel"},
+        {"Intel Corp.", "Intel"},
+        {"Intel Corporation", "Intel"},
+        {"Intel corporation", "Intel"},
+        {"Intel(R) Client Systems", "Intel"},
+        {"Intel(R) Corporation", "Intel"},
+
+        {"LENOVO", "Lenovo"},
+        {"LNVO", "Lenovo"},
+
+        {"Shenzhen Meigao Electronic Equipment Co.,Ltd", "Meigao"},
+        {"Micro Computer (HK) Tech Limited", "Micro Computer"},
+        {"Micro Computer(HK) Tech Limited", "Micro Computer"},
+
+        {"MICRO-STAR INTERNATIONAL CO., LTD", "MSI"},
+        {"MICRO-STAR INTERNATIONAL CO.,LTD", "MSI"},
+        {"MSI", "MSI"},
+        {"Micro-Star International Co., Ltd", "MSI"},
+        {"Micro-Star International Co., Ltd.", "MSI"},
+
+        {"MICROSOFT", "Microsoft"},
+        {"Microsoft Corporation", "Microsoft"},
+
+        {"nVIDIA", "NVIDIA"},
+
+        {"OPENSTACK", "OpenStack"},
+        {"OpenStack Foundation", "OpenStack"},
+
+        {"ORACLE CORPORATI", "Oracle"},
+        {"Oracle Corporation", "Oracle"},
+        {"innotek GmbH", "Oracle"},
+
+        {"Phoenix Technologies LTD", "Phoenix"},
+        {"Phoenix Technologies Ltd", "Phoenix"},
+        {"Phoenix Technologies Ltd.", "Phoenix"},
+        {"Phoenix Technologies, LTD", "Phoenix"},
+
+        {"QNAP Systems, Inc.", "QNAP"},
+
+        {"QUANTA", "Quanta"},
+        {"Quanta Cloud Technology Inc.", "Quanta"},
+        {"Quanta Computer Inc", "Quanta"},
+        {"Quanta Computer Inc.", "Quanta"},
+
+        {"RED HAT", "Red Hat"},
+
+        {"SAMSUNG ELECTRONICS CO., LTD.", "Samsung"},
+
+        {"SUN MICROSYSTEMS", "Sun"},
+
+        {"SuperMicro", "Supermicro"},
+        {"Supermicro Corporation", "Supermicro"},
+
+        {"SYNOLOGY", "Synology"},
+        {"Synology Inc.", "Synology"},
+
+        {"TYAN", "Tyan"},
+        {"TYAN Computer Corporation", "Tyan"},
+        {"Tyan Computer Corporation", "Tyan"},
+        {"$(TYAN_SYSTEM_MANUFACTURER)", "Tyan"},
+
+        {"VMware", "VMware"},
+        {"VMware, Inc.", "VMware"},
+
+        {"XIAOMI", "Xiaomi"},
+
+        {"ZOTAC", "Zotac"},
+        {"Motherboard by ZOTAC", "Zotac"}
+    };
+
+    for (size_t i = 0; i < _countof(vendors); i++) {
+        if (strcasecmp(buf, vendors[i].found) == 0) {
+            strcatz(buf, 0, vendors[i].replace, buf_size);
+            break;
+        }
+    }
+}
+
+static bool dmi_is_virtual_machine(const DMI_INFO *dmi) {
+    if(!dmi) return false;
+
+    const char *vm_indicators[] = {
+        "Virt", "KVM", "vServer", "Cloud", "Hyper", "Droplet", "Compute",
+        "HVM domU", "Parallels", "(i440FX", "(q35", "OpenStack", "QEMU",
+        "VMWare", "DigitalOcean", "Oracle", "Linode", "Amazon EC2"
+    };
+
+    const char *strs_to_check[] = {
+        dmi->product.name,
+        dmi->product.family,
+        dmi->sys.vendor,
+        dmi->board.name,
+    };
+
+    for (size_t i = 0; i < _countof(strs_to_check); i++) {
+        if (!strs_to_check[i] || !strs_to_check[i][0])
+            continue;
+
+        for (size_t j = 0; j < _countof(vm_indicators); j++) {
+            if (strcasestr(strs_to_check[i], vm_indicators[j]) != NULL)
+                return true;
+        }
+    }
+
+    return false;
+}
+
 static const char *dmi_chassis_type_to_string(int chassis_type) {
     // Original info from SMBIOS
     // https://www.dmtf.org/sites/default/files/standards/documents/DSP0134_3.2.0.pdf
