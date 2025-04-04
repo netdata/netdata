@@ -8,8 +8,9 @@
 #include "database/rrd-database-mode.h"
 #include "claim/cloud-status.h"
 #include "machine-guid.h"
+#include "status-file-dmi.h"
 
-#define STATUS_FILE_VERSION 26
+#define STATUS_FILE_VERSION 27
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -51,6 +52,7 @@ typedef struct daemon_status_file {
     size_t crashes;             // the number of times this agent has crashed (ever)
     size_t posts;               // the number of posts to the backend
     ssize_t reliability;        // consecutive restarts: > 0 reliable, < 0 crashing
+    pid_t pid;                  // the process id of the netdata agent
 
     ND_MACHINE_GUID host_id;    // the machine guid of the system
 
@@ -87,37 +89,14 @@ typedef struct daemon_status_file {
     char cloud_instance_region[32];
     bool read_system_info;
 
+    DMI_INFO hw;
+
     struct {
-        struct {
-            char vendor[64];
-        } sys;
-
-        struct {
-            char name[64];
-            char version[64];
-            char sku[64];
-            char family[64];
-        } product;
-
-        struct {
-            char name[64];
-            char version[64];
-            char vendor[64];
-        } board;
-
-        struct {
-            char type[64];
-            char vendor[64];
-            char version[64];
-        } chassis;
-
-        struct {
-            char date[16];
-            char release[64];
-            char version[64];
-            char vendor[64];
-        } bios;
-    } hw;
+        // normalized information from cloud provider and h/w information
+        char vendor[32];
+        char name[96];
+        char type[16];
+    } product;
 
     char stack_traces[63];   // the backend for capturing stack traces
 
@@ -181,9 +160,9 @@ const char *daemon_status_file_get_fatal_errno(void);
 const char *daemon_status_file_get_fatal_stack_trace(void);
 const char *daemon_status_file_get_fatal_thread(void);
 const char *daemon_status_file_get_stack_trace_backend(void);
-const char *daemon_status_file_get_hw_sys_vendor(void);
-const char *daemon_status_file_get_hw_product_name(void);
-const char *daemon_status_file_get_hw_chassis_type(void);
+const char *daemon_status_file_get_sys_vendor(void);
+const char *daemon_status_file_get_product_name(void);
+const char *daemon_status_file_get_product_type(void);
 
 pid_t daemon_status_file_get_fatal_thread_id(void);
 long daemon_status_file_get_fatal_line(void);
