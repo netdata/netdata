@@ -1288,6 +1288,8 @@ set(DAEMON_FILES
         src/daemon/status-file-io.h
         src/daemon/status-file-dmi.c
         src/daemon/status-file-dmi.h
+        src/daemon/status-file-product.c
+        src/daemon/status-file-product.h
 )
 
 set(DAEMON_SYSTEMD_WATCHER_FILES

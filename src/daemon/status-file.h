@@ -8,6 +8,7 @@
 #include "database/rrd-database-mode.h"
 #include "claim/cloud-status.h"
 #include "machine-guid.h"
+#include "status-file-dmi.h"
 
 #define STATUS_FILE_VERSION 26
 
@@ -87,37 +88,7 @@ typedef struct daemon_status_file {
     char cloud_instance_region[32];
     bool read_system_info;
 
-    struct {
-        struct {
-            char vendor[64];
-        } sys;
-
-        struct {
-            char name[64];
-            char version[64];
-            char sku[64];
-            char family[64];
-        } product;
-
-        struct {
-            char name[64];
-            char version[64];
-            char vendor[64];
-        } board;
-
-        struct {
-            char type[16];
-            char vendor[64];
-            char version[64];
-        } chassis;
-
-        struct {
-            char date[16];
-            char release[64];
-            char version[64];
-            char vendor[64];
-        } bios;
-    } hw;
+    DMI_INFO hw;
 
     struct {
         // normalized information from cloud provider and h/w information

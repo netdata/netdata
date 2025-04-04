@@ -9,6 +9,7 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 #include "status-file-dmi.h"
+#include "status-file-product.h"
 
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
