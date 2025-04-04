@@ -106,7 +106,7 @@ typedef struct daemon_status_file {
         } board;
 
         struct {
-            char type[64];
+            char type[16];
             char vendor[64];
             char version[64];
         } chassis;
@@ -118,6 +118,13 @@ typedef struct daemon_status_file {
             char vendor[64];
         } bios;
     } hw;
+
+    struct {
+        // normalized information from cloud provider and h/w information
+        char vendor[64];
+        char name[64];
+        char type[16];
+    } product;
 
     char stack_traces[63];   // the backend for capturing stack traces
 
@@ -181,9 +188,9 @@ const char *daemon_status_file_get_fatal_errno(void);
 const char *daemon_status_file_get_fatal_stack_trace(void);
 const char *daemon_status_file_get_fatal_thread(void);
 const char *daemon_status_file_get_stack_trace_backend(void);
-const char *daemon_status_file_get_hw_sys_vendor(void);
-const char *daemon_status_file_get_hw_product_name(void);
-const char *daemon_status_file_get_hw_chassis_type(void);
+const char *daemon_status_file_get_sys_vendor(void);
+const char *daemon_status_file_get_product_name(void);
+const char *daemon_status_file_get_product_type(void);
 
 pid_t daemon_status_file_get_fatal_thread_id(void);
 long daemon_status_file_get_fatal_line(void);

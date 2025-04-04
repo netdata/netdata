@@ -254,6 +254,14 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 
+    buffer_json_member_add_object(wb, "product");
+    {
+        buffer_json_member_add_string(wb, "vendor", ds->product.vendor);
+        buffer_json_member_add_string(wb, "name", ds->product.name);
+        buffer_json_member_add_string(wb, "type", ds->product.type);
+    }
+    buffer_json_object_close(wb);
+
     buffer_json_member_add_object(wb, "fatal");
     {
         buffer_json_member_add_uint64(wb, "line", ds->fatal.line);
@@ -322,6 +330,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v23 = version >= 23 ? strict : false;
     bool required_v24 = version >= 24 ? strict : false;
     bool required_v25 = version >= 25 ? strict : false;
+    bool required_v26 = version >= 26 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->timestamp_ut, error, required_v1);
@@ -479,6 +488,13 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->hw.bios.version, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->hw.bios.vendor, error, required_v25);
         });
+    });
+
+    // Parse product object
+    JSONC_PARSE_SUBOBJECT(jobj, path, "product", error, required_v26, {
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->product.vendor, error, required_v26);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "name", ds->product.name, error, required_v26);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "type", ds->product.type, error, required_v26);
     });
     
     // Parse fatal object
@@ -652,7 +668,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     }
 
     if(get_daemon_status_fields_from_system_info(&session_status))
-        finalize_vendor_product_vm(&session_status);
+        product_name_vendor_type(&session_status);
 
     if(netdata_configured_timezone)
         safecpy(session_status.timezone, netdata_configured_timezone);
@@ -1466,16 +1482,16 @@ const char *daemon_status_file_get_fatal_thread(void) {
     return session_status.fatal.thread;
 }
 
-const char *daemon_status_file_get_hw_sys_vendor(void) {
-    return session_status.hw.sys.vendor;
+const char *daemon_status_file_get_sys_vendor(void) {
+    return session_status.product.vendor;
 }
 
-const char *daemon_status_file_get_hw_product_name(void) {
-    return session_status.hw.product.name;
+const char *daemon_status_file_get_product_name(void) {
+    return session_status.product.name;
 }
 
-const char *daemon_status_file_get_hw_chassis_type(void) {
-    return session_status.hw.chassis.type;
+const char *daemon_status_file_get_product_type(void) {
+    return session_status.product.type;
 }
 
 pid_t daemon_status_file_get_fatal_thread_id(void) {

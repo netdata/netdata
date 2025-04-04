@@ -156,6 +156,10 @@ static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
         {"LENOVO", "Lenovo"},
         {"LNVO", "Lenovo"},
 
+        {"Shenzhen Meigao Electronic Equipment Co.,Ltd", "Meigao"},
+        {"Micro Computer (HK) Tech Limited", "Micro Computer"},
+        {"Micro Computer(HK) Tech Limited", "Micro Computer"},
+
         {"MICRO-STAR INTERNATIONAL CO., LTD", "MSI"},
         {"MICRO-STAR INTERNATIONAL CO.,LTD", "MSI"},
         {"MSI", "MSI"},
@@ -252,61 +256,64 @@ static bool dmi_is_virtual_machine(const DAEMON_STATUS_FILE *ds) {
 static const char *dmi_chassis_type_to_string(int chassis_type) {
     // Original info from SMBIOS
     // https://www.dmtf.org/sites/default/files/standards/documents/DSP0134_3.2.0.pdf
-    // selected values aligned with inxi: https://github.com/smxi/inxi/blob/master/inxi
+    // see also inxi: https://github.com/smxi/inxi/blob/master/inxi
+
+    // we categorize chassis types as:
+    //   1. desktop
+    //   2. laptop
+    //   3. server
+    //   4. mini-pc
+    //   5. unknown
+    // elsewhere we mark them also as "vm" (which is preferred over this)
+
     switch(chassis_type) {
-        case 1: return "other";
-        case 2: return "unknown";
-        case 3: return "desktop";
-        case 4: return "desktop"; /* "low-profile-desktop" */
-        case 5: return "pizza-box"; // was a 1 U desktop enclosure, but some old laptops also id this way
-        case 6: return "desktop"; /* "mini-tower-desktop" */
-        case 7: return "desktop"; /* "tower-desktop" */
-        case 8: return "portable";
-        case 9: return "laptop";
-        case 10: return "laptop"; /* "notebook" */
-        case 11: return "portable"; /* "hand-held" */
-        case 12: return "docking-station";
-        case 13: return "desktop"; /* "all-in-one" */
-        case 14: return "notebook"; /* "sub-notebook" */
-        case 15: return "desktop"; /* "space-saving-desktop" */
-        case 16: return "laptop"; /* "lunch-box" */
-        case 17: return "server"; /* "main-server-chassis" */
-        case 18: return "expansion-chassis";
-        case 19: return "sub-chassis";
-        case 20: return "bus-expansion";
-        case 21: return "peripheral";
-        case 22: return "raid";
-        case 23: return "server"; /* "rack-mount-server" */
-        case 24: return "desktop"; /* "sealed-desktop" */
-        case 25: return "server"; /* "multimount-chassis" */
-        case 26: return "compact-pci";
-        case 27: return "blade"; /* "advanced-tca" */
-        case 28: return "blade";
-        case 29: return "blade-enclosure";
-        case 30: return "tablet";
-        case 31: return "convertible";
-        case 32: return "detachable";
-        case 33: return "iot-gateway";
-        case 34: return "embedded-pc";
-        case 35: return "mini-pc";
-        case 36: return "stick-pc";
-        default: return NULL; // let it be numeric
+        case 3: /* "desktop" */
+        case 4: /* "low-profile-desktop" */
+        case 6: /* "mini-tower-desktop" */
+        case 7: /* "tower-desktop" */
+        case 13: /* "all-in-one" */
+        case 15: /* "space-saving-desktop" */
+        case 24: /* "sealed-desktop" */
+        case 26: /* "compact-pci" */
+            return "desktop";
+
+        case 5: /* "pizza-box" - was 1U desktops and some laptops */
+        case 8: /* "portable" */
+        case 9: /* "laptop" */
+        case 10: /* "notebook" */
+        case 11: /* "hand-held" */
+        case 12: /* "docking-station" */
+        case 14: /* "sub-notebook" */
+        case 16: /* "lunch-box" */
+        case 30: /* "tablet" */
+        case 31: /* "convertible" */
+        case 32: /* "detachable" */
+            return "laptop";
+
+        case 17: /* "main-server-chassis" */
+        case 23: /* "rack-mount-server" */
+        case 25: /* "multimount-chassis" */
+        case 27: /* "advanced-tca" */
+        case 28: /* "blade" */
+        case 29: /* "blade-enclosure" */
+            return "server";
+
+        case 33: /* "iot-gateway" */
+        case 34: /* "embedded-pc" */
+        case 35: /* "mini-pc" */
+        case 36: /* "stick-pc" */
+            return "mini-pc";
+
+        case 1: /* "other" */
+        case 2: /* "unknown" */
+        case 18: /* "expansion-chassis" */
+        case 19: /* "sub-chassis" */
+        case 20: /* "bus-expansion" */
+        case 21: /* "peripheral" */
+        case 22: /* "raid" */
+        default:
+            return "unknown";
     }
-}
-
-static void dmi_map_chassis_type(DAEMON_STATUS_FILE *ds, int chassis_type) {
-    if(!ds) return;
-
-    const char *str = NULL;
-
-    if(dmi_is_virtual_machine(ds))
-        str = "vm";
-
-    if(!str)
-        str = dmi_chassis_type_to_string(chassis_type);
-
-    if(str)
-        safecpy(ds->hw.chassis.type, str);
 }
 
 static void dmi_clean_field(char *buf, size_t buf_size) {
@@ -801,13 +808,7 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
     freebsd_get_kenv_str("smbios.chassis.version", ds->hw.chassis.version, sizeof(ds->hw.chassis.version));
 
     // Chassis type
-    char chassis_type[16] = "";
-    freebsd_get_kenv_str("smbios.chassis.type", chassis_type, sizeof(chassis_type));
-    if (chassis_type[0]) {
-        int type = atoi(chassis_type);
-        if (type > 0)
-            snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", type);
-    }
+    freebsd_get_kenv_str("smbios.chassis.type", ds->hw.chassis.type, sizeof(ds->hw.chassis.type));
 
     // If we couldn't get system information from SMBIOS, try to use model
     if (!ds->hw.product.name[0])
@@ -1072,8 +1073,7 @@ static void process_smbios_chassis_info(const smbios_header_t *header,
     
     // Type (numerical value at offset 5)
     BYTE chassis_type = data[5] & 0x7F; // Mask out MSB
-    if (chassis_type > 0 && chassis_type < 36) // Valid range check
-        snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", chassis_type);
+    snprintf(ds->hw.chassis.type, sizeof(ds->hw.chassis.type), "%d", chassis_type);
     
     // Version (string index at offset 6)
     if (data[6] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
@@ -1321,49 +1321,6 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
 // --------------------------------------------------------------------------------------------------------------------
 // public API
 
-void finalize_vendor_product_vm(DAEMON_STATUS_FILE *ds) {
-    if(ds->cloud_provider_type[0] && strcasecmp(ds->cloud_provider_type, "unknown") != 0)
-        safecpy(ds->hw.sys.vendor, ds->cloud_provider_type);
-
-    if(ds->cloud_instance_type[0] && strcasecmp(ds->cloud_instance_type, "unknown") != 0)
-        safecpy(ds->hw.product.name, ds->cloud_instance_type);
-
-    if(ds->virtualization[0] && strcasecmp(ds->virtualization, "none") != 0 && strcasecmp(ds->virtualization, "unknown") != 0)
-        safecpy(ds->hw.chassis.type, "vm");
-}
-
-static void dmi_set_if_empty(DAEMON_STATUS_FILE *ds, const char *vendor, const char *product, const char *version, const char *chassis_type) {
-    if(!ds->hw.sys.vendor[0])
-        safecpy(ds->hw.sys.vendor, vendor);
-
-    if(!ds->hw.board.vendor[0])
-        safecpy(ds->hw.board.vendor, vendor);
-
-    if(!ds->hw.chassis.vendor[0])
-        safecpy(ds->hw.chassis.vendor, vendor);
-
-    if(!ds->hw.bios.vendor[0])
-        safecpy(ds->hw.bios.vendor, vendor);
-
-    if(!ds->hw.product.name[0])
-        safecpy(ds->hw.product.name, product);
-
-    if(!ds->hw.board.name[0])
-        safecpy(ds->hw.board.name, product);
-
-    if(!ds->hw.product.version[0])
-        safecpy(ds->hw.product.version, version);
-
-    if(!ds->hw.board.version[0])
-        safecpy(ds->hw.board.version, version);
-
-    if(!ds->hw.chassis.version[0])
-        safecpy(ds->hw.chassis.version, version);
-
-    if(!ds->hw.chassis.type[0])
-        safecpy(ds->hw.chassis.type, chassis_type);
-}
-
 void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
     ds->hw.sys.vendor[0] = '\0';
     ds->hw.product.name[0] = '\0';
@@ -1383,47 +1340,87 @@ void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
 
     os_dmi_info(ds);
 
-    dmi_normalize_vendor_field(ds->hw.sys.vendor, sizeof(ds->hw.sys.vendor));
-    dmi_normalize_vendor_field(ds->hw.board.vendor, sizeof(ds->hw.board.vendor));
-    dmi_normalize_vendor_field(ds->hw.chassis.vendor, sizeof(ds->hw.chassis.vendor));
-    dmi_normalize_vendor_field(ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
-    dmi_map_chassis_type(ds, atoi(ds->hw.chassis.type));
+    product_name_vendor_type(ds);
+}
 
-    // make sure product name and board name fill each other
-    if(!ds->hw.board.name[0] && ds->hw.product.name[0])
-        safecpy(ds->hw.board.name, ds->hw.product.name);
+void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
+    char *force_type = NULL;
 
-    if(!ds->hw.product.name[0] && ds->hw.board.name[0])
-        safecpy(ds->hw.product.name, ds->hw.board.name);
+    if(ds->cloud_provider_type[0] && strcasecmp(ds->cloud_provider_type, "unknown") != 0)
+        safecpy(ds->product.vendor, ds->cloud_provider_type);
+    else {
+        // copy one of the names found in DMI
+        if(ds->hw.sys.vendor[0])
+            safecpy(ds->product.vendor, ds->hw.sys.vendor);
+        else if(ds->hw.board.vendor[0])
+            safecpy(ds->product.vendor, ds->hw.board.vendor);
+        else if(ds->hw.chassis.vendor[0])
+            safecpy(ds->product.vendor, ds->hw.chassis.vendor);
+        else if(ds->hw.bios.vendor[0])
+            safecpy(ds->product.vendor, ds->hw.bios.vendor);
 
-    // common exceptions
-    if(strcasestr(ds->hw.product.name, "Raspberry") != NULL)
-        dmi_set_if_empty(ds, "Raspberry", ds->hw.product.name, ds->hw.product.name, "mini-pc");
+        // derive the vendor from other DMI fields
+        if(!ds->product.vendor[0]) {
+            if(strcasestr(ds->hw.product.name, "VirtualMac") != NULL ||
+                (strcasestr(ds->hw.board.name, "Apple") != NULL &&
+                 strcasestr(ds->hw.board.name, "Virtual") != NULL)) {
+                safecpy(ds->product.vendor, "Apple");
+                force_type = "vm";
+            }
+            else if(strcasestr(ds->hw.product.name, "NVIDIA") != NULL &&
+                     strcasestr(ds->hw.product.name, "Kit") != NULL) {
+                safecpy(ds->product.vendor, "NVIDIA");
+                force_type = "vm";
+            }
+            else if(strcasestr(ds->hw.product.name, "Raspberry") != NULL) {
+                safecpy(ds->product.vendor, "Raspberry");
+                force_type = "mini-pc";
+            }
+            else if(strcasestr(ds->hw.product.name, "ODROID") != NULL) {
+                safecpy(ds->product.vendor, "Odroid");
+                force_type = "mini-pc";
+            }
+            else if(strcasestr(ds->hw.product.name, "BananaPi") != NULL ||
+                     strcasestr(ds->hw.product.name, "Banana Pi") != NULL) {
+                safecpy(ds->product.vendor, "BananaPi");
+                force_type = "mini-pc";
+            }
+            else if(strcasestr(ds->hw.product.name, "OrangePi") != NULL ||
+                     strcasestr(ds->hw.product.name, "Orange Pi") != NULL) {
+                safecpy(ds->product.vendor, "OrangePi");
+                force_type = "mini-pc";
+            }
+        }
 
-    if(strcasestr(ds->hw.product.name, "VirtualMac") != NULL ||
-        (strcasestr(ds->hw.board.name, "Apple") != NULL && strcasestr(ds->hw.board.name, "Virtual") != NULL))
-        dmi_set_if_empty(ds, "Apple", ds->hw.product.name, ds->hw.product.name, "vm");
+        if(!ds->product.vendor[0])
+            safecpy(ds->product.vendor, "unknown");
+        else
+            dmi_normalize_vendor_field(ds->product.vendor, sizeof(ds->product.vendor));
+    }
 
-    // make sure we have a system vendor
-    if(!ds->hw.sys.vendor[0])
-        safecpy(ds->hw.sys.vendor, ds->hw.board.vendor);
-    if(!ds->hw.sys.vendor[0])
-        safecpy(ds->hw.sys.vendor, ds->hw.chassis.vendor);
-    if(!ds->hw.sys.vendor[0])
-        safecpy(ds->hw.sys.vendor, ds->hw.bios.vendor);
-    if(!ds->hw.sys.vendor[0])
-        safecpy(ds->hw.sys.vendor, "unknown");
+    if(ds->cloud_instance_type[0] && strcasecmp(ds->cloud_instance_type, "unknown") != 0)
+        safecpy(ds->product.name, ds->cloud_instance_type);
+    else {
+        if(ds->hw.product.name[0])
+            safecpy(ds->product.name, ds->hw.product.name);
+        else if(ds->hw.board.name[0])
+            safecpy(ds->product.name, ds->hw.board.name);
+        else
+            safecpy(ds->product.name, "unknown");
+    }
 
-    // make sure we have a product name
-    if(!ds->hw.product.name[0])
-        safecpy(ds->hw.product.name, ds->hw.board.name);
-    if(!ds->hw.product.name[0])
-        safecpy(ds->hw.product.name, "unknown");
-
-    // make sure we have a chassis type
-    if(!ds->hw.chassis.type[0])
-        safecpy(ds->hw.chassis.type, "unknown");
-
-    // make sure the cloud provider and cloud instance loaded from system-info.sh are preferred
-    finalize_vendor_product_vm(ds);
+    if(ds->virtualization[0] && strcasecmp(ds->virtualization, "none") != 0 && strcasecmp(ds->virtualization, "unknown") != 0)
+        safecpy(ds->product.type, "vm");
+    else if(force_type)
+        safecpy(ds->product.type, force_type);
+    else if(dmi_is_virtual_machine(ds))
+        safecpy(ds->product.type, "vm");
+    else {
+        char *end = NULL;
+        int type = (int)strtol(ds->hw.chassis.type, &end, 10);
+        if(type && (!end || !*end))
+            safecpy(ds->product.type, dmi_chassis_type_to_string(type));
+        else
+            safecpy(ds->product.type, "unknown");
+    }
 }
