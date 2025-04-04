@@ -93,8 +93,8 @@ typedef struct daemon_status_file {
 
     struct {
         // normalized information from cloud provider and h/w information
-        char vendor[64];
-        char name[64];
+        char vendor[32];
+        char name[96];
         char type[16];
     } product;
 
