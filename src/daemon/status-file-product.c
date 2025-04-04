@@ -320,7 +320,9 @@ void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
     if(ds->cloud_instance_type[0] && strcasecmp(ds->cloud_instance_type, "unknown") != 0)
         safecpy(ds->product.name, ds->cloud_instance_type);
     else {
-        if(ds->hw.product.name[0])
+        if(ds->hw.product.family[0])
+            safecpy(ds->product.name, ds->hw.product.family);
+        else if(ds->hw.product.name[0])
             safecpy(ds->product.name, ds->hw.product.name);
         else if(ds->hw.board.name[0])
             safecpy(ds->product.name, ds->hw.board.name);
