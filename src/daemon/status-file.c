@@ -124,6 +124,10 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         if(ds->v >= 24)
             buffer_json_member_add_uint64(wb, "crashes", ds->crashes);
+            
+        // Only include PID if we're at version 27 or later
+        if(ds->v >= 27)
+            buffer_json_member_add_uint64(wb, "pid", (uint64_t)ds->pid);
 
         if(ds->v >= 22) {
             buffer_json_member_add_uint64(wb, "posts", ds->posts);
@@ -224,6 +228,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_object(wb, "sys");
         {
             buffer_json_member_add_string(wb, "vendor", ds->hw.sys.vendor);
+            buffer_json_member_add_string(wb, "serial", ds->hw.sys.serial);
+            buffer_json_member_add_string(wb, "uuid", ds->hw.sys.uuid);
+            buffer_json_member_add_string(wb, "asset_tag", ds->hw.sys.asset_tag);
         }
         buffer_json_object_close(wb);
 
@@ -241,6 +248,8 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string(wb, "name", ds->hw.board.name);
             buffer_json_member_add_string(wb, "version", ds->hw.board.version);
             buffer_json_member_add_string(wb, "vendor", ds->hw.board.vendor);
+            buffer_json_member_add_string(wb, "serial", ds->hw.board.serial);
+            buffer_json_member_add_string(wb, "asset_tag", ds->hw.board.asset_tag);
         }
         buffer_json_object_close(wb);
 
@@ -249,6 +258,8 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string(wb, "type", ds->hw.chassis.type);
             buffer_json_member_add_string(wb, "vendor", ds->hw.chassis.vendor);
             buffer_json_member_add_string(wb, "version", ds->hw.chassis.version);
+            buffer_json_member_add_string(wb, "serial", ds->hw.chassis.serial);
+            buffer_json_member_add_string(wb, "asset_tag", ds->hw.chassis.asset_tag);
         }
         buffer_json_object_close(wb);
 
@@ -258,6 +269,8 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string(wb, "release", ds->hw.bios.release);
             buffer_json_member_add_string(wb, "version", ds->hw.bios.version);
             buffer_json_member_add_string(wb, "vendor", ds->hw.bios.vendor);
+            buffer_json_member_add_string(wb, "mode", ds->hw.bios.mode);
+            buffer_json_member_add_boolean(wb, "secure_boot", ds->hw.bios.secure_boot);
         }
         buffer_json_object_close(wb);
     }
@@ -340,6 +353,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     bool required_v24 = version >= 24 ? strict : false;
     bool required_v25 = version >= 25 ? strict : false;
     bool required_v26 = version >= 26 ? strict : false;
+    bool required_v27 = version >= 27 ? strict : false;
 
     // Parse timestamp
     JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->timestamp_ut, error, required_v1);
@@ -385,6 +399,10 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
         if(version >= 24)
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "crashes", ds->crashes, error, required_v24);
+            
+        // Only try to parse PID if we're at version 27 or later
+        if(version >= 27)
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "pid", ds->pid, error, false);
 
         if(version >= 22) {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "posts", ds->posts, error, required_v22);
@@ -470,6 +488,9 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     JSONC_PARSE_SUBOBJECT(jobj, path, "hw", error, required_v25, {
         JSONC_PARSE_SUBOBJECT(jobj, path, "sys", error, required_v25, {
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->hw.sys.vendor, error, required_v25);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "serial", ds->hw.sys.serial, error, required_v26);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "uuid", ds->hw.sys.uuid, error, required_v27);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "asset_tag", ds->hw.sys.asset_tag, error, required_v27);
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "product", error, required_v25, {
@@ -483,19 +504,25 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "name", ds->hw.board.name, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->hw.board.version, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->hw.board.vendor, error, required_v25);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "serial", ds->hw.board.serial, error, required_v26);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "asset_tag", ds->hw.board.asset_tag, error, required_v27);
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "chassis", error, required_v25, {
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path,"type", ds->hw.chassis.type ,error ,required_v25);
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj,path,"vendor" ,ds->hw.chassis.vendor ,error ,required_v25);
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj,path,"version" ,ds->hw.chassis.version ,error ,required_v25);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "type", ds->hw.chassis.type, error, required_v25);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->hw.chassis.vendor, error, required_v25);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->hw.chassis.version, error, required_v25);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "serial", ds->hw.chassis.serial, error, required_v26);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "asset_tag", ds->hw.chassis.asset_tag, error, required_v27);
         });
 
-        JSONC_PARSE_SUBOBJECT(jobj,path,"bios" ,error ,required_v25,{
+        JSONC_PARSE_SUBOBJECT(jobj, path, "bios", error, required_v25, {
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "date", ds->hw.bios.date, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "release", ds->hw.bios.release, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->hw.bios.version, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->hw.bios.vendor, error, required_v25);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "mode", ds->hw.bios.mode, error, required_v27);
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "secure_boot", ds->hw.bios.secure_boot, error, required_v27);
         });
     });
 
@@ -652,6 +679,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
+    session_status.pid = getpid();
 
     // we keep the highest cloud status, to know how the agent gets connected to netdata.cloud
     CLOUD_STATUS cs = cloud_status();
@@ -1529,4 +1557,8 @@ ND_MACHINE_GUID daemon_status_file_get_host_id(void) {
 
 size_t daemon_status_file_get_fatal_worker_job_id(void) {
     return session_status.fatal.worker_job_id;
+}
+
+pid_t daemon_status_file_get_pid(void) {
+    return session_status.pid;
 }

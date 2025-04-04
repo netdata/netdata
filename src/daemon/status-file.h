@@ -10,7 +10,7 @@
 #include "machine-guid.h"
 #include "status-file-dmi.h"
 
-#define STATUS_FILE_VERSION 26
+#define STATUS_FILE_VERSION 27
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -52,6 +52,7 @@ typedef struct daemon_status_file {
     size_t crashes;             // the number of times this agent has crashed (ever)
     size_t posts;               // the number of posts to the backend
     ssize_t reliability;        // consecutive restarts: > 0 reliable, < 0 crashing
+    pid_t pid;                  // the process id of the netdata agent
 
     ND_MACHINE_GUID host_id;    // the machine guid of the system
 
@@ -170,5 +171,6 @@ size_t daemon_status_file_get_restarts(void);
 ssize_t daemon_status_file_get_reliability(void);
 ND_MACHINE_GUID daemon_status_file_get_host_id(void);
 size_t daemon_status_file_get_fatal_worker_job_id(void);
+pid_t daemon_status_file_get_pid(void);
 
 #endif //NETDATA_STATUS_FILE_H

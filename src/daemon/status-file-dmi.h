@@ -15,6 +15,9 @@
 typedef struct dmi_info {
     struct {
         char vendor[64];
+        char serial[64];  // System serial number
+        char uuid[64];    // System UUID (hardware identifier)
+        char asset_tag[64]; // System asset tag
     } sys;
 
     struct {
@@ -28,12 +31,16 @@ typedef struct dmi_info {
         char name[64];
         char version[64];
         char vendor[64];
+        char serial[64];  // Board serial number
+        char asset_tag[64]; // Board asset tag
     } board;
 
     struct {
         char type[16];
         char vendor[64];
         char version[64];
+        char serial[64];  // Chassis serial number
+        char asset_tag[64]; // Chassis asset tag
     } chassis;
 
     struct {
@@ -41,6 +48,8 @@ typedef struct dmi_info {
         char release[64];
         char version[64];
         char vendor[64];
+        char mode[16];    // Boot mode (UEFI/Legacy)
+        bool secure_boot; // Secure boot status (true/false)
     } bios;
 } DMI_INFO;
 

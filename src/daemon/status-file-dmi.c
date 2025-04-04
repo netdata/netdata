@@ -144,6 +144,9 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     if (!dmi) return;
     
     linux_get_dmi_field("sys_vendor", NULL, dmi->sys.vendor, sizeof(dmi->sys.vendor));
+    linux_get_dmi_field("system_serial", NULL, dmi->sys.serial, sizeof(dmi->sys.serial));
+    linux_get_dmi_field("product_uuid", NULL, dmi->sys.uuid, sizeof(dmi->sys.uuid));
+    linux_get_dmi_field("chassis_asset_tag", NULL, dmi->sys.asset_tag, sizeof(dmi->sys.asset_tag));
 
     linux_get_dmi_field("product_name", "/proc/device-tree/model", dmi->product.name, sizeof(dmi->product.name));
     linux_get_dmi_field("product_version", NULL, dmi->product.version, sizeof(dmi->product.version));
@@ -152,10 +155,14 @@ void os_dmi_info_get(DMI_INFO *dmi) {
 
     linux_get_dmi_field("chassis_vendor", NULL, dmi->chassis.vendor, sizeof(dmi->chassis.vendor));
     linux_get_dmi_field("chassis_version", NULL, dmi->chassis.version, sizeof(dmi->chassis.version));
+    linux_get_dmi_field("chassis_serial", NULL, dmi->chassis.serial, sizeof(dmi->chassis.serial));
+    linux_get_dmi_field("chassis_asset_tag", NULL, dmi->chassis.asset_tag, sizeof(dmi->chassis.asset_tag));
 
     linux_get_dmi_field("board_vendor", NULL, dmi->board.vendor, sizeof(dmi->board.vendor));
     linux_get_dmi_field("board_name", NULL, dmi->board.name, sizeof(dmi->board.name));
     linux_get_dmi_field("board_version", NULL, dmi->board.version, sizeof(dmi->board.version));
+    linux_get_dmi_field("board_serial", NULL, dmi->board.serial, sizeof(dmi->board.serial));
+    linux_get_dmi_field("board_asset_tag", NULL, dmi->board.asset_tag, sizeof(dmi->board.asset_tag));
 
     linux_get_dmi_field("bios_vendor", NULL, dmi->bios.vendor, sizeof(dmi->bios.vendor));
     linux_get_dmi_field("bios_version", NULL, dmi->bios.version, sizeof(dmi->bios.version));
@@ -163,6 +170,43 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     linux_get_dmi_field("bios_release", NULL, dmi->bios.release, sizeof(dmi->bios.release));
 
     linux_get_dmi_field("chassis_type", NULL, dmi->chassis.type, sizeof(dmi->chassis.type));
+    
+    // Check if running in UEFI mode - just file existence, no external command
+    bool is_uefi = access("/sys/firmware/efi", F_OK) == 0;
+    if (is_uefi) {
+        safecpy(dmi->bios.mode, "UEFI");
+        
+        // Check EFI variable for secure boot - direct file access, no external command
+        int fd = open("/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c", O_RDONLY);
+        if (fd != -1) {
+            // Skip the first 4 bytes which contain the EFI variable attributes
+            unsigned char value[5] = {0};
+            ssize_t bytes_read = read(fd, value, sizeof(value));
+            if (bytes_read == sizeof(value)) {
+                // The 5th byte (index 4) contains the secure boot status
+                dmi->bios.secure_boot = (value[4] == 1);
+            }
+            close(fd);
+        }
+        
+        // Alternative check through securelevel - direct file access, no external command
+        if (!dmi->bios.secure_boot) {
+            fd = open("/sys/kernel/security/securelevel", O_RDONLY);
+            if (fd != -1) {
+                char level[10] = {0};
+                ssize_t bytes_read = read(fd, level, sizeof(level) - 1);
+                if (bytes_read > 0) {
+                    level[bytes_read] = '\0'; // Ensure null termination
+                    // If securelevel is > 0, usually means secure boot is enabled
+                    int securelevel = atoi(level);
+                    dmi->bios.secure_boot = (securelevel > 0);
+                }
+                close(fd);
+            }
+        }
+    } else {
+        safecpy(dmi->bios.mode, "Legacy");
+    }
 }
 #elif defined(OS_MACOS)
 
@@ -322,9 +366,31 @@ static void get_platform_expert_info(DMI_INFO *dmi) {
     get_iokit_string_property(platform_expert, CFSTR("board-id"),
                               dmi->board.name, sizeof(dmi->board.name));
 
+    // System serial number - might be available as IOPlatformSerialNumber
+    get_iokit_string_property(platform_expert, CFSTR("IOPlatformSerialNumber"), 
+                             dmi->sys.serial, sizeof(dmi->sys.serial));
+
     // Hardware UUID can be useful to include
     char uuid_str[64] = {0};
     get_iokit_string_property(platform_expert, CFSTR("IOPlatformUUID"), uuid_str, sizeof(uuid_str));
+    
+    if (uuid_str[0])
+        safecpy(dmi->sys.uuid, uuid_str);
+        
+    // For asset tag, try alternative properties since Apple doesn't provide a specific asset tag property
+    // First try chassis tag property if available
+    char asset_tag[64] = {0};
+    get_iokit_string_property(platform_expert, CFSTR("IOPlatformChassisTag"), asset_tag, sizeof(asset_tag));
+    
+    // If not available, try using the serial number as an asset tag if not already set
+    if (!asset_tag[0]) {
+        // Model identifier can be a reasonable alternative for asset tag
+        get_iokit_string_property(platform_expert, CFSTR("model"), asset_tag, sizeof(asset_tag));
+    }
+    
+    if (asset_tag[0] && (!dmi->sys.serial[0] || strcmp(asset_tag, dmi->sys.serial) != 0)) {
+        safecpy(dmi->sys.asset_tag, asset_tag);
+    }
 
     // Get device type to determine chassis type
     char device_type[64] = {0};
@@ -494,6 +560,51 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     // Default chassis type if we couldn't determine it
     if (!dmi->chassis.type[0])
         safecpy(dmi->chassis.type, "3"); // Desktop
+        
+    // Check boot mode (UEFI vs Legacy) on macOS
+    io_registry_entry_t options = IORegistryEntryFromPath(kIOMasterPortDefault, "IODeviceTree:/options");
+    if (options) {
+        bool found_efi = false;
+        CFTypeRef property = IORegistryEntryCreateCFProperty(options, CFSTR("efi-boot-device"), kCFAllocatorDefault, 0);
+        if (property) {
+            found_efi = true;
+            CFRelease(property);
+        }
+        
+        if (found_efi) {
+            safecpy(dmi->bios.mode, "UEFI");
+            
+            // Check secure boot status
+            CFTypeRef secure_boot_prop = IORegistryEntryCreateCFProperty(options, 
+                                                                    CFSTR("SecureBootLevel"), 
+                                                                    kCFAllocatorDefault, 0);
+            if (secure_boot_prop) {
+                if (CFGetTypeID(secure_boot_prop) == CFNumberGetTypeID()) {
+                    int level;
+                    if (CFNumberGetValue((CFNumberRef)secure_boot_prop, kCFNumberIntType, &level)) {
+                        // Any positive value indicates secure boot is enabled
+                        dmi->bios.secure_boot = (level > 0);
+                    }
+                }
+                CFRelease(secure_boot_prop);
+            }
+        } else {
+            safecpy(dmi->bios.mode, "Legacy");
+        }
+        
+        IOObjectRelease(options);
+    } else {
+        safecpy(dmi->bios.mode, "Unknown");
+    }
+    
+    // Check for Apple T2 security chip (similar to TPM but without using external commands)
+    // This uses only IOKit APIs which are safe and built-in
+    io_registry_entry_t chip = IORegistryEntryFromPath(kIOMasterPortDefault, "IOService:/AppleACPIPlatformExpert/SMC/AppleT2:");
+    if (chip) {
+        // If T2 chip is present, secure boot is likely enabled
+        dmi->bios.secure_boot = true;
+        IOObjectRelease(chip);
+    }
 }
 
 #elif defined(OS_FREEBSD)
@@ -529,6 +640,7 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     freebsd_get_sysctl_str("hw.vendor", dmi->sys.vendor, sizeof(dmi->sys.vendor));
     freebsd_get_sysctl_str("hw.product", dmi->product.name, sizeof(dmi->product.name));
     freebsd_get_sysctl_str("hw.version", dmi->product.version, sizeof(dmi->product.version));
+    freebsd_get_sysctl_str("hw.serial", dmi->sys.serial, sizeof(dmi->sys.serial));
 
     // Try using kenv for additional information
     freebsd_get_kenv_str("smbios.system.maker", dmi->sys.vendor, sizeof(dmi->sys.vendor));
@@ -536,11 +648,13 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     freebsd_get_kenv_str("smbios.system.version", dmi->product.version, sizeof(dmi->product.version));
     freebsd_get_kenv_str("smbios.system.sku", dmi->product.sku, sizeof(dmi->product.sku));
     freebsd_get_kenv_str("smbios.system.family", dmi->product.family, sizeof(dmi->product.family));
+    freebsd_get_kenv_str("smbios.system.serial", dmi->sys.serial, sizeof(dmi->sys.serial));
 
     // Board information
     freebsd_get_kenv_str("smbios.planar.maker", dmi->board.vendor, sizeof(dmi->board.vendor));
     freebsd_get_kenv_str("smbios.planar.product", dmi->board.name, sizeof(dmi->board.name));
     freebsd_get_kenv_str("smbios.planar.version", dmi->board.version, sizeof(dmi->board.version));
+    freebsd_get_kenv_str("smbios.planar.serial", dmi->board.serial, sizeof(dmi->board.serial));
 
     // BIOS information
     freebsd_get_kenv_str("smbios.bios.vendor", dmi->bios.vendor, sizeof(dmi->bios.vendor));
@@ -551,6 +665,7 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     // Chassis information
     freebsd_get_kenv_str("smbios.chassis.maker", dmi->chassis.vendor, sizeof(dmi->chassis.vendor));
     freebsd_get_kenv_str("smbios.chassis.version", dmi->chassis.version, sizeof(dmi->chassis.version));
+    freebsd_get_kenv_str("smbios.chassis.serial", dmi->chassis.serial, sizeof(dmi->chassis.serial));
 
     // Chassis type
     freebsd_get_kenv_str("smbios.chassis.type", dmi->chassis.type, sizeof(dmi->chassis.type));
@@ -558,6 +673,43 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     // If we couldn't get system information from SMBIOS, try to use model
     if (!dmi->product.name[0])
         freebsd_get_sysctl_str("hw.model", dmi->product.name, sizeof(dmi->product.name));
+    
+    // Try to get asset tags
+    freebsd_get_kenv_str("smbios.system.asset_tag", dmi->sys.asset_tag, sizeof(dmi->sys.asset_tag));
+    freebsd_get_kenv_str("smbios.chassis.asset_tag", dmi->chassis.asset_tag, sizeof(dmi->chassis.asset_tag));
+    freebsd_get_kenv_str("smbios.planar.asset_tag", dmi->board.asset_tag, sizeof(dmi->board.asset_tag));
+    
+    // Get UUID
+    freebsd_get_kenv_str("smbios.system.uuid", dmi->sys.uuid, sizeof(dmi->sys.uuid));
+    
+    // Check for UEFI boot mode using sysctl (no external commands)
+    char bootmethod[64] = {0};
+    size_t bootmethod_size = sizeof(bootmethod) - 1;
+    if (sysctlbyname("kern.bootmethod", bootmethod, &bootmethod_size, NULL, 0) == 0) {
+        if (strncmp(bootmethod, "UEFI", 4) == 0) {
+            safecpy(dmi->bios.mode, "UEFI");
+            
+            // Check secure boot status - FreeBSD stores this in sysctl (no external commands)
+            int secure_boot_enabled = 0;
+            size_t secboot_size = sizeof(secure_boot_enabled);
+            if (sysctlbyname("kern.secureboot.enable", &secure_boot_enabled, &secboot_size, NULL, 0) == 0) {
+                dmi->bios.secure_boot = (secure_boot_enabled != 0);
+            }
+        } else {
+            safecpy(dmi->bios.mode, "Legacy");
+        }
+    } else {
+        // Fallback: check for EFI presence (older FreeBSD versions) - no external commands
+        int efi_present = 0;
+        size_t efi_size = sizeof(efi_present);
+        if (sysctlbyname("kern.efi.runtime", &efi_present, &efi_size, NULL, 0) == 0) {
+            if (efi_present) {
+                safecpy(dmi->bios.mode, "UEFI");
+            } else {
+                safecpy(dmi->bios.mode, "Legacy");
+            }
+        }
+    }
 }
 
 #elif defined(OS_WINDOWS)
@@ -759,11 +911,50 @@ static void process_smbios_system_info(const smbios_header_t *header,
         safecpy(dmi->product.version, temp_str);
     }
     
+    // Serial Number (string index at offset 7)
+    if (data[7] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[7], temp_str, sizeof(temp_str))) {
+        safecpy(dmi->sys.serial, temp_str);
+    }
+    
     // If structure is long enough for family (SMBIOS 2.1+)
     if (header->length >= 25 && data[21] > 0 && 
         get_smbios_string(smbios_data, smbios_size, string_table,
                        data[21], temp_str, sizeof(temp_str))) {
         safecpy(dmi->product.family, temp_str);
+    }
+    
+    // Extract system UUID (16 bytes starting at offset 8)
+    if (header->length >= 24) {
+        // Verify we have enough data to access all bytes safely
+        if ((uintptr_t)data + 23 < (uintptr_t)smbios_data + smbios_size) {
+            // UUID is stored as 16 bytes, we'll format it as a standard UUID string
+            char uuid_str[40] = {0}; // 36 chars for UUID + null terminator
+            
+            // Note: SMBIOS UUID needs byte swapping for first three fields
+            int ret = snprintf(uuid_str, sizeof(uuid_str),
+                     "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+                     data[11], data[10], data[9], data[8],         // field 1 (byte swapped)
+                     data[13], data[12],                           // field 2 (byte swapped)
+                     data[15], data[14],                           // field 3 (byte swapped)
+                     data[16], data[17],                           // field 4 (not swapped)
+                     data[18], data[19], data[20], data[21], data[22], data[23]); // field 5 (not swapped)
+            
+            // Verify the formatting worked and buffer wasn't truncated
+            if (ret > 0 && ret < (int)sizeof(uuid_str)) {
+                // Only set if not all zeros (some systems report all zeros)
+                if (uuid_str[0] != '0' || uuid_str[1] != '0' || uuid_str[2] != '0' || uuid_str[3] != '0') {
+                    safecpy(dmi->sys.uuid, uuid_str);
+                }
+            }
+        }
+    }
+    
+    // Asset Tag is sometimes available in newer SMBIOS versions
+    if (header->length >= 27 && data[26] > 0 &&
+        get_smbios_string(smbios_data, smbios_size, string_table,
+                       data[26], temp_str, sizeof(temp_str))) {
+        safecpy(dmi->sys.asset_tag, temp_str);
     }
 }
 
@@ -796,6 +987,19 @@ static void process_smbios_baseboard_info(const smbios_header_t *header,
                                      data[6], temp_str, sizeof(temp_str))) {
         safecpy(dmi->board.version, temp_str);
     }
+    
+    // Serial Number (string index at offset 7)
+    if (data[7] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[7], temp_str, sizeof(temp_str))) {
+        safecpy(dmi->board.serial, temp_str);
+    }
+    
+    // Asset Tag (string index at offset 8)
+    if (header->length >= 9 && data[8] > 0 &&
+        get_smbios_string(smbios_data, smbios_size, string_table,
+                      data[8], temp_str, sizeof(temp_str))) {
+        safecpy(dmi->board.asset_tag, temp_str);
+    }
 }
 
 // Process Chassis Information (Type 3)
@@ -824,6 +1028,19 @@ static void process_smbios_chassis_info(const smbios_header_t *header,
     if (data[6] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
                                      data[6], temp_str, sizeof(temp_str))) {
         safecpy(dmi->chassis.version, temp_str);
+    }
+    
+    // Serial Number (string index at offset 7)
+    if (data[7] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
+                                     data[7], temp_str, sizeof(temp_str))) {
+        safecpy(dmi->chassis.serial, temp_str);
+    }
+    
+    // Asset Tag (string index at offset 8)
+    if (header->length >= 9 && data[8] > 0 &&
+        get_smbios_string(smbios_data, smbios_size, string_table, 
+                      data[8], temp_str, sizeof(temp_str))) {
+        safecpy(dmi->chassis.asset_tag, temp_str);
     }
 }
 
@@ -984,6 +1201,15 @@ static void windows_get_registry_info(DMI_INFO *dmi) {
         dmi->product.name,
         sizeof(dmi->product.name)
     );
+    
+    // System Serial Number
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "SystemSerialNumber",
+        dmi->sys.serial,
+        sizeof(dmi->sys.serial)
+    );
 
     // BIOS information
     windows_read_registry_string(
@@ -1034,6 +1260,52 @@ static void windows_get_registry_info(DMI_INFO *dmi) {
         dmi->board.version,
         sizeof(dmi->board.version)
     );
+    
+    // Base Board Serial
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "BaseBoardSerialNumber",
+        dmi->board.serial,
+        sizeof(dmi->board.serial)
+    );
+    
+    // Chassis Serial (might not be available in registry, but try anyway)
+    windows_read_registry_string(
+        HKEY_LOCAL_MACHINE,
+        "HARDWARE\\DESCRIPTION\\System\\BIOS",
+        "ChassisSerialNumber",
+        dmi->chassis.serial,
+        sizeof(dmi->chassis.serial)
+    );
+    
+    // Get BIOS boot mode (UEFI or Legacy)
+    DWORD firmware_type = 0;
+    if (GetFirmwareType(&firmware_type)) {
+        switch (firmware_type) {
+            case 1: // FirmwareTypeBios
+                safecpy(dmi->bios.mode, "Legacy");
+                break;
+            case 2: // FirmwareTypeUefi
+                safecpy(dmi->bios.mode, "UEFI");
+                break;
+            default:
+                safecpy(dmi->bios.mode, "Unknown");
+        }
+    }
+    
+    // Check if secure boot is enabled
+    HKEY key;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State", 
+                     0, KEY_READ, &key) == ERROR_SUCCESS) {
+        DWORD secure_boot_value = 0;
+        DWORD size = sizeof(secure_boot_value);
+        if (RegQueryValueExA(key, "UEFISecureBootEnabled", NULL, NULL, 
+                            (LPBYTE)&secure_boot_value, &size) == ERROR_SUCCESS) {
+            dmi->bios.secure_boot = (secure_boot_value != 0);
+        }
+        RegCloseKey(key);
+    }
 }
 
 // Main function to get hardware information
@@ -1045,6 +1317,50 @@ void os_dmi_info_get(DMI_INFO *dmi) {
 
     // Try registry as a fallback or to fill missing values
     windows_get_registry_info(dmi);
+
+    // Get asset tags if not set by SMBIOS
+    if (!dmi->sys.asset_tag[0]) {
+        windows_read_registry_string(
+            HKEY_LOCAL_MACHINE,
+            "HARDWARE\\DESCRIPTION\\System\\BIOS",
+            "SystemAssetTag",
+            dmi->sys.asset_tag,
+            sizeof(dmi->sys.asset_tag)
+        );
+    }
+    
+    if (!dmi->board.asset_tag[0]) {
+        windows_read_registry_string(
+            HKEY_LOCAL_MACHINE,
+            "HARDWARE\\DESCRIPTION\\System\\BIOS",
+            "BaseBoardAssetTag",
+            dmi->board.asset_tag,
+            sizeof(dmi->board.asset_tag)
+        );
+    }
+    
+    if (!dmi->chassis.asset_tag[0]) {
+        windows_read_registry_string(
+            HKEY_LOCAL_MACHINE,
+            "HARDWARE\\DESCRIPTION\\System\\BIOS",
+            "ChassisAssetTag",
+            dmi->chassis.asset_tag,
+            sizeof(dmi->chassis.asset_tag)
+        );
+    }
+    
+    // Check for Secure Boot - Read directly from registry, no external commands
+    HKEY secureBootKey;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State", 
+                     0, KEY_READ, &secureBootKey) == ERROR_SUCCESS) {
+        DWORD secure_boot = 0;
+        DWORD size = sizeof(secure_boot);
+        if (RegQueryValueExA(secureBootKey, "UEFISecureBootEnabled", NULL, NULL, 
+                            (LPBYTE)&secure_boot, &size) == ERROR_SUCCESS) {
+            dmi->bios.secure_boot = (secure_boot != 0);
+        }
+        RegCloseKey(secureBootKey);
+    }
 
     // If chassis type is not set or not a valid number, set a default
     if (!dmi->chassis.type[0] || atoi(dmi->chassis.type) <= 0) {
@@ -1077,19 +1393,37 @@ void os_dmi_info_get(DMI_INFO *dmi) {
 void dmi_info_init(DMI_INFO *dmi) {
     if (!dmi) return;
     
+    // System information
     dmi->sys.vendor[0] = '\0';
+    dmi->sys.serial[0] = '\0';
+    dmi->sys.uuid[0] = '\0';
+    dmi->sys.asset_tag[0] = '\0';
+    
+    // Product information
     dmi->product.name[0] = '\0';
     dmi->product.version[0] = '\0';
     dmi->product.sku[0] = '\0';
     dmi->product.family[0] = '\0';
+    
+    // Board information
     dmi->board.vendor[0] = '\0';
     dmi->board.name[0] = '\0';
     dmi->board.version[0] = '\0';
+    dmi->board.serial[0] = '\0';
+    dmi->board.asset_tag[0] = '\0';
+    
+    // BIOS information
     dmi->bios.vendor[0] = '\0';
     dmi->bios.version[0] = '\0';
     dmi->bios.date[0] = '\0';
     dmi->bios.release[0] = '\0';
+    dmi->bios.mode[0] = '\0';
+    dmi->bios.secure_boot = false;
+    
+    // Chassis information
     dmi->chassis.vendor[0] = '\0';
     dmi->chassis.version[0] = '\0';
     dmi->chassis.type[0] = '\0';
+    dmi->chassis.serial[0] = '\0';
+    dmi->chassis.asset_tag[0] = '\0';
 }
