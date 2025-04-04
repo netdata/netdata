@@ -140,7 +140,7 @@ jobs:
         id: check-native
         run: |
           if [ '${{ github.event_name }}' == 'pull_request' ]; then
-            if [ "${{ steps.check-docker-files.outputs.any_modified }}" == "true" ] || [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/non-native') }}" = "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ "${{ steps.check-docker-files.outputs.any_modified }}" == "true" ] || [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/non-native') }}" = "true" ]; then
               echo 'docker-native=0' >> "${GITHUB_OUTPUT}"
             else
               echo 'docker-native=1' >> "${GITHUB_OUTPUT}"
@@ -168,7 +168,7 @@ jobs:
       - name: Read build matrix
         id: set-matrix
         run: |
-          matrix="$(.github/scripts/gen-matrix-docker.py ${{ needs.file-check.outputs.docker-native }})"
+          matrix="$(.github/scripts/gen-matrix-docker.py "${{ needs.file-check.outputs.docker-native }}")"
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification

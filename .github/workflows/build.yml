@@ -231,7 +231,7 @@ jobs:
       - name: Read build matrix
         id: set-matrix
         run: |
-          matrix="$(.github/scripts/gen-matrix-static.py ${{ needs.file-check.outputs.static-native }})"
+          matrix="$(.github/scripts/gen-matrix-static.py "${{ needs.file-check.outputs.static-native }}")"
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
