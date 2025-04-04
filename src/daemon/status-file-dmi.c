@@ -1328,14 +1328,46 @@ void os_dmi_info(DAEMON_STATUS_FILE *ds) {
 // public API
 
 void finalize_vendor_product_vm(DAEMON_STATUS_FILE *ds) {
-    if(ds->cloud_provider_type[0] && strcmp(ds->cloud_provider_type, "unknown") != 0)
+    if(ds->cloud_provider_type[0] && strcasecmp(ds->cloud_provider_type, "unknown") != 0)
         safecpy(ds->hw.sys.vendor, ds->cloud_provider_type);
 
-    if(ds->cloud_instance_type[0] && strcmp(ds->cloud_instance_type, "unknown") != 0)
+    if(ds->cloud_instance_type[0] && strcasecmp(ds->cloud_instance_type, "unknown") != 0)
         safecpy(ds->hw.product.name, ds->cloud_instance_type);
 
-    if(ds->virtualization[0] && strcmp(ds->virtualization, "none") != 0 && strcmp(ds->virtualization, "unknown") != 0)
+    if(ds->virtualization[0] && strcasecmp(ds->virtualization, "none") != 0 && strcasecmp(ds->virtualization, "unknown") != 0)
         safecpy(ds->hw.chassis.type, "vm");
+}
+
+static void dmi_set_if_empty(DAEMON_STATUS_FILE *ds, const char *vendor, const char *product, const char *version, const char *chassis_type) {
+    if(!ds->hw.sys.vendor[0])
+        safecpy(ds->hw.sys.vendor, vendor);
+
+    if(!ds->hw.board.vendor[0])
+        safecpy(ds->hw.board.vendor, vendor);
+
+    if(!ds->hw.chassis.vendor[0])
+        safecpy(ds->hw.chassis.vendor, vendor);
+
+    if(!ds->hw.bios.vendor[0])
+        safecpy(ds->hw.bios.vendor, vendor);
+
+    if(!ds->hw.product.name[0])
+        safecpy(ds->hw.product.name, product);
+
+    if(!ds->hw.board.name[0])
+        safecpy(ds->hw.board.name, product);
+
+    if(!ds->hw.product.version[0])
+        safecpy(ds->hw.product.version, version);
+
+    if(!ds->hw.board.version[0])
+        safecpy(ds->hw.board.version, version);
+
+    if(!ds->hw.chassis.version[0])
+        safecpy(ds->hw.chassis.version, version);
+
+    if(!ds->hw.chassis.type[0])
+        safecpy(ds->hw.chassis.type, chassis_type);
 }
 
 void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
@@ -1361,8 +1393,22 @@ void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
     dmi_normalize_vendor_field(ds->hw.board.vendor, sizeof(ds->hw.board.vendor));
     dmi_normalize_vendor_field(ds->hw.chassis.vendor, sizeof(ds->hw.chassis.vendor));
     dmi_normalize_vendor_field(ds->hw.bios.vendor, sizeof(ds->hw.bios.vendor));
-
     dmi_map_chassis_type(ds, atoi(ds->hw.chassis.type));
+
+    // make sure product name and board name fill each other
+    if(!ds->hw.board.name[0] && ds->hw.product.name[0])
+        safecpy(ds->hw.board.name, ds->hw.product.name);
+
+    if(!ds->hw.product.name[0] && ds->hw.board.name[0])
+        safecpy(ds->hw.product.name, ds->hw.board.name);
+
+    // common exceptions
+    if(strcasestr(ds->hw.product.name, "Raspberry") != NULL)
+        dmi_set_if_empty(ds, "Raspberry", ds->hw.product.name, ds->hw.product.name, "mini-pc");
+
+    if(strcasestr(ds->hw.product.name, "VirtualMac") != NULL ||
+        (strcasestr(ds->hw.board.name, "Apple") != NULL && strcasestr(ds->hw.board.name, "Virtual") != NULL))
+        dmi_set_if_empty(ds, "Apple", ds->hw.product.name, ds->hw.product.name, "vm");
 
     // make sure we have a system vendor
     if(!ds->hw.sys.vendor[0])
@@ -1371,24 +1417,18 @@ void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
         safecpy(ds->hw.sys.vendor, ds->hw.chassis.vendor);
     if(!ds->hw.sys.vendor[0])
         safecpy(ds->hw.sys.vendor, ds->hw.bios.vendor);
-    if(!ds->hw.sys.vendor[0] && strstr(ds->hw.product.name, "Raspberry") != NULL) {
-        safecpy(ds->hw.sys.vendor, "Raspberry");
-        safecpy(ds->hw.chassis.type, "mini-pc");
-    }
-    if(!ds->hw.sys.vendor[0] && (strstr(ds->hw.product.name, "VirtualMac") != NULL || strstr(ds->hw.board.name, "Apple") != NULL))
-        safecpy(ds->hw.sys.vendor, "Apple");
     if(!ds->hw.sys.vendor[0])
-        safecpy(ds->hw.sys.vendor, "Unknown");
+        safecpy(ds->hw.sys.vendor, "unknown");
 
     // make sure we have a product name
     if(!ds->hw.product.name[0])
         safecpy(ds->hw.product.name, ds->hw.board.name);
     if(!ds->hw.product.name[0])
-        safecpy(ds->hw.product.name, "Unknown");
+        safecpy(ds->hw.product.name, "unknown");
 
     // make sure we have a chassis type
     if(!ds->hw.chassis.type[0])
-        safecpy(ds->hw.chassis.type, "Unknown");
+        safecpy(ds->hw.chassis.type, "unknown");
 
     // make sure the cloud provider and cloud instance loaded from system-info.sh are preferred
     finalize_vendor_product_vm(ds);
