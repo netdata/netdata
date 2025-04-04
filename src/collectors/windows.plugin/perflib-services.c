@@ -18,22 +18,7 @@ struct win_service {
     RRDDIM *rd_service_state_paused;
     RRDDIM *rd_service_state_unknown;
 
-    RRDSET *st_service_status;
-    RRDDIM *rd_service_status_ok;
-    RRDDIM *rd_service_status_error;
-    RRDDIM *rd_service_status_unknown;
-    RRDDIM *rd_service_status_degraded;
-    RRDDIM *rd_service_status_pred_fail;
-    RRDDIM *rd_service_status_starting;
-    RRDDIM *rd_service_status_stopping;
-    RRDDIM *rd_service_status_service;
-    RRDDIM *rd_service_status_stressed;
-    RRDDIM *rd_service_status_nonrecover;
-    RRDDIM *rd_service_status_no_contact;
-    RRDDIM *rd_service_status_lost_comm;
-
     COUNTER_DATA ServiceState;
-    COUNTER_DATA ServiceStatus;
 };
 
 static DICTIONARY *win_services = NULL;
