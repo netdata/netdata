@@ -53,99 +53,100 @@ If you’re new to streaming, start with the [Quick Introduction to Streaming](/
 
 ## Configuration Files
 
-Netdata’s streaming settings are managed in two files:  
+Netdata’s streaming settings are managed in two files:
 
 - **`stream.conf`** – Configures how Netdata nodes send and receive metrics.
 - **`netdata.conf`** – Defines general settings, including web access and API permissions.
 
-To edit these files, use the following commands from Netdata’s configuration directory (`/etc/netdata`):  
+To edit these files, use the following commands from Netdata’s configuration directory (`/etc/netdata`):
 
 ```sh
 sudo ./edit-config stream.conf
 sudo ./edit-config netdata.conf
 ```
+
 ## `stream.conf`
 
-The `stream.conf` file consists of three main sections:  
+The `stream.conf` file consists of three main sections:
 
 1. **`[stream]`** – Configures child nodes (data senders).
-2. **`[API_KEY]`** – Defines API keys for parent nodes (data receivers). 
+2. **`[API_KEY]`** – Defines API keys for parent nodes (data receivers).
 3. **`[MACHINE_GUID]`** – Customizes settings for specific child nodes.
 
 ### `[stream]` Section (Child Node Settings)
 
 This section configures a child node to send metrics to a parent.
 
-| Setting                           | Default   | Description |
-|-----------------------------------|-----------|-------------|
-| `enabled`                         | `no`      | Enables streaming. Set to `yes` to allow this node to send metrics. |
-| [`destination`](#destination)     | (empty)   | Defines one or more parent nodes to send data to. |
-| `ssl skip certificate verification` | `yes`   | Accepts self-signed or expired SSL certificates. |
-| `CApath`                          | `/etc/ssl/certs/` | Directory for trusted SSL certificates. |
-| `CAfile`                          | `/etc/ssl/certs/cert.pem` | File containing trusted certificates. |
-| `api key`                         | (empty)   | API key used by the child to authenticate with the parent. |
-| `timeout`                         | `1m`      | Connection timeout duration. |
-| `default port`                     | `19999`   | Default port for streaming if not specified in `destination`. |
-| [`send charts matching`](#send-charts-matching) | `*` | Filters which charts are streamed. |
-| `buffer size bytes`                | `10485760` | Buffer size (10MB by default). Increase for higher latencies. |
-| `reconnect delay`                  | `5s`      | Time before retrying connection to the parent. |
-| `initial clock resync iterations`   | `60`      | Syncs chart clocks during startup. |
-| `parent using h2o`                 | `no`      | Set to `yes` if connecting to a parent using the H2O web server. |
+| Setting                                         | Default                   | Description                                                         |
+|-------------------------------------------------|---------------------------|---------------------------------------------------------------------|
+| `enabled`                                       | `no`                      | Enables streaming. Set to `yes` to allow this node to send metrics. |
+| [`destination`](#destination)                   | (empty)                   | Defines one or more parent nodes to send data to.                   |
+| `ssl skip certificate verification`             | `yes`                     | Accepts self-signed or expired SSL certificates.                    |
+| `CApath`                                        | `/etc/ssl/certs/`         | Directory for trusted SSL certificates.                             |
+| `CAfile`                                        | `/etc/ssl/certs/cert.pem` | File containing trusted certificates.                               |
+| `api key`                                       | (empty)                   | API key used by the child to authenticate with the parent.          |
+| `timeout`                                       | `1m`                      | Connection timeout duration.                                        |
+| `default port`                                  | `19999`                   | Default port for streaming if not specified in `destination`.       |
+| [`send charts matching`](#send-charts-matching) | `*`                       | Filters which charts are streamed.                                  |
+| `buffer size bytes`                             | `10485760`                | Buffer size (10MB by default). Increase for higher latencies.       |
+| `reconnect delay`                               | `5s`                      | Time before retrying connection to the parent.                      |
+| `initial clock resync iterations`               | `60`                      | Syncs chart clocks during startup.                                  |
+| `parent using h2o`                              | `no`                      | Set to `yes` if connecting to a parent using the H2O web server.    |
 
 ### `[API_KEY]` Section (Parent Node Authentication)
 
 This section allows parent nodes to accept streaming data from child nodes using an API key.
 
-| Setting                          | Default  | Description |
-|----------------------------------|----------|-------------|
-| `enabled`                        | `no`     | Enables or disables this API key. |
-| `type`                           | `api`    | Defines the section as an API key configuration. |
-| [`allow from`](#allow-from)       | `*`      | Specifies which child nodes (IP addresses) can connect. |
-| `retention`                      | `1h`     | How long to keep child node metrics in RAM-based storage. |
-| [`db`](#db)                       | `dbengine` | Specifies the database type for this API key. |
-| `health enabled`                  | `auto`   | Controls alerts and notifications (`auto`, `yes`, or `no`). |
-| `postpone alerts on connect`      | `1m`     | Delay alerts for a period after the child connects. |
-| `health log retention`            | `5d`     | Duration (in seconds) to keep health log events. |
-| `proxy enabled`                   | (empty)  | Enables routing metrics through a proxy. |
-| `proxy destination`               | (empty)  | IP and port of the proxy server. |
-| `proxy api key`                   | (empty)  | API key for the proxy server. |
-| `send charts matching`            | `*`      | Defines which charts to stream. |
-| `enable compression`              | `yes`    | Enables or disables data compression. |
-| `enable replication`              | `yes`    | Enables or disables data replication. |
-| `replication period`              | `1d`     | Maximum time window replicated from each child. |
-| `replication step`                | `10m`    | Time interval for each replication step. |
-| `is ephemeral node`               | `no`     | Marks the child as ephemeral (removes it after inactivity). |
+| Setting                      | Default    | Description                                                 |
+|------------------------------|------------|-------------------------------------------------------------|
+| `enabled`                    | `no`       | Enables or disables this API key.                           |
+| `type`                       | `api`      | Defines the section as an API key configuration.            |
+| [`allow from`](#allow-from)  | `*`        | Specifies which child nodes (IP addresses) can connect.     |
+| `retention`                  | `1h`       | How long to keep child node metrics in RAM-based storage.   |
+| [`db`](#db)                  | `dbengine` | Specifies the database type for this API key.               |
+| `health enabled`             | `auto`     | Controls alerts and notifications (`auto`, `yes`, or `no`). |
+| `postpone alerts on connect` | `1m`       | Delay alerts for a period after the child connects.         |
+| `health log retention`       | `5d`       | Duration (in seconds) to keep health log events.            |
+| `proxy enabled`              | (empty)    | Enables routing metrics through a proxy.                    |
+| `proxy destination`          | (empty)    | IP and port of the proxy server.                            |
+| `proxy api key`              | (empty)    | API key for the proxy server.                               |
+| `send charts matching`       | `*`        | Defines which charts to stream.                             |
+| `enable compression`         | `yes`      | Enables or disables data compression.                       |
+| `enable replication`         | `yes`      | Enables or disables data replication.                       |
+| `replication period`         | `1d`       | Maximum time window replicated from each child.             |
+| `replication step`           | `10m`      | Time interval for each replication step.                    |
+| `is ephemeral node`          | `no`       | Marks the child as ephemeral (removes it after inactivity). |
 
 ### `[MACHINE_GUID]` Section (Per-Node Customization)
 
 This section customizes settings for specific child nodes using their unique Machine GUID.
 
-| Setting                          | Default  | Description |
-|----------------------------------|----------|-------------|
-| `enabled`                        | `no`     | Enables or disables this specific node’s configuration. |
-| `type`                           | `machine` | Defines the section as a machine-specific configuration. |
-| [`allow from`](#allow-from)       | `*`      | Lists IP addresses allowed to stream metrics. |
-| `retention`                      | `3600`   | Retention period for child metrics in RAM-based storage. |
-| [`db`](#db)                       | `dbengine` | Database type for this node. |
-| `health enabled`                  | `auto`   | Controls alerts (`auto`, `yes`, `no`). |
-| `postpone alerts on connect`      | `1m`     | Delay alerts for a period after connection. |
-| `health log retention`            | `5d`     | Duration to keep health log events. |
-| `proxy enabled`                   | (empty)  | Routes metrics through a proxy if enabled. |
-| `proxy destination`               | (empty)  | Proxy server IP and port. |
-| `proxy api key`                   | (empty)  | API key for the proxy. |
-| `send charts matching`            | `*`      | Filters streamed charts. |
-| `enable compression`              | `yes`    | Enables or disables compression. |
-| `enable replication`              | `yes`    | Enables or disables replication. |
-| `replication period`              | `1d`     | Maximum replication window. |
-| `replication step`                | `10m`    | Time interval for each replication step. |
-| `is ephemeral node`               | `no`     | Marks the node as ephemeral (removes after inactivity). |
+| Setting                      | Default    | Description                                              |
+|------------------------------|------------|----------------------------------------------------------|
+| `enabled`                    | `no`       | Enables or disables this specific node’s configuration.  |
+| `type`                       | `machine`  | Defines the section as a machine-specific configuration. |
+| [`allow from`](#allow-from)  | `*`        | Lists IP addresses allowed to stream metrics.            |
+| `retention`                  | `3600`     | Retention period for child metrics in RAM-based storage. |
+| [`db`](#db)                  | `dbengine` | Database type for this node.                             |
+| `health enabled`             | `auto`     | Controls alerts (`auto`, `yes`, `no`).                   |
+| `postpone alerts on connect` | `1m`       | Delay alerts for a period after connection.              |
+| `health log retention`       | `5d`       | Duration to keep health log events.                      |
+| `proxy enabled`              | (empty)    | Routes metrics through a proxy if enabled.               |
+| `proxy destination`          | (empty)    | Proxy server IP and port.                                |
+| `proxy api key`              | (empty)    | API key for the proxy.                                   |
+| `send charts matching`       | `*`        | Filters streamed charts.                                 |
+| `enable compression`         | `yes`      | Enables or disables compression.                         |
+| `enable replication`         | `yes`      | Enables or disables replication.                         |
+| `replication period`         | `1d`       | Maximum replication window.                              |
+| `replication step`           | `10m`      | Time interval for each replication step.                 |
+| `is ephemeral node`          | `no`       | Marks the node as ephemeral (removes after inactivity).  |
 
 ## Additional Settings
 
 ### `destination`
 
 Defines parent nodes for streaming using the format:  
-`[PROTOCOL:]HOST[%INTERFACE][:PORT][:SSL]`  
+`[PROTOCOL:]HOST[%INTERFACE][:PORT][:SSL]`
 
 - **PROTOCOL**: `tcp`, `udp`, or `unix` (only `tcp` and `unix` are supported for parents).
 - **HOST**: IPv4, IPv6 (in brackets `[ ]`), hostname, or Unix domain socket path.
@@ -162,7 +163,7 @@ Example (TCP connection with SSL to `203.0.113.0` on port `20000`):
 
 ### `send charts matching`
 
-Controls which charts are streamed.  
+Controls which charts are streamed.
 
 - `*` (default) – Streams all charts.
 - Specific charts:
@@ -214,18 +215,20 @@ Here’s an optimized version of the `netdata.conf` structure with clearer, more
 
 ### netdata.conf
 
-The `netdata.conf` file is the primary configuration file for the Netdata agent. It controls the agent’s settings, including networking, data collection, logging, and resource usage. 
+The `netdata.conf` file is the primary configuration file for the Netdata agent. It controls the agent’s settings, including networking, data collection, logging, and resource usage.
 
 ### Sections
 
 #### [global]
-This section defines global settings for the Netdata agent. 
 
-- **hostname**: The hostname used by the agent. 
+This section defines global settings for the Netdata agent.
+
+- **hostname**: The hostname used by the agent.
 - **memory mode**: Choose the memory mode for data collection (e.g., `ram` or `swap`).
 - **error log file**: Path to the file where error logs are saved.
 
 #### [web]
+
 Configure the web interface settings here.
 
 - **bind to**: Define the network address to which Netdata binds.
@@ -233,12 +236,14 @@ Configure the web interface settings here.
 - **disable SSL**: Set to `yes` to disable SSL support.
 
 #### [plugin]
+
 This section configures individual plugins for data collection.
 
 - **enabled**: Enable or disable the plugin.
 - **update every**: Define the update frequency (in seconds).
 
 #### [database]
+
 Manage database settings for data storage and retention.
 
 - **memory mode**: Choose between in-memory or disk-based storage.
@@ -246,6 +251,7 @@ Manage database settings for data storage and retention.
 - **compression**: Enable or disable data compression.
 
 #### [logging]
+
 Configure logging behavior for Netdata.
 
 - **log file**: Define the log file location.

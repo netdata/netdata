@@ -8,9 +8,9 @@ When setting up Observability Centralization Points, consider the following:
 2. **Data Transfer Costs**: In multi-cloud or hybrid environments, placing centralization points strategically reduces egress bandwidth costs.
 3. **Usability Without Netdata Cloud**: Using fewer centralization points simplifies access and management when Netdata Cloud is not in use.
 4. **Optimized Deployment with Netdata Cloud**: Netdata Cloud provides a complete infrastructure view, allowing you to optimize based on:
-   - **Security** (internet access controls)
-   - **Cost** (bandwidth and resource allocation)
-   - **Operational needs** (regional, service, or team-based isolation)
+    - **Security** (internet access controls)
+    - **Cost** (bandwidth and resource allocation)
+    - **Operational needs** (regional, service, or team-based isolation)
 
 ## Cost Optimization Strategies
 
