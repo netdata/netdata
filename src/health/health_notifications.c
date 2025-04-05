@@ -38,6 +38,7 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
     }
 
     code = spawn_popen_wait(ae->popen_instance);
+    ae->popen_instance = NULL;
     netdata_log_debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
 
 cleanup:

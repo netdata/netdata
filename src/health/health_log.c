@@ -295,6 +295,12 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
         string_freez(ae->old_value_string);
         string_freez(ae->new_value_string);
         string_freez(ae->summary);
+
+        if(ae->popen_instance) {
+            spawn_popen_kill(ae->popen_instance, 0);
+            ae->popen_instance = NULL;
+        }
+
         health_alarm_entry_release(ae);
     }
 }
