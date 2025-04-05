@@ -246,7 +246,6 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
     // link it
     rw_spinlock_write_lock(&host->health_log.spinlock);
     DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
-    host->health_log.count++;
     rw_spinlock_write_unlock(&host->health_log.spinlock);
 
     // match previous alarms
@@ -302,6 +301,9 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
         if(ae->next || ae->prev)
             fatal("HEALTH: alarm entry to delete is still linked!");
 
+//        if(ae->prev_in_progress || ae->next_in_progress)
+//            fatal("HEALTH: alarm entry to be delete is linked in progress!");
+
         health_alarm_entry_destroy(ae);
     }
 }
@@ -344,7 +346,6 @@ void health_alarm_log_cleanup(RRDHOST *host) {
             
             // Free memory
             health_alarm_log_free_one_nochecks_nounlink(to_free);
-            host->health_log.count--;
         }
         else
             ae = ae->next;

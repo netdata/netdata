@@ -4,10 +4,7 @@
 #include "health-alert-entry.h"
 
 // the queue of executed alarm notifications that haven't been waited for yet
-static struct {
-    ALARM_ENTRY *head; // oldest
-    ALARM_ENTRY *tail; // latest
-} alarm_notifications_in_progress = {NULL, NULL};
+static ALARM_ENTRY *alarm_notifications_in_progress = NULL;
 
 struct health_raised_summary {
     RRDHOST *host;
@@ -53,7 +50,7 @@ cleanup:
 
 void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void) {
     ALARM_ENTRY *ae;
-    while (NULL != (ae = alarm_notifications_in_progress.head)) {
+    while (NULL != (ae = alarm_notifications_in_progress)) {
         if(unlikely(!service_running(SERVICE_HEALTH)))
             break;
 
@@ -63,36 +60,13 @@ void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_u
 
 void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae)
 {
-    struct alarm_entry *prev = ae->prev_in_progress;
-    struct alarm_entry *next = ae->next_in_progress;
-
-    if (NULL != prev) {
-        prev->next_in_progress = next;
-    }
-    if (NULL != next) {
-        next->prev_in_progress = prev;
-    }
-    if (ae == alarm_notifications_in_progress.head) {
-        alarm_notifications_in_progress.head = next;
-    }
-    if (ae == alarm_notifications_in_progress.tail) {
-        alarm_notifications_in_progress.tail = prev;
-    }
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(alarm_notifications_in_progress, ae, prev_in_progress, next_in_progress);
 }
 
 static inline void enqueue_alarm_notify_in_progress(ALARM_ENTRY *ae)
 {
-    ae->prev_in_progress = NULL;
-    ae->next_in_progress = NULL;
-
-    if (NULL != alarm_notifications_in_progress.tail) {
-        ae->prev_in_progress = alarm_notifications_in_progress.tail;
-        alarm_notifications_in_progress.tail->next_in_progress = ae;
-    }
-    if (NULL == alarm_notifications_in_progress.head) {
-        alarm_notifications_in_progress.head = ae;
-    }
-    alarm_notifications_in_progress.tail = ae;
+    fatal_assert(!ae->prev_in_progress && !ae->next_in_progress);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(alarm_notifications_in_progress, ae, prev_in_progress, next_in_progress);
 }
 
 static bool prepare_command(BUFFER *wb,

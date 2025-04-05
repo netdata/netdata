@@ -769,7 +769,6 @@ void sql_health_alarm_log_load(RRDHOST *host)
         ae->new_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae_units(ae), -1));
 
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
-        // TODO: where is the count++?
 
         if(unlikely(ae->unique_id > host->health_max_unique_id))
             host->health_max_unique_id = ae->unique_id;
