@@ -42,13 +42,13 @@ static void initialize(void)
 static BOOL fill_dictionary_with_content()
 {
     static PVOID buffer = NULL;
-    static ULONG initial_length = 0x8000;
+    static DWORD bytes_needed = 0;
 
     LPENUM_SERVICE_STATUS_PROCESS service, services;
-    DWORD bytes_needed = 0, total_services = 0;
+    DWORD total_services = 0;
     SC_HANDLE ndSCMH = OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE | SC_MANAGER_CONNECT);
     if (!ndSCMH) {
-        return -1;
+        return FALSE;
     }
 
     // Query to obtain overall information
@@ -57,8 +57,8 @@ static BOOL fill_dictionary_with_content()
         SC_ENUM_PROCESS_INFO,
         SERVICE_WIN32,
         SERVICE_STATE_ALL,
-        NULL,
-        0,
+        (LPBYTE)buffer,
+        bytes_needed,
         (LPDWORD)&bytes_needed,
         (LPDWORD)&total_services,
         NULL,
@@ -76,16 +76,39 @@ static BOOL fill_dictionary_with_content()
         goto endServiceCollection;
     }
 
+    if (!ret) {
+        ret = EnumServicesStatusEx(
+            ndSCMH,
+            SC_ENUM_PROCESS_INFO,
+            SERVICE_WIN32,
+            SERVICE_STATE_ALL,
+            (LPBYTE)buffer,
+            bytes_needed,
+            (LPDWORD)&bytes_needed,
+            (LPDWORD)&total_services,
+            NULL,
+            NULL);
+
+        if (!ret) {
+            goto endServiceCollection;
+        }
+    }
+
     services = (LPENUM_SERVICE_STATUS_PROCESS)buffer;
 
     for (ULONG i = 0; i < total_services; i++) {
         service = &services[i];
-        struct win_service *p = dictionary_set(win_services, service->lpServiceName, service, sizeof(*p));
+        if (!service->lpServiceName || !*service->lpServiceName)
+            continue;
+
+        struct win_service *p = dictionary_set(win_services, service->lpServiceName, NULL, sizeof(*p));
         if (!p)
             continue;
 
         p->ServiceState.current.Data = service->ServiceStatusProcess.dwCurrentState;
     }
+
+    ret = TRUE;
 
 endServiceCollection:
 
@@ -111,6 +134,7 @@ static RRDDIM *win_service_select_dim(struct win_service *p, uint32_t selector)
             return p->rd_service_state_pause_pending;
         case 7:
             return p->rd_service_state_paused;
+        case 8:
         default:
             return p->rd_service_state_unknown;
     }
@@ -170,16 +194,19 @@ static int dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unuse
             RRDLABEL_SRC_AUTO);
     }
 
+    if (p->st_service_state) {
 #define NETDATA_WINDOWS_SERVICE_STATE_TOTAL_STATES (8)
-    uint32_t current_state = (uint32_t)p->ServiceState.current.Data;
-    for (uint32_t i = 1; i <= NETDATA_WINDOWS_SERVICE_STATE_TOTAL_STATES; i++) {
-        RRDDIM *dim = win_service_select_dim(p, i);
-        uint32_t chart_value = (current_state == i) ? 1 : 0;
+        uint32_t current_state = (uint32_t)p->ServiceState.current.Data;
+        for (uint32_t i = 1; i <= NETDATA_WINDOWS_SERVICE_STATE_TOTAL_STATES; i++) {
+            RRDDIM *dim = win_service_select_dim(p, i);
+            if (!dim) continue;
+            uint32_t chart_value = (current_state == i) ? 1 : 0;
 
-        rrddim_set_by_pointer(p->st_service_state, dim, (collected_number)chart_value);
+            rrddim_set_by_pointer(p->st_service_state, dim, (collected_number)chart_value);
+        }
+
+        rrdset_done(p->st_service_state);
     }
-
-    rrdset_done(p->st_service_state);
 }
 
 int do_PerflibServices(int update_every, usec_t dt __maybe_unused)
@@ -195,6 +222,7 @@ int do_PerflibServices(int update_every, usec_t dt __maybe_unused)
 
     if (!fill_dictionary_with_content()) {
         if (++limit == NETDATA_SERVICE_MAX_TRY) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Disabling thread after %u consecutive tries to open Service Management.", NETDATA_SERVICE_MAX_TRY);
             return -1;
         }
         return 0;
