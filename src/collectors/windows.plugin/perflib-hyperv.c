@@ -142,6 +142,8 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
         if (!p->charts_created) {
             p->charts_created = true;
+            netdata_fix_chart_name(windows_shared_buffer);
+
             if (!p->st_vm_memory_physical) {
                 p->st_vm_memory_physical = rrdset_create_localhost(
                     "vm_memory_physical",
@@ -246,6 +248,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
 
         if (!p->charts_created) {
             p->charts_created = true;
+            netdata_fix_chart_name(windows_shared_buffer);
 
             p->st_vm_vid_physical_pages_allocated = rrdset_create_localhost(
                 "vm_vid_physical_pages_allocated",
@@ -330,6 +333,7 @@ static bool do_hyperv_health_summary(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
     if (!p->charts_created) {
         p->charts_created = true;
+        netdata_fix_chart_name(windows_shared_buffer);
         p->st_health = rrdset_create_localhost(
             "vms_health",
             windows_shared_buffer,
@@ -494,6 +498,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         // Create charts
         if (!p->charts_created) {
             p->charts_created = true;
+            netdata_fix_chart_name(windows_shared_buffer);
             p->st_device_space_pages = rrdset_create_localhost(
                 "root_partition_device_space_pages",
                 windows_shared_buffer,
@@ -819,6 +824,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
         if (!p->charts_created) {
             p->charts_created = true;
+            netdata_fix_chart_name(windows_shared_buffer);
             if (!p->st_operations) {
                 p->st_operations = rrdset_create_localhost(
                     "vm_storage_device_operations",
@@ -1054,6 +1060,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
         if (!p->charts_created) {
             p->charts_created = true;
+            netdata_fix_chart_name(windows_shared_buffer);
 
             p->st_bytes = rrdset_create_localhost(
                 "vswitch_traffic",
@@ -1418,6 +1425,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
         if (!p->charts_created) {
             p->charts_created = true;
+            netdata_fix_chart_name(windows_shared_buffer);
             p->st_dropped_packets = rrdset_create_localhost(
                 "vm_net_interface_packets_dropped",
                 windows_shared_buffer,
@@ -1679,6 +1687,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
 
         if (!p->charts_created) {
             p->charts_created = true;
+            netdata_fix_chart_name(windows_shared_buffer);
             p->st_HypervisorProcessorTotal = rrdset_create_localhost(
                 "vm_cpu_usage",
                 windows_shared_buffer,
