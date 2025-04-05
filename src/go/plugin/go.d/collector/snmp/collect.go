@@ -5,17 +5,35 @@ package snmp
 import (
 	"errors"
 	"fmt"
+	"log"
 	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
+
+	sysObjectID, err := c.getSysObjectID(snmpsd.OidSysObject)
+	if err != nil {
+		return nil, err
+	}
+
+	matchingProfiles := ddsnmp.Find(sysObjectID)
+
+	metricMap, err := c.parseMetricsFromProfiles(matchingProfiles)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]bool)
+	mx := make(map[string]int64)
+	c.makeChartsFromMetricMap(mx, metricMap, seen)
+
 	if c.sysInfo == nil {
 		si, err := snmpsd.GetSysInfo(c.snmpClient)
 		if err != nil {
@@ -29,8 +47,6 @@ func (c *Collector) collect() (map[string]int64, error) {
 			c.vnode = c.setupVnode(si)
 		}
 	}
-
-	mx := make(map[string]int64)
 
 	if err := c.collectSysUptime(mx); err != nil {
 		return nil, err
@@ -56,23 +72,38 @@ func (c *Collector) getSysObjectID(oid string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	return strings.Replace(resp.Variables[0].Value.(string), ".", "", 1), nil
 }
 
-func (c *Collector) makeChartsFromMetricMap(mx map[string]int64, metricMap map[string]processedMetric) error {
-
+func (c *Collector) makeChartsFromMetricMap(mx map[string]int64, metricMap map[string]processedMetric, seen map[string]bool) error {
 	for _, metric := range metricMap {
 		if metric.tableName == "" {
 			switch s := metric.value.(type) {
 			case int:
 
-				// log.Println(metric)
+				log.Println(metric)
 
-				// c.addSNMPChart(metric)
+				name := metric.name
+				if name == "" {
+					continue
+				}
+
+				seen[name] = true
+
+				if !c.seenMetrics[name] {
+					c.seenMetrics[name] = true
+					c.addSNMPChart(metric)
+				}
+
 				mx[metric.name] = int64(s)
-
 			}
+		}
+
+	}
+	for name := range c.seenMetrics {
+		if !seen[name] {
+			delete(c.seenMetrics, name)
+			c.removeSNMPChart(name)
 		}
 	}
 	return nil
