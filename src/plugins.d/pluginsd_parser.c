@@ -245,7 +245,8 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     rrdcontext_host_child_connected(host);
-    if (host->aclk_config)
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if (aclk_host_config)
         aclk_queue_node_info(host, true);
     else
         schedule_node_state_update(host, 100);
