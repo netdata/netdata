@@ -43,6 +43,7 @@ typedef struct {
     SPINLOCK spinlock;
     struct extent_page_details_list *base;
 } EPDL_EXTENT;
+void epdl_extent_release(EPDL_EXTENT *e);
 
 #define DATAFILE_MAGIC 0xDA7AF11E
 
@@ -102,6 +103,7 @@ int create_data_file(struct rrdengine_datafile *datafile);
 int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock);
 int init_data_files(struct rrdengine_instance *ctx);
 void finalize_data_files(struct rrdengine_instance *ctx);
+void cleanup_datafile_epdl_structures(struct rrdengine_datafile *datafile);
 
 NEVERNULL ALWAYS_INLINE
 static struct rrdengine_instance *datafile_ctx(struct rrdengine_datafile *datafile) {

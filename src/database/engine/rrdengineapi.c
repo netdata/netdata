@@ -1282,10 +1282,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    // No need to release the datafiles list
-    //finalize_rrd_files(ctx);
-
-    if (unittest_running) //(ctx->config.unittest)
+    if(unittest_running)
         freez(ctx);
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);

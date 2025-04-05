@@ -360,7 +360,15 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if(metrics_referenced)
         fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
             metrics_referenced);
-#endif    
+
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+        if(multidb_ctx[tier]) {
+            fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
+            finalize_rrd_files(multidb_ctx[tier]);
+            memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
+        }
+    }
+#endif
 
     fprintf(stderr, "Destroying UUIDMap...\n");
     size_t uuid_referenced = uuidmap_destroy();
