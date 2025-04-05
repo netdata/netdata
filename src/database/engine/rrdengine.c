@@ -1278,20 +1278,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         deleted_bytes += datafile_bytes;
     }
 
-    {
-        rw_spinlock_write_lock(&datafile->extent_epdl.spinlock);
-        bool first = true;
-        Word_t idx = 0;
-        Pvoid_t *PValue;
-        while ((PValue = JudyLFirstThenNext(datafile->extent_epdl.epdl_per_extent, &idx, &first))) {
-            EPDL_EXTENT *e = *PValue;
-            internal_fatal(e->base, "The should not be any EPDLs ");
-            freez(e);
-            *PValue = NULL;
-        }
-        JudyLFreeArray(&datafile->extent_epdl.epdl_per_extent, PJE0);
-        rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
-    }
+    cleanup_datafile_epdl_structures(datafile);
 
     memset(journal_file, 0, sizeof(*journal_file));
     memset(datafile, 0, sizeof(*datafile));
@@ -1622,6 +1609,7 @@ struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void) {
             [RRDENG_MEM_EPDL]           = epdl_aral_stats(),
             [RRDENG_MEM_DEOL]           = deol_aral_stats(),
             [RRDENG_MEM_PD]             = pd_aral_stats(),
+            [RRDENG_MEM_EPDL_EXTENT]    = epdl_extent_aral_stats(),
             [RRDENG_MEM_OPCODES]        = aral_get_statistics(rrdeng_main.cmd_queue.ar),
             [RRDENG_MEM_HANDLES]        = aral_get_statistics(rrdeng_main.handles.ar),
             [RRDENG_MEM_DESCRIPTORS]    = aral_get_statistics(rrdeng_main.descriptors.ar),
@@ -1765,6 +1753,7 @@ static void dbengine_initialize_structures(void) {
     page_details_init();
     epdl_init();
     deol_init();
+    epdl_extent_init();
     rrdeng_cmd_queue_init();
     work_request_init();
     rrdeng_query_handle_init();

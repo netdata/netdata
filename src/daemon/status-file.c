@@ -1177,7 +1177,6 @@ void daemon_status_file_check_crash(void) {
             last_session_status = session_status;
             last_session_status.status = DAEMON_STATUS_NONE;
             last_session_status.exit_reason = 0;
-            safecpy(last_session_status.fatal.function, "no_status");
         }
 
         struct post_status_file_thread_data d = {

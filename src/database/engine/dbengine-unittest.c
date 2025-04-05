@@ -407,6 +407,9 @@ int test_dbengine(void) {
         errors += dbengine_test_rrdr_single_region(st, rd, current_region, time_start[current_region], time_end[current_region]);
     }
 
+    // prevent closing the database before the test is finished
+    sleep(5);
+
     rrd_wrlock();
     rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si, false);
     rrdeng_exit((struct rrdengine_instance *)host->db[0].si);

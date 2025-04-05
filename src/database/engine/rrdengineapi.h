@@ -233,6 +233,7 @@ typedef enum rrdeng_mem {
     RRDENG_MEM_EPDL,
     RRDENG_MEM_DEOL,
     RRDENG_MEM_PD,
+    RRDENG_MEM_EPDL_EXTENT,
 
     // terminator
     RRDENG_MEM_MAX,
