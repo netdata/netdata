@@ -64,26 +64,9 @@ typedef struct rrdlabels {
     }                                                                                                                  \
     while (0)
 
-static inline void STATS_PLUS_MEMORY(struct dictionary_stats *stats, int64_t judy_mem, size_t item_size, size_t value_size) {
-    if(judy_mem)
-        __atomic_fetch_add(&stats->memory.index, judy_mem, __ATOMIC_RELAXED);
-
-    if(item_size)
-        __atomic_fetch_add(&stats->memory.dict, (ssize_t)item_size, __ATOMIC_RELAXED);
-
-    if(value_size)
-        __atomic_fetch_add(&stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
-}
-
-static inline void STATS_MINUS_MEMORY(struct dictionary_stats *stats, int64_t judy_mem, size_t item_size, size_t value_size) {
-    if(judy_mem)
-        __atomic_fetch_add(&stats->memory.index, judy_mem, __ATOMIC_RELAXED);
-
-    if(item_size)
-        __atomic_fetch_sub(&stats->memory.dict, (ssize_t)item_size, __ATOMIC_RELAXED);
-
-    if(value_size)
-        __atomic_fetch_sub(&stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
+static inline void RRDLABELS_MEMORY_DELTA(struct dictionary_stats *stats, int64_t judy_mem, int64_t item_size) {
+    __atomic_fetch_add(&stats->memory.index, judy_mem, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&stats->memory.dict, item_size, __ATOMIC_RELAXED);
 }
 
 __attribute__((constructor)) void initialize_label_stats(void) {
@@ -98,7 +81,7 @@ __attribute__((constructor)) void initialize_label_stats(void) {
 RRDLABELS *rrdlabels_create(void)
 {
     RRDLABELS *labels = callocz(1, sizeof(*labels));
-    STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, sizeof(RRDLABELS), 0);
+    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, 0, sizeof(RRDLABELS));
     return labels;
 }
 
@@ -140,12 +123,12 @@ static RRDLABEL *add_label_name_value(const char *name, const char *value)
         rrdlabel = *PValue;
         string_freez(label_index.key);
         string_freez(label_index.value);
-        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, judy_mem, 0, 0);
+        RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
     } else {
         rrdlabel = callocz(1, sizeof(*rrdlabel));
         rrdlabel->label.index = label_index;
         *PValue = rrdlabel;
-        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, judy_mem, sizeof(RRDLABEL_IDX), 0);
+        RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, sizeof(RRDLABEL_IDX));
     }
     __atomic_add_fetch(&rrdlabel->refcount, 1, __ATOMIC_RELAXED);
 
@@ -168,7 +151,7 @@ static void delete_label(RRDLABEL *label)
 
             int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
 
-            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, judy_mem, sizeof(*rrdlabel), 0);
+            RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, -(int64_t)sizeof(*rrdlabel));
             string_freez(label->index.key);
             string_freez(label->index.value);
             freez(rrdlabel);
@@ -192,8 +175,10 @@ void rrdlabels_flush(RRDLABELS *labels) {
     while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
         delete_label((RRDLABEL *)Index);
     }
-    size_t memory_freed = JudyLFreeArray(&labels->JudyL, PJE0);
-    STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, memory_freed + sizeof(RRDLABELS), 0);
+    JudyAllocThreadPulseReset();
+    JudyLFreeArray(&labels->JudyL, PJE0);
+    int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, -(int64_t)sizeof(RRDLABELS));
     spinlock_unlock(&labels->spinlock);
 }
 
@@ -240,7 +225,7 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
 
     RRDLABEL_SRC new_ls = (ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD));
 
-    size_t mem_before_judyl = JudyLMemUsed(labels->JudyL);
+    JudyAllocThreadPulseReset();
 
     Pvoid_t *PValue = JudyLIns(&labels->JudyL, (Word_t)new_label, PJE0);
     if (!PValue || PValue == PJERR)
@@ -265,8 +250,8 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
 
     labels->version++;
 
-    size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
-    STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
+    int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
 
     spinlock_unlock(&labels->spinlock);
 }
@@ -501,11 +486,11 @@ static void rrdlabels_remove_all_unmarked_unsafe(RRDLABELS *labels)
     while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
         if (!((*((RRDLABEL_SRC *)PValue)) & (RRDLABEL_FLAG_INTERNAL))) {
 
-            size_t mem_before_judyl = JudyLMemUsed(labels->JudyL);
+            JudyAllocThreadPulseReset();
             (void)JudyLDel(&labels->JudyL, Index, PJE0);
-            size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
+            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
 
-            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_before_judyl - mem_after_judyl, 0);
+            RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
 
             delete_label((RRDLABEL *)Index);
             if (labels->JudyL != (Pvoid_t) NULL) {
@@ -583,7 +568,8 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     RRDLABEL_SRC ls;
     lfe_start_nolock(src, label, ls)
     {
-        size_t mem_before_judyl = JudyLMemUsed(dst->JudyL);
+        JudyAllocThreadPulseGetAndReset();
+
         PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         if(unlikely(!PValue || PValue == PJERR))
             fatal("RRDLABELS migrate: corrupted labels array");
@@ -592,8 +578,8 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
         if (!*PValue) {
             flag = (ls & ~(RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_NEW;
             dup_label(label);
-            size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
-            STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
+            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+            RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
         }
         else
             flag = RRDLABEL_FLAG_OLD;
@@ -653,7 +639,8 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
     spinlock_lock(&dst->spinlock);
     spinlock_lock(&src->spinlock);
 
-    size_t mem_before_judyl = JudyLMemUsed(dst->JudyL);
+    JudyAllocThreadPulseReset();
+
     bool update_statistics = false;
     lfe_start_nolock(src, label, ls)
     {
@@ -679,8 +666,8 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
     }
     lfe_done_nolock();
     if (update_statistics) {
-        size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
-        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
+        int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+        RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
     }
 
     spinlock_unlock(&src->spinlock);
