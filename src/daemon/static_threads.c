@@ -30,15 +30,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = cpuidlejitter_main
     },
     {
-        .name = "HEALTH",
-        .config_section = NULL,
-        .config_name = NULL,
-        .enabled = 1,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = health_main
-    },
-    {
         .name = "ANALYTICS",
         .config_section = NULL,
         .config_name = NULL,
