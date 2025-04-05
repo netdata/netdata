@@ -60,6 +60,7 @@ void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_u
 
 void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae)
 {
+    fatal_assert(ae->prev_in_progress || ae->next_in_progress);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(alarm_notifications_in_progress, ae, prev_in_progress, next_in_progress);
 }
 
