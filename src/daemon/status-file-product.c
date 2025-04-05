@@ -57,6 +57,7 @@ static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
         {"DELL", "Dell"},
         {"Dell Computer Corporation", "Dell"},
         {"Dell Inc.", "Dell"},
+        {"Dell EMC", "Dell"},
 
         {"FUJITSU", "Fujitsu"},
         {"FUJITSU CLIENT COMPUTING LIMITED", "Fujitsu"},
@@ -174,7 +175,8 @@ static bool dmi_is_virtual_machine(const DMI_INFO *dmi) {
     if(!dmi) return false;
 
     const char *vm_indicators[] = {
-        "Virt", "KVM", "vServer", "Cloud", "Hyper", "Droplet", "Compute",
+        "Virt", "KVM", "vServer", "Cloud", "Hyper", "Droplet",
+        "Compute ", // with a space to not match "Computer"
         "HVM domU", "Parallels", "(i440FX", "(q35", "OpenStack", "QEMU",
         "VMWare", "DigitalOcean", "Oracle", "Linode", "Amazon EC2"
     };
