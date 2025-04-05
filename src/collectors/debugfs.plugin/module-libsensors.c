@@ -1258,7 +1258,7 @@ void *libsensors_thread(void *ptr __maybe_unused) {
 
         if(average_ut < 1)
             average_ut = 1;
-        
+
         if(max_ut < 1)
             max_ut = 1;
 
