@@ -490,7 +490,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         GET_INSTANCE_COUNTER(DeviceDMAErrors);
         GET_INSTANCE_COUNTER(DeviceInterruptErrors);
         GET_INSTANCE_COUNTER(DeviceInterruptThrottleEvents);
-        GET_INSTANCE_COUNTER(IOTLBFlusesSec);
+        GET_INSTANCE_COUNTER(IOTLBFlushesSec);
         GET_INSTANCE_COUNTER(AddressSpaces);
         GET_INSTANCE_COUNTER(VirtualTLBPages);
         GET_INSTANCE_COUNTER(VirtualTLBFlushEntiresSec);
@@ -719,7 +719,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         SETP_DIM_VALUE(st_DeviceDMAErrors, DeviceDMAErrors);
         SETP_DIM_VALUE(st_DeviceInterruptErrors, DeviceInterruptErrors);
         SETP_DIM_VALUE(st_DeviceInterruptThrottleEvents, DeviceInterruptThrottleEvents);
-        SETP_DIM_VALUE(st_IOTLBFlushesSec, IOTLBFlusesSec);
+        SETP_DIM_VALUE(st_IOTLBFlushesSec, IOTLBFlushesSec);
         SETP_DIM_VALUE(st_AddressSpaces, AddressSpaces);
         SETP_DIM_VALUE(st_VirtualTLBPages, VirtualTLBPages);
         SETP_DIM_VALUE(st_VirtualTLBFlushEntiresSec, VirtualTLBFlushEntiresSec);
