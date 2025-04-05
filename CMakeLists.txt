@@ -1907,6 +1907,8 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemUptime.c
         src/collectors/windows.plugin/GetSystemRAM.c
         src/collectors/windows.plugin/GetSystemCPU.c
+        src/collectors/windows.plugin/NetdataMSSQLAPI.c
+        src/collectors/windows.plugin/NetdataMSSQLAPI.h
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
@@ -3001,6 +3003,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
+        "$<$<BOOL:${OS_WINDOWS}>:sqlsrv32;odbc32>"
 )
 
 netdata_add_protobuf(netdata)

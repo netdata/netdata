@@ -11,6 +11,8 @@
 // 2^24
 #define WINDOWS_MAX_KERNEL_OBJECT 16777216
 
+#include "NetdataMSSQLAPI.h"
+
 void *win_plugin_main(void *ptr);
 
 extern char windows_shared_buffer[8192];

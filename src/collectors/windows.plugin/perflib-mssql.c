@@ -8,6 +8,18 @@
 #define NETDATA_MAX_INSTANCE_OBJECT 128
 
 BOOL is_sqlexpress = FALSE;
+BOOL is_connected = FALSE;
+SQLHENV netdataEnv = SQL_NULL_HENV;
+SQLHDBC netdataHdbc = SQL_NULL_HDBC;
+static struct netdata_mssql_conn dbconn = {
+    .driver = "SQL Server Native Client 11.0",
+    .server = "(localhost)",
+    .address = NULL,
+    .username = NULL,
+    .password = NULL,
+    .windows_auth = FALSE};
+
+SQLCHAR connectionString[1024];
 
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
@@ -1425,6 +1437,61 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     return 1;
 }
 
+void netdata_mount_mssql_connection_string(SQLCHAR *conn, size_t length, struct netdata_mssql_conn *dbInput)
+{
+    const char *serverAddress;
+    const char *serverAddressArg;
+    if (!conn || !dbInput)
+        return;
+
+    char auth[512];
+
+    if (dbInput->server && dbInput->address) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "Collector is not expecting server and address defined together, please, select one of them.");
+        conn[0] = '\0';
+        return;
+    }
+
+    if (dbInput->server) {
+        serverAddress = "Server";
+        serverAddressArg = dbInput->server;
+    } else {
+        serverAddressArg = "Address";
+        serverAddress = dbInput->address;
+    }
+
+    if (dbInput->windows_auth)
+        snprintfz(auth, sizeof(auth) - 1, "Trusted_Connection = yes");
+    else if (!dbInput->username || !dbInput->password) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "You are not using Windows Authentication. Thus, it is necessary to specify user and password.");
+        conn[0] = '\0';
+        return;
+    } else {
+        snprintfz(auth, sizeof(auth) - 1, "UID=%s;PWD=%s;", dbInput->username, dbInput->password);
+    }
+
+    snprintfz((char *)conn, length, "Driver={%s};%s=%s;%s", dbInput->driver, serverAddress, serverAddressArg, auth);
+}
+
+static void netdata_read_config_options()
+{
+    dbconn.driver = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "driver", dbconn.driver);
+    dbconn.server = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "server", dbconn.server);
+    dbconn.address = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "address", dbconn.address);
+    dbconn.username = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "uid", dbconn.username);
+    dbconn.password = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "pwd", dbconn.password);
+    dbconn.windows_auth = inicfg_get_boolean(
+        &netdata_config, "plugin:windows:PerflibMSSQL", "windows authentication", dbconn.windows_auth);
+
+    netdata_mount_mssql_connection_string(connectionString, sizeof(connectionString) - 1, &dbconn);
+}
+
 int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
@@ -1433,10 +1500,14 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
         if (initialize())
             return -1;
 
+        netdata_read_config_options();
+        netdataEnv = netdata_MSSQL_initialize_env();
         initialized = true;
     }
 
+    netdataHdbc = netdata_MSSQL_start_connection(netdataEnv, connectionString);
     dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_charts_cb, &update_every);
+    netdata_MSSQL_close_connection(netdataHdbc);
 
     return 0;
 }
