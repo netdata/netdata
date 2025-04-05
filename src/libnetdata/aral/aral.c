@@ -921,6 +921,11 @@ ALWAYS_INLINE void *aral_callocz_internal(ARAL *ar, bool marked TRACE_ALLOCATION
 
 void *aral_mallocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
 #if defined(FSANITIZE_ADDRESS)
+    if(ar->stats) {
+        __atomic_add_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ar->stats->malloc.allocated_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+    }
     return mallocz(ar->config.requested_element_size);
 #endif
 
@@ -978,6 +983,11 @@ void aral_unmark_allocation(ARAL *ar, void *ptr) {
 
 void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
 #if defined(FSANITIZE_ADDRESS)
+    if(ptr && ar->stats) {
+        __atomic_sub_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&ar->stats->malloc.allocated_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+    }
     freez(ptr);
     return;
 #endif
