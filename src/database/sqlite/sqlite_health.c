@@ -709,7 +709,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
             }
         }
 
-        ae = health_alarm_entry_get();
+        ae = health_alarm_entry_create();
 
         ae->unique_id = unique_id;
         ae->alarm_id = alarm_id;
@@ -768,8 +768,8 @@ void sql_health_alarm_log_load(RRDHOST *host)
         ae->old_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae_units(ae), -1));
         ae->new_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae_units(ae), -1));
 
-        ae->next = host->health_log.alarms;
-        host->health_log.alarms = ae;
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
+        // TODO: where is the count++?
 
         if(unlikely(ae->unique_id > host->health_max_unique_id))
             host->health_max_unique_id = ae->unique_id;

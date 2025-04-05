@@ -84,8 +84,8 @@ void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 // ARAL management functions for ALARM_ENTRY
 void health_alarm_entry_aral_init(void);
 struct aral_statistics *health_alarm_entry_aral_stats(void);
-ALARM_ENTRY *health_alarm_entry_get(void);
-void health_alarm_entry_release(ALARM_ENTRY *ae);
+ALARM_ENTRY *health_alarm_entry_create(void);
+void health_alarm_entry_destroy(ALARM_ENTRY *ae);
 
 void *health_cmdapi_thread(void *ptr);
 

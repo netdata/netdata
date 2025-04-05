@@ -29,13 +29,13 @@ struct aral_statistics *health_alarm_entry_aral_stats(void) {
     return aral_get_statistics(health_alarm_entry_globals.ar);
 }
 
-ALARM_ENTRY *health_alarm_entry_get(void) {
+ALARM_ENTRY *health_alarm_entry_create(void) {
     ALARM_ENTRY *ae = aral_mallocz(health_alarm_entry_globals.ar);
     memset(ae, 0, sizeof(ALARM_ENTRY));
     return ae;
 }
 
-void health_alarm_entry_release(ALARM_ENTRY *ae) {
+void health_alarm_entry_destroy(ALARM_ENTRY *ae) {
     aral_freez(health_alarm_entry_globals.ar, ae);
 }
 
@@ -189,7 +189,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
 
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
-    ALARM_ENTRY *ae = health_alarm_entry_get();
+    ALARM_ENTRY *ae = health_alarm_entry_create();
     ae->name = string_dup(name);
     ae->chart = string_dup(chart);
     ae->chart_context = string_dup(chart_context);
@@ -245,15 +245,13 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
 
     // link it
     rw_spinlock_write_lock(&host->health_log.spinlock);
-    ae->next = host->health_log.alarms;
-    host->health_log.alarms = ae;
+    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
     host->health_log.count++;
     rw_spinlock_write_unlock(&host->health_log.spinlock);
 
     // match previous alarms
     rw_spinlock_read_lock(&host->health_log.spinlock);
-    ALARM_ENTRY *t;
-    for(t = host->health_log.alarms ; t ; t = t->next) {
+    for(ALARM_ENTRY *t = host->health_log.alarms ; t ; t = t->next) {
         if(t != ae && t->alarm_id == ae->alarm_id) {
             if(!(t->flags & HEALTH_ENTRY_FLAG_UPDATED) && !t->updated_by_id) {
                 t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
@@ -301,16 +299,19 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
             ae->popen_instance = NULL;
         }
 
-        health_alarm_entry_release(ae);
+        if(ae->next || ae->prev)
+            fatal("HEALTH: alarm entry to delete is still linked!");
+
+        health_alarm_entry_destroy(ae);
     }
 }
 
 inline void health_alarm_log_free(RRDHOST *host) {
     rw_spinlock_write_lock(&host->health_log.spinlock);
 
-    ALARM_ENTRY *ae;
-    while((ae = host->health_log.alarms)) {
-        host->health_log.alarms = ae->next;
+    while(host->health_log.alarms) {
+        ALARM_ENTRY *ae = host->health_log.alarms;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
         health_alarm_log_free_one_nochecks_nounlink(ae);
     }
 
@@ -327,9 +328,7 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     
     rw_spinlock_write_lock(&host->health_log.spinlock);
     
-    ALARM_ENTRY *ae, *prev = NULL;
-    ae = host->health_log.alarms;
-    
+    ALARM_ENTRY *ae = host->health_log.alarms;
     while(ae) {
         // Check if entry is old enough to be deleted
         if(ae->when < now - retention && 
@@ -337,22 +336,18 @@ void health_alarm_log_cleanup(RRDHOST *host) {
            __atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED) == 0) { // Only remove entries not pending save
             
             // Remove from linked list
-            if(prev)
-                prev->next = ae->next;
-            else
-                host->health_log.alarms = ae->next;
-            
+            ALARM_ENTRY *next = ae->next;
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
+
             ALARM_ENTRY *to_free = ae;
-            ae = ae->next;
+            ae = next;
             
             // Free memory
             health_alarm_log_free_one_nochecks_nounlink(to_free);
             host->health_log.count--;
         }
-        else {
-            prev = ae;
+        else
             ae = ae->next;
-        }
     }
     
     rw_spinlock_write_unlock(&host->health_log.spinlock);

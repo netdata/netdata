@@ -535,8 +535,7 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
 
     rw_spinlock_read_lock(&host->health_log.spinlock);
 
-    ALARM_ENTRY *ae;
-    for(ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
+    for(ALARM_ENTRY *ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
         if(unlikely(
                 !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
                 !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
@@ -557,9 +556,9 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
     //delete those that are updated, no in progress execution, and is not repeating
     rw_spinlock_write_lock(&host->health_log.spinlock);
 
-    ALARM_ENTRY *prev = NULL, *next = NULL;
-    for(ae = host->health_log.alarms; ae ; ae = next) {
-        next = ae->next; // set it here, for the next iteration
+    ALARM_ENTRY *ae = host->health_log.alarms;
+    while(ae) {
+        ALARM_ENTRY *next = ae->next; // set it here, for the next iteration
 
         if((likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
              (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) &&
@@ -570,21 +569,11 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
              (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
              (ae->when + 86400 < now_realtime_sec())))
         {
-
-            if(host->health_log.alarms == ae) {
-                host->health_log.alarms = next;
-                // prev is also NULL here
-            }
-            else {
-                prev->next = next;
-                // prev should not be touched here - we need it for the next iteration
-                // because we may have to also remove the next item
-            }
-
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
             health_alarm_log_free_one_nochecks_nounlink(ae);
         }
-        else
-            prev = ae;
+
+        ae = next;
     }
 
     rw_spinlock_write_unlock(&host->health_log.spinlock);

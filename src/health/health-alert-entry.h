@@ -59,7 +59,7 @@ struct alarm_entry {
 
     POPEN_INSTANCE *popen_instance;
 
-    struct alarm_entry *next;
+    struct alarm_entry *next, *prev;
     struct alarm_entry *next_in_progress;
     struct alarm_entry *prev_in_progress;
 };
