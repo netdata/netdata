@@ -88,6 +88,8 @@ static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
 
         {"IBM Corp.", "IBM"},
 
+        {"IceWhale Technology Co.,Ltd.", "IceWhale"},
+
         {"INSYDE", "Insyde"},
         {"INSYDE Corp.", "Insyde"},
         {"Insyde Corp.", "Insyde"},
@@ -291,7 +293,7 @@ void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
             else if(strcasestr(ds->hw.product.name, "NVIDIA") != NULL &&
                      strcasestr(ds->hw.product.name, "Kit") != NULL) {
                 safecpy(ds->product.vendor, "NVIDIA");
-                force_type = "vm";
+                force_type = "mini-pc";
             }
             else if(strcasestr(ds->hw.product.name, "Raspberry") != NULL) {
                 safecpy(ds->product.vendor, "Raspberry");
