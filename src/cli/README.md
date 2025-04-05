@@ -26,4 +26,4 @@ See also the Netdata daemon [command line options](/src/daemon/README.md#command
 
 [^1]: This also clears any active alerts.
 [^2]: The Agent may be configured to [automatically clean up ephemeral nodes](/docs/nodes-ephemerality.md#automatic-ephemeral-nodes-cleanup) when they have been offline for longer than the configured time interval.
-[^3]: If a node is represented by multiple Parent Agents in a HA setup, this command must be issued on all these Parent Agents.
+[^3]: If a node is represented by multiple Parent Agents in a HA setup, this command must be executed on each Parent Agent.
