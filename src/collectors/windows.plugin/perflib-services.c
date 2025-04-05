@@ -26,7 +26,6 @@ void dict_win_service_insert_cb(const DICTIONARY_ITEM *item, void *value, void *
 {
     struct win_service *ptr = value;
     const char *name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
-    LPENUM_SERVICE_STATUS_PROCESS service = data;
 
     ptr->service_name = strdupz(name);
 }
@@ -140,7 +139,8 @@ static RRDDIM *win_service_select_dim(struct win_service *p, uint32_t selector)
     }
 }
 
-static int dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+static int
+dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct win_service *p = value;
     int *update_every = data;
@@ -163,11 +163,9 @@ static int dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unuse
             *update_every,
             RRDSET_TYPE_LINE);
 
-        p->rd_service_state_running = rrddim_add(
-            p->st_service_state, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_service_state_running = rrddim_add(p->st_service_state, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-        p->rd_service_state_stopped =
-            rrddim_add(p->st_service_state, "stopped", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_service_state_stopped = rrddim_add(p->st_service_state, "stopped", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         p->rd_service_state_start_pending =
             rrddim_add(p->st_service_state, "start_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -178,20 +176,14 @@ static int dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unuse
         p->rd_service_state_continue_pending =
             rrddim_add(p->st_service_state, "continue_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-        p->rd_service_state_pause_pending = rrddim_add(
-            p->st_service_state, "pause_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_service_state_pause_pending =
+            rrddim_add(p->st_service_state, "pause_pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-        p->rd_service_state_paused = rrddim_add(
-            p->st_service_state, "paused", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_service_state_paused = rrddim_add(p->st_service_state, "paused", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-        p->rd_service_state_unknown = rrddim_add(
-            p->st_service_state, "unknown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_service_state_unknown = rrddim_add(p->st_service_state, "unknown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-        rrdlabels_add(
-            p->st_service_state->rrdlabels,
-            "service",
-            p->service_name,
-            RRDLABEL_SRC_AUTO);
+        rrdlabels_add(p->st_service_state->rrdlabels, "service", p->service_name, RRDLABEL_SRC_AUTO);
     }
 
     if (p->st_service_state) {
@@ -199,7 +191,8 @@ static int dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unuse
         uint32_t current_state = (uint32_t)p->ServiceState.current.Data;
         for (uint32_t i = 1; i <= NETDATA_WINDOWS_SERVICE_STATE_TOTAL_STATES; i++) {
             RRDDIM *dim = win_service_select_dim(p, i);
-            if (!dim) continue;
+            if (!dim)
+                continue;
             uint32_t chart_value = (current_state == i) ? 1 : 0;
 
             rrddim_set_by_pointer(p->st_service_state, dim, (collected_number)chart_value);
@@ -222,7 +215,11 @@ int do_PerflibServices(int update_every, usec_t dt __maybe_unused)
 
     if (!fill_dictionary_with_content()) {
         if (++limit == NETDATA_SERVICE_MAX_TRY) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Disabling thread after %u consecutive tries to open Service Management.", NETDATA_SERVICE_MAX_TRY);
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Disabling thread after %u consecutive tries to open Service Management.",
+                NETDATA_SERVICE_MAX_TRY);
             return -1;
         }
         return 0;
