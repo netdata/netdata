@@ -709,7 +709,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
             }
         }
 
-        ae = callocz(1, sizeof(ALARM_ENTRY));
+        ae = health_alarm_entry_get();
 
         ae->unique_id = unique_id;
         ae->alarm_id = alarm_id;
@@ -796,6 +796,9 @@ void sql_health_alarm_log_load(RRDHOST *host)
     nd_log(NDLS_DAEMON, errored ? NDLP_WARNING : NDLP_DEBUG,
            "[%s]: Table health_log, loaded %zd alarm entries, errors in %zd entries.",
            rrdhost_hostname(host), loaded, errored);
+           
+    // Clean up old entries based on retention settings
+    health_alarm_log_cleanup(host);
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);

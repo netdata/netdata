@@ -29,13 +29,13 @@ struct aral_statistics *health_alarm_entry_aral_stats(void) {
     return aral_get_statistics(health_alarm_entry_globals.ar);
 }
 
-static ALWAYS_INLINE ALARM_ENTRY *health_alarm_entry_get(void) {
+ALARM_ENTRY *health_alarm_entry_get(void) {
     ALARM_ENTRY *ae = aral_mallocz(health_alarm_entry_globals.ar);
     memset(ae, 0, sizeof(ALARM_ENTRY));
     return ae;
 }
 
-static ALWAYS_INLINE void health_alarm_entry_release(ALARM_ENTRY *ae) {
+void health_alarm_entry_release(ALARM_ENTRY *ae) {
     aral_freez(health_alarm_entry_globals.ar, ae);
 }
 
