@@ -152,6 +152,7 @@ void health_plugin_init(void) {
 
     health_globals.initialization.done = true;
 
+    health_alarm_entry_aral_init();
     health_init_prototypes();
     health_load_config_defaults();
 

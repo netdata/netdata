@@ -375,6 +375,9 @@ void sql_health_alarm_log_cleanup(RRDHOST *host)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    
+    // After cleaning up SQLite entries, also clean up in-memory entries
+    health_alarm_log_cleanup(host);
 }
 
 #define SQL_UPDATE_TRANSITION_IN_HEALTH_LOG                                                                            \

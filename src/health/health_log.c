@@ -4,6 +4,42 @@
 #include "health-alert-entry.h"
 
 // ----------------------------------------------------------------------------
+// ARAL memory management for ALARM_ENTRY structures
+
+static struct {
+    ARAL *ar;
+} health_alarm_entry_globals = {
+    .ar = NULL,
+};
+
+void health_alarm_entry_aral_init(void) {
+    health_alarm_entry_globals.ar = aral_create(
+            "health-alarm-entry",
+            sizeof(ALARM_ENTRY),
+            0,
+            0,
+            NULL,
+            NULL, NULL, false, false, true
+    );
+
+    pulse_aral_register(health_alarm_entry_globals.ar, "health_log");
+}
+
+struct aral_statistics *health_alarm_entry_aral_stats(void) {
+    return aral_get_statistics(health_alarm_entry_globals.ar);
+}
+
+static ALWAYS_INLINE ALARM_ENTRY *health_alarm_entry_get(void) {
+    ALARM_ENTRY *ae = aral_mallocz(health_alarm_entry_globals.ar);
+    memset(ae, 0, sizeof(ALARM_ENTRY));
+    return ae;
+}
+
+static ALWAYS_INLINE void health_alarm_entry_release(ALARM_ENTRY *ae) {
+    aral_freez(health_alarm_entry_globals.ar, ae);
+}
+
+// ----------------------------------------------------------------------------
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
 {
@@ -153,7 +189,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
 
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
-    ALARM_ENTRY *ae = callocz(1, sizeof(ALARM_ENTRY));
+    ALARM_ENTRY *ae = health_alarm_entry_get();
     ae->name = string_dup(name);
     ae->chart = string_dup(chart);
     ae->chart_context = string_dup(chart_context);
@@ -259,7 +295,7 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
         string_freez(ae->old_value_string);
         string_freez(ae->new_value_string);
         string_freez(ae->summary);
-        freez(ae);
+        health_alarm_entry_release(ae);
     }
 }
 
@@ -272,5 +308,46 @@ inline void health_alarm_log_free(RRDHOST *host) {
         health_alarm_log_free_one_nochecks_nounlink(ae);
     }
 
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
+}
+
+// Clean up old alarm entries from memory based on retention settings
+void health_alarm_log_cleanup(RRDHOST *host) {
+    if(!host->health_log.alarms)
+        return;
+
+    time_t now = now_realtime_sec();
+    time_t retention = host->health_log.health_log_retention_s;
+    
+    rw_spinlock_write_lock(&host->health_log.spinlock);
+    
+    ALARM_ENTRY *ae, *prev = NULL;
+    ae = host->health_log.alarms;
+    
+    while(ae) {
+        // Check if entry is old enough to be deleted
+        if(ae->when < now - retention && 
+           (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) && // Only remove entries that have been processed/updated
+           __atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED) == 0) { // Only remove entries not pending save
+            
+            // Remove from linked list
+            if(prev)
+                prev->next = ae->next;
+            else
+                host->health_log.alarms = ae->next;
+            
+            ALARM_ENTRY *to_free = ae;
+            ae = ae->next;
+            
+            // Free memory
+            health_alarm_log_free_one_nochecks_nounlink(to_free);
+            host->health_log.count--;
+        }
+        else {
+            prev = ae;
+            ae = ae->next;
+        }
+    }
+    
     rw_spinlock_write_unlock(&host->health_log.spinlock);
 }

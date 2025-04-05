@@ -79,4 +79,7 @@ struct alarm_entry {
 #define ae_old_value_string(ae) string2str((ae)->old_value_string)
 #define ae_new_value_string(ae) string2str((ae)->new_value_string)
 
+// Function to clean up old alarm entries based on retention settings
+void health_alarm_log_cleanup(RRDHOST *host);
+
 #endif //NETDATA_HEALTH_ALERT_ENTRY_H

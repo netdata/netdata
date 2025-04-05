@@ -81,6 +81,10 @@ void health_alarm_log_free(RRDHOST *host);
 
 void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 
+// ARAL management functions for ALARM_ENTRY
+void health_alarm_entry_aral_init(void);
+struct aral_statistics *health_alarm_entry_aral_stats(void);
+
 void *health_cmdapi_thread(void *ptr);
 
 char *health_edit_command_from_source(const char *source);
