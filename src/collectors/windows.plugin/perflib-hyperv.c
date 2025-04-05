@@ -333,10 +333,9 @@ static bool do_hyperv_health_summary(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
     if (!p->charts_created) {
         p->charts_created = true;
-        netdata_fix_chart_name(windows_shared_buffer);
         p->st_health = rrdset_create_localhost(
             "vms_health",
-            windows_shared_buffer,
+            "hyperv_health_status",
             NULL,
             HYPERV,
             HYPERV ".vms_health",
