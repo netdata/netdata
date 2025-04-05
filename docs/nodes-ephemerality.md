@@ -84,7 +84,7 @@ To fully remove permanently offline nodes:
 netdatacli remove-stale-node <node_id | machine_guid | hostname | ALL_NODES>
 ```
 
-This is like the `mark-stale-nodes-ephemeral` subcommand, but also removes the node so that they are no longer available for querying.
+This is like the `mark-stale-nodes-ephemeral` subcommand, but it also removes the nodes so they are no longer available for querying.
 ## Cloud Integration
 
 Ephemeral nodes in Netdata Cloud are considered stale as long as there is at least one Agent reporting that, for that node, it has metrics data available for querying, by signaling the node as stale. When all Agents report the node as offline, ephemeral nodes are deleted from Cloud as well.
