@@ -45,26 +45,6 @@ For a production-ready streaming setup, consider the following best practices:
 
 By following these guidelines, you can set up a scalable and reliable Netdata streaming environment.
 
-```markdown
-# Streaming and Replication Configuration
-
-This guide covers advanced streaming options and recommended deployment settings for production use.  
-If you’re new to streaming, start with the [Quick Introduction to Streaming](/docs/observability-centralization-points/README.md) for a basic parent-child setup.
-
-## Configuration Files
-
-Netdata’s streaming settings are managed in two files:
-
-- **`stream.conf`** – Configures how Netdata nodes send and receive metrics.
-- **`netdata.conf`** – Defines general settings, including web access and API permissions.
-
-To edit these files, use the following commands from Netdata’s configuration directory (`/etc/netdata`):
-
-```sh
-sudo ./edit-config stream.conf
-sudo ./edit-config netdata.conf
-```
-
 ## `stream.conf`
 
 The `stream.conf` file consists of three main sections:
@@ -141,9 +121,9 @@ This section customizes settings for specific child nodes using their unique Mac
 | `replication step`           | `10m`      | Time interval for each replication step.                 |
 | `is ephemeral node`          | `no`       | Marks the node as ephemeral (removes after inactivity).  |
 
-## Additional Settings
+### Additional Settings
 
-### `destination`
+#### `destination`
 
 Defines parent nodes for streaming using the format:  
 `[PROTOCOL:]HOST[%INTERFACE][:PORT][:SSL]`
@@ -161,7 +141,7 @@ Example (TCP connection with SSL to `203.0.113.0` on port `20000`):
     destination = tcp:203.0.113.0:20000:SSL
 ```
 
-### `send charts matching`
+#### `send charts matching`
 
 Controls which charts are streamed.
 
@@ -180,7 +160,7 @@ Controls which charts are streamed.
       send charts matching = !apps.cpu *
   ```
 
-### `allow from`
+#### `allow from`
 
 Defines which child nodes (by IP) can connect.
 
@@ -198,7 +178,7 @@ Defines which child nodes (by IP) can connect.
       allow from = !10.1.2.3 10.*
   ```
 
-### `db`
+#### `db`
 
 Defines the database mode:
 
@@ -213,7 +193,7 @@ Defines the database mode:
 
 Here’s an optimized version of the `netdata.conf` structure with clearer, more direct language. I've broken down the key sections for readability and made the content less dense:
 
-### netdata.conf
+## `netdata.conf`
 
 The `netdata.conf` file is the primary configuration file for the Netdata agent. It controls the agent’s settings, including networking, data collection, logging, and resource usage.
 
@@ -308,7 +288,7 @@ Slow connections can also cause the parent to miss a message. For example, if th
 ERROR : STREAM_RECEIVER[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : requested a SET on chart 'CHART NAME' of host 'HOSTNAME', without a dimension. Disabling it.
 ```
 
-### Child Cannot Connect to Parent
+### Child Can’t Connect to Parent
 
 If the child can't connect to the parent (due to misconfiguration, networking issues, firewalls, or the parent being down), the child will log:
 
@@ -348,7 +328,7 @@ Possible causes for this error include:
 
 ### Netdata Could Not Create a Stream
 
-If the parent cannot convert the initial connection into a stream, it will log the following error:
+If the parent can’t convert the initial connection into a stream, it will log the following error:
 
 ```
 file descriptor given is not a valid stream
