@@ -1004,37 +1004,37 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
 
     Pvoid_t *metrics_judy_pptr = JudyLGet(cache->index[partition].sections_judy, page->section, PJE0);
     if(unlikely(!metrics_judy_pptr))
-        fatal("DBENGINE CACHE: section '%lu' should exist, but it does not.", page->section);
+        fatal("DBENGINE CACHE: section '%p' should exist, but it does not.", (void *)page->section);
 
     Pvoid_t *pages_judy_pptr = JudyLGet(*metrics_judy_pptr, page->metric_id, PJE0);
     if(unlikely(!pages_judy_pptr))
-        fatal("DBENGINE CACHE: metric '%lu' in section '%lu' should exist, but it does not.",
-              page->metric_id, page->section);
+        fatal("DBENGINE CACHE: metric '%p' in section '%p' should exist, but it does not.",
+              (void *)page->metric_id, (void *)page->section);
 
     Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, page->start_time_s, PJE0);
     if(unlikely(!page_ptr))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, but it does not.",
-              page->start_time_s, page->metric_id, page->section);
+        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%p' in section '%p' should exist, but it does not.",
+              page->start_time_s, (void *)page->metric_id, (void *)page->section);
 
     PGC_PAGE *found_page = *page_ptr;
     if(unlikely(found_page != page))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, "
+        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%p' in section '%p' should exist, "
               "but the index returned a different address (expected %p, got %p).",
-              page->start_time_s, page->metric_id, page->section,
+              page->start_time_s, (void *)page->metric_id, (void *)page->section,
               page, found_page);
 
     JudyAllocThreadPulseReset();
 
     if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_s, PJE0)))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' exists, but cannot be deleted.",
-              page->start_time_s, page->metric_id, page->section);
+        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%p' in section '%p' exists, but cannot be deleted.",
+              page->start_time_s, (void *)page->metric_id, (void *)page->section);
 
     if(!*pages_judy_pptr && !JudyLDel(metrics_judy_pptr, page->metric_id, PJE0))
-        fatal("DBENGINE CACHE: metric '%lu' in section '%lu' exists and is empty, but cannot be deleted.",
-              page->metric_id, page->section);
+        fatal("DBENGINE CACHE: metric '%p' in section '%p' exists and is empty, but cannot be deleted.",
+              (void *)page->metric_id, (void *)page->section);
 
     if(!*metrics_judy_pptr && !JudyLDel(&cache->index[partition].sections_judy, page->section, PJE0))
-        fatal("DBENGINE CACHE: section '%lu' exists and is empty, but cannot be deleted.", page->section);
+        fatal("DBENGINE CACHE: section '%p' exists and is empty, but cannot be deleted.", (void *)page->section);
 
     pgc_stats_index_judy_change(cache, JudyAllocThreadPulseGetAndReset());
 

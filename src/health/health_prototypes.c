@@ -203,6 +203,7 @@ static void alert_action_options_init(void) {
 static void health_prototype_cleanup_one_unsafe(RRD_ALERT_PROTOTYPE *ap) {
     rrd_alert_match_cleanup(&ap->match);
     rrd_alert_config_cleanup(&ap->config);
+    memset(ap, 0, sizeof(*ap));
 }
 
 void health_prototype_cleanup(RRD_ALERT_PROTOTYPE *ap) {
@@ -246,7 +247,6 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
         if(ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG) {
             // the existing is a dyncfg and the new one is read from the config
             health_prototype_cleanup(nap);
-            memset(nap, 0, sizeof(*nap));
         }
         else {
             // alerts with the same name are appended to the existing one
@@ -272,7 +272,6 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
         rw_spinlock_write_unlock(&nap->_internal.rw_spinlock);
 
         health_prototype_cleanup(nap);
-        memset(nap, 0, sizeof(*nap));
     }
 
     return true;

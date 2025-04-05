@@ -46,6 +46,10 @@ static struct {
     struct {
         ARAL *ar;
     } deol;
+
+    struct {
+        ARAL *ar;
+    } epdl_extent;
 } pdc_globals = {};
 
 void pdc_init(void) {
@@ -161,6 +165,36 @@ static ALWAYS_INLINE void deol_release(DEOL *deol) {
 
 struct aral_statistics *deol_aral_stats(void) {
     return aral_get_statistics(pdc_globals.deol.ar);
+}
+
+// ----------------------------------------------------------------------------
+// epdl_extent cache
+
+void epdl_extent_init(void) {
+    pdc_globals.epdl_extent.ar = aral_create(
+            "dbengine-epdl-extent",
+            sizeof(EPDL_EXTENT),
+            0,
+            0,
+            NULL,
+            NULL, NULL, false, false, true
+    );
+
+    pulse_aral_register(pdc_globals.epdl_extent.ar, "epdl_extent");
+}
+
+static ALWAYS_INLINE EPDL_EXTENT *epdl_extent_get(void) {
+    EPDL_EXTENT *e = aral_mallocz(pdc_globals.epdl_extent.ar);
+    memset(e, 0, sizeof(EPDL_EXTENT));
+    return e;
+}
+
+ALWAYS_INLINE void epdl_extent_release(EPDL_EXTENT *e) {
+    aral_freez(pdc_globals.epdl_extent.ar, e);
+}
+
+struct aral_statistics *epdl_extent_aral_stats(void) {
+    return aral_get_statistics(pdc_globals.epdl_extent.ar);
 }
 
 // ----------------------------------------------------------------------------
@@ -471,7 +505,7 @@ static ALWAYS_INLINE EPDL_EXTENT *epdl_find_extent_base(EPDL *epdl) {
 
     if(!e) {
         EPDL_EXTENT *e_to_free = NULL;
-        e = callocz(1, sizeof(*e));
+        e = epdl_extent_get();
 
         rw_spinlock_write_lock(&epdl->datafile->extent_epdl.spinlock);
         PValue = JudyLIns(&epdl->datafile->extent_epdl.epdl_per_extent, epdl->extent_offset, PJE0);
@@ -486,7 +520,7 @@ static ALWAYS_INLINE EPDL_EXTENT *epdl_find_extent_base(EPDL *epdl) {
         }
         rw_spinlock_write_unlock(&epdl->datafile->extent_epdl.spinlock);
 
-        freez(e_to_free);
+        epdl_extent_release(e_to_free);
     }
 
     return e;

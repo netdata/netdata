@@ -57,6 +57,7 @@ static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
         {"DELL", "Dell"},
         {"Dell Computer Corporation", "Dell"},
         {"Dell Inc.", "Dell"},
+        {"Dell EMC", "Dell"},
 
         {"FUJITSU", "Fujitsu"},
         {"FUJITSU CLIENT COMPUTING LIMITED", "Fujitsu"},
@@ -86,6 +87,8 @@ static void dmi_normalize_vendor_field(char *buf, size_t buf_size) {
         {"Huawei Technologies Co., Ltd.", "Huawei"},
 
         {"IBM Corp.", "IBM"},
+
+        {"IceWhale Technology Co.,Ltd.", "IceWhale"},
 
         {"INSYDE", "Insyde"},
         {"INSYDE Corp.", "Insyde"},
@@ -174,7 +177,8 @@ static bool dmi_is_virtual_machine(const DMI_INFO *dmi) {
     if(!dmi) return false;
 
     const char *vm_indicators[] = {
-        "Virt", "KVM", "vServer", "Cloud", "Hyper", "Droplet", "Compute",
+        "Virt", "KVM", "vServer", "Cloud", "Hyper", "Droplet",
+        "Compute ", // with a space to not match "Computer"
         "HVM domU", "Parallels", "(i440FX", "(q35", "OpenStack", "QEMU",
         "VMWare", "DigitalOcean", "Oracle", "Linode", "Amazon EC2"
     };
@@ -289,7 +293,7 @@ void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
             else if(strcasestr(ds->hw.product.name, "NVIDIA") != NULL &&
                      strcasestr(ds->hw.product.name, "Kit") != NULL) {
                 safecpy(ds->product.vendor, "NVIDIA");
-                force_type = "vm";
+                force_type = "mini-pc";
             }
             else if(strcasestr(ds->hw.product.name, "Raspberry") != NULL) {
                 safecpy(ds->product.vendor, "Raspberry");

@@ -70,7 +70,12 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
     if(remaining_seconds < 0)
         remaining_seconds = 0;
 
+#if defined(FSANITIZE_ADDRESS)
+    completion_wait_for(&watcher_steps[step_id].p);
+    bool ok = true;
+#else
     bool ok = completion_timedwait_for(&watcher_steps[step_id].p, remaining_seconds);
+#endif
 
     usec_t step_duration = now_monotonic_usec() - step_start_time;
 

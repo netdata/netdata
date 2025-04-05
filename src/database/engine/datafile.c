@@ -549,6 +549,22 @@ int init_data_files(struct rrdengine_instance *ctx)
     return 0;
 }
 
+void cleanup_datafile_epdl_structures(struct rrdengine_datafile *datafile)
+{
+    rw_spinlock_write_lock(&datafile->extent_epdl.spinlock);
+    bool first = true;
+    Word_t idx = 0;
+    Pvoid_t *PValue;
+    while ((PValue = JudyLFirstThenNext(datafile->extent_epdl.epdl_per_extent, &idx, &first))) {
+        EPDL_EXTENT *e = *PValue;
+        internal_error(e->base, "DBENGINE: unexpected active EPDLs during datafile cleanup");
+        epdl_extent_release(e);
+        *PValue = NULL;
+    }
+    JudyLFreeArray(&datafile->extent_epdl.epdl_per_extent, PJE0);
+    rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
+}
+
 void finalize_data_files(struct rrdengine_instance *ctx)
 {
     bool logged = false;
@@ -601,6 +617,9 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         datafile_list_delete_unsafe(ctx, datafile);
         spinlock_unlock(&datafile->writers.spinlock);
         uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+
+        // Clean up EPDL_EXTENT structures
+        cleanup_datafile_epdl_structures(datafile);
 
         memset(journalfile, 0, sizeof(*journalfile));
         memset(datafile, 0, sizeof(*datafile));
