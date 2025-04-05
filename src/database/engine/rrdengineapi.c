@@ -1147,7 +1147,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         }
     }
 
-    ctx->loading.populate_mrg.size = cpus;
+    ctx->loading.populate_mrg.size = 1;
     ctx->loading.populate_mrg.array = callocz(ctx->loading.populate_mrg.size, sizeof(struct completion));
 
     for (size_t i = 0; i < ctx->loading.populate_mrg.size; i++) {
