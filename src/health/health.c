@@ -167,7 +167,20 @@ cleanup:
 }
 
 void health_plugin_destroy(void) {
-    ;
+    if(!health_globals.initialization.done)
+        return;
+
+    spinlock_lock(&health_globals.initialization.spinlock);
+
+    // Clean up health prototypes dictionary
+    if(health_globals.prototypes.dict) {
+        dictionary_destroy(health_globals.prototypes.dict);
+        health_globals.prototypes.dict = NULL;
+    }
+
+    health_globals.initialization.done = false;
+
+    spinlock_unlock(&health_globals.initialization.spinlock);
 }
 
 void health_plugin_reload(void) {
