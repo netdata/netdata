@@ -86,9 +86,6 @@ static inline void STATS_MINUS_MEMORY(struct dictionary_stats *stats, int64_t ju
         __atomic_fetch_sub(&stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 }
 
-#define RRDLABELS_MAX_NAME_LENGTH 200
-#define RRDLABELS_MAX_VALUE_LENGTH 800 // 800 in bytes, up to 200 UTF-8 characters
-
 __attribute__((constructor)) void initialize_label_stats(void) {
     dictionary_stats_category_rrdlabels.memory.dict = 0;
     dictionary_stats_category_rrdlabels.memory.index = 0;
@@ -927,154 +924,6 @@ void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels) {
     rrdset_metadata_updated(st);
 }
 
-struct pattern_array *pattern_array_allocate()
-{
-    struct pattern_array *pa = callocz(1, sizeof(*pa));
-    return pa;
-}
-
-static void pattern_array_add_lblkey_with_sp(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *sp)
-{
-    if (!pa || !key || !sp)
-        return;
-
-    STRING *string_key = string_strdupz(key);
-    Pvoid_t *Pvalue = JudyLIns(&pa->JudyL, (Word_t) string_key, PJE0);
-    if (!Pvalue) {
-        string_freez(string_key);
-        simple_pattern_free(sp);
-        return;
-    }
-
-    struct pattern_array_item *pai;
-    if (*Pvalue) {
-        pai = *Pvalue;
-    } else {
-        *Pvalue = pai = callocz(1, sizeof(*pai));
-        pa->key_count++;
-    }
-
-    pai->size++;
-    Pvalue = JudyLIns(&pai->JudyL, (Word_t) pai->size, PJE0);
-    if (!Pvalue) {
-        simple_pattern_free(sp);
-        return;
-    }
-
-    *Pvalue = sp;
-}
-
-bool pattern_array_label_match(
-    struct pattern_array *pa,
-    RRDLABELS *labels,
-    char eq,
-    size_t *searches)
-{
-    if (!pa || !labels)
-        return true;
-
-    Pvoid_t *Pvalue;
-    Word_t Index = 0;
-    bool first_then_next = true;
-    while ((Pvalue = JudyLFirstThenNext(pa->JudyL, &Index, &first_then_next))) {
-        // for each label key in the patterns array
-
-        struct pattern_array_item *pai = *Pvalue;
-        SIMPLE_PATTERN_RESULT match = SP_NOT_MATCHED ;
-        for (Word_t i = 1; i <= pai->size; i++) {
-            // for each pattern in the label key pattern list
-
-            if (!(Pvalue = JudyLGet(pai->JudyL, i, PJE0)) || !*Pvalue)
-                continue;
-
-            match = rrdlabels_match_simple_pattern_parsed(labels, (SIMPLE_PATTERN *)(*Pvalue), eq, searches);
-
-            if(match != SP_NOT_MATCHED)
-                break;
-        }
-
-        if (match != SP_MATCHED_POSITIVE)
-            return false;
-    }
-    return true;
-}
-
-struct pattern_array *pattern_array_add_key_simple_pattern(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *pattern)
-{
-    if (unlikely(!pattern || !key))
-        return pa;
-
-    if (!pa)
-        pa = pattern_array_allocate();
-
-    pattern_array_add_lblkey_with_sp(pa, key, pattern);
-    return pa;
-}
-
-struct pattern_array *pattern_array_add_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep)
-{
-    if (unlikely(!pattern))
-        return pa;
-
-    if (!pa)
-        pa = pattern_array_allocate();
-
-    char *label_key;
-    while (pattern && (label_key = simple_pattern_iterate(&pattern))) {
-        char key[RRDLABELS_MAX_NAME_LENGTH + 1], *key_sep;
-
-        if (unlikely(!label_key || !(key_sep = strchr(label_key, sep))))
-            return pa;
-
-        *key_sep = '\0';
-        strncpyz(key, label_key, RRDLABELS_MAX_NAME_LENGTH);
-        *key_sep = sep;
-
-        pattern_array_add_lblkey_with_sp(pa, key, string_to_simple_pattern(label_key));
-    }
-    return pa;
-}
-
-struct pattern_array *pattern_array_add_key_value(struct pattern_array *pa, const char *key, const char *value, char sep)
-{
-    if (unlikely(!key || !value))
-        return pa;
-
-    if (!pa)
-        pa = pattern_array_allocate();
-
-    char label_key[RRDLABELS_MAX_NAME_LENGTH + RRDLABELS_MAX_VALUE_LENGTH + 2];
-    snprintfz(label_key, sizeof(label_key) - 1, "%s%c%s", key, sep, value);
-    pattern_array_add_lblkey_with_sp(
-        pa, key, simple_pattern_create(label_key, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true));
-    return pa;
-}
-
-void pattern_array_free(struct pattern_array *pa)
-{
-    if (!pa)
-        return;
-
-    Pvoid_t *Pvalue;
-    Word_t Index = 0;
-    while ((Pvalue = JudyLFirst(pa->JudyL, &Index, PJE0))) {
-        struct pattern_array_item *pai = *Pvalue;
-
-        for (Word_t i = 1; i <= pai->size; i++) {
-            if (!(Pvalue = JudyLGet(pai->JudyL, i, PJE0)))
-                continue;
-            simple_pattern_free((SIMPLE_PATTERN *) (*Pvalue));
-        }
-        JudyLFreeArray(&(pai->JudyL), PJE0);
-
-        string_freez((STRING *)Index);
-        (void) JudyLDel(&(pa->JudyL), Index, PJE0);
-        freez(pai);
-        Index = 0;
-    }
-    freez(pa);
-}
-
 // ----------------------------------------------------------------------------
 // rrdlabels unit test
 
@@ -1280,6 +1129,7 @@ static int unittest_dump_labels(const char *name, const char *value, RRDLABEL_SR
     return 1;
 }
 
+void pattern_array_add_lblkey_with_sp(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *sp);
 static int rrdlabels_unittest_pattern_check()
 {
     fprintf(stderr, "\n%s() tests\n", __FUNCTION__);

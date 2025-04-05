@@ -1650,6 +1650,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdhost-labels.h
         src/database/rrdhost-collection.c
         src/database/rrdhost-collection.h
+        src/database/pattern-array.c
+        src/database/pattern-array.h
 )
 
 if(ENABLE_DBENGINE)
