@@ -186,3 +186,12 @@ src/go/plugin/go.d/vendor
 
 # ignore files used with msi installer
 packaging/windows/*.msi
+
+# agent-events build artifacts and test files
+packaging/tools/agent-events/agent-events
+packaging/tools/agent-events/expected_metrics.txt
+packaging/tools/agent-events/cf_patch.txt
+packaging/tools/agent-events/parseBehaviorTest.go
+packaging/tools/agent-events/server
+packaging/tools/agent-events/go.mod
+packaging/tools/agent-events/go.sum
