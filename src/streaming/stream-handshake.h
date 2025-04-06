@@ -39,12 +39,12 @@ typedef enum {
 
     // --- internal handshake reasons ---
 
-    // receiver only codes
+    // receiver-only codes
     STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED       = -13,
     STREAM_HANDSHAKE_RCV_DISCONNECT_STALE_RECEIVER      = -14,
     STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED           = -15,
 
-    // sender only codes
+    // sender-only codes
     STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP        = -16,
     STREAM_HANDSHAKE_SND_DISCONNECT_COMPRESSION_FAILED  = -17,
     STREAM_HANDSHAKE_SND_DISCONNECT_HTTP_UPGRADE_FAILED = -18,
@@ -70,9 +70,10 @@ typedef enum {
     STREAM_HANDSHAKE_SP_CONNECTING                      = -34,
     STREAM_HANDSHAKE_SP_CONNECTED                       = -35,
     STREAM_HANDSHAKE_SP_NO_STREAM_INFO                  = -36,
+    STREAM_HANDSHAKE_SP_NO_DESTINATION                  = -37,
 
     // terminator - keep this positive, bigger than all negative values
-    STREAM_HANDSHAKE_NEGATIVE_MAX                       = 37,
+    STREAM_HANDSHAKE_NEGATIVE_MAX                       = 38,
 } STREAM_HANDSHAKE;
 
 const char *stream_handshake_error_to_string(STREAM_HANDSHAKE reason);

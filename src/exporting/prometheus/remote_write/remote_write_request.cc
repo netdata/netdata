@@ -16,7 +16,7 @@ google::protobuf::Arena arena;
 void *init_write_request()
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
-    WriteRequest *write_request = google::protobuf::Arena::CreateMessage<WriteRequest>(&arena);
+    WriteRequest *write_request = google::protobuf::Arena::Create<WriteRequest>(&arena);
     return (void *)write_request;
 }
 
@@ -235,7 +235,7 @@ int convert_write_request_to_string(
         return 1;
     }
 
-    WriteRequest *write_request = google::protobuf::Arena::CreateMessage<WriteRequest>(&arena);
+    WriteRequest *write_request = google::protobuf::Arena::Create<WriteRequest>(&arena);
     if (write_request->ParseFromString(std::string(uncompressed_write_request, uncompressed_size)) == false) {
         free(uncompressed_write_request);
         return 1;

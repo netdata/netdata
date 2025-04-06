@@ -95,7 +95,7 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
 }
 
 static bool parse_config_value(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
-    JSONC_PARSE_SUBOBJECT(jobj, path, "database_lookup", config, parse_config_value_database_lookup, error, strict);
+    JSONC_PARSE_SUBOBJECT_CB(jobj, path, "database_lookup", config, parse_config_value_database_lookup, error, strict);
     JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "calculation", config->calculation, error, false);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "units", config->units, error, false);
     JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "update_every", config->update_every, error, strict);
@@ -127,8 +127,8 @@ static bool parse_config_action(json_object *jobj, const char *path, struct rrd_
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", alert_action_options_parse_one, config->alert_action_options, error, strict);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "execute", config->exec, error, strict);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "recipient", config->recipient, error, strict);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "delay", config, parse_config_action_delay, error, strict);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "repeat", config, parse_config_action_repeat, error, strict);
+    JSONC_PARSE_SUBOBJECT_CB(jobj, path, "delay", config, parse_config_action_delay, error, strict);
+    JSONC_PARSE_SUBOBJECT_CB(jobj, path, "repeat", config, parse_config_action_repeat, error, strict);
     return true;
 }
 
@@ -143,10 +143,10 @@ static bool parse_config(json_object *jobj, const char *path, RRD_ALERT_PROTOTYP
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "component", ap->config.component, error, false);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "classification", ap->config.classification, error, false);
 
-    JSONC_PARSE_SUBOBJECT(jobj, path, "value", &ap->config, parse_config_value, error, strict);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "conditions", &ap->config, parse_config_conditions, error, false);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "action", &ap->config, parse_config_action, error, false);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "match", &ap->match, parse_match, error, strict);
+    JSONC_PARSE_SUBOBJECT_CB(jobj, path, "value", &ap->config, parse_config_value, error, strict);
+    JSONC_PARSE_SUBOBJECT_CB(jobj, path, "conditions", &ap->config, parse_config_conditions, error, false);
+    JSONC_PARSE_SUBOBJECT_CB(jobj, path, "action", &ap->config, parse_config_action, error, false);
+    JSONC_PARSE_SUBOBJECT_CB(jobj, path, "match", &ap->match, parse_match, error, strict);
 
     return true;
 }
@@ -183,18 +183,18 @@ static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTO
 
             JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(rule, path, "enabled", ap->match.enabled, error, strict);
 
-            STRING *type = NULL;
-            JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(rule, path, "type", type, error, strict);
-            if(string_strcmp(type, "template") == 0)
+            char type[32];
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(rule, path, "type", type, error, strict);
+            if(strcmp(type, "template") == 0)
                 ap->match.is_template = true;
-            else if(string_strcmp(type, "instance") == 0)
+            else if(strcmp(type, "instance") == 0)
                 ap->match.is_template = false;
             else {
-                buffer_sprintf(error, "type is '%s', but it can only be 'instance' or 'template'", string2str(type));
+                buffer_sprintf(error, "type is '%s', but it can only be 'instance' or 'template'", type);
                 return false;
             }
 
-            JSONC_PARSE_SUBOBJECT(rule, path, "config", ap, parse_config, error, strict);
+            JSONC_PARSE_SUBOBJECT_CB(rule, path, "config", ap, parse_config, error, strict);
 
             ap = NULL; // so that we will create another one, if available
         }
@@ -526,8 +526,11 @@ static size_t dyncfg_health_remove_all_rrdcalc_of_prototype(STRING *alert_name) 
 
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host) {
+        if(!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
+            continue;
+
         RRDCALC *rc;
-        foreach_rrdcalc_in_rrdhost_read(host, rc) {
+        foreach_rrdcalc_in_rrdhost_reentrant(host, rc) {
             if(rc->config.name != alert_name)
                 continue;
 
@@ -535,6 +538,7 @@ static size_t dyncfg_health_remove_all_rrdcalc_of_prototype(STRING *alert_name) 
             removed++;
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
+        dictionary_garbage_collect(host->rrdcalc_root_index);
     }
     dfe_done(host);
 
@@ -542,7 +546,6 @@ static size_t dyncfg_health_remove_all_rrdcalc_of_prototype(STRING *alert_name) 
 }
 
 static void dyncfg_health_prototype_reapply(RRD_ALERT_PROTOTYPE *ap) {
-    dyncfg_health_remove_all_rrdcalc_of_prototype(ap->config.name);
     health_prototype_apply_to_all_hosts(ap);
 }
 

@@ -6,7 +6,8 @@
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
-<h3 align="center">Monitor your servers, containers, and applications<br/>in high-resolution and in real-time.</h3>
+<h3 align="center">X-Ray Vision for your infrastructure!</h3>
+<h4 align="center">Every Metric, Every Second. No BS.</h4>
 
 <br />
 <p align="center">
@@ -32,21 +33,77 @@ MENU: **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)*
 > **Important** :bulb:<br/>
 > People get addicted to Netdata. Once you use it on your systems, **there's no going back!**<br/>
 
-**Netdata: Real-time Observability, Simplified.**
-
 [![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20FreeBSD%20%7C%20Windows-blue)]()
 
-Netdata is a high-performance observability platform designed to simplify modern infrastructure monitoring. With its innovative distributed architecture, Netdata delivers real-time insights into your systems, containers, and applications at a granular level.
+**TL;DR**
+
+Netdata is an open-source, real-time infrastructure monitoring platform designed for instant visibility and proactive troubleshooting across your entire IT environment. It captures every metric, every second, providing detailed insights into systems, containers, applications, and logs without compromising performance or requiring complex setup.
+
+Key Advantages:
+
+- **Instant Insights**<br/>Real-time, per-second metrics and visualizations for rapid problem detection.
+- **Automated and Zero-Configuration**<br/>Easy deployment with immediate monitoring—no complex setup needed.
+- **ML-Driven Intelligence**<br/>Built-in machine learning detects anomalies, predicts issues, and assists in root-cause analysis automatically.
+- **Highly Efficient**<br/>Proven minimal resource usage, exceptional scalability, and best-in-class energy efficiency validated by independent research.
+- **Distributed & Secure**<br/>Data stays securely within your infrastructure; no centralization required.
+
+Netdata complements or replaces traditional monitoring tools, offering significant performance and usability advantages over Prometheus, Datadog, Dynatrace, and similar products, while remaining fully compatible and integration-friendly.
+
+Designed for organizations seeking simplified operations, reduced overhead, and cost-effective monitoring solutions, Netdata provides a comprehensive, scalable, and user-friendly approach to observability.
 
 **:sparkles: Key Features**:
 
-- **Real-Time**: Per-second data collection provides immediate visibility into your infrastructure's behavior.
-- **Zero-Configuration**: Start monitoring in minutes with automatic detection and instant insights.
-- **ML-Powered Insights**: Automatic anomaly detection and pattern recognition, helping you identify issues before they become critical.
-- **Enterprise-Ready**: Scale from a single node to thousands while maintaining performance and ease of use.
-- **Complete Visibility**: From infrastructure to applications, logs to metrics, all in one solution.
-- **Edge-Based**: Process and store metrics at the edge for superior performance and cost efficiency.
-- **Advanced Visualization**: Rich, interactive dashboard for deep system insights and rapid troubleshooting.
+- **Real-Time**
+
+  Per-second data collection and real-time processing provides immediate visibility into your infrastructure's behavior.
+
+  _**Unique**: Netdata works in a beat and everything happens at this pace. You hit enter on a terminal and a second later you see the result on the dashboard._
+
+- **Zero-Configuration**
+
+  Start monitoring in minutes with automatic detection and discovery, fully automated dashboards, and hundreds of pre-configured alerts.
+
+  _**Unique**: Netdata auto-discovers everything on the nodes it runs. All kernel technologies, all processes, all applications, all containers, all hardware components. And with its dynamic configuration, any changes can be done via the dashboard._
+
+- **ML-Powered**
+
+  Unsupervised anomaly detection and pattern recognition for all metrics, providing advanced correlations and instant root cause analysis.
+
+  _**Unique**: Netdata trains multiple true ML models per metric, at the edge, for all metrics!_ <br/>
+  _**Unique**: A scoring engine that identifies correlations across metrics, applications, nodes, services, even cloud providers and data centers!_
+  
+- **Long-Term Retention**
+
+  High-performance and efficient tiered storage for years of retention and fast query responses.
+
+  _**Unique**: Netdata needs ~0.5 per sample on disk, offering superb compression for high-resolution data!_ <br/>
+  _**Unique**: A tiered storage engine automatically downsamples old data for archiving, long term retention and capacity planning._
+
+- **Advanced Visualization**
+
+  Rich, interactive low-latency dashboards for deep system and applications insights and rapid troubleshooting.
+
+  _**Unique**: Netdata dashboards allow you to slice and dice any dataset, without learning a query language._ <br/>
+  _**Unique**: A multi-faceted query engine, analyzes all aspects of your data in one go, and the dashboard provides interactive analysis for all them (NIDL framework)._
+  
+- **Extreme Scalability**
+
+  Native horizontal scalability, while maintaining performance and ease of use.
+
+  _**Unique**: Simple Parent-Child centralization and native horizontal scalability._ <br/>
+  _**Unique**: Each Netdata can scale to multi-million samples/s with reasonable resources utilization._
+  
+- **Complete End-to-End Visibility**
+
+  From infrastructure to applications, logs to metrics, hardware to databases, all in one solution.
+
+  _**Unique**: Netdata is built to simplify your operations, empower your team, provide clarity and eliminate silos._
+  
+- **Edge-Based**
+
+  All processing and storage of your data, at your premises, as close to the edge as possible.
+
+  _**Unique**: Instead of centralizing observability data, Netdata distributes the code. This provides higher processing capacity by utilizing resources that are usually available and spare, while eliminating most of the cost involved for metrics and logs management._
 
 ---
 
@@ -59,7 +116,7 @@ This three-part architecture enables Netdata to scale seamlessly from single-nod
 | Component     | Description                                                                                                                                                                                                                                                                                                                            | License                                         |
 |---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
 | Netdata Agent | • The heart of Netdata's monitoring capabilities<br/>• Handles data collection, storage, querying, ML analysis, exports, and alerts<br/>• Runs on physical/virtual servers, cloud, Kubernetes, and IoT devices<br/>• Optimized for zero production impact<br/>• Core of all observability features                                     | [GPL v3+](https://www.gnu.org/licenses/gpl-3.0) |
-| Netdata Cloud | • Adds enterprise-grade features:<br/>  &emsp; - User management and RBAC<br/>  &emsp; - Horizontal scalability<br/>  &emsp; - Centralized alert management<br/> &emsp;  - Access your infrastructure from anywhere<br/>• Available as SaaS or on-premises<br/>• Includes free community tier<br/>• Does not centralize metric storage |                                                 |
+| Netdata Cloud | • Adds enterprise-grade features<br/>&nbsp;(user management and RBAC, horizontal scalability,<br/>&nbsp; centralized alert management, access from anywhere)<br/>• Available as SaaS or on-premises<br/>• Includes free community tier<br/>• Does not centralize metric storage |                                                 |
 | Netdata UI    | • Powers all dashboards and visualizations<br/>• Free to use with both Agent and Cloud<br/>• Included in standard Netdata packages<br/>• Latest version available via CDN                                                                                                                                                              | [NCUL1](https://app.netdata.cloud/LICENSE.txt)  |
 
 ### Key capabilities of the Netdata Agent
@@ -99,7 +156,7 @@ Netdata monitors all the following:
 |                              **Cloud Provider Infrastructure**<small><br/>AWS, GCP, Azure, and more</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
 |                       **Custom Applications**<small><br/>OpenMetrics, StatsD and soon OpenTelemetry</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
 
-When the Netdata Agent runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies and offers full **enterprise hardware** coverage, monitoring all components that provide hardware error reporting, like PCI AER, RAM EDAC, IPMI, S.M.A.R.T., NVMe, Fans, Power, Voltages, and more.
+When operating on Linux, the Netdata Agent continuously monitors every available kernel feature and all hardware sensors for errors. This covers Intel, AMD, and Nvidia GPUs, PCI Advanced Error Reporting (PCI AER), RAM Error Detection and Correction (RAM EDAC), Intelligent Platform Management Interface (IPMI), S.M.A.R.T. for disks, Intel Running Average Power Limit (Intel RAPL), NVMe disks, as well as fans, power supplies, voltage readings, and more.
 
 ---
 
@@ -126,7 +183,7 @@ The study didn’t normalize the results based on the number of metrics collecte
 
 ---
 
-### Netdata vs Prometheus
+### Netdata vs Prometheus 2025 Review
 
 <p align="center">
 <a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis#gh-light-mode-only">
@@ -137,7 +194,7 @@ The study didn’t normalize the results based on the number of metrics collecte
 </a>
 </p>
 
-On the same workload, Netdata uses **1/3rd less CPU**, consumes **1/8th of the RAM**, performes **31 times less disk I/O**, stores **40 times more data**, while being **22 times faster** in query responses! [Read the full 2025 review in our blog](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/).
+NEW! On the same workload, Netdata uses **1/3rd less CPU**, consumes **1/8th of the RAM**, performes **31 times less disk I/O** and stores **40 times more data** while being up to **22 times faster** in query responses! [Read the full 2025 review in our blog](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/).
 
 ---
 
@@ -187,13 +244,14 @@ On the same workload, Netdata uses **1/3rd less CPU**, consumes **1/8th of the R
 
 ### 1. **Install Netdata everywhere** :v:
 
-Netdata can be installed on all Linux, macOS, FreeBSD (and soon on Windows) systems. We provide binary packages for the most popular operating systems and package managers.
+Netdata can be installed on all Linux, macOS, FreeBSD and Windows systems. We provide binary packages for the most popular operating systems and package managers.
 
 - Install on [Ubuntu, Debian CentOS, Fedora, Suse, Red Hat, Arch, Alpine, Gentoo, even BusyBox](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
 - Install with [Docker](/packaging/docker/README.md).<br/>
   Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
 - Install on [macOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
 - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
+- Install on [Windows](https://learn.netdata.cloud/docs/netdata-agent/installation/windows).
 - Install [from source](https://learn.netdata.cloud/docs/installing/build-the-netdata-agent-yourself/compile-from-source-code) ![github downloads](https://img.shields.io/github/downloads/netdata/netdata/total?color=success&logo=github)
 - For Kubernetes deployments [check here](https://learn.netdata.cloud/docs/installation/install-on-specific-environments/kubernetes/).
 
@@ -209,7 +267,6 @@ _Note: the binary packages we provide, install Netdata UI automatically. Netdata
 Netdata auto-detects and auto-discovers most operating system data sources and applications. However, many data sources require some manual configuration, usually to allow Netdata to get access to the metrics.
 
 - For a detailed list of the 800+ collectors available, check [this guide](https://learn.netdata.cloud/docs/data-collection/).
-- To monitor Windows servers and applications, use [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/system-metrics/windows-machines).<br/><small>Note that Netdata on Windows is at its final release stage, so at the next Netdata release Netdata will natively support Windows.</small>
 - To monitor SNMP devices, check [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/networking/snmp).
 
 ### 3. **Configure Alert Notifications** :bell:

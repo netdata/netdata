@@ -17,4 +17,3 @@ tls_cert: "ok"
 tls_key: "ok"
 tls_skip_verify: yes
 force_http2: yes
-setup_vars_path: "ok"

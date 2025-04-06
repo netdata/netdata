@@ -34,19 +34,7 @@ printf "MESSAGE=hey, this is error\nPRIORITY=3\n\n" | systemd-cat-native
 The result:
 ![image](https://github.com/netdata/netdata/assets/2662304/faf3eaa5-ac56-415b-9de8-16e6ceed9280)
 
-Sending multi-line log entries (in this example we replace the text `--NEWLINE--` with a newline in the log entry):
-
-```bash
-printf "MESSAGE=hello--NEWLINE--world\nPRIORITY=6\n\n" | systemd-cat-native --newline='--NEWLINE--'
-```
-
-The result:
-
-![image](https://github.com/netdata/netdata/assets/2662304/d6037b4a-87da-4693-ae67-e07df0decdd9)
-
-
-Processing the standard `\n` string can be tricky due to shell escaping. This works, but note that
-we have to add a lot of backslashes to printf.
+The program supports multi-line processing for all fields. The default newline sequence is `\n`.
 
 ```bash
 printf "MESSAGE=hello\\\\nworld\nPRIORITY=6\n\n" | systemd-cat-native --newline='\n'
@@ -60,6 +48,17 @@ MESSAGE=hello\nworld
 PRIORITY=6
 
 ```
+
+It also allows changing the newline sequence. In this example we replace the text `--NEWLINE--` with a newline in the log entry:
+
+```bash
+printf "MESSAGE=hello--NEWLINE--world\nPRIORITY=6\n\n" | systemd-cat-native --newline='--NEWLINE--'
+```
+
+The result:
+
+![image](https://github.com/netdata/netdata/assets/2662304/d6037b4a-87da-4693-ae67-e07df0decdd9)
+
 
 ## Best practices
 

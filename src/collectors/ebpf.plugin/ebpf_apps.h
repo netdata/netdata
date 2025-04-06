@@ -4,7 +4,7 @@
 #define NETDATA_EBPF_APPS_H 1
 
 #include "libnetdata/libnetdata.h"
-#include "collectors/collectors-ipc/collectors-ipc.h"
+#include "collectors/collectors-ipc/ebpf-ipc.h"
 #include "libbpf_api/ebpf.h"
 
 #define NETDATA_APPS_FAMILY "apps"
@@ -32,6 +32,8 @@
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"
 #include "ebpf_vfs.h"
+
+#include "ebpf_socket_ipc.h"
 
 #define EBPF_MAX_COMPARE_NAME 95
 #define EBPF_MAX_NAME 100
@@ -68,22 +70,6 @@ enum ebpf_main_index {
     EBPF_OPTION_CORE,
     EBPF_OPTION_UNITTEST
 };
-
-// ----------------------------------------------------------------------------
-// Structures used to read information from kernel ring
-
-typedef struct __attribute__((packed)) ebpf_publish_process {
-    uint64_t ct;
-
-    //Counter
-    uint32_t exit_call;
-    uint32_t release_call;
-    uint32_t create_process;
-    uint32_t create_thread;
-
-    //Counter
-    uint32_t task_err;
-} ebpf_publish_process_t;
 
 // ----------------------------------------------------------------------------
 // pid_stat
@@ -168,102 +154,6 @@ extern ebpf_pid_data_t *ebpf_pids_link_list;
 extern size_t ebpf_all_pids_count;
 extern size_t ebpf_hash_table_pids_count;
 void ebpf_del_pid_entry(pid_t pid);
-
-static inline void *ebpf_cachestat_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_cachestat_t));
-}
-
-static inline void ebpf_cachestat_release_publish(netdata_publish_cachestat_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_dcallocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_dcstat_t));
-}
-
-static inline void ebpf_dc_release_publish(netdata_publish_dcstat_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_fd_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_fd_stat_t));
-}
-
-static inline void ebpf_fd_release_publish(netdata_publish_fd_stat_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_shm_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_shm_t));
-}
-
-static inline void ebpf_shm_release_publish(netdata_publish_shm_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_socket_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(ebpf_socket_publish_apps_t));
-}
-
-static inline void ebpf_socket_release_publish(ebpf_socket_publish_apps_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_swap_allocate_publish_swap()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_swap_t));
-}
-
-static inline void ebpf_swap_release_publish(netdata_publish_swap_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_vfs_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_vfs_t));
-}
-
-static inline void ebpf_vfs_release_publish(netdata_publish_vfs_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_process_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(ebpf_publish_process_t));
-}
-
-static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
 
 ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid);
 

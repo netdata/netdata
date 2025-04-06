@@ -819,35 +819,43 @@ stop_all_netdata() {
     if [ -n "${NETDATA_STOP_CMD}" ]; then
       if ${NETDATA_STOP_CMD}; then
         stop_success=1
-        sleep 5
       fi
     elif issystemd; then
       if systemctl stop netdata; then
         stop_success=1
-        sleep 5
       fi
     elif [ "${uname}" = "Darwin" ]; then
       if launchctl stop netdata; then
         stop_success=1
-        sleep 5
       fi
     elif [ "${uname}" = "FreeBSD" ]; then
       if /etc/rc.d/netdata stop; then
         stop_success=1
-        sleep 5
       fi
     else
       if service netdata stop; then
         stop_success=1
-        sleep 5
       fi
+    fi
+  fi
+
+  if [ "${stop_success}" = "1" ]; then
+    sleep 30
+
+    if [ -n "$(netdata_pids)" ]; then
+      stop_success=0
     fi
   fi
 
   if [ "$stop_success" = "0" ]; then
     if [ -n "$(netdata_pids)" ] && [ -n "$(command -v netdatacli)" ]; then
-      netdatacli shutdown-agent
-      sleep 20
+      for p in /tmp/netdata-ipc /run/netdata/netdata.pipe /var/run/netdata/netdata.pipe /tmp/netdata/netdata.pipe; do
+        if [ -f "${p}" ]; then
+          NETDATA_PIPENAME="${p}" netdatacli shutdown-agent && break
+        fi
+      done
+
+      sleep 30
     fi
 
     for p in $(netdata_pids); do
@@ -1057,6 +1065,8 @@ portable_add_user() {
       run dscl . create /Users/"${username}" IsHidden 1
       return 0
     fi
+  elif command -v synouser 1> /dev/null 2>&1; then
+    run synouser -add "${username}" "" "netdata agent" 0 "" 0 && return 0
   fi
 
   warning "Failed to add ${username} user account!"
@@ -1084,6 +1094,8 @@ portable_add_group() {
     run addgroup "${groupname}" && return 0
   elif command -v dseditgroup 1> /dev/null 2>&1; then
     dseditgroup -o create "${groupname}" && return 0
+  elif command -v synogroup 1> /dev/null 2>&1; then
+    run synogroup --add "${groupname}" && return 0
   fi
 
   warning >&2 "Failed to add ${groupname} user group !"
@@ -1119,6 +1131,21 @@ portable_add_user_to_group() {
       run addgroup "${username}" "${groupname}" && return 0
     elif command -v dseditgroup 1> /dev/null 2>&1; then
       dseditgroup -u "${username}" "${groupname}" && return 0
+    elif command -v synogroup 1> /dev/null 2>&1; then
+      # Get current members of the group
+      current_members_list=$(synogroup --get "${groupname}" | grep '^[0-9]')
+      current_members=$(echo "${current_members_list}" | grep -oP '\[\K[^\]]+' | tr '\n' ' ' | sed 's/ $//')
+
+      # Append username to the list
+      if [ -n "$current_members" ]; then
+        new_members="${current_members} ${username}"
+      else
+        new_members="${username}"
+      fi
+
+      # Set the member list
+      # shellcheck disable=SC2086
+      run synogroup --member "${groupname}" ${new_members} && return 0
     fi
 
     warning >&2 "Failed to add user ${username} to group ${groupname}!"

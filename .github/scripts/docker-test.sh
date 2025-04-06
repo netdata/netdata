@@ -20,6 +20,7 @@ docker run -d --name=netdata \
            -v /etc/os-release:/host/etc/os-release:ro \
            --cap-add SYS_PTRACE \
            --security-opt apparmor=unconfined \
+           -e DISABLE_TELEMETRY=1 \
            netdata/netdata:test
 
 if ! "${SCRIPT_DIR}/../../packaging/runtime-check.sh"; then

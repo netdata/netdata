@@ -8,7 +8,7 @@ static BUFFER *preferred_sender_buffer(RRDHOST *host) {
     if(host->stream.snd.commit.receiver_tid == gettid_cached())
         return sender_host_buffer(host);
     else
-        return sender_thread_buffer(host->sender);
+        return sender_thread_buffer(host->sender, HOST_THREAD_BUFFER_INITIAL_SIZE);
 }
 
 ALWAYS_INLINE RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t wall_clock_time) {

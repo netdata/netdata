@@ -113,7 +113,7 @@ func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile, in ch
 	}
 
 	if cfg.Disabled {
-		d.Infof("pipeline config is disabled '%s' (%s)", cfg.Name, cfg.Source)
+		d.Infof("pipeline config is disabled '%s' (%s)", cfg.Name, conf.source)
 		return
 	}
 

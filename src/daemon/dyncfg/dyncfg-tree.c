@@ -17,7 +17,7 @@ static int dyncfg_tree_compar(const void *a, const void *b) {
     return rc;
 }
 
-static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
+static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb, bool anonymous) {
     buffer_json_member_add_object(wb, id);
     {
         buffer_json_member_add_string(wb, "type", dyncfg_id2type(df->type));
@@ -34,7 +34,7 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
         }
         buffer_json_object_close(wb);
         buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(df->current.source_type));
-        buffer_json_member_add_string(wb, "source", string2str(df->current.source));
+        buffer_json_member_add_string(wb, "source", df->current.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && anonymous ? "User details hidden in anonymous mode. Sign in to access configuration details." : string2str(df->current.source));
         buffer_json_member_add_boolean(wb, "sync", df->sync);
         buffer_json_member_add_boolean(wb, "user_disabled", df->dyncfg.user_disabled);
         buffer_json_member_add_boolean(wb, "restart_required", df->dyncfg.restart_required);
@@ -45,7 +45,7 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
                 buffer_json_member_add_boolean(wb, "available", true);
                 buffer_json_member_add_string(wb, "status", dyncfg_id2status(df->dyncfg.status));
                 buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(df->dyncfg.source_type));
-                buffer_json_member_add_string(wb, "source", string2str(df->dyncfg.source));
+                buffer_json_member_add_string(wb, "source", df->dyncfg.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && anonymous ? "User details hidden in anonymous mode. Sign in to access configuration details." :string2str(df->dyncfg.source));
                 buffer_json_member_add_uint64(wb, "created_ut", df->dyncfg.created_ut);
                 buffer_json_member_add_uint64(wb, "modified_ut", df->dyncfg.modified_ut);
                 buffer_json_member_add_string(wb, "content_type", content_type_id2string(df->dyncfg.payload->content_type));
@@ -61,7 +61,7 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
     buffer_json_object_close(wb);
 }
 
-static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, const char *id) {
+static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, const char *id, bool anonymous) {
     size_t entries = dictionary_entries(dyncfg_globals.nodes);
     size_t used = 0;
     const DICTIONARY_ITEM *items[entries];
@@ -112,7 +112,7 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
                 buffer_json_member_add_object(wb, string2str(last_path));
             }
 
-            dyncfg_to_json(df, dictionary_acquired_item_name(items[i]), wb);
+            dyncfg_to_json(df, dictionary_acquired_item_name(items[i]), wb, anonymous);
 
             if (df->dyncfg.plugin_rejected)
                 plugin_rejected++;
@@ -195,7 +195,7 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
         }
 
         code = HTTP_RESP_OK;
-        dyncfg_tree_for_host(host, rfe->result.wb, path, id);
+        dyncfg_tree_for_host(host, rfe->result.wb, path, id, !(rfe->user_access & HTTP_ACCESS_SENSITIVE_DATA));
     }
     else {
         const char *name = id;

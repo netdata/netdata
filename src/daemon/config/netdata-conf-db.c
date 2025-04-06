@@ -12,8 +12,10 @@ static size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = {1, 60, 60,
 static time_t storage_tiers_retention_time_s[RRD_STORAGE_TIERS] = {14 * DAYS, 90 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS};
 
 time_t rrdset_free_obsolete_time_s = 3600;
-time_t rrdhost_free_orphan_time_s = 3600;
-time_t rrdhost_free_ephemeral_time_s = 86400;
+time_t rrdhost_cleanup_orphan_to_archive_time_s = 3600;
+time_t rrdhost_free_ephemeral_time_s = 0;
+
+extern time_t dbengine_journal_v2_unmount_time;
 
 size_t get_tier_grouping(size_t tier) {
     if(unlikely(tier >= nd_profile.storage_tiers)) tier = nd_profile.storage_tiers - 1;
@@ -27,9 +29,7 @@ size_t get_tier_grouping(size_t tier) {
 }
 
 static void netdata_conf_dbengine_pre_logs(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     errno_clear();
 
@@ -143,7 +143,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
 
     dbengine_out_of_memory_protection = 0; // will be calculated below
     OS_SYSTEM_MEMORY sm = os_system_memory(true);
-    if(sm.ram_total_bytes && sm.ram_available_bytes && sm.ram_total_bytes > sm.ram_available_bytes) {
+    if(OS_SYSTEM_MEMORY_OK(sm) && sm.ram_total_bytes > sm.ram_available_bytes) {
         // calculate the default out of memory protection size
         uint64_t keep_free = sm.ram_total_bytes / 10;
         if(keep_free > 5ULL * 1024 * 1024 * 1024)
@@ -179,6 +179,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
     // ----------------------------------------------------------------------------------------------------------------
 
     dbengine_use_direct_io = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine use direct io", dbengine_use_direct_io);
+    dbengine_journal_v2_unmount_time = inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "dbengine journal v2 unmount time", nd_profile.dbengine_journal_v2_unmount_time);
 
     unsigned read_num = (unsigned)inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", DEFAULT_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= DEFAULT_PAGES_PER_EXTENT)
@@ -340,14 +341,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
 }
 
 void netdata_conf_section_db(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
-
-    // ------------------------------------------------------------------------
-
-    rrdhost_free_orphan_time_s =
-        inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_free_orphan_time_s);
+    FUNCTION_RUN_ONCE();
 
     // ------------------------------------------------------------------------
     // get default database update frequency
@@ -404,16 +398,27 @@ void netdata_conf_section_db(void) {
 
     // --------------------------------------------------------------------
 
+    rrdhost_cleanup_orphan_to_archive_time_s =
+        inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_cleanup_orphan_to_archive_time_s);
+    if(rrdhost_cleanup_orphan_to_archive_time_s < 10) {
+        rrdhost_cleanup_orphan_to_archive_time_s = 10;
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_cleanup_orphan_to_archive_time_s);
+    }
+
     rrdhost_free_ephemeral_time_s =
         inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup ephemeral hosts after", rrdhost_free_ephemeral_time_s);
+    if(rrdhost_free_ephemeral_time_s && rrdhost_free_ephemeral_time_s < rrdhost_cleanup_orphan_to_archive_time_s) {
+        // the free ephemeral time cannot be less than the cleanup orphan time
+        rrdhost_free_ephemeral_time_s = rrdhost_cleanup_orphan_to_archive_time_s;
+        inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup ephemeral hosts after", rrdhost_free_ephemeral_time_s);
+    }
 
     rrdset_free_obsolete_time_s =
         inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
-
-    // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
-    // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
-    // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
     if (rrdset_free_obsolete_time_s < 10) {
+        // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
+        // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
+        // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
         rrdset_free_obsolete_time_s = 10;
         netdata_log_info("The \"cleanup obsolete charts after\" option was set to 10 seconds.");
         inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);

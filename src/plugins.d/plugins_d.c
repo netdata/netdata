@@ -57,28 +57,6 @@ static inline bool plugin_is_running(struct plugind *cd) {
     return ret;
 }
 
-static void pluginsd_worker_thread_cleanup(void *pptr) {
-    struct plugind *cd = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!cd) return;
-
-    worker_unregister();
-
-    spinlock_lock(&cd->unsafe.spinlock);
-
-    cd->unsafe.running = false;
-    cd->unsafe.thread = 0;
-
-    cd->unsafe.pid = 0;
-
-    POPEN_INSTANCE *pi = cd->unsafe.pi;
-    cd->unsafe.pi = NULL;
-
-    spinlock_unlock(&cd->unsafe.spinlock);
-
-    if (pi)
-        spawn_popen_kill(pi, 3 * MSEC_PER_SEC);
-}
-
 #define SERIAL_FAILURES_THRESHOLD 10
 static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
     if (likely(cd->successful_collections)) {
@@ -143,7 +121,6 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
 
 static void *pluginsd_worker_thread(void *arg) {
     struct plugind *cd = (struct plugind *) arg;
-    CLEANUP_FUNCTION_REGISTER(pluginsd_worker_thread_cleanup) cleanup_ptr = cd;
 
     worker_register("PLUGINSD");
 
@@ -203,6 +180,22 @@ static void *pluginsd_worker_thread(void *arg) {
         if(unlikely(!plugin_is_enabled(cd)))
             break;
     }
+
+    spinlock_lock(&cd->unsafe.spinlock);
+
+    cd->unsafe.running = false;
+    cd->unsafe.thread = 0;
+    cd->unsafe.pid = 0;
+
+    POPEN_INSTANCE *pi = cd->unsafe.pi;
+    cd->unsafe.pi = NULL;
+
+    spinlock_unlock(&cd->unsafe.spinlock);
+
+    if (pi)
+        spawn_popen_kill(pi, 3 * MSEC_PER_SEC);
+
+    worker_unregister();
     return NULL;
 }
 

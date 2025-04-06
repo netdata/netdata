@@ -39,6 +39,7 @@ enum event_loop_job {
     UV_EVENT_DBENGINE_EVICT_OPEN_CACHE,
     UV_EVENT_DBENGINE_EVICT_EXTENT_CACHE,
     UV_EVENT_DBENGINE_BUFFERS_CLEANUP,
+    UV_EVENT_DBENGINE_FLUSH_DIRTY,
     UV_EVENT_DBENGINE_QUIESCE,
     UV_EVENT_DBENGINE_SHUTDOWN,
 
@@ -53,6 +54,7 @@ enum event_loop_job {
     UV_EVENT_STORE_CHART,
     UV_EVENT_STORE_DIMENSION,
     UV_EVENT_STORE_ALERT_TRANSITIONS,
+    UV_EVENT_STORE_SQL_STATEMENTS,
     UV_EVENT_HEALTH_LOG_CLEANUP,
     UV_EVENT_CHART_LABEL_CLEANUP,
     UV_EVENT_UUID_DELETION,
@@ -86,5 +88,7 @@ enum event_loop_job {
 };
 
 void register_libuv_worker_jobs();
+int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries);
+void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused);
 
 #endif //NETDATA_EVENT_LOOP_H

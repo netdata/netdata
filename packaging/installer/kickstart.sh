@@ -20,8 +20,8 @@ KICKSTART_SOURCE="$(
     echo "$(pwd -P)/${self##*/}"
 )"
 DEFAULT_PLUGIN_PACKAGES=""
-REPOCONFIG_DEB_VERSION="4-1"
-REPOCONFIG_RPM_VERSION="4-1"
+REPOCONFIG_DEB_VERSION="5-1"
+REPOCONFIG_RPM_VERSION="5-1"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l armv6l aarch64 ppc64le"
 
@@ -205,6 +205,7 @@ USAGE: kickstart.sh [options]
   --local-build-options            Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
   --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
   --offline-architecture           Limit an offline install source being prepared with --prepare-offline-install-source to only include the specified static build architecture.
+  --offline-install-source         Specify a folder to use as installation source when working offline. Use --prepare-offline-install-source first to set up this folder.
 
 The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
 
@@ -431,8 +432,8 @@ support_list() {
 }
 
 success_banner() {
-  printf >&2 "%s\n" "To view your system's real-time performance metrics, open your web browser and enter http://NODE:19999."
-  printf >&2 "%s\n\n" "Replace NODE with the IP address or hostname of your Netdata server to access the dashboard."
+  printf >&2 "%s\n" "To view the dashboard, open your web browser and enter http://NODE:19999."
+  printf >&2 "%s\n\n" "Replace NODE with the IP address or hostname of your Netdata server."
 
   printf >&2 "%s\n\n" "Official documentation can be found online at ${DOCS_URL}."
 
@@ -811,6 +812,11 @@ get_system_info() {
           DISTRO_COMPAT_NAME="${DISTRO}"
       else
           case "${DISTRO}" in
+          raspbian)
+              if [ "$SYSARCH" = "armv7l" ] || [ "$SYSARCH" = "aarch64" ]; then
+                DISTRO_COMPAT_NAME="debian"
+              fi
+              ;;
           opensuse-leap)
               DISTRO_COMPAT_NAME="opensuse"
               ;;
@@ -1515,7 +1521,22 @@ check_special_native_deps() {
   if [ "${DISTRO_COMPAT_NAME}" = "centos" ] && [ "${SYSVERSION}" -gt 6 ]; then
     progress "EPEL is required on this system, checking if it’s available."
 
-    if LC_ALL=C ${pm_cmd} search --nogpgcheck -v epel-release | grep -q "No matches found"; then
+    if [ "${SYSVERSION}" -ge 9 ]; then
+      progress "EPEL support requires CodeReady Builder repo on this system, attempting to enable it."
+
+      case "${DISTRO}" in
+        rhel) run_as_root subscription-manager repos --enable "codeready-builder-for-rhel-${SYSVERSION}-$(arch)-rpms" ;;
+        *) run_as_root dnf config-manager --set-enabled crb ;;
+      esac
+    fi
+
+    if [ "${DISTRO}" = "rhel" ]; then
+      # shellcheck disable=SC2086
+      if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "https://dl.fedoraproject.org/pub/epel/epel-release-latest-${SYSVERSION}.noarch.rpm"; then
+        warning "Failed to install EPEL, even though it is required to install native packages on this system."
+        return 1
+      fi
+    elif LC_ALL=C ${pm_cmd} search --nogpgcheck -v epel-release | grep -q "No matches found"; then
       warning "Unable to find a suitable source for libuv, cannot install using native packages on this system."
       return 1
     else

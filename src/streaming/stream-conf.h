@@ -58,7 +58,6 @@ extern struct _stream_receive stream_receive;
 
 struct stream_receiver_config {
     RRD_DB_MODE mode;
-    bool ephemeral;
     int history;
     int update_every;
 

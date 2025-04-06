@@ -171,10 +171,11 @@ void function_processes(const char *transaction, char *function,
     buffer_json_member_add_time_t(wb, "update_every", update_every);
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION);
-    buffer_json_member_add_array(wb, "data");
 
     if(info)
         goto close_and_send;
+
+    buffer_json_member_add_array(wb, "data");
 
     uint64_t cpu_divisor = NSEC_PER_SEC / 100;
     unsigned int memory_divisor = 1024 * 1024;

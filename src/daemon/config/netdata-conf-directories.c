@@ -10,9 +10,7 @@ static const char *get_varlib_subdir_from_config(const char *prefix, const char 
 }
 
 void netdata_conf_section_directories(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     // ------------------------------------------------------------------------
     // get system paths
@@ -24,7 +22,6 @@ void netdata_conf_section_directories(void) {
     netdata_configured_cache_dir        = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "cache",        netdata_configured_cache_dir);
     netdata_configured_varlib_dir       = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "lib",          netdata_configured_varlib_dir);
 
-    netdata_configured_lock_dir = get_varlib_subdir_from_config(netdata_configured_varlib_dir, "lock");
     netdata_configured_cloud_dir = get_varlib_subdir_from_config(netdata_configured_varlib_dir, "cloud.d");
 
     pluginsd_initialize_plugin_directories();

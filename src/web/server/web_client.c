@@ -457,7 +457,7 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, w, &is_dir)) {
         w->response.data->content_type = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
-        buffer_strcat_htmlescape(w->response.data, web_filename);
+        buffer_strcat_htmlescape(w->response.data, filename);
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -488,14 +488,14 @@ static int web_server_static_file(struct web_client *w, char *filename) {
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
             buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
-            buffer_strcat_htmlescape(w->response.data, web_filename);
+            buffer_strcat_htmlescape(w->response.data, filename);
             return HTTP_RESP_REDIR_TEMP;
         }
         else {
             netdata_log_error("%llu: Cannot open file '%s'.", w->id, web_filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Cannot open file: ");
-            buffer_strcat_htmlescape(w->response.data, web_filename);
+            buffer_strcat_htmlescape(w->response.data, filename);
             return HTTP_RESP_NOT_FOUND;
         }
     }
@@ -987,19 +987,19 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         netdata_log_debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, tok);
 
         if(nodeid) {
-            host = find_host_by_node_id(tok);
-            if(!host) {
-                host = rrdhost_find_by_hostname(tok);
-                if (!host)
-                    host = rrdhost_find_by_guid(tok);
-            }
-        }
-        else {
-            host = rrdhost_find_by_hostname(tok);
+            host = rrdhost_find_by_node_id(tok);
             if(!host) {
                 host = rrdhost_find_by_guid(tok);
                 if (!host)
-                    host = find_host_by_node_id(tok);
+                    host = rrdhost_find_by_hostname(tok);
+            }
+        }
+        else {
+            host = rrdhost_find_by_guid(tok);
+            if(!host) {
+                host = rrdhost_find_by_node_id(tok);
+                if (!host)
+                    host = rrdhost_find_by_hostname(tok);
             }
         }
 
@@ -1185,13 +1185,13 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             w->response.data->content_type = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
 
-            if(!netdata_exit)
+            if(!exit_initiated_get())
                 buffer_strcat(w->response.data, "ok, will do...");
             else
                 buffer_strcat(w->response.data, "I am doing it already");
 
             netdata_log_error("web request to exit received.");
-            netdata_cleanup_and_exit(0, NULL, NULL, NULL);
+            netdata_exit_gracefully(EXIT_REASON_API_QUIT, true);
             return HTTP_RESP_OK;
         }
         else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {

@@ -175,9 +175,10 @@ PGC *pgc_create(const char *name,
                 PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page);
 
 // destroy the cache
-void pgc_destroy(PGC *cache);
+void pgc_destroy(PGC *cache, bool flush);
 
 #define PGC_SECTION_ALL ((Word_t)0)
+void pgc_flush_dirty_pages(PGC *cache, Word_t section);
 void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section);
 
 // add a page to the cache and return a pointer to it
@@ -226,7 +227,7 @@ int64_t pgc_get_wanted_cache_size(PGC *cache);
 void pgc_page_hot_set_end_time_s(PGC *cache, PGC_PAGE *page, time_t end_time_s, size_t additional_bytes);
 bool pgc_page_to_clean_evict_or_release(PGC *cache, PGC_PAGE *page);
 
-typedef void (*migrate_to_v2_callback)(Word_t section, unsigned datafile_fileno, uint8_t type, Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos, size_t count_of_unique_extents, size_t count_of_unique_metrics, size_t count_of_unique_pages, void *data);
+typedef bool (*migrate_to_v2_callback)(Word_t section, unsigned datafile_fileno, uint8_t type, Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos, size_t count_of_unique_extents, size_t count_of_unique_metrics, size_t count_of_unique_pages, void *data);
 void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data);
 void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile);
 size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);

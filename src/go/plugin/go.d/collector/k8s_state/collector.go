@@ -31,7 +31,7 @@ func init() {
 
 func New() *Collector {
 	return &Collector{
-		initDelay:     time.Second * 3,
+		initDelay:     time.Second * 10,
 		newKubeClient: newKubeClient,
 		charts:        baseCharts.Copy(),
 		once:          &sync.Once{},

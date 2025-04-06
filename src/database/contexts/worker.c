@@ -14,6 +14,8 @@ static struct {
     .active_vs_archived_percentage = 50,
 };
 
+static void rrdcontext_dequeue_from_hub_queue(RRDCONTEXT *rc);
+
 static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused);
@@ -696,6 +698,7 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 
         if(extreme_cardinality.enabled &&
             extreme_cardinality.db_rotations &&
+            instances_active &&
             instances_no_tier0 >= extreme_cardinality.instances_count) {
             size_t percent = (100 * instances_no_tier0 / instances_active);
             if(percent >= extreme_cardinality.active_vs_archived_percentage) {
@@ -851,6 +854,7 @@ void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc) {
 }
 
 void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc) {
+    rrdcontext_dequeue_from_hub_queue(rc);
     rrdcontext_dequeue_from_post_processing(rc);
     dictionary_del(host->rrdctx.contexts, string2str(rc->id));
 }
@@ -1197,6 +1201,11 @@ void *rrdcontext_main(void *ptr) {
 
             if(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
                 continue;
+
+            if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION)) {
+                rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, false);
+                rrdhost_flag_clear(host, RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION);
+            }
 
             worker_is_busy(WORKER_JOB_HOSTS);
 

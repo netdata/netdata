@@ -150,7 +150,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
     uint32_t replicating_instances = UINT32_MAX;
 
     time_t since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
-    STREAM_HANDSHAKE reason = (online) ? STREAM_HANDSHAKE_NEVER : host->stream.rcv.status.exit_reason;
+    STREAM_HANDSHAKE reason = host->stream.rcv.status.reason;
 
     if (online) {
         if (db_status == RRDHOST_DB_STATUS_INITIALIZING)
@@ -169,7 +169,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             status = RRDHOST_INGEST_STATUS_ONLINE;
     }
     else {
-        if(!since)
+        if(!host->stream.rcv.status.connections)
             status = RRDHOST_INGEST_STATUS_ARCHIVED;
         else
             status = RRDHOST_INGEST_STATUS_OFFLINE;
@@ -247,7 +247,6 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
 
         if (rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED)) {
             s->stream.hops = host->sender->hops;
-            s->stream.reason = STREAM_HANDSHAKE_NEVER;
             s->stream.capabilities = host->sender->capabilities;
 
             s->stream.replication.completion = rrdhost_sender_replication_completion_unsafe(host, now, &s->stream.replication.instances);
@@ -263,8 +262,8 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
         else {
             s->stream.status = RRDHOST_STREAM_STATUS_OFFLINE;
             s->stream.hops = (int16_t)(s->ingest.hops + 1);
-            s->stream.reason = host->sender->exit.reason;
         }
+        s->stream.reason = host->stream.snd.status.reason;
 
         stream_sender_unlock(host->sender);
     }

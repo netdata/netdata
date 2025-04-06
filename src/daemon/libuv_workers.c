@@ -3,14 +3,8 @@
 #include <daemon/main.h>
 #include "libuv_workers.h"
 
-// Register workers
-void register_libuv_worker_jobs() {
-    static __thread bool registered = false;
-
-    if(likely(registered))
-        return;
-
-    registered = true;
+static void register_libuv_worker_jobs_internal(void) {
+    signals_block_all_except_deadly();
 
     worker_register("LIBUV");
 
@@ -47,6 +41,7 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_DBENGINE_EVICT_OPEN_CACHE, "evict open");
     worker_register_job_name(UV_EVENT_DBENGINE_EVICT_EXTENT_CACHE, "evict extent");
     worker_register_job_name(UV_EVENT_DBENGINE_BUFFERS_CLEANUP, "dbengine buffers cleanup");
+    worker_register_job_name(UV_EVENT_DBENGINE_FLUSH_DIRTY, "dbengine flush dirty");
     worker_register_job_name(UV_EVENT_DBENGINE_QUIESCE, "dbengine quiesce");
     worker_register_job_name(UV_EVENT_DBENGINE_SHUTDOWN, "dbengine shutdown");
 
@@ -58,6 +53,7 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_CTX_CLEANUP_SCHEDULE, "metadata ctx cleanup schedule");
     worker_register_job_name(UV_EVENT_CTX_CLEANUP, "metadata ctx cleanup");
     worker_register_job_name(UV_EVENT_STORE_ALERT_TRANSITIONS, "metadata store alert transitions");
+    worker_register_job_name(UV_EVENT_STORE_SQL_STATEMENTS, "metadata store sql statements");
     worker_register_job_name(UV_EVENT_CHART_LABEL_CLEANUP, "metadata chart label cleanup");
     worker_register_job_name(UV_EVENT_HEALTH_LOG_CLEANUP, "alert transitions cleanup");
     worker_register_job_name(UV_EVENT_UUID_DELETION, "metadata dimension deletion");
@@ -91,10 +87,55 @@ void register_libuv_worker_jobs() {
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
 
+    // make sure we have the right thread id
+    gettid_uncached();
+
     static int workers = 0;
     int worker_id = __atomic_add_fetch(&workers, 1, __ATOMIC_RELAXED);
 
     char buf[NETDATA_THREAD_TAG_MAX + 1];
     snprintfz(buf, NETDATA_THREAD_TAG_MAX, "UV_WORKER[%d]", worker_id);
     uv_thread_set_name_np(buf);
+}
+
+// Register workers
+ALWAYS_INLINE
+void register_libuv_worker_jobs() {
+    static __thread bool registered = false;
+
+    if(likely(registered))
+        return;
+
+    registered = true;
+    register_libuv_worker_jobs_internal();
+}
+
+// utils
+#define MAX_THREAD_CREATE_RETRIES (10)
+#define MAX_THREAD_CREATE_WAIT_MS (1000)
+
+int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries)
+{
+    int err;
+
+    do {
+        err = uv_thread_create(thread, thread_func, arg);
+        if (err == 0)
+            break;
+
+        uv_sleep(MAX_THREAD_CREATE_WAIT_MS);
+    } while (err == UV_EAGAIN && ++(*retries) < MAX_THREAD_CREATE_RETRIES);
+
+    return err;
+}
+
+void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused)
+{
+    // Only close handles that aren't already closing
+    if (!uv_is_closing(handle)) {
+        if (handle->type == UV_TIMER) {
+            uv_timer_stop((uv_timer_t *)handle);
+        }
+        uv_close(handle, NULL);
+    }
 }

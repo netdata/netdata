@@ -752,6 +752,7 @@ void pulse_dbengine_do(bool extended) {
         static RRDDIM *rd_pgc_buffers_epdl = NULL;
         static RRDDIM *rd_pgc_buffers_deol = NULL;
         static RRDDIM *rd_pgc_buffers_pd = NULL;
+        static RRDDIM *rd_pgc_buffers_epdl_extent = NULL;
 
         if (unlikely(!st_pgc_buffers)) {
             st_pgc_buffers = rrdset_create_localhost(
@@ -782,6 +783,7 @@ void pulse_dbengine_do(bool extended) {
             rd_pgc_buffers_xt_buf      = rrddim_add(st_pgc_buffers, "extent buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_epdl        = rrddim_add(st_pgc_buffers, "epdl",           NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_deol        = rrddim_add(st_pgc_buffers, "deol",           NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_epdl_extent = rrddim_add(st_pgc_buffers, "epdl extent",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         priority++;
 
@@ -799,6 +801,7 @@ void pulse_dbengine_do(bool extended) {
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_xt_buf, (collected_number)dbmem.xt_buf);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_epdl, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_EPDL]));
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_deol, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_DEOL]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_epdl_extent, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_EPDL_EXTENT]));
 
         rrdset_done(st_pgc_buffers);
     }

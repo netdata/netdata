@@ -152,6 +152,8 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     }
     rrdset_foreach_done(st);
 
+    dictionary_garbage_collect(host->rrdset_root_index);
+
     if(partial_archives != partial_candidates)
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS);
 
@@ -223,41 +225,45 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
 static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
     worker_is_busy(WORKER_JOB_CLEANUP_ORPHAN_HOSTS);
-    rrd_wrlock();
 
     time_t now = now_realtime_sec();
 
-    RRDHOST *host;
+    rrd_wrlock();
+    RRDHOST *host, *next = localhost;
+    while((host = next) != NULL) {
+        next = host->next;
 
-restart_after_removal:
-    rrdhost_foreach_write(host) {
-        if(!rrdhost_should_be_removed(host, protected_host, now))
+        if(!rrdhost_should_be_cleaned_up(host, protected_host, now))
             continue;
 
-        bool force = false;
-        if (rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST) &&
-            now - host->stream.snd.status.last_connected > rrdhost_free_ephemeral_time_s)
-            force = true;
+        bool delete = rrdhost_free_ephemeral_time_s &&
+                      now - host->stream.rcv.status.last_disconnected > rrdhost_free_ephemeral_time_s &&
+                      rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST);
 
-        bool is_archived = rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED);
-        if (!force && is_archived)
-            continue;
-
-       if (force) {
-            netdata_log_info("Host '%s' with machine guid '%s' is archived, ephemeral clean up.", rrdhost_hostname(host), host->machine_guid);
+        if (!delete && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+            // the node is archived, so the cleanup has already run
+            // however, the node may not have any retention now
+            // so it may still need to be needed
+            time_t from_s = 0, to_s = 0;
+            rrdhost_retention(host, now, rrdhost_is_online(host), &from_s, &to_s);
+            if(!from_s && !to_s)
+                delete = true;
+            else
+                continue;
         }
 
         worker_is_busy(WORKER_JOB_FREE_HOST);
-        // in case we have cloud connection we inform cloud
-        // a child disconnected
-        if (force) {
+
+        if (delete) {
+            netdata_log_info("Host '%s' with machine guid '%s' is archived, ephemeral clean up.", rrdhost_hostname(host), host->machine_guid);
+            // we inform cloud a child has been removed
             aclk_host_state_update(host, 0, 0);
             unregister_node(host->machine_guid);
+            rrdhost_free___while_having_rrd_wrlock(host);
         }
-        rrdhost_free___while_having_rrd_wrlock(host, force);
-        goto restart_after_removal;
+        else
+            rrdhost_cleanup_data_collection_and_health(host);
     }
-
     rrd_wrunlock();
 }
 

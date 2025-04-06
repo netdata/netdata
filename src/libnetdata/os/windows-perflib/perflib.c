@@ -65,6 +65,9 @@ static BOOL getCounterData(
     PERF_COUNTER_DEFINITION* pBaseCounter = NULL;
     BOOL fSuccess = TRUE;
 
+    if(!pCounterDataBlock)
+        return FALSE;
+
     //Point to the raw counter data.
     pData = (PVOID)((LPBYTE)pCounterDataBlock + pCounter->CounterOffset);
 
@@ -236,20 +239,22 @@ static BOOL getCounterData(
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline BOOL isValidPointer(PERF_DATA_BLOCK *pDataBlock __maybe_unused, void *ptr __maybe_unused) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    return (PBYTE)ptr >= (PBYTE)pDataBlock + pDataBlock->TotalByteLength ? FALSE : TRUE;
-#else
-    return TRUE;
-#endif
+ALWAYS_INLINE
+static BOOL isValidPointer(PERF_DATA_BLOCK *pDataBlock, void *ptr) {
+    return
+        !pDataBlock ||
+        (PBYTE)ptr < (PBYTE)pDataBlock ||
+        (PBYTE)ptr >= (PBYTE)pDataBlock + pDataBlock->TotalByteLength ? FALSE : TRUE;
 }
 
-static inline BOOL isValidStructure(PERF_DATA_BLOCK *pDataBlock __maybe_unused, void *ptr __maybe_unused, size_t length __maybe_unused) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    return (PBYTE)ptr + length > (PBYTE)pDataBlock + pDataBlock->TotalByteLength ? FALSE : TRUE;
-#else
-    return TRUE;
-#endif
+ALWAYS_INLINE
+static BOOL isValidStructure(PERF_DATA_BLOCK *pDataBlock, void *ptr, size_t length) {
+    return
+        !pDataBlock ||
+        !length || length > pDataBlock->TotalByteLength ||
+        (PBYTE)ptr < (PBYTE)pDataBlock ||
+        (PBYTE)ptr > (PBYTE)ptr + length || // Check for pointer arithmetic overflow
+        (PBYTE)ptr + length > (PBYTE)pDataBlock + pDataBlock->TotalByteLength ? FALSE : TRUE;
 }
 
 static inline PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer) {
@@ -273,7 +278,8 @@ static inline PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer) {
     return pDataBlock;
 }
 
-static inline PERF_OBJECT_TYPE *getObjectType(PERF_DATA_BLOCK* pDataBlock, PERF_OBJECT_TYPE *lastObjectType) {
+ALWAYS_INLINE
+static PERF_OBJECT_TYPE *getObjectType(PERF_DATA_BLOCK* pDataBlock, PERF_OBJECT_TYPE *lastObjectType) {
     PERF_OBJECT_TYPE* pObjectType = NULL;
 
     if(!lastObjectType)
@@ -282,18 +288,20 @@ static inline PERF_OBJECT_TYPE *getObjectType(PERF_DATA_BLOCK* pDataBlock, PERF_
         pObjectType = (PERF_OBJECT_TYPE *)((PBYTE)lastObjectType + lastObjectType->TotalByteLength);
 
     if(pObjectType && (!isValidPointer(pDataBlock, pObjectType) || !isValidStructure(pDataBlock, pObjectType, pObjectType->TotalByteLength))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "WINDOWS: PERFLIB: Invalid ObjectType!");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid ObjectType!", __FUNCTION__);
         pObjectType = NULL;
     }
 
     return pObjectType;
 }
 
-inline PERF_OBJECT_TYPE *getObjectTypeByIndex(PERF_DATA_BLOCK *pDataBlock, DWORD ObjectNameTitleIndex) {
+ALWAYS_INLINE
+PERF_OBJECT_TYPE *getObjectTypeByIndex(PERF_DATA_BLOCK *pDataBlock, DWORD ObjectNameTitleIndex) {
     PERF_OBJECT_TYPE *po = NULL;
     for(DWORD o = 0; o < pDataBlock->NumObjectTypes ; o++) {
         po = getObjectType(pDataBlock, po);
+        if(!po) break;
+
         if(po->ObjectNameTitleIndex == ObjectNameTitleIndex)
             return po;
     }
@@ -301,60 +309,68 @@ inline PERF_OBJECT_TYPE *getObjectTypeByIndex(PERF_DATA_BLOCK *pDataBlock, DWORD
     return NULL;
 }
 
-static inline PERF_INSTANCE_DEFINITION *getInstance(
+ALWAYS_INLINE
+static PERF_INSTANCE_DEFINITION *getInstance(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     PERF_COUNTER_BLOCK *lastCounterBlock
 ) {
-    PERF_INSTANCE_DEFINITION *pInstance;
+    if(unlikely(!pObjectType))
+        return NULL;
 
+    PERF_INSTANCE_DEFINITION *pInstance;
     if(!lastCounterBlock)
         pInstance = (PERF_INSTANCE_DEFINITION *)((PBYTE)pObjectType + pObjectType->DefinitionLength);
     else
         pInstance = (PERF_INSTANCE_DEFINITION *)((PBYTE)lastCounterBlock + lastCounterBlock->ByteLength);
 
     if(pInstance && (!isValidPointer(pDataBlock, pInstance) || !isValidStructure(pDataBlock, pInstance, pInstance->ByteLength))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "WINDOWS: PERFLIB: Invalid Instance Definition!");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid Instance Definition!", __FUNCTION__);
         pInstance = NULL;
     }
 
     return pInstance;
 }
 
-static inline PERF_COUNTER_BLOCK *getObjectTypeCounterBlock(
+ALWAYS_INLINE
+static PERF_COUNTER_BLOCK *getObjectTypeCounterBlock(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType
 ) {
+    if(unlikely(!pObjectType))
+        return NULL;
+
     PERF_COUNTER_BLOCK *pCounterBlock = (PERF_COUNTER_BLOCK *)((PBYTE)pObjectType + pObjectType->DefinitionLength);
 
     if(pCounterBlock && (!isValidPointer(pDataBlock, pCounterBlock) || !isValidStructure(pDataBlock, pCounterBlock, pCounterBlock->ByteLength))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "WINDOWS: PERFLIB: Invalid ObjectType CounterBlock!");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid ObjectType CounterBlock!", __FUNCTION__);
         pCounterBlock = NULL;
     }
 
     return pCounterBlock;
 }
 
-static inline PERF_COUNTER_BLOCK *getInstanceCounterBlock(
+ALWAYS_INLINE
+static PERF_COUNTER_BLOCK *getInstanceCounterBlock(
     PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
+    PERF_OBJECT_TYPE *pObjectType __maybe_unused,
     PERF_INSTANCE_DEFINITION *pInstance
 ) {
-    (void)pObjectType;
+    if(unlikely(!pInstance))
+        return NULL;
+
     PERF_COUNTER_BLOCK *pCounterBlock = (PERF_COUNTER_BLOCK *)((PBYTE)pInstance + pInstance->ByteLength);
 
     if(pCounterBlock && (!isValidPointer(pDataBlock, pCounterBlock) || !isValidStructure(pDataBlock, pCounterBlock, pCounterBlock->ByteLength))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "WINDOWS: PERFLIB: Invalid Instance CounterBlock!");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid Instance CounterBlock!", __FUNCTION__);
         pCounterBlock = NULL;
     }
 
     return pCounterBlock;
 }
 
-inline PERF_INSTANCE_DEFINITION *getInstanceByPosition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, DWORD instancePosition) {
+ALWAYS_INLINE
+PERF_INSTANCE_DEFINITION *getInstanceByPosition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, DWORD instancePosition) {
     PERF_INSTANCE_DEFINITION *pi = NULL;
     PERF_COUNTER_BLOCK *pc = NULL;
     for(DWORD i = 0; i <= instancePosition ;i++) {
@@ -364,17 +380,19 @@ inline PERF_INSTANCE_DEFINITION *getInstanceByPosition(PERF_DATA_BLOCK *pDataBlo
     return pi;
 }
 
-static inline PERF_COUNTER_DEFINITION *getCounterDefinition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_COUNTER_DEFINITION *lastCounterDefinition) {
-    PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
+ALWAYS_INLINE
+static PERF_COUNTER_DEFINITION *getCounterDefinition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_COUNTER_DEFINITION *lastCounterDefinition) {
+    if(unlikely(!pObjectType))
+        return NULL;
 
+    PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
     if(!lastCounterDefinition)
         pCounterDefinition = (PERF_COUNTER_DEFINITION *)((PBYTE)pObjectType + pObjectType->HeaderLength);
     else
         pCounterDefinition = (PERF_COUNTER_DEFINITION *)((PBYTE)lastCounterDefinition +	lastCounterDefinition->ByteLength);
 
     if(pCounterDefinition && (!isValidPointer(pDataBlock, pCounterDefinition) || !isValidStructure(pDataBlock, pCounterDefinition, pCounterDefinition->ByteLength))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "WINDOWS: PERFLIB: Invalid Counter Definition!");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid Counter Definition!", __FUNCTION__);
         pCounterDefinition = NULL;
     }
 
@@ -383,7 +401,8 @@ static inline PERF_COUNTER_DEFINITION *getCounterDefinition(PERF_DATA_BLOCK *pDa
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodePage, char *start, DWORD length) {
+ALWAYS_INLINE
+static BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodePage, char *start, DWORD length) {
     static __thread wchar_t unicode[PERFLIB_MAX_NAME_LENGTH];
 
     WCHAR *tempBuffer;  // Temporary buffer for Unicode data
@@ -411,29 +430,34 @@ static inline BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodeP
     return TRUE;
 }
 
-inline BOOL getInstanceName(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance,
+ALWAYS_INLINE
+BOOL getInstanceName(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance,
                      char *buffer, size_t bufferLen) {
     (void)pDataBlock;
-    if (!pInstance || !buffer || !bufferLen) return FALSE;
+    if (!pObjectType || !pInstance || !buffer || !bufferLen)
+        return FALSE;
 
     return getEncodedStringToUTF8(buffer, bufferLen, pObjectType->CodePage,
                                   ((char *)pInstance + pInstance->NameOffset), pInstance->NameLength);
 }
 
-inline BOOL getSystemName(PERF_DATA_BLOCK *pDataBlock, char *buffer, size_t bufferLen) {
+ALWAYS_INLINE
+BOOL getSystemName(PERF_DATA_BLOCK *pDataBlock, char *buffer, size_t bufferLen) {
     return getEncodedStringToUTF8(buffer, bufferLen, 0,
                                   ((char *)pDataBlock + pDataBlock->SystemNameOffset), pDataBlock->SystemNameLength);
 }
 
-inline bool ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType) {
+ALWAYS_INLINE
+BOOL ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType) {
     (void)pDataBlock;
-    return pObjectType->NumInstances != PERF_NO_INSTANCES && pObjectType->NumInstances > 0;
+    return pObjectType && pObjectType->NumInstances != PERF_NO_INSTANCES && pObjectType->NumInstances > 0 ? TRUE : FALSE;
 }
 
 PERF_OBJECT_TYPE *perflibFindObjectTypeByName(PERF_DATA_BLOCK *pDataBlock, const char *name) {
     PERF_OBJECT_TYPE* pObjectType = NULL;
     for(DWORD o = 0; o < pDataBlock->NumObjectTypes; o++) {
         pObjectType = getObjectType(pDataBlock, pObjectType);
+        if(!pObjectType) break;
         if(strcmp(name, RegistryFindNameByID(pObjectType->ObjectNameTitleIndex)) == 0)
             return pObjectType;
     }
@@ -515,6 +539,9 @@ failed:
 }
 
 bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, COUNTER_DATA *cd) {
+    if (unlikely(!pObjectType))
+        goto cleanup;
+
     PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
     for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
         pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
@@ -544,6 +571,7 @@ bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObj
         return cd->updated;
     }
 
+cleanup:
     cd->previous = cd->current;
     cd->current = RAW_DATA_EMPTY;
     cd->updated = false;

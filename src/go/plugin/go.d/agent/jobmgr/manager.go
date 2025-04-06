@@ -32,11 +32,8 @@ func New() *Manager {
 		Logger: logger.New().With(
 			slog.String("component", "job manager"),
 		),
-		Out:             io.Discard,
-		FileLock:        noop{},
-		FileStatus:      noop{},
-		FileStatusStore: noop{},
-		FnReg:           noop{},
+		Out:   io.Discard,
+		FnReg: noop{},
 
 		Vnodes: make(map[string]*vnodes.VirtualNode),
 
@@ -63,12 +60,11 @@ type Manager struct {
 	Out            io.Writer
 	Modules        module.Registry
 	ConfigDefaults confgroup.Registry
+	VarLibDir      string
+	FnReg          FunctionRegistry
+	Vnodes         map[string]*vnodes.VirtualNode
 
-	FileLock        FileLocker
-	FileStatus      FileStatus
-	FileStatusStore FileStatusStore
-	FnReg           FunctionRegistry
-	Vnodes          map[string]*vnodes.VirtualNode
+	fileStatus *fileStatus
 
 	discoveredConfigs *discoveredConfigs
 	seenConfigs       *seenConfigs
@@ -103,7 +99,12 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 		m.dyncfgCollectorModuleCreate(name)
 	}
 
+	m.loadFileStatus()
+
 	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() { defer wg.Done(); m.runFileStatusPersistence() }()
 
 	wg.Add(1)
 	go func() { defer wg.Done(); m.runProcessConfGroups(in) }()
@@ -193,8 +194,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 		}
 		if ecfg.status == dyncfgRunning {
 			m.stopRunningJob(ecfg.cfg.FullName())
-			m.FileLock.Unlock(ecfg.cfg.FullName())
-			m.FileStatus.Remove(ecfg.cfg)
+			m.fileStatus.remove(ecfg.cfg)
 		}
 		scfg.status = dyncfgAccepted
 		m.exposedConfigs.add(scfg) // replace existing exposed
@@ -226,8 +226,7 @@ func (m *Manager) removeConfig(cfg confgroup.Config) {
 
 	m.exposedConfigs.remove(cfg)
 	m.stopRunningJob(cfg.FullName())
-	m.FileLock.Unlock(cfg.FullName())
-	m.FileStatus.Remove(cfg)
+	m.fileStatus.remove(cfg)
 
 	if !isStock(cfg) || ecfg.status == dyncfgRunning {
 		m.dyncfgJobRemove(cfg)
@@ -273,7 +272,6 @@ func (m *Manager) stopRunningJob(name string) {
 }
 
 func (m *Manager) cleanup() {
-	m.FileLock.UnlockAll()
 	m.FnReg.Unregister("config")
 
 	m.runningJobs.lock()

@@ -9,7 +9,7 @@ list(APPEND DEB_DISTROS debian ubuntu)
 
 set(DEB_GPG_KEY_SOURCE "https://repo.netdata.cloud/netdatabot.gpg.key")
 
-set(PACKAGE_VERSION 4)
+set(PACKAGE_VERSION 5)
 set(PACKAGE_RELEASE 1)
 
 set(CPACK_THREADS 0)
@@ -148,6 +148,16 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
                     ALL
                     COMMENT "Dearmor ${CMAKE_BINARY_DIR}/netdatabot.gpg.key"
                     DEPENDS ${CMAKE_BINARY_DIR}/netdata.gpg)
+
+#  install(FILES ${CMAKE_SOURCE_DIR}/netdata-deb-repo-priority
+#          DESTINATION etc/apt/preferences.d
+#          RENAME 80netdata
+#          COMPONENT netdata-repo)
+#
+#  install(FILES ${CMAKE_SOURCE_DIR}/netdata-deb-repo-priority
+#          DESTINATION etc/apt/preferences.d
+#          RENAME 80netdata
+#          COMPONENT netdata-repo-edge)
 
   install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
           DESTINATION usr/share/keyrings

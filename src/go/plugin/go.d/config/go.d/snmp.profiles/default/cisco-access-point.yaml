@@ -1,0 +1,57 @@
+extends:
+  - cisco.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.9.1.525     # Cisco AIR AP 1210
+  - 1.3.6.1.4.1.9.1.618     # Cisco AIR AP 1130
+  - 1.3.6.1.4.1.9.1.1660    # AIR-SAP1602E-C-K9
+  - 1.3.6.1.4.1.9.1.2371    # Cisco Aironet 1830
+metadata:
+  device:
+    fields:
+      type:
+        value: "access_point"
+metrics:
+  - MIB: CISCO-DOT11-ASSOCIATION-MIB
+    table:
+      name: cDot11ActiveDevicesTable
+      OID: 1.3.6.1.4.1.9.9.273.1.1.2
+    symbols:
+      - name: cDot11ActiveWirelessClients
+        OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.1
+      - name: cDot11ActiveBridges
+        OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.2
+      - name: cDot11ActiveRepeaters
+        OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.3
+    metric_tags:
+      - tag: if_name
+        symbol:
+          name: ifName
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+  - MIB: CISCO-DOT11-ASSOCIATION-MIB
+    table:
+      name: cDot11AssociationStatsTable
+      OID: 1.3.6.1.4.1.9.9.273.1.1.3
+    symbols:
+      - name: cDot11AssStatsAssociated
+        OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.1
+        metric_type: monotonic_count
+      - name: cDot11AssStatsAuthenticated
+        OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.2
+        metric_type: monotonic_count
+      - name: cDot11AssStatsRoamedIn
+        OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.3
+        metric_type: monotonic_count
+      - name: cDot11AssStatsRoamedAway
+        OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.4
+        metric_type: monotonic_count
+      - name: cDot11AssStatsDeauthenticated
+        OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.5
+        metric_type: monotonic_count
+      - name: cDot11AssStatsDisassociated
+        OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.6
+        metric_type: monotonic_count
+    metric_tags:
+      - tag: if_name
+        symbol:
+          name: ifName
+          OID: 1.3.6.1.2.1.31.1.1.1.1

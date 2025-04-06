@@ -1,0 +1,71 @@
+# Virtual Chassis-related metrics
+
+metrics:
+
+  # These metrics will be sent as monotonic counts and rates:
+  - MIB: JUNIPER-VIRTUALCHASSIS-MIB
+    table:
+      OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2
+      name: jnxVirtualChassisPortTable
+    metric_type: monotonic_count
+    symbols:
+    # Indicates the total number of packets received on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.5
+      name: jnxVirtualChassisPortInPkts
+    # Indicates the total number of packets sent from the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.6
+      name: jnxVirtualChassisPortOutPkts
+    # Indicates the total number of octets received on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.7
+      name: jnxVirtualChassisPortInOctets
+    # Indicates the total number of octets sent on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.8
+      name: jnxVirtualChassisPortOutOctets
+    # Indicates the total number of multicast packets received on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.9
+      name: jnxVirtualChassisPortInMcasts
+    # Indicates the total number of multicast packets sent from the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.10
+      name: jnxVirtualChassisPortOutMcasts
+    # Indicates the total number of Carrier errors on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.15
+      name: jnxVirtualChassisPortCarrierTrans
+    # Indicates the total number of Input CRC Alignment errors on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.16
+      name: jnxVirtualChassisPortInCRCAlignErrors
+    # Indicates the total number of Undersize Packets on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.17
+      name: jnxVirtualChassisPortUndersizePkts
+    # Indicates the total number of Collisions on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.18
+      name: jnxVirtualChassisPortCollisions
+    metric_tags:
+    - symbol:
+        OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.2
+        name: jnxVirtualChassisPortName
+      tag: port_name
+
+  # These metrics will be sent as rates only (default for counter64 metrics):
+  - MIB: JUNIPER-VIRTUALCHASSIS-MIB
+    table:
+      OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2
+      name: jnxVirtualChassisPortTable
+    metric_type: gauge
+    symbols:
+    # Indicates the total number of packets received per second on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.11
+      name: jnxVirtualChassisPortInPkts1secRate
+    # Indicates the total number of packets sent per second from the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.12
+      name: jnxVirtualChassisPortOutPkts1secRate
+    # Indicates the total number of octets received per second on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.13
+      name: jnxVirtualChassisPortInOctets1secRate
+    # Indicates the total number of octets sent per second on the virtual-chassis port.
+    - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.14
+      name: jnxVirtualChassisPortOutOctets1secRate
+    metric_tags:
+    - symbol:
+        OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.2
+        name: jnxVirtualChassisPortName
+      tag: port_name

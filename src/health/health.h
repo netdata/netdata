@@ -81,6 +81,12 @@ void health_alarm_log_free(RRDHOST *host);
 
 void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 
+// ARAL management functions for ALARM_ENTRY
+void health_alarm_entry_aral_init(void);
+struct aral_statistics *health_alarm_entry_aral_stats(void);
+ALARM_ENTRY *health_alarm_entry_create(void);
+void health_alarm_entry_destroy(ALARM_ENTRY *ae);
+
 void *health_cmdapi_thread(void *ptr);
 
 char *health_edit_command_from_source(const char *source);
@@ -102,5 +108,7 @@ void health_prototype_metadata_foreach(void *data, prototype_metadata_cb_t cb);
 uint64_t health_evloop_current_iteration(void);
 void rrdhost_set_health_evloop_iteration(RRDHOST *host);
 uint64_t rrdhost_health_evloop_last_iteration(RRDHOST *host);
+
+void health_load_config_defaults(void);
 
 #endif //NETDATA_HEALTH_H

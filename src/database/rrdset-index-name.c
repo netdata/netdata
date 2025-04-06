@@ -49,31 +49,19 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
 
     if(st->name) {
         rrdset_index_del_name(host, st);
-        string_freez(st->name);
-        st->name = name_string;
+        SWAP(name_string, st->name);
+        string_freez(name_string);
     }
     else
         st->name = name_string;
 
     rrdset_index_add_name(host, st);
 
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
+    rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND|RRDSET_FLAG_EXPORTING_IGNORE|RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE);
     rrdset_metadata_updated(st);
 
     rrdcontext_updated_rrdset_name(st);
     return 2;
-}
-
-static void rrdset_name_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
-    RRDSET *st = rrdset;
-    rrdset_flag_set(st, RRDSET_FLAG_INDEXED_NAME);
-}
-static void rrdset_name_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
-    RRDSET *st = rrdset;
-    rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
 }
 
 static RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
@@ -83,28 +71,43 @@ static RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
 }
 
 void rrdset_index_byname_init(RRDHOST *host) {
-    if(!host->rrdset_root_index_name) {
-        host->rrdset_root_index_name = dictionary_create_advanced(
-            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
-            &dictionary_stats_category_rrdset, 0);
-
-        dictionary_register_insert_callback(host->rrdset_root_index_name, rrdset_name_insert_callback, host);
-        dictionary_register_delete_callback(host->rrdset_root_index_name, rrdset_name_delete_callback, host);
-    }
+    if(!host->rrdset_root_index_name)
+        host->rrdset_root_index_name = dictionary_create_view(host->rrdset_root_index);
 }
 
 void rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
     if(!st->name) return;
-    dictionary_set(host->rrdset_root_index_name, rrdset_name(st), st, sizeof(RRDSET));
+    const DICTIONARY_ITEM *sta = dictionary_get_and_acquire_item(host->rrdset_root_index, rrdset_id(st));
+    if(sta) {
+        const DICTIONARY_ITEM *sta2 = dictionary_view_set_and_acquire_item(host->rrdset_root_index_name, rrdset_name(st), sta);
+        if(sta2) {
+            if(dictionary_acquired_item_value(sta2) == st)
+                rrdset_flag_set(st, RRDSET_FLAG_INDEXED_NAME);
+
+            dictionary_acquired_item_release(host->rrdset_root_index_name, sta2);
+        }
+
+        dictionary_acquired_item_release(host->rrdset_root_index, sta);
+    }
 }
 
 void rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
-    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_NAME))
-        dictionary_del(host->rrdset_root_index_name, rrdset_name(st));
+    if(rrdset_flag_check(st, RRDSET_FLAG_INDEXED_NAME)) {
+        const DICTIONARY_ITEM *sta = dictionary_get_and_acquire_item(host->rrdset_root_index_name, rrdset_name(st));
+
+        if(sta) {
+            if(dictionary_acquired_item_value(sta) == st)
+                dictionary_del(host->rrdset_root_index_name, rrdset_name(st));
+
+            dictionary_acquired_item_release(host->rrdset_root_index_name, sta);
+            dictionary_garbage_collect(host->rrdset_root_index_name);
+        }
+
+        rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
+    }
 }
 
 RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
-    netdata_log_debug(D_RRD_CALLS, "rrdset_find_byname() for chart '%s' in host '%s'", name, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find_name(host, name);
     return(st);
 }

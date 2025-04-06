@@ -346,7 +346,7 @@ enable_netdata_updater() {
     "crontab")
       if [ -d "/etc/cron.d" ]; then
         [ -f "/etc/cron.d/netdata-updater" ] && rm -f "/etc/cron.d/netdata-updater"
-        install -p -m 0644 -o 0 -g 0 "${NETDATA_PREFIX}/usr/lib/system/cron/netdata-updater-daily" "/etc/cron.d/netdata-updater-daily"
+        install -p -m 0644 -o 0 -g 0 "${NETDATA_PREFIX}/usr/lib/netdata/system/cron/netdata-updater-daily" "/etc/cron.d/netdata-updater-daily"
 
         info "Auto-updating has been ENABLED through cron, using a crontab at /etc/cron.d/netdata-updater\n"
         info "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
@@ -1041,6 +1041,12 @@ update_binpkg() {
         ;;
       cloudlinux|almalinux|centos-stream|rocky|rhel)
         DISTRO_COMPAT_NAME="centos"
+        ;;
+      raspbian)
+        SYSARCH="$(uname -m)"
+        if [ "$SYSARCH" = "armv7l" ] || [ "$SYSARCH" = "aarch64" ]; then
+          DISTRO_COMPAT_NAME="debian"
+        fi
         ;;
       *)
         DISTRO_COMPAT_NAME="unknown"

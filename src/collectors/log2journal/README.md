@@ -575,7 +575,7 @@ If on other hand your organization prefers to maintain the full logs and control
 
 ## `log2journal` options
 
-```text
+````text
 
 Netdata log2journal v1.43.0-341-gdac4df856
 
@@ -900,7 +900,7 @@ JOURNAL FIELDS RULES (enforced by systemd-journald)
 
 You can find the most common fields at 'man systemd.journal-fields'.
 
-```
+````
 
 `log2journal` supports YAML configuration files, like the ones found [in this directory](https://github.com/netdata/netdata/tree/master/src/collectors/log2journal/log2journal.d).
 

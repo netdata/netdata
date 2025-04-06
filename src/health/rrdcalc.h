@@ -102,6 +102,9 @@ struct rrdcalc {
 #define rrdcalc_units(rc) string2str((rc)->config.units)
 #define rrdcalc_dimensions(rc) string2str((rc)->config.dimensions)
 
+#define foreach_rrdcalc_in_rrdhost_write(host, rc) \
+    dfe_start_write((host)->rrdcalc_root_index, rc) \
+
 #define foreach_rrdcalc_in_rrdhost_read(host, rc) \
     dfe_start_read((host)->rrdcalc_root_index, rc) \
 

@@ -75,3 +75,13 @@ func unmarshalPayload(dst any, fn functions.Function) error {
 	}
 	return yaml.Unmarshal(fn.Payload, dst)
 }
+
+func getFnSourceValue(fn functions.Function, key string) string {
+	prefix := key + "="
+	for _, part := range strings.Split(fn.Source, ",") {
+		if v, ok := strings.CutPrefix(part, prefix); ok {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}

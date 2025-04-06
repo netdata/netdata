@@ -1,3 +1,21 @@
+@PKG_NAME@ (5-1) unstable; urgency=high
+
+  * Deploy new package and metadata signing keys
+
+ -- Austin hemmelgarn <austin@netdata.cloud>  Mon, 17 Mar 2025 10:40:00 -0400
+
+@PKG_NAME@ (4-3) unstable; urgency=medium
+
+  * Revert broken priority configuration
+
+ -- Austin Hemmelgarn <austin@netdata.cloud>  Wed, 3 Mar 2025 10:13:00 -0500
+
+@PKG_NAME@ (4-2) unstable; urgency=medium
+
+  * Add priority configuration for repositories
+
+ -- Austin Hemmelgarn <austin@netdata.cloud>  Mon, 24 Feb 2025 09:42:00 -0500
+
 @PKG_NAME@ (4-1) unstable; urgency=medium
 
   * Update repositories to new subdomain

@@ -24,6 +24,9 @@
 int do_macos_iokit(int update_every, usec_t dt) {
     (void)dt;
 
+    static SIMPLE_PATTERN *excluded_mountpoints = NULL;
+    static SIMPLE_PATTERN *disabled_net_interfaces = NULL;
+
     static int do_io = -1, do_space = -1, do_inodes = -1, do_bandwidth = -1;
 
     if (unlikely(do_io == -1)) {
@@ -31,6 +34,25 @@ int do_macos_iokit(int update_every, usec_t dt) {
         do_space                = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "space usage for all disks", 1);
         do_inodes               = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "inodes usage for all disks", 1);
         do_bandwidth            = inicfg_get_boolean(&netdata_config, "plugin:macos:sysctl", "bandwidth", 1);
+
+        excluded_mountpoints = simple_pattern_create(
+            inicfg_get(
+                &netdata_config,
+                "plugin:macos:iokit",
+                "exclude mountpoints by path",
+                "/System/Volumes/* /private/var/folders/* /Volumes/Recovery"),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
+        disabled_net_interfaces = simple_pattern_create(
+            inicfg_get(
+                &netdata_config,
+                "plugin:macos:iokit",
+                "disable by default network interfaces matching",
+                "lo* awdl* llw* anpi* gif* bridge* ap*"),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
     }
 
     RRDSET *st;
@@ -73,7 +95,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
     // NEEDED BY: do_space, do_inodes
     struct statfs *mntbuf;
     int mntsize, i;
-    char title[4096 + 1];
 
     // NEEDED BY: do_bandwidth
     struct ifaddrs *ifa, *ifap;
@@ -154,7 +175,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 "disk"
                                 , diskstat.name
                                 , NULL
-                                , diskstat.name
+                                , "io"
                                 , "disk.io"
                                 , "Disk I/O Bandwidth"
                                 , "KiB/s"
@@ -167,6 +188,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                         rrddim_add(st, "reads", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
                         rrddim_add(st, "writes", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
+                        rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                     }
 
                     prev_diskstat.bytes_read = rrddim_set(st, "reads", diskstat.bytes_read);
@@ -189,7 +211,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 "disk_ops"
                                 , diskstat.name
                                 , NULL
-                                , diskstat.name
+                                , "ops"
                                 , "disk.ops"
                                 , "Disk Completed I/O Operations"
                                 , "operations/s"
@@ -202,6 +224,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                         rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                         rrddim_add(st, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                        rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                     }
 
                     prev_diskstat.operations_read = rrddim_set(st, "reads", diskstat.reads);
@@ -224,7 +247,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 "disk_util"
                                 , diskstat.name
                                 , NULL
-                                , diskstat.name
+                                , "utilization"
                                 , "disk.util"
                                 , "Disk Utilization Time"
                                 , "% of time working"
@@ -236,6 +259,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         );
 
                         rrddim_add(st, "utilization", NULL, 1, 10000000, RRD_ALGORITHM_INCREMENTAL);
+                        rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                     }
 
                     cur_diskstat.busy_time_ns = (diskstat.time_read + diskstat.time_write);
@@ -258,7 +282,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 "disk_iotime"
                                 , diskstat.name
                                 , NULL
-                                , diskstat.name
+                                , "utilization"
                                 , "disk.iotime"
                                 , "Disk Total I/O Time"
                                 , "milliseconds/s"
@@ -271,6 +295,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                         rrddim_add(st, "reads", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
                         rrddim_add(st, "writes", NULL, -1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                        rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                     }
 
                     cur_diskstat.duration_read_ns = diskstat.time_read + diskstat.latency_read;
@@ -289,7 +314,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     "disk_await"
                                     , diskstat.name
                                     , NULL
-                                    , diskstat.name
+                                    , "latency"
                                     , "disk.await"
                                     , "Average Completed I/O Operation Time"
                                     , "milliseconds/operation"
@@ -302,6 +327,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                             rrddim_add(st, "reads", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
                             rrddim_add(st, "writes", NULL, -1, 1000000, RRD_ALGORITHM_ABSOLUTE);
+                            rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                         }
 
                         rrddim_set(st, "reads", (diskstat.reads - prev_diskstat.operations_read) ?
@@ -316,7 +342,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     "disk_avgsz"
                                     , diskstat.name
                                     , NULL
-                                    , diskstat.name
+                                    , "io"
                                     , "disk.avgsz"
                                     , "Average Completed I/O Operation Bandwidth"
                                     , "KiB/operation"
@@ -329,6 +355,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                             rrddim_add(st, "reads", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
                             rrddim_add(st, "writes", NULL, -1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                            rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                         }
 
                         rrddim_set(st, "reads", (diskstat.reads - prev_diskstat.operations_read) ?
@@ -343,7 +370,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     "disk_svctm"
                                     , diskstat.name
                                     , NULL
-                                    , diskstat.name
+                                    , "latency"
                                     , "disk.svctm"
                                     , "Average Service Time"
                                     , "milliseconds/operation"
@@ -355,6 +382,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             );
 
                             rrddim_add(st, "svctm", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
+                            rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                         }
 
                         rrddim_set(st, "svctm", ((diskstat.reads - prev_diskstat.operations_read) + (diskstat.writes - prev_diskstat.operations_write)) ?
@@ -424,19 +452,22 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         strcmp(mntbuf[i].f_fstypename, "none") == 0)
                     continue;
 
+                if (simple_pattern_matches(excluded_mountpoints, mntbuf[i].f_mntonname)) {
+                    continue;
+                }
+
                 // --------------------------------------------------------------------------
 
                 if (likely(do_space)) {
                     st = rrdset_find_active_bytype_localhost("disk_space", mntbuf[i].f_mntonname);
                     if (unlikely(!st)) {
-                        snprintfz(title, sizeof(title) - 1, "Disk Space Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         st = rrdset_create_localhost(
                                 "disk_space"
                                 , mntbuf[i].f_mntonname
                                 , NULL
-                                , mntbuf[i].f_mntonname
+                                , "used space"
                                 , "disk.space"
-                                , title
+                                , "Disk Space Usage"
                                 , "GiB"
                                 , "macos.plugin"
                                 , "iokit"
@@ -448,6 +479,8 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrddim_add(st, "avail", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "used", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "reserved_for_root", "reserved for root", mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                        rrdlabels_add(st->rrdlabels, "mount_point", mntbuf[i].f_mntonname, RRDLABEL_SRC_AUTO);
+                        rrdlabels_add(st->rrdlabels, "filesystem", mntbuf[i].f_fstypename, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set(st, "avail", (collected_number) mntbuf[i].f_bavail);
@@ -461,14 +494,13 @@ int do_macos_iokit(int update_every, usec_t dt) {
                 if (likely(do_inodes)) {
                     st = rrdset_find_active_bytype_localhost("disk_inodes", mntbuf[i].f_mntonname);
                     if (unlikely(!st)) {
-                        snprintfz(title, sizeof(title) - 1, "Disk Files (inodes) Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         st = rrdset_create_localhost(
                                 "disk_inodes"
                                 , mntbuf[i].f_mntonname
                                 , NULL
-                                , mntbuf[i].f_mntonname
+                                , "used inodes"
                                 , "disk.inodes"
-                                , title
+                                , "Disk Files (inodes) Usage"
                                 , "inodes"
                                 , "macos.plugin"
                                 , "iokit"
@@ -480,6 +512,8 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrddim_add(st, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                        rrdlabels_add(st->rrdlabels, "mount_point", mntbuf[i].f_mntonname, RRDLABEL_SRC_AUTO);
+                        rrdlabels_add(st->rrdlabels, "filesystem", mntbuf[i].f_fstypename, RRDLABEL_SRC_AUTO);
                     }
 
                     rrddim_set(st, "avail", (collected_number) mntbuf[i].f_ffree);
@@ -502,13 +536,17 @@ int do_macos_iokit(int update_every, usec_t dt) {
                 if (ifa->ifa_addr->sa_family != AF_LINK)
                         continue;
 
+                if (simple_pattern_matches(disabled_net_interfaces, ifa->ifa_name)) {
+                    continue;
+                }
+
                 st = rrdset_find_active_bytype_localhost("net", ifa->ifa_name);
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "net"
                             , ifa->ifa_name
                             , NULL
-                            , ifa->ifa_name
+                            , "traffic"
                             , "net.net"
                             , "Bandwidth"
                             , "kilobits/s"
@@ -521,6 +559,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                     rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rrdlabels_add(st->rrdlabels, "device", ifa->ifa_name, RRDLABEL_SRC_AUTO);
                 }
 
                 rrddim_set(st, "received", IFA_DATA(ibytes));
@@ -533,7 +572,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             "net_packets"
                             , ifa->ifa_name
                             , NULL
-                            , ifa->ifa_name
+                            , "packets"
                             , "net.packets"
                             , "Packets"
                             , "packets/s"
@@ -548,6 +587,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "multicast_received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "multicast_sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrdlabels_add(st->rrdlabels, "device", ifa->ifa_name, RRDLABEL_SRC_AUTO);
                 }
 
                 rrddim_set(st, "received", IFA_DATA(ipackets));
@@ -562,7 +602,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             "net_errors"
                             , ifa->ifa_name
                             , NULL
-                            , ifa->ifa_name
+                            , "errors"
                             , "net.errors"
                             , "Interface Errors"
                             , "errors/s"
@@ -575,6 +615,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                     rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrdlabels_add(st->rrdlabels, "device", ifa->ifa_name, RRDLABEL_SRC_AUTO);
                 }
 
                 rrddim_set(st, "inbound", IFA_DATA(ierrors));
@@ -587,7 +628,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             "net_drops"
                             , ifa->ifa_name
                             , NULL
-                            , ifa->ifa_name
+                            , "drops"
                             , "net.drops"
                             , "Interface Drops"
                             , "drops/s"
@@ -599,6 +640,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     );
 
                     rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrdlabels_add(st->rrdlabels, "device", ifa->ifa_name, RRDLABEL_SRC_AUTO);
                 }
 
                 rrddim_set(st, "inbound", IFA_DATA(iqdrops));
@@ -610,7 +652,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             "net_events"
                             , ifa->ifa_name
                             , NULL
-                            , ifa->ifa_name
+                            , "errors"
                             , "net.events"
                             , "Network Interface Events"
                             , "events/s"
@@ -624,6 +666,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     rrddim_add(st, "frames", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "carrier", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrdlabels_add(st->rrdlabels, "device", ifa->ifa_name, RRDLABEL_SRC_AUTO);
                 }
 
                 rrddim_set(st, "collisions", IFA_DATA(collisions));

@@ -18,11 +18,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/filelock"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/filestatus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
 	"github.com/mattn/go-isatty"
 )
@@ -36,8 +35,7 @@ type Config struct {
 	CollectorsConfigDir       []string
 	CollectorsConfigWatchPath []string
 	ServiceDiscoveryConfigDir []string
-	StateFile                 string
-	LockDir                   string
+	VarLibDir                 string
 	ModuleRegistry            module.Registry
 	RunModule                 string
 	MinUpdateEvery            int
@@ -54,8 +52,7 @@ type Agent struct {
 	CollectorsConfigWatchPath []string
 	ServiceDiscoveryConfigDir multipath.MultiPath
 
-	StateFile string
-	LockDir   string
+	VarLibDir string
 
 	RunModule      string
 	MinUpdateEvery int
@@ -79,14 +76,13 @@ func New(cfg Config) *Agent {
 		CollectorsConfDir:         cfg.CollectorsConfigDir,
 		ServiceDiscoveryConfigDir: cfg.ServiceDiscoveryConfigDir,
 		CollectorsConfigWatchPath: cfg.CollectorsConfigWatchPath,
-		StateFile:                 cfg.StateFile,
-		LockDir:                   cfg.LockDir,
+		VarLibDir:                 cfg.VarLibDir,
 		RunModule:                 cfg.RunModule,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
 		ModuleRegistry:            module.DefaultRegistry,
 		Out:                       safewriter.Stdout,
 		api:                       netdataapi.New(safewriter.Stdout),
-		quitCh:                    make(chan struct{}),
+		quitCh:                    make(chan struct{}, 1),
 	}
 }
 
@@ -99,6 +95,8 @@ func (a *Agent) Run() {
 func serve(a *Agent) {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
+	signal.Ignore(syscall.SIGPIPE)
+
 	var wg sync.WaitGroup
 
 	var exit bool
@@ -197,27 +195,13 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr := jobmgr.New()
 	jobMgr.PluginName = a.Name
 	jobMgr.Out = a.Out
+	jobMgr.VarLibDir = a.VarLibDir
 	jobMgr.Modules = enabledModules
 	jobMgr.ConfigDefaults = discCfg.Registry
 	jobMgr.FnReg = fnMgr
 
 	if reg := a.setupVnodeRegistry(); len(reg) > 0 {
 		jobMgr.Vnodes = reg
-	}
-
-	if a.LockDir != "" {
-		jobMgr.FileLock = filelock.New(a.LockDir)
-	}
-
-	var fsMgr *filestatus.Manager
-	if !isTerminal && a.StateFile != "" {
-		fsMgr = filestatus.NewManager(a.StateFile)
-		jobMgr.FileStatus = fsMgr
-		if store, err := filestatus.LoadStore(a.StateFile); err != nil {
-			a.Warningf("couldn't load state file: %v", err)
-		} else {
-			jobMgr.FileStatusStore = store
-		}
 	}
 
 	in := make(chan []*confgroup.Group)
@@ -231,11 +215,6 @@ func (a *Agent) run(ctx context.Context) {
 
 	wg.Add(1)
 	go func() { defer wg.Done(); discMgr.Run(ctx, in) }()
-
-	if fsMgr != nil {
-		wg.Add(1)
-		go func() { defer wg.Done(); fsMgr.Run(ctx) }()
-	}
 
 	wg.Wait()
 	<-ctx.Done()
@@ -252,12 +231,11 @@ func (a *Agent) keepAlive() {
 	var n int
 	for range tk.C {
 		if err := a.api.EMPTYLINE(); err != nil {
-			a.Infof("keepAlive: %v", err)
 			n++
 		} else {
 			n = 0
 		}
-		if n == 3 {
+		if n >= 30 {
 			a.Info("too many keepAlive errors. Terminating...")
 			os.Exit(0)
 		}

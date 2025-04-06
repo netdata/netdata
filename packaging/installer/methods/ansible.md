@@ -1,34 +1,15 @@
 # Deploy Netdata with Ansible
 
-Netdata's [one-line kickstart](/packaging/installer/README.md) is zero-configuration, highly adaptable, and compatible with tons
-of different operating systems and Linux distributions. You can use it on bare metal, VMs, containers, and everything
-in-between.
+How do you quickly set up infrastructure monitoring? How can you efficiently deploy Netdata across multiple nodes? How do you make sure the deployment is **reliable, repeatable, and idempotent**? And how can you manage monitoring as **code**?
 
-But what if you're trying to bootstrap an infrastructure monitoring solution as quickly as possible? What if you need to
-deploy Netdata across an entire infrastructure with many nodes? What if you want to make this deployment reliable,
-repeatable, and idempotent? What if you want to write and deploy your infrastructure or cloud monitoring system like
-code?
+Meet [Ansible](https://ansible.com), a popular tool for provisioning, configuration management, and infrastructure as code (IaC). It uses **playbooks** to streamline operations with simple syntax, running them securely over SSH—no agent required. That means less setup and more focus on your application and monitoring.
 
-Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as
-code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run
-those operations over standard and secure SSH connections. There's no Agent to install on the remote system, so all you
-have to worry about is your application and your monitoring software.
+What does **idempotent** mean? 
+From the [Ansible glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
 
-Ansible has some competition from the likes of [Puppet](https://puppet.com/) or [Chef](https://www.chef.io/), but the
-most valuable feature about Ansible is **idempotent**. From the [Ansible
-glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
+> An operation is **idempotent** if running it once produces the same result as running it multiple times, without unintended changes. With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
 
-> An operation is idempotent if the result of performing it once is exactly the same as the result of performing it
-> repeatedly without any intervening actions.
-
-Idempotency means you can run an Ansible playbook against your nodes any number of times without affecting how they
-operate. When you deploy Netdata with Ansible, you're also deploying _monitoring as code_.
-
-In this guide, we'll walk through the process of using an [Ansible
-playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/) to automatically
-deploy the Netdata Agent to any number of distributed nodes, manage the configuration of each node, and connect them to
-your Netdata Cloud account. You'll go from some unmonitored nodes to a infrastructure monitoring solution in a matter of
-minutes.
+This guide walks you through deploying the **Netdata Agent** across multiple nodes using an [Ansible playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/), managing configurations, and connecting to **Netdata Cloud**—all in minutes.
 
 ## Prerequisites
 
@@ -115,9 +96,7 @@ claim_rooms: XXXXX
 Change the `dbengine_multihost_disk_space` if you want to change the metrics retention policy by allocating more or less
 disk space for storing metrics. The default is 2048 Mib, or 2 GiB.
 
-Because we're connecting this node to Netdata Cloud, and will view its dashboards there instead of via the IP address or
-hostname of the node, the playbook disables that local dashboard by setting `web_mode` to `none`. This gives a small
-security boost by not allowing any unwanted access to the local dashboard.
+Since this node connects to Netdata Cloud, we’ll view its dashboards there instead of using its IP or hostname. The playbook disables the local dashboard by setting `web_mode` to `none`, adding a small security boost by preventing unwanted access.
 
 You can read more about this decision, or other ways you might lock down the local dashboard, in our [node security
 doc](/docs/security-and-privacy-design/README.md).
@@ -135,8 +114,7 @@ ansible-playbook -i hosts tasks/main.yml
 
 Ansible first connects to your node(s) via SSH, then [collects
 facts](https://docs.ansible.com/ansible/latest/user_guide/playbooks_vars_facts.html#ansible-facts) about the system.
-This playbook doesn't use these facts, but you could expand it to provision specific types of systems based on the
-makeup of your infrastructure.
+This playbook doesn’t use these facts yet, but you can expand it to set up systems based on your infrastructure.
 
 Next, Ansible makes changes to each node according to the `tasks` defined in the playbook, and
 [returns](https://docs.ansible.com/ansible/latest/reference_appendices/common_return_values.html#changed) whether each

@@ -120,7 +120,7 @@ AutoReqProv: yes
 # Filter known bogus deps that would be caught by AutoReqProv.
 %global __requires_exclude_from ^%{_libdir}/%{name}/system/.*$
 
-Summary:	Netdata - Monitoring and troubleshooting, transformed!
+Summary:	Netdata - X-Ray Vision for your infrastructure!
 Name:		netdata
 Version:	%{version}
 Release:	1%{?dist}
@@ -160,6 +160,7 @@ BuildRequires: pkgconfig(libcurl)
 BuildRequires: pkgconfig(liblz4)
 BuildRequires: pkgconfig(yaml-0.1)
 BuildRequires: pkgconfig(json-c)
+BuildRequires: pkgconfig(libunwind)
 %if %{_have_log2journal}
 BuildRequires: pkgconfig(libpcre2-8)
 %endif
@@ -316,13 +317,10 @@ BuildRequires: flex
 # #####################################################################
 
 %description
-  netdata is the fastest way to visualize metrics. It is a resource
-efficient, highly optimized system for collecting and visualizing any
-type of realtime timeseries data, from CPU usage, disk activity, SQL
-queries, API calls, web site visitors, etc.
-  netdata tries to visualize the truth of now, in its greatest detail,
-so that you can get insights of what is happening now and what just
-happened, on your systems and applications.
+ netdata is a high-resolution, real-time, low-latency observability platform.
+Per-second data collection, high-performance long-term storage, low-latency
+visualization, machine-learning based anomaly detection, alerts and notifications,
+advanced correlations and fast root cause analysis, native horizontal scalability.
 
 %prep
 %setup -q -n "%{name}-%{version}"
@@ -336,7 +334,9 @@ happened, on your systems and applications.
 	-DUSE_CXX_11=On \
 	%endif
 	%endif
-	-DDISABLE_LTO=On \
+	%if 0%{?suse_version}
+	-DUSE_LTO=Off \
+	%endif
 	%if %{_have_cups}
 	-DENABLE_PLUGIN_CUPS=On \
 	%else
@@ -404,7 +404,8 @@ happened, on your systems and applications.
 	-DENABLE_PLUGIN_SYSTEMD_JOURNAL=On \
 	-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On \
 	-DENABLE_BUNDLED_JSONC=Off \
-	-DENABLE_BUNDLED_YAML=Off
+	-DENABLE_BUNDLED_YAML=Off \
+	-DENABLE_LBIUNWIND=On
 
 # Build step
 %{cmake_build}
@@ -563,6 +564,13 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/cloud.d
+
+# For some unknown reason openSUSE decides that some files in the build
+# directory were ‘installed’ when they very much were not. Explicitly
+# ignore that path to avoid build failures.
+%if 0%{?suse_version}
+%exclude /usr/src/packages/BUILD/build
+%endif
 
 # Dashboard belongs to a different sub-package
 %exclude %{_datadir}/%{name}/web
@@ -1005,6 +1013,8 @@ fi
 %{_datadir}/%{name}/web
 
 %changelog
+* Fri Mar 21 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-31
+- Exclude build directory from install to make openSUSE happy
 * Tue Jan 28 2025 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-30
 - Removed lm_sensors dependency for plugin-go package
 * Thu Aug 29 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-29

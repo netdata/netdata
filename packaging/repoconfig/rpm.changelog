@@ -1,3 +1,9 @@
+* Mon Mar 17 2025 Austin Hemmelgarn <austin@netdata.cloud> 5-1
+- Deploy new package and metadata signing keys
+* Wed Mar 3 2025 Austin Hemmelgarn <austin@netdata.cloud> 4-3
+- Version bump to stay in sync with DEB packages.
+* Mon Feb 24 2025 Austin Hemmelgarn <austin@netdata.cloud> 4-2
+- Version bump to stay in sync with DEB packages.
 * Thu Oct 31 2024 Austin Hemmelgarn <austin@netdata.cloud> 4-1
 - Switch repos to new subdomain.
 * Thu Sep 17 2024 Austin Hemmelgarn <austin@netdata.cloud> 3-5

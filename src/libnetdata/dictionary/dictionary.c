@@ -112,6 +112,7 @@ void dictionary_register_delete_callback(DICTIONARY *dict, dict_cb_delete_t dele
 // ----------------------------------------------------------------------------
 // dictionary statistics API
 
+ALWAYS_INLINE
 size_t dictionary_version(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
@@ -121,7 +122,8 @@ size_t dictionary_version(DICTIONARY *dict) {
     return __atomic_load_n(&dict->version, __ATOMIC_RELAXED);
 }
 
-ALWAYS_INLINE size_t dictionary_entries(DICTIONARY *dict) {
+ALWAYS_INLINE
+size_t dictionary_entries(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
     // this is required for views to return the right number
@@ -328,12 +330,14 @@ static void dictionary_queue_for_destruction(DICTIONARY *dict) {
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 }
 
-void cleanup_destroyed_dictionaries(void) {
+size_t cleanup_destroyed_dictionaries(void) {
     netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
     if (!dictionaries_waiting_to_be_destroyed) {
         netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
-        return;
+        return 0;
     }
+
+    size_t remaining = 0;
 
     DICTIONARY *dict, *last = NULL, *next = NULL;
     for(dict = dictionaries_waiting_to_be_destroyed; dict ; dict = next) {
@@ -351,7 +355,7 @@ void cleanup_destroyed_dictionaries(void) {
 
             internal_error(
                 true,
-                "DICTIONARY: freed dictionary with delayed destruction, created from %s() %zu@%s pid %d.",
+                "DICTIONARY DELAYED: freed dict created from %s() %zu@%s pid %d.",
                 function, line, file, pid);
 
             if(last) last->next = next;
@@ -361,15 +365,19 @@ void cleanup_destroyed_dictionaries(void) {
 
             internal_error(
                     true,
-                    "DICTIONARY: cannot free dictionary with delayed destruction, created from %s() %zu@%s pid %d.",
+                    "DICTIONARY DELAYED %zu: %zu referenced in dict created from %s() %zu@%s pid %d.",
+                    remaining + 1, dictionary_referenced_items(dict),
                     function, line, file, pid);
 
             DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
             last = dict;
+            remaining++;
         }
     }
 
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+
+    return remaining;
 }
 
 // ----------------------------------------------------------------------------
@@ -590,6 +598,8 @@ void dictionary_flush(DICTIONARY *dict) {
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
     DICTIONARY_STATS_DICT_FLUSHES_PLUS1(dict);
+
+    dictionary_garbage_collect(dict);
 }
 
 size_t dictionary_destroy(DICTIONARY *dict) {
@@ -599,7 +609,6 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    dict_flag_set(dict, DICT_FLAG_DESTROYED);
     DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(dict);
 
     size_t referenced_items = dictionary_referenced_items(dict);
@@ -717,6 +726,7 @@ void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 // ----------------------------------------------------------------------------
 // DUP/REL an item (increase/decrease its reference counter)
 
+ALWAYS_INLINE
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     // we allow the item to be NULL here
     api_internal_check(dict, item, false, true);
@@ -729,6 +739,7 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, 
     return item;
 }
 
+ALWAYS_INLINE
 void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     // we allow the item to be NULL here
     api_internal_check(dict, item, false, true);
@@ -744,11 +755,13 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONA
 // ----------------------------------------------------------------------------
 // get the name/value of an item
 
-ALWAYS_INLINE const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+ALWAYS_INLINE
+const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     return item_get_name(item);
 }
 
-ALWAYS_INLINE void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+ALWAYS_INLINE
+void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     if(likely(item))
         return item->shared->value;
 

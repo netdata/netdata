@@ -60,6 +60,8 @@ RUN mkdir -p /app/usr/sbin/ \
 # hadolint ignore=DL3007
 FROM netdata/base:v2 AS base
 
+ARG BUILD_DATE
+ARG BUILD_VERSION
 LABEL org.opencontainers.image.authors="Netdatabot <bot@netdata.cloud>"
 LABEL org.opencontainers.image.url="https://netdata.cloud"
 LABEL org.opencontainers.image.documentation="https://learn.netdata.cloud"
@@ -67,6 +69,8 @@ LABEL org.opencontainers.image.source="https://github.com/netdata/netdata"
 LABEL org.opencontainers.image.title="Netdata Agent"
 LABEL org.opencontainers.image.description="Official Netdata Agent Docker Image"
 LABEL org.opencontainers.image.vendor="Netdata Inc."
+LABEL org.opencontainers.image.created=${BUILD_DATE}
+LABEL org.opencontainers.image.version=${BUILD_VERSION}
 
 ARG OFFICIAL_IMAGE=false
 ENV NETDATA_OFFICIAL_IMAGE=$OFFICIAL_IMAGE
@@ -91,7 +95,6 @@ RUN mkdir -p /opt/src /var/log/netdata && \
     ln -sf /dev/stderr /var/log/netdata/error.log && \
     ln -sf /dev/stderr /var/log/netdata/daemon.log && \
     ln -sf /dev/stdout /var/log/netdata/collector.log && \
-    ln -sf /dev/stdout /var/log/netdata/fluentbit.log && \
     ln -sf /dev/stdout /var/log/netdata/health.log
 
 COPY --from=builder /app /

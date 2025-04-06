@@ -53,8 +53,7 @@ func main() {
 		CollectorsConfigDir:       cfg.collectorsDir,
 		ServiceDiscoveryConfigDir: cfg.serviceDiscoveryDir,
 		CollectorsConfigWatchPath: cfg.collectorsWatchPath,
-		StateFile:                 cfg.stateFile,
-		LockDir:                   cfg.lockDir,
+		VarLibDir:                 cfg.varLibDir,
 		RunModule:                 opts.Module,
 		MinUpdateEvery:            opts.UpdateEvery,
 	})

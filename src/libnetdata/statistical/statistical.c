@@ -112,21 +112,29 @@ inline NETDATA_DOUBLE *copy_series(const NETDATA_DOUBLE *series, size_t entries)
     return copy;
 }
 
+NETDATA_DOUBLE percentile_on_sorted_series(const NETDATA_DOUBLE *series, size_t entries, double percentile) {
+    if (unlikely(entries == 0)) return NAN;
+    if (unlikely(entries == 1)) return series[0];
+
+    // Clamp percentile between 0.0 and 1.0
+    percentile = fmax(0.0, fmin(1.0, percentile));
+
+    // Compute fractional index
+    NETDATA_DOUBLE index = percentile * (NETDATA_DOUBLE)(entries - 1);
+    size_t low_idx = (size_t)floor(index);
+    size_t high_idx = (size_t)ceil(index);;
+
+    // If index is an integer or at the last element, return directly
+    if (high_idx >= entries || low_idx == high_idx || considered_equal_ndd(index, (NETDATA_DOUBLE)low_idx))
+        return series[low_idx];
+
+    // Linear interpolation
+    NETDATA_DOUBLE weight = index - (NETDATA_DOUBLE)low_idx;
+    return series[low_idx] + weight * (series[high_idx] - series[low_idx]);
+}
+
 NETDATA_DOUBLE median_on_sorted_series(const NETDATA_DOUBLE *series, size_t entries) {
-    if(unlikely(entries == 0)) return NAN;
-    if(unlikely(entries == 1)) return series[0];
-    if(unlikely(entries == 2)) return (series[0] + series[1]) / 2;
-
-    NETDATA_DOUBLE average;
-    if(entries % 2 == 0) {
-        size_t m = entries / 2;
-        average = (series[m] + series[m + 1]) / 2;
-    }
-    else {
-        average = series[entries / 2];
-    }
-
-    return average;
+    return percentile_on_sorted_series(series, entries, 0.5);
 }
 
 NETDATA_DOUBLE median(const NETDATA_DOUBLE *series, size_t entries) {

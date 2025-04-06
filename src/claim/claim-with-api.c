@@ -84,7 +84,8 @@ static size_t response_write_callback(void *ptr, size_t size, size_t nmemb, void
     return real_size;
 }
 
-static const char *curl_add_json_room(BUFFER *wb, const char *start, const char *end) {
+static const char *curl_add_json_room(BUFFER *wb, const char *start, const char *end, bool last_item)
+{
     size_t len = end - start;
 
     // copy the item to an new buffer and terminate it
@@ -96,6 +97,9 @@ static const char *curl_add_json_room(BUFFER *wb, const char *start, const char 
     const char *trimmed = trim(buf); // remove leading and trailing spaces
     if(trimmed)
         buffer_json_add_array_item_string(wb, trimmed);
+
+    if (last_item)
+        return NULL;
 
     // prepare for the next item
     start = end + 1;
@@ -117,11 +121,11 @@ void curl_add_rooms_json_array(BUFFER *wb, const char *rooms) {
 
         // Process each item in the comma-separated list
         while ((end = strchr(start, ',')) != NULL)
-            start = curl_add_json_room(wb, start, end);
+            start = curl_add_json_room(wb, start, end, false);
 
         // Process the last item if any
         if (*start)
-            curl_add_json_room(wb, start, &start[strlen(start)]);
+            curl_add_json_room(wb, start, &start[strlen(start)], true);
     }
     buffer_json_array_close(wb);
 }
@@ -148,7 +152,7 @@ static int debug_callback(CURL *handle, curl_infotype type, char *data, size_t s
     return 0;
 }
 
-static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure, bool *can_retry) {
+static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, bool insecure, bool *can_retry) {
     CURL *curl;
     CURLcode res;
     char target_url[2048];
@@ -270,8 +274,16 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     // execute the request
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        claim_agent_failure_reason_set("Request failed with error: %s (proxy is set to '%s')",
-                                       curl_easy_strerror(res), proxy);
+        claim_agent_failure_reason_set("Request failed with error: %s\n"
+                                       "proxy: '%s',\n"
+                                       "insecure: %s,\n"
+                                       "public key file: '%s',\n"
+                                       "trusted key file: '%s'",
+                                       curl_easy_strerror(res),
+                                       proxy,
+                                       insecure ? "true" : "false",
+                                       public_key_file ? public_key_file : "none",
+                                       trusted_key_file ? trusted_key_file : "none");
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
         *can_retry = true;
@@ -372,7 +384,7 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
     bool done = false, can_retry = true;
     size_t retries = 0;
     do {
-        done = send_curl_request(registry_get_this_machine_guid(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, &can_retry);
+        done = send_curl_request(machine_guid_get_txt(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, &can_retry);
         if (done) break;
         sleep_usec(300 * USEC_PER_MS + 100 * retries * USEC_PER_MS);
         retries++;

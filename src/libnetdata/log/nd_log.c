@@ -26,6 +26,10 @@ ALWAYS_INLINE void errno_clear(void) {
 
 static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, SPINLOCK **spinlock) {
     *spinlock = NULL;
+
+    if(source >= _NDLS_MAX)
+        source = NDLS_DAEMON;
+    
     ND_LOG_METHOD output = nd_log.sources[source].method;
 
     switch(output) {
@@ -109,11 +113,46 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+
+static __thread bool nd_log_fatal_event = false;
+
+static void nd_log_fatal_hook(struct log_field *fields, size_t fields_max __maybe_unused) {
+    if(!nd_log_fatal_event)
+        return;
+
+    nd_log_fatal_event = false;
+
+    if(!nd_log.fatal_hook_cb)
+        return;
+
+    const char *filename = log_field_strdupz(&fields[NDF_FILE]);
+    const char *message = log_field_strdupz(&fields[NDF_MESSAGE]);
+    const char *function = log_field_strdupz(&fields[NDF_FUNC]);
+    const char *stack_trace = log_field_strdupz(&fields[NDF_STACK_TRACE]);
+    const char *errno_str = log_field_strdupz(&fields[NDF_ERRNO]);
+    long line = log_field_to_int64(&fields[NDF_LINE]);
+
+    nd_log.fatal_hook_cb(filename, function, message, errno_str, stack_trace, line);
+}
+
+void nd_log_register_fatal_hook_cb(log_event_t cb) {
+    nd_log.fatal_hook_cb = cb;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+void nd_log_register_fatal_final_cb(fatal_event_t cb) {
+    nd_log.fatal_final_cb = cb;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // high level logger
 
 static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
                                  ND_LOG_METHOD output, struct nd_log_source *source,
                                  struct log_field *fields, size_t fields_max) {
+    nd_log_fatal_hook(fields, fields_max);
+
     if(spinlock)
         spinlock_lock(spinlock);
 
@@ -232,8 +271,11 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
     // set the common fields that are automatically set by the logging subsystem
 
-    if(likely(!thread_log_fields[NDF_STACK_TRACE].entry.set))
+#if 0
+    // getting stack traces is crashing on some architectures, so we get them only for daemon status file
+    if(likely(!thread_log_fields[NDF_STACK_TRACE].entry.set) && priority <= NDLP_ALERT) // only on fatal errors
         thread_log_fields[NDF_STACK_TRACE].entry = ND_LOG_FIELD_CB(NDF_STACK_TRACE, stack_trace_formatter, NULL);
+#endif
 
     if(likely(!thread_log_fields[NDF_INVOCATION_ID].entry.set))
         thread_log_fields[NDF_INVOCATION_ID].entry = ND_LOG_FIELD_UUID(NDF_INVOCATION_ID, &nd_log.invocation_id);
@@ -360,6 +402,7 @@ static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
 // --------------------------------------------------------------------------------------------------------------------
 // public API for loggers
 
+NEVER_INLINE
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... )
 {
     int saved_errno = errno;
@@ -382,6 +425,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     va_end(args);
 }
 
+NEVER_INLINE
 void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     int saved_errno = errno;
 
@@ -419,6 +463,23 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
     erl->count = 0;
 }
 
+NEVER_INLINE NORETURN
+static void recursive_fatal_abort(void) {
+    // keep this as a separate function, to have it logged like this in sentry
+#ifdef ENABLE_SENTRY
+    abort();
+#endif
+    _exit(1);
+}
+
+NEVER_INLINE NORETURN
+static void fatal_abort_internal_checks(void) {
+    // keep this as a separate function, to have it logged like this in sentry
+    abort();
+    _exit(1);
+}
+
+NEVER_INLINE
 void netdata_logger_fatal(const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     static size_t already_in_fatal = 0;
 
@@ -429,13 +490,11 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         fprintf(stderr, "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
                 function, line, file);
         fflush(stderr);
-
-#ifdef ENABLE_SENTRY
-        abort();
-#else
-        _exit(1);
-#endif
+        recursive_fatal_abort();
     }
+
+    // send this event to deamon_status_file
+    nd_log_fatal_event = true;
 
     int saved_errno = errno;
     size_t saved_winerror = 0;
@@ -467,7 +526,7 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, saved_errno);
 
     const char *thread_tag = nd_thread_tag();
-    const char *tag_to_send =  thread_tag;
+    const char *tag_to_send = thread_tag;
 
     // anonymize thread names
     if(strncmp(thread_tag, THREAD_TAG_STREAM_RECEIVER, strlen(THREAD_TAG_STREAM_RECEIVER)) == 0)
@@ -475,25 +534,15 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     if(strncmp(thread_tag, THREAD_TAG_STREAM_SENDER, strlen(THREAD_TAG_STREAM_SENDER)) == 0)
         tag_to_send = THREAD_TAG_STREAM_SENDER;
 
-    char action_result[60+1];
-    snprintfz(action_result, 60, "%s:%s", program_name, tag_to_send);
-
-#if !defined(ENABLE_SENTRY) && defined(HAVE_BACKTRACE)
-    int fd = nd_log.sources[NDLS_DAEMON].fd;
-    if(fd == -1)
-        fd = STDERR_FILENO;
-
-    int nptrs;
-    void *buffer[10000];
-
-    nptrs = backtrace(buffer, sizeof(buffer));
-    if(nptrs)
-        backtrace_symbols_fd(buffer, nptrs, fd);
-#endif
+    char action_result[200+1];
+    snprintfz(action_result, 60, "%s:%s:%s", program_name, tag_to_send, function);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    abort();
+    fatal_abort_internal_checks();
 #endif
 
-    netdata_cleanup_and_exit(1, "FATAL", action_result, action_data);
+    if(nd_log.fatal_final_cb)
+        nd_log.fatal_final_cb();
+
+    exit(1);
 }

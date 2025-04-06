@@ -1,0 +1,276 @@
+extends:
+  - ibm.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.14685.1.8
+metrics:
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.14685.3.1.14.2.0 # dpStatusCPUUsageoneMinute
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: memory.usage
+      OID: 1.3.6.1.4.1.14685.3.1.5.1.0 # dpStatusMemoryStatusUsage
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusSystemUsageLoad
+      OID: 1.3.6.1.4.1.14685.3.1.52.2.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummaryestablished
+      OID: 1.3.6.1.4.1.14685.3.1.12.1.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummarysynsent
+      OID: 1.3.6.1.4.1.14685.3.1.12.2.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummarysynreceived
+      OID: 1.3.6.1.4.1.14685.3.1.12.3.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummaryfinwait1
+      OID: 1.3.6.1.4.1.14685.3.1.12.4.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummaryfinwait2
+      OID: 1.3.6.1.4.1.14685.3.1.12.5.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummarytimewait
+      OID: 1.3.6.1.4.1.14685.3.1.12.6.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummaryclosed
+      OID: 1.3.6.1.4.1.14685.3.1.12.7.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummaryclosewait
+      OID: 1.3.6.1.4.1.14685.3.1.12.8.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummarylastack
+      OID: 1.3.6.1.4.1.14685.3.1.12.9.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummarylisten
+      OID: 1.3.6.1.4.1.14685.3.1.12.10.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusTCPSummaryclosing
+      OID: 1.3.6.1.4.1.14685.3.1.12.11.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusConnectionsAcceptedtenSeconds
+      OID: 1.3.6.1.4.1.14685.3.1.13.1.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusConnectionsAcceptedoneMinute
+      OID: 1.3.6.1.4.1.14685.3.1.13.2.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusConnectionsAcceptedtenMinutes
+      OID: 1.3.6.1.4.1.14685.3.1.13.3.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusConnectionsAcceptedoneHour
+      OID: 1.3.6.1.4.1.14685.3.1.13.4.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusConnectionsAcceptedoneDay
+      OID: 1.3.6.1.4.1.14685.3.1.13.5.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusFilesystemStatusFreeEncrypted
+      OID: 1.3.6.1.4.1.14685.3.1.29.1.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusFilesystemStatusTotalEncrypted
+      OID: 1.3.6.1.4.1.14685.3.1.29.2.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusFilesystemStatusFreeTemporary
+      OID: 1.3.6.1.4.1.14685.3.1.29.5.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusFilesystemStatusTotalTemporary
+      OID: 1.3.6.1.4.1.14685.3.1.29.6.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusFilesystemStatusFreeInternal
+      OID: 1.3.6.1.4.1.14685.3.1.29.7.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusFilesystemStatusTotalInternal
+      OID: 1.3.6.1.4.1.14685.3.1.29.8.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusEnvironmentalSensorssystemTemp
+      OID: 1.3.6.1.4.1.14685.3.1.55.1.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusEnvironmentalSensorscpu1Temp
+      OID: 1.3.6.1.4.1.14685.3.1.55.2.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusEnvironmentalSensorscpu2Temp
+      OID: 1.3.6.1.4.1.14685.3.1.55.3.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusEnvironmentalSensorscpu1rpm
+      OID: 1.3.6.1.4.1.14685.3.1.55.4.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusEnvironmentalSensorscpu2rpm
+      OID: 1.3.6.1.4.1.14685.3.1.55.5.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusEnvironmentalSensorschassis1rpm
+      OID: 1.3.6.1.4.1.14685.3.1.55.6.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusEnvironmentalSensorschassis2rpm
+      OID: 1.3.6.1.4.1.14685.3.1.55.7.0
+  - MIB: DATAPOWER-STATUS-MIB
+    symbol:
+      name: ibm.dpStatusEnvironmentalSensorschassis3rpm
+      OID: 1.3.6.1.4.1.14685.3.1.55.8.0
+#  - MIB: DATAPOWER-STATUS-MIB
+#    symbol:
+#      name: ibm.dpStatusEnvironmentalSensorsCaseOpen
+#      OID: 1.3.6.1.4.1.14685.3.1.55.9.0
+#      enum:
+#        yes: 1
+#        no: 2
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+#  - MIB: DATAPOWER-STATUS-MIB
+#    symbol:
+#      name: ibm.dpStatusEnvironmentalSensorsPowerSupply
+#      OID: 1.3.6.1.4.1.14685.3.1.55.13.0
+#      enum:
+#        ok: 1
+#        power-1-failure: 2
+#        power-2-failure: 3
+#        power-1-ac-lost: 4
+#        power-2-ac-lost: 5
+#      TODO: enum in scalar metric is not supported yet (keep this metric and this
+#        comment in profile until it's fixed)
+  - MIB: DATAPOWER-STATUS-MIB
+    table:
+      name: dpStatusLogTargetStatusTable
+      OID: 1.3.6.1.4.1.14685.3.1.28
+    symbols:
+      - name: ibm.dpStatusLogTargetStatusEventsProcessed
+        OID: 1.3.6.1.4.1.14685.3.1.28.1.3
+        metric_type: monotonic_count
+      - name: ibm.dpStatusLogTargetStatusEventsDropped
+        OID: 1.3.6.1.4.1.14685.3.1.28.1.4
+        metric_type: monotonic_count
+      - name: ibm.dpStatusLogTargetStatusEventsPending
+        OID: 1.3.6.1.4.1.14685.3.1.28.1.5
+        metric_type: monotonic_count
+    metric_tags:
+      - symbol:
+          name: ibm.dpStatusLogTargetStatusLogTarget
+          OID: 1.3.6.1.4.1.14685.3.1.28.1.1
+        tag: ibm_dp_status_log_target_status_log_target
+      - symbol:
+          OID: 1.3.6.1.4.1.14685.3.1.28.1.2
+          name: ibm.dpStatusLogTargetStatusStatus
+        tag: ibm_dp_status_log_target_status_status
+        mapping:
+          1: active
+          2: warning
+          3: failure
+          4: suspended
+#      - symbol:
+#          OID: 1.3.6.1.4.1.14685.3.1.28.1.6
+#          name: ibm.dpStatusLogTargetStatusErrorInfo
+#        tag: ibm_dp_status_log_target_status_error_info
+# TODO : This tag might have high cardinality, to be investigated before adding
+  - MIB: DATAPOWER-STATUS-MIB
+    table:
+      name: dpStatusNetworkInterfaceStatusTable
+      OID: 1.3.6.1.4.1.14685.3.1.124
+    symbols:
+      - name: ibm.dpStatusNetworkInterfaceStatusRxHCBytes
+        OID: 1.3.6.1.4.1.14685.3.1.124.1.19
+        metric_type: monotonic_count
+      - name: ibm.dpStatusNetworkInterfaceStatusRxHCPackets
+        OID: 1.3.6.1.4.1.14685.3.1.124.1.20
+        metric_type: monotonic_count
+      - name: ibm.dpStatusNetworkInterfaceStatusRxErrors2
+        OID: 1.3.6.1.4.1.14685.3.1.124.1.21
+        metric_type: monotonic_count
+      - name: ibm.dpStatusNetworkInterfaceStatusRxDrops2
+        OID: 1.3.6.1.4.1.14685.3.1.124.1.22
+        metric_type: monotonic_count
+      - name: ibm.dpStatusNetworkInterfaceStatusTxHCBytes
+        OID: 1.3.6.1.4.1.14685.3.1.124.1.23
+        metric_type: monotonic_count
+      - name: ibm.dpStatusNetworkInterfaceStatusTxHCPackets
+        OID: 1.3.6.1.4.1.14685.3.1.124.1.24
+        metric_type: monotonic_count
+      - name: ibm.dpStatusNetworkInterfaceStatusTxErrors2
+        OID: 1.3.6.1.4.1.14685.3.1.124.1.25
+        metric_type: monotonic_count
+      - name: ibm.dpStatusNetworkInterfaceStatusTxDrops2
+        OID: 1.3.6.1.4.1.14685.3.1.124.1.26
+        metric_type: monotonic_count
+    metric_tags:
+      - symbol:
+          name: ibm.dpStatusNetworkInterfaceStatusInterfaceType
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.2
+        tag: ibm_dp_status_network_interface_status_interface_type
+        mapping:
+          1: other
+          6: ethernet
+          131: tunnel
+          135: vlan
+          161: aggregate
+      - symbol:
+          name: ibm.dpStatusNetworkInterfaceStatusName
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.3
+        tag: ibm_dp_status_network_interface_status_name
+      - symbol:
+          name: ibm.dpStatusNetworkInterfaceStatusIPType
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.6
+        tag: ibm_dp_status_network_interface_status_ip_type
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+          25: l2vpn
+      - symbol:
+          name: ibm.dpStatusNetworkInterfaceStatusIP
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.7
+          format: ip_address
+        tag: ibm_dp_status_network_interface_status_ip
+      - symbol:
+          name: ibm.dpStatusNetworkInterfaceStatusMACAddress
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.9
+          format: mac_address
+        tag: ibm_dp_status_network_interface_status_mac_address
+      - symbol:
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.4
+          name: ibm.dpStatusNetworkInterfaceStatusAdminStatus
+        tag: ibm_dp_status_network_interface_status_admin_status
+        mapping:
+          1: up
+          2: down
+      - symbol:
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.5
+          name: ibm.dpStatusNetworkInterfaceStatusOperStatus
+        tag: ibm_dp_status_network_interface_status_oper_status
+        mapping:
+          1: up
+          2: down
+          3: testing
+          4: unknown
+          5: dormant
+          6: not_present
+          7: lower_layer_down

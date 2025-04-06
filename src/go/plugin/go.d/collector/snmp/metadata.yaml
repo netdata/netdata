@@ -46,7 +46,21 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: ""
+          description: |
+            SNMP service discovery is a dedicated component that automatically scans configured networks to find SNMP-enabled devices. 
+
+            - This feature is disabled by default and requires explicit user configuration to activate.
+            - When enabled, it discovers devices using customizable credentials, supports various IP range formats (single IPs, ranges, CIDR) with a limit of 512 IPs per subnet, and optimizes network traffic through configurable caching of discovery results.
+            - Discovered devices are automatically made available to the SNMP collector for monitoring.
+
+            The configuration file name is [go.d/sd/snmp.conf](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/sd/snmp.conf).
+
+            You can edit the configuration file using the edit-config script from the Netdata [config directory](https://learn.netdata.cloud/docs/netdata-agent/configuration#the-netdata-config-directory).
+
+            ```bash
+             cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+             sudo ./edit-config go.d/sd/snmp.conf
+             ```
         limits:
           description: ""
         performance_impact:

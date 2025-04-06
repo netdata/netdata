@@ -4,7 +4,13 @@
 #include "stream-sender-internals.h"
 #include "stream-replication-sender.h"
 
-static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, STREAM_HANDSHAKE receiver_reason, bool reconnect);
+// help the IDE detect use after free
+#define stream_sender_move_running_to_connector_or_remove(sth, s, reason, receiver_reason, reconnect) do {      \
+        stream_sender_move_running_to_connector_or_remove_internal(sth, s, reason, receiver_reason, reconnect); \
+        (s) = NULL;                                                                                             \
+} while(0)
+
+static void stream_sender_move_running_to_connector_or_remove_internal(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, STREAM_HANDSHAKE receiver_reason, bool reconnect);
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -361,17 +367,15 @@ void stream_sender_remove(struct sender_state *s, STREAM_HANDSHAKE reason) {
     s->exit.reason = 0;
 
     __atomic_store_n(&s->exit.shutdown, false, __ATOMIC_RELAXED);
-    rrdhost_flag_clear(s->host,
-                       RRDHOST_FLAG_STREAM_SENDER_ADDED | RRDHOST_FLAG_STREAM_SENDER_CONNECTED |
-                           RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_SENDER_ADDED | RRDHOST_FLAG_STREAM_SENDER_CONNECTED | RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     s->last_state_since_t = now_realtime_sec();
-    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, s->last_state_since_t);
+    stream_parent_set_host_disconnect_reason(s->host, reason, s->last_state_since_t);
     s->connector.id = -1;
 
     stream_sender_unlock(s);
 
-    rrdhost_stream_parents_reset(s->host, reason);
+    stream_parents_host_reset(s->host, reason);
 
 #ifdef NETDATA_LOG_STREAM_SENDER
     spinlock_lock(&s->log.spinlock);
@@ -404,7 +408,7 @@ static void stream_sender_log_disconnection(struct stream_thread *sth, struct se
                sth->id, rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(reason));
 }
 
-static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, STREAM_HANDSHAKE receiver_reason, bool reconnect) {
+static void stream_sender_move_running_to_connector_or_remove_internal(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, STREAM_HANDSHAKE receiver_reason, bool reconnect) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     ND_LOG_STACK lgs[] = {
@@ -446,7 +450,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
     nd_sock_close(&s->sock);
 
-    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, now_realtime_sec());
+    stream_parent_set_host_disconnect_reason(s->host, reason, now_realtime_sec());
     stream_sender_clear_parent_claim_id(s->host);
     sender_host_buffer_free(s->host);
 
@@ -521,9 +525,9 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
 
         nd_poll_event_t wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
         if(unlikely(s->thread.wanted != wanted)) {
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM SND[%zu] '%s' [to %s]: nd_poll() wanted events mismatch.",
-                   sth->id, rrdhost_hostname(s->host), s->remote_ip);
+//            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+//                   "STREAM SND[%zu] '%s' [to %s]: nd_poll() wanted events mismatch.",
+//                   sth->id, rrdhost_hostname(s->host), s->remote_ip);
 
             s->thread.wanted = wanted;
             if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted))
@@ -630,6 +634,7 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
                    __atomic_load_n(&host->stream.snd.status.replication.counter_out, __ATOMIC_RELAXED));
 
             stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_REPLICATION_STALLED, 0, true);
+            continue;
         }
 
         s->replication.last_checked_ut = s->replication.last_progress_ut;
@@ -713,6 +718,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
                 // this is not executed from the opcode handling mechanism
                 // so we can safely remove the sender
                 stream_sender_move_running_to_connector_or_remove(sth, s, reason, 0, true);
+                break;
             }
             else {
                 // protection against this case:
@@ -782,8 +788,8 @@ bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *
                    "STREAM SND[%zu] '%s' [to %s]: %s (fd %d) - restarting sender connection.",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip, disconnect_reason, s->sock.fd);
 
-            stream_sender_move_running_to_connector_or_remove(
-                sth, s, reason, 0, true);
+            stream_sender_move_running_to_connector_or_remove(sth, s, reason, 0, true);
+            break;
         }
         else if(status == EVLOOP_STATUS_CONTINUE && process_opcodes && stream_thread_process_opcodes(sth, &s->thread.meta))
             status = EVLOOP_STATUS_OPCODE_ON_ME;

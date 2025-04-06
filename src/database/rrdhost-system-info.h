@@ -5,6 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include "rrdlabels.h"
+#include "daemon/status-file.h"
 
 #ifdef RRDHOST_SYSTEM_INFO_INTERNALS
 struct rrdhost_system_info {
@@ -97,5 +98,8 @@ struct update_node_info;
 void rrdhost_system_info_to_node_info(struct rrdhost_system_info *system_info, struct update_node_info *node_info);
 
 void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_system_info *system_info);
+
+bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds);
+void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_system_info *b);
 
 #endif //NETDATA_RRDHOST_SYSTEM_INFO_H

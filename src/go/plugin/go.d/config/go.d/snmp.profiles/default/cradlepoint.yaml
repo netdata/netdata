@@ -1,0 +1,118 @@
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "cradlepoint"
+sysobjectid:
+  - 1.3.6.1.4.1.20992.2.*     # Cradlepoint
+  - 1.3.6.1.4.1.20992.2.1     # Cradlepoint mbr1000
+  - 1.3.6.1.4.1.20992.2.2     # Cradlepoint ctr500
+  - 1.3.6.1.4.1.20992.2.3     # Cradlepoint mbr800
+  - 1.3.6.1.4.1.20992.2.4     # Cradlepoint mbr1100
+  - 1.3.6.1.4.1.20992.2.5     # Cradlepoint mbr1200
+  - 1.3.6.1.4.1.20992.2.6     # Cradlepoint mbr900
+  - 1.3.6.1.4.1.20992.2.7     # Cradlepoint cba250
+  - 1.3.6.1.4.1.20992.2.8     # Cradlepoint cba750
+  - 1.3.6.1.4.1.20992.2.9     # Cradlepoint cx111
+  - 1.3.6.1.4.1.20992.2.10    # Cradlepoint mbr1400
+  - 1.3.6.1.4.1.20992.2.11    # Cradlepoint mbr1200b
+  - 1.3.6.1.4.1.20992.2.12    # Cradlepoint cbr400
+  - 1.3.6.1.4.1.20992.2.13    # Cradlepoint cbr450
+  - 1.3.6.1.4.1.20992.2.14    # Cradlepoint ibr600
+  - 1.3.6.1.4.1.20992.2.15    # Cradlepoint ibr650
+  - 1.3.6.1.4.1.20992.2.16    # Cradlepoint mbr1400v2
+  - 1.3.6.1.4.1.20992.2.17    # Cradlepoint cba750b
+  - 1.3.6.1.4.1.20992.2.18    # Cradlepoint aer2100
+  - 1.3.6.1.4.1.20992.2.19    # Cradlepoint ibr1150
+  - 1.3.6.1.4.1.20992.2.20    # Cradlepoint ibr1100
+  - 1.3.6.1.4.1.20992.2.21    # Cradlepoint cba850
+  - 1.3.6.1.4.1.20992.2.22    # Cradlepoint ibr350
+  - 1.3.6.1.4.1.20992.2.23    # Cradlepoint aer3100
+  - 1.3.6.1.4.1.20992.2.24    # Cradlepoint aer1600
+  - 1.3.6.1.4.1.20992.2.25    # Cradlepoint ibr650b
+  - 1.3.6.1.4.1.20992.2.26    # Cradlepoint aer3150
+  - 1.3.6.1.4.1.20992.2.27    # Cradlepoint aer1650
+  - 1.3.6.1.4.1.20992.2.28    # Cradlepoint aer2150
+  - 1.3.6.1.4.1.20992.2.29    # Cradlepoint ibr600b
+  - 1.3.6.1.4.1.20992.2.30    # Cradlepoint ibr950
+  - 1.3.6.1.4.1.20992.2.31    # Cradlepoint ibr900
+  - 1.3.6.1.4.1.20992.2.32    # Cradlepoint ibr650c
+  - 1.3.6.1.4.1.20992.2.33    # Cradlepoint ibr600c
+  - 1.3.6.1.4.1.20992.2.34    # Cradlepoint ibr1700
+  - 1.3.6.1.4.1.20992.2.35    # Cradlepoint aer2200
+  - 1.3.6.1.4.1.20992.2.36    # Cradlepoint aer2250
+  - 1.3.6.1.4.1.20992.2.37    # Cradlepoint ap22
+  - 1.3.6.1.4.1.20992.2.38    # Cradlepoint ibr200
+  - 1.3.6.1.4.1.20992.2.39    # Cradlepoint ibr250
+  - 1.3.6.1.4.1.20992.2.40    # Cradlepoint ibr900-fips
+  - 1.3.6.1.4.1.20992.2.41    # Cradlepoint ibr950-fips
+  - 1.3.6.1.4.1.20992.2.42    # Cradlepoint ibr1700-fips
+  - 1.3.6.1.4.1.20992.2.43    # Cradlepoint aer2200-fips
+  - 1.3.6.1.4.1.20992.2.44    # Cradlepoint aer2250-fips
+  - 1.3.6.1.4.1.20992.2.45    # Cradlepoint cr4250
+  - 1.3.6.1.4.1.20992.2.46    # Cradlepoint cba550
+metrics:
+  - MIB: WIPIPE-MIB
+    table:
+      OID: 1.3.6.1.4.1.20992.1.2.2
+      name: mdmTable
+    symbols:
+      - name: cradlepoint.mdmSignalStrength
+        OID: 1.3.6.1.4.1.20992.1.2.2.1.4
+      - name: cradlepoint.mdmECIO
+        OID: 1.3.6.1.4.1.20992.1.2.2.1.6
+      - name: cradlepoint.mdmCINR
+        OID: 1.3.6.1.4.1.20992.1.2.2.1.12
+      - name: cradlepoint.mdmSINR
+        OID: 1.3.6.1.4.1.20992.1.2.2.1.13
+      - name: cradlepoint.mdmRSRP
+        OID: 1.3.6.1.4.1.20992.1.2.2.1.14
+      - name: cradlepoint.mdmRSRQ
+        OID: 1.3.6.1.4.1.20992.1.2.2.1.15
+    metric_tags:
+      - symbol:
+          name: cradlepoint.mdmDescr
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.2
+        tag: cradlepoint_mdm_descr
+      - symbol:
+          name: cradlepoint.mdmPort
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.3
+        tag: cradlepoint_mdm_port
+      - symbol:
+          name: cradlepoint.mdmRFBAND
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.17
+        tag: cradlepoint_mdm_rfband
+      - symbol:
+          name: cradlepoint.mdmHOMECARRIER
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.18
+        tag: cradlepoint_mdm_homecarrier
+      - symbol:
+          name: cradlepoint.mdmAPN
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.21
+        tag: cradlepoint_mdm_apn
+      - symbol:
+          name: cradlepoint.mdmRFCHANNEL
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.22
+        tag: cradlepoint_mdm_rfchannel
+      - symbol:
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.5
+          name: cradlepoint.mdmStatus
+        tag: cradlepoint_mdm_status
+        mapping:
+          1: established
+          2: establishing
+          3: ready
+          4: error
+          5: disconnected
+          6: disconnecting
+          7: suspended
+          8: empty
+          9: notconfigured
+          10: userstopped
+      - symbol:
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.16
+          name: cradlepoint.mdmROAM
+        tag: cradlepoint_mdm_roam

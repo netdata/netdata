@@ -622,7 +622,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         key = trim_all(key);
         value = trim_all(value);
 
-        if(!key) {
+        if(!key || !*key) {
             netdata_log_error(
                 "Health configuration has invalid line %zu of file '%s'. Keyword is empty. Ignoring it.",
                 line, filename);
@@ -630,7 +630,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             continue;
         }
 
-        if(!value) {
+        if(!value || !*value) {
             netdata_log_error(
                 "Health configuration has invalid line %zu of file '%s'. value is empty. Ignoring it.",
                 line, filename);

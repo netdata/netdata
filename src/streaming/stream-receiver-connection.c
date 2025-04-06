@@ -99,6 +99,15 @@ void stream_receiver_free(struct receiver_state *rpt) {
     stream_circular_buffer_destroy(rpt->thread.send_to_child.scb);
     rpt->thread.send_to_child.scb = NULL;
 
+    string_freez(rpt->thread.cd.id);
+    string_freez(rpt->thread.cd.filename);
+    string_freez(rpt->thread.cd.fullfilename);
+    string_freez(rpt->thread.cd.cmd);
+    rpt->thread.cd.id = NULL;
+    rpt->thread.cd.filename = NULL;
+    rpt->thread.cd.fullfilename = NULL;
+    rpt->thread.cd.cmd = NULL;
+
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     if(rpt->log.fp)
         fclose(rpt->log.fp);
@@ -173,7 +182,8 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             rpt->config.replication.step,
             rpt->system_info,
             0);
-        // IMPORTANT: system_info is now consumed!
+
+        rrdhost_system_info_free(rpt->system_info);
         rpt->system_info = NULL;
 
         if(!host) {
@@ -701,11 +711,8 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         schedule_node_state_update(rpt->host, 300);
         rrdhost_set_is_parent_label();
 
-        if (rpt->config.ephemeral)
-            rrdhost_option_set(rpt->host, RRDHOST_OPTION_EPHEMERAL_HOST);
-
         // let it reconnect to parents asap
-        rrdhost_stream_parents_reset(rpt->host, STREAM_HANDSHAKE_SP_PREPARING);
+        stream_parents_host_reset(rpt->host, STREAM_HANDSHAKE_SP_PREPARING);
 
         // add it to a stream thread queue
         stream_receiver_add_to_queue(rpt);

@@ -123,9 +123,10 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
                                         sizeof(struct alert_by_x_entry),
                                         rcl);
 
-                char *module = NULL;
-                rrdlabels_get_value_strdup_or_null(st->rrdlabels, &module, "_collect_module");
-                if(!module || !*module) module = "[unset]";
+                char module[128];
+                rrdlabels_get_value_strcpyz(st->rrdlabels, module, sizeof(module), "_collect_module");
+                if(!*module)
+                    strncpyz(module, "[unset]", sizeof(module) - 1);
 
                 dictionary_set_advanced(ctl->alerts.by_module,
                                         module,

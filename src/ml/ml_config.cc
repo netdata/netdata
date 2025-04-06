@@ -19,7 +19,7 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 void ml_config_load(ml_config_t *cfg) {
     const char *config_section_ml = CONFIG_SECTION_ML;
 
-    int enable_anomaly_detection = inicfg_get_boolean_ondemand(&netdata_config, config_section_ml, "enabled", CONFIG_BOOLEAN_AUTO);
+    int enable_anomaly_detection = inicfg_get_boolean_ondemand(&netdata_config, config_section_ml, "enabled", nd_profile.ml_enabled);
 
     /*
      * Read values

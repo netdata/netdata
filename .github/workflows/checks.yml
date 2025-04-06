@@ -25,7 +25,7 @@ jobs:
           submodules: recursive
       - name: Check source files
         id: check-source-files
-        uses: tj-actions/changed-files@v45
+        uses: step-security/changed-files@v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -44,7 +44,7 @@ jobs:
             **/*.md
       - name: Check build files
         id: check-build-files
-        uses: tj-actions/changed-files@v45
+        uses: step-security/changed-files@v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |

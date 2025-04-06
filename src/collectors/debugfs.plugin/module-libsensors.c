@@ -1217,11 +1217,14 @@ static int libsensors_update_every = 1;
 void *libsensors_thread(void *ptr __maybe_unused) {
     int update_every = libsensors_update_every;
 
-    // first try the default directory for libsensors
-    FILE *fp = fopen("/etc/sensors3.conf", "r");
-    if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "../sensors3.conf");
-    if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "sensors3.conf");
-    if(!fp) fp = sensors_open_file("NETDATA_STOCK_CONFIG_DIR", LIBCONFIG_DIR, "sensors3.conf");
+    FILE *fp = NULL;
+    if(access("/etc/sensors3.conf", R_OK) != 0 &&
+        access("/etc/sensors.conf", R_OK) != 0 &&
+        access("/etc/sensors.d", R_OK | X_OK) != 0) {
+                fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "../sensors3.conf");
+        if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "sensors3.conf");
+        if(!fp) fp = sensors_open_file("NETDATA_STOCK_CONFIG_DIR", LIBCONFIG_DIR, "sensors3.conf");
+    }
 
     if (sensors_init(fp) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot initialize libsensors - disabling sensors monitoring");
@@ -1252,6 +1255,12 @@ void *libsensors_thread(void *ptr __maybe_unused) {
         }
         usec_t ended_ut = now_monotonic_usec();
         usec_t average_ut = (ended_ut - started_ut) / samples;
+
+        if(average_ut < 1)
+            average_ut = 1;
+
+        if(max_ut < 1)
+            max_ut = 1;
 
         // List of valid intervals in seconds (divisors and multiples of 60)
         static const int valid_update_every_intervals[] = {1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60, 120, 180, 240, 300, 600, 900, 1200, 1800, 3600};

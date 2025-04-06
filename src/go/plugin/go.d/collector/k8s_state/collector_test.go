@@ -11,10 +11,14 @@ import (
 	"testing"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -356,18 +360,27 @@ func TestCollector_Collect(t *testing.T) {
 				}
 			},
 		},
-		"Nodes and Pods": {
+		"Nodes and Pods and Deployment": {
 			create: func(t *testing.T) testCase {
 				node := newNode("node01")
 				pod := newPod(node.Name, "pod01")
+				deploy := newDeployment("replicaset01")
 				client := fake.NewClientset(
 					node,
 					pod,
+					deploy,
 				)
 
 				step1 := func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
+						"deploy_default_replicaset01_age":                                                        3,
+						"deploy_default_replicaset01_condition_available":                                        1,
+						"deploy_default_replicaset01_condition_progressing":                                      1,
+						"deploy_default_replicaset01_condition_replica_failure":                                  1,
+						"deploy_default_replicaset01_current_replicas":                                           1,
+						"deploy_default_replicaset01_desired_replicas":                                           2,
+						"deploy_default_replicaset01_ready_replicas":                                             3,
 						"discovery_node_discoverer_state":                                                        1,
 						"discovery_pod_discoverer_state":                                                         1,
 						"node_node01_age":                                                                        3,
@@ -483,10 +496,90 @@ func TestCollector_Collect(t *testing.T) {
 
 					assert.Equal(t, expected, mx)
 					assert.Equal(t,
-						len(nodeChartsTmpl)+len(podChartsTmpl)+len(containerChartsTmpl)*len(pod.Spec.Containers)+len(baseCharts),
+						len(nodeChartsTmpl)+
+							len(podChartsTmpl)+
+							len(containerChartsTmpl)*len(pod.Spec.Containers)+
+							len(deploymentChartsTmpl)+
+							len(baseCharts),
 						len(*collr.Charts()),
 					)
 					module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1},
+				}
+			},
+		},
+		"CronJobs": {
+			create: func(t *testing.T) testCase {
+				cj := prepareCronJob("cronjob01")
+				cjSuspended := prepareCronJob("cronjob02")
+				cjSuspended.Spec.Suspend = ptr(true)
+				jobNotStarted := prepareCronJobNotStartedJob("job-not-started", cj)
+				jobComplete := prepareCronJobCompleteJob("job-complete", cj)
+				jobFailed := prepareCronJobFailedJob("job-failed", cj)
+				jobRunning := prepareCronJobRunningJob("job-running", cj)
+				jobSuspended := prepareCronJobSuspendedJob("job-suspended", cj)
+
+				client := fake.NewClientset(
+					cjSuspended,
+					cj,
+					jobNotStarted,
+					jobComplete,
+					jobFailed,
+					jobRunning,
+					jobSuspended,
+				)
+
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+					expected := map[string]int64{
+						"cronjob_default_cronjob01_age":                                       10,
+						"cronjob_default_cronjob01_complete_jobs":                             1,
+						"cronjob_default_cronjob01_failed_jobs":                               1,
+						"cronjob_default_cronjob01_failed_jobs_reason_backoff_limit_exceeded": 0,
+						"cronjob_default_cronjob01_failed_jobs_reason_deadline_exceeded":      1,
+						"cronjob_default_cronjob01_failed_jobs_reason_pod_failure_policy":     0,
+						"cronjob_default_cronjob01_last_completion_duration":                  60,
+						"cronjob_default_cronjob01_last_execution_status_failed":              0,
+						"cronjob_default_cronjob01_last_execution_status_succeeded":           1,
+						"cronjob_default_cronjob01_last_schedule_seconds_ago":                 130,
+						"cronjob_default_cronjob01_last_successful_seconds_ago":               70,
+						"cronjob_default_cronjob01_running_jobs":                              1,
+						"cronjob_default_cronjob01_suspend_status_enabled":                    1,
+						"cronjob_default_cronjob01_suspend_status_suspended":                  0,
+						"cronjob_default_cronjob01_suspended_jobs":                            1,
+						"cronjob_default_cronjob02_age":                                       10,
+						"cronjob_default_cronjob02_complete_jobs":                             0,
+						"cronjob_default_cronjob02_failed_jobs":                               0,
+						"cronjob_default_cronjob02_failed_jobs_reason_backoff_limit_exceeded": 0,
+						"cronjob_default_cronjob02_failed_jobs_reason_deadline_exceeded":      0,
+						"cronjob_default_cronjob02_failed_jobs_reason_pod_failure_policy":     0,
+						"cronjob_default_cronjob02_last_execution_status_failed":              0,
+						"cronjob_default_cronjob02_last_execution_status_succeeded":           0,
+						"cronjob_default_cronjob02_last_schedule_seconds_ago":                 130,
+						"cronjob_default_cronjob02_last_successful_seconds_ago":               70,
+						"cronjob_default_cronjob02_running_jobs":                              0,
+						"cronjob_default_cronjob02_suspend_status_enabled":                    0,
+						"cronjob_default_cronjob02_suspend_status_suspended":                  1,
+						"cronjob_default_cronjob02_suspended_jobs":                            0,
+						"discovery_node_discoverer_state":                                     1,
+						"discovery_pod_discoverer_state":                                      1,
+					}
+
+					copyIfSuffix(expected, mx, "age", "ago")
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(cronJobChartsTmpl)*2+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					module.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, dim *module.Dim) bool {
+						return strings.Contains(chart.ID, cjSuspended.Name) && strings.HasSuffix(chart.ID, "last_completion_duration")
+					})
 				}
 
 				return testCase{
@@ -967,6 +1060,113 @@ func newPod(nodeName, name string) *corev1.Pod {
 	}
 }
 
+func newDeployment(name string) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			Namespace:         corev1.NamespaceDefault,
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+		},
+		Status: appsv1.DeploymentStatus{
+			Conditions: []appsv1.DeploymentCondition{
+				{
+					Type:   appsv1.DeploymentAvailable,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   appsv1.DeploymentProgressing,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   appsv1.DeploymentReplicaFailure,
+					Status: corev1.ConditionTrue,
+				},
+			},
+			AvailableReplicas: 1,
+			Replicas:          2,
+			ReadyReplicas:     3,
+		},
+	}
+}
+
+func prepareCronJob(name string) *batchv1.CronJob {
+	return &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			Namespace:         corev1.NamespaceDefault,
+			UID:               types.UID(name),
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+		},
+		Status: batchv1.CronJobStatus{
+			LastScheduleTime:   &metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
+			LastSuccessfulTime: &metav1.Time{Time: time.Now().Add(-1 * time.Minute)},
+		},
+	}
+}
+
+func prepareCronJobNotStartedJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	return prepareCronJobJob(name, cj)
+}
+
+func prepareCronJobRunningJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	job := prepareCronJobJob(name, cj)
+	job.Status.StartTime = &metav1.Time{Time: time.Now()}
+	job.Status.Active = 1
+	return job
+}
+
+func prepareCronJobCompleteJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	job := prepareCronJobJob(name, cj)
+	job.Status.StartTime = &metav1.Time{Time: time.Now().Add(-1 * time.Minute)}
+	job.Status.CompletionTime = &metav1.Time{Time: time.Now()}
+	job.Status.Conditions = []batchv1.JobCondition{
+		{Type: batchv1.JobComplete, Status: corev1.ConditionTrue},
+	}
+	return job
+}
+
+func prepareCronJobFailedJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	job := prepareCronJobJob(name, cj)
+	job.Status.StartTime = &metav1.Time{Time: time.Now()}
+	job.Status.Conditions = []batchv1.JobCondition{
+		{
+			Type:               batchv1.JobFailed,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+			Reason:             batchv1.JobReasonDeadlineExceeded,
+		},
+	}
+	return job
+}
+
+func prepareCronJobSuspendedJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	job := prepareCronJobJob(name, cj)
+	job.Status.StartTime = &metav1.Time{Time: time.Now()}
+	job.Status.Conditions = []batchv1.JobCondition{
+		{Type: batchv1.JobSuspended, Status: corev1.ConditionTrue},
+	}
+	return job
+}
+
+func prepareCronJobJob(name string, cj *batchv1.CronJob) *batchv1.Job {
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			Namespace:         corev1.NamespaceDefault,
+			UID:               types.UID(name),
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Controller: ptr(true),
+					Kind:       "CronJob",
+					UID:        cj.UID,
+					Name:       cj.Name,
+				},
+			},
+		},
+	}
+}
+
 type brokenInfoKubeClient struct {
 	kubernetes.Interface
 }
@@ -1000,15 +1200,20 @@ func mustQuantity(s string) apiresource.Quantity {
 	return q
 }
 
-func copyAge(dst, src map[string]int64) {
+func copyIfSuffix(dst, src map[string]int64, suffixes ...string) {
 	for k, v := range src {
-		if !strings.HasSuffix(k, "_age") {
-			continue
-		}
-		if _, ok := dst[k]; ok {
-			dst[k] = v
+		for _, suffix := range suffixes {
+			if strings.HasSuffix(k, suffix) {
+				if _, ok := dst[k]; ok {
+					dst[k] = v
+				}
+			}
 		}
 	}
+}
+
+func copyAge(dst, src map[string]int64) {
+	copyIfSuffix(dst, src, "_age")
 }
 
 func isLabelValueSet(c *module.Chart, name string) bool {

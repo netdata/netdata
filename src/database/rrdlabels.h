@@ -5,16 +5,6 @@
 
 #include "libnetdata/libnetdata.h"
 
-struct pattern_array_item {
-    Word_t size;
-    Pvoid_t JudyL;
-};
-
-struct pattern_array {
-    Word_t key_count;
-    Pvoid_t JudyL;
-};
-
 typedef enum __attribute__ ((__packed__)) rrdlabel_source {
     RRDLABEL_SRC_AUTO       = (1 << 0), // set when Netdata found the label by some automation
     RRDLABEL_SRC_CONFIG     = (1 << 1), // set when the user configured the label
@@ -30,11 +20,15 @@ typedef enum __attribute__ ((__packed__)) rrdlabel_source {
 
 #define RRDLABEL_FLAG_INTERNAL (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_DONT_DELETE)
 
+#define RRDLABELS_MAX_NAME_LENGTH 200
+#define RRDLABELS_MAX_VALUE_LENGTH 800 // 800 in bytes, up to 200 UTF-8 characters
+
 struct rrdlabels;
 typedef struct rrdlabels RRDLABELS;
 
 RRDLABELS *rrdlabels_create(void);
 void rrdlabels_destroy(RRDLABELS *labels_dict);
+void rrdlabels_flush(RRDLABELS *labels);
 void rrdlabels_add(RRDLABELS *labels, const char *name, const char *value, RRDLABEL_SRC ls);
 void rrdlabels_add_pair(RRDLABELS *labels, const char *string, RRDLABEL_SRC ls);
 void rrdlabels_value_to_buffer_array_item_or_null(RRDLABELS *labels, BUFFER *wb, const char *key);
@@ -63,19 +57,6 @@ void rrdlabels_to_buffer_json_members(RRDLABELS *labels, BUFFER *wb);
 void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src);
 void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src);
 size_t rrdlabels_common_count(RRDLABELS *labels1, RRDLABELS *labels2);
-
-struct pattern_array *pattern_array_allocate();
-struct pattern_array *
-pattern_array_add_key_value(struct pattern_array *pa, const char *key, const char *value, char sep);
-bool pattern_array_label_match(
-    struct pattern_array *pa,
-    RRDLABELS *labels,
-    char eq,
-    size_t *searches);
-struct pattern_array *pattern_array_add_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep);
-struct pattern_array *
-pattern_array_add_key_simple_pattern(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *pattern);
-void pattern_array_free(struct pattern_array *pa);
 
 int rrdlabels_unittest(void);
 size_t rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size);

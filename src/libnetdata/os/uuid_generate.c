@@ -29,6 +29,8 @@ void os_uuid_generate_time(void *out) {
 #endif
 
 void os_uuid_generate(void *out) {
+    // IMPORTANT: this generates a UUIDv4, which is random
+    // and falls back to uuid_generate_time() if high resolution random generated is not available
     uuid_generate(out);
 }
 
@@ -37,6 +39,7 @@ void os_uuid_generate_random(void *out) {
 }
 
 void os_uuid_generate_time(void *out) {
+    // IMPORTANT: this generates a UUIDv1, which is not random and may suffer from collisions
     uuid_generate_time(out);
 }
 

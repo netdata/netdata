@@ -1849,17 +1849,19 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         rw_spinlock_write_unlock(&pid_ptr->socket_stats.rw_spinlock);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    end_socket_loop:; // the empty statement is here to allow code to be compiled by old compilers
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key.pid, 0, values[0].name, EBPF_MODULE_SOCKET_IDX);
-        ebpf_socket_publish_apps_t *curr = local_pid->socket;
-        if (!curr)
-            local_pid->socket = curr = ebpf_socket_allocate_publish();
+    end_socket_loop: ;// the empty statement is here to allow code to be compiled by old compilers
+        netdata_ebpf_pid_stats_t *local_pid =
+            netdata_ebpf_get_shm_pointer_unsafe(key.pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
+        if (!local_pid)
+            continue;
+        ebpf_socket_publish_apps_t *curr = &local_pid->socket;
 
         if (!deleted)
             ebpf_socket_fill_publish_apps(curr, values);
         else {
-            ebpf_release_pid_data(local_pid, fd, key.pid, EBPF_MODULE_SOCKET_IDX);
-            ebpf_socket_release_publish(curr);
+            netdata_ebpf_reset_shm_pointer_unsafe(fd, key.pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
+            memset(curr, 0, sizeof(*curr));
+            bpf_map_delete_elem(fd, &key);
         }
         memset(values, 0, length);
         memcpy(&key, &next_key, sizeof(key));
@@ -1872,6 +1874,7 @@ void ebpf_socket_resume_apps_data()
 {
     struct ebpf_target *w;
 
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX))))
             continue;
@@ -1881,11 +1884,13 @@ void ebpf_socket_resume_apps_data()
         ebpf_socket_publish_apps_t *values = &w->socket;
         memset(&w->socket, 0, sizeof(ebpf_socket_publish_apps_t));
         for (; move; move = move->next) {
-            int32_t pid = move->pid;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SOCKET_IDX);
-            ebpf_socket_publish_apps_t *ws = local_pid->socket;
-            if (!ws)
+            uint32_t pid = move->pid;
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
+            if (!local_pid)
                 continue;
+
+            ebpf_socket_publish_apps_t *ws = &local_pid->socket;
 
             values->call_tcp_v4_connection = ws->call_tcp_v4_connection;
             values->call_tcp_v6_connection = ws->call_tcp_v6_connection;
@@ -1898,6 +1903,44 @@ void ebpf_socket_resume_apps_data()
             values->call_udp_received = ws->call_udp_received;
         }
     }
+    pthread_mutex_unlock(&collect_data_mutex);
+}
+
+/**
+ * Update cgroup
+ *
+ * Update cgroup data based in PIDs.
+ */
+static void ebpf_update_socket_cgroup()
+{
+    ebpf_cgroup_target_t *ect;
+
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        struct pid_on_target2 *pids;
+        for (pids = ect->pids; pids; pids = pids->next) {
+            uint32_t pid = pids->pid;
+            ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
+            if (!local_pid)
+                continue;
+
+            ebpf_socket_publish_apps_t *in = &local_pid->socket;
+
+            publish->bytes_sent = in->bytes_sent;
+            publish->bytes_received = in->bytes_received;
+            publish->call_tcp_sent = in->call_tcp_sent;
+            publish->call_tcp_received = in->call_tcp_received;
+            publish->retransmit = in->retransmit;
+            publish->call_udp_sent = in->call_udp_sent;
+            publish->call_udp_received = in->call_udp_received;
+            publish->call_close = in->call_close;
+            publish->call_tcp_v4_connection = in->call_tcp_v4_connection;
+            publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
+        }
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -1923,6 +1966,7 @@ void *ebpf_read_socket_thread(void *ptr)
 
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    int cgroups = em->cgroup_charts;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
@@ -1930,10 +1974,13 @@ void *ebpf_read_socket_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        pthread_mutex_lock(&collect_data_mutex);
+        sem_wait(shm_mutex_ebpf_integration);
         ebpf_update_array_vectors(em);
         ebpf_socket_resume_apps_data();
-        pthread_mutex_unlock(&collect_data_mutex);
+        if (cgroups && shm_ebpf_cgroup.header)
+            ebpf_update_socket_cgroup();
+
+        sem_post(shm_mutex_ebpf_integration);
 
         counter = 0;
     }
@@ -2101,40 +2148,6 @@ void ebpf_socket_fill_publish_apps(ebpf_socket_publish_apps_t *curr, netdata_soc
     curr->call_udp_received = ns->udp.call_udp_received;
 }
 
-/**
- * Update cgroup
- *
- * Update cgroup data based in PIDs.
- */
-static void ebpf_update_socket_cgroup()
-{
-    ebpf_cgroup_target_t *ect;
-
-    pthread_mutex_lock(&mutex_cgroup_shm);
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        struct pid_on_target2 *pids;
-        for (pids = ect->pids; pids; pids = pids->next) {
-            int pid = pids->pid;
-            ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SOCKET_IDX);
-            ebpf_socket_publish_apps_t *in = local_pid->socket;
-            if (!in)
-                continue;
-
-            publish->bytes_sent = in->bytes_sent;
-            publish->bytes_received = in->bytes_received;
-            publish->call_tcp_sent = in->call_tcp_sent;
-            publish->call_tcp_received = in->call_tcp_received;
-            publish->retransmit = in->retransmit;
-            publish->call_udp_sent = in->call_udp_sent;
-            publish->call_udp_received = in->call_udp_received;
-            publish->call_close = in->call_close;
-            publish->call_tcp_v4_connection = in->call_tcp_v4_connection;
-            publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
-        }
-    }
-    pthread_mutex_unlock(&mutex_cgroup_shm);
-}
 
 /**
  * Sum PIDs
@@ -2779,9 +2792,6 @@ static void socket_collector(ebpf_module_t *em)
             ebpf_socket_read_hash_global_tables(stats, maps_per_core);
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
-            ebpf_update_socket_cgroup();
-
         pthread_mutex_lock(&lock);
         if (socket_global_enabled)
             ebpf_socket_send_data(em);
@@ -2931,14 +2941,11 @@ void ebpf_parse_service_name_section(struct config *cfg)
  */
 void parse_table_size_options(struct config *cfg)
 {
-    socket_maps[NETDATA_SOCKET_OPEN_SOCKET].user_input = (uint32_t) inicfg_get_number(cfg,
-                                                                                        EBPF_GLOBAL_SECTION,
-                                                                                        EBPF_CONFIG_SOCKET_MONITORING_SIZE,
-                                                                                        NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
+    socket_maps[NETDATA_SOCKET_OPEN_SOCKET].user_input = (uint32_t)inicfg_get_number(
+        cfg, EBPF_GLOBAL_SECTION, EBPF_CONFIG_SOCKET_MONITORING_SIZE, NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
 
-    socket_maps[NETDATA_SOCKET_TABLE_UDP].user_input = (uint32_t) inicfg_get_number(cfg,
-                                                                                      EBPF_GLOBAL_SECTION,
-                                                                                      EBPF_CONFIG_UDP_SIZE, NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED);
+    socket_maps[NETDATA_SOCKET_TABLE_UDP].user_input = (uint32_t)inicfg_get_number(
+        cfg, EBPF_GLOBAL_SECTION, EBPF_CONFIG_UDP_SIZE, NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED);
 }
 
 /*
@@ -3005,8 +3012,8 @@ void *ebpf_socket_thread(void *ptr)
     rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
     // It was not enabled from main config file (ebpf.d.conf)
     if (!network_viewer_opt.enabled)
-        network_viewer_opt.enabled = inicfg_get_boolean(&socket_config, EBPF_NETWORK_VIEWER_SECTION, "enabled",
-                                                           CONFIG_BOOLEAN_YES);
+        network_viewer_opt.enabled =
+            inicfg_get_boolean(&socket_config, EBPF_NETWORK_VIEWER_SECTION, "enabled", CONFIG_BOOLEAN_YES);
 
     rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
 

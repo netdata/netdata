@@ -195,30 +195,30 @@ int do_kern_devstat(int update_every, usec_t dt) {
     static SIMPLE_PATTERN *excluded_disks = NULL;
 
     if (unlikely(enable_new_disks == -1)) {
-        enable_new_disks = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT,
+        enable_new_disks = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT,
                                                        "enable new disks detected at runtime", CONFIG_BOOLEAN_AUTO);
 
-        enable_pass_devices = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT,
+        enable_pass_devices = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT,
                                                           "performance metrics for pass devices", CONFIG_BOOLEAN_AUTO);
 
-        do_system_io = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "total bandwidth for all disks",
+        do_system_io = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "total bandwidth for all disks",
                                                    CONFIG_BOOLEAN_YES);
 
-        do_io     = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "bandwidth for all disks",
+        do_io     = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "bandwidth for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_ops    = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "operations for all disks",
+        do_ops    = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "operations for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_qops   = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "queued operations for all disks",
+        do_qops   = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "queued operations for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_util   = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "utilization percentage for all disks",
+        do_util   = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "utilization percentage for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_iotime = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "i/o time for all disks",
+        do_iotime = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "i/o time for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_await  = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "average completed i/o time for all disks",
+        do_await  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "average completed i/o time for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_avagsz = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "average completed i/o bandwidth for all disks",
+        do_avagsz = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "average completed i/o bandwidth for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
-        do_svctm  = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT, "average service time for all disks",
+        do_svctm  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "average service time for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
 
         excluded_disks = simple_pattern_create(
@@ -302,18 +302,18 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->enabled = !simple_pattern_matches(excluded_disks, disk);
 
                             snprintfz(var_name, 4096, "%s:%s", CONFIG_SECTION_KERN_DEVSTAT, disk);
-                            dm->enabled = config_get_boolean_ondemand(var_name, "enabled", dm->enabled);
+                            dm->enabled = inicfg_get_boolean_ondemand(&netdata_config, var_name, "enabled", dm->enabled);
 
-                            dm->do_io     = config_get_boolean_ondemand(var_name, "bandwidth",               do_io);
-                            dm->do_ops    = config_get_boolean_ondemand(var_name, "operations",              do_ops);
-                            dm->do_qops   = config_get_boolean_ondemand(var_name, "queued operations",       do_qops);
-                            dm->do_util   = config_get_boolean_ondemand(var_name, "utilization percentage",  do_util);
-                            dm->do_iotime = config_get_boolean_ondemand(var_name, "i/o time",                do_iotime);
-                            dm->do_await  = config_get_boolean_ondemand(var_name, "average completed i/o time",
+                            dm->do_io     = inicfg_get_boolean_ondemand(&netdata_config, var_name, "bandwidth",               do_io);
+                            dm->do_ops    = inicfg_get_boolean_ondemand(&netdata_config, var_name, "operations",              do_ops);
+                            dm->do_qops   = inicfg_get_boolean_ondemand(&netdata_config, var_name, "queued operations",       do_qops);
+                            dm->do_util   = inicfg_get_boolean_ondemand(&netdata_config, var_name, "utilization percentage",  do_util);
+                            dm->do_iotime = inicfg_get_boolean_ondemand(&netdata_config, var_name, "i/o time",                do_iotime);
+                            dm->do_await  = inicfg_get_boolean_ondemand(&netdata_config, var_name, "average completed i/o time",
                                                                         do_await);
-                            dm->do_avagsz = config_get_boolean_ondemand(var_name, "average completed i/o bandwidth",
+                            dm->do_avagsz = inicfg_get_boolean_ondemand(&netdata_config, var_name, "average completed i/o bandwidth",
                                                                         do_avagsz);
-                            dm->do_svctm  = config_get_boolean_ondemand(var_name, "average service time",    do_svctm);
+                            dm->do_svctm  = inicfg_get_boolean_ondemand(&netdata_config, var_name, "average service time",    do_svctm);
 
                             // initialise data for differential charts
 
@@ -352,7 +352,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->st_io = rrdset_create_localhost("disk",
                                                                     disk,
                                                                     NULL,
-                                                                    disk,
+                                                                    "io",
                                                                     "disk.io",
                                                                     "Disk I/O Bandwidth",
                                                                     "KiB/s",
@@ -369,6 +369,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                            RRD_ALGORITHM_INCREMENTAL);
                                 dm->rd_io_free = rrddim_add(dm->st_io, "frees", NULL, -1, KILO_FACTOR,
                                                            RRD_ALGORITHM_INCREMENTAL);
+                                rrdlabels_add(dm->st_io->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                             }
 
                             rrddim_set_by_pointer(dm->st_io, dm->rd_io_in,   dstat[i].bytes[DEVSTAT_READ]);
@@ -382,7 +383,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->st_ops = rrdset_create_localhost("disk_ops",
                                                                      disk,
                                                                      NULL,
-                                                                     disk,
+                                                                     "ops",
                                                                      "disk.ops",
                                                                      "Disk Completed I/O Operations",
                                                                      "operations/s",
@@ -401,6 +402,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                              RRD_ALGORITHM_INCREMENTAL);
                                 dm->rd_ops_free = rrddim_add(dm->st_ops, "frees",  NULL, -1, 1,
                                                              RRD_ALGORITHM_INCREMENTAL);
+                                rrdlabels_add(dm->st_ops->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                             }
 
                             rrddim_set_by_pointer(dm->st_ops, dm->rd_ops_in,    dstat[i].operations[DEVSTAT_READ]);
@@ -415,7 +417,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->st_qops = rrdset_create_localhost("disk_qops",
                                                                       disk,
                                                                       NULL,
-                                                                      disk,
+                                                                      "ops",
                                                                       "disk.qops",
                                                                       "Disk Current I/O Operations",
                                                                       "operations",
@@ -427,6 +429,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 );
 
                                 dm->rd_qops = rrddim_add(dm->st_qops, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                                rrdlabels_add(dm->st_qops->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                             }
 
                             rrddim_set_by_pointer(dm->st_qops, dm->rd_qops, dstat[i].start_count - dstat[i].end_count);
@@ -438,7 +441,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->st_util = rrdset_create_localhost("disk_util",
                                                                       disk,
                                                                       NULL,
-                                                                      disk,
+                                                                      "utilization",
                                                                       "disk.util",
                                                                       "Disk Utilization Time",
                                                                       "% of time working",
@@ -451,6 +454,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                                 dm->rd_util = rrddim_add(dm->st_util, "utilization", NULL, 1, 10,
                                                          RRD_ALGORITHM_INCREMENTAL);
+                                rrdlabels_add(dm->st_util->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                             }
 
                             rrddim_set_by_pointer(dm->st_util, dm->rd_util, cur_dstat.busy_time_ms);
@@ -462,7 +466,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 dm->st_iotime = rrdset_create_localhost("disk_iotime",
                                                                         disk,
                                                                         NULL,
-                                                                        disk,
+                                                                        "io",
                                                                         "disk.iotime",
                                                                         "Disk Total I/O Time",
                                                                         "milliseconds/s",
@@ -481,6 +485,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                 RRD_ALGORITHM_INCREMENTAL);
                                 dm->rd_iotime_free  = rrddim_add(dm->st_iotime, "frees",  NULL, -1, 1,
                                                                 RRD_ALGORITHM_INCREMENTAL);
+                                rrdlabels_add(dm->st_iotime->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                             }
 
                             rrddim_set_by_pointer(dm->st_iotime, dm->rd_iotime_in,    cur_dstat.duration_read_ms);
@@ -499,7 +504,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                     dm->st_await = rrdset_create_localhost("disk_await",
                                                                            disk,
                                                                            NULL,
-                                                                           disk,
+                                                                           "io",
                                                                            "disk.await",
                                                                            "Average Completed I/O Operation Time",
                                                                            "milliseconds/operation",
@@ -518,6 +523,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                   RRD_ALGORITHM_ABSOLUTE);
                                     dm->rd_await_free  = rrddim_add(dm->st_await, "frees",  NULL, -1, 1,
                                                                   RRD_ALGORITHM_ABSOLUTE);
+                                    rrdlabels_add(dm->st_await->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                                 }
 
                                 rrddim_set_by_pointer(dm->st_await, dm->rd_await_in,
@@ -556,7 +562,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                     dm->st_avagsz = rrdset_create_localhost("disk_avgsz",
                                                                             disk,
                                                                             NULL,
-                                                                            disk,
+                                                                            "io",
                                                                             "disk.avgsz",
                                                                             "Average Completed I/O Operation Bandwidth",
                                                                             "KiB/operation",
@@ -573,6 +579,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                      RRD_ALGORITHM_ABSOLUTE);
                                     dm->rd_avagsz_free  = rrddim_add(dm->st_avagsz, "frees",  NULL, -1, KILO_FACTOR,
                                                                      RRD_ALGORITHM_ABSOLUTE);
+                                    rrdlabels_add(dm->st_avagsz->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                                 }
 
                                 rrddim_set_by_pointer(dm->st_avagsz, dm->rd_avagsz_in,
@@ -604,7 +611,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                     dm->st_svctm = rrdset_create_localhost("disk_svctm",
                                                                            disk,
                                                                            NULL,
-                                                                           disk,
+                                                                           "ops",
                                                                            "disk.svctm",
                                                                            "Average Service Time",
                                                                            "milliseconds/operation",
@@ -617,6 +624,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                                     dm->rd_svctm = rrddim_add(dm->st_svctm, "svctm", NULL, 1, 1,
                                                               RRD_ALGORITHM_ABSOLUTE);
+                                    rrdlabels_add(dm->st_svctm->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
                                 }
 
                                 rrddim_set_by_pointer(dm->st_svctm, dm->rd_svctm,

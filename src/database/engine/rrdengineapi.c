@@ -166,8 +166,6 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
 
     bool added;
     METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
-    if (added)
-        __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
     return metric;
 }
 
@@ -901,7 +899,7 @@ ALWAYS_INLINE_HOT STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_qu
     pgdc_get_next_point(&handle->pgdc, handle->position, &sp);
 
 prepare_for_next_iteration:
-    internal_fatal(sp.end_time_s < seqh->start_time_s, "DBENGINE: this point is too old for this query");
+    // internal_fatal(sp.end_time_s < seqh->start_time_s, "DBENGINE: this point is too old for this query");
     internal_fatal(sp.end_time_s < handle->now_s, "DBENGINE: this point is too old for this point in time");
 
     handle->now_s += handle->dt_s;
@@ -1284,24 +1282,25 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    // No need to release the datafiles list
-    //finalize_rrd_files(ctx);
-
-    if (unittest_running) //(ctx->config.unittest)
+    if(unittest_running)
         freez(ctx);
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;
 }
 
-void rrdeng_quiesce(struct rrdengine_instance *ctx) {
+void rrdeng_quiesce(struct rrdengine_instance *ctx, bool dirty_only)
+{
     if (NULL == ctx)
         return;
 
     // FIXME - ktsaou - properly cleanup ctx
     // 1. make sure all collectors are stopped
 
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    if (dirty_only)
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_FLUSH_DIRTY, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    else
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
@@ -1335,7 +1334,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
 
             time_t update_every_s;
 
-            size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile->ctx);
+            size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile_ctx(datafile));
 
             time_t start_time_s = journal_start_time_s + descr->delta_start_s;
             time_t end_time_s = journal_start_time_s + descr->delta_end_s;
@@ -1343,7 +1342,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
             if(likely(points > 1))
                 update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
             else {
-                update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile->ctx->config.tier));
+                update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile_ctx(datafile)->config.tier));
                 stats->single_point_pages++;
             }
 

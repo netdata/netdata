@@ -155,9 +155,9 @@ done:
 
 void ctx_get_label_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_context_meta, CTX_GET_LABEL_LIST, &res))
+    if (!PREPARE_STATEMENT(db_context_meta, CTX_GET_LABEL_LIST, &res))
         return;
 
     int param = 0;
@@ -175,7 +175,7 @@ void ctx_get_label_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 // CONTEXT LIST

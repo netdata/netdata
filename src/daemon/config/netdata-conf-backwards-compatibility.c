@@ -4,6 +4,8 @@
 #include "database/engine/rrdengineapi.h"
 
 void netdata_conf_backwards_compatibility(void) {
+    FUNCTION_RUN_ONCE();
+
     // move [global] options to the [web] section
 
     inicfg_move(&netdata_config, CONFIG_SECTION_GLOBAL, "http port listen backlog",
@@ -242,7 +244,9 @@ void netdata_conf_backwards_compatibility(void) {
             found_old_config = true;
     }
 
+#ifdef ENABLE_DBENGINE
     legacy_multihost_db_space = found_old_config;
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
 

@@ -303,7 +303,8 @@ static ALWAYS_INLINE void rrdmetric_set_collected(RRDMETRIC *rm) {
     if(!(old & RRD_FLAG_COLLECTED))
         __atomic_add_fetch(&rm->ri->rc->rrdhost->collected.metrics_count, 1, __ATOMIC_RELAXED);
 
-    rm->rrddim->rrdcontexts.collected = true;
+    if(likely(rm->rrddim))
+        rm->rrddim->rrdcontexts.collected = true;
 }
 
 static ALWAYS_INLINE void rrdmetric_set_archived(RRDMETRIC *rm) {
@@ -480,5 +481,7 @@ void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_
 
 void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc);
 void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc);
+
+RRDLABELS *rrdinstance_labels(RRDINSTANCE *ri);
 
 #endif //NETDATA_RRDCONTEXT_INTERNAL_H

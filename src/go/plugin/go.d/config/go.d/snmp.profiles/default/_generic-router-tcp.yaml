@@ -1,0 +1,5 @@
+# Generic TCP metrics for routers.
+# This profile is deprecated and kept in place for retrocompatibility purposes, please use `_generic-tcp` instead.
+
+extends:
+  - _generic-tcp.yaml

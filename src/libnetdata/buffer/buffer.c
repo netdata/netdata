@@ -224,6 +224,11 @@ BUFFER *buffer_create(size_t size, size_t *statistics)
 {
     BUFFER *b;
 
+    if(!size)
+        size = 1024 - sizeof(BUFFER_OVERFLOW_EOF) - 2;
+    else
+        size++; // make room for the terminator
+
     netdata_log_debug(D_WEB_BUFFER, "Creating new web buffer of size %zu.", size);
 
     b = callocz(1, sizeof(BUFFER));
@@ -263,10 +268,10 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
     if(remaining >= free_size_required) return;
 
     size_t increase = free_size_required - remaining;
-    size_t minimum = 128;
+    size_t minimum = 1024;
     if(minimum > increase) increase = minimum;
 
-    size_t optimal = (b->size > 5*1024*1024) ? b->size / 2 : b->size;
+    size_t optimal = (b->size > 5 * 1024 * 1024) ? b->size / 2 : b->size;
     if(optimal > increase) increase = optimal;
 
     netdata_log_debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", (size_t)b->size, (size_t)(b->size + increase));

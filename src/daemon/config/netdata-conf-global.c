@@ -76,18 +76,20 @@ void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_thre
 }
 
 void libuv_initialize(void) {
+    libuv_worker_threads = (int)netdata_conf_cpus() * 6;
+    libuv_worker_threads = MIN(MAX_LIBUV_WORKER_THREADS, MAX(MIN_LIBUV_WORKER_THREADS, libuv_worker_threads));
+
     libuv_worker_threads = (int)inicfg_get_number_range(
         &netdata_config, CONFIG_SECTION_GLOBAL, "libuv worker threads",
-        (int)netdata_conf_cpus() * 6, MIN_LIBUV_WORKER_THREADS, MAX_LIBUV_WORKER_THREADS);
+        libuv_worker_threads, MIN_LIBUV_WORKER_THREADS, MAX_LIBUV_WORKER_THREADS);
 
     char buf[20 + 1];
     snprintfz(buf, sizeof(buf) - 1, "%d", libuv_worker_threads);
     setenv("UV_THREADPOOL_SIZE", buf, 1);
 }
 
-void netdata_conf_section_global(void) {
-    // ------------------------------------------------------------------------
-    // get the hostname
+void netdata_conf_section_global_hostname(void) {
+    FUNCTION_RUN_ONCE();
 
     netdata_configured_host_prefix = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "host access prefix", "");
     (void) verify_netdata_host_prefix(true);
@@ -98,8 +100,13 @@ void netdata_conf_section_global(void) {
 
     netdata_configured_hostname = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "hostname", buf);
     netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
+}
+
+void netdata_conf_section_global(void) {
+    FUNCTION_RUN_ONCE();
 
     netdata_conf_section_directories();
+    netdata_conf_section_global_hostname();
 
     nd_profile_setup(); // required for configuring the database
     netdata_conf_section_db();

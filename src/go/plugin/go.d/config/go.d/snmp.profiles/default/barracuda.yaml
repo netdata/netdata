@@ -1,0 +1,10 @@
+extends:
+  - _base.yaml
+  - _generic-if.yaml
+  - _generic-ucd.yaml
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "barracuda"

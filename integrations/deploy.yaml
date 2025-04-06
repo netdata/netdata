@@ -254,6 +254,7 @@
             -v /etc/os-release:/host/etc/os-release:ro \
             -v /var/log:/host/var/log:ro \
             -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -v /run/dbus:/run/dbus:ro \
             --restart unless-stopped \
             --cap-add SYS_PTRACE \
             --cap-add SYS_ADMIN \
@@ -281,6 +282,7 @@
             -v /etc/os-release:/host/etc/os-release:ro \
             -v /var/log:/host/var/log:ro \
             -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -v /run/dbus:/run/dbus:ro \
             --restart unless-stopped \
             --cap-add SYS_PTRACE \
             --cap-add SYS_ADMIN \
@@ -321,6 +323,7 @@
                   - /etc/os-release:/host/etc/os-release:ro
                   - /var/log:/host/var/log:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
+                  - /run/dbus:/run/dbus:ro
             {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
@@ -359,6 +362,7 @@
                   - /etc/os-release:/host/etc/os-release:ro
                   - /var/log:/host/var/log:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
+                  - /run/dbus:/run/dbus:ro
             {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
@@ -398,6 +402,7 @@
                   - /etc/hostname:/etc/hostname:ro
                   - /var/log:/host/var/log:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
+                  - /run/dbus:/run/dbus:ro
             {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
@@ -439,6 +444,7 @@
                   - /etc/hostname:/etc/hostname:ro
                   - /var/log:/host/var/log:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
+                  - /run/dbus:/run/dbus:ro
             {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}

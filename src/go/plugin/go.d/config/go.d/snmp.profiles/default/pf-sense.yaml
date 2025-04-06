@@ -1,0 +1,13 @@
+extends:
+  - _base.yaml
+  - _generic-host-resources-base.yaml
+  - _generic-if.yaml
+  - _generic-ucd.yaml
+
+sysobjectid: 1.3.6.1.4.1.12325.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "pfSense"

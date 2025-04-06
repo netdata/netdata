@@ -335,13 +335,14 @@ typedef uint32_t uid_t;
 
 #define UNUSED(x) (void)(x)
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(FSANITIZE_ADDRESS)
 #define UNUSED_FUNCTION(x) __attribute__((unused)) UNUSED_##x
 #define ALWAYS_INLINE_ONLY __attribute__((always_inline))
 #define ALWAYS_INLINE inline __attribute__((always_inline))             // Forces inlining
 #define ALWAYS_INLINE_HOT inline __attribute__((hot, always_inline))    // Encourages optimization and forces inlining
 #define ALWAYS_INLINE_HOT_FLATTEN inline __attribute__((hot, always_inline, flatten))    // Encourages optimization and forces inlining and flattening
 #define NOT_INLINE_HOT __attribute__((hot))                             // Encourages optimization but doesn’t force inlining.
+#define NEVER_INLINE __attribute__((noinline))
 #else
 #define UNUSED_FUNCTION(x) UNUSED_##x
 #define ALWAYS_INLINE_ONLY
@@ -349,6 +350,7 @@ typedef uint32_t uid_t;
 #define ALWAYS_INLINE_HOT inline
 #define ALWAYS_INLINE_HOT_FLATTEN inline
 #define NOT_INLINE_HOT
+#define NEVER_INLINE
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -426,6 +428,22 @@ typedef uint32_t uid_t;
 
 // --------------------------------------------------------------------------------------------------------------------
 
+#define FUNCTION_RUN_ONCE() {                                           \
+    static bool __run_once = false;                                     \
+    if (!__sync_bool_compare_and_swap(&__run_once, false, true)) {      \
+        return;                                                         \
+    }                                                                   \
+}
+
+#define FUNCTION_RUN_ONCE_RET(ret) {                                    \
+    static bool __run_once = false;                                     \
+    if (!__sync_bool_compare_and_swap(&__run_once, false, true)) {      \
+        return (ret);                                                   \
+    }                                                                   \
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 256
 #endif
@@ -448,6 +466,27 @@ typedef uint32_t uid_t;
 #include <wbemidl.h>
 #include <sddl.h>
 // #include <winternl.h> // conflicts on STRING,
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
+
+/* Define a portable way to access st_mtim across Unix variants */
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200809L
+/* POSIX.1-2008 compliant systems have st_mtim */
+#define STAT_GET_MTIME_SEC(st)  ((st).st_mtim.tv_sec)
+#define STAT_GET_MTIME_NSEC(st) ((st).st_mtim.tv_nsec)
+#elif defined(__APPLE__) || defined(__darwin__) || defined(__MACH__)
+/* macOS has st_mtimespec */
+#define STAT_GET_MTIME_SEC(st)  ((st).st_mtimespec.tv_sec)
+#define STAT_GET_MTIME_NSEC(st) ((st).st_mtimespec.tv_nsec)
+#elif defined(__FreeBSD__) || defined(__DragonFly__) || defined(__NetBSD__) || defined(__OpenBSD__)
+/* BSD systems typically have st_mtim or provide a compatibility layer */
+#define STAT_GET_MTIME_SEC(st)  ((st).st_mtim.tv_sec)
+#define STAT_GET_MTIME_NSEC(st) ((st).st_mtim.tv_nsec)
+#else
+/* Fallback for systems with only second precision */
+#define STAT_GET_MTIME_SEC(st)  ((st).st_mtime)
+#define STAT_GET_MTIME_NSEC(st) (0)
 #endif
 
 # ifdef __cplusplus

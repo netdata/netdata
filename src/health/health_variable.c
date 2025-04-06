@@ -36,7 +36,7 @@ struct variable_lookup_job {
 };
 
 static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, RRDSET *st, const char *source __maybe_unused) {
-    if(vbd->score.last_rrdset != st) {
+    if(vbd->score.last_rrdset != st && vbd->rc->rrdset) {
         vbd->score.last_rrdset = st;
         vbd->score.last_score = rrdlabels_common_count(vbd->rc->rrdset->rrdlabels, st->rrdlabels);
     }
@@ -144,7 +144,7 @@ bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
     bool found = false;
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(vbd->host, rc) {
-        if(rc->config.name == vbd->variable) {
+        if(rc->config.name == vbd->variable && rc->rrdset) {
             variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, rc->rrdset, "alarm value");
             found = true;
         }

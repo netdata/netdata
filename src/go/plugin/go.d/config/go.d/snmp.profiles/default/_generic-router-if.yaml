@@ -1,0 +1,5 @@
+# Generic network interfaces metrics for routers.
+# This profile is deprecated and kept in place for retrocompatibility purposes, please use `_generic-if` instead.
+
+extends:
+  - _generic-if.yaml

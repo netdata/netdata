@@ -52,6 +52,8 @@ struct worker {
     size_t spinlocks_used;
     struct worker_spinlock spinlocks[WORKER_SPINLOCK_CONTENTION_FUNCTIONS];
 
+    uint64_t memory_calls[WORKERS_MEMORY_CALL_MAX];
+
     struct worker *next;
     struct worker *prev;
 };
@@ -60,6 +62,24 @@ struct workers_workname {                           // this is what we add to Ju
     SPINLOCK spinlock;
     struct worker *base;
 };
+
+ENUM_STR_MAP_DEFINE(WORKERS_MEMORY_CALL) = {
+    {WORKERS_MEMORY_CALL_LIBC_MALLOC, "malloc"},
+    {WORKERS_MEMORY_CALL_LIBC_CALLOC, "calloc"},
+    {WORKERS_MEMORY_CALL_LIBC_REALLOC, "realloc"},
+    {WORKERS_MEMORY_CALL_LIBC_FREE, "free"},
+    {WORKERS_MEMORY_CALL_LIBC_STRDUP, "strdup"},
+    {WORKERS_MEMORY_CALL_LIBC_STRNDUP, "strndup"},
+    {WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN, "posix_memalign"},
+    {WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN_FREE, "posix_memalign_free"},
+    {WORKERS_MEMORY_CALL_MMAP, "mmap"},
+    {WORKERS_MEMORY_CALL_MUNMAP, "munmap"},
+
+    // terminator
+    {0, NULL},
+};
+
+ENUM_STR_DEFINE_FUNCTIONS(WORKERS_MEMORY_CALL, WORKERS_MEMORY_CALL_LIBC_MALLOC, "other");
 
 static struct workers_globals {
     bool enabled;
@@ -75,6 +95,11 @@ static struct workers_globals {
 };
 
 static __thread struct worker *worker = NULL; // the current thread worker
+static __thread size_t last_job_id = 0;
+
+size_t workers_get_last_job_id() {
+    return last_job_id;
+}
 
 static ALWAYS_INLINE usec_t worker_now_monotonic_usec(void) {
 #ifdef NETDATA_WITHOUT_WORKERS_LATENCY
@@ -100,7 +125,7 @@ size_t workers_allocated_memory(void) {
 }
 
 void worker_register(const char *name) {
-    if(unlikely(worker || !workers_globals.enabled))
+    if(likely(worker || !workers_globals.enabled))
         return;
 
     worker = callocz(1, sizeof(struct worker));
@@ -140,7 +165,7 @@ void worker_register(const char *name) {
 }
 
 void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type) {
-    if(unlikely(!worker)) return;
+    if(likely(!worker)) return;
 
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES)) {
         netdata_log_error("WORKER_UTILIZATION: job_id %zu is too big. Max is %zu", job_id, (size_t)(WORKER_UTILIZATION_MAX_JOB_TYPES - 1));
@@ -166,7 +191,7 @@ void worker_register_job_name(size_t job_id, const char *name) {
 }
 
 void worker_unregister(void) {
-    if(unlikely(!worker)) return;
+    if(likely(!worker)) return;
 
     size_t workname_size = strlen(worker->workname) + 1;
     spinlock_lock(&workers_globals.spinlock);
@@ -214,7 +239,7 @@ static void worker_is_idle_with_time(usec_t now) {
 }
 
 ALWAYS_INLINE void worker_is_idle(void) {
-    if(unlikely(!worker || worker->last_action != WORKER_BUSY)) return;
+    if(likely(!worker || worker->last_action != WORKER_BUSY)) return;
 
     worker_is_idle_with_time(worker_now_monotonic_usec());
 }
@@ -236,7 +261,9 @@ static void worker_is_busy_do(size_t job_id) {
 }
 
 ALWAYS_INLINE void worker_is_busy(size_t job_id) {
-    if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+    last_job_id = job_id;
+
+    if(likely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 
     worker_is_busy_do(job_id);
@@ -257,7 +284,7 @@ static void worker_set_metric_do(size_t job_id, NETDATA_DOUBLE value) {
 }
 
 ALWAYS_INLINE void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
-    if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+    if(likely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 
     worker_set_metric_do(job_id, value);
@@ -289,10 +316,17 @@ static void worker_spinlock_contention_do(const char *func, size_t spins) {
 }
 
 ALWAYS_INLINE void worker_spinlock_contention(const char *func, size_t spins) {
-    if(unlikely(!worker))
+    if(likely(!worker))
         return;
 
     worker_spinlock_contention_do(func, spins);
+}
+
+ALWAYS_INLINE void workers_memory_call(WORKERS_MEMORY_CALL call) {
+    if(likely(!worker || call >= WORKERS_MEMORY_CALL_MAX))
+        return;
+
+    worker->memory_calls[call]++;
 }
 
 // statistics interface
@@ -314,6 +348,7 @@ void workers_foreach(const char *name, void (*callback)(
                                            , const char *spinlock_functions[]
                                            , size_t *spinlock_locks
                                            , size_t *spinlock_spins
+                                           , uint64_t *memory_calls
                                            )
                                            , void *data) {
     if(!workers_globals.enabled)
@@ -353,6 +388,8 @@ void workers_foreach(const char *name, void (*callback)(
         const char *spinlock_functions[WORKER_SPINLOCK_CONTENTION_FUNCTIONS];
         size_t spinlock_locks[WORKER_SPINLOCK_CONTENTION_FUNCTIONS];
         size_t spinlock_spins[WORKER_SPINLOCK_CONTENTION_FUNCTIONS];
+
+        uint64_t memory_calls[WORKERS_MEMORY_CALL_MAX];
 
         size_t max_job_id = p->worker_max_job_id;
         for(size_t i  = 0; i <= max_job_id ;i++) {
@@ -466,6 +503,10 @@ void workers_foreach(const char *name, void (*callback)(
 
         // ------------------------------------------------------------------------------------------------------------
 
+        memcpy(memory_calls, p->memory_calls, sizeof(memory_calls));
+
+        // ------------------------------------------------------------------------------------------------------------
+
         callback(data
                  , p->pid
                  , p->tag
@@ -483,6 +524,7 @@ void workers_foreach(const char *name, void (*callback)(
                  , spinlock_functions
                  , spinlock_locks
                  , spinlock_spins
+                 , memory_calls
                  );
     }
 

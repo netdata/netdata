@@ -42,9 +42,7 @@ static int make_dns_decision(const char *section_name, const char *config_name, 
 
 extern struct netdata_static_thread *static_threads;
 void web_server_threading_selection(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     web_server_mode = web_server_mode_id(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "mode", web_server_mode_name(web_server_mode)));
 
@@ -58,9 +56,7 @@ void web_server_threading_selection(void) {
 }
 
 void netdata_conf_section_web(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     web_client_timeout =
         (int)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_WEB, "disconnect idle clients after", web_client_timeout);
@@ -146,20 +142,16 @@ void netdata_conf_section_web(void) {
 }
 
 void netdata_conf_web_security_init(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
+    FUNCTION_RUN_ONCE();
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
-    netdata_ssl_security_key = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "ssl key",  filename);
+    snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem", netdata_configured_user_config_dir);
+    netdata_ssl_security_key = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "ssl key", filename);
 
-    snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
-    netdata_ssl_security_cert = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "ssl certificate",  filename);
+    snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem", netdata_configured_user_config_dir);
+    netdata_ssl_security_cert = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "ssl certificate", filename);
 
     tls_version    = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "tls ciphers",  "none");
-
-    netdata_ssl_initialize_openssl();
 }
 

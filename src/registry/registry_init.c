@@ -62,7 +62,12 @@ void registry_generate_curl_urls(void) {
     fclose(fp);
 }
 
-int registry_init(void) {
+void netdata_conf_section_registry(void) {
+    FUNCTION_RUN_ONCE();
+
+    netdata_conf_section_directories();
+    netdata_conf_section_global_hostname();
+
     char filename[FILENAME_MAX + 1];
 
     // registry enabled?
@@ -70,7 +75,7 @@ int registry_init(void) {
         registry.enabled = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "enabled", 0);
     }
     else {
-        netdata_log_info("Registry is disabled - use the central netdata");
+        netdata_log_info("Registry is disabled");
         inicfg_set_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "enabled", 0);
         registry.enabled = 0;
     }
@@ -78,13 +83,8 @@ int registry_init(void) {
     // path names
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
     registry.pathname = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "registry", filename);
-    if(mkdir(registry.pathname, 0770) == -1 && errno != EEXIST)
-        fatal("Cannot create directory '%s'.", registry.pathname);
 
     // filenames
-    snprintfz(filename, FILENAME_MAX, "%s/netdata.public.unique.id", registry.pathname);
-    registry.machine_guid_filename = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "netdata unique id file", filename);
-
     snprintfz(filename, FILENAME_MAX, "%s/registry.db", registry.pathname);
     registry.db_filename = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry db file", filename);
 
@@ -93,8 +93,7 @@ int registry_init(void) {
 
     // configuration options
     registry.save_registry_every_entries = (unsigned long long)inicfg_get_number(&netdata_config, CONFIG_SECTION_REGISTRY, "registry save db every new entries", 1000000);
-    registry.persons_expiration = inicfg_get_duration_days_to_seconds(
-                                      &netdata_config, CONFIG_SECTION_REGISTRY, "registry expire idle persons", 365 * 86400);
+    registry.persons_expiration = inicfg_get_duration_days_to_seconds(&netdata_config, CONFIG_SECTION_REGISTRY, "registry expire idle persons", 365 * 86400);
     registry.registry_domain = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry domain", "");
     registry.registry_to_announce = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io");
     registry.hostname = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry hostname", netdata_configured_hostname);
@@ -116,8 +115,14 @@ int registry_init(void) {
         registry.max_name_length = 10;
         inicfg_set_number(&netdata_config, CONFIG_SECTION_REGISTRY, "max URL name length", (long long)registry.max_name_length);
     }
+}
 
-    bool use_mmap = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "use mmap", false);
+void registry_init(void) {
+    FUNCTION_RUN_ONCE();
+
+    netdata_conf_section_registry();
+
+    verify_required_directory(NULL, registry.pathname, true, 0770);
 
     // initialize entries counters
     registry.persons_count = 0;
@@ -128,9 +133,12 @@ int registry_init(void) {
 
     // initialize locks
     netdata_mutex_init(&registry.lock);
+}
 
-    // load the registry database
+bool registry_load(void) {
     if(registry.enabled) {
+        bool use_mmap = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_REGISTRY, "use mmap", false);
+
         // create dictionaries
         registry.persons = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
         registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
@@ -180,12 +188,14 @@ int registry_init(void) {
         if(unlikely(registry_db_should_be_saved()))
             registry_db_save();
 
-//        registry_db_stats();
-//        registry_generate_curl_urls();
-//        exit(0);
+        //        registry_db_stats();
+        //        registry_generate_curl_urls();
+        //        exit(0);
+
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 static int machine_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {

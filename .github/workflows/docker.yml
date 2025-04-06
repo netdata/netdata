@@ -43,7 +43,7 @@ jobs:
       - name: Check source files
         id: check-source-files
         if: github.event_name != 'workflow_dispatch'
-        uses: tj-actions/changed-files@v45
+        uses: step-security/changed-files@v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -63,7 +63,7 @@ jobs:
       - name: Check build system files
         id: check-build-files
         if: github.event_name != 'workflow_dispatch'
-        uses: tj-actions/changed-files@v45
+        uses: step-security/changed-files@v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -213,6 +213,8 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             EXTRA_INSTALL_OPTS=${{ needs.file-check.outputs.skip-go }}
+            BUILD_VERSION=test
+            BUILD_DATE=${{ github.event.repository.updated_at }}
       - name: Test Image
         id: test
         if: needs.file-check.outputs.run == 'true' && matrix.platform == 'linux/amd64'
@@ -220,7 +222,7 @@ jobs:
       - name: Upload Cache
         id: upload-cache
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache/*
@@ -322,7 +324,10 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
-          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+          build-args: |
+            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+            BUILD_VERSION=${{ github.event.inputs.version }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
       - name: Export Digest
         id: export-digest
         if: github.repository == 'netdata/netdata'
@@ -333,7 +338,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: docker-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
@@ -471,7 +476,10 @@ jobs:
         with:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
-          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+          build-args: |
+            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+            BUILD_VERSION=${{ github.event.inputs.version }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
           outputs: type=image,name=quay.io/netdata/netdata,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
         id: export-digest
@@ -483,7 +491,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: quay-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
@@ -622,7 +630,10 @@ jobs:
         with:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
-          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+          build-args: |
+            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+            BUILD_VERSION=${{ github.event.inputs.version }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
           outputs: type=image,name=ghcr.io/netdata/netdata,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
         id: export-digest
@@ -634,7 +645,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ghcr-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*

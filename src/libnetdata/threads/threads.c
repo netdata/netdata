@@ -130,6 +130,13 @@ const char *nd_thread_tag(void) {
     return nd_thread_get_name(false);
 }
 
+const char *nd_thread_tag_async_safe(void) {
+    if(nd_thread_has_tag())
+        return _nd_thread_info->tag;
+
+    return _nd_thread_os_name;
+}
+
 void nd_thread_tag_set(const char *tag) {
     if(!tag || !*tag) return;
 
@@ -143,9 +150,11 @@ void nd_thread_tag_set(const char *tag) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static __thread bool libuv_name_set = false;
-void uv_thread_set_name_np(const char* name) {
-    if(libuv_name_set) return;
+void uv_thread_set_name_np(const char *name) {
+    static __thread bool libuv_name_set = false;
+
+    if(!name || !*name || (libuv_name_set && _nd_thread_os_name[0]))
+        return;
 
     strncpyz(_nd_thread_os_name, name, sizeof(_nd_thread_os_name) - 1);
     os_set_thread_name(_nd_thread_os_name);
@@ -211,7 +220,7 @@ size_t netdata_threads_init(void) {
 // ----------------------------------------------------------------------------
 // late initialization
 
-void netdata_threads_init_after_fork(size_t stacksize) {
+void netdata_threads_set_stack_size(size_t stacksize) {
     int i;
 
     // set pthread stack size
@@ -234,7 +243,7 @@ void netdata_threads_init_for_external_plugins(size_t stacksize) {
     if(default_stacksize < 1 * 1024 * 1024)
         default_stacksize = 1 * 1024 * 1024;
 
-    netdata_threads_init_after_fork(stacksize ? stacksize : default_stacksize);
+    netdata_threads_set_stack_size(stacksize ? stacksize : default_stacksize);
 }
 
 // ----------------------------------------------------------------------------
@@ -347,6 +356,8 @@ static void *nd_thread_starting_point(void *ptr) {
 
     CLEANUP_FUNCTION_REGISTER(nd_thread_exit) cleanup_ptr = nti;
 
+    signals_block_all_except_deadly();
+
     // run the thread code
     nti->ret = nti->start_routine(nti->arg);
 
@@ -414,6 +425,7 @@ void nd_thread_signal_cancel(ND_THREAD *nti) {
     spinlock_unlock(&nti->canceller.spinlock);
 }
 
+ALWAYS_INLINE
 bool nd_thread_signaled_to_cancel(void) {
     if(!_nd_thread_info) return false;
     return __atomic_load_n(&_nd_thread_info->cancel_atomic, __ATOMIC_RELAXED);
@@ -428,7 +440,9 @@ int nd_thread_join(ND_THREAD *nti) {
 
     int ret = pthread_join(nti->thread, NULL);
     if(ret != 0) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot join thread. pthread_join() failed with code %d. (tag=%s)", ret, nti->tag);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "cannot join thread. pthread_join() failed with code %d. (tag=%s)",
+               ret, nti->tag);
     }
     else {
         nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);

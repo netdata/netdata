@@ -150,8 +150,6 @@ static void health_initialize_rrdhost(RRDHOST *host) {
         !service_running(SERVICE_HEALTH))
         return;
 
-    rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
-
     host->health_log.max = health_globals.config.health_log_entries_max;
     host->health_log.health_log_retention_s = health_globals.config.health_log_retention_s;
     host->health.default_exec = string_dup(health_globals.config.default_exec);
@@ -161,8 +159,10 @@ static void health_initialize_rrdhost(RRDHOST *host) {
     host->health_log.next_log_id = get_uint32_id();
     host->health_log.next_alarm_id = 0;
 
-    rw_spinlock_init(&host->health_log.spinlock);
     sql_health_alarm_log_load(host);
+    rw_spinlock_init(&host->health_log.spinlock);
+    rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
+
     health_apply_prototypes_to_host(host);
 }
 
@@ -669,7 +669,7 @@ static void health_event_loop(void) {
                    "Postponing alarm checks for %"PRId32" seconds, "
                    "because it seems that the system was just resumed from suspension.",
                    (int32_t)health_globals.config.postpone_alarms_during_hibernation_for_seconds);
-            schedule_node_state_update(localhost, 0);
+            schedule_node_state_update(localhost, 10);
         }
 
         if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {

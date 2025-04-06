@@ -118,8 +118,9 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
         dfe_done(rm);
 
         size_t label_searches = 0;
-        if(unlikely(ri->rrdlabels && rrdlabels_entries(ri->rrdlabels) &&
-                    rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, q, ':', &label_searches) == SP_MATCHED_POSITIVE)) {
+        RRDLABELS *labels = rrdinstance_labels(ri);
+        if(unlikely(rrdlabels_entries(labels) &&
+                    rrdlabels_match_simple_pattern_parsed(labels, q, ':', &label_searches) == SP_MATCHED_POSITIVE)) {
             ctl->q.fts.searches += label_searches;
             ctl->q.fts.char_searches += label_searches;
             matched = FTS_MATCHED_LABEL;
@@ -638,14 +639,14 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
             ;
         else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
             // keep new
-            string_freez(o->family);
-            o->family = string_dup(n->family);
+            SWAP(o->family, n->family);
         }
         else {
             // merge
             STRING *old_family = o->family;
             o->family = string_2way_merge(o->family, n->family);
             string_freez(old_family);
+            // n->family will be freed below
         }
     }
 
@@ -655,8 +656,7 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
             ;
         else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
             // keep new
-            string_freez(o->units);
-            o->units = string_dup(n->units);
+            SWAP(o->units, n->units);
         }
         else {
             // keep old
@@ -689,6 +689,7 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     o->flags |= n->flags;
     o->match = MIN(o->match, n->match);
 
+    string_freez(n->units);
     string_freez(n->family);
 
     return true;

@@ -1,0 +1,28 @@
+# Profile for Cisco catalyst WLC
+# This profile is only compatible with the core SNMP integration
+
+extends:
+  - _base.yaml
+  - _cisco-generic.yaml
+  - _cisco-catalyst.yaml
+  - _cisco-wlc.yaml
+
+device:
+  vendor: "cisco"
+
+sysobjectid:
+  - 1.3.6.1.4.1.9.1.2025 # cisco5700WLC
+  - 1.3.6.1.4.1.9.1.2067 # cisco5760WLC
+  - 1.3.6.1.4.1.9.1.2391 # ciscoC9800CLK9
+  - 1.3.6.1.4.1.9.1.2530 # ciscoC980040K9
+  - 1.3.6.1.4.1.9.1.2531 # ciscoAIRCT9880K9
+  - 1.3.6.1.4.1.9.1.2669 # ciscoC980080K9
+  - 1.3.6.1.4.1.9.1.2825 # ciscoCMeWlc
+  - 1.3.6.1.4.1.9.1.2860 # ciscoC9800LCK9
+  - 1.3.6.1.4.1.9.1.2861 # ciscoC9800LFK9
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "WLC"

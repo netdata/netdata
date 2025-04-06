@@ -17,7 +17,7 @@ src/collectors/cups.plugin/ @thiagoftsm
 src/exporting/ @thiagoftsm
 src/daemon/ @thiagoftsm @vkalintiris
 src/database/ @thiagoftsm @vkalintiris
-docs/ @Ancairon
+docs/ @Ancairon @kanelatechnical
 src/go/ @ilyam8
 src/health/ @thiagoftsm @vkalintiris
 src/health/health.d/ @thiagoftsm
@@ -31,11 +31,10 @@ src/streaming/ @thiagoftsm
 system/ @netdata/agent-sre
 tests/ @netdata/agent-sre @vkalintiris
 src/web/ @thiagoftsm @vkalintiris
-src/web/gui/ @novykh
 
 # Ownership by filetype (overwrites ownership by directory)
-*.md @Ancairon
-*.mdx @Ancairon
+*.md @Ancairon @kanelatechnical
+*.mdx @Ancairon @kanelatechnical
 Dockerfile* @netdata/agent-sre
 
 # Ownership of specific files

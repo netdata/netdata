@@ -1,0 +1,64 @@
+extends:
+  - _vertiv.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.476.1.42 # liebertGlobalProducts
+metrics:
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.1.2.1.0
+      name: lgpEnvTemperatureSettingDegF
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.1.2.2.0
+      name: lgpEnvTemperatureToleranceDegF
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.1.2.3
+      name: lgpEnvTemperatureTableDegF
+    symbols:
+      - OID: 1.3.6.1.4.1.476.1.42.3.4.1.2.3.1.3
+        name: lgpEnvTemperatureMeasurementDegF
+      - OID: 1.3.6.1.4.1.476.1.42.3.4.1.3.3.1.3
+        name: lgpEnvTemperatureMeasurementDegC
+      - OID: 1.3.6.1.4.1.476.1.42.3.4.2.2.3.1.3
+        name: lgpEnvHumidityMeasurementRel
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.476.1.42.3.4.1.2.3.1.2 # OID index
+          name: lgpEnvTemperatureDescrDegF
+        tag: lgp_env_temperature_descr_deg_f
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.6.1.0
+      name: lgpEnvStatisticsComp1RunHr
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.6.2.0
+      name: lgpEnvStatisticsComp2RunHr
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.6.3.0
+      name: lgpEnvStatisticsFanRunHr
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.6.4.0
+      name: lgpEnvStatisticsHumRunHr
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.6.7.0
+      name: lgpEnvStatisticsReheat1RunHr
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.6.8.0
+      name: lgpEnvStatisticsReheat2RunHr
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.6.9.0
+      name: lgpEnvStatisticsReheat3RunHr
+metric_tags:
+  - tag: lgp_agent_ident_model
+    OID: 1.3.6.1.4.1.476.1.42.2.1.2.0
+    symbol: lgpAgentIdentModel
+  - tag: lgp_agent_ident_serial_number
+    OID: 1.3.6.1.4.1.476.1.42.2.1.4.0
+    symbol: lgpAgentIdentSerialNumber

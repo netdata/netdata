@@ -219,7 +219,7 @@ static ALWAYS_INLINE RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *s
         if(likely(rd)) {
             const char *id = prd->id;
 
-            if(strcmp(id, dimension) == 0) {
+            if(id && *id && strcmp(id, dimension) == 0) {
                 // we found it cached
                 return rd;
             }

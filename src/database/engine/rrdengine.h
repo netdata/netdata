@@ -15,7 +15,7 @@
 #include "journalfile.h"
 #include "rrdengineapi.h"
 #include "pagecache.h"
-#include "metric.h"
+#include "mrg.h"
 #include "cache.h"
 #include "pdc.h"
 #include "page.h"
@@ -255,6 +255,7 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_EVICT_OPEN,
     RRDENG_OPCODE_EVICT_EXTENT,
     RRDENG_OPCODE_CTX_SHUTDOWN,
+    RRDENG_OPCODE_CTX_FLUSH_DIRTY,
     RRDENG_OPCODE_CTX_QUIESCE,
     RRDENG_OPCODE_CTX_POPULATE_MRG,
     RRDENG_OPCODE_SHUTDOWN_EVLOOP,
@@ -283,27 +284,14 @@ struct extent_io_data {
 
 struct extent_io_descriptor {
     struct rrdengine_instance *ctx;
-    uv_fs_t uv_fs_request;
-    uv_buf_t iov;
-    uv_file file;
     void *buf;
-    struct wal *wal;
     uint64_t pos;
-    unsigned bytes;
     unsigned descr_count;
+    unsigned bytes;
+    struct wal *wal;
+    uv_file file;
     struct page_descr_with_data *descr_array[MAX_PAGES_PER_EXTENT];
     struct rrdengine_datafile *datafile;
-    struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
-};
-
-struct generic_io_descriptor {
-    struct rrdengine_instance *ctx;
-    uv_fs_t req;
-    uv_buf_t iov;
-    void *buf;
-    void *data;
-    uint64_t pos;
-    unsigned bytes;
 };
 
 typedef struct wal {
@@ -311,7 +299,6 @@ typedef struct wal {
     void *buf;
     size_t size;
     size_t buf_size;
-    struct generic_io_descriptor io_descr;
 
     struct {
         struct wal *prev;
@@ -559,8 +546,9 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx);
+uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock);
 void rrdeng_calculate_tier_disk_space_percentage(void);
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
+void dbengine_shutdown();
 
 #endif /* NETDATA_RRDENGINE_H */

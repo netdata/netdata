@@ -1,18 +1,26 @@
-# Observability Centralization Points
+# **Observability Centralization Points**
 
-Netdata supports the creation of multiple independent **Observability Centralization Points**, aggregating metric samples, logs and metadata within an infrastructure.
+Netdata allows you to set up multiple **Observability Centralization Points** to aggregate metrics, logs, and metadata across your infrastructure.
 
-Observability Centralization Points are crucial for ensuring comprehensive monitoring and observability across an infrastructure, particularly under the following conditions:
+## **Why Use Centralization Points?**
 
-1. **Ephemeral Systems**: For systems like Kubernetes nodes or ephemeral VMs that may not be persistently available, centralization points ensure that metrics and logs are not lost when these systems go offline. This is essential for maintaining historical data for analysis and troubleshooting.
+- **Ephemeral Systems**:
+    - Ideal for **Kubernetes nodes or temporary VMs** that frequently go offline.
+    - Ensures metrics and logs remain available for analysis and troubleshooting.
 
-2. **Resource Constraints**: In scenarios where the monitored systems lack sufficient resources (disk space or I/O bandwidth, CPU, RAM) to handle observability tasks effectively, centralization points offload these responsibilities, ensuring that production systems can operate efficiently without compromise.
+- **Limited Resources**:
+    - Offloads observability tasks from systems with **low disk space, CPU, RAM, or I/O bandwidth**.
+    - Keeps production systems running efficiently without performance trade-offs.
 
-3. **Multi-node Dashboards without Netdata Cloud**: For environments requiring aggregated views across multiple nodes but without the use of Netdata Cloud, Netdata Parents can aggregate this data to provide comprehensive dashboards, similar to what Netdata Cloud offers.
+- **Multi-Node Dashboards Without Netdata Cloud**:
+    - Aggregates data from multiple nodes for **centralized dashboards**, similar to Netdata Cloud.
 
-4. **Netdata Cloud Access Restrictions**: In cases where monitored systems cannot connect to Netdata Cloud (due to a firewall policy), a Netdata Parent can serve as a bridge, aggregating data and interfacing with Netdata Cloud on behalf of these restricted systems.
+- **Restricted Netdata Cloud Access**:
+    - Acts as a **bridge** when monitored systems can’t connect to Netdata Cloud due to **firewall restrictions**.
 
-When multiple independent centralization points are available:
+## **How Multiple Centralization Points Work**
 
-- Netdata Cloud provides a unified infrastructure view by querying all points in parallel.
-- Parent nodes without Cloud access provide consolidated views of their connected infrastructure's metrics and logs.
+- **With Netdata Cloud**:
+    - Queries all centralization points in parallel for a unified view of the infrastructure.
+- **Without Netdata Cloud**:
+    - Parent nodes consolidate data from connected systems, providing a local view of metrics and logs.

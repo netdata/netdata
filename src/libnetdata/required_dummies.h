@@ -3,16 +3,6 @@
 #ifndef NETDATA_LIB_DUMMIES_H
 #define NETDATA_LIB_DUMMIES_H 1
 
-// callback required by fatal()
-void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data)
-{
-    (void)action;
-    (void)action_result;
-    (void)action_data;
-
-    exit(ret);
-}
-
 void rrdset_thread_rda_free(void){}
 void sender_thread_buffer_free(void){}
 void query_target_free(void){}

@@ -5,6 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
+#define HOST_LABEL_IS_EPHEMERAL "_is_ephemeral"
+
 struct stream_thread;
 struct rrdset;
 
@@ -82,6 +84,7 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 27), // metadata needs to be stored in the database
 
     RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 28), // set when the host has updated global functions
+    RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION       = (1 << 29), // set when rrdcontext needs to update the retention of the host
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_get(host)                         atomic_flags_get(&((host)->flags))
@@ -91,17 +94,13 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 #define rrdhost_flag_set_and_clear(host, set, clear)   atomic_flags_set_and_clear(&((host)->flags), set, clear)
 
 typedef enum __attribute__ ((__packed__)) {
-    // Indexing
-    RRDHOST_OPTION_INDEXED_MACHINE_GUID     = (1 << 0), // when set, we have indexed its machine guid
-    RRDHOST_OPTION_INDEXED_HOSTNAME         = (1 << 1), // when set, we have indexed its hostname
-
     // Streaming configuration
-    RRDHOST_OPTION_SENDER_ENABLED           = (1 << 2), // set when the host is configured to send metrics to a parent
-    RRDHOST_OPTION_REPLICATION              = (1 << 3), // when set, we support replication for this host
+    RRDHOST_OPTION_SENDER_ENABLED           = (1 << 0), // set when the host is configured to send metrics to a parent
+    RRDHOST_OPTION_REPLICATION              = (1 << 1), // when set, we support replication for this host
 
     // Other options
-    RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 4), // when set, this host is a virtual one
-    RRDHOST_OPTION_EPHEMERAL_HOST           = (1 << 5), // when set, this host is an ephemeral one
+    RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 2), // when set, this host is a virtual one
+    RRDHOST_OPTION_EPHEMERAL_HOST           = (1 << 3), // when set, this host is an ephemeral one
 } RRDHOST_OPTIONS;
 
 #define rrdhost_option_check(host, flag) ((host)->options & (flag))
@@ -186,6 +185,7 @@ struct rrdhost {
 
                 time_t last_connected;              // last time child connected (stored in db)
                 uint32_t connections;               // the number of times this sender has connected
+                STREAM_HANDSHAKE reason;            // the last receiver exit reason
 
                 struct {
                     uint32_t counter_in;            // counts the number of replication statements we have received
@@ -219,10 +219,10 @@ struct rrdhost {
                 time_t last_disconnected;           // the time the last sender was disconnected
                 time_t last_chart;                  // the time of the last CHART streaming command
                 bool check_obsolete;                // set when child connects, will instruct parent to
-                                          // trigger a check for obsoleted charts since previous connect
+                                                    // trigger a check for obsoleted charts since previous connect
 
                 uint32_t connections;               // the number of times this receiver has connected
-                STREAM_HANDSHAKE exit_reason;       // the last receiver exit reason
+                STREAM_HANDSHAKE reason;            // the last receiver exit reason
 
                 struct {
                     uint32_t counter_in;            // counts the number of replication statements we have received
@@ -384,7 +384,7 @@ void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha);
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 RRDHOST *rrdhost_find_by_guid(const char *guid);
-RRDHOST *find_host_by_node_id(char *node_id);
+RRDHOST *rrdhost_find_by_node_id(char *node_id);
 
 #ifdef RRDHOST_INTERNALS
 RRDHOST *rrdhost_create(
@@ -442,9 +442,10 @@ RRDHOST *rrdhost_find_or_create(
 
 void rrdhost_free_all(void);
 
-void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force);
+void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host);
+void rrdhost_cleanup_data_collection_and_health(RRDHOST *host);
 
-bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
+bool rrdhost_should_be_cleaned_up(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
 bool rrdhost_should_run_health(RRDHOST *host);
 
 void set_host_properties(
@@ -467,7 +468,7 @@ static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, tim
         *to = online ? now : last_time_s;
 }
 
-extern time_t rrdhost_free_orphan_time_s;
+extern time_t rrdhost_cleanup_orphan_to_archive_time_s;
 extern time_t rrdhost_free_ephemeral_time_s;
 
 #include "rrdhost-collection.h"

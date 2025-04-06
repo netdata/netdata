@@ -4,10 +4,7 @@
 #include "health-alert-entry.h"
 
 // the queue of executed alarm notifications that haven't been waited for yet
-static struct {
-    ALARM_ENTRY *head; // oldest
-    ALARM_ENTRY *tail; // latest
-} alarm_notifications_in_progress = {NULL, NULL};
+static ALARM_ENTRY *alarm_notifications_in_progress = NULL;
 
 struct health_raised_summary {
     RRDHOST *host;
@@ -38,6 +35,7 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
     }
 
     code = spawn_popen_wait(ae->popen_instance);
+    ae->popen_instance = NULL;
     netdata_log_debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
 
 cleanup:
@@ -52,7 +50,7 @@ cleanup:
 
 void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void) {
     ALARM_ENTRY *ae;
-    while (NULL != (ae = alarm_notifications_in_progress.head)) {
+    while (NULL != (ae = alarm_notifications_in_progress)) {
         if(unlikely(!service_running(SERVICE_HEALTH)))
             break;
 
@@ -62,36 +60,14 @@ void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_u
 
 void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae)
 {
-    struct alarm_entry *prev = ae->prev_in_progress;
-    struct alarm_entry *next = ae->next_in_progress;
-
-    if (NULL != prev) {
-        prev->next_in_progress = next;
-    }
-    if (NULL != next) {
-        next->prev_in_progress = prev;
-    }
-    if (ae == alarm_notifications_in_progress.head) {
-        alarm_notifications_in_progress.head = next;
-    }
-    if (ae == alarm_notifications_in_progress.tail) {
-        alarm_notifications_in_progress.tail = prev;
-    }
+    fatal_assert(ae->prev_in_progress || ae->next_in_progress);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(alarm_notifications_in_progress, ae, prev_in_progress, next_in_progress);
 }
 
 static inline void enqueue_alarm_notify_in_progress(ALARM_ENTRY *ae)
 {
-    ae->prev_in_progress = NULL;
-    ae->next_in_progress = NULL;
-
-    if (NULL != alarm_notifications_in_progress.tail) {
-        ae->prev_in_progress = alarm_notifications_in_progress.tail;
-        alarm_notifications_in_progress.tail->next_in_progress = ae;
-    }
-    if (NULL == alarm_notifications_in_progress.head) {
-        alarm_notifications_in_progress.head = ae;
-    }
-    alarm_notifications_in_progress.tail = ae;
+    fatal_assert(!ae->prev_in_progress && !ae->next_in_progress);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(alarm_notifications_in_progress, ae, prev_in_progress, next_in_progress);
 }
 
 static bool prepare_command(BUFFER *wb,
@@ -534,8 +510,7 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
 
     rw_spinlock_read_lock(&host->health_log.spinlock);
 
-    ALARM_ENTRY *ae;
-    for(ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
+    for(ALARM_ENTRY *ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
         if(unlikely(
                 !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
                 !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
@@ -556,9 +531,9 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
     //delete those that are updated, no in progress execution, and is not repeating
     rw_spinlock_write_lock(&host->health_log.spinlock);
 
-    ALARM_ENTRY *prev = NULL, *next = NULL;
-    for(ae = host->health_log.alarms; ae ; ae = next) {
-        next = ae->next; // set it here, for the next iteration
+    ALARM_ENTRY *ae = host->health_log.alarms;
+    while(ae) {
+        ALARM_ENTRY *next = ae->next; // set it here, for the next iteration
 
         if((likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
              (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) &&
@@ -569,21 +544,11 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
              (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
              (ae->when + 86400 < now_realtime_sec())))
         {
-
-            if(host->health_log.alarms == ae) {
-                host->health_log.alarms = next;
-                // prev is also NULL here
-            }
-            else {
-                prev->next = next;
-                // prev should not be touched here - we need it for the next iteration
-                // because we may have to also remove the next item
-            }
-
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
             health_alarm_log_free_one_nochecks_nounlink(ae);
         }
-        else
-            prev = ae;
+
+        ae = next;
     }
 
     rw_spinlock_write_unlock(&host->health_log.spinlock);

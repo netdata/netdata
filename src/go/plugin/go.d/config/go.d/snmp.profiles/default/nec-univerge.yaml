@@ -1,0 +1,181 @@
+extends:
+  - _base.yaml
+  - _generic-bgp4.yaml
+  - _generic-if.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.119.1.*        # NEC
+  - 1.3.6.1.4.1.119.1.84.18    # NEC IX Series IX2207
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "nec"
+metrics:
+  - MIB: PICO-SMI
+    symbol:
+      name: nec.picoCelsius
+      OID: 1.3.6.1.4.1.119.2.3.84.2.1.1.0
+  - MIB: PICO-SMI
+    symbol:
+      name: nec.picoFahrenheit
+      OID: 1.3.6.1.4.1.119.2.3.84.2.1.2.0
+  - MIB: PICO-SMI
+    symbol:
+      name: nec.picoVoltage
+      OID: 1.3.6.1.4.1.119.2.3.84.2.2.0
+  - MIB: PICO-SMI
+    symbol:
+      name: cpu.usage
+      OID: 1.3.6.1.4.1.119.2.3.84.2.5.3.0
+  - MIB: PICO-SMI
+    symbol:
+      name: memory.usage
+      OID: 1.3.6.1.4.1.119.2.3.84.2.6.2.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalActiveTunnels
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.1.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalInNotifys
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.6.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalInP2Exchgs
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.7.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalInP2ExchgInvalids
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.8.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalInP2ExchgRejects
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.9.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalInP2SaDelRequests
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.10.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalOutNotifys
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.14.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalOutP2Exchgs
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.15.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalOutP2ExchgInvalids
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.16.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalOutP2ExchgRejects
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.17.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalOutP2SaDelRequests
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.18.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalInitTunnels
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.19.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalInitTunnelFails
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.20.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalRespTunnelFails
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.21.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalAuthFails
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.23.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalDecryptFails
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.24.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalHashValidFails
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.25.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalRespTunnels
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.27.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalInP1SaDelRequests
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.30.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pikeGlobalOutP1SaDelRequests
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.2.1.31.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalActiveTunnels
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.1.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalInOctets
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.3.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalInPkts
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.9.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalInDrops
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.10.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalInReplayDrops
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.11.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalInAuths
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.12.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalInAuthFails
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.13.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalInDecrypts
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.14.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalInDecryptFails
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.15.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalOutOctets
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.16.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalOutPkts
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.22.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalOutDrops
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.23.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalOutAuths
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.24.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalOutAuthFails
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.25.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalOutEncrypts
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.26.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalOutEncryptFails
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.27.0
+  - MIB: PICO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      name: nec.pipSecGlobalNoSaFails
+      OID: 1.3.6.1.4.1.119.2.3.84.3.1.3.1.33.0

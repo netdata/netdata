@@ -334,7 +334,8 @@ static inline void pgc_size_histogram_del(PGC *cache, struct pgc_size_histogram 
 // ----------------------------------------------------------------------------
 // evictions control
 
-static ALWAYS_INLINE int64_t pgc_threshold(ssize_t threshold, int64_t wanted, int64_t current, int64_t clean) {
+ALWAYS_INLINE
+static int64_t pgc_threshold(ssize_t threshold, int64_t wanted, int64_t current, int64_t clean) {
     if(current < clean)
         current = clean;
 
@@ -346,6 +347,18 @@ static ALWAYS_INLINE int64_t pgc_threshold(ssize_t threshold, int64_t wanted, in
         ret = current - clean;
 
     return ret;
+}
+
+ALWAYS_INLINE
+static int64_t pgc_wanted_size(const int64_t hot, const int64_t hot_max, const int64_t dirty_max, const int64_t index) {
+    // our promise to users
+    const int64_t max_size1 = MAX(hot_max, hot) * 2;
+
+    // protection against slow flushing
+    const int64_t max_size2 = hot_max + MAX(dirty_max * 2, hot_max * 2 / 3) + index;
+
+    // the final wanted cache size
+    return MIN(max_size1, max_size2);
 }
 
 static ssize_t cache_usage_per1000(PGC *cache, int64_t *size_to_evict) {
@@ -372,20 +385,15 @@ static ssize_t cache_usage_per1000(PGC *cache, int64_t *size_to_evict) {
         const int64_t dirty_max = __atomic_load_n(&cache->dirty.stats->max_size, __ATOMIC_RELAXED);
         const int64_t hot_max = __atomic_load_n(&cache->hot.stats->max_size, __ATOMIC_RELAXED);
 
-        // our promise to users
-        const int64_t max_size1 = MAX(hot_max, hot) * 2;
-
-        // protection against slow flushing
-        const int64_t max_size2 = hot_max + ((dirty_max * 2 < hot_max * 2 / 3) ? hot_max * 2 / 3 : dirty_max * 2) + index;
-
-        // the final wanted cache size
-        wanted_cache_size = MIN(max_size1, max_size2);
-
         if(cache->config.dynamic_target_size_cb) {
+            wanted_cache_size = pgc_wanted_size(hot, hot, dirty, index);
+
             const int64_t wanted_cache_size_cb = cache->config.dynamic_target_size_cb();
             if(wanted_cache_size_cb > wanted_cache_size)
                 wanted_cache_size = wanted_cache_size_cb;
         }
+        else
+            wanted_cache_size = pgc_wanted_size(hot, hot_max, dirty_max, index);
 
         if (wanted_cache_size < hot + dirty + index + cache->config.clean_size)
             wanted_cache_size = hot + dirty + index + cache->config.clean_size;
@@ -401,7 +409,7 @@ static ssize_t cache_usage_per1000(PGC *cache, int64_t *size_to_evict) {
     if(cache->config.out_of_memory_protection_bytes) {
         // out of memory protection
         OS_SYSTEM_MEMORY sm = os_system_memory(false);
-        if(sm.ram_total_bytes) {
+        if(OS_SYSTEM_MEMORY_OK(sm)) {
             // when the total exists, ram_available_bytes is also right
 
             const int64_t ram_available_bytes = (int64_t)sm.ram_available_bytes;
@@ -996,35 +1004,37 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
 
     Pvoid_t *metrics_judy_pptr = JudyLGet(cache->index[partition].sections_judy, page->section, PJE0);
     if(unlikely(!metrics_judy_pptr))
-        fatal("DBENGINE CACHE: section '%lu' should exist, but it does not.", page->section);
+        fatal("DBENGINE CACHE: section '%p' should exist, but it does not.", (void *)page->section);
 
     Pvoid_t *pages_judy_pptr = JudyLGet(*metrics_judy_pptr, page->metric_id, PJE0);
     if(unlikely(!pages_judy_pptr))
-        fatal("DBENGINE CACHE: metric '%lu' in section '%lu' should exist, but it does not.",
-              page->metric_id, page->section);
+        fatal("DBENGINE CACHE: metric '%p' in section '%p' should exist, but it does not.",
+              (void *)page->metric_id, (void *)page->section);
 
     Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, page->start_time_s, PJE0);
     if(unlikely(!page_ptr))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, but it does not.",
-              page->start_time_s, page->metric_id, page->section);
+        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%p' in section '%p' should exist, but it does not.",
+              page->start_time_s, (void *)page->metric_id, (void *)page->section);
 
     PGC_PAGE *found_page = *page_ptr;
     if(unlikely(found_page != page))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, but the index returned a different address.",
-              page->start_time_s, page->metric_id, page->section);
+        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%p' in section '%p' should exist, "
+              "but the index returned a different address (expected %p, got %p).",
+              page->start_time_s, (void *)page->metric_id, (void *)page->section,
+              page, found_page);
 
     JudyAllocThreadPulseReset();
 
     if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_s, PJE0)))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' exists, but cannot be deleted.",
-              page->start_time_s, page->metric_id, page->section);
+        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%p' in section '%p' exists, but cannot be deleted.",
+              page->start_time_s, (void *)page->metric_id, (void *)page->section);
 
     if(!*pages_judy_pptr && !JudyLDel(metrics_judy_pptr, page->metric_id, PJE0))
-        fatal("DBENGINE CACHE: metric '%lu' in section '%lu' exists and is empty, but cannot be deleted.",
-              page->metric_id, page->section);
+        fatal("DBENGINE CACHE: metric '%p' in section '%p' exists and is empty, but cannot be deleted.",
+              (void *)page->metric_id, (void *)page->section);
 
     if(!*metrics_judy_pptr && !JudyLDel(&cache->index[partition].sections_judy, page->section, PJE0))
-        fatal("DBENGINE CACHE: section '%lu' exists and is empty, but cannot be deleted.", page->section);
+        fatal("DBENGINE CACHE: section '%p' exists and is empty, but cannot be deleted.", (void *)page->section);
 
     pgc_stats_index_judy_change(cache, JudyAllocThreadPulseGetAndReset());
 
@@ -1042,11 +1052,13 @@ static inline void remove_and_free_page_not_in_any_queue_and_acquired_for_deleti
 static inline bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page) {
     pointer_check(cache, page);
 
+    WAITQ_PRIORITY prio = is_page_clean(page) ? PGC_QUEUE_LOCK_PRIO_EVICTORS : PGC_QUEUE_LOCK_PRIO_COLLECTORS;
+
     page_transition_lock(cache, page);
-    pgc_queue_lock(cache, &cache->clean, PGC_QUEUE_LOCK_PRIO_EVICTORS);
+    pgc_queue_lock(cache, &cache->clean, prio);
 
     // make it clean - it does not have any accesses, so it will be prepended
-    page_set_clean(cache, page, true, true, PGC_QUEUE_LOCK_PRIO_EVICTORS);
+    page_set_clean(cache, page, true, true, prio);
 
     if(!acquired_page_get_for_deletion_or_release_it(cache, page)) {
         pgc_queue_unlock(cache, &cache->clean);
@@ -1055,7 +1067,7 @@ static inline bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache
     }
 
     // remove it from the linked list
-    pgc_queue_del(cache, &cache->clean, page, true, PGC_QUEUE_LOCK_PRIO_EVICTORS);
+    pgc_queue_del(cache, &cache->clean, page, true, prio);
     pgc_queue_unlock(cache, &cache->clean);
     page_transition_unlock(cache, page);
 
@@ -1841,7 +1853,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
 
         // call the callback to save them
         // it may take some time, so let's release the lock
-        cache->config.pgc_save_dirty_cb(cache, array, pages, pages_added);
+        if(cache->config.pgc_save_dirty_cb)
+            cache->config.pgc_save_dirty_cb(cache, array, pages, pages_added);
+
         flushes_so_far++;
 
         __atomic_add_fetch(&cache->stats.flushes_completed, pages_added, __ATOMIC_RELAXED);
@@ -2006,7 +2020,7 @@ PGC *pgc_create(const char *name,
     cache->config.out_of_memory_protection_bytes    = (int64_t)dbengine_out_of_memory_protection;
 
     // partitions
-    if(partitions == 0) partitions  = netdata_conf_cpus();
+    if(partitions == 0) partitions  = netdata_conf_cpus() * 2;
     if(partitions <= 4) partitions  = 4;
     if(partitions > 256) partitions = 256;
     cache->config.partitions        = partitions;
@@ -2073,6 +2087,10 @@ struct aral_statistics *pgc_aral_stats(void) {
     return &pgc_aral_statistics;
 }
 
+void pgc_flush_dirty_pages(PGC *cache, Word_t section) {
+    flush_pages(cache, 0, section, true, true);
+}
+
 void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {
     all_hot_pages_to_dirty(cache, section);
 
@@ -2080,7 +2098,15 @@ void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {
     flush_pages(cache, 0, section, true, true);
 }
 
-void pgc_destroy(PGC *cache) {
+void pgc_destroy(PGC *cache, bool flush) {
+    if(!cache)
+        return;
+
+    if(!flush) {
+        cache->config.pgc_save_init_cb = NULL;
+        cache->config.pgc_save_dirty_cb = NULL;
+    }
+
     // convert all hot pages to dirty
     all_hot_pages_to_dirty(cache, PGC_SECTION_ALL);
 
@@ -2288,7 +2314,7 @@ bool pgc_flush_pages(PGC *cache) {
 }
 
 void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_s, size_t additional_bytes) {
-    internal_fatal(!is_page_hot(page) && !netdata_exit,
+    internal_fatal(!is_page_hot(page) && !exit_initiated_get(),
                    "DBENGINE CACHE: end_time_s update on non-hot page");
 
     internal_fatal(end_time_s < __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
@@ -2444,7 +2470,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
         size_t current_extent_index_id;
         Pvoid_t *PValue = JudyLIns(&JudyL_extents_pos, xio->pos, PJE0);
-        if(!PValue || *PValue == PJERR)
+        if(!PValue || PValue == PJERR)
             fatal("Corrupted JudyL extents pos");
 
         struct jv2_extents_info *ei;
@@ -2468,7 +2494,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         // update the metrics JudyL
 
         PValue = JudyLIns(&JudyL_metrics, page->metric_id, PJE0);
-        if(!PValue || *PValue == PJERR)
+        if(!PValue || PValue == PJERR)
             fatal("Corrupted JudyL metrics");
 
         struct jv2_metrics_info *mi;
@@ -2494,7 +2520,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         }
 
         PValue = JudyLIns(&mi->JudyL_pages_by_start_time, page->start_time_s, PJE0);
-        if(!PValue || *PValue == PJERR)
+        if(!PValue || PValue == PJERR)
             fatal("Corrupted JudyL metric pages");
 
         if(!*PValue) {
@@ -2526,7 +2552,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
     pgc_queue_unlock(cache, &cache->hot);
 
     // callback
-    cb(section, datafile_fileno, type, JudyL_metrics, JudyL_extents_pos, count_of_unique_extents, count_of_unique_metrics, count_of_unique_pages, data);
+    bool success = cb(section, datafile_fileno, type, JudyL_metrics, JudyL_extents_pos, count_of_unique_extents, count_of_unique_metrics, count_of_unique_pages, data);
 
     {
         Pvoid_t *PValue1;
@@ -2541,12 +2567,14 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
             while ((PValue2 = JudyLFirstThenNext(mi->JudyL_pages_by_start_time, &start_time, &start_time_first))) {
                 struct jv2_page_info *pi = *PValue2;
 
-                // balance-parents: transition from hot to clean directly
                 yield_the_processor(); // do not lock too aggressively
-                page_set_clean(cache, pi->page, true, false, PGC_QUEUE_LOCK_PRIO_LOW);
-                page_transition_unlock(cache, pi->page);
-                page_release(cache, pi->page, true);
+                if (likely(success))
+                    page_set_clean(cache, pi->page, true, false, PGC_QUEUE_LOCK_PRIO_LOW);
+                else
+                    page_flag_clear(pi->page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
 
+                page_transition_unlock(cache, pi->page);
+                page_release(cache, pi->page, success);
                 // before balance-parents:
                 // page_transition_unlock(cache, pi->page);
                 // pgc_page_hot_to_dirty_and_release(cache, pi->page, true);
@@ -3058,7 +3086,7 @@ int pgc_unittest(void) {
     pgc_page_hot_set_end_time_s(cache, page3, 2001, 0);
     pgc_page_hot_to_dirty_and_release(cache, page3, false);
 
-    pgc_destroy(cache);
+    pgc_destroy(cache, true);
 
 #ifdef PGC_STRESS_TEST
     unittest_stress_test();

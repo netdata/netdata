@@ -11,37 +11,54 @@ flowchart BT
     C3 -->|stream| P1
 ```
 
-Netdata **Streaming and Replication** copies the recent past samples (replication) and in real-time all new samples collected (streaming) from production systems (Netdata Children) to metrics centralization points (Netdata Parents). The Netdata Parents then maintain the database for these metrics, according to their retention settings.
+- **Netdata Streaming and Replication**:
+    - Copies **recent past samples** (replication) and **real-time new samples** (streaming) from production systems (**Netdata Children**) to **metrics centralization points** (**Netdata Parents**).
+    - **Netdata Parents** store the database for these metrics based on **retention settings**.
 
-Each production system (Netdata Child) can stream to **only one** Netdata Parent at a time. The configuration allows configuring multiple Netdata Parents for high availability, but only the first found working will be used.
+- **Netdata Child Behavior**:
+    - Each **Netdata Child** can stream to **only one** Netdata Parent at a time.
+    - Multiple **Netdata Parents** can be configured for **high availability**, but only the **first working one** will be used.
 
-Netdata Parents receive metric samples **from multiple** production systems (Netdata Children) and can re-stream them to another Netdata Parent. This allows building an infinite hierarchy of Netdata Parents. It also enables the configuration of Netdata Parents Clusters, for high availability.
+- **Netdata Parent Capabilities**:
+    - Receives metric samples **from multiple Netdata Children**.
+    - Can **re-stream** received metrics to another **Netdata Parent**, forming an **infinite hierarchy** of Parents.
+    - Supports **Netdata Parents Clusters** for **high availability**.
 
-|           Feature           |                                                         Netdata Child (production system)                                                          |                      Netdata Parent (centralization point)                      |
-|:---------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------------:|:-------------------------------------------------------------------------------:|
-|      Metrics Retention      | Can be minimized, or switched to mode `ram` or `alloc` to save resources. Some retention is required in case network errors introduce disconnects. |           Common retention settings for all systems aggregated to it.           |
-|      Machine Learning       |                                                       Can be disabled (enabled by default).                                                        |            Runs Anomaly Detection for all systems aggregated to it.             |
-|   Alerts & Notifications    |                                                       Can be disabled (enabled by default).                                                        |  Runs health checks and sends notifications for all systems aggregated to it.   |
-|      API and Dashboard      |                                                       Can be disabled (enabled by default).                                                        | Serves the dashboard for all systems aggregated to it, using its own retention. |
-|      Exporting Metrics      |                                                         Not required (enabled by default).                                                         |  Exports the samples of all metrics collected by the systems aggregated to it.  |
-|      Netdata Functions      |                                                           Netdata Child must be online.                                                            |          Forwards Functions requests to the Children connected to it.           |
-| Connection to Netdata Cloud |                                                                   Not required.                                                                    |  Each Netdata Parent registers to Netdata Cloud all systems aggregated to it.   |
+| Feature                    | Netdata Child (Production System)                 | Netdata Parent (Centralization Point)                 |
+|----------------------------|---------------------------------------------------|-------------------------------------------------------|
+| **Metrics Retention**      | Minimal retention; can use `ram` or `alloc` mode. | Stores metrics for all connected systems.             |
+| **Machine Learning**       | Can be disabled (default: enabled).               | Runs anomaly detection for all connected systems.     |
+| **Alerts & Notifications** | Can be disabled (default: enabled).               | Monitors health and sends alerts for all systems.     |
+| **API & Dashboard**        | Can be disabled (default: enabled).               | Hosts the dashboard using its own retention settings. |
+| **Exporting Metrics**      | Optional (default: enabled).                      | Exports all collected metrics.                        |
+| **Netdata Functions**      | Child must be online to function.                 | Forwards function requests to connected Children.     |
+| **Netdata Cloud**          | Not required.                                     | Registers all connected systems to Netdata Cloud.     |
 
-## Supported Configurations
+## **Supported Configurations**
 
-For Netdata Children:
+### **For Netdata Children**
 
-1. **Full**: Full Netdata functionality is available at the Children. This means running machine learning, alerts, notifications, having the local dashboard available, and generally all Netdata features enabled. This is the default.
-2. **Thin**: The Children are only collecting and forwarding metrics to a Parent. Some local retention may exist to avoid missing samples in case of network issues or Parent maintenance, but everything else is disabled.
+- **Full Mode (Default)**:
+    - All Netdata features are enabled (machine learning, alerts, notifications, dashboard, etc.).
+- **Thin Mode**:
+    - Only collects and forwards metrics to a Parent.
+    - Some local retention is kept to handle network issues, but all other features are disabled.
 
-For Netdata Parents:
+### **For Netdata Parents**
 
-1. **Standalone**: The Parent is standalone, either the only Parent available in the infrastructure, or the top-most of a hierarchy of Parents.
-2. **Cluster**: The Parent is part of a cluster of Parents, all having the same data from the same Children. A Cluster of Parents offers high-availability.
-3. **Proxy**: The Parent receives metrics and stores them locally, but it also forwards them to a Grand Parent.
+- **Standalone**:
+    - A single Parent in the infrastructure or the top-most Parent in a hierarchy.
+- **Cluster**:
+    - A group of Parents that share the same data from the same Children.
+    - Provides **high availability**.
+- **Proxy**:
+    - Stores received metrics locally and **forwards them** to a higher-level Parent (Grand Parent).
 
-A Cluster consists of nodes configured as circular **Proxies**, where each node acts as a Parent to all others. When using multiple levels of centralization, only the top level can be configured as a cluster.
+### **Cluster Configuration**
 
-## Best Practices
+- A Cluster consists of **circular Proxy nodes**, where each Parent acts as a Parent to the others.
+- Only the **top level** of a multi-level hierarchy can be configured as a cluster.
 
-Refer to [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/best-practices.md).
+## **Best Practices**
+
+For detailed guidelines, check [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/best-practices.md).

@@ -1,0 +1,81 @@
+extends:
+  - _vertiv.yaml
+sysobjectid:
+  - 1.3.6.1.4.1.21239.5.1 # watchdog100
+metadata:
+  device:
+    fields:
+      type:
+        value: "sensor"
+metrics:
+  - MIB: VERTIV-BB-MIB
+    table:
+      name: internalTable
+      OID: 1.3.6.1.4.1.21239.5.1.2
+    symbols:
+      - OID: 1.3.6.1.4.1.21239.5.1.2.1.5
+        name: vertiv.internalTemp
+      - OID: 1.3.6.1.4.1.21239.5.1.2.1.6
+        name: vertiv.internalHumidity
+      - OID: 1.3.6.1.4.1.21239.5.1.2.1.7
+        name: vertiv.internalDewPoint
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.21239.5.1.2.1.2
+          name: vertiv.internalSerial
+        tag: vertiv_internal_serial
+#      - symbol:
+#          OID: 1.3.6.1.4.1.21239.5.1.1.7.0
+#          name: vertiv.temperatureUnits
+#        tag: vertiv_temperature_units
+#        mapping:
+#          0: fahrenheit
+#          1: celsius
+# TODO : Add this tag back when tagging by scalar symbol is implemented NDM-2247
+      - symbol:
+          OID: 1.3.6.1.4.1.21239.5.1.2.1.4
+          name: vertiv.internalAvail
+        tag: vertiv_internal_avail
+        mapping:
+          0: unavailable
+          1: available
+          2: partially_unavailable
+          # mapping in the metric description
+  - MIB: VERTIV-BB-MIB
+    table:
+      name: tempSensorTable
+      OID: 1.3.6.1.4.1.21239.5.1.4
+    symbols:
+      - OID: 1.3.6.1.4.1.21239.5.1.4.1.5
+        name: vertiv.tempSensorTemp
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.21239.5.1.4.1.2
+          name: vertiv.tempSensorSerial
+        tag: vertiv_temp_sensor_serial
+      - symbol:
+          OID: 1.3.6.1.4.1.21239.5.1.4.1.3
+          name: vertiv.tempSensorLabel
+        tag: vertiv_temp_sensor_label
+      - symbol:
+          OID: 1.3.6.1.4.1.21239.5.1.4.1.4
+          name: vertiv.tempSensorAvail
+        tag: vertiv_temp_sensor_avail
+        mapping:
+          0: unavailable
+          1: available
+          2: partially_unavailable
+          # mapping in the metric description
+metric_tags:
+  - OID: 1.3.6.1.4.1.21239.5.1.1.1.0
+    symbol: productTitle
+    tag: vertiv_product_title
+  - OID: 1.3.6.1.4.1.21239.5.1.1.2.0
+    symbol: productVersion
+    tag: vertiv_product_version
+  - OID: 1.3.6.1.4.1.21239.5.1.1.3.0
+    symbol: productFriendlyName
+    tag: vertiv_product_friendly_name
+  - OID: 1.3.6.1.4.1.21239.5.1.1.4.0
+    symbol: productMacAddress
+    tag: vertiv_product_mac_address

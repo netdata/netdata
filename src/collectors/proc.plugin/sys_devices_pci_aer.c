@@ -195,8 +195,8 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
         int do_root_ports = CONFIG_BOOLEAN_AUTO;
         int do_pci_slots = CONFIG_BOOLEAN_NO;
 
-        char buffer[100 + 1] = "";
-        rrdlabels_get_value_strcpyz(localhost->rrdlabels, buffer, 100, "_virtualization");
+        char buffer[128];
+        rrdlabels_get_value_strcpyz(localhost->rrdlabels, buffer, sizeof(buffer), "_virtualization");
         if(strcmp(buffer, "none") != 0) {
             // no need to run on virtualized environments
             do_root_ports = CONFIG_BOOLEAN_NO;

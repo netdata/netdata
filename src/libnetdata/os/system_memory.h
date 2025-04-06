@@ -20,10 +20,15 @@ typedef struct {
     uint64_t ram_available_bytes;
 } OS_SYSTEM_MEMORY;
 
+#define OS_SYSTEM_MEMORY_OK(mem) ((mem).ram_total_bytes > 0)
+#define OS_SYSTEM_MEMORY_EMPTY (OS_SYSTEM_MEMORY){ 0 }
+
 // The function to get current system memory:
 OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram);
 
 // Returns the last successfully reported os_system_memory() value.
 OS_SYSTEM_MEMORY os_last_reported_system_memory(void);
+
+double os_system_memory_available_percent(OS_SYSTEM_MEMORY mem);
 
 #endif //NETDATA_OS_MEM_AVAILABLE_H

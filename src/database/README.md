@@ -6,16 +6,9 @@ Netdata stores detailed metrics at one-second granularity using its Database eng
 
 | Mode       | Description                                                                                                                                                                                                                                           |
 |------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `dbengine` | Stores data in a database with RAM for caching and indexing, while keeping compressed data on disk. Storage capacity depends on available disk space and data compression ratio.  For details, see [Database Engine](/src/database/engine/README.md). |
-| `ram`      | Stores data entirely in memory without disk persistence.                                                                                                                                                                                              |
-| `none`     | Operates without storage (metrics can only be streamed to another Agent).                                                                                                                                                                             |
-
-The default `dbengine` mode is optimized for:
-
-- Long-term data retention
-- Parent nodes in [Centralization](/docs/observability-centralization-points/README.md) setups
-
-For resource-constrained environments, particularly Child nodes in Centralization setups, consider using `ram`.
+| `dbengine` | The high performance multi-tiered time-series database of Netdata, providing superior storage efficiency (~0.5 bytes per sample on disk for high resolution per-second data), and fast long term data queries (typically 20+ times faster) by transparently utilizing all available database tiers. For details, see [Database Engine](/src/database/engine/README.md). |
+| `ram`      | Stores data entirely in memory without disk persistence. This is typically used in IoT deviced or children that stream their metrics to Netdata parents, to avoid having any disk dependency on Netdata                                                                                                                                                                |
+| `none`     | Operates without storage (metrics can only be streamed to a Netdata parent).                                                                                                                                                                             |
 
 ## Tiers
 
@@ -45,3 +38,4 @@ There are two cache sizes that can be used to optimize the Database:
 
 1. **Page cache size**: The main cache that keeps metrics data into memory. When data is not found in it, the extent cache is consulted, and if not found in that too, they are loaded from the disk.
 2. **Extent cache size**: The compressed extent cache. It keeps in memory compressed data blocks, as they appear on disk, to avoid reading them again. Data found in the extent cache but not in the main cache have to be uncompressed to be queried.
+

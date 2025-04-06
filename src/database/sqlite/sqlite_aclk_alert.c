@@ -742,7 +742,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
     sqlite3_stmt *res = NULL;
     struct aclk_sync_cfg_t *wc;
 
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
     if (unlikely(!host || !(wc = host->aclk_config))) {
         freez(config_hash);
@@ -1032,11 +1032,11 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     nd_log(
         NDLS_ACCESS,
         NDLP_DEBUG,
-        "ACLK REQ [%s (%s)]: Sent! %d alerts snapshot, snapshot_uuid %s  (version = %llu)",
+        "ACLK REQ [%s (%s)]: Created snapshot %s with %d alerts (version = %llu)",
         wc->node_id,
         rrdhost_hostname(host),
-        cnt,
         snapshot_uuid,
+        total_count,
         (long long unsigned)version);
 
 done:
@@ -1053,7 +1053,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version)
         return;
 
     struct aclk_sync_cfg_t *wc;
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
     if (unlikely(!host || !(wc = host->aclk_config))) {
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Ignoring request to stream alert state changes, invalid node.", node_id);
@@ -1087,7 +1087,7 @@ void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_vers
     }
 
     struct aclk_sync_cfg_t *wc;
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
     if ((!host || !(wc = host->aclk_config)))
         nd_log(NDLS_ACCESS, NDLP_NOTICE,

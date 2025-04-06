@@ -25,22 +25,22 @@ arch_order:  # sort order for per-architecture jobs in CI
 arch_data:  # Mapping of per-architecture matrix behavior.
   amd64: &amd64
     qemu: false
-    runner: ubuntu-24.04
+    runner: &x86-runner ubuntu-22.04
   x86_64: *amd64
   i386: *amd64
   armhf: &arm
     qemu: false
-    runner: ubuntu-24.04-arm
+    runner: &arm-runner ubuntu-22.04-arm
   armhfp: *arm
   armv6l: *arm
   armv7l: *arm
   arm64: &arm64
     qemu: false
-    runner: ubuntu-24.04-arm
+    runner: *arm-runner
   aarch64: *arm64
   ppc64le:
     qemu: true
-    runner: ubuntu-24.04-arm
+    runner: *x86-runner
 static_arches:  # Static build architectures
   - x86_64
   - armv6l

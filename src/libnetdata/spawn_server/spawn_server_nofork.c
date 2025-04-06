@@ -119,7 +119,7 @@ static const char** argv_decode(const char *buffer, size_t size) {
 // --------------------------------------------------------------------------------------------------------------------
 // status reports
 
-typedef enum __attribute__((packed)) {
+typedef enum {
     STATUS_REPORT_NONE = 0,
     STATUS_REPORT_STARTED,
     STATUS_REPORT_FAILED,
@@ -443,7 +443,7 @@ static bool spawn_server_is_running(const char *path) {
     size_t dummy_size = 0;
     SPAWN_INSTANCE_TYPE dummy_type = 0;
     ND_UUID magic = UUID_ZERO;
-    char cmsgbuf[CMSG_SPACE(sizeof(int))];
+    char cmsgbuf[CMSG_SPACE(sizeof(int))] __attribute__((aligned(sizeof(size_t))));
 
     iov[0].iov_base = &msg_type;
     iov[0].iov_len = sizeof(msg_type);
@@ -506,7 +506,7 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     struct msghdr msg = {0};
     struct cmsghdr *cmsg;
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_REQUEST;
-    char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)];
+    char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)] __attribute__((aligned(sizeof(size_t))));
     struct iovec iov[11];
 
     // We send 1 request with 10 iovec in it
@@ -587,7 +587,7 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     size_t data_size;
     ND_UUID magic = UUID_ZERO;
     SPAWN_INSTANCE_TYPE type;
-    char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)];
+    char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)] __attribute__((aligned(sizeof(size_t))));
     char *envp_encoded = NULL, *argv_encoded = NULL, *data = NULL;
     int stdin_fd = -1, stdout_fd = -1, stderr_fd = -1, custom_fd = -1;
 
@@ -830,21 +830,13 @@ static void spawn_server_process_sigchld(void) {
     }
 }
 
-static void posix_unmask_sigchld_on_thread(void) {
-    sigset_t sigset;
-    sigemptyset(&sigset);  // Initialize the signal set to empty
-    sigaddset(&sigset, SIGCHLD);  // Add SIGCHLD to the set
-
-    if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN SERVER: cannot unmask SIGCHLD");
-}
-
 static int spawn_server_event_loop(SPAWN_SERVER *server) {
     int pipe_fd = server->pipe[1];
     close(server->pipe[0]); server->pipe[0] = -1;
 
-    posix_unmask_sigchld_on_thread();
+    signals_block_all();
+    int wanted_signals[] = {SIGTERM, SIGCHLD};
+    signals_unblock(wanted_signals, _countof(wanted_signals));
 
     // Set up the signal handler for SIGCHLD and SIGTERM
     struct sigaction sa;
@@ -986,6 +978,9 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
         return false;
     }
 
+    if(chmod(server->path, 0770) != 0)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to chmod '%s' to 0770", server->path);
+
     return true;
 }
 
@@ -1028,8 +1023,10 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     server->id = __atomic_add_fetch(&spawn_server_id, 1, __ATOMIC_RELAXED);
     os_uuid_generate_random(server->magic.uuid);
 
-    char *runtime_directory = getenv("NETDATA_CACHE_DIR");
-    if(runtime_directory && !*runtime_directory) runtime_directory = NULL;
+    const char *runtime_directory = getenv("NETDATA_RUN_DIR");
+    if(!runtime_directory || !*runtime_directory)
+        runtime_directory = os_run_dir(true);
+
     if (runtime_directory) {
         struct stat statbuf;
 
@@ -1058,11 +1055,11 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     char path[1024];
     if(name && *name) {
         server->name = strdupz(name);
-        snprintf(path, sizeof(path), "%s/.netdata-spawn-%s.sock", runtime_directory, name);
+        snprintf(path, sizeof(path), "%s/netdata-spawn-%s.sock", runtime_directory, name);
     }
     else {
         server->name = strdupz("unnamed");
-        snprintf(path, sizeof(path), "%s/.netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
+        snprintf(path, sizeof(path), "%s/netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
     }
 
     server->path = strdupz(path);
@@ -1084,6 +1081,10 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         os_setproctitle(buf, server->argc, server->argv);
 
         replace_stdio_with_dev_null();
+
+        if(nd_log_collectors_fd() != STDERR_FILENO)
+            dup2(nd_log_collectors_fd(), STDERR_FILENO);
+
         int fds_to_keep[] = {
             server->sock,
             server->pipe[1],

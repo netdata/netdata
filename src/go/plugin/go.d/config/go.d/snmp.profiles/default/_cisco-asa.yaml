@@ -1,0 +1,68 @@
+# Profile for Cisco ASA devices
+
+extends:
+  - _cisco-generic.yaml
+
+metrics:
+  - MIB: CISCO-FIREWALL-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.147.1.2.2.2
+      name: cfwConnectionStatTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.5
+        name: cfwConnectionStatValue
+    metric_tags:
+      - index: 1
+        tag: service_type
+      - index: 2
+        tag: stat_type
+
+  - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
+    symbol:
+      # declined sessions
+      OID: 1.3.6.1.4.1.9.9.392.1.4.1.2.0
+      name: crasNumDeclinedSessions
+  - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
+    symbol:
+      # num sessions
+      OID: 1.3.6.1.4.1.9.9.392.1.3.1.0
+      name: crasNumSessions
+  - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
+    symbol:
+      # num users
+      OID: 1.3.6.1.4.1.9.9.392.1.3.3.0
+      name: crasNumUsers
+  - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
+    metric_type: monotonic_count
+    symbol:
+      # session setup failed
+      OID: 1.3.6.1.4.1.9.9.392.1.4.1.3.0
+      name: crasNumSetupFailInsufResources
+  - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.171.1.3.1.1.0
+      name: cipSecGlobalActiveTunnels
+  - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.171.1.3.1.4.0
+      name: cipSecGlobalHcInOctets
+  - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
+    metric_type: monotonic_count
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.171.1.3.1.17.0
+      name: cipSecGlobalHcOutOctets
+  - MIB: ENTITY-SENSOR-MIB
+    table:
+      OID: 1.3.6.1.2.1.99.1.1
+      name: entPhySensorTable
+    symbols:
+      - OID: 1.3.6.1.2.1.99.1.1.1.4
+        name: entPhySensorValue
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.99.1.1.1.1
+          name: entPhySensorType
+        tag: sensor_type
+      - index: 1
+        tag: sensor_id

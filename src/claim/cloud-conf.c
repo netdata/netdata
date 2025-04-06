@@ -54,6 +54,8 @@ static void cloud_conf_load_defaults(void) {
 }
 
 void cloud_conf_load(int silent) {
+    netdata_conf_section_directories();
+
     errno_clear();
     char *filename = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "cloud.conf");
     int ret = inicfg_load(&cloud_config, filename, 1, NULL);
@@ -77,7 +79,7 @@ void cloud_conf_init_after_registry(void) {
 
     // for machine guid and hostname we have to use inicfg_set() for that they will be saved uncommented
     if(!machine_guid || !*machine_guid)
-        inicfg_set(&cloud_config, CONFIG_SECTION_GLOBAL, "machine_guid", registry_get_this_machine_guid());
+        inicfg_set(&cloud_config, CONFIG_SECTION_GLOBAL, "machine_guid", machine_guid_get_txt());
 
     if(!hostname || !*hostname)
         inicfg_set(&cloud_config, CONFIG_SECTION_GLOBAL, "hostname", registry_get_this_machine_hostname());
@@ -100,7 +102,7 @@ bool cloud_conf_save(void) {
     return true;
 }
 
-bool cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure) {
+bool cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, bool insecure) {
     // for backwards compatibility (older agents), save the claimed_id to its file
     claimed_id_save_to_file(claimed_id_str);
 

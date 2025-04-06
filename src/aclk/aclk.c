@@ -30,12 +30,16 @@ mqtt_wss_client mqttwss_client;
 static bool aclk_connected = false;
 static inline void aclk_set_connected(void) {
     __atomic_store_n(&aclk_connected, true, __ATOMIC_RELAXED);
+
+    daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
 static inline void aclk_set_disconnected(void) {
     __atomic_store_n(&aclk_connected, false, __ATOMIC_RELAXED);
 
     if(mqttwss_client)
         mqtt_wss_reset_stats(mqttwss_client);
+
+    daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
 
 inline bool aclk_online(void) {
@@ -199,7 +203,7 @@ static int wait_till_agent_claimed(void)
  * @param aclk_hostname points to location where string pointer to hostname will be set
  * @param aclk_port port to int where port will be saved
  * 
- * @return If non 0 returned irrecoverable error happened (or netdata_exit) and ACLK should be terminated
+ * @return If non 0 returned irrecoverable error happened (or exit_initiated) and ACLK should be terminated
  */
 static int wait_till_agent_claim_ready()
 {
@@ -306,7 +310,7 @@ static int handle_connection(mqtt_wss_client client)
 {
     while (service_running(SERVICE_ACLK)) {
         // timeout 1000 to check at least once a second
-        // for netdata_exit
+        // for exit_initiated
         int rc = mqtt_wss_service(client, 1000);
         if (rc < 0){
             worker_is_busy(WORKER_ACLK_DISCONNECTED);
@@ -452,9 +456,9 @@ static unsigned long aclk_reconnect_delay() {
     return aclk_tbeb_delay(0, aclk_env->backoff.base, aclk_env->backoff.min_s, aclk_env->backoff.max_s);
 }
 
-/* Block till aclk_reconnect_delay is satisfied or netdata_exit is signalled
+/* Block till aclk_reconnect_delay is satisfied or exit_initiated is signalled
  * @return 0 - Go ahead and connect (delay expired)
- *         1 - netdata_exit
+ *         1 - exit_initiated
  */
 #define NETDATA_EXIT_POLL_MS (MSEC_PER_SEC/4)
 static int aclk_block_till_recon_allowed() {
@@ -466,7 +470,7 @@ static int aclk_block_till_recon_allowed() {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Wait before attempting to reconnect in %.3f seconds", recon_delay / (float)MSEC_PER_SEC);
 
-    // we want to wake up from time to time to check netdata_exit
+    // we want to wake up from time to time to check exit_initiated
     worker_is_busy(WORKER_ACLK_WAITING_TO_CONNECT);
     while (recon_delay)
     {
@@ -602,14 +606,9 @@ const char *aclk_cloud_base_url = NULL;
  * @param client instance of mqtt_wss_client
  * @return  0 - Successful Connection,
  *          <0 - Irrecoverable Error -> Kill ACLK,
- *          >0 - netdata_exit
+ *          >0 - exit_initiated
  */
 #define CLOUD_BASE_URL_READ_RETRY 30
-#ifdef ACLK_SSL_ALLOW_SELF_SIGNED
-#define ACLK_SSL_FLAGS MQTT_WSS_SSL_ALLOW_SELF_SIGNED
-#else
-#define ACLK_SSL_FLAGS MQTT_WSS_SSL_CERT_CHECK_FULL
-#endif
 static int aclk_attempt_to_connect(mqtt_wss_client client)
 {
     https_client_resp_t rc;
@@ -743,11 +742,13 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         mqtt_conn_params.will_msg = aclk_generate_lwt(&mqtt_conn_params.will_msg_len);
 
+        int ssl_flags = cloud_config_insecure_get() ? MQTT_WSS_SSL_ALLOW_SELF_SIGNED : MQTT_WSS_SSL_CERT_CHECK_FULL;
+
 #ifdef ACLK_DISABLE_CHALLENGE
-        int mqtt_rc = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf);
+        int mqtt_rc = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf);
         url_t_destroy(&base_url);
 #else
-        int mqtt_rc = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf, &fallback_ipv4);
+        int mqtt_rc = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ssl_flags, &proxy_conf, &fallback_ipv4);
         url_t_destroy(&mqtt_url);
 
         freez((char*)mqtt_conn_params.clientid);
@@ -865,7 +866,7 @@ void *aclk_main(void *ptr)
     mqtt_wss_set_max_buf_size(mqttwss_client, 25*1024*1024);
 
     // Keep reconnecting and talking until our time has come
-    // and the Grim Reaper (netdata_exit) calls
+    // and the Grim Reaper (exit_initiated) calls
     netdata_log_info("ACLK: Starting ACLK query event loop");
     aclk_query_init(mqttwss_client);
     do {
@@ -875,7 +876,7 @@ void *aclk_main(void *ptr)
 
         if (schedule_node_update) {
             worker_is_busy(WORKER_ACLK_NODE_UPDATE);
-            schedule_node_state_update(localhost, 0);
+            schedule_node_state_update(localhost, 10);
             schedule_node_update = false;
         }
 

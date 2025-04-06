@@ -93,7 +93,7 @@ ALWAYS_INLINE void rrdcontext_collected_rrdset(RRDSET *st) {
 }
 
 ALWAYS_INLINE void rrdcontext_host_child_disconnected(RRDHOST *host) {
-    rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD, false);
+    rrdhost_flag_set(host, RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION);
 }
 
 ALWAYS_INLINE void rrdcontext_host_child_connected(RRDHOST *host) {
@@ -214,7 +214,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
         return;
     }
 
-    RRDHOST *host = find_host_by_node_id(cmd->node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
     if(!host) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', "
@@ -286,7 +286,7 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
         return;
     }
 
-    RRDHOST *host = find_host_by_node_id(cmd->node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
     if(!host) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', "
@@ -312,6 +312,7 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 
+ALWAYS_INLINE
 bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t before) {
     if(unlikely(!rca)) return false;
 

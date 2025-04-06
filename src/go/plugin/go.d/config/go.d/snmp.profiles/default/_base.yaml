@@ -1,0 +1,29 @@
+# Base profile that should only contain any items we want to provide for all profiles.
+
+metric_tags:
+  - OID: 1.3.6.1.2.1.1.5.0
+    symbol: sysName
+    tag: snmp_host
+  - OID: 1.3.6.1.2.1.1.5.0
+    symbol: sysName
+    tag: device_hostname
+
+metadata:
+  device:
+    fields:
+      name:
+        symbol:
+          OID: 1.3.6.1.2.1.1.5.0
+          name: sysName
+      description:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+      sys_object_id:
+        symbol:
+          OID: 1.3.6.1.2.1.1.2.0
+          name: sysObjectID
+      location:
+        symbol:
+          OID: 1.3.6.1.2.1.1.6.0
+          name: sysLocation

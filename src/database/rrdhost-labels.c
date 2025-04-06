@@ -71,7 +71,7 @@ static void rrdhost_load_auto_labels(void) {
     // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.
 
     int is_ephemeral = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "is ephemeral node", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, HOST_LABEL_IS_EPHEMERAL, is_ephemeral ? "true" : "false", RRDLABEL_SRC_CONFIG);
 
     int has_unstable_connection = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
     rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
@@ -83,6 +83,9 @@ static void rrdhost_load_auto_labels(void) {
 
     if (localhost->stream.snd.destination)
         rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);
+
+    rrdlabels_add(labels, "_timezone", rrdhost_timezone(localhost), RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_abbrev_timezone", rrdhost_abbrev_timezone(localhost), RRDLABEL_SRC_AUTO);
 }
 
 void reload_host_labels(void) {

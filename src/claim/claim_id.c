@@ -106,7 +106,7 @@ CLAIM_ID rrdhost_claim_id_get(RRDHOST *host) {
 
     if(host == localhost) {
         ret.uuid = claim_id_get_uuid();
-        if(UUIDiszero(ret.uuid))
+        if(UUIDiszero(ret.uuid) || (!aclk_online() && !UUIDiszero(host->aclk.claim_id_of_parent)))
             ret.uuid = host->aclk.claim_id_of_parent;
     }
     else {
