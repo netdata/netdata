@@ -6,10 +6,12 @@
 
 **Merged pull requests:**
 
+- Fix memory leaks [\#20062](https://github.com/netdata/netdata/pull/20062) ([ktsaou](https://github.com/ktsaou))
 - daemon status 27 [\#20058](https://github.com/netdata/netdata/pull/20058) ([ktsaou](https://github.com/ktsaou))
 - nested code block in doc [\#20056](https://github.com/netdata/netdata/pull/20056) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations docs [\#20054](https://github.com/netdata/netdata/pull/20054) ([netdatabot](https://github.com/netdatabot))
 - Remove unnecessary parameters for oidc configuration [\#20053](https://github.com/netdata/netdata/pull/20053) ([juacker](https://github.com/juacker))
+- Observability cent points improved [\#20052](https://github.com/netdata/netdata/pull/20052) ([kanelatechnical](https://github.com/kanelatechnical))
 - daemon status 26e [\#20051](https://github.com/netdata/netdata/pull/20051) ([ktsaou](https://github.com/ktsaou))
 - fix cgroup netdev renames [\#20050](https://github.com/netdata/netdata/pull/20050) ([ktsaou](https://github.com/ktsaou))
 - added checksum to detect corruption in netdev rename tasks [\#20048](https://github.com/netdata/netdata/pull/20048) ([ktsaou](https://github.com/ktsaou))
@@ -462,7 +464,6 @@
 - Fix alert transition [\#19507](https://github.com/netdata/netdata/pull/19507) ([stelfrag](https://github.com/stelfrag))
 - update buildinfo  [\#19506](https://github.com/netdata/netdata/pull/19506) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/nvme\): support v2.11 output format [\#19505](https://github.com/netdata/netdata/pull/19505) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/vmware/govmomi from 0.47.0 to 0.48.0 in /src/go [\#19504](https://github.com/netdata/netdata/pull/19504) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
