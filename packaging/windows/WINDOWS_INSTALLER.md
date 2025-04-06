@@ -79,7 +79,7 @@ winget install netdata.netdata
 
 ### Update Netdata
 
-To update Netdata to the latest version using Winget, run the following command:
+Get the latest Netdata features and security updates with:
 
 ```powershell
 winget upgrade netdata.netdata
