@@ -242,19 +242,47 @@ func TestHandler(t *testing.T) {
 		metricsContent := string(metricsBodyBytes)
 		t.Logf("Metrics Output for Verification:\n%s", metricsContent) // Log for manual inspection if needed
 
-		// Check for presence of key metrics (adjust names if needed)
-		expectedMetrics := []string{
-			"agent_events_requests_ratio_total", // Consolidated metric with status labels
-			"agent_events_bytes_received_total",
-			"agent_events_dedup_cache_entries",
-			"agent_events_request_duration_seconds", // Check for histograms
-			"go_goroutines",
+		// Check for presence of key metrics (handling both standard and suffixed names)
+		// OpenTelemetry may add suffixes like _ratio_total to counter metrics
+		metricChecks := []struct {
+			namePatterns []string
+			description  string
+		}{
+			{
+				namePatterns: []string{"agent_events_requests", "agent_events_requests_ratio_total"}, 
+				description:  "Requests counter",
+			},
+			{
+				namePatterns: []string{"agent_events_received_bytes", "agent_events_received_bytes_ratio_total"},
+				description:  "Bytes received counter",
+			},
+			{
+				namePatterns: []string{"agent_events_dedup_cache_entries"},
+				description:  "Dedup cache size gauge",
+			},
+			{
+				namePatterns: []string{"agent_events_request_duration_seconds"},
+				description:  "Request duration histogram",
+			},
+			{
+				namePatterns: []string{"go_goroutines"},
+				description:  "Go runtime metrics",
+			},
 		}
-		for _, metricName := range expectedMetrics {
-			if !strings.Contains(metricsContent, metricName) {
-				t.Errorf("metrics response missing expected metric: %s", metricName)
+		
+		for _, check := range metricChecks {
+			found := false
+			for _, pattern := range check.namePatterns {
+				if strings.Contains(metricsContent, pattern) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("metrics response missing expected metric: %s (patterns: %v)", check.description, check.namePatterns)
 			}
 		}
+		
 		// OpenTelemetry histogram metrics have this pattern in the output:
 		// agent_events_request_duration_seconds_bucket{...
 		// agent_events_request_duration_seconds_sum{...
