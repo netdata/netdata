@@ -71,7 +71,7 @@ Make sure Winget is installed on your Windows system. Need to install Winget? Ch
 
 ### Install Netdata
 
-To install Netdata using Winget, run the following command:
+Install Netdata by running this command in PowerShell:
 
 ```powershell
 winget install netdata.netdata
