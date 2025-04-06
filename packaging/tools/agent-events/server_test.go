@@ -247,7 +247,7 @@ func TestHandler(t *testing.T) {
 			"agent_events_requests_total",
 			"agent_events_duplicate_requests_total",
 			"agent_events_method_not_allowed_requests_total",
-			"agent_events_dedup_cache_entries_size",
+			"agent_events_dedup_cache_entries",
 			"agent_events_request_duration_seconds_count", // Check for count specifically
 			"go_goroutines",
 		}

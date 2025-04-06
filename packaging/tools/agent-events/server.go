@@ -144,12 +144,12 @@ func initMetrics() (*prometheus.Exporter, error) {
 	entityTooLargeRequests, _ = createCounter("agent_events_entity_too_large_requests_total", "Total number of requests exceeding size limits")
 	internalErrorRequests, _ = createCounter("agent_events_internal_error_requests_total", "Total number of internal server errors")
 	bytesReceived, _ = createCounter("agent_events_received_bytes_total", "Total number of bytes received in request bodies")
-	dedupCacheSize, _ = createGauge("agent_events_dedup_cache_entries_size", "Current number of entries in the deduplication cache")
+	dedupCacheSize, _ = createGauge("agent_events_dedup_cache_entries", "Current number of entries in the deduplication cache")
 	activeConnectionsGauge, _ = createGauge("agent_events_active_connections", "Number of currently active connections")
 	uptimeGauge, _ = createGauge("agent_events_uptime_seconds", "How long the server has been running in seconds")
 	requestDuration, _ = createHistogram("agent_events_request_duration_seconds",
 		"Histogram of request processing times in seconds",
-		[]float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		[]float64{0.00001, 0.000025, 0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1 },
 	)
 	// Basic check if any metric failed (optional, depends on how critical individual metrics are)
 	// if requestsTotal == nil || ... { return exporter, fmt.Errorf("one or more metrics failed to initialize") }
