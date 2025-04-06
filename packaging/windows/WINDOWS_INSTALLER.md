@@ -87,7 +87,7 @@ winget upgrade netdata.netdata
 
 ### Uninstall Netdata
 
-To uninstall Netdata using Winget, run the following command:
+If you need to remove Netdata from your system, use:
 
 ```powershell
 winget uninstall netdata.netdata
