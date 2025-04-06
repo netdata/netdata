@@ -95,13 +95,13 @@ winget uninstall netdata.netdata
 
 ### Troubleshooting Winget Installation
 
-If you encounter issues while installing Netdata using Winget, consider the following troubleshooting steps:
+If you run into issues during installation, try these steps:
 
-1. **Ensure Winget is up to date**: Run `winget --version` to check the version and update if necessary.
-2. **Check network connectivity**: Ensure your system has a stable internet connection.
-3. **Verify package identifier**: Ensure you are using the correct package identifier (`netdata.netdata`).
-4. **Review Winget logs**: Check the Winget logs for any error messages or details about the installation process.
+1. **Check Winget Version**: Use `winget --version` to verify you're running the latest version.
+2. **Test Your Connection**: Make sure you have a working internet connection.
+3. **Confirm Package Name**: Double-check that you're using the correct package ID (`netdata.netdata`).
+4. **Examine Winget Logs**: If problems persist, review the Winget logs for specific error messages.
 
-For further assistance, refer to the [Winget documentation](https://learn.microsoft.com/en-us/windows/package-manager/winget/) or seek help from the Netdata community.
+Need more help? Visit the [Winget documentation](https://learn.microsoft.com/en-us/windows/package-manager/winget/) or reach out to the Netdata community.
 
 After installation, you can access your Netdata dashboard by opening your browser and going to `localhost:19999`.
