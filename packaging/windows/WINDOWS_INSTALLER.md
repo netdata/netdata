@@ -66,7 +66,8 @@ This section provides instructions for installing Netdata using Winget, Microsof
 
 ### Prerequisites
 
-Ensure you have Winget installed on your system. If not, follow the instructions on the [Winget documentation](https://learn.microsoft.com/en-us/windows/package-manager/winget/).
+Make sure Winget is installed on your Windows system. Need to install Winget? Check the official [Microsoft documentation](https://learn.microsoft.com/en-us/windows/package-manager/winget/).
+
 
 ### Install Netdata
 
