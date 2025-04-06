@@ -62,7 +62,7 @@ Once installed, you can access your Netdata dashboard at `localhost:19999`.
 
 ## Installing Netdata using Winget
 
-This section provides instructions for installing Netdata using Winget, the official Windows package manager by Microsoft.
+This section provides instructions for installing Netdata using Winget, Microsoft's official Windows package manager.
 
 ### Prerequisites
 
