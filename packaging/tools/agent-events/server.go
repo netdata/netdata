@@ -138,13 +138,13 @@ func initMetrics() (*prometheus.Exporter, error) {
 	}
 
 	requestsTotal, _ = createCounter("agent_events_requests_total", "Total number of requests received")
-	duplicateRequests, _ = createCounter("agent_events_requests_duplicate_total", "Total number of duplicate requests detected")
-	methodNotAllowedRequests, _ = createCounter("agent_events_requests_method_not_allowed_total", "Total number of requests with incorrect HTTP method")
-	badRequestsTotal, _ = createCounter("agent_events_requests_bad_request_total", "Total number of requests with invalid JSON")
-	entityTooLargeRequests, _ = createCounter("agent_events_requests_entity_too_large_total", "Total number of requests exceeding size limits")
-	internalErrorRequests, _ = createCounter("agent_events_requests_internal_error_total", "Total number of internal server errors")
-	bytesReceived, _ = createCounter("agent_events_bytes_received_total", "Total number of bytes received in request bodies")
-	dedupCacheSize, _ = createGauge("agent_events_dedup_cache_size", "Current number of entries in the deduplication cache")
+	duplicateRequests, _ = createCounter("agent_events_duplicate_requests_total", "Total number of duplicate requests detected")
+	methodNotAllowedRequests, _ = createCounter("agent_events_method_not_allowed_requests_total", "Total number of requests with incorrect HTTP method")
+	badRequestsTotal, _ = createCounter("agent_events_bad_request_requests_total", "Total number of requests with invalid JSON")
+	entityTooLargeRequests, _ = createCounter("agent_events_entity_too_large_requests_total", "Total number of requests exceeding size limits")
+	internalErrorRequests, _ = createCounter("agent_events_internal_error_requests_total", "Total number of internal server errors")
+	bytesReceived, _ = createCounter("agent_events_received_bytes_total", "Total number of bytes received in request bodies")
+	dedupCacheSize, _ = createGauge("agent_events_dedup_cache_entries_size", "Current number of entries in the deduplication cache")
 	activeConnectionsGauge, _ = createGauge("agent_events_active_connections", "Number of currently active connections")
 	uptimeGauge, _ = createGauge("agent_events_uptime_seconds", "How long the server has been running in seconds")
 	requestDuration, _ = createHistogram("agent_events_request_duration_seconds",
