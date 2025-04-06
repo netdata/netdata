@@ -107,16 +107,7 @@ func initMetrics() (*prometheus.Exporter, error) {
 	meter = meterProvider.Meter("agent-events")
 
 	// --- Create Metric Instruments ---
-	// Helper to reduce repetition
-	createCounter := func(name, desc string) (metric.Int64Counter, error) {
-		counter, err := meter.Int64Counter(name, metric.WithDescription(desc))
-		if err != nil {
-			slog.Error("failed to create counter", "name", name, "error", err)
-		}
-		return counter, err
-	}
-	
-	// Create a counter with a status label for consolidated metrics
+	// Helper to create counters with status labels for consolidated metrics
 	createLabeledCounter := func(name, desc string) (metric.Int64Counter, error) {
 		counter, err := meter.Int64Counter(
 			name, 
@@ -146,9 +137,18 @@ func initMetrics() (*prometheus.Exporter, error) {
 		return hist, err
 	}
 
-	// Create unified request counter with status label
-	requestsCounter, _ = createLabeledCounter("agent_events_requests_ratio_total", "Total number of requests by status")
-	bytesReceived, _ = createCounter("agent_events_bytes_received_total", "Total number of bytes received in request bodies")
+	// Create unified counters with status label
+	requestsCounter, _ = createLabeledCounter("agent_events_requests", "Number of requests by status")
+	bytesReceived, _ = createLabeledCounter("agent_events_received_bytes", "Number of bytes received in request bodies by status")
+	
+	// Pre-initialize counters with all status labels set to zero
+	ctx := context.Background()
+	statusLabels := []string{"success", "duplicate", "invalid_json", "method_not_allowed", "body_too_large", "failed_to_read", "cant_marshal_output"}
+	for _, status := range statusLabels {
+		requestsCounter.Add(ctx, 0, metric.WithAttributes(attribute.String("status", status)))
+		bytesReceived.Add(ctx, 0, metric.WithAttributes(attribute.String("status", status)))
+	}
+	
 	dedupCacheSize, _ = createGauge("agent_events_dedup_cache_entries", "Current number of entries in the deduplication cache")
 	activeConnectionsGauge, _ = createGauge("agent_events_active_connections", "Number of currently active connections")
 	uptimeGauge, _ = createGauge("agent_events_uptime_seconds", "How long the server has been running in seconds")
@@ -259,8 +259,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	requestStartTime := time.Now()
 	ctx := r.Context()
 
-	// Record metrics using OTEL API
-	requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "total")))
 	defer func() {
 		requestDuration.Record(ctx, time.Since(requestStartTime).Seconds())
 	}()
@@ -281,15 +279,14 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		if errors.As(err, &maxBytesErr) {
 			http.Error(w, fmt.Sprintf("Request body exceeds limit (%d bytes)", maxRequestBodySize), http.StatusRequestEntityTooLarge)
 			slog.Info("request discarded", "reason", "body_too_large", "limit", maxRequestBodySize, "remote_addr", r.RemoteAddr)
-			requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "entity_too_large")))
+			requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "body_too_large")))
 		} else {
 			http.Error(w, "Error reading request", http.StatusInternalServerError)
 			slog.Error("request discarded", "reason", "error_reading_body", "error", err)
-			requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "internal_error")))
+			requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "failed_to_read")))
 		}
 		return
 	}
-	bytesReceived.Add(ctx, int64(len(body)))
 
 	// JSON Validation - Attempt to unmarshal directly to map (requires object)
 	var fullData map[string]interface{}
@@ -297,9 +294,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		bodyDetail := ""; if slog.Default().Enabled(context.Background(), slog.LevelDebug) { bodyDetail = fmt.Sprintf(", Body: %s", string(body)) } else { bodyDetail = fmt.Sprintf(", Body snippet: %s", limitString(string(body), 100)) }
 		slog.Warn("request discarded", "reason", "invalid_json", "error", err.Error(), "body_detail", bodyDetail)
-		requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "bad_request")))
+		bytesReceived.Add(ctx, int64(len(body)), metric.WithAttributes(attribute.String("status", "invalid_json")))
+		requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "invalid_json")))
 		return
 	}
+	
+	bytesReceived.Add(ctx, int64(len(body)), metric.WithAttributes(attribute.String("status", "success")))
 
 	// Deduplication Logic
 	shouldProcess := true
@@ -316,6 +316,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 		if !checkAndRecordHash(dedupHash) {
 			shouldProcess = false
+			bytesReceived.Add(ctx, int64(len(body)), metric.WithAttributes(attribute.String("status", "duplicate")))
 			requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "duplicate")))
 			slog.Debug("discarded duplicate request", "hash", fmt.Sprintf("%x", dedupHash), "note", "timestamp refreshed")
 			if _, err := w.Write([]byte("OK")); err != nil { slog.Error("error writing response", "context", "after_duplicate_discard", "error", err) }
@@ -341,7 +342,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, "Internal Server Error during output marshal", http.StatusInternalServerError)
 			slog.Error("request discarded", "reason", "json_marshal_failed", "error", err)
-			requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "internal_error")))
+			requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "cant_marshal_output")))
 			return
 		}
 
