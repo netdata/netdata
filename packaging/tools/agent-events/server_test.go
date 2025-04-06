@@ -244,7 +244,7 @@ func TestHandler(t *testing.T) {
 
 		// Check for presence of key metrics (adjust names if needed)
 		expectedMetrics := []string{
-			"agent_events_requests_ratio_total", // Consolidated metric with status labels
+			"agent_events_requests", // Consolidated metric with status labels
 			"agent_events_bytes_received_total",
 			"agent_events_dedup_cache_entries",
 			"agent_events_request_duration_seconds", // Check for histograms
