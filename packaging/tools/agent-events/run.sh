@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 
-stdbuf -oL /opt/agent-events/server --port=30001 --dedup-key agent.id --dedup-window 1800 2>/opt/agent-events/log/agent-events.log \
+stdbuf -oL /opt/agent-events/server \
+	--port=30001 \
+	--dedup-key=agent.id \
+	--dedup-key=host.id \
+	--dedup-key=host.boot.id \
+	--dedup-key=exit_cause \
+	--dedup-logfile=/opt/agent-events/log/dedup.log \
+	--dedup-window=1800 \
+	2>/opt/agent-events/log/stderr.log \
 	| stdbuf -oL log2journal json \
 		--prefix 'AE_' \
 		--inject 'SYSLOG_IDENTIFIER=agent-events' \
