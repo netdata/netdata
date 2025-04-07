@@ -32,6 +32,7 @@ jobs:
     outputs:
       run: ${{ steps.check-run.outputs.run }}
       skip-go: ${{ steps.check-go.outputs.skip-go }}
+      docker-native: ${{ steps.check-native.outputs.docker-native }}
     steps:
       - name: Checkout
         id: checkout
