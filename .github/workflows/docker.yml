@@ -22,6 +22,7 @@ on:
         required: true
 env:
   DISABLE_TELEMETRY: 1
+  NIGHTLY_COUNT: 4
 concurrency:
   group: docker-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
@@ -260,6 +261,14 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     outputs:
       tags: ${{ steps.tag.outputs.tags }}
+      nightly: ${{ steps.tag.outputs.nightly }}
+      nightly_tag: ${{ steps.tag.outputs.nightly_tag }}
+      docker_tags: ${{ steps.tag.outputs.docker_tags }}
+      quay_tags: ${{ steps.tag.outputs.quay_tags }}
+      ghcr_tags: ${{ steps.tag.outputs.ghcr_tags }}
+      docker_repo: ${{ steps.tag.outputs.docker_repo }}
+      quay_repo: ${{ steps.tag.outputs.quay_repo }}
+      ghcr_repo: ${{ steps.tag.outputs.ghcr_repo }}
     steps:
       - name: Checkout
         id: checkout
@@ -268,9 +277,9 @@ jobs:
         id: tag
         run: |
           if [ ${{ github.event_name }} = 'workflow_dispatch' ]; then
-            echo "tags=$(.github/scripts/gen-docker-tags.py ${{ github.event_name }} ${{ github.event.inputs.version }})" >> "${GITHUB_OUTPUT}"
+            .github/scripts/gen-docker-tags.py ${{ github.event_name }} ${{ github.event.inputs.version }}
           else
-            echo "tags=$(.github/scripts/gen-docker-tags.py ${{ github.event_name }} '')" >> "${GITHUB_OUTPUT}"
+            .github/scripts/gen-docker-tags.py ${{ github.event_name }} ''
           fi
 
   build-images-docker-hub:
@@ -403,6 +412,10 @@ jobs:
         id: manifest
         if: github.repository == 'netdata/netdata'
         run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ needs.gen-tags.outputs.tags }}")
+      - name: Rotate Old Image Tags
+        id: rotate
+        if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
+        run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.docker_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -418,6 +431,7 @@ jobs:
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
               Create and push manifest: ${{ steps.manifest.outcome }}
+              Rotate old image tags: ${{ steps.rotate.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
@@ -557,6 +571,10 @@ jobs:
         id: manifest
         if: github.repository == 'netdata/netdata'
         run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ needs.gen-tags.outputs.tags }}")
+      - name: Rotate Old Image Tags
+        id: rotate
+        if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
+        run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.quay_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -572,6 +590,7 @@ jobs:
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
               Create and push manifest: ${{ steps.manifest.outcome }}
+              Rotate old image tags: ${{ steps.rotate.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
@@ -711,6 +730,10 @@ jobs:
         id: manifest
         if: github.repository == 'netdata/netdata'
         run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ needs.gen-tags.outputs.tags }}")
+      - name: Rotate Old Image Tags
+        id: rotate
+        if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
+        run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.ghcr_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -726,6 +749,7 @@ jobs:
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
               Create and push manifest: ${{ steps.manifest.outcome }}
+              Rotate old image tags: ${{ steps.rotate.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
