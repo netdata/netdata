@@ -6,8 +6,8 @@ Netdata categorizes nodes into two types:
 
 | Type          | Description                                    | Common Use Cases                                                                                                                                                         |
 |---------------|------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Ephemeral** | Expected to disconnect or reconnect frequently | - Auto-scaling cloud instances<br>- Dynamic containers and VMs<br>- IoT devices with intermittent connectivity<br>- Development/test environments with frequent restarts |
-| **Permanent** | Expected to maintain continuous connectivity   | - Production servers<br>- Core infrastructure nodes<br>- Critical monitoring systems<br>- Stable database servers                                                        |
+| **Ephemeral** | Expected to disconnect or reconnect frequently | - Auto-scaling cloud instances<br/>- Dynamic containers and VMs<br/>- IoT devices with intermittent connectivity<br/>- Development/test environments with frequent restarts |
+| **Permanent** | Expected to maintain continuous connectivity   | - Production servers<br/>- Core infrastructure nodes<br/>- Critical monitoring systems<br/>- Stable database servers                                                        |
 
 > **Note:** Disconnections in permanent nodes indicate potential system failures and require immediate attention.
 
