@@ -61,9 +61,11 @@ The [Netdata CLI](/src/cli/README.md) tool has two commands for working with arc
 ### mark-stale-nodes-ephemeral
 
 To mark a permanently offline nodes, including virtual nodes, as ephemeral:
+
 ```bash
 netdatacli mark-stale-nodes-ephemeral <node_id | machine_guid | hostname | ALL_NODES>
 ```
+
 This keeps the previously collected metrics data available for querying and clears any active alerts.
 
 > **Note:** Nodes will revert to permanent status if they reconnect unless explicitly configured as ephemeral in `netdata.conf`.
@@ -76,7 +78,7 @@ To fully remove permanently offline nodes:
 netdatacli remove-stale-node <node_id | machine_guid | hostname | ALL_NODES>
 ```
 
-This is like the `mark-stale-nodes-ephemeral` subcommand, but also removes the node so that they are no longer available for querying.
+This is like the `mark-stale-nodes-ephemeral` subcommand, but it also removes the nodes so they are no longer available for querying.
 
 ## Cloud Integration
 
