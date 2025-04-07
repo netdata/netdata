@@ -57,6 +57,8 @@ var (
 	keyPaths       dedupPaths
 	dedupSeparator string
 	startTime      time.Time
+	dedupLogger    *os.File
+	dedupLogFile   string // Store the deduplication log file path
 
 	// Track active connections for graceful shutdown
 	activeConnections int32
@@ -301,8 +303,17 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	
 	bytesReceived.Add(ctx, int64(len(body)), metric.WithAttributes(attribute.String("status", "success")))
 
+	// Add Cloudflare Headers to all requests
+	cfHeaders := make(map[string]string)
+	cfHeaderPrefixes := []string{"CF-IPCountry", "CF-Ray", "CF-Connecting-IP", "CF-IPCity", "CF-IPContinent", "CF-IPLatitude", "CF-IPLongitude", "CF-IPRegion", "CF-IPTimeZone", "CF-Visitor", "CF-IPCOLO"}
+	for _, name := range cfHeaderPrefixes { if value := r.Header.Get(name); value != "" { key := strings.TrimPrefix(name, "CF-"); cfHeaders[key] = value } }
+	for name, values := range r.Header { if strings.HasPrefix(name, "CF-") && len(values) > 0 { key := strings.TrimPrefix(name, "CF-"); if _, exists := cfHeaders[key]; !exists { cfHeaders[key] = values[0] } } }
+	if len(cfHeaders) > 0 { fullData["cf"] = cfHeaders; slog.Debug("added cloudflare headers", "count", len(cfHeaders)) }
+	
 	// Deduplication Logic
 	shouldProcess := true
+	var finalKeyString string
+	var dedupHash [32]byte
 	if len(keyPaths) > 0 {
 		var keyBuilder strings.Builder
 		for i, path := range keyPaths {
@@ -310,49 +321,60 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			keyBuilder.WriteString(result.String()) // gjson returns "" for non-existent paths
 			if i < len(keyPaths)-1 { keyBuilder.WriteString(dedupSeparator) }
 		}
-		finalKeyString := keyBuilder.String()
-		dedupHash := sha256.Sum256([]byte(finalKeyString))
+		finalKeyString = keyBuilder.String()
+		dedupHash = sha256.Sum256([]byte(finalKeyString))
 		slog.Debug("generated dedup key", "key_string", finalKeyString, "hash", fmt.Sprintf("%x", dedupHash))
+		
+		// Add _dedup key to all requests (regardless of duplicate status)
+		fullData["_dedup"] = map[string]interface{}{
+			"key": finalKeyString,
+			"hash": fmt.Sprintf("%x", dedupHash),
+		}
 
+		// Check if this is a duplicate
 		if !checkAndRecordHash(dedupHash) {
 			shouldProcess = false
 			bytesReceived.Add(ctx, int64(len(body)), metric.WithAttributes(attribute.String("status", "duplicate")))
 			requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "duplicate")))
 			slog.Debug("discarded duplicate request", "hash", fmt.Sprintf("%x", dedupHash), "note", "timestamp refreshed")
-			if _, err := w.Write([]byte("OK")); err != nil { slog.Error("error writing response", "context", "after_duplicate_discard", "error", err) }
-			return
 		}
 	} else {
 		slog.Debug("skipping deduplication", "reason", "no dedup keys provided")
 	}
 
-	// Process Request if Not Duplicate
+	// Marshal the fully prepared object for either stdout or dedup log
+	outputBytes, err := json.Marshal(fullData)
+	if err != nil {
+		http.Error(w, "Internal Server Error during output marshal", http.StatusInternalServerError)
+		slog.Error("request discarded", "reason", "json_marshal_failed", "error", err)
+		requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "cant_marshal_output")))
+		return
+	}
+
+	// Decide where to output based on deduplication status
 	if shouldProcess {
-		// We've already parsed fullData in the initial check
-
-		// Add Cloudflare Headers
-		cfHeaders := make(map[string]string)
-		cfHeaderPrefixes := []string{"CF-IPCountry", "CF-Ray", "CF-Connecting-IP", "CF-IPCity", "CF-IPContinent", "CF-IPLatitude", "CF-IPLongitude", "CF-IPRegion", "CF-IPTimeZone", "CF-Visitor", "CF-IPCOLO"}
-		for _, name := range cfHeaderPrefixes { if value := r.Header.Get(name); value != "" { key := strings.TrimPrefix(name, "CF-"); cfHeaders[key] = value } }
-		for name, values := range r.Header { if strings.HasPrefix(name, "CF-") && len(values) > 0 { key := strings.TrimPrefix(name, "CF-"); if _, exists := cfHeaders[key]; !exists { cfHeaders[key] = values[0] } } }
-		if len(cfHeaders) > 0 { fullData["cf"] = cfHeaders; slog.Debug("added cloudflare headers", "count", len(cfHeaders)) }
-
-		// Marshal Output
-		outputBytes, err := json.Marshal(fullData)
-		if err != nil {
-			http.Error(w, "Internal Server Error during output marshal", http.StatusInternalServerError)
-			slog.Error("request discarded", "reason", "json_marshal_failed", "error", err)
-			requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "cant_marshal_output")))
-			return
-		}
-
-		// Write Output & Response
+		// Write to stdout for normal processing
 		fmt.Println(string(outputBytes))
-		// Count successful processing
 		requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success")))
-		if _, err := w.Write([]byte("OK")); err != nil {
-			slog.Error("error writing response", "context", "after_successful_processing", "error", err)
+	} else if dedupLogger != nil {
+		// Write to dedup log file if it's a duplicate and logging is enabled
+		if _, err := fmt.Fprintln(dedupLogger, string(outputBytes)); err != nil {
+			slog.Error("failed to write to deduplication log file", "error", err)
 		}
+	}
+
+	// Send response
+	if _, err := w.Write([]byte("OK")); err != nil {
+		if shouldProcess {
+			slog.Error("error writing response", "context", "after_successful_processing", "error", err)
+		} else {
+			slog.Error("error writing response", "context", "after_duplicate_discard", "error", err)
+		}
+	}
+	
+	// For duplicates, return early
+	if !shouldProcess {
+		return
 	}
 }
 
@@ -367,7 +389,20 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		"version":     "agent-events v1.0",
 	}
 	memStats := &runtime.MemStats{}; runtime.ReadMemStats(memStats); status["memory"] = map[string]interface{}{"alloc": memStats.Alloc, "total_alloc": memStats.TotalAlloc, "sys": memStats.Sys, "heap_alloc": memStats.HeapAlloc, "gc_cycles": memStats.NumGC}
-	mapMutex.Lock(); mapSize := len(seenIDs); mapMutex.Unlock(); status["deduplication"] = map[string]interface{}{"enabled": len(keyPaths) > 0, "keys": keyPaths, "window": dedupWindow.String(), "map_size": mapSize}
+	mapMutex.Lock(); mapSize := len(seenIDs); mapMutex.Unlock(); 
+	dedupLogEnabled := dedupLogger != nil
+	dedupLogPath := ""
+	if dedupLogEnabled {
+		dedupLogPath = dedupLogFile
+	}
+	status["deduplication"] = map[string]interface{}{
+		"enabled": len(keyPaths) > 0, 
+		"keys": keyPaths, 
+		"window": dedupWindow.String(), 
+		"map_size": mapSize,
+		"log_enabled": dedupLogEnabled,
+		"log_file": dedupLogPath,
+	}
 	w.Header().Set("Content-Type", "application/json"); w.WriteHeader(http.StatusOK);
 	if err := json.NewEncoder(w).Encode(status); err != nil { slog.Error("error encoding health check response", "error", err) }
 }
@@ -389,6 +424,8 @@ func main() {
 	healthPath := flag.String("health-path", "/healthz", "Path for health check endpoint")
 	logFormat := flag.String("log-format", "json", "Log format: 'json' or 'text'")
 	logLevelFlag := flag.String("log-level", "info", "Log level: 'debug', 'info', 'warn', 'error'")
+	// Use the global dedupLogFile variable
+	flag.StringVar(&dedupLogFile, "dedup-logfile", "", "File to log deduplicated requests (empty to disable)")
 	flag.Var(&keyPaths, "dedup-key", "JSON path (dot-notation) for deduplication key (can be used multiple times)")
 	flag.StringVar(&dedupSeparator, "dedup-separator", "-", "Separator used between multi-key values")
 	flag.Parse()
@@ -411,6 +448,18 @@ func main() {
 	// Initialize core components
 	seenIDs = make(map[[32]byte]seenEntry)
 	dedupWindow = time.Duration(*dedupSeconds) * time.Second
+	
+	// Open deduplication log file if specified
+	if dedupLogFile != "" {
+		var err error
+		dedupLogger, err = os.OpenFile(dedupLogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			slog.Error("failed to open deduplication log file", "file", dedupLogFile, "error", err)
+			os.Exit(1)
+		}
+		slog.Info("deduplication log file opened", "path", dedupLogFile)
+	}
+	
 	if _, err := initMetrics(); err != nil { // Handle potential error from initMetrics
         slog.Error("failed to initialize metrics", "error", err)
         os.Exit(1)
@@ -471,6 +520,14 @@ func main() {
 		// Shutdown HTTP server
 		slog.Info("shutting down HTTP server")
 		if err := server.Shutdown(shutdownCtx); err != nil { slog.Error("server shutdown failed", "error", err) } else { slog.Info("server shutdown completed gracefully") }
+		
+		// Close deduplication log file if open
+		if dedupLogger != nil {
+			slog.Info("closing deduplication log file")
+			if err := dedupLogger.Close(); err != nil {
+				slog.Error("failed to close deduplication log file", "error", err)
+			}
+		}
 	}
 
 	slog.Info("server exiting")

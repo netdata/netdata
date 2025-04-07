@@ -225,9 +225,15 @@ func TestHandler(t *testing.T) {
 		t.Cleanup(metricsServer.Close)
 
 		// Make requests to main handler to generate metrics
-		handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"id": "m1"}`)))
-		handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"id": "m1"}`))) // duplicate
-		handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))                             // method not allowed
+		captureOutput(t, func() {
+			handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"id": "m1"}`)))
+		})
+		captureOutput(t, func() {
+			handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"id": "m1"}`))) // duplicate
+		})
+		captureOutput(t, func() {
+			handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil)) // method not allowed
+		})
 
 		// Fetch metrics
 		resp, err := http.Get(metricsServer.URL)
