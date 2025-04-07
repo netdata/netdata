@@ -1088,6 +1088,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/machine_id.h
         src/libnetdata/os/process_memory.c
         src/libnetdata/os/process_memory.h
+        src/libnetdata/os/dir_size.c
+        src/libnetdata/os/dir_size.h
         src/libnetdata/signals/signal-code.c
         src/libnetdata/signals/signal-code.h
 )

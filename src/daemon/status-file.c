@@ -207,6 +207,13 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
                 buffer_json_member_add_boolean(wb, "read_only", ds->var_cache.is_read_only);
             }
             buffer_json_object_close(wb);
+            
+            buffer_json_member_add_object(wb, "netdata");
+            buffer_json_member_add_uint64(wb, "dbengine", ds->disk_footprint.dbengine);
+            buffer_json_member_add_uint64(wb, "sqlite", ds->disk_footprint.sqlite);
+            buffer_json_member_add_uint64(wb, "other", ds->disk_footprint.other);
+            buffer_json_member_add_datetime_rfc3339(wb, "last_updated", ds->disk_footprint.last_updated_ut, true);
+            buffer_json_object_close(wb);
         }
         buffer_json_object_close(wb);
     }
@@ -461,6 +468,14 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
                 JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "read_only", ds->var_cache.is_read_only, error, false);
                 if(!OS_SYSTEM_DISK_SPACE_OK(ds->var_cache))
                     ds->var_cache = OS_SYSTEM_DISK_SPACE_EMPTY;
+            });
+            
+            JSONC_PARSE_SUBOBJECT(jobj, path, "netdata", error, required_v27, {
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "dbengine", ds->disk_footprint.dbengine, error, required_v27);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "sqlite", ds->disk_footprint.sqlite, error, required_v27);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "other", ds->disk_footprint.other, error, required_v27);
+                JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "last_updated", ds->disk_footprint.last_updated_ut, error, required_v27);
+                // Don't reset if not OK since this is a new field
             });
         });
 
@@ -717,6 +732,41 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
     session_status.memory = os_system_memory(true);
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
+    
+    // Update disk footprint at most once every 10 minutes (600 seconds)
+    if ((now_ut - session_status.disk_footprint.last_updated_ut) >= 600 * USEC_PER_SEC ||
+        session_status.disk_footprint.last_updated_ut == 0) {
+        // Calculate disk footprint by categories
+        const char *dirs_to_measure[] = {
+            netdata_configured_varlib_dir,
+            netdata_configured_cache_dir
+        };
+        
+        // Create patterns for different file types
+        SIMPLE_PATTERN *dbengine_pattern = simple_pattern_create("*dbengine*/*.ndf *dbengine*/*.njf*", " ", SIMPLE_PATTERN_EXACT, false);
+        SIMPLE_PATTERN *sqlite_pattern = simple_pattern_create("*.db *.sqlite *.wal *.shm", " ", SIMPLE_PATTERN_EXACT, false);
+        
+        // Get total size first
+        DIR_SIZE total_size = dir_size_multiple(dirs_to_measure, 2, NULL, 0);
+        
+        // Get DBEngine files size
+        DIR_SIZE dbengine_size = dir_size_multiple(dirs_to_measure, 2, dbengine_pattern, 0);
+        session_status.disk_footprint.dbengine = dbengine_size.bytes;
+        
+        // Get SQLite files size
+        DIR_SIZE sqlite_size = dir_size_multiple(dirs_to_measure, 2, sqlite_pattern, 0);
+        session_status.disk_footprint.sqlite = sqlite_size.bytes;
+        
+        // Calculate other files (total - dbengine - sqlite)
+        session_status.disk_footprint.other = total_size.bytes - dbengine_size.bytes - sqlite_size.bytes;
+        
+        // Update last updated timestamp
+        session_status.disk_footprint.last_updated_ut = now_ut;
+        
+        // Clean up patterns
+        simple_pattern_free(dbengine_pattern);
+        simple_pattern_free(sqlite_pattern);
+    }
 
     spinlock_unlock(&session_status.spinlock);
     dsf_release(session_status);
