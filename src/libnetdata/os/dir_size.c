@@ -17,7 +17,7 @@ typedef struct {
 
 // Internal function to recursively calculate directory size
 static void calc_dir_size_recursive(const char *base_path, const char *rel_path, 
-                                   SIMPLE_PATTERN *pattern, int max_depth, int current_depth,
+                                   SIMPLE_PATTERN *pattern, size_t max_depth, size_t current_depth,
                                    DIR_SIZE *result, DICTIONARY *visited_inodes) {
     
     char path[FILENAME_MAX + 1];
@@ -135,7 +135,7 @@ static void calc_dir_size_recursive(const char *base_path, const char *rel_path,
     // Other file types (symlinks, etc.) are not counted in size calculation
 }
 
-DIR_SIZE dir_size(const char *path, SIMPLE_PATTERN *pattern, int max_depth) {
+DIR_SIZE dir_size(const char *path, SIMPLE_PATTERN *pattern, size_t max_depth) {
     DIR_SIZE result = DIR_SIZE_EMPTY;
     
     if (!path || !*path)
@@ -174,7 +174,7 @@ DIR_SIZE dir_size(const char *path, SIMPLE_PATTERN *pattern, int max_depth) {
     return result;
 }
 
-DIR_SIZE dir_size_multiple(const char **paths, int num_paths, SIMPLE_PATTERN *pattern, int max_depth) {
+DIR_SIZE dir_size_multiple(const char **paths, int num_paths, SIMPLE_PATTERN *pattern, size_t max_depth) {
     DIR_SIZE result = DIR_SIZE_EMPTY;
     
     if (!paths || num_paths <= 0)

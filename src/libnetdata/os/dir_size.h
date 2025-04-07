@@ -8,10 +8,10 @@
 
 typedef struct {
     uint64_t bytes;        // Total size in bytes
-    uint64_t files;        // Number of files
-    uint64_t directories;  // Number of directories (including root directory)
-    uint64_t depth;        // Maximum depth found
-    uint64_t errors;       // Number of errors encountered during calculation
+    size_t files;          // Number of files
+    size_t directories;    // Number of directories (including root directory)
+    size_t depth;          // Maximum depth found
+    size_t errors;         // Number of errors encountered during calculation
 } DIR_SIZE;
 
 #define DIR_SIZE_EMPTY (DIR_SIZE){ 0 }
@@ -29,7 +29,7 @@ typedef struct {
  * the given path and calculates the total size in bytes, counting files and
  * directories. It safely handles symbolic links to avoid infinite loops.
  */
-DIR_SIZE dir_size(const char *path, SIMPLE_PATTERN *pattern, int max_depth);
+DIR_SIZE dir_size(const char *path, SIMPLE_PATTERN *pattern, size_t max_depth);
 
 /**
  * Calculate multiple directory sizes in one pass
@@ -42,6 +42,6 @@ DIR_SIZE dir_size(const char *path, SIMPLE_PATTERN *pattern, int max_depth);
  *
  * This function calculates sizes for multiple directories and returns their combined total.
  */
-DIR_SIZE dir_size_multiple(const char **paths, int num_paths, SIMPLE_PATTERN *pattern, int max_depth);
+DIR_SIZE dir_size_multiple(const char **paths, int num_paths, SIMPLE_PATTERN *pattern, size_t max_depth);
 
 #endif //NETDATA_DIR_SIZE_H
