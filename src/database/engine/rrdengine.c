@@ -2258,6 +2258,8 @@ void dbengine_event_loop(void* arg) {
 
         } while (opcode != RRDENG_OPCODE_NOOP);
     }
+    freez(mlt);
+    uv_sem_destroy(&sem);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
     (void) uv_loop_close(&main->loop);
