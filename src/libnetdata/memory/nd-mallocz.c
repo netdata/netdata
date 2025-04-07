@@ -7,19 +7,6 @@ void mallocz_register_out_of_memory_cb(out_of_memory_cb cb) {
     out_of_memory_callback = cb;
 }
 
-uint64_t process_max_rss(void) {
-#if defined(OS_LINUX) || defined(OS_WINDOWS)
-    int rss_multiplier = 1024;
-#else
-    int rss_multiplier = 1;
-#endif
-
-    struct rusage usage = { 0 };
-    if(getrusage(RUSAGE_SELF, &usage) != 0)
-        return 0;
-
-    return usage.ru_maxrss * rss_multiplier;
-}
 
 ALWAYS_INLINE NORETURN
 void out_of_memory(const char *call, size_t size, const char *details) {
@@ -29,7 +16,8 @@ void out_of_memory(const char *call, size_t size, const char *details) {
     if(out_of_memory_callback)
         out_of_memory_callback();
 
-    uint64_t max_rss = process_max_rss();
+    OS_PROCESS_MEMORY proc_mem = os_process_memory(0);
+    uint64_t max_rss = OS_PROCESS_MEMORY_OK(proc_mem) ? proc_mem.max_rss : 0;
 
     char mem_available[64];
     char rss_used[64];

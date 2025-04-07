@@ -692,7 +692,10 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         session_status.cloud_status = cs;
 
     session_status.oom_protection = dbengine_out_of_memory_protection;
-    session_status.netdata_max_rss = process_max_rss();
+    
+    OS_PROCESS_MEMORY proc_mem = os_process_memory(0);
+    if(OS_PROCESS_MEMORY_OK(proc_mem))
+        session_status.netdata_max_rss = proc_mem.max_rss;
 
     session_status.claim_id = claim_id_get_uuid();
 
