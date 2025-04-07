@@ -64,7 +64,7 @@ To mark a permanently offline nodes, including virtual nodes, as ephemeral:
 ```bash
 netdatacli mark-stale-nodes-ephemeral <node_id | machine_guid | hostname | ALL_NODES>
 ```
-This keeps the previously collected metrics data available for querying, and also clears any active alerts.
+This keeps the previously collected metrics data available for querying and clears any active alerts.
 
 > **Note:** Nodes will revert to permanent status if they reconnect unless explicitly configured as ephemeral in `netdata.conf`.
 
