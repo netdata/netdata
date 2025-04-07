@@ -183,7 +183,8 @@ static void insert_alert_queue(
 
     int rc;
 
-    if (!host->aclk_config)
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if (!aclk_host_config)
         return;
 
     time_t submit_delay = trigger_time + calculate_delay(old_status, new_status);

@@ -76,7 +76,7 @@ static struct aclk_database_cmd aclk_database_deq_cmd(void)
 
 static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
 {
-    if(unlikely(!aclk_sync_config.initialized))
+    if(unlikely(!__atomic_load_n(&aclk_sync_config.initialized, __ATOMIC_RELAXED)))
         return;
 
     struct aclk_database_cmd *t = aral_mallocz(aclk_sync_config.ar);
@@ -505,6 +505,11 @@ struct worker_data {
     struct aclk_sync_config_s *config;
 };
 
+struct notify_timer_cb_data {
+    void *payload;
+    struct completion *completion;
+};
+
 static void after_do_unregister_node(uv_work_t *req, int status __maybe_unused)
 {
     struct worker_data *data = req->data;
@@ -524,16 +529,25 @@ static void do_unregister_node(uv_work_t *req)
     worker_is_idle();
 }
 
+static void notify_timer_close_callback(uv_handle_t *handle)
+{
+    struct notify_timer_cb_data *data = handle->data;
+    if (data->completion) {
+        completion_mark_complete(data->completion);
+    }
+    freez(data);
+}
+
 static void node_update_timer_cb(uv_timer_t *handle)
 {
-    struct aclk_sync_cfg_t *ahc = handle->data;
-    if (unlikely(!ahc))
+    struct aclk_sync_cfg_t *aclk_host_config = handle->data;
+    if (unlikely(!aclk_host_config))
         return;
 
-    RRDHOST *host = ahc->host;
+    RRDHOST *host = aclk_host_config->host;
 
     if(!host || aclk_host_state_update_auto(host))
-        uv_timer_stop(&ahc->timer);
+        uv_timer_stop(&aclk_host_config->timer);
 }
 
 static void after_start_alert_push(uv_work_t *req, int status __maybe_unused)
@@ -621,6 +635,8 @@ static void aclk_synchronization_event_loop(void *arg)
     worker_register_job_name(ACLK_MQTT_WSS_CLIENT_SET,          "config mqtt client");
     worker_register_job_name(ACLK_MQTT_WSS_CLIENT_RESET,        "reset mqtt client");
     worker_register_job_name(ACLK_DATABASE_NODE_UNREGISTER,     "unregister node");
+    worker_register_job_name(ACLK_CANCEL_NODE_UPDATE_TIMER,     "cancel node update timer");
+    worker_register_job_name(ACLK_QUEUE_NODE_INFO,     "queue node info");
 
     uv_loop_t *loop = &config->loop;
     fatal_assert(0 == uv_loop_init(loop));
@@ -640,6 +656,7 @@ static void aclk_synchronization_event_loop(void *arg)
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
 
     struct worker_data *data;
+    struct notify_timer_cb_data *timer_cb_data;
     aclk_query_t query;
 
     // This holds queries that need to be executed one by one
@@ -659,6 +676,8 @@ static void aclk_synchronization_event_loop(void *arg)
 
     while (likely(ACLK_SYNC_SHOULD_BE_RUNNING)) {
         enum aclk_database_opcode opcode;
+        RRDHOST *host;
+        struct aclk_sync_cfg_t *aclk_host_config;
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
 
@@ -695,30 +714,30 @@ static void aclk_synchronization_event_loop(void *arg)
                     /* the command queue was empty, do nothing */
                     break;
                     // NODE STATE
-                case ACLK_DATABASE_NODE_STATE:;
-                    RRDHOST *host = cmd.param[0];
-                    struct aclk_sync_cfg_t *ahc = host->aclk_config;
-                    if (unlikely(!ahc)) {
+                case ACLK_DATABASE_NODE_STATE:
+                    host = cmd.param[0];
+                    aclk_host_config = host->aclk_host_config;
+                    if (unlikely(!aclk_host_config)) {
                         create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
-                        ahc = host->aclk_config;
+                        aclk_host_config = host->aclk_host_config;
                     }
 
-                    if (ahc) {
+                    if (aclk_host_config) {
                         uint64_t schedule_time = (uint64_t)(uintptr_t)cmd.param[1];
-                        if (!ahc->timer_initialized) {
-                            int rc = uv_timer_init(loop, &ahc->timer);
+                        if (!aclk_host_config->timer_initialized) {
+                            int rc = uv_timer_init(loop, &aclk_host_config->timer);
                             if (!rc) {
-                                ahc->timer_initialized = true;
-                                ahc->timer.data = ahc;
+                                aclk_host_config->timer_initialized = true;
+                                aclk_host_config->timer.data = aclk_host_config;
                             }
                         }
 
-                        if (ahc->timer_initialized) {
-                            if (uv_is_active((uv_handle_t *)&ahc->timer))
-                                uv_timer_stop(&ahc->timer);
+                        if (aclk_host_config->timer_initialized) {
+                            if (uv_is_active((uv_handle_t *)&aclk_host_config->timer))
+                                uv_timer_stop(&aclk_host_config->timer);
 
-                            ahc->timer.data = ahc;
-                            int rc = uv_timer_start(&ahc->timer, node_update_timer_cb, schedule_time, 5000);
+                            aclk_host_config->timer.data = aclk_host_config;
+                            int rc = uv_timer_start(&aclk_host_config->timer, node_update_timer_cb, schedule_time, 5000);
                             if (!rc)
                                 break; // Timer started, exit
                         }
@@ -726,6 +745,31 @@ static void aclk_synchronization_event_loop(void *arg)
 
                     // This is fallback if timer fails
                     aclk_host_state_update_auto(host);
+                    break;
+                case ACLK_QUEUE_NODE_INFO:
+                    host = cmd.param[0];
+                    bool immediate = (bool)(uintptr_t)cmd.param[1];
+                    aclk_host_config = host->aclk_host_config;
+                    if (unlikely(!aclk_host_config)) {
+                        create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
+                        aclk_host_config = host->aclk_host_config;
+                    }
+                    aclk_host_config->node_info_send_time = (host == localhost ||(void *)(uintptr_t) immediate) ? 1 : now_realtime_sec();
+                    break;
+                case ACLK_CANCEL_NODE_UPDATE_TIMER:
+                    host = cmd.param[0];
+                    aclk_host_config = host->aclk_host_config;
+                    if (!aclk_host_config || !aclk_host_config->timer_initialized)
+                        break;
+                    if (uv_is_active((uv_handle_t *)&aclk_host_config->timer))
+                        uv_timer_stop(&aclk_host_config->timer);
+
+                    aclk_host_config->timer_initialized = false;
+                    timer_cb_data = mallocz(sizeof(*data));
+                    timer_cb_data->payload = host;
+                    timer_cb_data->completion = (struct completion *)cmd.param[1];
+                    aclk_host_config->timer.data = data;
+                    uv_close((uv_handle_t *)&aclk_host_config->timer, notify_timer_close_callback);
                     break;
 
                 case ACLK_DATABASE_NODE_UNREGISTER:
@@ -739,7 +783,6 @@ static void aclk_synchronization_event_loop(void *arg)
                         freez(data);
                     }
                     break;
-                    // ALERTS
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:
                     aclk_push_alert_config_event(cmd.param[0], cmd.param[1]);
                     break;
@@ -885,7 +928,7 @@ static void aclk_synchronization_event_loop(void *arg)
         uv_close((uv_handle_t *)&config->timer_req, NULL);
 
     uv_close((uv_handle_t *)&config->async, NULL);
-    uv_walk(loop, libuv_close_callback, NULL);
+    uv_walk(loop, libuv_close_callback, notify_timer_close_callback);
     uv_run(loop, UV_RUN_NOWAIT);
 
     (void) uv_loop_close(loop);
@@ -932,34 +975,30 @@ static void aclk_initialize_event_loop(void)
 
 // -------------------------------------------------------------
 
-void create_aclk_config(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __maybe_unused, nd_uuid_t *node_id __maybe_unused)
+void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_uuid_t *node_id __maybe_unused)
 {
 
-    if (!host || host->aclk_config)
+    if (!host || host->aclk_host_config)
         return;
 
-    struct aclk_sync_cfg_t *wc = callocz(1, sizeof(struct aclk_sync_cfg_t));
+    struct aclk_sync_cfg_t *aclk_host_config = callocz(1, sizeof(struct aclk_sync_cfg_t));
     if (node_id && !uuid_is_null(*node_id))
-        uuid_unparse_lower(*node_id, wc->node_id);
+        uuid_unparse_lower(*node_id, aclk_host_config->node_id);
 
-    host->aclk_config = wc;
-    if (node_id && UUIDiszero(host->node_id)) {
-        uuid_copy(host->node_id.uuid, *node_id);
+    struct aclk_sync_cfg_t *expected = NULL;
+    if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+        if (node_id && UUIDiszero(host->node_id))
+            uuid_copy(host->node_id.uuid, *node_id);
+    }
+    else {
+        freez(aclk_host_config);
+        return;
     }
 
-    wc->host = host;
-    wc->stream_alerts = false;
+    aclk_host_config->host = host;
+    aclk_host_config->stream_alerts = false;
     time_t now = now_realtime_sec();
-    wc->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
-}
-
-void destroy_aclk_config(RRDHOST *host)
-{
-    if (!host || !host->aclk_config)
-        return;
-
-    freez(host->aclk_config);
-    host->aclk_config = NULL;
+    aclk_host_config->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
 }
 
 #define SQL_FETCH_ALL_HOSTS                                                                                            \
@@ -1087,4 +1126,31 @@ void unregister_node(const char *machine_guid)
     if (unlikely(!machine_guid))
         return;
     queue_aclk_sync_cmd(ACLK_DATABASE_NODE_UNREGISTER, strdupz(machine_guid), NULL);
+}
+
+void destroy_aclk_config(RRDHOST *host)
+{
+    if (!host)
+        return;
+
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if (!aclk_host_config)
+        return;
+
+    if(likely(__atomic_load_n(&aclk_sync_config.initialized, __ATOMIC_RELAXED))) {
+        struct completion compl;
+        completion_init(&compl);
+
+        queue_aclk_sync_cmd(ACLK_CANCEL_NODE_UPDATE_TIMER, (void *)host, (void *)&compl);
+        completion_wait_for(&compl);
+        completion_destroy(&compl);
+    }
+
+    struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_RELAXED);
+    freez(old_aclk_host_config);
+}
+
+void aclk_queue_node_info(RRDHOST *host, bool immediate)
+{
+    queue_aclk_sync_cmd(ACLK_QUEUE_NODE_INFO, (void *)host, (void *)(uintptr_t)immediate);
 }
