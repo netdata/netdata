@@ -56,17 +56,33 @@ To investigate an alert:
 
 ## Managing Offline Nodes
 
-To clear alerts for permanently offline nodes, run:
+The [Netdata CLI](/src/cli/README.md) tool has two commands for working with archived nodes.
 
+### mark-stale-nodes-ephemeral
+
+To mark a permanently offline nodes, including virtual nodes, as ephemeral:
 ```bash
 netdatacli mark-stale-nodes-ephemeral <node_id | machine_guid | hostname | ALL_NODES>
 ```
+This keeps the previously collected metrics data available for querying, and also clears any active alerts.
 
 > **Note:** Nodes will revert to permanent status if they reconnect unless explicitly configured as ephemeral in `netdata.conf`.
+
+### remove-stale-node
+
+To fully remove permanently offline nodes:
+
+```bash
+netdatacli remove-stale-node <node_id | machine_guid | hostname | ALL_NODES>
+```
+
+This is like the `mark-stale-nodes-ephemeral` subcommand, but also removes the node so that they are no longer available for querying.
 
 ## Cloud Integration
 
 From v2.3.0 onward, Netdata Cloud sends unreachable-node notifications **only for permanent nodes**, reducing unnecessary alerts.
+
+Ephemeral nodes in Netdata Cloud are considered stale as long as there is at least one Agent reporting that, for that node, it has metrics data available for querying, by signaling the node as stale. When all Agents report the node as offline, ephemeral nodes are deleted from Cloud as well.
 
 ## Automatically Removing Ephemeral Nodes
 
