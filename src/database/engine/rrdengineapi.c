@@ -1113,20 +1113,11 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    ssize_t cpus = (ssize_t)netdata_conf_cpus() / (ssize_t)nd_profile.storage_tiers;
-    if(cpus > (ssize_t)datafiles)
-        cpus = (ssize_t)datafiles;
-
-    if(cpus > (ssize_t)libuv_worker_threads)
-        cpus = (ssize_t)libuv_worker_threads;
-
-    if(cpus >= (ssize_t)netdata_conf_cpus() / 2)
-        cpus = (ssize_t)(netdata_conf_cpus() / 2 - 1);
-
+    ssize_t cpus = (ssize_t)netdata_conf_cpus();
     if(cpus < 1)
         cpus = 1;
 
-    netdata_log_info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zd threads...", datafiles, ctx->config.tier, cpus);
+    netdata_log_info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using a shared pool of %zd threads...", datafiles, ctx->config.tier, cpus);
 
     if(datafiles > 2) {
         struct rrdengine_datafile *datafile;

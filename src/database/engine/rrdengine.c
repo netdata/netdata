@@ -1386,8 +1386,23 @@ static void *populate_mrg_tp_worker(
     int tier = ctx->config.tier;
 
     size_t thread_index = 0;
-    size_t threads_used = 0;
     int rc;
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    size_t total_datafiles = 0;
+    size_t populated_datafiles = 0;
+    for (struct rrdengine_datafile *df = ctx->datafiles.first; df; df = df->next) {
+        total_datafiles++;
+        if (df->populate_mrg.populated)
+            populated_datafiles++;
+    }
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    if (total_datafiles == 0) {
+        nd_log_daemon(NDLP_WARNING, "DBENGINE: No datafiles to populate MRG");
+        worker_is_idle();
+        return data;
+    }
 
     do {
         struct rrdengine_datafile *datafile = NULL;
@@ -1428,6 +1443,7 @@ static void *populate_mrg_tp_worker(
                     __atomic_store_n(&mlt[index].busy, false, __ATOMIC_RELEASE);
                     __atomic_store_n(&mlt[index].finished, false, __ATOMIC_RELEASE);
                     mlt[index].datafile->populate_mrg.populated = true;
+                    populated_datafiles++;
                     spinlock_unlock(&mlt[index].datafile->populate_mrg.spinlock);
 
                     // We've cleaned up a thread slot, but we'll still look for a free one
@@ -1463,10 +1479,10 @@ static void *populate_mrg_tp_worker(
             nd_log_daemon(NDLP_WARNING, "Failed to create thread, rc = %d", rc);
             __atomic_store_n(&mlt[thread_index].busy, false, __ATOMIC_RELEASE);
             spinlock_unlock(&datafile->populate_mrg.spinlock);
-        } else {
-            threads_used++;
         }
-
+        nd_log_limit_static_thread_var(erl, 10, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO, "DBENGINE: Tier %d MRG population completed: %.2f%% (%zu/%zu)", tier, (populated_datafiles * 100.0) / total_datafiles,
+                     populated_datafiles, total_datafiles);
     } while(1);
 
     // We've processed all datafiles. Now wait for all our threads to complete
