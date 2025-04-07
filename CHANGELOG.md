@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- fix\(go.d/prometheus\): don't use "ratio" as unit [\#20069](https://github.com/netdata/netdata/pull/20069) ([ilyam8](https://github.com/ilyam8))
+- agent-events: fix more metrics [\#20068](https://github.com/netdata/netdata/pull/20068) ([ktsaou](https://github.com/ktsaou))
+- agent-events: Consolidate metrics into a single labeled counter [\#20067](https://github.com/netdata/netdata/pull/20067) ([ktsaou](https://github.com/ktsaou))
+- ci: remove codeql-action build-mode none [\#20066](https://github.com/netdata/netdata/pull/20066) ([ilyam8](https://github.com/ilyam8))
+- agent-events: fix metrics [\#20065](https://github.com/netdata/netdata/pull/20065) ([ktsaou](https://github.com/ktsaou))
+- agent-events: fix metric names [\#20064](https://github.com/netdata/netdata/pull/20064) ([ktsaou](https://github.com/ktsaou))
+- Improve agent-events web server [\#20063](https://github.com/netdata/netdata/pull/20063) ([ktsaou](https://github.com/ktsaou))
 - Fix memory leaks [\#20062](https://github.com/netdata/netdata/pull/20062) ([ktsaou](https://github.com/ktsaou))
 - daemon status 27 [\#20058](https://github.com/netdata/netdata/pull/20058) ([ktsaou](https://github.com/ktsaou))
 - nested code block in doc [\#20056](https://github.com/netdata/netdata/pull/20056) ([Ancairon](https://github.com/Ancairon))
@@ -457,13 +464,6 @@
 - Invert order of checks in pgd\_append\_point\(\). [\#19515](https://github.com/netdata/netdata/pull/19515) ([vkalintiris](https://github.com/vkalintiris))
 - Link the ebpf plugin against libbpf directly instead of through libnetdata. [\#19514](https://github.com/netdata/netdata/pull/19514) ([Ferroin](https://github.com/Ferroin))
 - compile time and runtime check of required compiler flags [\#19513](https://github.com/netdata/netdata/pull/19513) ([ktsaou](https://github.com/ktsaou))
-- netdata.spec/plugin-go: remove dependency for lm\_sensors [\#19511](https://github.com/netdata/netdata/pull/19511) ([k0ste](https://github.com/k0ste))
-- chore\(go.d/nvme\): fix :dog: warning [\#19510](https://github.com/netdata/netdata/pull/19510) ([ilyam8](https://github.com/ilyam8))
-- Bundle cmake cache. [\#19509](https://github.com/netdata/netdata/pull/19509) ([vkalintiris](https://github.com/vkalintiris))
-- ACLK: allow encoded proxy username and password to work [\#19508](https://github.com/netdata/netdata/pull/19508) ([ktsaou](https://github.com/ktsaou))
-- Fix alert transition [\#19507](https://github.com/netdata/netdata/pull/19507) ([stelfrag](https://github.com/stelfrag))
-- update buildinfo  [\#19506](https://github.com/netdata/netdata/pull/19506) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d/nvme\): support v2.11 output format [\#19505](https://github.com/netdata/netdata/pull/19505) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
