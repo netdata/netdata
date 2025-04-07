@@ -358,13 +358,15 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
     }
 
     bool ok_to_send = true;
+    mqtt_wss_client client = __atomic_load_n(&config->client, __ATOMIC_RELAXED);
 
     switch (query->type) {
 
 // Incoming : cloud -> agent
         case HTTP_API_V2:
             worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
-            http_api_v2(config->client, query);
+            if (client)
+                http_api_v2(client, query);
             ok_to_send = false;
             break;
         case CTX_CHECKPOINT:;
@@ -430,7 +432,6 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
     }
 
     if (ok_to_send) {
-        mqtt_wss_client client = __atomic_load_n(&config->client, __ATOMIC_RELAXED);
         if (client)
             send_bin_msg(client, query);
         else {
