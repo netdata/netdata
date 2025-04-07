@@ -142,12 +142,14 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
         if (!p->charts_created) {
             p->charts_created = true;
-            netdata_fix_chart_name(windows_shared_buffer);
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
 
             if (!p->st_vm_memory_physical) {
                 p->st_vm_memory_physical = rrdset_create_localhost(
                     "vm_memory_physical",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_memory_physical",
@@ -248,11 +250,13 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
 
         if (!p->charts_created) {
             p->charts_created = true;
-            netdata_fix_chart_name(windows_shared_buffer);
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
 
             p->st_vm_vid_physical_pages_allocated = rrdset_create_localhost(
                 "vm_vid_physical_pages_allocated",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_vid_physical_pages_allocated",
@@ -497,10 +501,13 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         // Create charts
         if (!p->charts_created) {
             p->charts_created = true;
-            netdata_fix_chart_name(windows_shared_buffer);
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+
             p->st_device_space_pages = rrdset_create_localhost(
                 "root_partition_device_space_pages",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_device_space_pages",
@@ -823,11 +830,14 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
         if (!p->charts_created) {
             p->charts_created = true;
-            netdata_fix_chart_name(windows_shared_buffer);
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+
             if (!p->st_operations) {
                 p->st_operations = rrdset_create_localhost(
                     "vm_storage_device_operations",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_storage_device_operations",
@@ -1059,11 +1069,13 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
         if (!p->charts_created) {
             p->charts_created = true;
-            netdata_fix_chart_name(windows_shared_buffer);
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
 
             p->st_bytes = rrdset_create_localhost(
                 "vswitch_traffic",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_traffic",
@@ -1424,10 +1436,13 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
         if (!p->charts_created) {
             p->charts_created = true;
-            netdata_fix_chart_name(windows_shared_buffer);
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+
             p->st_dropped_packets = rrdset_create_localhost(
                 "vm_net_interface_packets_dropped",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_net_interface_packets_dropped",
@@ -1686,10 +1701,13 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
 
         if (!p->charts_created) {
             p->charts_created = true;
-            netdata_fix_chart_name(windows_shared_buffer);
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+
             p->st_HypervisorProcessorTotal = rrdset_create_localhost(
                 "vm_cpu_usage",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_cpu_usage",
