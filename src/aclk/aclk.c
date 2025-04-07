@@ -868,7 +868,8 @@ void *aclk_main(void *ptr)
     // Keep reconnecting and talking until our time has come
     // and the Grim Reaper (exit_initiated) calls
     netdata_log_info("ACLK: Starting ACLK query event loop");
-    aclk_query_init(mqttwss_client);
+    aclk_mqtt_client_set(mqttwss_client);
+    bool client_to_reset = true;
     do {
         worker_is_busy(WORKER_ACLK_CONNECT);
         if (aclk_attempt_to_connect(mqttwss_client))
@@ -888,7 +889,9 @@ void *aclk_main(void *ptr)
             nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK DISCONNECTED");
         }
     } while (service_running(SERVICE_ACLK));
-
+    aclk_mqtt_client_reset();
+    // No need to reset the client again when exiting
+    client_to_reset = false;
     worker_is_busy(WORKER_ACLK_DISCONNECTED);
     aclk_graceful_disconnect(mqttwss_client);
 
@@ -899,6 +902,8 @@ void *aclk_main(void *ptr)
 
 exit_full:
     free_topic_cache();
+    if (client_to_reset)
+        aclk_mqtt_client_reset();
     mqtt_wss_destroy(mqttwss_client);
 exit:
     if (aclk_env) {
