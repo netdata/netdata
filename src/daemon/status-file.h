@@ -6,6 +6,7 @@
 #include "libnetdata/libnetdata.h"
 #include "daemon/config/netdata-conf-profile.h"
 #include "database/rrd-database-mode.h"
+#include "database/rrd-metadata.h"
 #include "claim/cloud-status.h"
 #include "machine-guid.h"
 #include "status-file-dmi.h"
@@ -73,6 +74,16 @@ typedef struct daemon_status_file {
     uint64_t netdata_max_rss;
     OS_SYSTEM_MEMORY memory;
     OS_SYSTEM_DISK_SPACE var_cache;
+    
+    struct {
+        uint64_t dbengine;     // Size of dbengine files
+        uint64_t sqlite;       // Size of sqlite files
+        uint64_t other;        // Size of other files (total - dbengine - sqlite)
+        usec_t last_updated_ut; // Last time the footprint was updated (microseconds)
+    } disk_footprint;
+    
+    // Metrics statistics
+    RRDSTATS_METADATA metrics_metadata;
 
     char install_type[32];
     char architecture[32];   // ECS: host.architecture

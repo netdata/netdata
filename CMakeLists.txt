@@ -1081,6 +1081,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/signals/signals.h
         src/libnetdata/os/machine_id.c
         src/libnetdata/os/machine_id.h
+        src/libnetdata/os/process_memory.c
+        src/libnetdata/os/process_memory.h
+        src/libnetdata/os/dir_size.c
+        src/libnetdata/os/dir_size.h
         src/libnetdata/signals/signal-code.c
         src/libnetdata/signals/signal-code.h
 )
@@ -1572,6 +1576,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdlabels.c
         src/database/rrd.c
         src/database/rrd.h
+        src/database/rrd-metadata.c
+        src/database/rrd-metadata.h
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h

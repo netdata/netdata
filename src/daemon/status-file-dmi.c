@@ -171,42 +171,6 @@ void os_dmi_info_get(DMI_INFO *dmi) {
 
     linux_get_dmi_field("chassis_type", NULL, dmi->chassis.type, sizeof(dmi->chassis.type));
     
-    // Check if running in UEFI mode - just file existence, no external command
-    bool is_uefi = access("/sys/firmware/efi", F_OK) == 0;
-    if (is_uefi) {
-        safecpy(dmi->bios.mode, "UEFI");
-        
-        // Check EFI variable for secure boot - direct file access, no external command
-        int fd = open("/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c", O_RDONLY);
-        if (fd != -1) {
-            // Skip the first 4 bytes which contain the EFI variable attributes
-            unsigned char value[5] = {0};
-            ssize_t bytes_read = read(fd, value, sizeof(value));
-            if (bytes_read == sizeof(value)) {
-                // The 5th byte (index 4) contains the secure boot status
-                dmi->bios.secure_boot = (value[4] == 1);
-            }
-            close(fd);
-        }
-        
-        // Alternative check through securelevel - direct file access, no external command
-        if (!dmi->bios.secure_boot) {
-            fd = open("/sys/kernel/security/securelevel", O_RDONLY);
-            if (fd != -1) {
-                char level[10] = {0};
-                ssize_t bytes_read = read(fd, level, sizeof(level) - 1);
-                if (bytes_read > 0) {
-                    level[bytes_read] = '\0'; // Ensure null termination
-                    // If securelevel is > 0, usually means secure boot is enabled
-                    int securelevel = atoi(level);
-                    dmi->bios.secure_boot = (securelevel > 0);
-                }
-                close(fd);
-            }
-        }
-    } else {
-        safecpy(dmi->bios.mode, "Legacy");
-    }
 }
 #elif defined(OS_MACOS)
 
@@ -561,50 +525,6 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     if (!dmi->chassis.type[0])
         safecpy(dmi->chassis.type, "3"); // Desktop
         
-    // Check boot mode (UEFI vs Legacy) on macOS
-    io_registry_entry_t options = IORegistryEntryFromPath(kIOMasterPortDefault, "IODeviceTree:/options");
-    if (options) {
-        bool found_efi = false;
-        CFTypeRef property = IORegistryEntryCreateCFProperty(options, CFSTR("efi-boot-device"), kCFAllocatorDefault, 0);
-        if (property) {
-            found_efi = true;
-            CFRelease(property);
-        }
-        
-        if (found_efi) {
-            safecpy(dmi->bios.mode, "UEFI");
-            
-            // Check secure boot status
-            CFTypeRef secure_boot_prop = IORegistryEntryCreateCFProperty(options, 
-                                                                    CFSTR("SecureBootLevel"), 
-                                                                    kCFAllocatorDefault, 0);
-            if (secure_boot_prop) {
-                if (CFGetTypeID(secure_boot_prop) == CFNumberGetTypeID()) {
-                    int level;
-                    if (CFNumberGetValue((CFNumberRef)secure_boot_prop, kCFNumberIntType, &level)) {
-                        // Any positive value indicates secure boot is enabled
-                        dmi->bios.secure_boot = (level > 0);
-                    }
-                }
-                CFRelease(secure_boot_prop);
-            }
-        } else {
-            safecpy(dmi->bios.mode, "Legacy");
-        }
-        
-        IOObjectRelease(options);
-    } else {
-        safecpy(dmi->bios.mode, "Unknown");
-    }
-    
-    // Check for Apple T2 security chip (similar to TPM but without using external commands)
-    // This uses only IOKit APIs which are safe and built-in
-    io_registry_entry_t chip = IORegistryEntryFromPath(kIOMasterPortDefault, "IOService:/AppleACPIPlatformExpert/SMC/AppleT2:");
-    if (chip) {
-        // If T2 chip is present, secure boot is likely enabled
-        dmi->bios.secure_boot = true;
-        IOObjectRelease(chip);
-    }
 }
 
 #elif defined(OS_FREEBSD)
@@ -682,34 +602,6 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     // Get UUID
     freebsd_get_kenv_str("smbios.system.uuid", dmi->sys.uuid, sizeof(dmi->sys.uuid));
     
-    // Check for UEFI boot mode using sysctl (no external commands)
-    char bootmethod[64] = {0};
-    size_t bootmethod_size = sizeof(bootmethod) - 1;
-    if (sysctlbyname("kern.bootmethod", bootmethod, &bootmethod_size, NULL, 0) == 0) {
-        if (strncmp(bootmethod, "UEFI", 4) == 0) {
-            safecpy(dmi->bios.mode, "UEFI");
-            
-            // Check secure boot status - FreeBSD stores this in sysctl (no external commands)
-            int secure_boot_enabled = 0;
-            size_t secboot_size = sizeof(secure_boot_enabled);
-            if (sysctlbyname("kern.secureboot.enable", &secure_boot_enabled, &secboot_size, NULL, 0) == 0) {
-                dmi->bios.secure_boot = (secure_boot_enabled != 0);
-            }
-        } else {
-            safecpy(dmi->bios.mode, "Legacy");
-        }
-    } else {
-        // Fallback: check for EFI presence (older FreeBSD versions) - no external commands
-        int efi_present = 0;
-        size_t efi_size = sizeof(efi_present);
-        if (sysctlbyname("kern.efi.runtime", &efi_present, &efi_size, NULL, 0) == 0) {
-            if (efi_present) {
-                safecpy(dmi->bios.mode, "UEFI");
-            } else {
-                safecpy(dmi->bios.mode, "Legacy");
-            }
-        }
-    }
 }
 
 #elif defined(OS_WINDOWS)
@@ -1279,33 +1171,6 @@ static void windows_get_registry_info(DMI_INFO *dmi) {
         sizeof(dmi->chassis.serial)
     );
     
-    // Get BIOS boot mode (UEFI or Legacy)
-    DWORD firmware_type = 0;
-    if (GetFirmwareType(&firmware_type)) {
-        switch (firmware_type) {
-            case 1: // FirmwareTypeBios
-                safecpy(dmi->bios.mode, "Legacy");
-                break;
-            case 2: // FirmwareTypeUefi
-                safecpy(dmi->bios.mode, "UEFI");
-                break;
-            default:
-                safecpy(dmi->bios.mode, "Unknown");
-        }
-    }
-    
-    // Check if secure boot is enabled
-    HKEY key;
-    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State", 
-                     0, KEY_READ, &key) == ERROR_SUCCESS) {
-        DWORD secure_boot_value = 0;
-        DWORD size = sizeof(secure_boot_value);
-        if (RegQueryValueExA(key, "UEFISecureBootEnabled", NULL, NULL, 
-                            (LPBYTE)&secure_boot_value, &size) == ERROR_SUCCESS) {
-            dmi->bios.secure_boot = (secure_boot_value != 0);
-        }
-        RegCloseKey(key);
-    }
 }
 
 // Main function to get hardware information
@@ -1349,18 +1214,6 @@ void os_dmi_info_get(DMI_INFO *dmi) {
         );
     }
     
-    // Check for Secure Boot - Read directly from registry, no external commands
-    HKEY secureBootKey;
-    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State", 
-                     0, KEY_READ, &secureBootKey) == ERROR_SUCCESS) {
-        DWORD secure_boot = 0;
-        DWORD size = sizeof(secure_boot);
-        if (RegQueryValueExA(secureBootKey, "UEFISecureBootEnabled", NULL, NULL, 
-                            (LPBYTE)&secure_boot, &size) == ERROR_SUCCESS) {
-            dmi->bios.secure_boot = (secure_boot != 0);
-        }
-        RegCloseKey(secureBootKey);
-    }
 
     // If chassis type is not set or not a valid number, set a default
     if (!dmi->chassis.type[0] || atoi(dmi->chassis.type) <= 0) {
@@ -1417,8 +1270,6 @@ void dmi_info_init(DMI_INFO *dmi) {
     dmi->bios.version[0] = '\0';
     dmi->bios.date[0] = '\0';
     dmi->bios.release[0] = '\0';
-    dmi->bios.mode[0] = '\0';
-    dmi->bios.secure_boot = false;
     
     // Chassis information
     dmi->chassis.vendor[0] = '\0';

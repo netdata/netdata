@@ -266,6 +266,108 @@ static const char *dmi_chassis_type_to_string(int chassis_type) {
     }
 }
 
+// Check for active ECC memory controllers
+static bool has_ecc_memory(void) {
+#if defined(OS_LINUX)
+    char edac_path[FILENAME_MAX + 1];
+    snprintfz(edac_path, FILENAME_MAX, "%s/sys/devices/system/edac/mc", netdata_configured_host_prefix ? netdata_configured_host_prefix : "");
+
+    DIR *dir = opendir(edac_path);
+    if (!dir)
+        return false;
+
+    struct dirent *entry;
+    bool found_mc = false;
+
+    while ((entry = readdir(dir))) {
+        // Look for "mc0", "mc1", etc. directories
+        if (strncmp(entry->d_name, "mc", 2) == 0 && isdigit(entry->d_name[2])) {
+            // Check for presence of ECC-related files in this mc directory
+            char mc_path[FILENAME_MAX + 1];
+            snprintfz(mc_path, FILENAME_MAX, "%s/%s/ce_count", edac_path, entry->d_name);
+
+            struct stat st;
+            if (stat(mc_path, &st) == 0) {
+                found_mc = true;
+                break;
+            }
+        }
+    }
+
+    closedir(dir);
+    return found_mc;
+#else
+    return false; // Not implemented for this OS
+#endif
+}
+
+// Check for IPMI device
+static bool has_ipmi(void) {
+#if defined(OS_LINUX)
+    char ipmi_dev_path[FILENAME_MAX + 1];
+    snprintfz(ipmi_dev_path, FILENAME_MAX, "%s/dev/ipmi0", netdata_configured_host_prefix ? netdata_configured_host_prefix : "");
+    struct stat ipmi_stat;
+    return (stat(ipmi_dev_path, &ipmi_stat) == 0);
+#else
+    return false; // Not implemented for this OS
+#endif
+}
+
+// Check for multiple CPU sockets
+static bool has_multiple_cpu_sockets(void) {
+#if defined(OS_LINUX)
+    char cpu_path[FILENAME_MAX + 1];
+    snprintfz(cpu_path, FILENAME_MAX, "%s/sys/devices/system/cpu", netdata_configured_host_prefix ? netdata_configured_host_prefix : "");
+
+    DIR *dir = opendir(cpu_path);
+    if (!dir)
+        return false;
+
+    DICTIONARY *physical_ids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    struct dirent *entry;
+
+    while ((entry = readdir(dir))) {
+        // Check for cpu directories (cpu0, cpu1, etc.)
+        if (strncmp(entry->d_name, "cpu", 3) == 0 && isdigit(entry->d_name[3])) {
+            char topology_path[FILENAME_MAX + 1];
+            char physical_id[64];
+
+            // Read the physical_package_id file for this CPU
+            snprintfz(topology_path, FILENAME_MAX, "%s/%s/topology/physical_package_id",
+                      cpu_path, entry->d_name);
+
+            if (read_txt_file(topology_path, physical_id, sizeof(physical_id)) == 0) {
+                dictionary_set(physical_ids, physical_id, NULL, 0);
+            }
+        }
+    }
+
+    closedir(dir);
+
+    unsigned int socket_count = dictionary_entries(physical_ids);
+    dictionary_destroy(physical_ids);
+
+    return (socket_count > 1);
+#else
+    return false; // Not implemented for this OS
+#endif
+}
+
+// Main function to check for server hardware indicators
+static bool is_server_hardware(void) {
+    // Check each server indicator
+    if (has_ecc_memory())
+        return true;
+
+    if (has_ipmi())
+        return true;
+
+    if (has_multiple_cpu_sockets())
+        return true;
+
+    return false; // No server indicators found
+}
+
 void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
     char *force_type = NULL;
 
@@ -378,6 +480,8 @@ void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
         safecpy(ds->product.type, force_type);
     else if(dmi_is_virtual_machine(&ds->hw))
         safecpy(ds->product.type, "vm");
+    else if(is_server_hardware())
+        safecpy(ds->product.type, "server");
     else {
         char *end = NULL;
         int type = (int)strtol(ds->hw.chassis.type, &end, 10);

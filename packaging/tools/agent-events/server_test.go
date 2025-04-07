@@ -157,12 +157,21 @@ func TestHandler(t *testing.T) {
 		t.Cleanup(resetDedupState)
 		jsonBody := `{"id": "uuid-cf", "data": "value-cf"}`
 		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(jsonBody))
-		req.Header.Set("CF-IPCountry", "US"); req.Header.Set("CF-Ray", "123"); req.Header.Set("CF-Connecting-IP", "1.2.3.4"); req.Header.Set("CF-IPCity", "Testville")
+		// Set allowed headers (non-IP related)
+		req.Header.Set("CF-IPCountry", "US"); req.Header.Set("CF-Ray", "123"); req.Header.Set("CF-IPCity", "Testville") 
+		// Set IP-related headers that should be excluded for GDPR compliance
+		req.Header.Set("CF-Connecting-IP", "1.2.3.4"); req.Header.Set("CF-IPLatitude", "12.34"); req.Header.Set("CF-IPLongitude", "-56.78"); req.Header.Set("CF-Visitor", "{\"ip\":\"1.2.3.4\"}")
+		
 		rr := httptest.NewRecorder(); stdout, _ := captureOutput(t, func() { handler(rr, req) })
 		if status := rr.Code; status != http.StatusOK { t.Errorf("status: got %v want %v", status, http.StatusOK) }
 		if !strings.Contains(stdout, `"cf":`) { t.Errorf("stdout missing cf object") }
 		if !strings.Contains(stdout, `"IPCountry":"US"`) { t.Errorf("stdout missing cf header IPCountry") }
-		if !strings.Contains(stdout, `"Connecting-IP":"1.2.3.4"`) { t.Errorf("stdout missing cf header Connecting-IP") }
+		
+		// Verify IP-related headers are excluded for GDPR compliance
+		if strings.Contains(stdout, `"Connecting-IP"`) { t.Errorf("stdout should not contain IP address: Connecting-IP") }
+		if strings.Contains(stdout, `"IPLatitude"`) { t.Errorf("stdout should not contain IP geolocation: IPLatitude") }
+		if strings.Contains(stdout, `"IPLongitude"`) { t.Errorf("stdout should not contain IP geolocation: IPLongitude") }
+		if strings.Contains(stdout, `"Visitor"`) { t.Errorf("stdout should not contain Visitor which includes IP") }
 	})
 
 	t.Run("MethodNotAllowed", func(t *testing.T) {

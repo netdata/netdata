@@ -48,8 +48,6 @@ typedef struct dmi_info {
         char release[64];
         char version[64];
         char vendor[64];
-        char mode[16];    // Boot mode (UEFI/Legacy)
-        bool secure_boot; // Secure boot status (true/false)
     } bios;
 } DMI_INFO;
 
