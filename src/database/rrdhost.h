@@ -253,7 +253,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
 
-    struct aclk_sync_cfg_t *aclk_config;
+    struct aclk_sync_cfg_t *aclk_host_config;
 
     // ------------------------------------------------------------------------
     // health monitoring options
