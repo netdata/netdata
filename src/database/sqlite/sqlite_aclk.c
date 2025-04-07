@@ -358,13 +358,15 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
     }
 
     bool ok_to_send = true;
+    mqtt_wss_client client = __atomic_load_n(&config->client, __ATOMIC_RELAXED);
 
     switch (query->type) {
 
 // Incoming : cloud -> agent
         case HTTP_API_V2:
             worker_is_busy(UV_EVENT_ACLK_QUERY_EXECUTE);
-            http_api_v2(config->client, query);
+            if (client)
+                http_api_v2(client, query);
             ok_to_send = false;
             break;
         case CTX_CHECKPOINT:;
@@ -429,8 +431,14 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query
             break;
     }
 
-    if (ok_to_send)
-        send_bin_msg(config->client, query);
+    if (ok_to_send) {
+        if (client)
+            send_bin_msg(client, query);
+        else {
+            freez(query->data.bin_payload.payload);
+            nd_log_daemon(NDLP_ERR, "No client to send message %u", query->type);
+        }
+    }
 
     aclk_query_free(query);
 }
@@ -610,7 +618,8 @@ static void aclk_synchronization_event_loop(void *arg)
     worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,           "aclk query execute sync");
     worker_register_job_name(ACLK_QUERY_BATCH_EXECUTE,          "aclk batch execute");
     worker_register_job_name(ACLK_QUERY_BATCH_ADD,              "aclk batch add");
-    worker_register_job_name(ACLK_MQTT_WSS_CLIENT,              "config mqtt client");
+    worker_register_job_name(ACLK_MQTT_WSS_CLIENT_SET,          "config mqtt client");
+    worker_register_job_name(ACLK_MQTT_WSS_CLIENT_RESET,        "reset mqtt client");
     worker_register_job_name(ACLK_DATABASE_NODE_UNREGISTER,     "unregister node");
 
     uv_loop_t *loop = &config->loop;
@@ -750,10 +759,14 @@ static void aclk_synchronization_event_loop(void *arg)
                         config->alert_push_running = false;
                     }
                     break;
-                case ACLK_MQTT_WSS_CLIENT:
+                case ACLK_MQTT_WSS_CLIENT_SET:
                     config->client = (mqtt_wss_client)cmd.param[0];
                     break;
-
+                case ACLK_MQTT_WSS_CLIENT_RESET:
+                    __atomic_store_n(&config->client, NULL, __ATOMIC_RELEASE);
+                    struct completion *comp = cmd.param[0];
+                    completion_mark_complete(comp);
+                    break;
                 case ACLK_QUERY_EXECUTE:
                     query = (aclk_query_t)cmd.param[0];
 
@@ -1044,9 +1057,21 @@ void aclk_add_job(aclk_query_t query)
     queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
 }
 
-void aclk_query_init(mqtt_wss_client client)
+void aclk_mqtt_client_set(mqtt_wss_client client)
 {
-    queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT, client, NULL);
+    queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT_SET, client, NULL);
+}
+
+void aclk_mqtt_client_reset()
+{
+    if (!__atomic_load_n(&aclk_sync_config.client, __ATOMIC_RELAXED))
+        return;
+
+    struct completion compl;
+    completion_init(&compl);
+    queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT_RESET, &compl, NULL);
+    completion_wait_for(&compl);
+    completion_destroy(&compl);
 }
 
 void schedule_node_state_update(RRDHOST *host, uint64_t delay)
