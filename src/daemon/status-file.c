@@ -269,8 +269,6 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string(wb, "release", ds->hw.bios.release);
             buffer_json_member_add_string(wb, "version", ds->hw.bios.version);
             buffer_json_member_add_string(wb, "vendor", ds->hw.bios.vendor);
-            buffer_json_member_add_string(wb, "mode", ds->hw.bios.mode);
-            buffer_json_member_add_boolean(wb, "secure_boot", ds->hw.bios.secure_boot);
         }
         buffer_json_object_close(wb);
     }
@@ -521,8 +519,6 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "release", ds->hw.bios.release, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->hw.bios.version, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->hw.bios.vendor, error, required_v25);
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "mode", ds->hw.bios.mode, error, required_v27);
-            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "secure_boot", ds->hw.bios.secure_boot, error, required_v27);
         });
     });
 
