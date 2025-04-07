@@ -163,6 +163,41 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 
+    // Add metrics stats as a top-level node
+    buffer_json_member_add_object(wb, "metrics");
+    {
+        buffer_json_member_add_object(wb, "nodes");
+        {
+            buffer_json_member_add_uint64(wb, "total", ds->metrics_metadata.nodes.total);
+            buffer_json_member_add_uint64(wb, "receiving", ds->metrics_metadata.nodes.receiving);
+            buffer_json_member_add_uint64(wb, "sending", ds->metrics_metadata.nodes.sending);
+            buffer_json_member_add_uint64(wb, "archived", ds->metrics_metadata.nodes.archived);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "metrics");
+        {
+            buffer_json_member_add_uint64(wb, "collected", ds->metrics_metadata.metrics.collected);
+            buffer_json_member_add_uint64(wb, "available", ds->metrics_metadata.metrics.available);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "instances");
+        {
+            buffer_json_member_add_uint64(wb, "collected", ds->metrics_metadata.instances.collected);
+            buffer_json_member_add_uint64(wb, "available", ds->metrics_metadata.instances.available);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "contexts");
+        {
+            buffer_json_member_add_uint64(wb, "collected", ds->metrics_metadata.contexts.collected);
+            buffer_json_member_add_uint64(wb, "available", ds->metrics_metadata.contexts.available);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb);
+
     buffer_json_member_add_object(wb, "host");
     {
         buffer_json_member_add_uuid_compact(wb, "id", ds->machine_id.uuid);
@@ -218,7 +253,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
-
+    
     buffer_json_member_add_object(wb, "os");
     {
         buffer_json_member_add_string(wb, "type", DAEMON_OS_TYPE_2str(ds->os_type));
@@ -486,6 +521,31 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "cloud_region", ds->cloud_instance_region, error, required_v20);
         }
     });
+    
+    // Parse metrics metadata
+    JSONC_PARSE_SUBOBJECT(jobj, path, "metrics", error, required_v27, {
+        JSONC_PARSE_SUBOBJECT(jobj, path, "nodes", error, required_v27, {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->metrics_metadata.nodes.total, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "receiving", ds->metrics_metadata.nodes.receiving, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "sending", ds->metrics_metadata.nodes.sending, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "archived", ds->metrics_metadata.nodes.archived, error, required_v27);
+        });
+        
+        JSONC_PARSE_SUBOBJECT(jobj, path, "metrics", error, required_v27, {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "collected", ds->metrics_metadata.metrics.collected, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "available", ds->metrics_metadata.metrics.available, error, required_v27);
+        });
+        
+        JSONC_PARSE_SUBOBJECT(jobj, path, "instances", error, required_v27, {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "collected", ds->metrics_metadata.instances.collected, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "available", ds->metrics_metadata.instances.available, error, required_v27);
+        });
+        
+        JSONC_PARSE_SUBOBJECT(jobj, path, "contexts", error, required_v27, {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "collected", ds->metrics_metadata.contexts.collected, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "available", ds->metrics_metadata.contexts.available, error, required_v27);
+        });
+    });
 
     // Parse os object
     JSONC_PARSE_SUBOBJECT(jobj, path, "os", error, required_v1, {
@@ -733,6 +793,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.memory = os_system_memory(true);
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
     
+    // Collect metrics metadata statistics
+    session_status.metrics_metadata = rrdstats_metadata_collect();
+    
     // Update disk footprint at most once every 10 minutes (600 seconds)
     if ((now_ut - session_status.disk_footprint.last_updated_ut) >= 600 * USEC_PER_SEC ||
         session_status.disk_footprint.last_updated_ut == 0) {
@@ -744,7 +807,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         
         // Create patterns for different file types
         SIMPLE_PATTERN *dbengine_pattern = simple_pattern_create("*dbengine*/*.ndf *dbengine*/*.njf*", " ", SIMPLE_PATTERN_EXACT, false);
-        SIMPLE_PATTERN *sqlite_pattern = simple_pattern_create("*.db *.sqlite *.wal *.shm", " ", SIMPLE_PATTERN_EXACT, false);
+        SIMPLE_PATTERN *sqlite_pattern = simple_pattern_create("*.db *.wal *.shm", " ", SIMPLE_PATTERN_EXACT, false);
         
         // Get total size first
         DIR_SIZE total_size = dir_size_multiple(dirs_to_measure, 2, NULL, 0);

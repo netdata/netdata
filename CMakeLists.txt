@@ -1588,6 +1588,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdlabels.c
         src/database/rrd.c
         src/database/rrd.h
+        src/database/rrd-metadata.c
+        src/database/rrd-metadata.h
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h
