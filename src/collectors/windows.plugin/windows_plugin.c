@@ -48,7 +48,7 @@ static struct proc_module {
 
     {.name = "PerflibADFS", .dim = "PerflibADFS", .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibADFS},
 
-    {.name = "PerflibServices", .dim = "PerflibServices", .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibServices},
+    {.name = "PerflibServices", .dim = "PerflibServices", .enabled = CONFIG_BOOLEAN_NO, .func = do_PerflibServices},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}};
