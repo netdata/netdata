@@ -169,13 +169,13 @@ OS_PROCESS_MEMORY os_process_memory(pid_t pid) {
     }
     
     // Get basic task info (RSS and virtual size) - direct Mach API call
-    struct task_basic_info_64 task_info;
+    struct task_basic_info_64 task_basic_info;
     mach_msg_type_number_t count = TASK_BASIC_INFO_64_COUNT;
-    kr = task_info(task, TASK_BASIC_INFO_64, (task_info_t)&task_info, &count);
+    kr = task_info(task, TASK_BASIC_INFO_64, (task_info_t)&task_basic_info, &count);
     
     if (kr == KERN_SUCCESS) {
-        proc_mem.rss = task_info.resident_size;
-        proc_mem.virtual_size = task_info.virtual_size;
+        proc_mem.rss = task_basic_info.resident_size;
+        proc_mem.virtual_size = task_basic_info.virtual_size;
         
         // Get page-in information to estimate max RSS - direct Mach API call
         // This avoids using getrusage().ru_maxrss
@@ -185,12 +185,12 @@ OS_PROCESS_MEMORY os_process_memory(pid_t pid) {
         
         if (kr == KERN_SUCCESS && events_info.pageins > 0) {
             // If we have page-ins, we can use a more accurate calculation
-            mach_vm_size_t page_size = 0;
+            vm_size_t page_size = 0;  // Changed from mach_vm_size_t to vm_size_t
             host_page_size(mach_host_self(), &page_size);
-            proc_mem.max_rss = task_info.resident_size + (events_info.pageins * page_size);
+            proc_mem.max_rss = task_basic_info.resident_size + (events_info.pageins * page_size);
         } else {
             // Otherwise, just use current RSS as a fallback
-            proc_mem.max_rss = task_info.resident_size;
+            proc_mem.max_rss = task_basic_info.resident_size;
         }
         
         // Get memory region info for shared, text, data - direct Mach API calls
@@ -208,7 +208,7 @@ OS_PROCESS_MEMORY os_process_memory(pid_t pid) {
                 proc_mem.shared += size;
             } else if (info.share_mode == SM_PRIVATE) {
                 // Try to determine if this is code or data
-                if (info.obj_id != VM_OBJECT_NULL) {
+                if (info.obj_id != 0) {  // 0 instead of VM_OBJECT_NULL
                     // This is likely code
                     proc_mem.text += size;
                 } else {
