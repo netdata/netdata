@@ -241,6 +241,7 @@ static void worker_is_idle_with_time(usec_t now) {
 ALWAYS_INLINE void worker_is_idle(void) {
     if(likely(!worker || worker->last_action != WORKER_BUSY)) return;
 
+    last_job_id = WORKER_UTILIZATION_MAX_JOB_TYPES;
     worker_is_idle_with_time(worker_now_monotonic_usec());
 }
 
