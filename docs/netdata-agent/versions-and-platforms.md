@@ -74,7 +74,7 @@ Existing installs of native packages on a platform that is no longer supported, 
 
 If the operating system cannot be upgraded to a more recent version, the install can be switched to a static build. This is a manual process, may cause data loss, and is therefore **not supported**. However, following these steps should result in a functioning Agent with metrics data and connection to Netdata Cloud in tact:
 
-1. Stop the Agent, as appropriate for your platform. For platforms with systemd:
+1. Stop the Agent, [as appropriate for your platform](/docs/netdata-agent/start-stop-restart.md).
 
    ```sh
    sudo systemctl stop netdata
