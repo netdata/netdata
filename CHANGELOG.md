@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix memory allocation for timer callback data when cancelling a timer [\#20084](https://github.com/netdata/netdata/pull/20084) ([stelfrag](https://github.com/stelfrag))
 - Fix crash during shutdown when there are pending messages to cloud [\#20080](https://github.com/netdata/netdata/pull/20080) ([stelfrag](https://github.com/stelfrag))
 - Do not try to index jv2 files during shutdown [\#20079](https://github.com/netdata/netdata/pull/20079) ([stelfrag](https://github.com/stelfrag))
 - Cleanup during shutdown [\#20078](https://github.com/netdata/netdata/pull/20078) ([stelfrag](https://github.com/stelfrag))
@@ -24,9 +25,11 @@
 - agent-events: fix metric names [\#20064](https://github.com/netdata/netdata/pull/20064) ([ktsaou](https://github.com/ktsaou))
 - Improve agent-events web server [\#20063](https://github.com/netdata/netdata/pull/20063) ([ktsaou](https://github.com/ktsaou))
 - Fix memory leaks [\#20062](https://github.com/netdata/netdata/pull/20062) ([ktsaou](https://github.com/ktsaou))
+- Address Chart name \(Windows Hyper V\) [\#20060](https://github.com/netdata/netdata/pull/20060) ([thiagoftsm](https://github.com/thiagoftsm))
 - daemon status 27 [\#20058](https://github.com/netdata/netdata/pull/20058) ([ktsaou](https://github.com/ktsaou))
 - Improve ephemerality docs, adding `remove-stale-node` [\#20057](https://github.com/netdata/netdata/pull/20057) ([ralphm](https://github.com/ralphm))
 - nested code block in doc [\#20056](https://github.com/netdata/netdata/pull/20056) ([Ancairon](https://github.com/Ancairon))
+- Skip non-native builds in CI on PRs in most cases. [\#20055](https://github.com/netdata/netdata/pull/20055) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#20054](https://github.com/netdata/netdata/pull/20054) ([netdatabot](https://github.com/netdatabot))
 - Remove unnecessary parameters for oidc configuration [\#20053](https://github.com/netdata/netdata/pull/20053) ([juacker](https://github.com/juacker))
 - Observability cent points improved [\#20052](https://github.com/netdata/netdata/pull/20052) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -460,9 +463,6 @@
 - Fix contexts stay not-live when children reconnect [\#19536](https://github.com/netdata/netdata/pull/19536) ([ktsaou](https://github.com/ktsaou))
 - Fix coverity issue [\#19535](https://github.com/netdata/netdata/pull/19535) ([stelfrag](https://github.com/stelfrag))
 - Actually handle the `-fexceptions` requirement correctly in our build system. [\#19534](https://github.com/netdata/netdata/pull/19534) ([Ferroin](https://github.com/Ferroin))
-- fix heap use after free [\#19532](https://github.com/netdata/netdata/pull/19532) ([ktsaou](https://github.com/ktsaou))
-- docs\(web/gui\): remove info about old dashboard from readme [\#19531](https://github.com/netdata/netdata/pull/19531) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19530](https://github.com/netdata/netdata/pull/19530) ([netdatabot](https://github.com/netdatabot))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
