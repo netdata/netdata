@@ -1327,7 +1327,8 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
 
     // Store the first netdata function from the stack trace if available
     const char *first_nd_fn = capture_stack_trace_root_cause_function();
-    if (first_nd_fn && *first_nd_fn && !ds->fatal.function[0])
+    if (first_nd_fn && *first_nd_fn &&
+        (!ds->fatal.function[0] || strncmp(ds->fatal.function, "thread:", 7) == 0))
         safecpy(ds->fatal.function, first_nd_fn);
 
     if(buffer_strlen(wb) > 0) {
@@ -1447,6 +1448,18 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         session_status.fatal.worker_job_id = workers_get_last_job_id();
 
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag_async_safe());
+
+    if(!session_status.fatal.function[0] ||
+        strncmp(session_status.fatal.function, "startup(", 8) == 0 ||
+        strncmp(session_status.fatal.function, "shutdown(", 9) == 0) {
+        size_t len = 0;
+        len = strcatz(session_status.fatal.function, len, "thread:", sizeof(session_status.fatal.function));
+        len = strcatz(session_status.fatal.function, len, session_status.fatal.thread, sizeof(session_status.fatal.function));
+        if(session_status.fatal.worker_job_id <= WORKER_UTILIZATION_MAX_JOB_TYPES) {
+            len = strcatz(session_status.fatal.function, len, ":", sizeof(session_status.fatal.function));
+            len += print_uint64(&session_status.fatal.function[len], session_status.fatal.worker_job_id);
+        }
+    }
 
     dsf_release(session_status);
 
