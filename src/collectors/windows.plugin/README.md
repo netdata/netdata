@@ -39,3 +39,16 @@ To do this, remove the comment symbol (`#`) at the beginning of the line and the
         # PerflibADFS = yes
 ```
 
+### Update Every
+
+Most threads in this collector gather data at an interval of `1 second`. However, there is an exception:
+the `PerflibServices` thread collects data every 30 seconds.
+
+You can modify the collection interval for each thread by adding a new section to your netdata.conf file. For example,
+to reduce the `PerflibServices` interval, add the following lines to your configuration file and restart the
+Netdata service:
+
+```text
+[plugin:windows:PerflibServices]
+    update every = 10
+```
