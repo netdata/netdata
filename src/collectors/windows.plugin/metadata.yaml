@@ -2811,8 +2811,8 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: Windows Services
-          description: "These metrics refer to the Windows Services status and states."
+        - name: Windows Service
+          description: "These metrics refer to Windows Services."
           labels:
             - name: service
               description: The service name
