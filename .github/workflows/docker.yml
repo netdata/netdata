@@ -143,9 +143,9 @@ jobs:
         run: |
           if [ '${{ github.event_name }}' == 'pull_request' ]; then
             if [ "${{ steps.check-docker-files.outputs.any_modified }}" == "true" ] || [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/non-native') }}" = "true" ]; then
-              echo 'docker-native=0' >> "${GITHUB_OUTPUT}"
-            else
               echo 'docker-native=1' >> "${GITHUB_OUTPUT}"
+            else
+              echo 'docker-native=0' >> "${GITHUB_OUTPUT}"
             fi
           else
             echo 'docker-native=0' >> "${GITHUB_OUTPUT}"
