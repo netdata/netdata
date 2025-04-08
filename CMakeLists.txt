@@ -1484,6 +1484,7 @@ if(ENABLE_ML)
         if(NOT ENABLE_MIMALLOC)
                 list(APPEND ML_FILES src/ml/ml_memory.cc)
         endif()
+        set_source_files_properties(${ML_FILES} PROPERTIES COMPILE_OPTIONS "-Wno-attributes")
 else()
         set(ML_FILES
                 src/ml/ml_public.h
@@ -2152,7 +2153,7 @@ set(ACLK_FILES
         src/aclk/schema-wrappers/agent_cmds.cc
         src/aclk/schema-wrappers/agent_cmds.h
 )
-
+set_source_files_properties(src/aclk/schema-wrappers/proto_2_json.cc PROPERTIES COMPILE_OPTIONS "-Wno-unused-result")
 
 set(MONGODB_EXPORTING_FILES
         src/exporting/mongodb/mongodb.c
@@ -2199,6 +2200,7 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 #
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
+set_source_files_properties(src/libnetdata/gorilla/gorilla.cc PROPERTIES COMPILE_OPTIONS "-Wno-attributes")
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)
 
