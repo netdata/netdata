@@ -75,11 +75,6 @@ Existing installs of native packages on a platform that is no longer supported, 
 If the operating system cannot be upgraded to a more recent version, the install can be switched to a static build. This is a manual process, may cause data loss, and is therefore **not supported**. However, following these steps should result in a functioning Agent with metrics data and connection to Netdata Cloud in tact:
 
 1. Stop the Agent, [as appropriate for your platform](/docs/netdata-agent/start-stop-restart.md).
-
-   ```sh
-   sudo systemctl stop netdata
-   ```
-
 2. Backup the contents of these directories: `/etc/netdata`, `/var/cache/netdata`, `/var/lib/netdata`, `/var/log/netdata`.
 3. Uninstall the native package, answering "yes" to all questions.
 
@@ -87,7 +82,7 @@ If the operating system cannot be upgraded to a more recent version, the install
    wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
    ```
 
-4. Unmask the Netdata service for systemd:
+4. For platforms using systemd, unmask the Netdata service:
 
    ```sh
    sudo systemctl unmask netdata
@@ -111,9 +106,4 @@ If the operating system cannot be upgraded to a more recent version, the install
               /etc/netdata /var/lib/netdata /var/cache/netdata /var/log/netdata ./
    ```
 
-8. Start the Agent:
-
-   ```sh
-   sudo systemctl start netdata
-
-   ```
+8. Start the Agent.
