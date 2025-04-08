@@ -131,9 +131,9 @@ jobs:
         run: |
           if [ '${{ github.event_name }}' == 'pull_request' ]; then
             if [ "${{ steps.check-static-build-files.outputs.any_modified }}" == "true" ] || [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/non-native') }}" = "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-              echo 'static-native=0' >> "${GITHUB_OUTPUT}"
-            else
               echo 'static-native=1' >> "${GITHUB_OUTPUT}"
+            else
+              echo 'static-native=0' >> "${GITHUB_OUTPUT}"
             fi
           else
             echo 'static-native=0' >> "${GITHUB_OUTPUT}"
