@@ -25,7 +25,7 @@ This script handles:
 ## Quick Setup
 
 :::tip Recommended
-Use the `edit-config` script to safely edit configuration files. It auto-creates the necessary files in the right place and opens them in your editor.
+Use the `edit-config` script to safely edit configuration files. It automatically creates the necessary files in the right place and opens them in your editor.
 → [Learn how to use `edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)
 :::
 
@@ -219,5 +219,5 @@ Then look for the internal calls and re-run the one you want to trace in more de
 ## Related Docs
 
 - [How to configure alerts](/src/health/REFERENCE.md)
-- [Notification methods list](/docs/alerts-and-notifications/notifications/agent-dispatched-notifications)
+- [Notification methods list](/docs/alerts-and-notifications/notifications/README.md#notification-methods)
 - [Netdata configuration basics](/docs/netdata-agent/configuration/README.md)

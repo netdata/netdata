@@ -5,27 +5,12 @@ To use this feature, you’ll need an active Netdata subscription. → [View sub
 
 ---
 
-## How to Create an Alert (Step-by-Step)
+## Creating Alerts: Quick Guide
 
-1. Go to the **Metrics** tab in your Netdata Cloud Dashboard.
-2. Find the chart you want to monitor.
-3. Click the **alert icon** in the top-right corner of the chart.
-4. The **Alert Configuration Manager** will open.
-5. Adjust the threshold values. The alert definition on the right updates live as you make changes.
-6. (Optional) Click **Show advanced** for more detailed settings.
-7. Copy the generated alert definition from the code box.
-8. Paste it into a custom alert file on your Agent:
-
-   ```
-   <netdata-install>/etc/netdata/health.d/your-alert.conf
-   ```
-   → [How to edit alert configuration files](/src/health/REFERENCE.md#edit-health-configuration-files)
-
-9. Apply your changes:
-
-   ```
-   <netdata-install>/usr/sbin/netdatacli reload-health
-   ```
+1. Navigate to **Metrics** in your Netdata Cloud Dashboard and locate your target chart.
+2. Click the **alert icon** (🔔) in the chart's right corner, then select **Add alert** from the popup menu.
+3. Set your thresholds and watch the definition update in real-time.
+4. When finished configuring your alert, click the **Submit to nodes** button.
 
 ---
 
