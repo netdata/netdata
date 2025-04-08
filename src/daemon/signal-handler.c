@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "daemon/status-file.h"
+#include "protected-access.h"
 
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
@@ -49,6 +50,7 @@ static void (*original_sigactions[NSIG])(int, siginfo_t *, void *) = {0};
 
 NEVER_INLINE
 void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused) {
+    signal_protected_access_check(signo, info, context);
 
     for(size_t i = 0; i < _countof(signals_waiting) ; i++) {
         if(signals_waiting[i].signo != signo)
