@@ -10,10 +10,10 @@ Alerts are based on each node's health status. You can change thresholds, add ne
 
 ## How Alert Notifications Work
 
-| Method               | Where Alerts Are Sent From | Customization | Highlights |
-|----------------------|----------------------------|---------------|------------|
-| **Netdata Cloud**    | Cloud UI                   | Medium        | Centralized alerting using connected nodes’ health status |
-| **Netdata Agent**    | Local Netdata Agent        | High          | Node-level alerting with wide integration support |
+| Method            | Where Alerts Are Sent From | Customization | Highlights                                                |
+|-------------------|----------------------------|---------------|-----------------------------------------------------------|
+| **Netdata Cloud** | Cloud UI                   | Medium        | Centralized alerting using connected nodes’ health status |
+| **Netdata Agent** | Local Netdata Agent        | High          | Node-level alerting with wide integration support         |
 
 You can enable one or both methods depending on your needs.
 
@@ -23,10 +23,10 @@ You can enable one or both methods depending on your needs.
 
 Use this table to choose and set up your preferred alerting method:
 
-| Option               | Setup Location       | Setup Effort | Best For                      |
-|----------------------|----------------------|---------------|-------------------------------|
-| **Netdata Cloud**    | In the Cloud UI      | Low           | Teams managing multiple nodes |
-| **Netdata Agent**    | On each Netdata node | Medium        | Full control and flexibility  |
+| Option            | Setup Location       | Setup Effort | Best For                      |
+|-------------------|----------------------|--------------|-------------------------------|
+| **Netdata Cloud** | In the Cloud UI      | Low          | Teams managing multiple nodes |
+| **Netdata Agent** | On each Netdata node | Medium       | Full control and flexibility  |
 
 ---
 
@@ -96,6 +96,6 @@ You can tune alerts to match your environment:
 
 ## Related Documentation
 
-- [All alert notification methods](/docs/alerts-and-notifications/notifications/README.md)  
-- [Supported collectors](/src/collectors/COLLECTORS.md)  
+- [All alert notification methods](/docs/alerts-and-notifications/notifications/README.md)
+- [Supported collectors](/src/collectors/COLLECTORS.md)
 - [Full alert reference](/src/health/REFERENCE.md)

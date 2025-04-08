@@ -109,6 +109,7 @@ role_recipients_email[sysadmin]="user1@example.com user2@example.com|critical"
 ```
 
 This setup:
+
 - Sends all alerts to `user1@example.com`
 - Sends only critical-related alerts to `user2@example.com`
 
@@ -149,13 +150,13 @@ date_format="+%F %T%:z"   # Example: RFC 3339
 
 Common formats:
 
-| Format             | String                         |
-|--------------------|--------------------------------|
-| ISO 8601           | `+%FT%T%z`                     |
-| RFC 5322           | `+%a, %d %b %Y %H:%M:%S %z`     |
-| RFC 3339           | `+%F %T%:z`                     |
-| Local time         | `+%x %X`                        |
-| ANSI C / asctime() | *(leave empty)*                |
+| Format             | String                      |
+|--------------------|-----------------------------|
+| ISO 8601           | `+%FT%T%z`                  |
+| RFC 5322           | `+%a, %d %b %Y %H:%M:%S %z` |
+| RFC 3339           | `+%F %T%:z`                 |
+| Local time         | `+%x %X`                    |
+| ANSI C / asctime() | *(leave empty)*             |
 
 → See `man date` for more formatting options.
 
@@ -195,9 +196,11 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 
 :::info Using a custom Registry?
 If you’re running your own Netdata Registry, set:
+
 ```bash
 export NETDATA_REGISTRY_URL="https://your.registry.url"
 ```
+
 before testing.
 :::
 

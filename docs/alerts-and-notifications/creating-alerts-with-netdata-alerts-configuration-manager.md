@@ -26,17 +26,18 @@ To use this feature, you’ll need an active Netdata subscription. → [View sub
    ```
    <netdata-install>/usr/sbin/netdatacli reload-health
    ```
+
 ---
 
 ## Alert Detection Types
 
 Netdata supports different ways of triggering alerts:
 
-| Type              | Description                                                 |
-|-------------------|-------------------------------------------------------------|
-| **Standard**       | Fires when a metric crosses a set value                    |
-| **Metric Variance**| Fires based on variation in values over time              |
-| **Anomaly Rate**   | Fires when the anomaly rate exceeds a certain threshold   |
+| Type                | Description                                             |
+|---------------------|---------------------------------------------------------|
+| **Standard**        | Fires when a metric crosses a set value                 |
+| **Metric Variance** | Fires based on variation in values over time            |
+| **Anomaly Rate**    | Fires when the anomaly rate exceeds a certain threshold |
 
 Choose the type that best suits the behavior you want to monitor.
 
@@ -50,12 +51,12 @@ Click **Show advanced** in the Alert Configuration Manager to access these optio
 
 You can define how Netdata should query the data before triggering an alert:
 
-| Parameter   | Description                       |
-|-------------|-----------------------------------|
-| `method`    | How values are aggregated (`avg`, `min`, `max`, etc.) |
-| `duration`  | Time window used for the check    |
-| `dimensions`| Which metric dimensions to include|
-| `options`   | Modify how values are interpreted (e.g., `percentage`, `absolute`) |
+| Parameter    | Description                                                        |
+|--------------|--------------------------------------------------------------------|
+| `method`     | How values are aggregated (`avg`, `min`, `max`, etc.)              |
+| `duration`   | Time window used for the check                                     |
+| `dimensions` | Which metric dimensions to include                                 |
+| `options`    | Modify how values are interpreted (e.g., `percentage`, `absolute`) |
 
 ### Filtering Targets
 
@@ -83,25 +84,25 @@ Example:
 
 You can control how and when alerts are triggered, escalated, or resolved.
 
-| Setting              | Purpose                                                                 |
-|----------------------|-------------------------------------------------------------------------|
-| **Thresholds**        | Define values for `warning` and `critical` states                      |
-| **Recovery thresholds**| Set when the alert should downgrade or clear                          |
-| **Check interval**    | How often the alert check runs (e.g., every 10 seconds)                |
-| **Notification delay**| Delay before sending notifications for state changes                   |
-| **Repeat notifications**| How often to resend an alert if the issue persists (Agent only)     |
-| **Notification recipients**| Define who gets alerted (Agent only)                              |
-| **Custom exec script** | Run a custom shell script when an alert triggers                      |
+| Setting                     | Purpose                                                         |
+|-----------------------------|-----------------------------------------------------------------|
+| **Thresholds**              | Define values for `warning` and `critical` states               |
+| **Recovery thresholds**     | Set when the alert should downgrade or clear                    |
+| **Check interval**          | How often the alert check runs (e.g., every 10 seconds)         |
+| **Notification delay**      | Delay before sending notifications for state changes            |
+| **Repeat notifications**    | How often to resend an alert if the issue persists (Agent only) |
+| **Notification recipients** | Define who gets alerted (Agent only)                            |
+| **Custom exec script**      | Run a custom shell script when an alert triggers                |
 
 ---
 
 ## Naming and Documentation
 
-| Field               | Description                                        |
-|---------------------|----------------------------------------------------|
-| **Alert Name**       | A unique name for the alert                       |
-| **Description**      | What the alert does, in one or two sentences      |
-| **Summary**          | Optional: a short summary for display in dashboards |
+| Field           | Description                                         |
+|-----------------|-----------------------------------------------------|
+| **Alert Name**  | A unique name for the alert                         |
+| **Description** | What the alert does, in one or two sentences        |
+| **Summary**     | Optional: a short summary for display in dashboards |
 
 ---
 

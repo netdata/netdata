@@ -19,10 +19,10 @@ Netdata Cloud collects alert data from all connected nodes and sends notificatio
 
 **Popular integrations:**
 
-- Amazon SNS  
-- Slack  
-- Discord  
-- Splunk  
+- Amazon SNS
+- Slack
+- Discord
+- Splunk
 - Microsoft Teams
 
 ---
@@ -35,11 +35,11 @@ The Agent sends alerts directly from the node, even if it's offline or not conne
 
 **Popular integrations:**
 
-- Email  
-- Slack  
-- PagerDuty  
-- Twilio  
-- Telegram  
+- Email
+- Slack
+- PagerDuty
+- Twilio
+- Telegram
 - Opsgenie
 
 ---
@@ -48,20 +48,20 @@ The Agent sends alerts directly from the node, even if it's offline or not conne
 
 Choose the option that fits your needs:
 
-| Use Case                                       | Best Option         |
-|------------------------------------------------|----------------------|
-| Manage multiple nodes centrally                | Netdata Cloud        |
-| Fewer configs, alerts from one place           | Netdata Cloud        |
-| Full control at node level                     | Netdata Agent        |
-| No internet or external dependencies           | Netdata Agent        |
-| Fine-tuned control per system/service          | Netdata Agent        |
-| Want both simplicity and flexibility           | Use **both**         |
+| Use Case                              | Best Option   |
+|---------------------------------------|---------------|
+| Manage multiple nodes centrally       | Netdata Cloud |
+| Fewer configs, alerts from one place  | Netdata Cloud |
+| Full control at node level            | Netdata Agent |
+| No internet or external dependencies  | Netdata Agent |
+| Fine-tuned control per system/service | Netdata Agent |
+| Want both simplicity and flexibility  | Use **both**  |
 
 ---
 
 ## Next Steps
 
-- 🔧 [Set up Cloud Notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications)  
+- 🔧 [Set up Cloud Notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications)
 - ⚙️ [Set up Agent Notifications](/docs/alerts-and-notifications/notifications/agent-dispatched-notifications)
 
 :::info Want help with alert customization?
