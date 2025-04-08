@@ -1291,6 +1291,8 @@ set(DAEMON_FILES
         src/daemon/status-file-dmi.h
         src/daemon/status-file-product.c
         src/daemon/status-file-product.h
+        src/daemon/protected-access.c
+        src/daemon/protected-access.h
 )
 
 set(H2O_FILES

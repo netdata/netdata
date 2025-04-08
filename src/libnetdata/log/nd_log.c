@@ -519,23 +519,9 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         va_end(args);
     }
 
-    char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-
-    char action_data[70+1];
-    snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, saved_errno);
-
-    const char *thread_tag = nd_thread_tag();
-    const char *tag_to_send = thread_tag;
-
-    // anonymize thread names
-    if(strncmp(thread_tag, THREAD_TAG_STREAM_RECEIVER, strlen(THREAD_TAG_STREAM_RECEIVER)) == 0)
-        tag_to_send = THREAD_TAG_STREAM_RECEIVER;
-    if(strncmp(thread_tag, THREAD_TAG_STREAM_SENDER, strlen(THREAD_TAG_STREAM_SENDER)) == 0)
-        tag_to_send = THREAD_TAG_STREAM_SENDER;
-
-    char action_result[200+1];
-    snprintfz(action_result, 60, "%s:%s:%s", program_name, tag_to_send, function);
+#if defined(FSANITIZE_ADDRESS)
+    fprintf(stderr, "FATAL: %04lu@%s:%s, errno = %d\n", line, file, function, saved_errno);
+#endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
     fatal_abort_internal_checks();
