@@ -54,8 +54,7 @@ cmake --build "${build}" -- ${build_args}
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Netdata buildinfo"}
-ls -alFhs "${build}"
-"${build}/netdata.exe" -W buildinfo
+"${build}/netdata.exe" -W buildinfo || true
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 if [ -t 1 ]; then
