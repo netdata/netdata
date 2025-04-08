@@ -1,207 +1,223 @@
-# Agent alert notifications
+# Agent Alert Notifications
 
-This is reference documentation for Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+Netdata's Agent can send alert notifications directly from each node. It supports a wide range of services, multiple recipients, and role-based routing.
 
-The `script to execute on alarm` line in `netdata.conf` defines the external script that will be called once the alert is triggered.
+---
+
+## How It Works
+
+The Agent uses a notification script defined in `netdata.conf` under the `[health]` section:
+
+```ini
+script to execute on alarm = /usr/libexec/netdata/plugins.d/alarm-notify.sh
+```
 
 The default script is `alarm-notify.sh`.
 
-> ### Info
->
-> This file mentions editing configuration files.  
->
-> - To edit configuration files safely, we provide the [`edit config` script](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)located in your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
-> Note that to run the script you need to be inside your Netdata config directory.
->
-> - Please also note that after most configuration changes, you will need to [restart the Agent](/docs/netdata-agent/start-stop-restart.md) for the changes to take effect.
->
-> It is recommended to use this way for configuring Netdata.
+This script handles:
 
-You can change the default script globally by editing `netdata.conf` and changing the `script to execute on alarm` in the `[health]` section.
+- Multiple recipients
+- Multiple notification methods
+- Role-based routing (e.g., `sysadmin`, `webmaster`, `dba`)
 
-`alarm-notify.sh` is capable of sending notifications:
+---
 
-- to multiple recipients
-- using multiple notification methods
-- filtering severity per recipient
+## Quick Setup
 
-It uses **roles**. For example `sysadmin`, `webmaster`, `dba`, etc.
+:::tip Recommended
+Use the `edit-config` script to safely edit configuration files. It automatically creates the necessary files in the right place and opens them in your editor.
+→ [Learn how to use `edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)
+:::
 
-Each alert is assigned to one or more roles, using the `to` line of the alert configuration. For example, here is the alert configuration for `ram.conf` that defaults to the role `sysadmin`:
+1. Open the Agent’s health notification config:
+   ```bash
+   sudo ./edit-config health_alarm_notify.conf
+   ```
 
-```text
-    alarm: ram_in_use
-       on: system.ram
-    class: Utilization
-     type: System
+2. Set up the required API keys or credentials for the service you want to use.
+
+3. Define recipients per **role** (see below).
+
+4. Restart the Agent for changes to take effect:
+   ```bash
+   sudo systemctl restart netdata
+   ```
+
+---
+
+## Example: Alert with Role-Based Routing
+
+Here’s an example alert assigned to the `sysadmin` role from the `ram.conf` file:
+
+```ini
+alarm: ram_in_use
+   on: system.ram
+class: Utilization
+ type: System
 component: Memory
-       os: linux
-    hosts: *
-     calc: $used * 100 / ($used + $cached + $free + $buffers)
-    units: %
-    every: 10s
-     warn: $this > (($status >= $WARNING)  ? (80) : (90))
-     crit: $this > (($status == $CRITICAL) ? (90) : (98))
-    delay: down 15m multiplier 1.5 max 1h
-     info: system memory utilization
-       to: sysadmin
+     os: linux
+  hosts: *
+   calc: $used * 100 / ($used + $cached + $free + $buffers)
+  units: %
+  every: 10s
+   warn: $this > (($status >= $WARNING)  ? (80) : (90))
+   crit: $this > (($status == $CRITICAL) ? (90) : (98))
+  delay: down 15m multiplier 1.5 max 1h
+   info: system memory utilization
+     to: sysadmin
 ```
 
-Then `alarm-notify.sh` uses its own configuration file `health_alarm_notify.conf`, which at the bottom of the file stores the recipients per role, for all notification methods.
+Then, in `health_alarm_notify.conf`, you assign recipients per notification method:
 
-Here is an example, of the `sysadmin`'s role recipients for the email notification.  
-You can send the notification to multiple recipients by separating the emails with a space.
-
-```text
-
-###############################################################################
-# RECIPIENTS PER ROLE
-
-# -----------------------------------------------------------------------------
-# generic system alerts
-# CPU, disks, network interfaces, entropy, etc
-
-role_recipients_email[sysadmin]="someone@exaple.com someoneelse@example.com"
+```ini
+role_recipients_email[sysadmin]="admin1@example.com admin2@example.com"
+role_recipients_slack[sysadmin]="#alerts #infra"
 ```
 
-Each role may have one or more destinations and one or more notification methods.
+---
 
-So, for example, the `sysadmin` role may send:
+## Configuration Options
 
-1. emails to admin1@example.com and admin2@example.com
-2. pushover.net notifications to USERTOKENS `A`, `B` and `C`.
-3. pushbullet.com push notifications to admin1@example.com and admin2@example.com
-4. messages to the `#alerts` and `#systems` channels of a Slack workspace.
-5. messages to Discord channels `#alerts` and `#systems`.
+### Recipients Per Role
 
-## Configuration
+Define who receives alerts and how:
 
-You can edit `health_alarm_notify.conf` using the `edit-config` script to configure:
-
-- **Settings** per notification method:
-
-     All notification methods, except email, require some configuration (i.e., API keys, tokens, destination rooms, channels, etc.). Please check this section's content to find the configuration guides for your notification option of choice
-
-- **Recipients** per role per notification method
-
-     ```text
-     role_recipients_email[sysadmin]="${DEFAULT_RECIPIENT_EMAIL}"
-     role_recipients_pushover[sysadmin]="${DEFAULT_RECIPIENT_PUSHOVER}"
-     role_recipients_pushbullet[sysadmin]="${DEFAULT_RECIPIENT_PUSHBULLET}"
-     role_recipients_telegram[sysadmin]="${DEFAULT_RECIPIENT_TELEGRAM}"
-     role_recipients_slack[sysadmin]="${DEFAULT_RECIPIENT_SLACK}"
-     ...
-     ```
-
-     Here you can change the `${DEFAULT_...}` values to the values of the recipients you want, separated by a space if you have multiple recipients.
-
-## Testing Alert Notifications
-
-You can run the following command by hand, to test alerts configuration:
-
-```sh
-# become user netdata
-sudo su -s /bin/bash netdata
-
-# enable debugging info on the console
-export NETDATA_ALARM_NOTIFY_DEBUG=1
-
-# send test alerts to sysadmin
-/usr/libexec/netdata/plugins.d/alarm-notify.sh test
-
-# send test alerts to any role
-/usr/libexec/netdata/plugins.d/alarm-notify.sh test "ROLE"
+```ini
+role_recipients_email[sysadmin]="team@example.com"
+role_recipients_telegram[webmaster]="123456789"
+role_recipients_slack[dba]="#database-alerts"
 ```
 
-If you are [running your own Registry](/src/registry/CONFIGURATION.md#configure-a-custom-registry), add `export NETDATA_REGISTRY_URL=[YOUR_URL]` before calling `alarm-notify.sh`.
+Use spaces to separate multiple recipients.
 
-> If you need to dig even deeper, you can trace the execution with `bash -x`. Note that in test mode, `alarm-notify.sh` calls itself with many more arguments. So first do:
->
->```sh
->bash -x /usr/libexec/netdata/plugins.d/alarm-notify.sh test
->```
->
-> And then look in the output for the alarm-notify.sh calls and run the one you want to trace with `bash -x`.
+To disable a notification method for a role, use:
 
-## Global configuration options
-
-### Notification Filtering
-
-When you define recipients per role for notification methods, you can append `|critical` to limit the notifications that are sent.
-
-In the following examples, the first recipient receives all the alerts, while the second one receives only notifications for alerts that have at some point become critical.
-The second user may still receive warning and clear notifications, but only for the event that previously caused a critical alert.
-
-```text
- email      : "user1@example.com user2@example.com|critical"
- pushover   : "2987343...9437837 8756278...2362736|critical"
- telegram   : "111827421 112746832|critical"
- slack      : "alerts disasters|critical"
- alerta     : "alerts disasters|critical"
- flock      : "alerts disasters|critical"
- discord    : "alerts disasters|critical"
- twilio     : "+15555555555 +17777777777|critical"
- messagebird: "+15555555555 +17777777777|critical"
- kavenegar  : "09155555555 09177777777|critical"
- pd         : "<pd_service_key_1> <pd_service_key_2>|critical"
- irc        : "<irc_channel_1> <irc_channel_2>|critical"
+```ini
+role_recipients_email[sysadmin]="disabled"
 ```
 
-If a per role recipient is set to an empty string, the default recipient of the given
-notification method (email, pushover, telegram, slack, alerta, etc.) will be used.
+If left empty, the default recipient for that method is used.
 
-To disable a notification, use the recipient called: disabled
-This works for all notification methods (including the default recipients).
+---
 
-### Proxy configuration
+### Alert Severity Filtering
 
-If you need to send curl-based notifications (pushover, pushbullet, slack, alerta,
-flock, discord, telegram) via a proxy, you should set these variables to your proxy address:
+You can limit certain recipients to only receive **critical** alerts:
 
-```text
+```ini
+role_recipients_email[sysadmin]="user1@example.com user2@example.com|critical"
+```
+
+This setup:
+
+- Sends all alerts to `user1@example.com`
+- Sends only critical-related alerts to `user2@example.com`
+
+Works for all supported methods: email, Slack, Telegram, Twilio, Discord, etc.
+
+---
+
+### Proxy Settings
+
+To send notifications via a proxy, set these environment variables:
+
+```bash
 export http_proxy="http://10.0.0.1:3128/"
 export https_proxy="http://10.0.0.1:3128/"
 ```
 
-### Notification images
+---
 
-Images in notifications need to be downloaded from an Internet facing site.
+### Notification Images
 
-To allow notification providers to fetch the icons/images, by default we set the URL of the global public Netdata Registry.
+By default, Netdata includes public image URLs in notifications (hosted by the global Registry).
 
-If you have an Internet facing netdata (or you have copied the images/ folder
-of Netdata to your web server), set its URL here, to fetch the notification
-images from it.
+To use custom image paths:
 
-```text
+```ini
 images_base_url="http://my.public.netdata.server:19999"
 ```
 
-### Date handling
+---
 
-You can configure netdata alerts to send dates in any format you want via editing the `date_format` variable.
+### Custom Date Format
 
-This uses standard `date` command format strings. See `man date` for
-more info on what formats are supported.
+Change the timestamp format in notifications:
 
-Note that this has to start with a '+'; otherwise it won't work.
+```ini
+date_format="+%F %T%:z"   # Example: RFC 3339
+```
 
-- For ISO 8601 dates, use `+%FT%T%z`
-- For RFC 5322 dates, use `+%a, %d %b %Y %H:%M:%S %z`
-- For RFC 3339 dates, use `+%F %T%:z`
-- For RFC 1123 dates, use `+%a, %d %b %Y %H:%M:%S %Z`
-- For RFC 1036 dates, use `+%A, %d-%b-%y %H:%M:%S %Z`
-- For a reasonably local date and time (in that order), use `+%x %X`
-- For the old default behavior (compatible with ANSI C's `asctime()` function), leave the `date_format` field empty.
+Common formats:
 
-### Hostname handling
+| Format             | String                      |
+|--------------------|-----------------------------|
+| ISO 8601           | `+%FT%T%z`                  |
+| RFC 5322           | `+%a, %d %b %Y %H:%M:%S %z` |
+| RFC 3339           | `+%F %T%:z`                 |
+| Local time         | `+%x %X`                    |
+| ANSI C / asctime() | *(leave empty)*             |
 
-By default, Netdata will use the simple hostname for the system (the hostname with everything after the first `.` removed) when displaying the hostname in alert notifications.
+→ See `man date` for more formatting options.
 
-If you instead prefer to have Netdata use the host's fully qualified domain name, you can set `use_fdqn` to `YES`.
+---
 
-This setting does not account for child systems for which the system you are configuring is a parent.
+### Hostname Format
 
-> ### Note
->
-> If the system's host name is overridden in `/etc/netdata.conf` with the `hostname` option, that name will be used unconditionally.
+By default, Netdata uses the short hostname in notifications.
+
+To use the fully qualified domain name (FQDN), set:
+
+```ini
+use_fqdn=YES
+```
+
+If you’ve set a custom hostname in `netdata.conf`, that value takes priority.
+
+---
+
+## Testing Your Notification Setup
+
+You can test alert notifications manually.
+
+```bash
+# Switch to the Netdata user
+sudo su -s /bin/bash netdata
+
+# Enable debugging
+export NETDATA_ALARM_NOTIFY_DEBUG=1
+
+# Test default role (sysadmin)
+./plugins.d/alarm-notify.sh test
+
+# Test specific role
+./plugins.d/alarm-notify.sh test "webmaster"
+```
+
+:::info Using a custom Registry?
+If you’re running your own Netdata Registry, set:
+
+```bash
+export NETDATA_REGISTRY_URL="https://your.registry.url"
+```
+
+before testing.
+:::
+
+### Debugging with Trace
+
+To see full execution output:
+
+```bash
+bash -x ./plugins.d/alarm-notify.sh test
+```
+
+Then look for the internal calls and re-run the one you want to trace in more detail.
+
+---
+
+## Related Docs
+
+- [How to configure alerts](/src/health/REFERENCE.md)
+- [Notification methods list](/docs/alerts-and-notifications/notifications/README.md#notification-methods)
+- [Netdata configuration basics](/docs/netdata-agent/configuration/README.md)
