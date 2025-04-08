@@ -8,7 +8,6 @@ static struct proc_module {
     const char *name;
     const char *dim;
     int enabled;
-    int update_counter;
     int update_every;
     int (*func)(int update_every, usec_t dt);
     RRDDIM *rd;
@@ -18,74 +17,63 @@ static struct proc_module {
     {.name = "GetSystemUptime",
      .dim = "GetSystemUptime",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_GetSystemUptime},
     {.name = "GetSystemRAM",
      .dim = "GetSystemRAM",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_GetSystemRAM},
 
     // the same is provided by PerflibProcessor, with more detailed analysis
     //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",       .enabled = CONFIG_BOOLEAN_YES,
-    // .update_counter = 0, .update_every = UPDATE_EVERY_MIN, .func = do_GetSystemCPU},
+    // .update_every = UPDATE_EVERY_MIN, .func = do_GetSystemCPU},
 
     {.name = "PerflibProcesses",
      .dim = "PerflibProcesses",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibProcesses},
     {.name = "PerflibProcessor",
      .dim = "PerflibProcessor",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibProcessor},
     {.name = "PerflibMemory",
      .dim = "PerflibMemory",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibMemory},
     {.name = "PerflibStorage",
      .dim = "PerflibStorage",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibStorage},
     {.name = "PerflibNetwork",
      .dim = "PerflibNetwork",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibNetwork},
     {.name = "PerflibObjects",
      .dim = "PerflibObjects",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibObjects},
     {.name = "PerflibHyperV",
      .dim = "PerflibHyperV",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibHyperV},
 
     {.name = "PerflibThermalZone",
      .dim = "PerflibThermalZone",
      .enabled = CONFIG_BOOLEAN_NO,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibThermalZone},
 
     {.name = "PerflibWebService",
      .dim = "PerflibWebService",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibWebService},
     {.name = "PerflibMSSQL", .dim = "PerflibMSSQL", .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibMSSQL},
@@ -93,34 +81,29 @@ static struct proc_module {
     {.name = "PerflibNetFramework",
      .dim = "PerflibNetFramework",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibNetFramework},
     {.name = "PerflibAD",
      .dim = "PerflibAD",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibAD},
 
     {.name = "PerflibADCS",
      .dim = "PerflibADCS",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibADCS},
 
     {.name = "PerflibADFS",
      .dim = "PerflibADFS",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibADFS},
 
     {.name = "PerflibServices",
      .dim = "PerflibServices",
      .enabled = CONFIG_BOOLEAN_YES,
-     .update_counter = 0,
      .update_every = 30 * UPDATE_EVERY_MIN,
      .func = do_PerflibServices},
 
@@ -173,7 +156,6 @@ void *win_plugin_main(void *ptr)
 
         pm->update_every =
             (int)inicfg_get_duration_seconds(&netdata_config, buf, "update every", localhost->rrd_update_every);
-        pm->update_counter = pm->update_every - 1;
 
         worker_register_job_name(i, win_modules[i].dim);
     }
@@ -206,11 +188,6 @@ void *win_plugin_main(void *ptr)
             if (unlikely(!pm->enabled))
                 continue;
 
-            pm->update_counter += 1;
-            if (unlikely(pm->update_counter != pm->update_every))
-                continue;
-
-            pm->update_counter = 0;
             worker_is_busy(i);
             lgs[LGS_MODULE_ID] = ND_LOG_FIELD_CB(NDF_MODULE, log_windows_module, pm);
             pm->enabled = !pm->func(pm->update_every, hb_dt);
