@@ -1455,7 +1455,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         size_t len = 0;
         len = strcatz(session_status.fatal.function, len, "thread:", sizeof(session_status.fatal.function));
         len = strcatz(session_status.fatal.function, len, session_status.fatal.thread, sizeof(session_status.fatal.function));
-        if(session_status.fatal.worker_job_id < 10000) {
+        if(session_status.fatal.worker_job_id <= WORKER_UTILIZATION_MAX_JOB_TYPES) {
             len = strcatz(session_status.fatal.function, len, ":", sizeof(session_status.fatal.function));
             len += print_uint64(&session_status.fatal.function[len], session_status.fatal.worker_job_id);
         }
