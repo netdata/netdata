@@ -33,6 +33,7 @@ jobs:
     outputs:
       run: ${{ steps.check-run.outputs.run }}
       skip-go: ${{ steps.check-go.outputs.skip-go }}
+      docker-native: ${{ steps.check-native.outputs.docker-native }}
     steps:
       - name: Checkout
         id: checkout
@@ -86,6 +87,25 @@ jobs:
           files_ignore: |
             **/*.md
             packaging/repoconfig/
+      - name: Check Docker files
+        id: check-docker-files
+        if: github.event_name != 'workflow_dispatch'
+        uses: step-security/changed-files@v45
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            .dockerignore
+            .github/data/distros.yml
+            .github/workflows/docker.yml
+            .github/scripts/docker-test.sh
+            .github/scripts/gen-matrix-docker.py
+            .github/scripts/gen-docker-tags.py
+            .github/scripts/gen-docker-imagetool-args.py
+            packaging/docker/
+            packaging/runtime-check.sh
+          files_ignore: |
+            **/*.md
+            packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
         if: github.event_name != 'workflow_dispatch'
@@ -118,10 +138,24 @@ jobs:
           else
             echo 'skip-go=' >> "${GITHUB_OUTPUT}"
           fi
+      - name: Check Native
+        id: check-native
+        run: |
+          if [ '${{ github.event_name }}' == 'pull_request' ]; then
+            if [ "${{ steps.check-docker-files.outputs.any_modified }}" == "true" ] || [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/non-native') }}" = "true" ]; then
+              echo 'docker-native=0' >> "${GITHUB_OUTPUT}"
+            else
+              echo 'docker-native=1' >> "${GITHUB_OUTPUT}"
+            fi
+          else
+            echo 'docker-native=0' >> "${GITHUB_OUTPUT}"
+          fi
 
   matrix:
     name: Generate Docker Build Matrix
     runs-on: ubuntu-latest
+    needs:
+      - file-check
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -136,7 +170,7 @@ jobs:
       - name: Read build matrix
         id: set-matrix
         run: |
-          matrix="$(.github/scripts/gen-matrix-docker.py)"
+          matrix="$(.github/scripts/gen-matrix-docker.py "${{ needs.file-check.outputs.docker-native }}")"
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
