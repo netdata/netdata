@@ -86,17 +86,20 @@ If the operating system cannot be upgraded to a more recent version, the install
    ```sh
    wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
    ```
+
 4. Unmask the Netdata service for systemd:
 
    ```sh
    sudo systemctl unmask netdata
    sudo systemctl daemon-reload
    ```
+
 5. Install the static build:
 
    ```sh
    sh /tmp/netdata-kickstart.sh --static-only
    ```
+
 6. Stop the Agent (again).
 7. Copy over the data from the previous install:
 
@@ -107,6 +110,7 @@ If the operating system cannot be upgraded to a more recent version, the install
               --exclude /etc/netdata/.environment \
               /etc/netdata /var/lib/netdata /var/cache/netdata /var/log/netdata ./
    ```
+
 8. Start the Agent:
 
    ```sh
