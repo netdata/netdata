@@ -55,7 +55,7 @@ all_tags = [x for y in tags.values() for x in y]
 
 def write_output(name: str, value: str) -> None:
     with open(os.getenv('GITHUB_OUTPUT'), 'a') as f:
-        f.write(f'{name}={value}')
+        f.write(f'{name}={value}\n')
 
 
 write_output('tags', ','.join(all_tags))
