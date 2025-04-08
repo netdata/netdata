@@ -765,10 +765,10 @@ static void aclk_synchronization_event_loop(void *arg)
                         uv_timer_stop(&aclk_host_config->timer);
 
                     aclk_host_config->timer_initialized = false;
-                    timer_cb_data = mallocz(sizeof(*data));
+                    timer_cb_data = mallocz(sizeof(*timer_cb_data));
                     timer_cb_data->payload = host;
                     timer_cb_data->completion = (struct completion *)cmd.param[1];
-                    aclk_host_config->timer.data = data;
+                    aclk_host_config->timer.data = timer_cb_data;
                     uv_close((uv_handle_t *)&aclk_host_config->timer, notify_timer_close_callback);
                     break;
 
