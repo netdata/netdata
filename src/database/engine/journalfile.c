@@ -1105,12 +1105,11 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     usec_t validation_start_ut = now_monotonic_usec();
 
     int rc = 0;
-    PROTECTED_ACCESS_SETUP(data_start, journal_v2_file_size);
+    PROTECTED_ACCESS_SETUP(data_start, journal_v2_file_size, path_v2, "validate");
     if(no_signal_received) {
         rc = journalfile_v2_validate(data_start, journal_v2_file_size, journal_v1_file_size);
     }
     else {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: failed to access journal file '%s' (SIGBUS)", path_v2);
         rc = 2;
     }
 
@@ -1364,7 +1363,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     struct journal_metric_list_to_sort *uuid_list = NULL;
 
-    PROTECTED_ACCESS_SETUP(data_start, total_file_size);
+    PROTECTED_ACCESS_SETUP(data_start, total_file_size, path, "migrate");
     if(no_signal_received) {
         fatal_assert(extent_offset <= total_file_size);
         memset(data_start, 0, extent_offset);

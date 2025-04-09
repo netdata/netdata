@@ -8,6 +8,44 @@ __thread protected_access_t protected_access_state = {0};
 // Declare the thread-local state variable, initialized to zero/inactive.
 // *** RELIES ON ASYNC-SIGNAL-SAFE ACCESS TO THIS VARIABLE ***
 
+// Helper function to get diagnostic information from the last fault
+const protected_access_frame_t *protected_access_get_last_fault(void) {
+    if (protected_access_state.depth < 1)
+        return NULL;
+        
+    protected_access_frame_t *frame = &protected_access_state.stack[protected_access_state.depth-1];
+    if (frame->is_active != 2) // Not a frame with a fault
+        return NULL;
+        
+    return frame;
+}
+
+// Format a string with diagnostic information about the last fault
+void protected_access_format_error(char *buffer, size_t buffer_size) {
+    const protected_access_frame_t *frame = protected_access_get_last_fault();
+    if (!frame) {
+        snprintf(buffer, buffer_size, "No protected access fault information available");
+        return;
+    }
+    
+    // Use the proper public API for signal code formatting
+    char signal_code_buf[128];
+    SIGNAL_CODE_2str_h(frame->signal_code, signal_code_buf, sizeof(signal_code_buf));
+    
+    snprintf(buffer, buffer_size, 
+        "Protected access fault in %s: %s %s failed with signal %s\n"
+        "  Fault address: %p (offset +%lu within protected region %p-%p)",
+        frame->caller, 
+        frame->operation, 
+        frame->resource_name,
+        signal_code_buf,
+        frame->fault_address,
+        (unsigned long)((char*)frame->fault_address - (char*)frame->protected_start_addr),
+        frame->protected_start_addr,
+        (void*)((char*)frame->protected_start_addr + frame->protected_size)
+    );
+}
+
 // --- Public API Function (called by signal handler) ---
 void signal_protected_access_check(int sig, siginfo_t *si, void *context __maybe_unused) {
     // --- ASYNC-SIGNAL-SAFETY WARNING ---
@@ -61,6 +99,10 @@ void signal_protected_access_check(int sig, siginfo_t *si, void *context __maybe
             // Set frame to '2'. This prevents handler re-entry if another signal occurs
             // immediately, and signals to start() that recovery happened.
             frame->is_active = 2;
+            
+            // Store diagnostic information about the fault
+            frame->fault_address = fault_addr;
+            frame->signal_code = signal_code(sig, si->si_code);
 
             // Update the depth to unwind all nested frames up to this one
             state->depth = i;
