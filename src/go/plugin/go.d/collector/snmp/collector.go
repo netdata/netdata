@@ -68,7 +68,7 @@ type Collector struct {
 
 	vnode *vnodes.VirtualNode
 
-	charts *module.Charts
+	charts      *module.Charts
 	seenMetrics map[string]bool
 
 	newSnmpClient func() gosnmp.Handler

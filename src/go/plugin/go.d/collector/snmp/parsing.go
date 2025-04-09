@@ -95,7 +95,7 @@ func parseMetric(metric profiledefinition.MetricsConfig) (metricParseResult, err
 	} else if metric.Symbol != (profiledefinition.SymbolConfig{}) {
 		// Single Metric
 		return (parseSymbolMetric(metric.Symbol, metric.MIB)) // TODO metric tags might be needed here.
-	//Can't support tables at the moment
+		//Can't support tables at the moment
 	} else {
 		return metricParseResult{}, nil
 	}

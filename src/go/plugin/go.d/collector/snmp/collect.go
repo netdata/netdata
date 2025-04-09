@@ -9,30 +9,28 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
-
-	sysObjectID, err := c.getSysObjectID(snmpsd.OidSysObject)
-	if err != nil {
-		return nil, err
-	}
-
-	matchingProfiles := ddsnmp.Find(sysObjectID)
-
-	metricMap, err := c.parseMetricsFromProfiles(matchingProfiles)
-	if err != nil {
-		return nil, err
-	}
-	seen := make(map[string]bool)
-	mx := make(map[string]int64)
-	c.makeChartsFromMetricMap(mx, metricMap, seen)
+	//sysObjectID, err := c.getSysObjectID(snmpsd.OidSysObject)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//matchingProfiles := ddsnmp.Find(sysObjectID)
+	//
+	//metricMap, err := c.parseMetricsFromProfiles(matchingProfiles)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//seen := make(map[string]bool)
+	//mx := make(map[string]int64)
+	//c.makeChartsFromMetricMap(mx, metricMap, seen)
 
 	if c.sysInfo == nil {
 		si, err := snmpsd.GetSysInfo(c.snmpClient)
@@ -47,6 +45,8 @@ func (c *Collector) collect() (map[string]int64, error) {
 			c.vnode = c.setupVnode(si)
 		}
 	}
+
+	mx := make(map[string]int64)
 
 	if err := c.collectSysUptime(mx); err != nil {
 		return nil, err

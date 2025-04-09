@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/gosnmp/gosnmp"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 

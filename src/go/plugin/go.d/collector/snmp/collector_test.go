@@ -152,11 +152,11 @@ func TestCollector_Charts(t *testing.T) {
 	}{
 		"if-mib, no custom": {
 			doCollect:     true,
-			wantNumCharts: len(netIfaceChartsTmpl)*4 + 1 + 1,
+			wantNumCharts: len(netIfaceChartsTmpl)*4 + 1,
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
 				collr := New()
 				collr.Config = prepareV2Config()
-				setMockClientSysObjectidExpect(m)
+				//setMockClientSysObjectidExpect(m)
 				setMockClientSysExpect(m)
 				setMockClientIfMibExpect(m)
 
@@ -206,7 +206,7 @@ func TestCollector_Check(t *testing.T) {
 			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
 				collr := New()
 				collr.Config = prepareV2Config()
-				setMockClientSysObjectidExpect(m)
+				//setMockClientSysObjectidExpect(m)
 				setMockClientIfMibExpect(m)
 
 				return collr
@@ -219,7 +219,7 @@ func TestCollector_Check(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
 
-				setMockClientSysObjectidExpect(m)
+				//setMockClientSysObjectidExpect(m)
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -243,7 +243,7 @@ func TestCollector_Check(t *testing.T) {
 				collr := New()
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
-				setMockClientSysObjectidExpect(m)
+				//setMockClientSysObjectidExpect(m)
 				m.EXPECT().Get(gomock.Any()).Return(nil, errors.New("mock Get() error")).Times(1)
 
 				return collr
@@ -283,13 +283,13 @@ func TestCollector_Collect(t *testing.T) {
 				collr := New()
 				collr.Config = prepareV2Config()
 
-				setMockClientSysObjectidExpect(m)
+				//setMockClientSysObjectidExpect(m)
 				setMockClientIfMibExpect(m)
 
 				return collr
 			},
 			wantCollected: map[string]int64{
-				"TestMetric":                                        1,
+				//"TestMetric":                                        1,
 				"net_iface_ether1_admin_status_down":                0,
 				"net_iface_ether1_admin_status_testing":             0,
 				"net_iface_ether1_admin_status_up":                  1,
@@ -387,7 +387,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
 
-				setMockClientSysObjectidExpect(m)
+				//setMockClientSysObjectidExpect(m)
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -405,7 +405,7 @@ func TestCollector_Collect(t *testing.T) {
 				return collr
 			},
 			wantCollected: map[string]int64{
-				"TestMetric":                                        1,
+				//"TestMetric":             1,
 				"1.3.6.1.2.1.2.2.1.10.0": 10,
 				"1.3.6.1.2.1.2.2.1.16.0": 20,
 				"1.3.6.1.2.1.2.2.1.10.1": 30,
@@ -423,7 +423,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
 				collr.collectIfMib = false
 
-				setMockClientSysObjectidExpect(m)
+				//setMockClientSysObjectidExpect(m)
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -439,7 +439,7 @@ func TestCollector_Collect(t *testing.T) {
 				return collr
 			},
 			wantCollected: map[string]int64{
-				"TestMetric":                                        1,
+				//"TestMetric":             1,
 				"1.3.6.1.2.1.2.2.1.10.0": 10,
 				"1.3.6.1.2.1.2.2.1.16.0": 20,
 				"1.3.6.1.2.1.2.2.1.10.1": 30,
@@ -452,7 +452,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
 				collr.collectIfMib = false
 
-				setMockClientSysObjectidExpect(m)
+				//setMockClientSysObjectidExpect(m)
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -468,7 +468,7 @@ func TestCollector_Collect(t *testing.T) {
 				return collr
 			},
 			wantCollected: map[string]int64{
-				"TestMetric": 1,
+				//"TestMetric": 1,
 				"uptime": 60,
 			},
 		},
