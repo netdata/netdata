@@ -2722,6 +2722,7 @@ if(NEED_NDSUDO)
     install(TARGETS ndsudo
             COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
+    set_source_files_properties(${NDSUDO_FILES} PROPERTIES COMPILE_OPTIONS "-Wno-unused-result")
 endif()
 
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
