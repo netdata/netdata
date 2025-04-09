@@ -103,7 +103,7 @@ extern volatile int aclk_conversation_log_counter;
 #define ACLK_GET_CONV_LOG_NEXT() __atomic_fetch_add(&aclk_conversation_log_counter, 1, __ATOMIC_SEQ_CST)
 #endif
 
-unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min_s, unsigned long int max_s);
+unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int mins_ms, unsigned long int min_ms);
 #define aclk_tbeb_reset(x) aclk_tbeb_delay(1, 0, 0, 0)
 
 void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd, enum mqtt_wss_proxy_type *type);

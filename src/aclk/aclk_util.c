@@ -332,7 +332,7 @@ const char *aclk_topic_cache_iterate(size_t *iter)
  *
  */
 
-unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min_s, unsigned long int max_s) {
+unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int mins_ms, unsigned long int min_ms) {
     static int attempt = -1;
 
     if (reset) {
@@ -350,11 +350,14 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min_s, 
 
     delay += (os_random32() % (MAX(1000, delay/2)));
 
-    if (delay <= min_s * MSEC_PER_SEC)
-        return min_s * MSEC_PER_SEC;
+    // Note: this is a bug, the value expected from the env backoff payload should be in seconds
+    // but the code here is in milliseconds. To avoid confusion the cloud will be sending the value
+    // in milliseconds so that the code will work as expected.
+    if (delay <= mins_ms * MSEC_PER_SEC)
+        return mins_ms;
 
-    if (delay >= max_s * MSEC_PER_SEC)
-        return max_s * MSEC_PER_SEC;
+    if (delay >= min_ms * MSEC_PER_SEC)
+        return min_ms;
 
     return delay;
 }
