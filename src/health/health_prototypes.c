@@ -246,14 +246,15 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
     if(!replace) {
         if(ap->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG) {
             // alerts with the same name are appended to the existing one
-            RRD_ALERT_PROTOTYPE *alloced = callocz(1, sizeof(*alloced));
-            SWAP(*alloced, *nap);
+            nap = callocz(1, sizeof(*nap));     // empty named nap
+            RRD_ALERT_PROTOTYPE *empty = new_value;     // nap named empty
+            SWAP(*nap, *empty); // nap and empty are now named properly
 
             rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, alloced, _internal.prev, _internal.next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, nap, _internal.prev, _internal.next);
             rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
 
-            if(alloced->_internal.enabled)
+            if(nap->_internal.enabled)
                 ap->_internal.enabled = true;
         }
     }
