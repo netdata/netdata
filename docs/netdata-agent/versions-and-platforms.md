@@ -67,3 +67,43 @@ Static builds usually miss certain features that require operating-system suppor
 - eBPF related features
 
 When platforms are removed from the [Binary Distribution Packages](/packaging/makeself/README.md) list, they default to install or update Netdata to a static build. This may mean that after platforms become EOL, Netdata on them may lose some of its features. We recommend upgrading the operating system before it becomes EOL, to continue using all the features of Netdata.
+
+### Migrating from Native Package to Static Build
+
+Existing installs of native packages on a platform that is no longer supported, are not automatically updated. The upgrade process will show the Agent is already at the newest version, because we no longer publish new packages for that platform.
+
+If the operating system cannot be upgraded to a more recent version, the install can be switched to a static build. This is a manual process, may cause data loss, and is therefore **not supported**. However, following these steps should result in a functioning Agent with metrics data and connection to Netdata Cloud in tact:
+
+1. Stop the Agent, [as appropriate for your platform](/docs/netdata-agent/start-stop-restart.md).
+2. Backup the contents of these directories: `/etc/netdata`, `/var/cache/netdata`, `/var/lib/netdata`, `/var/log/netdata`.
+3. Uninstall the native package, answering "yes" to all questions.
+
+   ```sh
+   wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
+   ```
+
+4. For platforms using systemd, unmask the Netdata service:
+
+   ```sh
+   sudo systemctl unmask netdata
+   sudo systemctl daemon-reload
+   ```
+
+5. Install the static build:
+
+   ```sh
+   sh /tmp/netdata-kickstart.sh --static-only
+   ```
+
+6. Stop the Agent (again).
+7. Copy over the data from the previous install:
+
+   ```sh
+   cd /opt/netdata
+   sudo rsync -aRv --delete \
+              --exclude /etc/netdata/.install-type \
+              --exclude /etc/netdata/.environment \
+              /etc/netdata /var/lib/netdata /var/cache/netdata /var/log/netdata ./
+   ```
+
+8. Start the Agent.
