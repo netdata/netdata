@@ -513,7 +513,9 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
         if (unlikely(!j2_header))
             continue;
 
-        PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size);
+        char file_path[RRDENG_PATH_MAX];
+        journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
+        PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
         if(no_signal_received) {
             time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
             size_t journal_v2_file_size = datafile->journalfile->mmap.size;
