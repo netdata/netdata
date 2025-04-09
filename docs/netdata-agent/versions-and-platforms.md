@@ -70,7 +70,7 @@ When platforms are removed from the [Binary Distribution Packages](/packaging/ma
 
 ### Upgrading on an Unsupported Platform
 
-Existing installs of native packages on a platform that is no longer supported, cannot be automatically updated at this time. The upgrader will show it is already at the newest version, because we no longer publish new packages.
+Existing installs of native packages on a platform that is no longer supported, are not automatically updated. The upgrade process will show the Agent is already at the newest version, because we no longer publish new packages for that platform.
 
 If the operating system cannot be upgraded to a more recent version, the install can be switched to a static build. This is a manual process, may cause data loss, and is therefore **not supported**. However, following these steps should result in a functioning Agent with metrics data and connection to Netdata Cloud in tact:
 
