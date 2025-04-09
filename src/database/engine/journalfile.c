@@ -1519,6 +1519,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             internal_error(
                 true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
             ctx_current_disk_space_increase(ctx, total_file_size);
+            freez(uuid_list);
             return true;
         }
     }
