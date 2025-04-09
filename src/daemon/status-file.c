@@ -1289,6 +1289,7 @@ void daemon_status_file_check_crash(void) {
             last_session_status = session_status;
             last_session_status.status = DAEMON_STATUS_NONE;
             last_session_status.exit_reason = 0;
+            memset(&last_session_status.fatal, 0, sizeof(last_session_status.fatal));
         }
 
         struct post_status_file_thread_data d = {
