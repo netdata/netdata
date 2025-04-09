@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	priosnmp = module.Priority + iota
-	prioNetIfaceTraffic
+	prioNetIfaceTraffic = module.Priority + iota
 	prioNetIfaceUnicast
 	prioNetIfaceMulticast
 	prioNetIfaceBroadcast
@@ -20,6 +19,8 @@ const (
 	prioNetIfaceAdminStatus
 	prioNetIfaceOperStatus
 	prioSysUptime
+
+	priosnmp
 )
 
 var netIfaceChartsTmpl = module.Charts{
