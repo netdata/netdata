@@ -76,7 +76,6 @@ static void copy_and_clean_thread_name_if_empty(DAEMON_STATUS_FILE *ds, const ch
         *p = '\0';
 }
 
-#define STACK_TRACE_INFO_PREFIX "info: "
 static bool stack_trace_is_empty(DAEMON_STATUS_FILE *ds) {
     return !ds->fatal.stack_trace[0] || strncmp(ds->fatal.stack_trace, STACK_TRACE_INFO_PREFIX, strlen(STACK_TRACE_INFO_PREFIX)) == 0;
 }
@@ -1532,7 +1531,7 @@ void daemon_status_file_shutdown_timeout(BUFFER *trace) {
     // keep the spinlock locked, to prevent further steps updating the status
 }
 
-void daemon_status_file_shutdown_step(const char *step) {
+void daemon_status_file_shutdown_step(const char *step, const char *step_timings) {
     if(session_status.fatal.filename[0] || !spinlock_trylock(&shutdown_timeout_spinlock))
         // we have a fatal logged
         return;
@@ -1541,6 +1540,9 @@ void daemon_status_file_shutdown_step(const char *step) {
         snprintfz(session_status.fatal.function, sizeof(session_status.fatal.function), "shutdown(%s)", step);
     else
         session_status.fatal.function[0] = '\0';
+
+    if(step_timings && *step_timings && stack_trace_is_empty(&session_status))
+        safecpy(session_status.fatal.stack_trace, step_timings);
 
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 
