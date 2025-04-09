@@ -19,6 +19,8 @@ const (
 	prioNetIfaceAdminStatus
 	prioNetIfaceOperStatus
 	prioSysUptime
+
+	priosnmp
 )
 
 var netIfaceChartsTmpl = module.Charts{
@@ -31,6 +33,20 @@ var netIfaceChartsTmpl = module.Charts{
 	netIfaceAdminStatusChartTmpl.Copy(),
 	netIfaceOperStatusChartTmpl.Copy(),
 }
+
+var (
+	snmpChartTemplate = module.Chart{
+		ID:       "%s",
+		Title:    "%s",
+		Units:    "%s",
+		Fam:      "%s",
+		Ctx:      "snmp.%s",
+		Priority: priosnmp,
+		Dims: module.Dims{
+			{ID: "%s", Name: "%s"},
+		},
+	}
+)
 
 var (
 	netIfaceTrafficChartTmpl = module.Chart{
@@ -175,6 +191,36 @@ func (c *Collector) addNetIfaceCharts(iface *netInterface) {
 
 	if err := c.Charts().Add(*charts...); err != nil {
 		c.Warning(err)
+	}
+}
+
+func (c *Collector) addSNMPChart(processedMetric processedMetric) {
+	if processedMetric.tableName == "" {
+		chart := snmpChartTemplate.Copy()
+
+		chart.ID = fmt.Sprintf(chart.ID, processedMetric.name)
+		chart.Title = fmt.Sprintf(chart.Title, processedMetric.name)
+		chart.Units = fmt.Sprintf(chart.Units, "TBD unit")
+		chart.Ctx = fmt.Sprintf(chart.Ctx, processedMetric.name)
+		chart.Fam = fmt.Sprintf(chart.Fam, processedMetric.name)
+
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, processedMetric.name)
+			dim.Name = fmt.Sprintf(dim.Name, processedMetric.name)
+		}
+
+		if err := c.Charts().Add(chart); err != nil {
+			c.Warning(err)
+		}
+	}
+}
+
+func (c *Collector) removeSNMPChart(name string) {
+	for _, chart := range *c.Charts() {
+		if chart.ID == name {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
 	}
 }
 
