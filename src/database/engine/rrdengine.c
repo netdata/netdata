@@ -989,37 +989,47 @@ time_t find_uuid_first_time(
         struct uuid_first_time_s *uuid_original_entry;
 
         size_t journal_metric_count = j2_header->metric_count;
+        char file_path[RRDENG_PATH_MAX];
+        journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
+        PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
+        if(no_signal_received) {
+            for (size_t index = 0; index < count; ++index) {
+                uuid_original_entry = &uuid_first_entry_list[index];
 
-        for (size_t index = 0; index < count; ++index) {
-            uuid_original_entry = &uuid_first_entry_list[index];
+                // Check here if we should skip this
+                if (uuid_original_entry->df_matched > 3 || uuid_original_entry->pages_found > 5)
+                    continue;
 
-            // Check here if we should skip this
-            if (uuid_original_entry->df_matched > 3 || uuid_original_entry->pages_found > 5)
-                continue;
+                struct journal_metric_list *live_entry = bsearch(
+                    uuid_original_entry->uuid,
+                    uuid_list,
+                    journal_metric_count,
+                    sizeof(*uuid_list),
+                    journal_metric_uuid_compare);
 
-            struct journal_metric_list *live_entry =
-                    bsearch(uuid_original_entry->uuid,uuid_list,journal_metric_count,
-                            sizeof(*uuid_list), journal_metric_uuid_compare);
+                if (!live_entry) {
+                    // Not found in this journal
+                    not_matching_bsearches++;
+                    continue;
+                }
 
-            if (!live_entry) {
-                // Not found in this journal
-                not_matching_bsearches++;
-                continue;
+                uuid_original_entry->pages_found += live_entry->entries;
+                uuid_original_entry->df_matched++;
+
+                time_t old_first_time_s = uuid_original_entry->first_time_s;
+
+                // Calculate first / last for this match
+                time_t first_time_s = live_entry->delta_start_s + journal_start_time_s;
+                uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
+
+                if (uuid_original_entry->first_time_s != old_first_time_s)
+                    uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
+
+                binary_match++;
             }
-
-            uuid_original_entry->pages_found += live_entry->entries;
-            uuid_original_entry->df_matched++;
-
-            time_t old_first_time_s = uuid_original_entry->first_time_s;
-
-            // Calculate first / last for this match
-            time_t first_time_s = live_entry->delta_start_s + journal_start_time_s;
-            uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
-
-            if (uuid_original_entry->first_time_s != old_first_time_s)
-                uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
-
-            binary_match++;
+        } else {
+            nd_log_daemon(
+                NDLP_ERR, "DBENGINE: journalfile \"%s\" is corrupted, skipping it", file_path);
         }
 
         journalfile_count++;

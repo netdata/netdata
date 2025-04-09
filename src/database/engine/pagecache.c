@@ -624,9 +624,9 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
             }
         }
         else {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "DBENGINE: failed to journal file %u of tier %u (SIGBUS)",
-                   datafile->fileno, datafile->tier);
+            nd_log_limit_static_thread_var(erl, 10, 0);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: failed to access journal file %u of tier %d (SIGBUS)",
+                         datafile->fileno, datafile->ctx->config.tier);
         }
 
         journalfile_v2_data_release(datafile->journalfile);
