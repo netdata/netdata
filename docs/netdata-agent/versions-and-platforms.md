@@ -68,7 +68,7 @@ Static builds usually miss certain features that require operating-system suppor
 
 When platforms are removed from the [Binary Distribution Packages](/packaging/makeself/README.md) list, they default to install or update Netdata to a static build. This may mean that after platforms become EOL, Netdata on them may lose some of its features. We recommend upgrading the operating system before it becomes EOL, to continue using all the features of Netdata.
 
-### Upgrading on an Unsupported Platform
+### Migrating from Native Package to Static Build
 
 Existing installs of native packages on a platform that is no longer supported, are not automatically updated. The upgrade process will show the Agent is already at the newest version, because we no longer publish new packages for that platform.
 
