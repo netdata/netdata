@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- protected access against SIGBUS/SIGSEGV for journal v2 files [\#20092](https://github.com/netdata/netdata/pull/20092) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#20091](https://github.com/netdata/netdata/pull/20091) ([netdatabot](https://github.com/netdatabot))
+- Fix typo in .github/scripts/gen-docker-tags.py [\#20089](https://github.com/netdata/netdata/pull/20089) ([Ferroin](https://github.com/Ferroin))
+- daemon status 27c [\#20088](https://github.com/netdata/netdata/pull/20088) ([ktsaou](https://github.com/ktsaou))
+- Fix inverted logic for skipping non-native CI jobs on PRs. [\#20087](https://github.com/netdata/netdata/pull/20087) ([Ferroin](https://github.com/Ferroin))
+- Alerts and Notifications [\#20085](https://github.com/netdata/netdata/pull/20085) ([kanelatechnical](https://github.com/kanelatechnical))
 - Fix memory allocation for timer callback data when cancelling a timer [\#20084](https://github.com/netdata/netdata/pull/20084) ([stelfrag](https://github.com/stelfrag))
 - Fix crash during shutdown when there are pending messages to cloud [\#20080](https://github.com/netdata/netdata/pull/20080) ([stelfrag](https://github.com/stelfrag))
 - Do not try to index jv2 files during shutdown [\#20079](https://github.com/netdata/netdata/pull/20079) ([stelfrag](https://github.com/stelfrag))
@@ -83,6 +89,7 @@
 - docs: improve Synology NAS installation documentation clarity [\#19993](https://github.com/netdata/netdata/pull/19993) ([ilyam8](https://github.com/ilyam8))
 - added worker last job id to status file [\#19992](https://github.com/netdata/netdata/pull/19992) ([ktsaou](https://github.com/ktsaou))
 - Improve shutdown and datafile rotation [\#19991](https://github.com/netdata/netdata/pull/19991) ([stelfrag](https://github.com/stelfrag))
+- Windows Services Monitoring [\#19990](https://github.com/netdata/netdata/pull/19990) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update synology.md [\#19989](https://github.com/netdata/netdata/pull/19989) ([ycdtosa](https://github.com/ycdtosa))
 - Regenerate integrations docs [\#19988](https://github.com/netdata/netdata/pull/19988) ([netdatabot](https://github.com/netdatabot))
 - Installation + docker, improvements [\#19987](https://github.com/netdata/netdata/pull/19987) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -125,6 +132,7 @@
 - build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.0 to 1.9.1 in /src/go [\#19943](https://github.com/netdata/netdata/pull/19943) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/docker/docker from 28.0.1+incompatible to 28.0.2+incompatible in /src/go [\#19942](https://github.com/netdata/netdata/pull/19942) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/DataDog/datadog-agent/pkg/networkdevice/profile from 0.65.0-devel.0.20250317105920-ce55f088ab29 to 0.66.0-devel in /src/go [\#19941](https://github.com/netdata/netdata/pull/19941) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Update src/aclk/aclk-schemas to latest version. [\#19940](https://github.com/netdata/netdata/pull/19940) ([Ferroin](https://github.com/Ferroin))
 - Don't build libunwind in static builds when it's not needed. [\#19939](https://github.com/netdata/netdata/pull/19939) ([Ferroin](https://github.com/Ferroin))
 - detect low ram conditions more aggresively [\#19938](https://github.com/netdata/netdata/pull/19938) ([ktsaou](https://github.com/ktsaou))
 - status file 21b [\#19937](https://github.com/netdata/netdata/pull/19937) ([ktsaou](https://github.com/ktsaou))
@@ -455,14 +463,6 @@
 - virtual hosts now get hops = 1 [\#19546](https://github.com/netdata/netdata/pull/19546) ([ktsaou](https://github.com/ktsaou))
 - chore: remove old dashboard leftovers [\#19545](https://github.com/netdata/netdata/pull/19545) ([ilyam8](https://github.com/ilyam8))
 - chore\(windows.plugin\): format perflib ad and netframework [\#19544](https://github.com/netdata/netdata/pull/19544) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19541](https://github.com/netdata/netdata/pull/19541) ([netdatabot](https://github.com/netdatabot))
-- Use database/rrd.h instead of daemon/common.h [\#19540](https://github.com/netdata/netdata/pull/19540) ([vkalintiris](https://github.com/vkalintiris))
-- allow dbengine to read at offsets above 4GiB - again [\#19539](https://github.com/netdata/netdata/pull/19539) ([ktsaou](https://github.com/ktsaou))
-- allow dbengine to read at offsets above 4GiB [\#19538](https://github.com/netdata/netdata/pull/19538) ([ktsaou](https://github.com/ktsaou))
-- inline dbengine query critical path [\#19537](https://github.com/netdata/netdata/pull/19537) ([ktsaou](https://github.com/ktsaou))
-- Fix contexts stay not-live when children reconnect [\#19536](https://github.com/netdata/netdata/pull/19536) ([ktsaou](https://github.com/ktsaou))
-- Fix coverity issue [\#19535](https://github.com/netdata/netdata/pull/19535) ([stelfrag](https://github.com/stelfrag))
-- Actually handle the `-fexceptions` requirement correctly in our build system. [\#19534](https://github.com/netdata/netdata/pull/19534) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
