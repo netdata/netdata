@@ -41,7 +41,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
 {
     if(!steps_timings) {
         steps_timings = buffer_create(0, NULL);
-        buffer_strcat(steps_timings, "# shutdown steps timings");
+        buffer_strcat(steps_timings, STACK_TRACE_INFO_PREFIX " shutdown steps timings");
     }
 
     usec_t step_start_time = now_monotonic_usec();
@@ -61,7 +61,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
             watcher_steps[step_id].msg);
 #endif
 
-    daemon_status_file_shutdown_step(watcher_steps[step_id].msg);
+    daemon_status_file_shutdown_step(watcher_steps[step_id].msg, buffer_tostring(steps_timings));
 
     // Wait with a timeout
     time_t timeout = 135; // systemd gives us 150, we timeout at 135
@@ -153,6 +153,9 @@ void *watcher_main(void *arg)
     usec_t shutdown_duration = shutdown_end_time - shutdown_start_time;
     netdata_log_error("Shutdown process ended in %llu milliseconds",
                       shutdown_duration / USEC_PER_MS);
+
+    daemon_status_file_shutdown_step(NULL, buffer_tostring(steps_timings));
+    daemon_status_file_update_status(DAEMON_STATUS_EXITED);
 
     return NULL;
 }

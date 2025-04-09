@@ -4,7 +4,7 @@
 
 bool nd_log_forked = false;
 
-#define NO_STACK_TRACE_PREFIX "info: stack trace is not available, "
+#define NO_STACK_TRACE_PREFIX STACK_TRACE_INFO_PREFIX "stack trace is not available, "
 
 // The signal handler function name to filter out in stack traces
 static const char *signal_handler_function = "nd_signal_handler";
