@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	priosnmp = module.Priority + iota
-	prioNetIfaceTraffic
+	prioNetIfaceTraffic = module.Priority + iota
 	prioNetIfaceUnicast
 	prioNetIfaceMulticast
 	prioNetIfaceBroadcast
@@ -20,6 +19,8 @@ const (
 	prioNetIfaceAdminStatus
 	prioNetIfaceOperStatus
 	prioSysUptime
+
+	priosnmp
 )
 
 var netIfaceChartsTmpl = module.Charts{
@@ -210,25 +211,16 @@ func (c *Collector) addSNMPChart(processedMetric processedMetric) {
 		}
 		chart.Ctx = fmt.Sprintf(chart.Ctx, processedMetric.name)
 		chart.Fam = fmt.Sprintf(chart.Fam, processedMetric.name)
-		chart.Dims = append(chart.Dims, &module.Dim{ID: processedMetric.name, Name: processedMetric.name})
+
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, processedMetric.name)
+			dim.Name = fmt.Sprintf(dim.Name, processedMetric.name)
+		}
 
 		if err := c.Charts().Add(chart); err != nil {
 			c.Warning(err)
 		}
 	}
-	// else {}
-
-	// chart.Labels = []module.Label{
-	// 	{Key: "vendor", Value: c.sysInfo.Organization},
-	// 	{Key: "sysName", Value: c.sysInfo.Name},
-	// 	{Key: "ifDescr", Value: iface.ifDescr},
-	// 	{Key: "ifName", Value: iface.ifName},
-	// 	{Key: "ifType", Value: ifTypeMapping[iface.ifType]},
-	// }
-	// for _, dim := range chart.Dims {
-	// 	dim.ID = fmt.Sprintf(dim.ID, iface.ifName)
-	// }
-
 }
 
 func (c *Collector) removeSNMPChart(name string) {

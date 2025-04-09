@@ -66,9 +66,11 @@ type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
+	enableProfiles bool
+
 	vnode *vnodes.VirtualNode
 
-	charts *module.Charts
+	charts      *module.Charts
 	seenMetrics map[string]bool
 
 	newSnmpClient func() gosnmp.Handler
