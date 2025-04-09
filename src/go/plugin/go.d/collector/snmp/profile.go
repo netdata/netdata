@@ -2,7 +2,6 @@ package snmp
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -64,7 +63,7 @@ func (c *Collector) parseMetricsFromProfiles(matchingProfiles []*ddsnmp.Profile)
 				continue
 			}
 			if tableRows, err := c.walkOIDTree(oid); err != nil {
-				log.Fatalf("Error walking OID tree: %v, oid %s", err, oid)
+				return nil, fmt.Errorf("error walking OID tree: %v, oid %s", err, oid)
 			} else {
 				for _, metric := range results.parsed_metrics {
 					switch s := metric.(type) {
