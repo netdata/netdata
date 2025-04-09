@@ -99,6 +99,7 @@ typedef struct daemon_status_file {
     char cloud_instance_type[32];
     char cloud_instance_region[32];
     bool read_system_info;
+    size_t system_cpus;
 
     DMI_INFO hw;
 
