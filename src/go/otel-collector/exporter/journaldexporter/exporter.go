@@ -3,19 +3,35 @@ package journaldexporter
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/user"
+	"strconv"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/plog"
-	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.uber.org/zap"
 )
 
-type journaldExporter struct {
-	metricsMarshaler pmetric.Marshaler
-}
+type (
+	journaldExporter struct {
+		log    *zap.Logger
+		conf   *Config
+		fields commonFields
+	}
+	commonFields struct {
+		syslogID  string
+		pid       string
+		uid       string
+		bootID    string
+		machineID string
+		hostname  string
+	}
+)
 
-func newMyExporter() *journaldExporter {
+func newJournaldExporter(cfg component.Config, logger *zap.Logger) *journaldExporter {
 	return &journaldExporter{
-		metricsMarshaler: &pmetric.JSONMarshaler{},
+		log:  logger,
+		conf: cfg.(*Config),
 	}
 }
 
@@ -24,9 +40,16 @@ func (e *journaldExporter) consumeLogs(_ context.Context, ld plog.Logs) error {
 	return nil
 }
 
-func (e *journaldExporter) Start(_ context.Context, host component.Host) error {
-	host.GetExtensions()
-	fmt.Println("Starting MyExporter")
+func (e *journaldExporter) Start(_ context.Context, _ component.Host) error {
+	e.fields.syslogID = "nd-otel-collector"
+	e.fields.pid = strconv.Itoa(os.Getpid())
+	e.fields.hostname, _ = os.Hostname()
+	e.fields.bootID = getBootID()
+	e.fields.machineID = getMachineID()
+	if cu, err := user.Current(); err == nil {
+		e.fields.uid = cu.Uid
+	}
+
 	return nil
 }
 

@@ -279,14 +279,14 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
         return;
     }
 
-    struct aclk_sync_cfg_t  *wc = host->aclk_config;
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
 
     uuid_copy(host->node_id.uuid, *node_id);
 
-    if (unlikely(!wc))
+    if (unlikely(!aclk_host_config))
         create_aclk_config(host, &host->host_id.uuid, node_id);
     else
-        uuid_unparse_lower(*node_id, wc->node_id);
+        uuid_unparse_lower(*node_id, aclk_host_config->node_id);
 
     stream_receiver_send_node_and_claim_id_to_child(host);
     stream_path_node_id_updated(host);
@@ -2481,15 +2481,6 @@ static void start_metadata_hosts(uv_work_t *req)
     worker_is_idle();
 }
 
-static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
-{
-    if (handle->type == UV_TIMER) {
-        uv_timer_stop((uv_timer_t *)handle);
-    }
-
-    uv_close(handle, NULL);  // Automatically close and free the handle
-}
-
 #define EVENT_LOOP_NAME "METASYNC"
 
 static void metadata_event_loop(void *arg)
@@ -2695,7 +2686,7 @@ static void metadata_event_loop(void *arg)
     }
     config->initialized = false;
 
-    uv_walk(loop, (uv_walk_cb) close_callback, NULL);
+    uv_walk(loop, libuv_close_callback, NULL);
     uv_run(loop, UV_RUN_NOWAIT);
 
     int rc;

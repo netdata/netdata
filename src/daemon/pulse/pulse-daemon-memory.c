@@ -3,6 +3,7 @@
 #define PULSE_INTERNALS 1
 #include "pulse-daemon-memory.h"
 #include "streaming/stream-replication-sender.h"
+#include "health/health.h"
 
 static size_t rrd_slot_memory = 0;
 
@@ -49,6 +50,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
         static RRDDIM *rd_aral = NULL;
         static RRDDIM *rd_judy = NULL;
         static RRDDIM *rd_slots = NULL;
+        static RRDDIM *rd_health_log = NULL;
         static RRDDIM *rd_other = NULL;
 
         if (unlikely(!st_memory)) {
@@ -93,6 +95,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
             rd_judy = rrddim_add(st_memory, "judy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_slots = rrddim_add(st_memory, "slots", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_health_log = rrddim_add(st_memory, "health log", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         // each of these should also be analyzed below at the buffers chart
@@ -118,6 +121,8 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
 
         size_t strings_memory = 0, strings_index = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings_memory, &strings_index, NULL, NULL);
+        
+        size_t health_log_memory = aral_used_bytes_from_stats(health_alarm_entry_aral_stats());
 
         rrddim_set_by_pointer(st_memory, rd_db_dbengine, (collected_number)pulse_dbengine_total_memory);
         rrddim_set_by_pointer(st_memory, rd_db_rrd, (collected_number)pulse_rrd_memory_size);
@@ -193,6 +198,10 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
 
         rrddim_set_by_pointer(st_memory, rd_slots,
                               (collected_number)__atomic_load_n(&rrd_slot_memory, __ATOMIC_RELAXED));
+
+
+        rrddim_set_by_pointer(st_memory, rd_health_log,
+                              (collected_number)health_log_memory);
 
         rrddim_set_by_pointer(st_memory, rd_other,
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));

@@ -2,6 +2,7 @@
 
 #include "status-file-dedup.h"
 #include "status-file-io.h"
+#include "status-file-dmi.h"
 
 #define DEDUP_FILENAME "dedup-netdata.dat"
 #define DEDUP_VERSION 1
@@ -67,31 +68,31 @@ uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const 
 
     dsf_acquire(*ds);
 
-    to_hash.v = ds->v,
-    to_hash.status = ds->status,
-    to_hash.signal_code = ds->fatal.signal_code,
-    to_hash.profile = ds->profile,
-    to_hash.exit_reason = ds->exit_reason,
-    to_hash.db_mode = ds->db_mode,
-    to_hash.db_tiers = ds->db_tiers,
-    to_hash.kubernetes = ds->kubernetes,
-    to_hash.sentry_available = ds->sentry_available,
-    to_hash.sentry_fatal = ds->fatal.sentry,
-    to_hash.host_id = ds->host_id,
-    to_hash.machine_id = ds->machine_id,
-    to_hash.worker_job_id = ds->fatal.worker_job_id,
+    to_hash.v = ds->v;
+    to_hash.status = ds->status;
+    to_hash.signal_code = ds->fatal.signal_code;
+    to_hash.profile = ds->profile;
+    to_hash.exit_reason = ds->exit_reason;
+    to_hash.db_mode = ds->db_mode;
+    to_hash.db_tiers = ds->db_tiers;
+    to_hash.kubernetes = ds->kubernetes;
+    to_hash.sentry_available = ds->sentry_available;
+    to_hash.sentry_fatal = ds->fatal.sentry;
+    to_hash.host_id = ds->host_id;
+    to_hash.machine_id = ds->machine_id;
+    to_hash.worker_job_id = ds->fatal.worker_job_id;
 
-    strncpyz(to_hash.version, ds->version, sizeof(to_hash.version) - 1);
-    strncpyz(to_hash.filename, ds->fatal.filename, sizeof(to_hash.filename) - 1);
-    strncpyz(to_hash.filename, ds->fatal.function, sizeof(to_hash.function) - 1);
-    strncpyz(to_hash.stack_trace, ds->fatal.stack_trace, sizeof(to_hash.stack_trace) - 1);
-    strncpyz(to_hash.thread, ds->fatal.thread, sizeof(to_hash.thread) - 1);
+    safecpy(to_hash.version, ds->version);
+    safecpy(to_hash.filename, ds->fatal.filename);
+    safecpy(to_hash.filename, ds->fatal.function);
+    safecpy(to_hash.stack_trace, ds->fatal.stack_trace);
+    safecpy(to_hash.thread, ds->fatal.thread);
 
     if(msg)
-        strncpyz(to_hash.msg, msg, sizeof(to_hash.msg) - 1);
+        safecpy(to_hash.msg, msg);
 
     if(cause)
-        strncpyz(to_hash.cause, cause, sizeof(to_hash.cause) - 1);
+        safecpy(to_hash.cause, cause);
 
     stack_trace_anonymize(to_hash.stack_trace);
 

@@ -1086,6 +1086,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/signals/signals.h
         src/libnetdata/os/machine_id.c
         src/libnetdata/os/machine_id.h
+        src/libnetdata/os/process_memory.c
+        src/libnetdata/os/process_memory.h
+        src/libnetdata/os/dir_size.c
+        src/libnetdata/os/dir_size.h
         src/libnetdata/signals/signal-code.c
         src/libnetdata/signals/signal-code.h
 )
@@ -1286,6 +1290,12 @@ set(DAEMON_FILES
         src/daemon/status-file-dedup.h
         src/daemon/status-file-io.c
         src/daemon/status-file-io.h
+        src/daemon/status-file-dmi.c
+        src/daemon/status-file-dmi.h
+        src/daemon/status-file-product.c
+        src/daemon/status-file-product.h
+        src/daemon/protected-access.c
+        src/daemon/protected-access.h
 )
 
 set(DAEMON_SYSTEMD_WATCHER_FILES
@@ -1580,6 +1590,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdlabels.c
         src/database/rrd.c
         src/database/rrd.h
+        src/database/rrd-metadata.c
+        src/database/rrd-metadata.h
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h
@@ -1646,6 +1658,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdhost-labels.h
         src/database/rrdhost-collection.c
         src/database/rrdhost-collection.h
+        src/database/pattern-array.c
+        src/database/pattern-array.h
 )
 
 if(ENABLE_DBENGINE)
@@ -1916,6 +1930,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
         src/collectors/windows.plugin/perflib-web-service.c
+        src/collectors/windows.plugin/perflib-services.c
         src/collectors/windows.plugin/perflib-hyperv.c
 )
 

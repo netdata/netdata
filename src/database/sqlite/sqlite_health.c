@@ -183,7 +183,8 @@ static void insert_alert_queue(
 
     int rc;
 
-    if (!host->aclk_config)
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if (!aclk_host_config)
         return;
 
     time_t submit_delay = trigger_time + calculate_delay(old_status, new_status);
@@ -375,6 +376,9 @@ void sql_health_alarm_log_cleanup(RRDHOST *host)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    
+    // After cleaning up SQLite entries, also clean up in-memory entries
+    health_alarm_log_cleanup(host);
 }
 
 #define SQL_UPDATE_TRANSITION_IN_HEALTH_LOG                                                                            \
@@ -706,7 +710,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
             }
         }
 
-        ae = callocz(1, sizeof(ALARM_ENTRY));
+        ae = health_alarm_entry_create();
 
         ae->unique_id = unique_id;
         ae->alarm_id = alarm_id;
@@ -765,8 +769,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
         ae->old_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae_units(ae), -1));
         ae->new_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae_units(ae), -1));
 
-        ae->next = host->health_log.alarms;
-        host->health_log.alarms = ae;
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
 
         if(unlikely(ae->unique_id > host->health_max_unique_id))
             host->health_max_unique_id = ae->unique_id;
@@ -793,6 +796,9 @@ void sql_health_alarm_log_load(RRDHOST *host)
     nd_log(NDLS_DAEMON, errored ? NDLP_WARNING : NDLP_DEBUG,
            "[%s]: Table health_log, loaded %zd alarm entries, errors in %zd entries.",
            rrdhost_hostname(host), loaded, errored);
+           
+    // Clean up old entries based on retention settings
+    health_alarm_log_cleanup(host);
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);

@@ -2,6 +2,7 @@
 
 #include "api_v2_contexts.h"
 #include "aclk/aclk_capas.h"
+#include "database/rrd-metadata.h"
 
 void build_info_to_json_object(BUFFER *b);
 
@@ -42,65 +43,36 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
         buffer_json_cloud_status(wb, now_s);
 
-        size_t collected_metrics = 0;
-        size_t collected_instances = 0;
-        size_t collected_contexts = 0;
-        size_t available_metrics = 0;
-        size_t available_instances = 0;
-        size_t available_contexts = 0;
+        // Get metrics metadata using our reusable function
+        RRDSTATS_METADATA metadata = rrdstats_metadata_collect();
 
         buffer_json_member_add_object(wb, "nodes");
         {
-            size_t receiving = 0, archived = 0, sending = 0, total = 0;
-            RRDHOST *host;
-            dfe_start_read(rrdhost_root_index, host) {
-                total++;
-
-                available_metrics += __atomic_load_n(&host->rrdctx.metrics_count, __ATOMIC_RELAXED);
-                available_instances += __atomic_load_n(&host->rrdctx.instances_count, __ATOMIC_RELAXED);
-                available_contexts += __atomic_load_n(&host->rrdctx.contexts_count, __ATOMIC_RELAXED);
-
-                if(rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED))
-                    sending++;
-
-                if (rrdhost_is_online(host)) {
-                    collected_metrics += __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
-                    collected_instances += __atomic_load_n(&host->collected.instances_count, __ATOMIC_RELAXED);
-                    collected_contexts += __atomic_load_n(&host->collected.contexts_count, __ATOMIC_RELAXED);
-
-                    if(host != localhost)
-                        receiving++;
-                }
-                else
-                    archived++;
-            }
-            dfe_done(host);
-
-            buffer_json_member_add_uint64(wb, "total", total);
-            buffer_json_member_add_uint64(wb, "receiving", receiving);
-            buffer_json_member_add_uint64(wb, "sending", sending);
-            buffer_json_member_add_uint64(wb, "archived", archived);
+            buffer_json_member_add_uint64(wb, "total", metadata.nodes.total);
+            buffer_json_member_add_uint64(wb, "receiving", metadata.nodes.receiving);
+            buffer_json_member_add_uint64(wb, "sending", metadata.nodes.sending);
+            buffer_json_member_add_uint64(wb, "archived", metadata.nodes.archived);
         }
         buffer_json_object_close(wb); // nodes
 
         buffer_json_member_add_object(wb, "metrics");
         {
-            buffer_json_member_add_uint64(wb, "collected", collected_metrics);
-            buffer_json_member_add_uint64(wb, "available", available_metrics);
+            buffer_json_member_add_uint64(wb, "collected", metadata.metrics.collected);
+            buffer_json_member_add_uint64(wb, "available", metadata.metrics.available);
         }
         buffer_json_object_close(wb);
 
         buffer_json_member_add_object(wb, "instances");
         {
-            buffer_json_member_add_uint64(wb, "collected", collected_instances);
-            buffer_json_member_add_uint64(wb, "available", available_instances);
+            buffer_json_member_add_uint64(wb, "collected", metadata.instances.collected);
+            buffer_json_member_add_uint64(wb, "available", metadata.instances.available);
         }
         buffer_json_object_close(wb);
 
         buffer_json_member_add_object(wb, "contexts");
         {
-            buffer_json_member_add_uint64(wb, "collected", collected_contexts);
-            buffer_json_member_add_uint64(wb, "available", available_contexts);
+            buffer_json_member_add_uint64(wb, "collected", metadata.contexts.collected);
+            buffer_json_member_add_uint64(wb, "available", metadata.contexts.available);
         }
         buffer_json_object_close(wb);
 

@@ -868,7 +868,8 @@ void *aclk_main(void *ptr)
     // Keep reconnecting and talking until our time has come
     // and the Grim Reaper (exit_initiated) calls
     netdata_log_info("ACLK: Starting ACLK query event loop");
-    aclk_query_init(mqttwss_client);
+    aclk_mqtt_client_set(mqttwss_client);
+    bool client_to_reset = true;
     do {
         worker_is_busy(WORKER_ACLK_CONNECT);
         if (aclk_attempt_to_connect(mqttwss_client))
@@ -888,7 +889,9 @@ void *aclk_main(void *ptr)
             nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK DISCONNECTED");
         }
     } while (service_running(SERVICE_ACLK));
-
+    aclk_mqtt_client_reset();
+    // No need to reset the client again when exiting
+    client_to_reset = false;
     worker_is_busy(WORKER_ACLK_DISCONNECTED);
     aclk_graceful_disconnect(mqttwss_client);
 
@@ -899,6 +902,8 @@ void *aclk_main(void *ptr)
 
 exit_full:
     free_topic_cache();
+    if (client_to_reset)
+        aclk_mqtt_client_reset();
     mqtt_wss_destroy(mqttwss_client);
 exit:
     if (aclk_env) {
@@ -1030,20 +1035,20 @@ void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, con
 
 static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
 {
-    struct aclk_sync_cfg_t *wc = host->aclk_config;
-    if (!wc)
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if (!aclk_host_config)
         return;
 
-    buffer_sprintf(wb,
+    buffer_sprintf(
+        wb,
         "\n\t\tUpdates: %d"
         "\n\t\tCheckpoints: %d"
         "\n\t\tAlert count: %d"
         "\n\t\tAlert snapshot count: %d",
-        wc->stream_alerts,
-        wc->checkpoint_count,
-        wc->alert_count,
-        wc->snapshot_count
-    );
+        aclk_host_config->stream_alerts,
+        aclk_host_config->checkpoint_count,
+        aclk_host_config->alert_count,
+        aclk_host_config->snapshot_count);
 }
 
 char *aclk_state(void)
@@ -1132,22 +1137,22 @@ char *aclk_state(void)
 
 static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 {
-    struct aclk_sync_cfg_t *wc = host->aclk_config;
-    if (!wc)
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if (!aclk_host_config)
         return;
 
-    json_object *tmp = json_object_new_int(wc->stream_alerts);
+    json_object *tmp = json_object_new_int(aclk_host_config->stream_alerts);
     json_object_object_add(obj, "updates", tmp);
 
-    tmp = json_object_new_int(wc->checkpoint_count);
+    tmp = json_object_new_int(aclk_host_config->checkpoint_count);
     json_object_object_add(obj, "checkpoint-count", tmp);
 
-    tmp = json_object_new_int(wc->alert_count);
+    tmp = json_object_new_int(aclk_host_config->alert_count);
     json_object_object_add(obj, "alert-count", tmp);
 
-    tmp = json_object_new_int(wc->snapshot_count);
+    tmp = json_object_new_int(aclk_host_config->snapshot_count);
     json_object_object_add(obj, "alert-snapshot-count", tmp);
-    tmp = json_object_new_int64(calculate_node_alert_version(wc->host));
+    tmp = json_object_new_int64(calculate_node_alert_version(aclk_host_config->host));
     json_object_object_add(obj, "alert-version", tmp);
 }
 
@@ -1296,11 +1301,4 @@ void add_aclk_host_labels(void) {
     rrdlabels_add(labels, "_mqtt_version", "5", RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_aclk_proxy", proxy_str, RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_aclk_ng_new_cloud_protocol", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
-}
-
-void aclk_queue_node_info(RRDHOST *host, bool immediate)
-{
-    struct aclk_sync_cfg_t *wc = host->aclk_config;
-    if (wc)
-        wc->node_info_send_time = (host == localhost || immediate) ? 1 : now_realtime_sec();
 }

@@ -128,3 +128,14 @@ int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, i
 
     return err;
 }
+
+void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused)
+{
+    // Only close handles that aren't already closing
+    if (!uv_is_closing(handle)) {
+        if (handle->type == UV_TIMER) {
+            uv_timer_stop((uv_timer_t *)handle);
+        }
+        uv_close(handle, NULL);
+    }
+}

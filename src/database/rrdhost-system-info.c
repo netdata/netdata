@@ -240,6 +240,10 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
 
     if (system_info->prebuilt_dist)
         rrdlabels_add(labels, "_prebuilt_dist", system_info->prebuilt_dist, RRDLABEL_SRC_AUTO);
+
+    rrdlabels_add(labels, "_hw_sys_vendor", daemon_status_file_get_sys_vendor(), RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_hw_product_name", daemon_status_file_get_product_name(), RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_hw_product_type", daemon_status_file_get_product_type(), RRDLABEL_SRC_AUTO);
 }
 
 int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
@@ -619,13 +623,14 @@ void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_
     }
 }
 
-void get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
-    if(ds->read_system_info) return;
+bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
+    if(ds->read_system_info)
+        return false;
 
     struct rrdhost_system_info *ri = (localhost && localhost->system_info) ? localhost->system_info : NULL;
     if(!ri) {
         // nothing we can do, let it be
-        return;
+        return false;
     }
 
     if(ri->architecture)
@@ -659,14 +664,16 @@ void get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
             ds->kubernetes = false;
     }
 
-    if(ri->cloud_provider_type && strcmp(ri->cloud_provider_type, "unknown") != 0)
+    if(ri->cloud_provider_type && strcasecmp(ri->cloud_provider_type, "unknown") != 0)
         strncpyz(ds->cloud_provider_type, ri->cloud_provider_type, sizeof(ds->cloud_provider_type) - 1);
 
-    if(ri->cloud_instance_type && strcmp(ri->cloud_instance_type, "unknown") != 0)
+    if(ri->cloud_instance_type && strcasecmp(ri->cloud_instance_type, "unknown") != 0)
         strncpyz(ds->cloud_instance_type, ri->cloud_instance_type, sizeof(ds->cloud_instance_type) - 1);
 
-    if(ri->cloud_instance_region && strcmp(ri->cloud_instance_region, "unknown") != 0)
+    if(ri->cloud_instance_region && strcasecmp(ri->cloud_instance_region, "unknown") != 0)
         strncpyz(ds->cloud_instance_region, ri->cloud_instance_region, sizeof(ds->cloud_instance_region) - 1);
 
     ds->read_system_info = true;
+
+    return true;
 }

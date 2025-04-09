@@ -161,6 +161,10 @@ void nd_sentry_init(void) {
     nd_sentry_set_tag("cloud_type", daemon_status_file_get_cloud_instance_type());
     nd_sentry_set_tag("cloud_region", daemon_status_file_get_cloud_instance_region());
     nd_sentry_set_tag("timezone", daemon_status_file_get_timezone());
+    
+    nd_sentry_set_tag("hw_sys_vendor", daemon_status_file_get_sys_vendor());
+    nd_sentry_set_tag("hw_product_name", daemon_status_file_get_product_name());
+    nd_sentry_set_tag("hw_product_type", daemon_status_file_get_product_type());
 
     // profile
     CLEAN_BUFFER *profile = buffer_create(0, NULL);

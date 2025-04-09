@@ -123,7 +123,7 @@ void nd_profile_setup(void) {
         nd_profile.malloc_arenas = 4;
         nd_profile.malloc_trim = 128 * 1024;
         nd_profile.stream_sender_compression = ND_COMPRESSION_FASTEST;
-        nd_profile.dbengine_journal_v2_unmount_time = 0;
+        nd_profile.dbengine_journal_v2_unmount_time = 600;
         nd_profile.max_page_size = 2 * 1024 * 1024; // 2MB for THP
         nd_profile.ml_enabled = CONFIG_BOOLEAN_AUTO;
         // web server threads = dynamic

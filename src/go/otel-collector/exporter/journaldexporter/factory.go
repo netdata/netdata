@@ -25,7 +25,8 @@ func createDefaultConfig() component.Config {
 }
 
 func createLogsExporter(ctx context.Context, set exporter.Settings, cfg component.Config) (exporter.Logs, error) {
-	exp := newMyExporter()
+	exp := newJournaldExporter(cfg, set.Logger)
+
 	return exporterhelper.NewLogs(
 		ctx,
 		set,
