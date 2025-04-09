@@ -332,7 +332,7 @@ const char *aclk_topic_cache_iterate(size_t *iter)
  *
  */
 
-unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, unsigned long int max) {
+unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min_s, unsigned long int max_s) {
     static int attempt = -1;
 
     if (reset) {
@@ -350,11 +350,11 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, un
 
     delay += (os_random32() % (MAX(1000, delay/2)));
 
-    if (delay <= min * MSEC_PER_SEC)
-        return min;
+    if (delay <= min_s * MSEC_PER_SEC)
+        return min_s * MSEC_PER_SEC;
 
-    if (delay >= max * MSEC_PER_SEC)
-        return max;
+    if (delay >= max_s * MSEC_PER_SEC)
+        return max_s * MSEC_PER_SEC;
 
     return delay;
 }
