@@ -1001,7 +1001,7 @@ static bool send_job_to_worker(struct health_config_s *config, struct job_list_t
     job->running++;
 
     host_health->job_running = true;
-    nd_log_daemon(NDLP_INFO, "HEALTH: Running job %d for %s", job->job_type, rrdhost_hostname(host));
+    nd_log_daemon(NDLP_INFO, "HEALTH: Running job %u for %s", job->job_type, rrdhost_hostname(host));
     internal_fatal(job->job_type >= HEALTH_JOB_MAX, "Invalid job type %d", job->job_type);
     int rc = uv_queue_work(&config->loop, &data->request, job_functions[job->job_type].work_cb, job_functions[job->job_type].after_work_cb);
     if (rc) {

@@ -324,10 +324,7 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     ALARM_ENTRY *ae = host->health_log.alarms;
     while(ae) {
         // Check if entry is old enough to be deleted
-        if(ae->when < now - retention &&
-           (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) && // Only remove entries that have been processed/updated
-           __atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED) == 0) { // Only remove entries not pending save
-
+        if (ae->when < now - retention && (ae->flags & HEALTH_ENTRY_FLAG_UPDATED)) {
             // Remove from linked list
             ALARM_ENTRY *next = ae->next;
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
