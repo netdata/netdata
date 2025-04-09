@@ -33,7 +33,9 @@ const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 const char *nd_log_method_for_external_plugins(const char *s);
 ND_UUID nd_log_get_invocation_id(void);
 
+#define STACK_TRACE_INFO_PREFIX "info: "
 void capture_stack_trace(BUFFER *wb);
+
 void capture_stack_trace_init(void);
 void capture_stack_trace_flush(void);
 bool capture_stack_trace_available(void);
