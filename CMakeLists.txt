@@ -164,6 +164,11 @@ mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # High-level features
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
+
+if(ENABLE_ML)
+  set(NETDATA_DLIB_SOURCE_DIR "" CACHE PATH "Path to local dlib sources for building ML code")
+endif()
+
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 option(ENABLE_DASHBOARD "Enable local dashboard" True)
 mark_as_advanced(ENABLE_DASHBOARD)
