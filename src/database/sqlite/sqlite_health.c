@@ -23,7 +23,7 @@
             NULL;                                                                                                      \
     })
 
-Pvoid_t id_JudyL;
+Pvoid_t id_JudyL = (Pvoid_t)NULL;
 SPINLOCK id_spinlock = SPINLOCK_INITIALIZER;
 
 #define DB_HEALTH_VERSION 1
@@ -117,7 +117,7 @@ static int get_id_from_JudyL(STRING *key)
     int id = 0;
     spinlock_lock(&id_spinlock);
     Pvoid_t *Pvalue = JudyLGet(&id_JudyL, (Word_t)key, PJE0);
-    if (Pvalue)
+    if (Pvalue != PJERR && Pvalue && *Pvalue)
         id = *(int *)Pvalue;
     spinlock_unlock(&id_spinlock);
     return id;
