@@ -122,6 +122,9 @@ static void windows_main_cleanup(void *pptr)
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
+    // Cleanup registry resources
+    PerflibNamesRegistryCleanup();
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
     worker_unregister();
