@@ -1050,14 +1050,23 @@ static enum crash_report_t check_crash_reports_config(void) {
     return rc;
 }
 
+// Loads the latest status file from any available location
+bool daemon_status_file_load_latest(DAEMON_STATUS_FILE *ds) {
+    if (!ds)
+        return false;
+
+    // Load the latest status file using status_file_io_load
+    return status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, ds);
+}
+
 void daemon_status_file_init(void) {
     static_save_buffer_init();
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
-    status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status);
+    // Load the latest status file
+    daemon_status_file_load_latest(&last_session_status);
 
     // fill missing information on older versions of the status file
-
     if(last_session_status.v <= 26)
         fill_dmi_info(&last_session_status);
     
@@ -1693,4 +1702,41 @@ ND_MACHINE_GUID daemon_status_file_get_host_id(void) {
 
 size_t daemon_status_file_get_fatal_worker_job_id(void) {
     return session_status.fatal.worker_job_id;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Parent process update function
+
+void daemon_status_file_parent_update(SIGNAL_CODE signal_code, EXIT_REASON exit_reason, const char *fatal_function) {
+    // Load the current status file using our centralized loading function
+    DAEMON_STATUS_FILE ds = {0};
+    
+    if (daemon_status_file_load_latest(&ds)) {
+        // Check if we need to update the status file
+        if (ds.status != DAEMON_STATUS_EXITED) {
+            // Update the status to indicate the process has exited
+            ds.status = DAEMON_STATUS_EXITED;
+            
+            // Update exit reason
+            ds.exit_reason |= exit_reason;
+            
+            // Update the fatal function field if it's empty or was in shutdown
+            if (fatal_function && (ds.fatal.function[0] == '\0' ||
+                                   strncmp(ds.fatal.function, "startup(", 8) == 0 ||
+                                   strncmp(ds.fatal.function, "shutdown(", 9) == 0)) {
+                safecpy(ds.fatal.function, fatal_function);
+            }
+            
+            // Set signal code if provided
+            if (signal_code)
+                ds.fatal.signal_code = signal_code;
+            
+            // Update the timestamp
+            ds.timestamp_ut = now_realtime_usec();
+            
+            // Save the updated status file
+            CLEAN_BUFFER *wb = buffer_create(16384, NULL);
+            daemon_status_file_save(wb, &ds, false);
+        }
+    }
 }

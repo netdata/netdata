@@ -145,6 +145,9 @@ void daemon_status_file_check_crash(void);
 bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds);
 bool daemon_status_file_was_incomplete_shutdown(void);
 
+// update the status file from the parent process when netdata exits abnormally
+void daemon_status_file_parent_update(SIGNAL_CODE signal_code, EXIT_REASON exit_reason, const char *fatal_function);
+
 void daemon_status_file_startup_step(const char *step);
 void daemon_status_file_shutdown_step(const char *step);
 void daemon_status_file_shutdown_timeout(BUFFER *trace);

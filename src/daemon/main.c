@@ -3,6 +3,7 @@
 #include "common.h"
 #include "buildinfo.h"
 #include "daemon-shutdown-watcher.h"
+#include "daemon-parent.h"
 #include "status-file.h"
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
@@ -787,6 +788,18 @@ int netdata_main(int argc, char **argv) {
     nd_log_register_fatal_hook_cb(daemon_status_file_register_fatal);
     nd_log_register_fatal_final_cb(fatal_status_file_save);
     exit_initiated_init();
+
+#if !defined(FSANITIZE_ADDRESS) && !defined(OS_WINDOWS) && !defined(RUN_UNDER_CLION)
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("parent watcher");
+
+    // Start the parent process to monitor netdata
+    // This returns 0 for the child (netdata) process, and doesn't return for the parent
+    // If it fails, the function will handle the error and return 0 to continue without parent
+
+    if(dont_fork)
+        daemon_parent_start(argc, argv);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("signals");
