@@ -89,13 +89,14 @@ static inline void protected_access_end(volatile int *ptr __maybe_unused) {
 
 #define PROTECTED_ACCESS_END() protected_access_end(NULL);
 
-#define PROTECTED_ACCESS_SETUP(start, size, resource, op)                           \
-    PROTECTED_ACCESS_AUTO_CLEANUP();                                                \
-    bool no_signal_received = PROTECTED_ACCESS_START(start, size, resource, op);    \
-    if (!no_signal_received) {                                                      \
-        char __pa_error_buf[1024];                                                  \
-        protected_access_format_error(__pa_error_buf, sizeof(__pa_error_buf));      \
-        nd_log(NDLS_DAEMON, NDLP_ERR, "%s", __pa_error_buf);                        \
+#define PROTECTED_ACCESS_SETUP(start, size, resource, op)                                                              \
+    PROTECTED_ACCESS_AUTO_CLEANUP();                                                                                   \
+    bool no_signal_received = PROTECTED_ACCESS_START(start, size, resource, op);                                       \
+    if (!no_signal_received) {                                                                                         \
+        char __pa_error_buf[1024];                                                                                     \
+        protected_access_format_error(__pa_error_buf, sizeof(__pa_error_buf));                                         \
+        nd_log_limit_static_thread_var(_erl, 10, 0);                                                                   \
+        nd_log_limit(&_erl, NDLS_DAEMON, NDLP_ERR, "%s", __pa_error_buf);                                              \
     }
 
 void signal_protected_access_check(int sig, siginfo_t *si, void *context);
