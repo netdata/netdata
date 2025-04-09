@@ -156,7 +156,9 @@ func TestCollector_Charts(t *testing.T) {
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
 				collr := New()
 				collr.Config = prepareV2Config()
-				//setMockClientSysObjectidExpect(m)
+				if collr.enableProfiles {
+					setMockClientSysObjectidExpect(m)
+				}
 				setMockClientSysExpect(m)
 				setMockClientIfMibExpect(m)
 
@@ -206,7 +208,9 @@ func TestCollector_Check(t *testing.T) {
 			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
 				collr := New()
 				collr.Config = prepareV2Config()
-				//setMockClientSysObjectidExpect(m)
+				if collr.enableProfiles {
+					setMockClientSysObjectidExpect(m)
+				}
 				setMockClientIfMibExpect(m)
 
 				return collr
@@ -219,7 +223,9 @@ func TestCollector_Check(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
 
-				//setMockClientSysObjectidExpect(m)
+				if collr.enableProfiles {
+					setMockClientSysObjectidExpect(m)
+				}
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -243,7 +249,9 @@ func TestCollector_Check(t *testing.T) {
 				collr := New()
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
-				//setMockClientSysObjectidExpect(m)
+				if collr.enableProfiles {
+					setMockClientSysObjectidExpect(m)
+				}
 				m.EXPECT().Get(gomock.Any()).Return(nil, errors.New("mock Get() error")).Times(1)
 
 				return collr
@@ -283,7 +291,9 @@ func TestCollector_Collect(t *testing.T) {
 				collr := New()
 				collr.Config = prepareV2Config()
 
-				//setMockClientSysObjectidExpect(m)
+				if collr.enableProfiles {
+					setMockClientSysObjectidExpect(m)
+				}
 				setMockClientIfMibExpect(m)
 
 				return collr
@@ -387,7 +397,9 @@ func TestCollector_Collect(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
 
-				//setMockClientSysObjectidExpect(m)
+				if collr.enableProfiles {
+					setMockClientSysObjectidExpect(m)
+				}
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -423,7 +435,9 @@ func TestCollector_Collect(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
 				collr.collectIfMib = false
 
-				//setMockClientSysObjectidExpect(m)
+				if collr.enableProfiles {
+					setMockClientSysObjectidExpect(m)
+				}
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -452,7 +466,9 @@ func TestCollector_Collect(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
 				collr.collectIfMib = false
 
-				//setMockClientSysObjectidExpect(m)
+				if collr.enableProfiles {
+					setMockClientSysObjectidExpect(m)
+				}
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -488,6 +504,10 @@ func TestCollector_Collect(t *testing.T) {
 			require.NoError(t, collr.Init(context.Background()))
 
 			mx := collr.Collect(context.Background())
+
+			if collr.enableProfiles {
+				mx["TestMetric"] = 1
+			}
 
 			assert.Equal(t, test.wantCollected, mx)
 		})
