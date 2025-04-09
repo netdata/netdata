@@ -74,10 +74,10 @@ static struct aclk_database_cmd aclk_database_deq_cmd(void)
     return ret;
 }
 
-static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
+static bool aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
 {
     if(unlikely(!__atomic_load_n(&aclk_sync_config.initialized, __ATOMIC_RELAXED)))
-        return;
+        return false;
 
     struct aclk_database_cmd *t = aral_mallocz(aclk_sync_config.ar);
     *t = *cmd;
@@ -88,6 +88,7 @@ static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
     spinlock_unlock(&aclk_sync_config.cmd_queue_lock);
 
     (void) uv_async_send(&aclk_sync_config.async);
+    return true;
 }
 
 enum {
@@ -1047,22 +1048,24 @@ void aclk_synchronization_init(void)
     nd_log_daemon(NDLP_INFO, "ACLK sync initialization completed");
 }
 
-static inline void queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const void *param0, const void *param1)
+static inline bool queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const void *param0, const void *param1)
 {
     struct aclk_database_cmd cmd;
     cmd.opcode = opcode;
     cmd.param[0] = (void *) param0;
     cmd.param[1] = (void *) param1;
-    aclk_database_enq_cmd(&cmd);
+    return aclk_database_enq_cmd(&cmd);
 }
 
 void aclk_synchronization_shutdown(void)
 {
     // Send shutdown command, not that the completion is initialized
     // on init and still valid
-    queue_aclk_sync_cmd(ACLK_SYNC_SHUTDOWN, NULL, NULL);
+    aclk_mqtt_client_reset();
 
-    completion_wait_for(&aclk_sync_config.start_stop_complete);
+    if (queue_aclk_sync_cmd(ACLK_SYNC_SHUTDOWN, NULL, NULL))
+        completion_wait_for(&aclk_sync_config.start_stop_complete);
+
     completion_destroy(&aclk_sync_config.start_stop_complete);
     int rc = uv_thread_join(&aclk_sync_config.thread);
     if (rc)
@@ -1085,7 +1088,7 @@ void aclk_execute_query(aclk_query_t query)
     if (unlikely(!query))
         return;
 
-    queue_aclk_sync_cmd(ACLK_QUERY_EXECUTE, query, NULL);
+    (void) queue_aclk_sync_cmd(ACLK_QUERY_EXECUTE, query, NULL);
 }
 
 void aclk_add_job(aclk_query_t query)
@@ -1093,12 +1096,12 @@ void aclk_add_job(aclk_query_t query)
     if (unlikely(!query))
         return;
 
-    queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
+    (void) queue_aclk_sync_cmd(ACLK_QUERY_BATCH_ADD, query, NULL);
 }
 
 void aclk_mqtt_client_set(mqtt_wss_client client)
 {
-    queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT_SET, client, NULL);
+    (void) queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT_SET, client, NULL);
 }
 
 void aclk_mqtt_client_reset()
@@ -1108,8 +1111,8 @@ void aclk_mqtt_client_reset()
 
     struct completion compl;
     completion_init(&compl);
-    queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT_RESET, &compl, NULL);
-    completion_wait_for(&compl);
+    if (queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT_RESET, &compl, NULL))
+        completion_wait_for(&compl);
     completion_destroy(&compl);
 }
 
@@ -1118,14 +1121,15 @@ void schedule_node_state_update(RRDHOST *host, uint64_t delay)
     if (unlikely(!host))
         return;
 
-    queue_aclk_sync_cmd(ACLK_DATABASE_NODE_STATE, host, (void *)(uintptr_t)delay);
+    (void) queue_aclk_sync_cmd(ACLK_DATABASE_NODE_STATE, host, (void *)(uintptr_t)delay);
 }
 
 void unregister_node(const char *machine_guid)
 {
     if (unlikely(!machine_guid))
         return;
-    queue_aclk_sync_cmd(ACLK_DATABASE_NODE_UNREGISTER, strdupz(machine_guid), NULL);
+
+    (void) queue_aclk_sync_cmd(ACLK_DATABASE_NODE_UNREGISTER, strdupz(machine_guid), NULL);
 }
 
 void destroy_aclk_config(RRDHOST *host)
@@ -1141,8 +1145,8 @@ void destroy_aclk_config(RRDHOST *host)
         struct completion compl;
         completion_init(&compl);
 
-        queue_aclk_sync_cmd(ACLK_CANCEL_NODE_UPDATE_TIMER, (void *)host, (void *)&compl);
-        completion_wait_for(&compl);
+        if (queue_aclk_sync_cmd(ACLK_CANCEL_NODE_UPDATE_TIMER, (void *)host, (void *)&compl))
+            completion_wait_for(&compl);
         completion_destroy(&compl);
     }
 
@@ -1152,5 +1156,5 @@ void destroy_aclk_config(RRDHOST *host)
 
 void aclk_queue_node_info(RRDHOST *host, bool immediate)
 {
-    queue_aclk_sync_cmd(ACLK_QUEUE_NODE_INFO, (void *)host, (void *)(uintptr_t)immediate);
+    (void) queue_aclk_sync_cmd(ACLK_QUEUE_NODE_INFO, (void *)host, (void *)(uintptr_t)immediate);
 }
