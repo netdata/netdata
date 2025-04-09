@@ -328,9 +328,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_shutdown_end();
     watcher_thread_stop();
 
-    daemon_status_file_shutdown_step(NULL);
-    daemon_status_file_update_status(DAEMON_STATUS_EXITED);
-
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\n");
 

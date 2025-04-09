@@ -149,7 +149,7 @@ bool daemon_status_file_was_incomplete_shutdown(void);
 void daemon_status_file_parent_update(SIGNAL_CODE signal_code, EXIT_REASON exit_reason, const char *fatal_function);
 
 void daemon_status_file_startup_step(const char *step);
-void daemon_status_file_shutdown_step(const char *step);
+void daemon_status_file_shutdown_step(const char *step, const char *step_timings);
 void daemon_status_file_shutdown_timeout(BUFFER *trace);
 
 void daemon_status_file_init(void);
