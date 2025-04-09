@@ -622,15 +622,6 @@ static void node_update_timer_cb(uv_timer_t *handle)
         uv_timer_stop(&aclk_host_config->timer);
 }
 
-static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
-{
-    if (handle->type == UV_TIMER) {
-        uv_timer_stop((uv_timer_t *)handle);
-    }
-
-    uv_close(handle, NULL);  // Automatically close and free the handle
-}
-
 static void after_start_alert_push_for_host(uv_work_t *req, int status __maybe_unused)
 {
     struct worker_data *data = req->data;

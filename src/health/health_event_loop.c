@@ -1090,14 +1090,6 @@ static void schedule_job_to_run(struct health_config_s *config, health_job_type_
 
 // HEALTH CLEANUP
 
-static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
-{
-    if (handle->type == UV_TIMER) {
-        uv_timer_stop((uv_timer_t *)handle);
-    }
-    uv_close(handle, NULL);  // Automatically close and free the handle
-}
-
 static void host_health_timer_cb(uv_timer_t *handle)
 {
     RRDHOST *host = handle->data;
@@ -1147,7 +1139,9 @@ static void health_ev_loop(void *arg)
 
     fatal_assert(0 == uv_timer_start(&config->timer_req, timer_cb, TIMER_INITIAL_PERIOD_MS, TIMER_REPEAT_PERIOD_MS));
 
-    int max_thread_count = netdata_conf_health_threads();
+    int max_thread_count = netdata_conf_cpus() / 6;
+    if (max_thread_count < 6)
+        max_thread_count = 6;
     int maint_max_thread_count = (max_thread_count * 25 / 100);
     if (maint_max_thread_count < 1)
         maint_max_thread_count = 1;
@@ -1313,9 +1307,7 @@ static void health_ev_loop(void *arg)
         uv_close((uv_handle_t *)&config->timer_req, NULL);
 
     uv_close((uv_handle_t *)&config->async, NULL);
-    uv_run(loop, UV_RUN_NOWAIT);
-
-    uv_walk(loop, (uv_walk_cb) close_callback, NULL);
+    uv_walk(loop, libuv_close_callback, NULL);
     uv_run(loop, UV_RUN_NOWAIT);
 
     (void) uv_loop_close(loop);
