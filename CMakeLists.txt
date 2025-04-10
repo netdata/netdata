@@ -984,6 +984,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setproctitle.h
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
+        src/libnetdata/stacktrace/stacktrace.c
+        src/libnetdata/stacktrace/stacktrace.h
         src/libnetdata/json/json-c-parser-inline.c
         src/libnetdata/parsers/duration.h
         src/libnetdata/parsers/timeframe.c
@@ -1064,7 +1066,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/benchmark.h
         src/libnetdata/locks/benchmark-rw.c
         src/libnetdata/locks/benchmark-rw.h
-        src/libnetdata/log/nd_log-stacktrace.c
         src/libnetdata/memory/nd-mallocz.c
         src/libnetdata/memory/nd-mallocz.h
         src/libnetdata/memory/nd-mmap.c

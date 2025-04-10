@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "nd_log-internals.h"
+#include "stacktrace.h"
+#include "../libjudy/judyl-typed.h"
 
 bool nd_log_forked = false;
 
@@ -108,6 +109,41 @@ static inline void keep_first_root_cause_function(const char *function) {
         return;
 
     strncpyz(root_cause_function, function, sizeof(root_cause_function) - 1);
+}
+
+// Define the stacktrace structure
+struct stacktrace {
+    uint64_t hash;          // Hash of the stack trace
+    char *text;             // Text representation (cached, lazy-initialized)
+    int frame_count;        // Number of frames
+    void *frames[1];        // Variable-length array of frame pointers
+};
+
+// Stacktrace cache using JudyL
+DEFINE_JUDYL_TYPED(STACKTRACE, struct stacktrace *);
+static STACKTRACE_JudyLSet stacktrace_cache;
+static SPINLOCK stacktrace_lock = SPINLOCK_INITIALIZER;
+static bool cache_initialized = false;
+
+// Initialize the stacktrace cache
+static void init_stacktrace_cache(void) {
+    if (cache_initialized)
+        return;
+
+    spinlock_lock(&stacktrace_lock);
+    if (!cache_initialized) {
+        STACKTRACE_INIT(&stacktrace_cache);
+        cache_initialized = true;
+    }
+    spinlock_unlock(&stacktrace_lock);
+}
+
+// Allocate a new stacktrace structure with the given number of frames
+static struct stacktrace *stacktrace_create(int num_frames) {
+    size_t size = sizeof(struct stacktrace) + ((num_frames - 1) * sizeof(void *));
+    struct stacktrace *trace = callocz(1, size);
+    trace->frame_count = num_frames;
+    return trace;
 }
 
 #if defined(HAVE_LIBBACKTRACE)
@@ -276,6 +312,8 @@ void capture_stack_trace_init(void) {
                                                  NULL, // We'll handle errors in bt_full_handler
                                                  NULL);
     }
+    
+    init_stacktrace_cache();
 }
 
 void capture_stack_trace_flush(void) {
@@ -322,6 +360,152 @@ void capture_stack_trace(BUFFER *wb) {
     }
 }
 
+// For collecting raw frames
+typedef struct {
+    void **frames;
+    int max_frames;
+    int num_frames;
+    int skip_frames;
+} collect_frames_data_t;
+
+// Simple callback for collecting PC addresses
+static int bt_collect_frames_callback(void *data, uintptr_t pc) {
+    collect_frames_data_t *cf_data = (collect_frames_data_t *)data;
+    
+    // Skip frames at the top of the stack
+    if (cf_data->skip_frames > 0) {
+        cf_data->skip_frames--;
+        return 0;
+    }
+    
+    if (cf_data->num_frames < cf_data->max_frames) {
+        cf_data->frames[cf_data->num_frames++] = (void *)pc;
+    }
+    
+    return 0;
+}
+
+// New function to get the current stacktrace
+STACKTRACE stacktrace_get(void) {
+    if (!backtrace_state || !BACKTRACE_SUPPORTED)
+        return NULL;
+    
+    init_stacktrace_cache();
+    
+    // Collect up to 50 frames
+    void *frames[50] = {0};
+    collect_frames_data_t data = {
+        .frames = frames,
+        .max_frames = 50,
+        .num_frames = 0,
+        .skip_frames = 1  // Skip stacktrace_get itself
+    };
+    
+    backtrace_simple(backtrace_state, 0, bt_collect_frames_callback, bt_error_handler, &data);
+    
+    if (data.num_frames == 0)
+        return NULL;
+    
+    // Calculate hash
+    uint64_t hash = XXH3_64bits(frames, data.num_frames * sizeof(void *));
+    
+    // Look up in cache first
+    spinlock_lock(&stacktrace_lock);
+    
+    struct stacktrace *trace = STACKTRACE_GET(&stacktrace_cache, hash);
+    
+    // If existing trace found, verify it's the same frames
+    // This handles hash collisions
+    if (trace) {
+        if (trace->frame_count != data.num_frames || 
+            memcmp(trace->frames, frames, data.num_frames * sizeof(void *)) != 0) {
+            // Hash collision - use linear probing
+            int i = 1;
+            uint64_t new_hash = hash;
+            do {
+                new_hash = hash + i;
+                trace = STACKTRACE_GET(&stacktrace_cache, new_hash);
+                
+                if (!trace || 
+                    (trace->frame_count == data.num_frames && 
+                     memcmp(trace->frames, frames, data.num_frames * sizeof(void *)) == 0)) {
+                    break; // Either found a match or empty slot
+                }
+                i++;
+            } while (i < 10);  // Limit search to avoid infinite loops
+            
+            hash = new_hash;
+        }
+    }
+    
+    // If not found or hash collision, create new entry
+    if (!trace) {
+        trace = stacktrace_create(data.num_frames);
+        trace->hash = hash;
+        memcpy(trace->frames, frames, data.num_frames * sizeof(void *));
+        STACKTRACE_SET(&stacktrace_cache, hash, trace);
+    }
+    
+    spinlock_unlock(&stacktrace_lock);
+    
+    return trace;
+}
+
+// Convert stacktrace to buffer
+void stacktrace_to_buffer(STACKTRACE trace, BUFFER *wb) {
+    if (!trace || !wb) {
+        if (wb)
+            buffer_strcat(wb, NO_STACK_TRACE_PREFIX "invalid stacktrace");
+        return;
+    }
+    
+    struct stacktrace *st = (struct stacktrace *)trace;
+    
+    // If we already have cached text representation, use it
+    if (st->text) {
+        buffer_strcat(wb, st->text);
+        return;
+    }
+    
+    // Resolve each frame
+    backtrace_data_t bt_data = {
+        .wb = wb,
+        .frame_count = 0,
+        .first_frame = true,
+        .found_signal_handler = false
+    };
+    
+    for (int i = 0; i < st->frame_count; i++) {
+        backtrace_pcinfo(
+            backtrace_state,
+            (uintptr_t)st->frames[i],
+            bt_full_handler,
+            bt_error_handler,
+            &bt_data
+        );
+    }
+    
+    // If we couldn't resolve any frames, use addresses
+    if (bt_data.frame_count == 0) {
+        for (int i = 0; i < st->frame_count; i++) {
+            if (i > 0)
+                buffer_putc(wb, '\n');
+                
+            buffer_putc(wb, '#');
+            buffer_print_uint64(wb, i);
+            buffer_strcat(wb, " <unknown> [");
+            buffer_print_uint64_hex(wb, (uint64_t)st->frames[i]);
+            buffer_putc(wb, ']');
+        }
+    }
+    
+    // Cache the text representation
+    spinlock_lock(&stacktrace_lock);
+    if (!st->text)
+        st->text = strdupz(buffer_tostring(wb));
+    spinlock_unlock(&stacktrace_lock);
+}
+
 #elif defined(HAVE_LIBUNWIND)
 #if !defined(STATIC_BUILD)
 #define UNW_LOCAL_ONLY
@@ -334,6 +518,7 @@ const char *capture_stack_trace_backend(void) {
 
 void capture_stack_trace_init(void) {
     unw_set_caching_policy(unw_local_addr_space, UNW_CACHE_NONE);
+    init_stacktrace_cache();
 }
 
 void capture_stack_trace_flush(void) {
@@ -422,6 +607,142 @@ void capture_stack_trace(BUFFER *wb) {
         buffer_strcat(wb, NO_STACK_TRACE_PREFIX "libunwind reports no frames");
 }
 
+// Collect frames using libunwind
+static int collect_frames_libunwind(void **frames, int max_frames, int skip) {
+    unw_cursor_t cursor;
+    unw_context_t context;
+    int frame_count = 0;
+    
+    unw_getcontext(&context);
+    unw_init_local(&cursor, &context);
+    
+    // Skip initial frames
+    for (int i = 0; i < skip && unw_step(&cursor) > 0; i++);
+    
+    // Collect frames
+    while (frame_count < max_frames && unw_step(&cursor) > 0) {
+        unw_word_t pc;
+        unw_get_reg(&cursor, UNW_REG_IP, &pc);
+        if (!pc)
+            break;
+            
+        frames[frame_count++] = (void *)pc;
+    }
+    
+    return frame_count;
+}
+
+// New function to get the current stacktrace
+STACKTRACE stacktrace_get(void) {
+    init_stacktrace_cache();
+    
+    // Collect up to 50 frames
+    void *frames[50] = {0};
+    int num_frames = collect_frames_libunwind(frames, 50, 1); // Skip stacktrace_get itself
+    
+    if (num_frames == 0)
+        return NULL;
+    
+    // Calculate hash
+    uint64_t hash = XXH3_64bits(frames, num_frames * sizeof(void *));
+    
+    // Look up in cache first
+    spinlock_lock(&stacktrace_lock);
+    
+    struct stacktrace *trace = STACKTRACE_GET(&stacktrace_cache, hash);
+    
+    // If existing trace found, verify it's the same frames
+    // This handles hash collisions
+    if (trace) {
+        if (trace->frame_count != num_frames || 
+            memcmp(trace->frames, frames, num_frames * sizeof(void *)) != 0) {
+            // Hash collision - use linear probing
+            int i = 1;
+            uint64_t new_hash = hash;
+            do {
+                new_hash = hash + i;
+                trace = STACKTRACE_GET(&stacktrace_cache, new_hash);
+                
+                if (!trace || 
+                    (trace->frame_count == num_frames && 
+                     memcmp(trace->frames, frames, num_frames * sizeof(void *)) == 0)) {
+                    break; // Either found a match or empty slot
+                }
+                i++;
+            } while (i < 10);  // Limit search to avoid infinite loops
+            
+            hash = new_hash;
+        }
+    }
+    
+    // If not found or hash collision, create new entry
+    if (!trace) {
+        trace = stacktrace_create(num_frames);
+        trace->hash = hash;
+        memcpy(trace->frames, frames, num_frames * sizeof(void *));
+        STACKTRACE_SET(&stacktrace_cache, hash, trace);
+    }
+    
+    spinlock_unlock(&stacktrace_lock);
+    
+    return trace;
+}
+
+// Convert stacktrace to buffer
+void stacktrace_to_buffer(STACKTRACE trace, BUFFER *wb) {
+    if (!trace || !wb) {
+        if (wb)
+            buffer_strcat(wb, NO_STACK_TRACE_PREFIX "invalid stacktrace");
+        return;
+    }
+    
+    struct stacktrace *st = (struct stacktrace *)trace;
+    
+    // If we already have cached text representation, use it
+    if (st->text) {
+        buffer_strcat(wb, st->text);
+        return;
+    }
+    
+    // Format each frame
+    for (int i = 0; i < st->frame_count; i++) {
+        if (i > 0)
+            buffer_putc(wb, '\n');
+            
+        buffer_putc(wb, '#');
+        buffer_print_uint64(wb, i);
+        buffer_putc(wb, ' ');
+        
+        // Try to resolve symbol name
+        unw_cursor_t cursor;
+        unw_context_t context;
+        char sym[256] = "<unknown>";
+        unw_word_t offset = 0;
+        
+        // We don't have the context anymore, so do the best we can
+        // Try to resolve the address to a symbol name
+        if (dladdr(st->frames[i], (Dl_info *)sym) == 0) {
+            buffer_strcat(wb, "<unknown>");
+        } else {
+            Dl_info *info = (Dl_info *)sym;
+            if (info->dli_sname)
+                buffer_strcat(wb, info->dli_sname);
+            else
+                buffer_strcat(wb, "<unknown>");
+        }
+        
+        buffer_strcat(wb, " [");
+        buffer_print_uint64_hex(wb, (uint64_t)st->frames[i]);
+        buffer_putc(wb, ']');
+    }
+    
+    // Cache the text representation
+    spinlock_lock(&stacktrace_lock);
+    if (!st->text)
+        st->text = strdupz(buffer_tostring(wb));
+    spinlock_unlock(&stacktrace_lock);
+}
+
 #elif defined(HAVE_BACKTRACE)
 
 const char *capture_stack_trace_backend(void) {
@@ -433,7 +754,7 @@ bool capture_stack_trace_available(void) {
 }
 
 void capture_stack_trace_init(void) {
-    ;
+    init_stacktrace_cache();
 }
 
 void capture_stack_trace_flush(void) {
@@ -500,6 +821,132 @@ void capture_stack_trace(BUFFER *wb) {
     free(messages);
 }
 
+// New function to get the current stacktrace
+STACKTRACE stacktrace_get(void) {
+    init_stacktrace_cache();
+    
+    // Collect stack trace
+    void *array[50];
+    int size = backtrace(array, _countof(array));
+    
+    if (size <= 1) // Skip at least stacktrace_get itself
+        return NULL;
+    
+    // Skip the first frame (stacktrace_get)
+    void **frames = array + 1;
+    int num_frames = size - 1;
+    
+    // Calculate hash
+    uint64_t hash = XXH3_64bits(frames, num_frames * sizeof(void *));
+    
+    // Look up in cache first
+    spinlock_lock(&stacktrace_lock);
+    
+    struct stacktrace *trace = STACKTRACE_GET(&stacktrace_cache, hash);
+    
+    // If existing trace found, verify it's the same frames
+    // This handles hash collisions
+    if (trace) {
+        if (trace->frame_count != num_frames || 
+            memcmp(trace->frames, frames, num_frames * sizeof(void *)) != 0) {
+            // Hash collision - use linear probing
+            int i = 1;
+            uint64_t new_hash = hash;
+            do {
+                new_hash = hash + i;
+                trace = STACKTRACE_GET(&stacktrace_cache, new_hash);
+                
+                if (!trace || 
+                    (trace->frame_count == num_frames && 
+                     memcmp(trace->frames, frames, num_frames * sizeof(void *)) == 0)) {
+                    break; // Either found a match or empty slot
+                }
+                i++;
+            } while (i < 10);  // Limit search to avoid infinite loops
+            
+            hash = new_hash;
+        }
+    }
+    
+    // If not found or hash collision, create new entry
+    if (!trace) {
+        trace = stacktrace_create(num_frames);
+        trace->hash = hash;
+        memcpy(trace->frames, frames, num_frames * sizeof(void *));
+        STACKTRACE_SET(&stacktrace_cache, hash, trace);
+    }
+    
+    spinlock_unlock(&stacktrace_lock);
+    
+    return trace;
+}
+
+// Convert stacktrace to buffer
+void stacktrace_to_buffer(STACKTRACE trace, BUFFER *wb) {
+    if (!trace || !wb) {
+        if (wb)
+            buffer_strcat(wb, NO_STACK_TRACE_PREFIX "invalid stacktrace");
+        return;
+    }
+    
+    struct stacktrace *st = (struct stacktrace *)trace;
+    
+    // If we already have cached text representation, use it
+    if (st->text) {
+        buffer_strcat(wb, st->text);
+        return;
+    }
+    
+    // Convert to text representation
+    char **messages = backtrace_symbols(st->frames, st->frame_count);
+    
+    if (!messages) {
+        buffer_strcat(wb, NO_STACK_TRACE_PREFIX "backtrace_symbols() failed");
+        return;
+    }
+    
+    bool found_signal_handler = false;
+    int added = 0;
+    
+    for (int i = 0; i < st->frame_count; i++) {
+        if (!messages[i] || !*messages[i])
+            continue;
+            
+        // Handle filtering
+        if (!found_signal_handler && contains_signal_handler_function(messages[i])) {
+            buffer_flush(wb);
+            added = 0;
+            found_signal_handler = true;
+            continue;
+        }
+        
+        if (!found_signal_handler && contains_logging_function(messages[i])) {
+            buffer_flush(wb);
+            added = 0;
+        }
+        
+        if (added > 0)
+            buffer_putc(wb, '\n');
+            
+        buffer_putc(wb, '#');
+        buffer_print_uint64(wb, added);
+        buffer_putc(wb, ' ');
+        buffer_strcat(wb, messages[i]);
+        added++;
+    }
+    
+    free(messages);
+    
+    if (added == 0)
+        buffer_strcat(wb, NO_STACK_TRACE_PREFIX "no valid frames");
+    
+    // Cache the text representation
+    spinlock_lock(&stacktrace_lock);
+    if (!st->text)
+        st->text = strdupz(buffer_tostring(wb));
+    spinlock_unlock(&stacktrace_lock);
+}
+
 #else
 
 const char *capture_stack_trace_backend(void) {
@@ -511,7 +958,7 @@ bool capture_stack_trace_available(void) {
 }
 
 void capture_stack_trace_init(void) {
-    ;
+    init_stacktrace_cache();
 }
 
 void capture_stack_trace_flush(void) {
@@ -533,28 +980,54 @@ void capture_stack_trace(BUFFER *wb) {
     // (at the end - but it needs the frame pointer)
 }
 
-#endif
-
-NEVER_INLINE
-bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
-    static __thread bool in_stack_trace = false;
-
-    if (nd_log_forked) {
-        // libunwind freezes in forked children
-        buffer_strcat(wb, NO_STACK_TRACE_PREFIX "stack trace after fork is disabled");
-        return true;
+// Simple dummy implementation for platforms without stack trace support
+STACKTRACE stacktrace_get(void) {
+    init_stacktrace_cache();
+    
+    // Just use a counter to create unique stacktraces
+    static uint64_t counter = 0;
+    uint64_t id = __atomic_fetch_add(&counter, 1, __ATOMIC_SEQ_CST);
+    
+    // Store in cache
+    spinlock_lock(&stacktrace_lock);
+    
+    struct stacktrace *trace = STACKTRACE_GET(&stacktrace_cache, id);
+    
+    if (!trace) {
+        trace = stacktrace_create(1);
+        trace->hash = id;
+        trace->frames[0] = (void *)(uintptr_t)id;  // Store ID as a pointer
+        STACKTRACE_SET(&stacktrace_cache, id, trace);
     }
-
-    if (in_stack_trace) {
-        // Prevent recursion
-        buffer_strcat(wb, NO_STACK_TRACE_PREFIX "stack trace recursion detected");
-        return true;
-    }
-
-    in_stack_trace = true;
-
-    capture_stack_trace(wb);
-
-    in_stack_trace = false; // Ensure the flag is reset
-    return true;
+    
+    spinlock_unlock(&stacktrace_lock);
+    
+    return trace;
 }
+
+void stacktrace_to_buffer(STACKTRACE trace, BUFFER *wb) {
+    if (!trace || !wb) {
+        if (wb)
+            buffer_strcat(wb, NO_STACK_TRACE_PREFIX "invalid stacktrace");
+        return;
+    }
+    
+    struct stacktrace *st = (struct stacktrace *)trace;
+    
+    // If we already have cached text representation, use it
+    if (st->text) {
+        buffer_strcat(wb, st->text);
+        return;
+    }
+    
+    // Simple representation for platforms without stack trace support
+    buffer_sprintf(wb, NO_STACK_TRACE_PREFIX "no back-end available (id: %" PRIu64 ")", st->hash);
+    
+    // Cache the text representation
+    spinlock_lock(&stacktrace_lock);
+    if (!st->text)
+        st->text = strdupz(buffer_tostring(wb));
+    spinlock_unlock(&stacktrace_lock);
+}
+
+#endif
