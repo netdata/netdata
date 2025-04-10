@@ -58,31 +58,40 @@ The following builds from source should usually work, although we don't regularl
 
 ## Static Builds and Unsupported Linux Versions
 
-The static builds of Netdata can be used on any Linux platform of the supported architectures. The only requirement these static builds have is a working Linux kernel, any version. Everything else required for Netdata to run is inside the package itself.
+Netdata's static builds can run on any Linux platform with supported architecture, requiring only a functioning Linux kernel of any version. These self-contained packages include everything Netdata needs to operate effectively.
 
-Static builds usually miss certain features that require operating-system support and can’t be provided generically. These features include:
+### Limitations of Static Builds
 
-- IPMI hardware sensors support
-- systemd-journal features
-- eBPF related features
+Static builds lack certain features that require specific operating system support, including:
 
-When platforms are removed from the [Binary Distribution Packages](/packaging/makeself/README.md) list, they default to install or update Netdata to a static build. This may mean that after platforms become EOL, Netdata on them may lose some of its features. We recommend upgrading the operating system before it becomes EOL, to continue using all the features of Netdata.
+- IPMI hardware sensors monitoring
+- systemd-journal functionality
+- eBPF-related capabilities
+
+### Impact of Platform End-of-Life (EOL)
+
+**Important**: When a platform is removed from the [Binary Distribution Packages list](/packaging/makeself/README.md):
+
+- **No automatic transitions occur** - Existing native package installations will remain as-is.
+- Your local updater will report the Agent as up-to-date even when newer versions exist.
+- When a new Netdata version is published, you'll see "Nodes are below the recommended Agent version" warnings in the Netdata Cloud UI.
+- You will stop receiving new features, improvements, and security updates.
+
+We strongly recommend upgrading your operating system before it reaches EOL to maintain full Netdata functionality and continued updates.
 
 ### Migrating from Native Package to Static Build
 
-Existing installs of native packages on a platform that is no longer supported, are not automatically updated. The upgrade process will show the Agent is already at the newest version, because we no longer publish new packages for that platform.
+If upgrading your operating system isn't possible, you can manually switch to a static build. Please note that this process is **not officially supported** and may result in data loss. However, following these steps should preserve your metrics data and Netdata Cloud connection:
 
-If the operating system cannot be upgraded to a more recent version, the install can be switched to a static build. This is a manual process, may cause data loss, and is therefore **not supported**. However, following these steps should result in a functioning Agent with metrics data and connection to Netdata Cloud in tact:
-
-1. Stop the Agent, [as appropriate for your platform](/docs/netdata-agent/start-stop-restart.md).
-2. Backup the contents of these directories: `/etc/netdata`, `/var/cache/netdata`, `/var/lib/netdata`, `/var/log/netdata`.
-3. Uninstall the native package, answering "yes" to all questions.
+1. Stop the Netdata Agent [using the appropriate method for your platform](/docs/netdata-agent/start-stop-restart.md).
+2. Back up your Netdata configuration and data: `/etc/netdata`, `/var/cache/netdata`, `/var/lib/netdata`, `/var/log/netdata`.
+3. Uninstall the native package (confirm all prompts with "yes").
 
    ```sh
    wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
    ```
 
-4. For platforms using systemd, unmask the Netdata service:
+4. For systemd-based platforms, unmask the Netdata service:
 
    ```sh
    sudo systemctl unmask netdata
@@ -92,13 +101,21 @@ If the operating system cannot be upgraded to a more recent version, the install
 5. Install the static build:
 
    ```sh
-   sh /tmp/netdata-kickstart.sh --static-only
+   # For nightly builds
+   sh /tmp/netdata-kickstart.sh --static-only --dont-start-it
+
+   # For stable release builds
+   sh /tmp/netdata-kickstart.sh --static-only --dont-start-it --stable-channel
    ```
 
-6. Stop the Agent (again).
-7. Copy over the data from the previous install:
+6. Restore your data from the previous installation:
 
    ```sh
+   # Install rsync if needed (example for Debian/Ubuntu)
+   # sudo apt-get update && sudo apt-get install -y rsync
+   # For RHEL/CentOS/Fedora
+   # sudo yum install -y rsync
+
    cd /opt/netdata
    sudo rsync -aRv --delete \
               --exclude /etc/netdata/.install-type \
@@ -106,4 +123,4 @@ If the operating system cannot be upgraded to a more recent version, the install
               /etc/netdata /var/lib/netdata /var/cache/netdata /var/log/netdata ./
    ```
 
-8. Start the Agent.
+7. Start the Netdata Agent to complete the migration.
