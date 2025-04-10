@@ -3,7 +3,7 @@
 #ifndef NETDATA_STACKTRACE_H
 #define NETDATA_STACKTRACE_H 1
 
-#include "../libnetdata.h"
+#include "libnetdata/common.h"
 
 #define STACK_TRACE_INFO_PREFIX "info: "
 
@@ -11,34 +11,40 @@
 typedef struct stacktrace *STACKTRACE;
 
 // Set the signal handler function name to filter out in stack traces
-void capture_stack_trace_set_signal_handler_function(const char *function_name);
+void stacktrace_set_signal_handler_function(const char *function_name);
 
 // Returns the first netdata function found in the stack trace
-const char *capture_stack_trace_root_cause_function(void);
+const char *stacktrace_root_cause_function(void);
 
 // Initialize the stacktrace capture mechanism
-void capture_stack_trace_init(void);
+void stacktrace_init(void);
 
 // Free any resources used by the stacktrace mechanism
-void capture_stack_trace_flush(void);
+void stacktrace_flush(void);
 
 // Return true if the stacktrace mechanism can be safely used in signal handlers
-bool capture_stack_trace_is_async_signal_safe(void);
+bool stacktrace_capture_is_async_signal_safe(void);
 
 // Return true if stacktrace capture is available on this platform
-bool capture_stack_trace_available(void);
+bool stacktrace_available(void);
 
 // Capture a stacktrace to a buffer
-void capture_stack_trace(BUFFER *wb);
+struct web_buffer;
+void stacktrace_capture(BUFFER *wb);
 
 // Return a string describing the backend used for capturing stacktraces
-const char *capture_stack_trace_backend(void);
+const char *stacktrace_backend(void);
 
-// New API functions
 // Get the current stacktrace, hash it, and store it in a cache
 STACKTRACE stacktrace_get(void);
 
 // Convert a stacktrace to a buffer
-void stacktrace_to_buffer(STACKTRACE trace, BUFFER *wb);
+void stacktrace_to_buffer(STACKTRACE trace, struct web_buffer *wb);
+
+void stacktrace_forked(void);
+bool stack_trace_formatter(struct web_buffer *wb, void *data);
+
+// Unit testing
+int stacktrace_unittest(void);
 
 #endif /* NETDATA_STACKTRACE_H */

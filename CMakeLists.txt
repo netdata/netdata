@@ -984,8 +984,15 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setproctitle.h
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
-        src/libnetdata/stacktrace/stacktrace.c
         src/libnetdata/stacktrace/stacktrace.h
+        src/libnetdata/stacktrace/stacktrace-common.h
+        src/libnetdata/stacktrace/stacktrace-common.c
+        src/libnetdata/stacktrace/stacktrace-libbacktrace.c
+        src/libnetdata/stacktrace/stacktrace-libunwind.c
+        src/libnetdata/stacktrace/stacktrace-backtrace.c
+        src/libnetdata/stacktrace/stacktrace-none.c
+        src/libnetdata/stacktrace/stacktrace-log.c
+        src/libnetdata/stacktrace/stacktrace-unittest.c
         src/libnetdata/json/json-c-parser-inline.c
         src/libnetdata/parsers/duration.h
         src/libnetdata/parsers/timeframe.c
