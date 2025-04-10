@@ -32,8 +32,8 @@ func (c *Collector) walkOIDTree(baseOID string) (map[string]processedMetric, err
 		value := fmt.Sprintf("%v", pdu.Value)
 
 		tableRows[nextOID] = processedMetric{
-			oid:         nextOID,
-			value:       value,
+			oid:        nextOID,
+			value:      value,
 			metricType: metricType,
 		}
 
