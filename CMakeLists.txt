@@ -3033,7 +3033,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
-        "$<$<BOOL:${OS_WINDOWS}>:sqlsrv32;odbc32>"
+        "$<$<BOOL:${OS_WINDOWS}>:odbc32>"
 )
 
 netdata_add_protobuf(netdata)
