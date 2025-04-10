@@ -8,6 +8,17 @@
 // linux calculates this once every 5 seconds
 #define MIN_LOADAVG_UPDATE_EVERY 5
 
+static const RRDVAR_ACQUIRED *rd_pidmax = NULL;
+
+void proc_loadavg_plugin_cleanup(void) {
+    // Cleanup any acquired RRDVARs
+    RRDSET *st = rrdset_find_localhost("system.active_processes");
+    if (st && rd_pidmax) {
+        rrdvar_chart_variable_release(st, rd_pidmax);
+        rd_pidmax = NULL;
+    }
+}
+
 int do_proc_loadavg(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int do_loadavg = -1, do_all_processes = -1;
@@ -95,7 +106,6 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     if(likely(do_all_processes)) {
         static RRDSET *processes_chart = NULL;
         static RRDDIM *rd_active = NULL;
-        static const RRDVAR_ACQUIRED *rd_pidmax;
 
         if(unlikely(!processes_chart)) {
             processes_chart = rrdset_create_localhost(

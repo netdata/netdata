@@ -256,7 +256,7 @@ int netdata_main(int argc, char **argv) {
 
     int i;
     int config_loaded = 0;
-    bool close_open_fds = true;
+    bool close_open_fds = true; (void)close_open_fds;
     size_t default_stacksize;
     const char *user = NULL;
 

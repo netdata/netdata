@@ -57,6 +57,16 @@ static inline void cgroup_free_network_interfaces(struct cgroup *cg) {
 static inline void cgroup_free(struct cgroup *cg) {
     netdata_log_debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
+    if(cg->st_cpu && cg->chart_var_cpu_limit) {
+        rrdvar_chart_variable_release(cg->st_cpu, cg->chart_var_cpu_limit);
+        cg->chart_var_cpu_limit = NULL;
+    }
+
+    if(cg->st_mem_usage && cg->chart_var_memory_limit) {
+        rrdvar_chart_variable_release(cg->st_mem_usage, cg->chart_var_memory_limit);
+        cg->chart_var_memory_limit = NULL;
+    }
+
     cgroup_netdev_delete(cg);
 
     if(cg->st_cpu) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu);
@@ -85,7 +95,6 @@ static inline void cgroup_free(struct cgroup *cg) {
     freez(cg->filename_cpu_cfs_period);
     freez(cg->filename_cpu_cfs_quota);
     freez(cg->filename_memory_limit);
-    freez(cg->filename_memoryswap_limit);
 
     cgroup_free_network_interfaces(cg);
 
@@ -541,16 +550,6 @@ static inline void discovery_update_filenames_cgroup_v1(struct cgroup *cg) {
             }
         }
 
-        if (unlikely(!cg->memory.staterr_swap && !cg->memory.filename_msw_usage_in_bytes)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.usage_in_bytes", cgroup_memory_base, cg->id);
-            if (!(cg->memory.staterr_swap = stat(filename, &buf) != 0)) {
-                cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
-
-                snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.limit_in_bytes", cgroup_memory_base, cg->id);
-                cg->filename_memoryswap_limit = strdupz(filename);
-            }
-        }
-
         if (unlikely(!cg->memory.staterr_failcnt && !cg->memory.filename_failcnt)) {
             snprintfz(filename, FILENAME_MAX, "%s%s/memory.failcnt", cgroup_memory_base, cg->id);
             if (!(cg->memory.staterr_failcnt = stat(filename, &buf) != 0)) {
@@ -687,16 +686,6 @@ static inline void discovery_update_filenames_cgroup_v2(struct cgroup *cg) {
         snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_unified_base, cg->id);
         if (!(cg->memory.staterr_mem_stat = stat(filename, &buf) != 0)) {
             cg->memory.filename_detailed = strdupz(filename);
-        }
-    }
-
-    if (unlikely(!cg->memory.staterr_swap && !cg->memory.filename_msw_usage_in_bytes)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/memory.swap.current", cgroup_unified_base, cg->id);
-        if (!(cg->memory.staterr_swap = stat(filename, &buf) != 0)) {
-            cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
-
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.swap.max", cgroup_unified_base, cg->id);
-            cg->filename_memoryswap_limit = strdupz(filename);
         }
     }
 
@@ -1338,6 +1327,16 @@ void cgroup_discovery_worker(void *ptr)
 
         discovery_find_all_cgroups();
     }
+
+    // free all cgroups
+    uv_mutex_lock(&cgroup_root_mutex);
+    while(cgroup_root) {
+        struct cgroup *cg = cgroup_root;
+        cgroup_root = cg->next;
+        cgroup_free(cg);
+    }
+    uv_mutex_unlock(&cgroup_root_mutex);
+
     collector_info("discovery thread stopped");
     cgroup_cleanup_ebpf_integration();
     worker_unregister();

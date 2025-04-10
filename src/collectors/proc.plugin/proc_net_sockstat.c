@@ -25,11 +25,34 @@ static struct proc_net_sockstat {
 } sockstat_root = { 0 };
 
 
+static const RRDVAR_ACQUIRED
+    *tcp_mem_low_threshold = NULL,
+    *tcp_mem_pressure_threshold = NULL,
+    *tcp_mem_high_threshold = NULL,
+    *tcp_max_orphans_var = NULL;
+
+void proc_net_sockstat_plugin_cleanup(void) {
+    // Cleanup any acquired RRDVARs
+    if (tcp_mem_low_threshold) {
+        rrdvar_host_variable_release(localhost, tcp_mem_low_threshold);
+        tcp_mem_low_threshold = NULL;
+    }
+    if (tcp_mem_pressure_threshold) {
+        rrdvar_host_variable_release(localhost, tcp_mem_pressure_threshold);
+        tcp_mem_pressure_threshold = NULL;
+    }
+    if (tcp_mem_high_threshold) {
+        rrdvar_host_variable_release(localhost, tcp_mem_high_threshold);
+        tcp_mem_high_threshold = NULL;
+    }
+    if (tcp_max_orphans_var) {
+        rrdvar_host_variable_release(localhost, tcp_max_orphans_var);
+        tcp_max_orphans_var = NULL;
+    }
+}
+
 static int read_tcp_mem(void) {
     static char *filename = NULL;
-    static const RRDVAR_ACQUIRED *tcp_mem_low_threshold = NULL,
-                  *tcp_mem_pressure_threshold = NULL,
-                  *tcp_mem_high_threshold = NULL;
 
     if(unlikely(!tcp_mem_low_threshold)) {
         tcp_mem_low_threshold      = rrdvar_host_variable_add_and_acquire(localhost, "tcp_mem_low");
@@ -69,7 +92,6 @@ static int read_tcp_mem(void) {
 
 static kernel_uint_t read_tcp_max_orphans(void) {
     static char *filename = NULL;
-    static const RRDVAR_ACQUIRED *tcp_max_orphans_var = NULL;
 
     if(unlikely(!filename)) {
         char buffer[FILENAME_MAX + 1];
