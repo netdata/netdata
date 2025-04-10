@@ -533,29 +533,3 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
 
     exit(1);
 }
-
-// The stack trace formatter called by logger - using new stacktrace API
-NEVER_INLINE
-bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
-    static __thread bool in_stack_trace = false;
-
-    if (nd_log_forked) {
-        // libunwind freezes in forked children
-        buffer_strcat(wb, "stack trace is not available, stack trace after fork is disabled");
-        return true;
-    }
-
-    if (in_stack_trace) {
-        // Prevent recursion
-        buffer_strcat(wb, "stack trace is not available, stack trace recursion detected");
-        return true;
-    }
-
-    in_stack_trace = true;
-
-    // Use the existing capture_stack_trace from the stacktrace module
-    capture_stack_trace(wb);
-
-    in_stack_trace = false; // Ensure the flag is reset
-    return true;
-}
