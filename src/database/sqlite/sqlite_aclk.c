@@ -759,16 +759,19 @@ static void aclk_synchronization_event_loop(void *arg)
                     break;
                 case ACLK_CANCEL_NODE_UPDATE_TIMER:
                     host = cmd.param[0];
+                    struct completion *compl = cmd.param[1];
                     aclk_host_config = host->aclk_host_config;
-                    if (!aclk_host_config || !aclk_host_config->timer_initialized)
+                    if (!aclk_host_config || !aclk_host_config->timer_initialized) {
+                        completion_mark_complete(compl);
                         break;
+                    }
                     if (uv_is_active((uv_handle_t *)&aclk_host_config->timer))
                         uv_timer_stop(&aclk_host_config->timer);
 
                     aclk_host_config->timer_initialized = false;
                     timer_cb_data = mallocz(sizeof(*timer_cb_data));
                     timer_cb_data->payload = host;
-                    timer_cb_data->completion = (struct completion *)cmd.param[1];
+                    timer_cb_data->completion = compl;
                     aclk_host_config->timer.data = timer_cb_data;
                     uv_close((uv_handle_t *)&aclk_host_config->timer, notify_timer_close_callback);
                     break;
