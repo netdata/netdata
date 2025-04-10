@@ -5,7 +5,6 @@ package snmp
 import (
 	"errors"
 	"fmt"
-	"log"
 	"slices"
 	"strings"
 
@@ -83,9 +82,6 @@ func (c *Collector) makeChartsFromMetricMap(mx map[string]int64, metricMap map[s
 		if metric.tableName == "" {
 			switch s := metric.value.(type) {
 			case int:
-
-				log.Println(metric)
-
 				name := metric.name
 				if name == "" {
 					continue

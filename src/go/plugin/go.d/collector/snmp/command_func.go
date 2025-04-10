@@ -22,7 +22,6 @@ func (c *Collector) walkOIDTree(baseOID string) (map[string]processedMetric, err
 		pdu := result.Variables[0]
 
 		nextOID := strings.Replace(pdu.Name, ".", "", 1) //remove dot at the start of the OID
-		// fmt.Println(nextOID, baseOID)
 
 		// If the next OID does not start with the base OID, we've reached the end of the subtree.
 		if !strings.HasPrefix(nextOID, baseOID) {
@@ -35,7 +34,7 @@ func (c *Collector) walkOIDTree(baseOID string) (map[string]processedMetric, err
 		tableRows[nextOID] = processedMetric{
 			oid:         nextOID,
 			value:       value,
-			metric_type: metricType,
+			metricType: metricType,
 		}
 
 		currentOID = nextOID

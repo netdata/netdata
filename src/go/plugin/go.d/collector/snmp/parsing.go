@@ -9,13 +9,13 @@ import (
 )
 
 func parseMetrics(metrics []profiledefinition.MetricsConfig) (parsedResult, error) {
-	oids := []string{}
-	next_oids := []string{}
-	bulk_oids := []string{}
-	parsed_metrics := []parsedMetric{}
-	oids_to_resolve := []map[string]string{}
-	indexes_to_resolve := []indexMapping{}
-	bulk_threshold := 0
+	OIDs := []string{}
+	nextOIDs := []string{}
+	bulkOIDs := []string{}
+	parsedMetrics := []parsedMetric{}
+	OIDsToResolve := []map[string]string{}
+	indexesToResolve := []indexMapping{}
+	bulkThreshold := 0
 	for _, metric := range metrics {
 		result, err := parseMetric(metric)
 
@@ -23,30 +23,33 @@ func parseMetrics(metrics []profiledefinition.MetricsConfig) (parsedResult, erro
 			return parsedResult{}, err
 		}
 
-		oids = append(oids, result.oidsToFetch...)
+		OIDs = append(OIDs, result.oidsToFetch...)
 
 		for name, oid := range result.oidsToResolve {
 			// here in the python implementation a registration happens to their OIDResolver. I will not support this atm
-			oids_to_resolve = append(oids_to_resolve, map[string]string{name: oid})
+			OIDsToResolve = append(OIDsToResolve, map[string]string{name: oid})
 		}
 
 		// here in the python implementation a registration happens to their OIDResolver. I will not support this atm
-		indexes_to_resolve = append(indexes_to_resolve, result.indexMappings...)
+		indexesToResolve = append(indexesToResolve, result.indexMappings...)
 
 		for _, batch := range result.tableBatches {
-			should_query_in_bulk := bulk_threshold > 0 && len(batch.oids) > bulk_threshold
+			should_query_in_bulk := bulkThreshold > 0 && len(batch.oids) > bulkThreshold
 			if should_query_in_bulk {
-				bulk_oids = append(bulk_oids, batch.tableOID)
+				bulkOIDs = append(bulkOIDs, batch.tableOID)
 			} else {
-				next_oids = append(next_oids, batch.oids...)
+				nextOIDs = append(nextOIDs, batch.oids...)
 			}
 		}
 
-		parsed_metrics = append(parsed_metrics, result.parsedMetrics...)
+		parsedMetrics = append(parsedMetrics, result.parsedMetrics...)
 
 	}
-	return parsedResult{oids: oids,
-		next_oids: next_oids, bulk_oids: bulk_oids, parsed_metrics: parsed_metrics}, nil
+	return parsedResult{
+		OIDs:          OIDs,
+		nextOIDs:      nextOIDs,
+		bulkOIDs:      bulkOIDs,
+		parsedMetrics: parsedMetrics}, nil
 }
 
 func parseMetric(metric profiledefinition.MetricsConfig) (metricParseResult, error) {
@@ -118,33 +121,33 @@ func parseSymbolMetric(symbol profiledefinition.SymbolConfig, mib string) (metri
 	    symbol: tcpActiveOpens      # require MIB syntax
 	```*/
 
-	parsed_symbol, err := parseSymbol(mib, symbol)
+	parsedSymbol, err := parseSymbol(symbol)
 	if err != nil {
 		return metricParseResult{}, err
 	}
 
-	parsed_symbol_metric := parsedSymbolMetric{
-		name:                parsed_symbol.name,
+	parsedSymbolMetric := parsedSymbolMetric{
+		name:                parsedSymbol.name,
 		tags:                nil,
 		forcedType:          string(symbol.MetricType),
 		enforceScalar:       false,
 		options:             nil,
-		extractValuePattern: parsed_symbol.extractValuePattern,
-		baseoid:             parsed_symbol.oid,
+		extractValuePattern: parsedSymbol.extractValuePattern,
+		baseoid:             parsedSymbol.oid,
 		unit:                symbol.Unit,
 		description:         symbol.Description,
 	}
 
 	return metricParseResult{
-		oidsToFetch:   []string{parsed_symbol.oid},
-		oidsToResolve: parsed_symbol.oidsToResolve,
-		parsedMetrics: []parsedMetric{parsed_symbol_metric},
+		oidsToFetch:   []string{parsedSymbol.oid},
+		oidsToResolve: parsedSymbol.oidsToResolve,
+		parsedMetrics: []parsedMetric{parsedSymbolMetric},
 		tableBatches:  nil,
 		indexMappings: nil,
 	}, nil
 }
 
-func parseSymbol(mib string, symbol interface{}) (parsedSymbol, error) {
+func parseSymbol(symbol interface{}) (parsedSymbol, error) {
 	/*
 		Parse an OID symbol.
 
