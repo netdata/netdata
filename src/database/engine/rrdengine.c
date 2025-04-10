@@ -878,29 +878,22 @@ static void *extent_write_tp_worker(
 
     int retries = 10;
     int ret = -1;
-    while (ret == -1 && --retries) {
+    while (ret < 0 && --retries) {
         ret = uv_fs_write(NULL, &request, datafile->file, &iov, 1, (int64_t)xt_io_descr->pos, NULL);
-        if (ret == -1) {
+        uv_fs_req_cleanup(&request);
+        if (ret < 0) {
+            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+                break;
             sleep_usec(300 * USEC_PER_MS);
-            uv_fs_req_cleanup(&request);
         }
     }
 
-    bool df_write_error = (ret == -1 || request.result < 0);
+    bool df_write_error = (ret < 0);
 
     if (unlikely(df_write_error)) {
         ctx_io_error(ctx);
-        if (ret == -1)
-            netdata_log_error(
-                "DBENGINE: %s: uv_fs_write: failed to store metrics in datafile %u, offset %ld",
-                __func__,
-                datafile->fileno,
-                (int64_t)xt_io_descr->pos);
-        else
-            netdata_log_error(
-                "DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)request.result));
+        netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror(ret));
     }
-    uv_fs_req_cleanup(&request);
 
     if (likely(!df_write_error)) {
         journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
