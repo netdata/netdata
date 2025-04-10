@@ -101,13 +101,21 @@ If upgrading your operating system isn't possible, you can manually switch to a 
 5. Install the static build:
 
    ```sh
-   sh /tmp/netdata-kickstart.sh --static-only
+   # For nightly builds
+   sh /tmp/netdata-kickstart.sh --static-only --dont-start-it
+
+   # For stable release builds
+   sh /tmp/netdata-kickstart.sh --static-only --dont-start-it --stable-channel
    ```
 
-6. Stop the newly installed Agent.
-7. Restore your data from the previous installation:
+6. Restore your data from the previous installation:
 
    ```sh
+   # Install rsync if needed (example for Debian/Ubuntu)
+   # sudo apt-get update && sudo apt-get install -y rsync
+   # For RHEL/CentOS/Fedora
+   # sudo yum install -y rsync
+
    cd /opt/netdata
    sudo rsync -aRv --delete \
               --exclude /etc/netdata/.install-type \
@@ -115,4 +123,4 @@ If upgrading your operating system isn't possible, you can manually switch to a 
               /etc/netdata /var/lib/netdata /var/cache/netdata /var/log/netdata ./
    ```
 
-8. Start the Netdata Agent to complete the migration.
+7. Start the Netdata Agent to complete the migration.
