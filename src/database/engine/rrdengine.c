@@ -730,7 +730,8 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
 static struct extent_io_descriptor *
 datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_data *base, uv_buf_t *iov)
 {
-    unsigned i, count, size_bytes, pos, real_io_size;
+    unsigned i;
+    uint32_t real_io_size, size_bytes, count, pos;
     uint32_t uncompressed_payload_length, max_compressed_size, payload_offset;
     struct page_descr_with_data *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
@@ -848,15 +849,17 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     journalfile_extent_build(ctx, xt_io_descr);
 
     ctx_last_flush_fileno_set(ctx, datafile->fileno);
-    ctx_current_disk_space_increase(ctx, real_io_size);
-    ctx_io_write_op_bytes(ctx, real_io_size);
+//    ctx_current_disk_space_increase(ctx, real_io_size);
+//    ctx_io_write_op_bytes(ctx, real_io_size);
+    xt_io_descr->real_io_size = real_io_size;
 
     return xt_io_descr;
 }
 
 static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
 {
-    ;
+    if(completion)
+        completion_mark_complete(completion);
 }
 
 static void *extent_write_tp_worker(
@@ -878,32 +881,27 @@ static void *extent_write_tp_worker(
 
     int retries = 10;
     int ret = -1;
-    while (ret == -1 && --retries) {
+    while (ret < 0 && --retries) {
         ret = uv_fs_write(NULL, &request, datafile->file, &iov, 1, (int64_t)xt_io_descr->pos, NULL);
-        if (ret == -1) {
+        uv_fs_req_cleanup(&request);
+        if (ret < 0) {
+            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+                break;
             sleep_usec(300 * USEC_PER_MS);
-            uv_fs_req_cleanup(&request);
         }
     }
 
-    bool df_write_error = (ret == -1 || request.result < 0);
-
-    if (unlikely(df_write_error)) {
+    if (unlikely(ret < 0))
         ctx_io_error(ctx);
-        if (ret == -1)
-            netdata_log_error(
-                "DBENGINE: %s: uv_fs_write: failed to store metrics in datafile %u, offset %ld",
-                __func__,
-                datafile->fileno,
-                (int64_t)xt_io_descr->pos);
-        else
-            netdata_log_error(
-                "DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)request.result));
+    else {
+        ctx_current_disk_space_increase(ctx, xt_io_descr->real_io_size);
+        ctx_io_write_op_bytes(ctx, xt_io_descr->real_io_size);
+        ret = journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
     }
-    uv_fs_req_cleanup(&request);
 
-    if (likely(!df_write_error)) {
-        journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
+    if (ret < 0) {
+        nd_log_limit_static_global_var(dbengine_erl, 10, 0);
+        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Tier %d, %s", ctx->config.tier, uv_strerror(ret));
     }
 
     spinlock_lock(&datafile->writers.spinlock);
@@ -911,14 +909,12 @@ static void *extent_write_tp_worker(
     datafile->writers.flushed_to_open_running++;
     spinlock_unlock(&datafile->writers.spinlock);
 
-    extent_flush_to_open(ctx, xt_io_descr, df_write_error);
+    extent_flush_to_open(ctx, xt_io_descr, ret < 0);
 
      if(ctx_is_available_for_queries(ctx) && rrdeng_ctx_tier_cap_exceeded(ctx))
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 done:
-    if(completion)
-        completion_mark_complete(completion);
-
+    __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
     worker_is_idle();
     return NULL;
 }
@@ -1273,6 +1269,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
     deleted_bytes = journalfile_v2_data_size_get(journal_file);
 
     netdata_log_info("DBENGINE: deleting data and journal files to maintain disk quota");
+    // This will delete journalfile_v2 and journalfile_v1
     ret = journalfile_destroy_unsafe(journal_file, datafile);
     if (!ret) {
         journalfile_v1_generate_path(datafile, path, sizeof(path));
@@ -1281,6 +1278,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         netdata_log_info("DBENGINE: deleted journal file \"%s\".", path);
         deleted_bytes += journal_file_bytes;
     }
+    // This will delete the datafile
     ret = destroy_data_file_unsafe(datafile);
     if (!ret) {
         generate_datafilepath(datafile, path, sizeof(path));
