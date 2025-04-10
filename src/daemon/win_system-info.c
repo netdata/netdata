@@ -246,33 +246,23 @@ static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD bui
 static char *netdata_windows_get_edition(void)
 {
     static char edition[256] = {0};
-    DWORD buffer_size = sizeof(edition);
     
-    HKEY lKey;
-    long ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                           "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
-                           0,
-                           KEY_READ,
-                           &lKey);
-    if (ret != ERROR_SUCCESS)
-        return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
-
     // Try to read EditionID first, which is more precise
-    ret = netdata_registry_get_string_from_open_key(edition, buffer_size-1, lKey, "EditionID");
+    if (netdata_registry_get_string(edition, sizeof(edition)-1, HKEY_LOCAL_MACHINE, 
+                                   "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 
+                                   "EditionID")) {
+        return edition;
+    }
     
     // If EditionID fails, try ProductName
-    if (ret != ERROR_SUCCESS) {
-        ret = netdata_registry_get_string_from_open_key(edition, buffer_size-1, lKey, "ProductName");
+    if (netdata_registry_get_string(edition, sizeof(edition)-1, HKEY_LOCAL_MACHINE, 
+                                   "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 
+                                   "ProductName")) {
+        return edition;
     }
-    
-    RegCloseKey(lKey);
     
     // Return unknown if both methods fail
-    if (ret != ERROR_SUCCESS || edition[0] == '\0') {
-        return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
-    }
-    
-    return edition;
+    return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
 }
 
 static char *netdata_windows_get_os_id_like(DWORD build)
