@@ -299,6 +299,14 @@ void send_internal_metrics(struct instance *instance);
 void clean_instance(struct instance *ptr);
 void simple_connector_cleanup(struct instance *instance);
 
+/**
+ * Free exporting configuration
+ * 
+ * Free all memory associated with the exporting configuration.
+ * Called during shutdown to prevent memory leaks.
+ */
+void exporting_config_free(void);
+
 static inline void disable_instance(struct instance *instance)
 {
     instance->disabled = 1;

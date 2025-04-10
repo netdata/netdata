@@ -1195,6 +1195,13 @@ static void do_proc_net_snmp6(int update_every) {
     }
 }
 
+static const RRDVAR_ACQUIRED *tcp_max_connections_var = NULL;
+
+void proc_net_netstat_cleanup(void) {
+    if(tcp_max_connections_var)
+        rrdvar_host_variable_release(localhost, tcp_max_connections_var);
+}
+
 int do_proc_net_netstat(int update_every, usec_t dt) {
     (void)dt;
 
@@ -1221,8 +1228,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     static ARL_BASE *arl_tcp = NULL;
     static ARL_BASE *arl_udp = NULL;
     static ARL_BASE *arl_udplite = NULL;
-
-    static const RRDVAR_ACQUIRED *tcp_max_connections_var = NULL;
 
     // --------------------------------------------------------------------
     // IP

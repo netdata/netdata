@@ -475,6 +475,16 @@ static int read_cpuidle_states(const char *cpuidle_name_filename, const char *cp
     return 0;
 }
 
+static const RRDVAR_ACQUIRED *cpus_var = NULL;
+
+void proc_stat_plugin_cleanup(void) {
+    // Cleanup any acquired RRDVARs
+    if (cpus_var) {
+        rrdvar_host_variable_release(localhost, cpus_var);
+        cpus_var = NULL;
+    }
+}
+
 int do_proc_stat(int update_every, usec_t dt) {
     (void)dt;
 
@@ -486,7 +496,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
     static const char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL,
            *time_in_state_filename = NULL, *schedstat_filename = NULL, *cpuidle_name_filename = NULL, *cpuidle_time_filename = NULL;
-    static const RRDVAR_ACQUIRED *cpus_var = NULL;
+
     static int accurate_freq_avail = 0, accurate_freq_is_used = 0;
     size_t cores_found = (size_t)os_get_system_cpus();
 

@@ -186,6 +186,7 @@ static struct ibport {
 
     const RRDVAR_ACQUIRED *stv_speed;
 
+
     usec_t speed_last_collected_usec;
 
     struct ibport *next;
@@ -216,6 +217,17 @@ void infiniband_hwcounters_parse_mlx(struct ibport *port)
     if (port->do_hwpackets != CONFIG_BOOLEAN_NO)
         FOREACH_HWCOUNTER_MLX_PACKETS(GEN_DO_HWCOUNTER_READ, port, port->hwcounters_mlx)
 }
+void sys_class_infiniband_plugin_cleanup(void) {
+    // Cleanup any acquired RRDVARs
+    struct ibport *port;
+    for (port = ibport_root; port; port = port->next) {
+        if (port->stv_speed) {
+            rrdvar_chart_variable_release(port->st_bytes, port->stv_speed);
+            port->stv_speed = NULL;
+        }
+    }
+}
+
 void infiniband_hwcounters_dorrd_mlx(struct ibport *port)
 {
     if (port->do_hwerrors != CONFIG_BOOLEAN_NO) {

@@ -7,6 +7,16 @@
 
 static struct config stream_config = APPCONFIG_INITIALIZER;
 
+/**
+ * Free stream configuration
+ * 
+ * Free all memory associated with the stream configuration.
+ * Called during shutdown to prevent memory leaks.
+ */
+void stream_config_free(void) {
+    inicfg_free(&stream_config);
+}
+
 struct _stream_send stream_send = {
     .enabled = false,
     .api_key = NULL,
