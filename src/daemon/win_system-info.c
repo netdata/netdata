@@ -243,6 +243,88 @@ static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD bui
     (void)snprintf(out, length, "Windows %u.%u.%u Build: %u", major, minor, build, build);
 }
 
+static char *netdata_windows_get_edition(void)
+{
+    static char edition[256] = {0};
+    DWORD buffer_size = sizeof(edition);
+    
+    HKEY lKey;
+    long ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+                           "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                           0,
+                           KEY_READ,
+                           &lKey);
+    if (ret != ERROR_SUCCESS)
+        return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
+
+    // Try to read EditionID first, which is more precise
+    ret = netdata_registry_get_string_from_open_key(edition, buffer_size-1, lKey, "EditionID");
+    
+    // If EditionID fails, try ProductName
+    if (ret != ERROR_SUCCESS) {
+        ret = netdata_registry_get_string_from_open_key(edition, buffer_size-1, lKey, "ProductName");
+    }
+    
+    RegCloseKey(lKey);
+    
+    // Return unknown if both methods fail
+    if (ret != ERROR_SUCCESS || edition[0] == '\0') {
+        return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
+    }
+    
+    return edition;
+}
+
+static char *netdata_windows_get_os_id_like(DWORD build)
+{
+    static char id_like[256];
+    char *edition = netdata_windows_get_edition();
+    const char *base_id = "";
+    
+    if (IsWindowsServer()) {
+        // Windows Server versions based on build numbers
+        if (build >= 25000)
+            base_id = "Windows-Server-2025";
+        else if (build >= 20348)
+            base_id = "Windows-Server-2022";
+        else if (build >= 17763)
+            base_id = "Windows-Server-2019";
+        else if (build >= 14393)
+            base_id = "Windows-Server-2016";
+        else if (build >= 9600)
+            base_id = "Windows-Server-2012R2";
+        else if (build >= 9200)
+            base_id = "Windows-Server-2012";
+        else if (build >= 7601)
+            base_id = "Windows-Server-2008R2";
+        else
+            base_id = "Windows-Server";
+    } else {
+        // Windows client versions
+        if (build >= 22000)
+            base_id = "Windows-11";
+        else if (build >= 10240)
+            base_id = "Windows-10";
+        else if (build >= 9600)
+            base_id = "Windows-8.1";
+        else if (build >= 9200)
+            base_id = "Windows-8";
+        else if (build >= 7601)
+            base_id = "Windows-7";
+        else
+            base_id = "Windows";
+    }
+    
+    // If we have a valid edition, append it to the ID_LIKE with a dash
+    if (strcmp(edition, NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN) != 0) {
+        snprintf(id_like, sizeof(id_like), "%s-%s", base_id, edition);
+    } else {
+        strcpy(id_like, base_id);
+    }
+    
+    return id_like;
+}
+
 static void netdata_windows_host(struct rrdhost_system_info *systemInfo)
 {
     char osVersion[4096];
@@ -253,8 +335,8 @@ static void netdata_windows_host(struct rrdhost_system_info *systemInfo)
     netdata_windows_discover_os_version(osVersion, 4095, build);
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_ID", osVersion);
 
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_HOST_OS_ID_LIKE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
+    char *id_like = netdata_windows_get_os_id_like(build);
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_ID_LIKE", id_like);
 
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_VERSION", osVersion);
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_VERSION_ID", osVersion);
