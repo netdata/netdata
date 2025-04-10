@@ -1183,7 +1183,7 @@ int dictionary_unittest(size_t entries) {
     errors += dictionary_unittest_threads();
     errors += dictionary_unittest_view_threads();
 
-    cleanup_destroyed_dictionaries();
+    cleanup_destroyed_dictionaries(false);
 
     fprintf(stderr, "\n%zu errors found\n", errors);
     return  errors ? 1 : 0;

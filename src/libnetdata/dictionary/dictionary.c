@@ -330,7 +330,7 @@ static void dictionary_queue_for_destruction(DICTIONARY *dict) {
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 }
 
-size_t cleanup_destroyed_dictionaries(void) {
+size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
     netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
     if (!dictionaries_waiting_to_be_destroyed) {
         netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
@@ -368,6 +368,14 @@ size_t cleanup_destroyed_dictionaries(void) {
                     "DICTIONARY DELAYED %zu: %zu referenced in dict created from %s() %zu@%s pid %d.",
                     remaining + 1, dictionary_referenced_items(dict),
                     function, line, file, pid);
+
+#if defined(FSANITIZE_ADDRESS) && defined(NETDATA_INTERNAL_CHECKS)
+            if(shutdown)
+                fprintf(stderr,
+                        " > DICTIONARY DELAYED %zu: %zu items referenced in dict created from %s() %zu@%s pid %d.\n",
+                        remaining + 1, dictionary_referenced_items(dict),
+                        function, line, file, pid);
+#endif
 
             DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
             last = dict;
@@ -498,7 +506,7 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
 
 static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size) {
     dictionary_init_aral();
-    cleanup_destroyed_dictionaries();
+    cleanup_destroyed_dictionaries(false);
 
     DICTIONARY *dict = aral_callocz(ar_dict);
     dict->options = options;
@@ -603,7 +611,7 @@ void dictionary_flush(DICTIONARY *dict) {
 }
 
 size_t dictionary_destroy(DICTIONARY *dict) {
-    cleanup_destroyed_dictionaries();
+    cleanup_destroyed_dictionaries(false);
 
     if(!dict) return 0;
 

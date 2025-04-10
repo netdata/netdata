@@ -347,7 +347,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     rrdhost_free_all();
 
     fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
-    size_t dictionaries_referenced = cleanup_destroyed_dictionaries();
+    size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
     if(dictionaries_referenced)
         fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
                 dictionaries_referenced);
