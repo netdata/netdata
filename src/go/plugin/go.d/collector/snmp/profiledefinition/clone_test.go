@@ -6,9 +6,10 @@
 package profiledefinition
 
 import (
-	"github.com/stretchr/testify/assert"
 	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type cloneMe struct {

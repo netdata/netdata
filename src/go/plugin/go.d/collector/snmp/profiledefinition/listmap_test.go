@@ -7,10 +7,11 @@ package profiledefinition
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/invopop/jsonschema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 type ExampleStruct struct {
@@ -61,7 +62,7 @@ func TestListMap_JSONSchema(t *testing.T) {
 
 	expectedSchema := `
 {
-  "$id": "https://github.com/DataDog/datadog-agent/pkg/networkdevice/profile/profiledefinition/example-struct",
+  "$id": "https://github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/profiledefinition/example-struct",
   "$ref": "#/$defs/ExampleStruct",
   "$defs": {
     "ExampleStruct": {
