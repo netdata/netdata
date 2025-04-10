@@ -15,12 +15,9 @@ static inline void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONA
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
-    internal_error(false,
-                   "DICTIONARY: Running insert callback on item '%s' of dictionary created from %s() %zu@%s.",
-                   item_get_name(item),
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
+    dictionary_internal_error(false, dict,
+                   "DICTIONARY: Running insert callback on item '%s' of dictionary",
+                   item_get_name(item));
 
     dict->hooks->insert_callback(item, item->shared->value, constructor_data?constructor_data:dict->hooks->insert_callback_data);
     DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(dict);
@@ -33,12 +30,9 @@ static inline bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIO
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
-    internal_error(false,
-                   "DICTIONARY: Running conflict callback on item '%s' of dictionary created from %s() %zu@%s.",
-                   item_get_name(item),
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
+    dictionary_internal_error(false, dict,
+                   "DICTIONARY: Running conflict callback on item '%s' of dictionary",
+                   item_get_name(item));
 
     bool ret = dict->hooks->conflict_callback(
         item, item->shared->value, new_value,
@@ -56,12 +50,9 @@ static inline void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONAR
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
-    internal_error(false,
-                   "DICTIONARY: Running react callback on item '%s' of dictionary created from %s() %zu@%s.",
-                   item_get_name(item),
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
+    dictionary_internal_error(false, dict,
+                   "DICTIONARY: Running react callback on item '%s' of dictionary",
+                   item_get_name(item));
 
     dict->hooks->react_callback(item, item->shared->value,
                                 constructor_data?constructor_data:dict->hooks->react_callback_data);
@@ -77,12 +68,9 @@ static inline void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONA
     // because we may have references to it, after the master is gone
     // so, the shared structure will remain until the last reference is released.
 
-    internal_error(false,
-                   "DICTIONARY: Running delete callback on item '%s' of dictionary created from %s() %zu@%s.",
-                   item_get_name(item),
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
+    dictionary_internal_error(false, dict,
+                   "DICTIONARY: Running delete callback on item '%s' of dictionary",
+                   item_get_name(item));
 
     dict->hooks->delete_callback(item, item->shared->value, dict->hooks->delelte_callback_data);
 
