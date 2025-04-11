@@ -1116,13 +1116,10 @@ void pluginsd_process_cleanup(PARSER *parser) {
     pluginsd_cleanup_v2(parser);
     pluginsd_host_define_cleanup(parser);
 
-    parser_destroy(parser);
-}
+    rrdlabels_destroy(parser->user.new_host_labels);
+    rrdlabels_destroy(parser->user.chart_rrdlabels_linked_temporarily);
 
-void pluginsd_process_thread_cleanup(void *pptr) {
-    PARSER *parser = CLEANUP_FUNCTION_GET_PTR(pptr);
-    pluginsd_process_cleanup(parser);
-    rrd_collector_finished();
+    parser_destroy(parser);
 }
 
 bool parser_reconstruct_node(BUFFER *wb, void *ptr) {
@@ -1188,7 +1185,6 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    CLEANUP_FUNCTION_REGISTER(pluginsd_process_thread_cleanup) cleanup_parser = parser;
     buffered_reader_init(&parser->reader);
     CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
     bool send_quit = true;
@@ -1233,6 +1229,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     }
     else
         cd->serial_failures++;
+
+    pluginsd_process_cleanup(parser);
+    rrd_collector_finished();
 
     return count;
 }
