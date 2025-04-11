@@ -439,22 +439,22 @@ bool string_starts_with_string(const STRING *whole, const STRING *end) {
     return strncmp(string2str(whole), string2str(end), string_strlen(end)) == 0;
 }
 
-STRING *string_2way_merge(STRING *a, STRING *b) {
-    static STRING *X = NULL;
+// Static X used by string_2way_merge
+static STRING *string_2way_merge_X = NULL;
 
-    if(unlikely(!X)) {
-        X = string_strdupz("[x]");
-    }
+STRING *string_2way_merge(STRING *a, STRING *b) {
+    if(unlikely(!string_2way_merge_X))
+        string_2way_merge_X = string_strdupz("[x]");
 
     if(unlikely(a == b)) return string_dup(a);
-    if(unlikely(a == X)) return string_dup(a);
-    if(unlikely(b == X)) return string_dup(b);
-    if(unlikely(!a)) return string_dup(X);
-    if(unlikely(!b)) return string_dup(X);
+    if(unlikely(a == string_2way_merge_X)) return string_dup(a);
+    if(unlikely(b == string_2way_merge_X)) return string_dup(b);
+    if(unlikely(!a)) return string_dup(string_2way_merge_X);
+    if(unlikely(!b)) return string_dup(string_2way_merge_X);
 
     size_t alen = string_strlen(a);
     size_t blen = string_strlen(b);
-    size_t length = alen + blen + string_strlen(X) + 1;
+    size_t length = alen + blen + string_strlen(string_2way_merge_X) + 1;
     char buf1[length + 1], buf2[length + 1], *dst1;
     const char *s1, *s2;
 
@@ -541,6 +541,10 @@ static long unittest_string_entries(void) {
 // returns the number of strings that were freed, but were still referenced
 size_t string_destroy(void) {
     size_t referenced = 0;
+
+    // Free the static X string used by string_2way_merge
+    string_freez(string_2way_merge_X);
+    string_2way_merge_X = NULL;
 
 #ifdef FSANITIZE_ADDRESS
     // Create JudyL array for tracking stats by stacktrace
