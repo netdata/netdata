@@ -28,7 +28,7 @@ Choose the version that suits your needs:
 
 ---
 
-## 🔇 Silent Installation (Command Line)
+## 🤐 Silent Installation (Command Line)
 
 Use silent mode to deploy Netdata without user interaction (ideal for automation).
 
