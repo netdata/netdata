@@ -87,11 +87,23 @@ static struct workers_globals {
     SPINLOCK spinlock;
     Pvoid_t worknames_JudyHS;
     size_t memory;
+    
+#ifdef FSANITIZE_ADDRESS
+    // For tracking all registered worker items during ASAN builds
+    Pvoid_t workers_JudyL;         // JudyL array of all worker structs
+    Pvoid_t worknames_JudyL;       // JudyL array of all workname structs
+    Pvoid_t worker_strings_JudyL;  // JudyL array of all STRING objects in workers
+#endif
 
 } workers_globals = {                           // workers globals, the base of all worknames
     .enabled = false,
     .spinlock = SPINLOCK_INITIALIZER,           // a lock for the worknames index
     .worknames_JudyHS = NULL,                   // the worknames index
+#ifdef FSANITIZE_ADDRESS
+    .workers_JudyL = NULL,
+    .worknames_JudyL = NULL,
+    .worker_strings_JudyL = NULL,
+#endif
 };
 
 static __thread struct worker *worker = NULL; // the current thread worker
@@ -111,17 +123,6 @@ static ALWAYS_INLINE usec_t worker_now_monotonic_usec(void) {
 
 void workers_utilization_enable(void) {
     workers_globals.enabled = true;
-}
-
-void worker_utilization_cleanup(void) {
-    if(!workers_globals.enabled)
-        return;
-
-    spinlock_lock(&workers_globals.spinlock);
-    JudyHSFreeArray(&workers_globals.worknames_JudyHS, PJE0);
-    spinlock_unlock(&workers_globals.spinlock);
-
-    memset(&workers_globals, 0, sizeof(workers_globals));
 }
 
 size_t workers_allocated_memory(void) {
@@ -154,6 +155,13 @@ void worker_register(const char *name) {
 
     workers_globals.memory += sizeof(struct worker) + strlen(worker->tag) + 1 + strlen(worker->workname) + 1;
 
+#ifdef FSANITIZE_ADDRESS
+    // Track the worker struct in our JudyL array for ASAN builds
+    Pvoid_t *WValue = JudyLIns(&workers_globals.workers_JudyL, (Word_t)worker, PJE0);
+    if (WValue != PJERR)
+        *WValue = (void *)1;
+#endif
+
     JudyAllocThreadPulseReset();
     Pvoid_t *PValue = JudyHSIns(&workers_globals.worknames_JudyHS, (void *)name, name_size, PJE0);
     int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
@@ -166,6 +174,13 @@ void worker_register(const char *name) {
         *PValue = workname;
 
         workers_globals.memory = (int64_t)workers_globals.memory + (int64_t)sizeof(struct workers_workname) + judy_mem;
+        
+#ifdef FSANITIZE_ADDRESS
+        // Track the workname struct in our JudyL array for ASAN builds
+        Pvoid_t *WValue = JudyLIns(&workers_globals.worknames_JudyL, (Word_t)workname, PJE0);
+        if (WValue != PJERR)
+            *WValue = (void *)1;
+#endif
     }
 
     spinlock_lock(&workname->spinlock);
@@ -192,9 +207,41 @@ void worker_register_job_custom_metric(size_t job_id, const char *name, const ch
         return;
     }
 
-    worker->per_job_type[job_id].name = string_strdupz(name);
-    worker->per_job_type[job_id].units = string_strdupz(units);
+    STRING *name_str = string_strdupz(name);
+    STRING *units_str = string_strdupz(units);
+    
+    worker->per_job_type[job_id].name = name_str;
+    worker->per_job_type[job_id].units = units_str;
     worker->per_job_type[job_id].type = type;
+    
+#ifdef FSANITIZE_ADDRESS
+    // Track the strings in our JudyL array for ASAN builds
+    spinlock_lock(&workers_globals.spinlock);
+    
+    // Track the name STRING with reference counting
+    if (name_str) {
+        Pvoid_t *PValue = JudyLIns(&workers_globals.worker_strings_JudyL, (Word_t)name_str, PJE0);
+        if (PValue != PJERR) {
+            // Increment the reference count (or initialize to 1 if new)
+            size_t count = (size_t)(uintptr_t)*PValue;
+            count++;
+            *PValue = (void *)(uintptr_t)count;
+        }
+    }
+    
+    // Track the units STRING with reference counting
+    if (units_str) {
+        Pvoid_t *PValue = JudyLIns(&workers_globals.worker_strings_JudyL, (Word_t)units_str, PJE0);
+        if (PValue != PJERR) {
+            // Increment the reference count (or initialize to 1 if new)
+            size_t count = (size_t)(uintptr_t)*PValue;
+            count++;
+            *PValue = (void *)(uintptr_t)count;
+        }
+    }
+    
+    spinlock_unlock(&workers_globals.spinlock);
+#endif
 }
 
 void worker_register_job_name(size_t job_id, const char *name) {
@@ -222,10 +269,52 @@ void worker_unregister(void) {
         }
     }
     workers_globals.memory -= sizeof(struct worker) + strlen(worker->tag) + 1 + strlen(worker->workname) + 1;
+    
+#ifdef FSANITIZE_ADDRESS
+    // Remove this worker from the tracking array
+    JudyLDel(&workers_globals.workers_JudyL, (Word_t)worker, PJE0);
+#endif
+    
     spinlock_unlock(&workers_globals.spinlock);
 
     // Free all thread-local resources associated with this worker
     for(int i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
+#ifdef FSANITIZE_ADDRESS
+        // Decrement reference count in tracking array before freeing
+        if (worker->per_job_type[i].name) {
+            spinlock_lock(&workers_globals.spinlock);
+            Pvoid_t *PValue = JudyLGet(workers_globals.worker_strings_JudyL, (Word_t)worker->per_job_type[i].name, PJE0);
+            if (PValue) {
+                size_t count = (size_t)(uintptr_t)*PValue;
+                if (count > 1) {
+                    // Decrement reference count
+                    count--;
+                    *PValue = (void *)(uintptr_t)count;
+                } else {
+                    // Last reference, remove from tracking
+                    JudyLDel(&workers_globals.worker_strings_JudyL, (Word_t)worker->per_job_type[i].name, PJE0);
+                }
+            }
+            spinlock_unlock(&workers_globals.spinlock);
+        }
+        if (worker->per_job_type[i].units) {
+            spinlock_lock(&workers_globals.spinlock);
+            Pvoid_t *PValue = JudyLGet(workers_globals.worker_strings_JudyL, (Word_t)worker->per_job_type[i].units, PJE0);
+            if (PValue) {
+                size_t count = (size_t)(uintptr_t)*PValue;
+                if (count > 1) {
+                    // Decrement reference count
+                    count--;
+                    *PValue = (void *)(uintptr_t)count;
+                } else {
+                    // Last reference, remove from tracking
+                    JudyLDel(&workers_globals.worker_strings_JudyL, (Word_t)worker->per_job_type[i].units, PJE0);
+                }
+            }
+            spinlock_unlock(&workers_globals.spinlock);
+        }
+#endif
+        // Then free the strings
         string_freez(worker->per_job_type[i].name);
         string_freez(worker->per_job_type[i].units);
     }
@@ -235,6 +324,154 @@ void worker_unregister(void) {
     freez(worker);
 
     worker = NULL;
+}
+
+// Cleanup all worker utilization resources
+void worker_utilization_cleanup(void) {
+    if(!workers_globals.enabled)
+        return;
+
+    // Clean up the current thread's worker if it exists
+    worker_unregister();
+    
+    spinlock_lock(&workers_globals.spinlock);
+    
+#ifdef FSANITIZE_ADDRESS
+    // Free any remaining strings in the tracking array according to their reference counts
+    if (workers_globals.worker_strings_JudyL) {
+        Word_t string_ptr = 0;
+        Pvoid_t *PValue = JudyLFirst(workers_globals.worker_strings_JudyL, &string_ptr, PJE0);
+        size_t total_strings = 0;
+        size_t total_refs = 0;
+        
+        // First pass: count how many strings and references
+        while (PValue) {
+            total_strings++;
+            size_t refs = (size_t)(uintptr_t)*PValue;
+            total_refs += refs;
+            PValue = JudyLNext(workers_globals.worker_strings_JudyL, &string_ptr, PJE0);
+        }
+        
+        // If any strings remain, emit info about them
+        if (total_strings > 0) {
+            fprintf(stderr, "INFO: Freeing %zu STRING objects with %zu total references\n", 
+                    total_strings, total_refs);
+            
+            // Second pass: free each string the correct number of times
+            string_ptr = 0;
+            PValue = JudyLFirst(workers_globals.worker_strings_JudyL, &string_ptr, PJE0);
+            
+            while (PValue) {
+                STRING *str = (STRING *)string_ptr;
+                size_t refs = (size_t)(uintptr_t)*PValue;
+                
+                // Get the next one before we potentially delete this entry
+                PValue = JudyLNext(workers_globals.worker_strings_JudyL, &string_ptr, PJE0);
+                
+                // Free the string exactly the number of times it was referenced
+                for (size_t i = 0; i < refs; i++) {
+                    string_freez(str);
+                }
+            }
+        }
+        
+        // Free the array itself
+        JudyLFreeArray(&workers_globals.worker_strings_JudyL, PJE0);
+        workers_globals.worker_strings_JudyL = NULL;
+    }
+    
+    // We don't need to free worker or workname structs here as they should
+    // be freed by worker_unregister, but we should free the tracking arrays
+    if (workers_globals.workers_JudyL) {
+        JudyLFreeArray(&workers_globals.workers_JudyL, PJE0);
+        workers_globals.workers_JudyL = NULL;
+    }
+    
+    if (workers_globals.worknames_JudyL) {
+        JudyLFreeArray(&workers_globals.worknames_JudyL, PJE0);
+        workers_globals.worknames_JudyL = NULL;
+    }
+#endif
+    
+    // Free the JudyHS array that contains workname structs
+    if (workers_globals.worknames_JudyHS) {
+#ifdef FSANITIZE_ADDRESS
+        // For ASAN builds, we need to free any remaining workname structures
+        // First, collect all workname pointers
+        Pvoid_t worknames_to_free = NULL;
+        
+        // Cannot iterate JudyHS directly, but we can use worknames_JudyL which tracks all worknames
+        if (workers_globals.worknames_JudyL) {
+            Word_t workname_ptr = 0;
+            Pvoid_t *PValue = JudyLFirst(workers_globals.worknames_JudyL, &workname_ptr, PJE0);
+            size_t count = 0;
+            
+            while (PValue) {
+                // Store this workname to free it later
+                Pvoid_t *StoreValue = JudyLIns(&worknames_to_free, workname_ptr, PJE0);
+                if (StoreValue != PJERR)
+                    *StoreValue = (void *)1;
+                
+                count++;
+                PValue = JudyLNext(workers_globals.worknames_JudyL, &workname_ptr, PJE0);
+            }
+            
+            if (count > 0) {
+                fprintf(stderr, "INFO: Freeing %zu workers_workname structures from tracking array\n", count);
+            }
+        }
+        
+        // Also try to get the LIBUV workname directly since it's the one leaking
+        // This is a direct approach to ensure we don't miss any worknames
+        const char *libuv_name = "LIBUV";
+        size_t libuv_name_size = strlen(libuv_name) + 1;
+        Pvoid_t *LiuvValue = JudyHSGet(workers_globals.worknames_JudyHS, (void *)libuv_name, libuv_name_size);
+        if (LiuvValue && *LiuvValue) {
+            struct workers_workname *libuv_workname = *LiuvValue;
+            // Check if we've already got this workname in our tracking array
+            bool already_tracked = false;
+            if (worknames_to_free) {
+                Pvoid_t *ExistingValue = JudyLGet(worknames_to_free, (Word_t)libuv_workname, PJE0);
+                already_tracked = (ExistingValue != NULL);
+            }
+            
+            if (!already_tracked) {
+                // Add this workname to our list
+                Pvoid_t *StoreValue = JudyLIns(&worknames_to_free, (Word_t)libuv_workname, PJE0);
+                if (StoreValue != PJERR) {
+                    *StoreValue = (void *)1;
+                    fprintf(stderr, "INFO: Found LIBUV workname not in tracking array\n");
+                }
+            }
+        }
+#endif
+        
+        // Free the JudyHS array
+        JudyHSFreeArray(&workers_globals.worknames_JudyHS, PJE0);
+        workers_globals.worknames_JudyHS = NULL;
+        
+#ifdef FSANITIZE_ADDRESS
+        // Now free all the workname structures we collected
+        if (worknames_to_free) {
+            Word_t workname_ptr = 0;
+            Pvoid_t *PValue = JudyLFirst(worknames_to_free, &workname_ptr, PJE0);
+            
+            while (PValue) {
+                struct workers_workname *workname = (struct workers_workname *)workname_ptr;
+                freez(workname);
+                
+                PValue = JudyLNext(worknames_to_free, &workname_ptr, PJE0);
+            }
+            
+            JudyLFreeArray(&worknames_to_free, PJE0);
+        }
+#endif
+    }
+    
+    // Reset memory count
+    workers_globals.memory = 0;
+    
+    spinlock_unlock(&workers_globals.spinlock);
 }
 
 static void worker_is_idle_with_time(usec_t now) {
