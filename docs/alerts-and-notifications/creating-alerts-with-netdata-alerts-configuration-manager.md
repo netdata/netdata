@@ -48,7 +48,7 @@ Click **Show advanced** in the Alert Configuration Manager to access these optio
 
 ### Metrics Lookup
 
-You can define how Netdata should query the data before triggering an alert:
+You can define how Netdata should query the data before triggering an Alert:
 
 | Parameter   | Description                       |
 |-------------|-----------------------------------|
