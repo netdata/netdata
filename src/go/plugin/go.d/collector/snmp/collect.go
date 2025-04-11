@@ -5,7 +5,6 @@ package snmp
 import (
 	"errors"
 	"fmt"
-	"log"
 	"slices"
 	"strings"
 
@@ -18,6 +17,9 @@ import (
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
+
+	mx := make(map[string]int64)
+
 	if c.enableProfiles {
 		sysObjectID, err := c.getSysObjectID(snmpsd.OidSysObject)
 		if err != nil {
@@ -31,7 +33,6 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, err
 		}
 		seen := make(map[string]bool)
-		mx := make(map[string]int64)
 		c.makeChartsFromMetricMap(mx, metricMap, seen)
 	}
 
@@ -48,8 +49,6 @@ func (c *Collector) collect() (map[string]int64, error) {
 			c.vnode = c.setupVnode(si)
 		}
 	}
-
-	mx := make(map[string]int64)
 
 	if err := c.collectSysUptime(mx); err != nil {
 		return nil, err
@@ -83,9 +82,6 @@ func (c *Collector) makeChartsFromMetricMap(mx map[string]int64, metricMap map[s
 		if metric.tableName == "" {
 			switch s := metric.value.(type) {
 			case int:
-
-				log.Println(metric)
-
 				name := metric.name
 				if name == "" {
 					continue

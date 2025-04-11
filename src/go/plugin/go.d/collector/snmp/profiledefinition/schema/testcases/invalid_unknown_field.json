@@ -1,0 +1,6 @@
+{
+  "profile_definition": {
+    "name": "some-profile",
+    "unknown_field": "abc"
+  }
+}

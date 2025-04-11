@@ -1,0 +1,14 @@
+{
+  "profile_definition": {
+    "name": "some-profile",
+    "metrics": [
+      {
+        "symbol": {
+          "OID": "1.3.6.1.4.1.318.1.1.1.2.2.5.0",
+          "name": "upsAdvBatteryNumOfBattPacks"
+        },
+        "forced_type": "gauge"
+      }
+    ]
+  }
+}

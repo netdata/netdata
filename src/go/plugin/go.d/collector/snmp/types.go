@@ -7,18 +7,18 @@ import (
 )
 
 type snmpPDU struct {
-	value       interface{}
-	oid         string
-	metric_type gosnmp.Asn1BER
+	value      interface{}
+	oid        string
+	metricType gosnmp.Asn1BER
 }
 
 type SysObjectIDs []string
 
 type parsedResult struct {
-	oids           []string
-	next_oids      []string
-	bulk_oids      []string
-	parsed_metrics []parsedMetric
+	OIDs          []string
+	nextOIDs      []string
+	bulkOIDs      []string
+	parsedMetrics []parsedMetric
 }
 
 type tableBatchKey struct {
@@ -83,6 +83,8 @@ type parsedSymbolMetric struct {
 	options             map[string]string
 	extractValuePattern *regexp.Regexp
 	baseoid             string //TODO consider changing this to OID, it will not have nested OIDs as it is a symbol
+	unit                string
+	description         string
 }
 
 type parsedTableMetric struct {
@@ -102,8 +104,8 @@ type parsedMetric any
 
 // Not supported yet
 /*type parsedSimpleMetricTag struct {
-	name string
-}
+		name string
+	}
 
 type parsedMatchMetricTag struct {
 tags    []string
@@ -111,15 +113,15 @@ symbol  Symbol
 pattern *regexp.Regexp
 }
 
-type symbolTag struct {
-	parsedMetricTag parsedMetricTag
-	symbol          string
-}
+	type symbolTag struct {
+		parsedMetricTag parsedMetricTag
+		symbol          string
+	}
 
-type parsedSymbolTagsResult struct {
-	oids             []string
-	parsedSymbolTags []symbolTag
-}
+	type parsedSymbolTagsResult struct {
+		oids             []string
+		parsedSymbolTags []symbolTag
+	}
 */
 type parsedMetricTag struct {
 	name string
@@ -146,6 +148,8 @@ type processedMetric struct {
 	oid         string
 	name        string
 	value       interface{}
-	metric_type gosnmp.Asn1BER
+	metricType  gosnmp.Asn1BER
 	tableName   string
+	unit        string
+	description string
 }

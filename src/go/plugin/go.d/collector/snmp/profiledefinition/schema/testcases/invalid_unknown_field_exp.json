@@ -1,0 +1,5 @@
+{
+  "error_patterns": [
+    "additionalProperties 'unknown_field' not allowed"
+  ]
+}
