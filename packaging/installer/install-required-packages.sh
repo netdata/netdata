@@ -631,6 +631,11 @@ declare -A pkg_find=(
   ['default']="WARNING|"
 )
 
+declare -A pkg_awk=(
+  ['gentoo']="app-alternatives/awk"
+  ['default']="gawk"
+)
+
 declare -A pkg_distro_sdk=(
   ['alpine']="alpine-sdk"
   ['centos']="kernel-headers"
@@ -1220,6 +1225,7 @@ packages() {
 
   require_cmd git || suitable_package git
   require_cmd find || suitable_package find
+  require_cmd awk || suitable_package awk
 
   require_cmd gcc || require_cmd clang ||
     require_cmd gcc-multilib || suitable_package gcc
