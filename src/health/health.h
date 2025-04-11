@@ -58,7 +58,7 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 
 int health_alarm_log_open(RRDHOST *host);
-void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async);
+void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
 void health_alarm_log_load(RRDHOST *host);
 
 ALARM_ENTRY* health_create_alarm_entry(
@@ -73,7 +73,7 @@ ALARM_ENTRY* health_create_alarm_entry(
     int delay,
     HEALTH_ENTRY_FLAGS flags);
 
-void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async);
+void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
 const char *health_user_config_dir(void);
 const char *health_stock_config_dir(void);
@@ -108,6 +108,15 @@ void health_prototype_metadata_foreach(void *data, prototype_metadata_cb_t cb);
 uint64_t health_evloop_current_iteration(void);
 void rrdhost_set_health_evloop_iteration(RRDHOST *host);
 uint64_t rrdhost_health_evloop_last_iteration(RRDHOST *host);
+void health_register_host(RRDHOST *host, time_t run_at);
+void health_event_loop_init(void);
+void health_unregister_host(RRDHOST *host, bool rrdcalc_cleanup);
+void health_shutdown();
+void health_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae);
+void health_queue_ae_deletion(RRDHOST *host, ALARM_ENTRY *ae);
+void health_schedule_ae_save(RRDHOST *host, ALARM_ENTRY *ae);
+void health_pause();
+void health_resume();
 
 void health_load_config_defaults(void);
 

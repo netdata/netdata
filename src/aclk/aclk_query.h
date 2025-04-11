@@ -15,6 +15,7 @@ void mark_pending_req_cancel_all();
 void aclk_execute_query(aclk_query_t query);
 void aclk_mqtt_client_set(mqtt_wss_client client);
 void aclk_mqtt_client_reset();
+void aclk_push_host_alert(RRDHOST *host);
 int http_api_v2(mqtt_wss_client client, aclk_query_t query);
 int send_bin_msg(mqtt_wss_client client, aclk_query_t query);
 

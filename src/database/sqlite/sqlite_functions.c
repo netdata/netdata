@@ -393,6 +393,29 @@ void sqlite_close_databases(void)
 
     sql_close_database(db_context_meta, "CONTEXT");
     sql_close_database(db_meta, "METADATA");
+    sql_close_database(db_aclk, "ACLK");
+    sql_close_database(db_health, "HEALTH");
+}
+
+int sql_init_context_database(bool in_memory);
+int sql_init_health_database(bool in_memory);
+int sql_init_aclk_database(bool in_memory);
+
+int sql_init_databases(bool memory_mode)
+{
+    if (unlikely(sql_init_meta_database(DB_CHECK_NONE, memory_mode))) {
+        if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE)
+            return 1;
+        nd_log_daemon(NDLP_DEBUG, "Skipping SQLITE metadata initialization since memory mode is not dbengine");
+    }
+
+    sql_init_context_database(memory_mode);
+
+    sql_init_health_database(memory_mode);
+
+    sql_init_aclk_database(memory_mode);
+
+    return 0;
 }
 
 uint64_t get_total_database_space(void)
@@ -460,4 +483,77 @@ void sqlite_library_shutdown(void)
     spinlock_lock(&sqlite_spinlock);
     (void) sqlite3_shutdown();
     spinlock_unlock(&sqlite_spinlock);
+}
+
+int attach_database(sqlite3 *database, const char *db_file, const char *alias, bool in_memory)
+{
+    char buf[1024 + 1] = "";
+    const char *list[2] = { buf, NULL };
+
+    if (likely(!in_memory))
+        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE \"%s/%s\" as %s", netdata_configured_cache_dir, db_file, alias);
+    else
+        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE ':memory:' as meta");
+
+    return init_database_batch(database, list, alias);
+}
+
+void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    nd_uuid_t  uuid;
+
+    if ( argc != 1 ){
+        sqlite3_result_null(context);
+        return ;
+    }
+    int rc = uuid_parse((const char *) sqlite3_value_text(argv[0]), uuid);
+    if (rc == -1)  {
+        sqlite3_result_null(context);
+        return ;
+    }
+
+    sqlite3_result_blob(context, &uuid, sizeof(nd_uuid_t), SQLITE_TRANSIENT);
+}
+
+void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    if (argc != 1 ){
+        sqlite3_result_null(context);
+        return ;
+    }
+
+    if (sqlite3_value_int(argv[0]) != 0) {
+        struct timespec req = {.tv_sec = 0, .tv_nsec = 1};
+        nanosleep(&req, NULL);
+    }
+
+    sqlite3_result_int64(context, (sqlite_int64) now_realtime_usec());
+}
+
+void sqlite_uuid_random(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    (void)argc;
+    (void)argv;
+
+    nd_uuid_t uuid;
+    uuid_generate_random(uuid);
+    sqlite3_result_blob(context, &uuid, sizeof(nd_uuid_t), SQLITE_TRANSIENT);
+}
+
+
+void create_user_database_functions(sqlite3 *database)
+{
+    int rc;
+
+    rc = sqlite3_create_function(database, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal u2h function");
+
+    rc = sqlite3_create_function(database, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal now_usec function");
+
+    rc = sqlite3_create_function(database, "uuid_random", 0, SQLITE_ANY, 0, sqlite_uuid_random, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal uuid_random function");
 }
