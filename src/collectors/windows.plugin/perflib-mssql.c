@@ -3,17 +3,29 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
+#include <sqlext.h>
+#include <sqltypes.h>
+#include <sql.h>
+
 // https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
 #define NETDATA_MAX_INSTANCE_NAME 32
 #define NETDATA_MAX_INSTANCE_OBJECT 128
 
 BOOL is_sqlexpress = FALSE;
 BOOL is_connected = FALSE;
-SQLHENV netdataEnv = SQL_NULL_HENV;
-SQLHDBC netdataHdbc = SQL_NULL_HDBC;
-static struct netdata_mssql_conn dbconn = {
-    .driver = "SQL Server Native Client 11.0",
-    .server = "(localhost)",
+SQLHENV netdataSQLEnv = NULL;
+SQLHDBC netdataSQLHDBc = NULL;
+
+struct netdata_mssql_conn {
+    const char *driver;
+    const char *server;
+    const char *address;
+    const char *username;
+    const char *password;
+    bool windows_auth;
+} dbconn = {
+    .driver = "SQL Server",
+    .server = NULL,
     .address = NULL,
     .username = NULL,
     .password = NULL,
@@ -1495,6 +1507,67 @@ static void netdata_read_config_options()
     netdata_mount_mssql_connection_string(connectionString, sizeof(connectionString) - 1, &dbconn);
 }
 
+static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle)
+{
+    SQLCHAR state[1024];
+    SQLCHAR message[1024];
+    if (SQL_SUCCESS == SQLGetDiagRec(type, handle, 1, state, NULL, message, 1024, NULL))
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to MSSQL server:  %s, %s", message, state);
+}
+
+static bool MSSQL_initialize_conection()
+{
+    SQLRETURN ret;
+    if (netdataSQLEnv == NULL) {
+        ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &netdataSQLEnv);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            return FALSE;
+
+        ret = SQLSetEnvAttr(netdataSQLEnv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, 0);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            return FALSE;
+        }
+    }
+
+    ret = SQLAllocHandle(SQL_HANDLE_DBC, netdataSQLEnv, &netdataSQLHDBc);
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        return FALSE;
+    }
+
+    ret = SQLSetConnectAttr(netdataSQLHDBc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        return FALSE;
+    }
+
+    SQLCHAR ret_conn_str[1024];
+    ret = SQLDriverConnect(
+        netdataSQLHDBc,
+        NULL,
+        connectionString,
+        SQL_NTS,
+        ret_conn_str,
+        1024,
+        NULL,
+        SQL_DRIVER_NOPROMPT);
+
+    BOOL retConn;
+    switch (ret) {
+        case SQL_NO_DATA_FOUND:
+        case SQL_INVALID_HANDLE:
+        case SQL_ERROR:
+        default:
+            netdata_MSSQL_error(SQL_HANDLE_DBC, netdataSQLHDBc);
+            retConn = FALSE;
+            break;
+        case SQL_SUCCESS:
+        case SQL_SUCCESS_WITH_INFO:
+            retConn = TRUE;
+            break;
+    }
+
+    return retConn;
+}
+
 int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
@@ -1504,13 +1577,11 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
             return -1;
 
         netdata_read_config_options();
-        netdataEnv = netdata_MSSQL_initialize_env();
+        is_connected = MSSQL_initialize_conection();
         initialized = true;
     }
 
-    netdataHdbc = netdata_MSSQL_start_connection(netdataEnv, connectionString);
     dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_charts_cb, &update_every);
-    netdata_MSSQL_close_connection(netdataHdbc);
 
     return 0;
 }
