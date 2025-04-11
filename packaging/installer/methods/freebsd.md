@@ -63,7 +63,7 @@ fetch https://github.com/netdata/netdata/releases/latest/download/netdata-latest
 Or fetch a specific version:
 
 ```bash
-fetch https://github.com/netdata/netdata/releases/download/v1.36.1/netdata-v1.36.1.tar.gz
+fetch https://github.com/netdata/netdata/releases/download/v2.3.2/netdata-v2.3.2.tar.gz
 ```
 
 Extract the archive:
