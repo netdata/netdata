@@ -17,6 +17,10 @@ struct netdata_string {
     REFCOUNT refcount;  // how many times this string is used
                         // We use a signed number to be able to detect duplicate frees of a string.
                         // If at any point this goes below zero, we have a duplicate free.
+                        
+#ifdef FSANITIZE_ADDRESS
+    STACKTRACE stacktrace;  // stacktrace captured at creation time
+#endif
 
     const char str[];   // the string itself, is appended to this structure
 };
@@ -33,9 +37,12 @@ static struct string_partition {
     long int memory;            // the memory used
     long int memory_index;      // JudyHS (accurate)
 
+#ifdef FSANITIZE_ADDRESS
+    Pvoid_t JudyLPointers;      // JudyL array to keep track of all string pointers for traversal
+#endif
+
 #ifdef NETDATA_INTERNAL_CHECKS
     // internal statistics
-
     struct {
         size_t searches;            // the number of successful searches in the index
         size_t releases;            // when a string is unreferenced
@@ -201,6 +208,18 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
         strcpy((char *)string->str, str);
         string->length = length;
         string->refcount = 1;
+        
+#ifdef FSANITIZE_ADDRESS
+        // Capture stacktrace at creation time
+        string->stacktrace = stacktrace_get();
+        
+        // Add to JudyL array for tracking strings by pointer
+        Pvoid_t *PValue;
+        PValue = JudyLIns(&string_base[partition].JudyLPointers, (Word_t)string, PJE0);
+        if (PValue != PJERR)
+            *PValue = (void *)1;  // Use a simple value of 1 for now
+#endif
+        
         *ptr = string;
         string_base[partition].inserts++;
         string_base[partition].entries++;
@@ -265,6 +284,13 @@ static inline void string_index_delete(STRING *string) {
         string_base[partition].entries--;
         string_base[partition].memory -= mem_size;
         string_base[partition].memory_index += judy_mem;
+        
+#ifdef FSANITIZE_ADDRESS
+        // Remove from the JudyL array if it exists
+        if (string_base[partition].JudyLPointers)
+            JudyLDel(&string_base[partition].JudyLPointers, (Word_t)string, PJE0);
+#endif
+        
         freez(string);
     }
 
@@ -460,15 +486,57 @@ static long unittest_string_entries(void) {
 size_t string_destroy(void) {
     size_t referenced = 0;
 
+#ifdef FSANITIZE_ADDRESS
+    // Create JudyL array for tracking stats by stacktrace
+    Pvoid_t string_counts = NULL;    // JudyL array to count strings per stacktrace
+    
+    BUFFER *wb = buffer_create(16384, NULL);
+    
+    fprintf(stderr, "\n========= STRINGS GROUPED BY CREATION STACKTRACE =========\n");
+#endif
+
     // Traverse all partitions
     for (size_t partition = 0; partition < STRING_PARTITIONS; partition++) {
         // Lock the partition to prevent new entries while we're cleaning up
         rw_spinlock_write_lock(&string_base[partition].spinlock);
 
+#ifdef FSANITIZE_ADDRESS
+        // First, collect statistics about remaining strings
+        if (string_base[partition].JudyLPointers) {
+            // Traverse the JudyL array to count strings by stacktrace
+            Word_t string_idx = 0;
+            Pvoid_t *PValue;
+            
+            PValue = JudyLFirst(string_base[partition].JudyLPointers, &string_idx, PJE0);
+            while (PValue) {
+                STRING *string = (STRING *)string_idx;
+                if (string && string->stacktrace) {
+                    Word_t key = (Word_t)string->stacktrace;
+                    PValue = JudyLGet(string_counts, key, PJE0);
+                    if (PValue) {
+                        // Increment existing count
+                        size_t count = (size_t)(uintptr_t)*PValue;
+                        count++;
+                        *PValue = (Pvoid_t)(uintptr_t)count;
+                    } else {
+                        // Insert new count
+                        PValue = JudyLIns(&string_counts, key, PJE0);
+                        if (PValue != PJERR)
+                            *PValue = (Pvoid_t)(uintptr_t)1;
+                    }
+                }
+                
+                PValue = JudyLNext(string_base[partition].JudyLPointers, &string_idx, PJE0);
+            }
+            
+            // Free the JudyL pointers array
+            JudyLFreeArray(&string_base[partition].JudyLPointers, PJE0);
+            string_base[partition].JudyLPointers = NULL;
+        }
+#endif
+
         // Since JudyHS doesn't have simple traversal functions,
         // we'll free the entire array at once.
-        // This is a bit inefficient because we won't be able to
-        // determine exactly how many strings were referenced.
         if (string_base[partition].JudyHSArray) {
             // We'll count all entries as "referenced" since we can't check them individually
             referenced += string_base[partition].entries;
@@ -499,6 +567,77 @@ size_t string_destroy(void) {
 
         rw_spinlock_write_unlock(&string_base[partition].spinlock);
     }
+
+#ifdef FSANITIZE_ADDRESS
+    // Collect stacktraces into an array for sorting
+    typedef struct {
+        STACKTRACE st;
+        size_t count;
+    } StacktraceEntry;
+
+    // First, count the number of unique stacktraces
+    Word_t Index = 0;
+    Pvoid_t *PValue;
+    size_t unique_stacktraces = 0;
+    
+    if (string_counts) {
+        PValue = JudyLFirst(string_counts, &Index, PJE0);
+        while (PValue) {
+            unique_stacktraces++;
+            PValue = JudyLNext(string_counts, &Index, PJE0);
+        }
+    }
+    
+    // Allocate an array for sorting
+    StacktraceEntry *entries = mallocz(sizeof(StacktraceEntry) * unique_stacktraces);
+    size_t entry_count = 0;
+    
+    // Populate the array with stacktraces and counts
+    if (string_counts && unique_stacktraces > 0) {
+        Index = 0;
+        PValue = JudyLFirst(string_counts, &Index, PJE0);
+        while (PValue) {
+            entries[entry_count].st = (STACKTRACE)Index;
+            entries[entry_count].count = (size_t)(uintptr_t)*PValue;
+            entry_count++;
+            PValue = JudyLNext(string_counts, &Index, PJE0);
+        }
+    }
+    
+    // Sort by count in descending order
+    // Simple insertion sort is sufficient for a small number of entries
+    for (size_t i = 1; i < entry_count; i++) {
+        StacktraceEntry key = entries[i];
+        ssize_t j = i - 1;
+        
+        // Move elements that are greater than key to one position ahead of their current position
+        while (j >= 0 && entries[j].count < key.count) {
+            entries[j + 1] = entries[j];
+            j--;
+        }
+        entries[j + 1] = key;
+    }
+    
+    // Print sorted stacktraces
+    fprintf(stderr, "\nTop string creation stacktraces by count:\n");
+    
+    for (size_t i = 0; i < entry_count; i++) {
+        // Format stacktrace to buffer
+        buffer_flush(wb);
+        stacktrace_to_buffer(entries[i].st, wb);
+        
+        fprintf(stderr, "\n > STRINGS REMAINING %zu: %zu strings created from:\n%s\n",
+                i + 1, entries[i].count, buffer_tostring(wb));
+    }
+    
+    fprintf(stderr, "==================================================================\n\n");
+    
+    // Clean up
+    freez(entries);
+    if (string_counts)
+        JudyLFreeArray(&string_counts, PJE0);
+    buffer_free(wb);
+#endif
 
     memset(&string_base, 0, sizeof(string_base));
     return referenced;
@@ -752,6 +891,12 @@ int string_unittest(size_t entries) {
 }
 
 void string_init(void) {
-    for (size_t i = 0; i != STRING_PARTITIONS; i++)
+    for (size_t i = 0; i != STRING_PARTITIONS; i++) {
         rw_spinlock_init(&string_base[i].spinlock);
+        
+#ifdef FSANITIZE_ADDRESS
+        // Initialize the JudyL pointers array to NULL
+        string_base[i].JudyLPointers = NULL;
+#endif
+    }
 }
