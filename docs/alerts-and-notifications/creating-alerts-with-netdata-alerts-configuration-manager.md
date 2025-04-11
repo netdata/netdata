@@ -24,7 +24,7 @@ To use this feature, you’ll need an active Netdata subscription. → [View sub
 9. Apply your changes:
 
    ```
-   <netdata-install>/usr/sbin/netdatacli reload-health
+   <INSTALL_PREFIX>/usr/sbin/netdatacli reload-health
    ```
 ---
 
