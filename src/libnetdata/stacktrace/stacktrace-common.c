@@ -142,13 +142,13 @@ void stacktrace_keep_first_root_cause_function(const char *function) {
 }
 
 // Get the current stacktrace - public API
-STACKTRACE stacktrace_get(void) {
+STACKTRACE stacktrace_get(int skip_frames) {
     // Make sure cache is initialized
     stacktrace_cache_init();
     
     // Get the frames from the implementation
     void *frames[50] = {0};
-    int num_frames = impl_stacktrace_get_frames(frames, 50, 1); // Skip 1 frame (stacktrace_get itself)
+    int num_frames = impl_stacktrace_get_frames(frames, 50, skip_frames + 1); // Skip 1 frame (stacktrace_get itself)
     
     if (num_frames <= 0)
         return NULL;

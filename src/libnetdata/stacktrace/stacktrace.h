@@ -36,7 +36,7 @@ void stacktrace_capture(BUFFER *wb);
 const char *stacktrace_backend(void);
 
 // Get the current stacktrace, hash it, and store it in a cache
-STACKTRACE stacktrace_get(void);
+STACKTRACE stacktrace_get(int skip_frames);
 
 // Convert a stacktrace to a buffer
 void stacktrace_to_buffer(STACKTRACE trace, struct web_buffer *wb);
