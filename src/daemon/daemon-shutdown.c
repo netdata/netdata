@@ -21,6 +21,7 @@ extern void inicfg_free(struct config *root);
 extern void claim_config_free(void);
 extern void stream_config_free(void);
 extern void exporting_config_free(void);
+extern void rrd_functions_inflight_destroy(void);
 
 static bool abort_on_fatal = true;
 
@@ -346,6 +347,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     fprintf(stderr, "Freeing all RRDHOSTs...\n");
     rrdhost_free_all();
     dyncfg_shutdown();
+    rrd_functions_inflight_destroy();
 
     fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
     size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
