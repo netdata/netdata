@@ -22,6 +22,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
 void dyncfg_del_low_level(RRDHOST *host, const char *id);
 void dyncfg_status_low_level(RRDHOST *host, const char *id, DYNCFG_STATUS status);
 void dyncfg_init_low_level(bool load_saved);
+void dyncfg_shutdown_low_level(void);
 
 // high-level API for internal modules
 bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type,
@@ -32,5 +33,6 @@ void dyncfg_del(RRDHOST *host, const char *id);
 void dyncfg_status(RRDHOST *host, const char *id, DYNCFG_STATUS status);
 
 void dyncfg_init(bool load_saved);
+void dyncfg_shutdown(void);
 
 #endif //NETDATA_DYNCFG_H

@@ -345,6 +345,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     fprintf(stderr, "Freeing all RRDHOSTs...\n");
     rrdhost_free_all();
+    dyncfg_shutdown();
 
     fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
     size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
