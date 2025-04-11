@@ -56,7 +56,21 @@ This port is typically blocked by Windows Defender, so you must allow access bef
 7. Finally, provide a `Name` and an optional `Description` for the new rule,
    then click `Finish`.
 
-#### Microsoft SQL Server
+#### Microsoft SQL Server (Configuration)
+
+After enabling access through the firewall, you will need to configure your SQL Server instance to accept TCP
+connections:
+
+1. Open `SQL Server Configuration Manager`.
+2. Expand `SQL Server Network Configuration`.
+3. In the console panel, select `Protocols for <instance name>.`.
+4. In the details panel, double-click the `TCP` protocol, and set `Yes` for `Enabled`.
+5. Go to the `IP Address` tab, locate the section labeled`IPAII`.
+   - Remove any value from the `TCP Dynamic Ports` field.
+   - Enter a value in the `TCP Port` field. By default, SQL Server uses `1433`.
+6. Finally, select `SQL Server Services`, and restart your SQL Server instance.
+
+#### Microsoft SQL Server (User)
 
 Netdata requires a user with the `VIEW SERVER STATE` permission to collect data from the server.
 Once the user is created, it must be added to the databases.
@@ -110,8 +124,8 @@ Now that the user has been created inside your server, update `netdata.conf` by 
 
 ```text
 [plugin:windows:PerflibMSSQL]
-        driver = SQL Server Native Client 11.0
-        server = (localhost)
+        driver = SQL Server
+        server = 127.0.0.1\\Dev, 1433
         #address = [protocol:]Address[,port |\pipe\pipename]
         uid = netdata_user
         pwd = AReallyStrongPasswordShouldBeInsertedHere
