@@ -66,7 +66,7 @@ static void never_inline_function_to_capture_stack_trace(stacktrace_test_data_t 
 
     // Test 2: Indirect capture (get + to_buffer)
     buffer_flush(wb);
-    STACKTRACE trace = stacktrace_get();
+    STACKTRACE trace = stacktrace_get(0);
     if (trace) {
         stacktrace_to_buffer(trace, wb);
         buffer_strcat(test_data->indirect_trace, buffer_tostring(wb));

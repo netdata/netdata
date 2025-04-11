@@ -567,7 +567,7 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_s
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // Capture the stack trace at creation time
-    dict->stacktrace = stacktrace_get();
+    dict->stacktrace = stacktrace_get(0);
 #endif
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);
@@ -596,7 +596,7 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // Capture the stack trace at creation time
-    dict->stacktrace = stacktrace_get();
+    dict->stacktrace = stacktrace_get(0);
 #endif
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);

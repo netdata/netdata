@@ -37,7 +37,7 @@ struct netdata_string {
 // Ensures no duplicate stacktraces are added
 static inline void string_add_stacktrace(STRING *string) {
     // Get current stacktrace
-    STACKTRACE current = stacktrace_get();
+    STACKTRACE current = stacktrace_get(1);
     
     // Protect the stacktraces array with a spinlock
     spinlock_lock(&string->stacktrace_spinlock);
