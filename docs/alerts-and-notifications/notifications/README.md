@@ -15,7 +15,7 @@ Use Cloud for a centralized setup, or Agent for full control on each node.
 
 Netdata Cloud collects alert data from all connected nodes and sends notifications through your configured integrations.
 
-→ [See supported Cloud integrations](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications)
+:point_right: [See supported Cloud integrations](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications)
 
 **Popular integrations:**
 
