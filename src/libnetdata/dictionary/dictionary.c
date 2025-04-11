@@ -150,6 +150,12 @@ void dictionary_version_increment(DICTIONARY *dict) {
 }
 
 // ----------------------------------------------------------------------------
+// tracking allocated dictionaries
+
+// Include the dictionary debugging header
+#include "dictionary-debug.h"
+
+// ----------------------------------------------------------------------------
 // items garbage collector
 
 void garbage_collect_pending_deletes(DICTIONARY *dict) {
@@ -290,7 +296,8 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
 
     if(dict->value_aral)
         aral_by_size_release(dict->value_aral);
-        
+
+    dictionary_debug_untrack_dict(dict);
     aral_freez(ar_dict, dict);
 
     internal_error(
@@ -468,78 +475,8 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
 // ----------------------------------------------------------------------------
 // API internal checks
 
-#ifdef NETDATA_INTERNAL_CHECKS
-#define api_internal_check(dict, item, allow_null_dict, allow_null_item) api_internal_check_with_trace(dict, item, __FUNCTION__, allow_null_dict, allow_null_item)
-static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITEM *item, const char *function, bool allow_null_dict, bool allow_null_item) {
-    if(!allow_null_dict && !dict) {
-        // Create a buffer for the item's dict stacktrace
-        BUFFER *wb = buffer_create(1024, NULL);
-        if (item && item->dict && item->dict->stacktrace) {
-            buffer_strcat(wb, "\nItem's dictionary creation stacktrace:\n");
-            stacktrace_to_buffer(item->dict->stacktrace, wb);
-        } else {
-            buffer_strcat(wb, "\nItem's dictionary stacktrace not available");
-        }
-        
-        internal_error(
-            item,
-            "DICTIONARY: attempted to %s() with a NULL dictionary, passing an item. %s",
-            function,
-            buffer_tostring(wb));
-            
-        buffer_free(wb);
-        fatal("DICTIONARY: attempted to %s() but dict is NULL", function);
-    }
-
-    if(!allow_null_item && !item) {
-        dictionary_internal_error(true, dict,
-            "DICTIONARY: attempted to %s() without an item on a dictionary",
-            function);
-        fatal("DICTIONARY: attempted to %s() but item is NULL", function);
-    }
-
-    if(dict && item && dict != item->dict) {
-        // Create buffer for both dictionaries' stacktraces
-        BUFFER *wb = buffer_create(1024, NULL);
-        
-        if (dict->stacktrace) {
-            buffer_strcat(wb, "\nDictionary stacktrace:\n");
-            stacktrace_to_buffer(dict->stacktrace, wb);
-        } else {
-            buffer_strcat(wb, "\nDictionary stacktrace not available");
-        }
-        
-        if (item->dict && item->dict->stacktrace) {
-            buffer_strcat(wb, "\nItem's dictionary stacktrace:\n");
-            stacktrace_to_buffer(item->dict->stacktrace, wb);
-        } else {
-            buffer_strcat(wb, "\nItem's dictionary stacktrace not available");
-        }
-        
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() an item on a dictionary different from the item's dictionary. %s",
-            function,
-            buffer_tostring(wb));
-            
-        buffer_free(wb);
-        fatal("DICTIONARY: %s(): item does not belong to this dictionary.", function);
-    }
-
-    if(item) {
-        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
-        if (unlikely(refcount <= 0)) {
-            dictionary_internal_error(true, item->dict,
-                "DICTIONARY: attempted to %s() of an item with reference counter = %d on a dictionary",
-                function,
-                refcount);
-            fatal("DICTIONARY: attempted to %s but item is having refcount = %d", function, refcount);
-        }
-    }
-}
-#else
-#define api_internal_check(dict, item, allow_null_dict, allow_null_item) debug_dummy()
-#endif
+// Use the debug version from dictionary-debug.h
+#define api_internal_check(dict, item, allow_null_dict, allow_null_item) dictionary_debug_internal_check(dict, item, allow_null_dict, allow_null_item)
 
 #define api_is_name_good(dict, name, name_len) api_is_name_good_with_trace(dict, name, name_len, __FUNCTION__)
 static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const char *name, ssize_t name_len __maybe_unused, const char *function __maybe_unused) {
@@ -634,6 +571,7 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_s
 #endif
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);
+    dictionary_debug_track_dict(dict);
     return dict;
 }
 
@@ -662,6 +600,7 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
 #endif
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);
+    dictionary_debug_track_dict(dict);
     return dict;
 }
 

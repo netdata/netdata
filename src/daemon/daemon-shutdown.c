@@ -355,6 +355,9 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if(dictionaries_referenced)
         fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
                 dictionaries_referenced);
+                
+    // Always report dictionary allocations during ASAN builds
+    dictionary_print_still_allocated_stacktraces();
 
 #ifdef ENABLE_DBENGINE
     // destroy the caches in reverse order (extent and open depend on main cache)

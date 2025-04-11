@@ -843,6 +843,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/datetime/rfc3339.c
         src/libnetdata/datetime/rfc3339.h
         src/libnetdata/dictionary/dictionary.c
+        src/libnetdata/dictionary/dictionary-debug.c
+        src/libnetdata/dictionary/dictionary-debug.h
         src/libnetdata/dictionary/dictionary.h
         src/libnetdata/eval/eval.c
         src/libnetdata/eval/eval.h
