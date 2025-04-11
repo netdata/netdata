@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- fix memory leaks [\#20116](https://github.com/netdata/netdata/pull/20116) ([ktsaou](https://github.com/ktsaou))
+- netdatacli remove/mark stale, swap order in help output [\#20113](https://github.com/netdata/netdata/pull/20113) ([ilyam8](https://github.com/ilyam8))
+- Fix completion marking in ACLK cancel node update timer logic [\#20111](https://github.com/netdata/netdata/pull/20111) ([stelfrag](https://github.com/stelfrag))
+- docs: clarify static build transition process for EOL platforms [\#20110](https://github.com/netdata/netdata/pull/20110) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.1 to 1.9.2 in /src/go [\#20109](https://github.com/netdata/netdata/pull/20109) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump golang.org/x/net from 0.38.0 to 0.39.0 in /src/go [\#20108](https://github.com/netdata/netdata/pull/20108) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/prometheus-community/pro-bing from 0.6.1 to 0.7.0 in /src/go [\#20107](https://github.com/netdata/netdata/pull/20107) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Further improve ACLK synchronization shutdown [\#20105](https://github.com/netdata/netdata/pull/20105) ([stelfrag](https://github.com/stelfrag))
 - daemon status 27f [\#20104](https://github.com/netdata/netdata/pull/20104) ([ktsaou](https://github.com/ktsaou))
 - daemon status 27e [\#20101](https://github.com/netdata/netdata/pull/20101) ([ktsaou](https://github.com/ktsaou))
@@ -459,11 +466,6 @@
 - Code cleanup on ACLK messages [\#19566](https://github.com/netdata/netdata/pull/19566) ([stelfrag](https://github.com/stelfrag))
 - Add a new agent status when connecting to the cloud [\#19564](https://github.com/netdata/netdata/pull/19564) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#19563](https://github.com/netdata/netdata/pull/19563) ([netdatabot](https://github.com/netdatabot))
-- feat\(go.d/dnsquery\): support system DNS servers from /etc/resolv.conf [\#19562](https://github.com/netdata/netdata/pull/19562) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19561](https://github.com/netdata/netdata/pull/19561) ([netdatabot](https://github.com/netdatabot))
-- MSSQL Multiple Instances \(windows.plugin\) [\#19559](https://github.com/netdata/netdata/pull/19559) ([thiagoftsm](https://github.com/thiagoftsm))
-- build\(deps\): bump github.com/lmittmann/tint from 1.0.6 to 1.0.7 in /src/go [\#19558](https://github.com/netdata/netdata/pull/19558) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Metadata \(AD and ADCS\), and small fixes [\#19557](https://github.com/netdata/netdata/pull/19557) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
