@@ -3,11 +3,35 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
+#include <sqlext.h>
+#include <sqltypes.h>
+#include <sql.h>
+
 // https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
 #define NETDATA_MAX_INSTANCE_NAME 32
 #define NETDATA_MAX_INSTANCE_OBJECT 128
 
 BOOL is_sqlexpress = FALSE;
+BOOL is_connected = FALSE;
+SQLHENV netdataSQLEnv = NULL;
+SQLHDBC netdataSQLHDBc = NULL;
+
+struct netdata_mssql_conn {
+    const char *driver;
+    const char *server;
+    const char *address;
+    const char *username;
+    const char *password;
+    bool windows_auth;
+} dbconn = {
+    .driver = "SQL Server",
+    .server = NULL,
+    .address = NULL,
+    .username = NULL,
+    .password = NULL,
+    .windows_auth = FALSE};
+
+SQLCHAR connectionString[1024];
 
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
@@ -1425,6 +1449,122 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     return 1;
 }
 
+void netdata_mount_mssql_connection_string(SQLCHAR *conn, size_t length, struct netdata_mssql_conn *dbInput)
+{
+    const char *serverAddress;
+    const char *serverAddressArg;
+    if (!conn || !dbInput)
+        return;
+
+    char auth[512];
+
+    if (dbInput->server && dbInput->address) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "Collector is not expecting server and address defined together, please, select one of them.");
+        conn[0] = '\0';
+        return;
+    }
+
+    if (dbInput->server) {
+        serverAddress = "Server";
+        serverAddressArg = dbInput->server;
+    } else {
+        serverAddressArg = "Address";
+        serverAddress = dbInput->address;
+    }
+
+    if (dbInput->windows_auth)
+        snprintfz(auth, sizeof(auth) - 1, "Trusted_Connection = yes");
+    else if (!dbInput->username || !dbInput->password) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "You are not using Windows Authentication. Thus, it is necessary to specify user and password.");
+        conn[0] = '\0';
+        return;
+    } else {
+        snprintfz(auth, sizeof(auth) - 1, "UID=%s;PWD=%s;", dbInput->username, dbInput->password);
+    }
+
+    snprintfz((char *)conn, length, "Driver={%s};%s=%s;%s", dbInput->driver, serverAddress, serverAddressArg, auth);
+}
+
+static void netdata_read_config_options()
+{
+    dbconn.driver = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "driver", dbconn.driver);
+    dbconn.server = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "server", dbconn.server);
+    dbconn.address = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "address", dbconn.address);
+    dbconn.username = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "uid", dbconn.username);
+    dbconn.password = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "pwd", dbconn.password);
+    dbconn.windows_auth = inicfg_get_boolean(
+        &netdata_config, "plugin:windows:PerflibMSSQL", "windows authentication", dbconn.windows_auth);
+
+    netdata_mount_mssql_connection_string(connectionString, sizeof(connectionString) - 1, &dbconn);
+}
+
+static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle)
+{
+    SQLCHAR state[1024];
+    SQLCHAR message[1024];
+    if (SQL_SUCCESS == SQLGetDiagRec(type, handle, 1, state, NULL, message, 1024, NULL))
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to MSSQL server:  %s, %s", message, state);
+}
+
+static bool MSSQL_initialize_conection()
+{
+    SQLRETURN ret;
+    if (netdataSQLEnv == NULL) {
+        ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &netdataSQLEnv);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            return FALSE;
+
+        ret = SQLSetEnvAttr(netdataSQLEnv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, 0);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            return FALSE;
+        }
+    }
+
+    ret = SQLAllocHandle(SQL_HANDLE_DBC, netdataSQLEnv, &netdataSQLHDBc);
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        return FALSE;
+    }
+
+    ret = SQLSetConnectAttr(netdataSQLHDBc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        return FALSE;
+    }
+
+    SQLCHAR ret_conn_str[1024];
+    ret = SQLDriverConnect(
+        netdataSQLHDBc,
+        NULL,
+        connectionString,
+        SQL_NTS,
+        ret_conn_str,
+        1024,
+        NULL,
+        SQL_DRIVER_NOPROMPT);
+
+    BOOL retConn;
+    switch (ret) {
+        case SQL_NO_DATA_FOUND:
+        case SQL_INVALID_HANDLE:
+        case SQL_ERROR:
+        default:
+            netdata_MSSQL_error(SQL_HANDLE_DBC, netdataSQLHDBc);
+            retConn = FALSE;
+            break;
+        case SQL_SUCCESS:
+        case SQL_SUCCESS_WITH_INFO:
+            retConn = TRUE;
+            break;
+    }
+
+    return retConn;
+}
+
 int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
@@ -1433,6 +1573,8 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
         if (initialize())
             return -1;
 
+        netdata_read_config_options();
+        is_connected = MSSQL_initialize_conection();
         initialized = true;
     }
 
