@@ -40,6 +40,13 @@ static bool aer_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
     return false;
 }
 
+static void aer_entry_free_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct aer_entry *a = value;
+    dictionary_destroy(a->values);
+    string_freez(a->name);
+    procfile_close(a->ff);
+}
+
 static void aer_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct aer_entry *a = value;
     a->values = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE|DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(struct aer_value));
@@ -190,6 +197,14 @@ static void add_label_from_link(struct aer_entry *a, const char *path, const cha
     }
 }
 
+// Cleanup function for the PCI AER module
+void pci_aer_plugin_cleanup(void) {
+    if(aer_root) {
+        dictionary_destroy(aer_root);
+        aer_root = NULL;
+    }
+}
+
 int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
     if(unlikely(!aer_root)) {
         int do_root_ports = CONFIG_BOOLEAN_AUTO;
@@ -211,6 +226,7 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
 
         aer_root = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(struct aer_entry));
         dictionary_register_insert_callback(aer_root, aer_insert_callback, NULL);
+        dictionary_register_delete_callback(aer_root, aer_entry_free_callback, NULL);
 
         AER_TYPE types = ((do_root_ports) ? (AER_ROOTPORT_TOTAL_ERR_COR|AER_ROOTPORT_TOTAL_ERR_FATAL) : 0) |
                 ((do_pci_slots) ? (AER_DEV_FATAL|AER_DEV_NONFATAL|AER_DEV_CORRECTABLE) : 0);
