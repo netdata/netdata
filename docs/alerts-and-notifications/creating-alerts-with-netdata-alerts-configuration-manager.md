@@ -17,7 +17,7 @@ To use this feature, you’ll need an active Netdata subscription. → [View sub
 8. Paste it into a custom alert file on your Agent:
 
    ```
-   <netdata-install>/etc/netdata/health.d/your-alert.conf
+   <INSTALL_PREFIX>/etc/netdata/health.d/your-alert.conf
    ```
    → [How to edit alert configuration files](/src/health/REFERENCE.md#edit-health-configuration-files)
 
