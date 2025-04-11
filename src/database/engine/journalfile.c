@@ -27,32 +27,28 @@ void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengin
 
     int retries = 10;
     int ret = -1;
-    while (ret == -1 && --retries) {
+    while (ret < 0 && --retries) {
         ret = uv_fs_write(NULL, &request, journalfile->file, &iov, 1, (int64_t)journalfile_position, NULL);
-        if (ret == -1) {
+        uv_fs_req_cleanup(&request);
+        if (ret < 0) {
+            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+                break;
             sleep_usec(300 * USEC_PER_MS);
-            uv_fs_req_cleanup(&request);
         }
     }
 
-    bool jf_write_error = (ret == -1 || request.result < 0);
+    bool jf_write_error = (ret < 0);
 
     if (unlikely(jf_write_error)) {
         ctx_io_error(ctx);
-        if (ret == -1)
-            netdata_log_error(
-                "DBENGINE: %s: uv_fs_write: failed to store metadata in journalfile %u, offset %"PRIu64,
-                __func__,
-                datafile->fileno,
-                journalfile_position);
-        else
-            netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)request.result));
+        netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)ret));
+        goto done;
     }
 
-    uv_fs_req_cleanup(&request);
     ctx_current_disk_space_increase(ctx, wal->buf_size);
     ctx_io_write_op_bytes(ctx, wal->buf_size);
 
+done:
     wal_release(wal);
     __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
     worker_is_idle();
