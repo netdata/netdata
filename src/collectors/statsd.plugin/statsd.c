@@ -2425,6 +2425,16 @@ static void statsd_main_cleanup(void *pptr) {
     dictionary_destroy(statsd.sets.dict);
     dictionary_destroy(statsd.timers.dict);
 
+    // Clean up app dictionaries
+    STATSD_APP *app = statsd.apps;
+    while(app) {
+        if(app->dict) {
+            dictionary_destroy(app->dict);
+            app->dict = NULL;
+        }
+        app = app->next;
+    }
+
     collector_info("STATSD: cleanup completed.");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
