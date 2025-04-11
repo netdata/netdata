@@ -348,6 +348,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     rrdhost_free_all();
     dyncfg_shutdown();
     rrd_functions_inflight_destroy();
+    health_plugin_destroy();
 
     fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
     size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
