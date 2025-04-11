@@ -500,6 +500,7 @@ size_t string_destroy(void) {
         rw_spinlock_write_unlock(&string_base[partition].spinlock);
     }
 
+    memset(&string_base, 0, sizeof(string_base));
     return referenced;
 }
 
