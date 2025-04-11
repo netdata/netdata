@@ -120,6 +120,8 @@ void worker_utilization_cleanup(void) {
     spinlock_lock(&workers_globals.spinlock);
     JudyHSFreeArray(&workers_globals.worknames_JudyHS, PJE0);
     spinlock_unlock(&workers_globals.spinlock);
+
+    memset(&workers_globals, 0, sizeof(workers_globals));
 }
 
 size_t workers_allocated_memory(void) {
