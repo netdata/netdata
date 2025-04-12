@@ -49,7 +49,6 @@ struct rrdcalc {
     STRING *key;                    // the unique key in the host's rrdcalc_root_index
     STRING *chart;                  // the chart id this should be linked to
 
-    struct rrd_alert_match match;
     struct rrd_alert_config config;
 
     // ------------------------------------------------------------------------

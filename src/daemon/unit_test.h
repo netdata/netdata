@@ -13,6 +13,7 @@ int unit_test_buffer(void);
 int unit_test_static_threads(void);
 int test_sqlite(void);
 int unit_test_bitmaps(void);
+int stacktrace_unittest(void);
 #ifdef ENABLE_DBENGINE
 int test_dbengine(void);
 void generate_dbengine_dataset(unsigned history_seconds);

@@ -168,7 +168,10 @@ void dictionary_version_increment(DICTIONARY *dict);
 
 void dictionary_garbage_collect(DICTIONARY *dict);
 
-size_t cleanup_destroyed_dictionaries(void);
+size_t cleanup_destroyed_dictionaries(bool shutdown);
+
+// Report on allocated dictionaries - used during Address Sanitizer builds
+void dictionary_print_still_allocated_stacktraces(void);
 
 // ----------------------------------------------------------------------------
 // Set an item in the dictionary

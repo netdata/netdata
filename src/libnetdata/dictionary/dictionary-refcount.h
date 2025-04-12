@@ -32,15 +32,10 @@ static inline void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 
 
     if(refcount <= 0) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to acquire item which is deleted (refcount = %d): "
-            "'%s' on dictionary created by %s() (%zu@%s)",
+        dictionary_internal_error(true, dict,
+            "DICTIONARY: attempted to acquire item which is deleted (refcount = %d): '%s'",
             refcount - 1,
-            item_get_name(item),
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
+            item_get_name(item));
 
         fatal(
             "DICTIONARY: request to acquire item '%s', which is deleted (refcount = %d)!",
@@ -81,15 +76,10 @@ static inline void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     }
 
     if(refcount < 0) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to release item without references (refcount = %d): "
-            "'%s' on dictionary created by %s() (%zu@%s)",
+        dictionary_internal_error(true, dict,
+            "DICTIONARY: attempted to release item without references (refcount = %d): '%s'",
             refcount + 1,
-            item_get_name(item),
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
+            item_get_name(item));
 
         fatal(
             "DICTIONARY: attempted to release item '%s' without references (refcount = %d)",
