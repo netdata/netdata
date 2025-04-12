@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- feat\(system-info\): improve Windows OS detection and categorization [\#20117](https://github.com/netdata/netdata/pull/20117) ([ktsaou](https://github.com/ktsaou))
 - fix memory leaks [\#20116](https://github.com/netdata/netdata/pull/20116) ([ktsaou](https://github.com/ktsaou))
 - netdatacli remove/mark stale, swap order in help output [\#20113](https://github.com/netdata/netdata/pull/20113) ([ilyam8](https://github.com/ilyam8))
 - Fix completion marking in ACLK cancel node update timer logic [\#20111](https://github.com/netdata/netdata/pull/20111) ([stelfrag](https://github.com/stelfrag))
@@ -166,6 +167,7 @@
 - Fix TOCTOU race in daemon status file handling. [\#19924](https://github.com/netdata/netdata/pull/19924) ([Ferroin](https://github.com/Ferroin))
 - Exclude external code from CodeQL scanning. [\#19923](https://github.com/netdata/netdata/pull/19923) ([Ferroin](https://github.com/Ferroin))
 - remove ilove endpoint [\#19919](https://github.com/netdata/netdata/pull/19919) ([ilyam8](https://github.com/ilyam8))
+- Dump Netdata buildinfo during CI. [\#19918](https://github.com/netdata/netdata/pull/19918) ([Ferroin](https://github.com/Ferroin))
 - Align cmsgbuf to size\_t to avoid unaligned memory access. [\#19917](https://github.com/netdata/netdata/pull/19917) ([vkalintiris](https://github.com/vkalintiris))
 - Make sure ACLK sync thread completes initialization [\#19916](https://github.com/netdata/netdata/pull/19916) ([stelfrag](https://github.com/stelfrag))
 - do not enqueue command if aclk is not initialized [\#19914](https://github.com/netdata/netdata/pull/19914) ([ktsaou](https://github.com/ktsaou))
@@ -462,10 +464,6 @@
 - fix\(go.d\): clean up charts for stopped and removed jobs [\#19573](https://github.com/netdata/netdata/pull/19573) ([ilyam8](https://github.com/ilyam8))
 - Modify eBPF.plugin integration \(Part II, the sockets\) [\#19572](https://github.com/netdata/netdata/pull/19572) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix memory leak [\#19569](https://github.com/netdata/netdata/pull/19569) ([stelfrag](https://github.com/stelfrag))
-- build\(deps\): bump github.com/prometheus-community/pro-bing from 0.6.0 to 0.6.1 in /src/go [\#19567](https://github.com/netdata/netdata/pull/19567) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Code cleanup on ACLK messages [\#19566](https://github.com/netdata/netdata/pull/19566) ([stelfrag](https://github.com/stelfrag))
-- Add a new agent status when connecting to the cloud [\#19564](https://github.com/netdata/netdata/pull/19564) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations docs [\#19563](https://github.com/netdata/netdata/pull/19563) ([netdatabot](https://github.com/netdatabot))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
