@@ -64,3 +64,11 @@ void dyncfg_init(bool load_saved) {
     dyncfg_nodes = dyncfg_nodes_dictionary_create();
     dyncfg_init_low_level(load_saved);
 }
+
+void dyncfg_shutdown(void) {
+    if(dyncfg_nodes) {
+        dictionary_destroy(dyncfg_nodes);
+        dyncfg_nodes = NULL;
+    }
+    dyncfg_shutdown_low_level();
+}

@@ -57,6 +57,7 @@ void proc_stat_plugin_cleanup(void);
 void proc_net_sockstat_plugin_cleanup(void);
 void proc_loadavg_plugin_cleanup(void);
 void sys_class_infiniband_plugin_cleanup(void);
+void pci_aer_plugin_cleanup(void);
 
 // metrics that need to be shared among data collectors
 extern unsigned long long zfs_arcstats_shrinkable_cache_size_bytes;

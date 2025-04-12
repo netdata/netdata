@@ -182,6 +182,16 @@ void dyncfg_init_low_level(bool load_saved) {
     }
 }
 
+void dyncfg_shutdown_low_level(void) {
+    if(dyncfg_globals.nodes) {
+        dictionary_destroy(dyncfg_globals.nodes);
+        dyncfg_globals.nodes = NULL;
+    }
+    
+    freez((void *)dyncfg_globals.dir);
+    dyncfg_globals.dir = NULL;
+}
+
 // ----------------------------------------------------------------------------
 
 const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path,
