@@ -193,6 +193,173 @@ struct mssql_db_instance {
     uint32_t updated;
 };
 
+// Connection and SQL
+static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle)
+{
+    SQLCHAR state[1024];
+    SQLCHAR message[1024];
+    if (SQL_SUCCESS == SQLGetDiagRec((short)type, handle, 1, state, NULL, message, 1024, NULL))
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to MSSQL server:  %s, %s", message, state);
+}
+
+// https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
+// The undocumented sp_MSforeachdb function is the simplest way to get data, without necessary to create
+// a stored procedure and change permissions. BUT, ODBC CLIENT CANNOT WORK PROPERLY WITH IT
+#define NETDATA_GET_FILE_SIZE_QUERY "EXEC sp_MSforeachdb 'USE ? SELECT name, size * 8/1024 AS size FROM sys.database_files WHERE type = 0;'"
+#define NETDATA_GET_FILE_SIZE_COLUMNS (2)
+
+static void netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_conn *nmc) {
+    static BOOL first_call = TRUE;
+    static SQLCHAR db_name[SQLSERVER_MAX_NAME_LENGTH + 1] = { };
+    static long db_size = 0;
+    static SQLCHAR col_name[NETDATA_GET_FILE_SIZE_COLUMNS][SQLSERVER_MAX_NAME_LENGTH + 1] = { };
+    static SQLSMALLINT col_name_len[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+    static SQLSMALLINT col_data_type[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+    static SQLULEN col_data_size[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+    static SQLSMALLINT col_data_digits[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+    static SQLSMALLINT col_data_nullable[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+    static SQLLEN col_data_len[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+
+    // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
+    SQLRETURN ret;
+    SQLSMALLINT i;
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "KILLME BEGIN");
+    if (first_call) {
+        for (i = 0; i < NETDATA_GET_FILE_SIZE_COLUMNS; i++) {
+            ret = SQLDescribeCol (
+                nmc->dataFileSizeSTMT,
+                i+1,
+                col_name[i],
+                SQLSERVER_MAX_NAME_LENGTH,
+                &col_name_len[i],
+                &col_data_type[i],
+                &col_data_size[i],
+                &col_data_digits[i],
+                &col_data_nullable[i]);
+            if (ret != SQL_SUCCESS) {
+                netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
+                return;
+            }
+
+            SQLPOINTER ptr;
+            if  (!i)
+                ptr = db_name;
+            else
+                ptr = &db_size;
+
+            ret = SQLBindCol(nmc->dataFileSizeSTMT,
+                             i+1,
+                             col_data_type[i],
+                             ptr,
+                             (long)col_data_size[i],
+                             &col_data_len[i]);
+
+            if (ret != SQL_SUCCESS) {
+                netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
+                return;
+            }
+        }
+        first_call = FALSE;
+    }
+
+    for (i=0; ; i++) {
+        ret = SQLFetch(nmc->dataFileSizeSTMT);
+        if (ret == SQL_NO_DATA)
+            break;
+        else if (ret != SQL_SUCCESS)
+            return;
+
+        // add diciontary transverse here
+    }
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "KILLME DBS %d", i);
+
+}
+
+int netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc) {
+    //SQLRETURN ret = SQLExecDirect(dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, SQL_NTS);
+    SQLRETURN ret = SQLPrepare(nmc->dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, strlen(NETDATA_GET_FILE_SIZE_QUERY));
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
+        goto end_data_file_size;
+    }
+
+
+
+    SQLSMALLINT columns = 0;
+    ret = SQLNumResultCols(nmc->dataFileSizeSTMT, &columns);
+    if (ret != SQL_SUCCESS || columns != NETDATA_GET_FILE_SIZE_COLUMNS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
+        goto end_data_file_size;
+    }
+
+    netdata_MSSQL_fill_data_file_size_dict(nmc);
+
+    end_data_file_size:
+    SQLFreeStmt(nmc->dataFileSizeSTMT, SQL_CLOSE);
+    return 0;
+}
+
+static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
+{
+    SQLRETURN ret;
+    if (nmc->netdataSQLEnv == NULL) {
+        ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &nmc->netdataSQLEnv);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            return FALSE;
+
+        ret = SQLSetEnvAttr(nmc->netdataSQLEnv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, 0);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            return FALSE;
+        }
+    }
+
+    ret = SQLAllocHandle(SQL_HANDLE_DBC, nmc->netdataSQLEnv, &nmc->netdataSQLHDBc);
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        return FALSE;
+    }
+
+    ret = SQLSetConnectAttr(nmc->netdataSQLHDBc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        return FALSE;
+    }
+
+    SQLCHAR ret_conn_str[1024];
+    ret = SQLDriverConnect(
+        nmc->netdataSQLHDBc,
+        NULL,
+        connectionString,
+        SQL_NTS,
+        ret_conn_str,
+        1024,
+        NULL,
+        SQL_DRIVER_NOPROMPT);
+
+    BOOL retConn;
+    switch (ret) {
+        case SQL_NO_DATA_FOUND:
+        case SQL_INVALID_HANDLE:
+        case SQL_ERROR:
+        default:
+            netdata_MSSQL_error(SQL_HANDLE_DBC, nmc->netdataSQLHDBc);
+            retConn = FALSE;
+            break;
+        case SQL_SUCCESS:
+        case SQL_SUCCESS_WITH_INFO:
+            retConn = TRUE;
+            break;
+    }
+
+    if (retConn) {
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dataFileSizeSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+    }
+
+    return retConn;
+    }
+
+// Dictionary
 static DICTIONARY *mssql_instances = NULL;
 
 static void initialize_mssql_objects(struct mssql_instance *p, const char *instance)
@@ -314,6 +481,7 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
     initialize_mssql_keys(p);
 
     p->conn = &dbconn;
+    dbconn.is_connected = netdata_MSSQL_initialize_conection(p->conn);
 }
 
 static int mssql_fill_dictionary()
@@ -1429,6 +1597,9 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     struct mssql_instance *p = value;
     int *update_every = data;
 
+    if (p->conn->is_connected)
+        netdata_MSSQL_fill_data_file_size(&dbconn);
+
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
         do_mssql_general_stats,
         do_mssql_errors,
@@ -1502,171 +1673,6 @@ void netdata_mount_mssql_connection_string(SQLCHAR *conn, size_t length, struct 
     snprintfz((char *)conn, length, "Driver={%s};%s=%s;%s", dbInput->driver, serverAddress, serverAddressArg, auth);
 }
 
-static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle)
-{
-    SQLCHAR state[1024];
-    SQLCHAR message[1024];
-    if (SQL_SUCCESS == SQLGetDiagRec((short)type, handle, 1, state, NULL, message, 1024, NULL))
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to MSSQL server:  %s, %s", message, state);
-}
-
-// https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
-// The undocumented sp_MSforeachdb function is the simplest way to get data, without necessary to create
-// a stored procedure and change permissions. BUT, ODBC CLIENT CANNOT WORK PROPERLY WITH IT
-#define NETDATA_GET_FILE_SIZE_QUERY "EXEC sp_MSforeachdb 'USE ? SELECT name, size * 8/1024 AS size FROM sys.database_files WHERE type = 0;'"
-#define NETDATA_GET_FILE_SIZE_COLUMNS (2)
-
-void netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_conn *nmc) {
-    static BOOL first_call = TRUE;
-    static SQLCHAR db_name[SQLSERVER_MAX_NAME_LENGTH + 1] = { };
-    static long db_size = 0;
-    static SQLCHAR col_name[NETDATA_GET_FILE_SIZE_COLUMNS][SQLSERVER_MAX_NAME_LENGTH + 1] = { };
-    static SQLSMALLINT col_name_len[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
-    static SQLSMALLINT col_data_type[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
-    static SQLULEN col_data_size[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
-    static SQLSMALLINT col_data_digits[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
-    static SQLSMALLINT col_data_nullable[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
-    static SQLLEN col_data_len[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
-
-    // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
-    SQLRETURN ret;
-    SQLSMALLINT i;
-
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "KILLME BEGIN");
-    if (first_call) {
-        for (i = 0; i < NETDATA_GET_FILE_SIZE_COLUMNS; i++) {
-            ret = SQLDescribeCol (
-                    nmc->dataFileSizeSTMT,
-                    i+1,
-                    col_name[i],
-                    SQLSERVER_MAX_NAME_LENGTH,
-                    &col_name_len[i],
-                    &col_data_type[i],
-                    &col_data_size[i],
-                    &col_data_digits[i],
-                    &col_data_nullable[i]);
-            if (ret != SQL_SUCCESS) {
-                netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
-                return;
-            }
-
-            SQLPOINTER ptr;
-            if  (!i)
-                ptr = db_name;
-            else
-                ptr = &db_size;
-
-            ret = SQLBindCol(nmc->dataFileSizeSTMT,
-                              i+1,
-                              col_data_type[i],
-                              ptr,
-                              (long)col_data_size[i],
-                              &col_data_len[i]);
-
-            if (ret != SQL_SUCCESS) {
-                netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
-                return;
-            }
-        }
-        first_call = FALSE;
-    }
-
-    for (i=0; ; i++) {
-        ret = SQLFetch(nmc->dataFileSizeSTMT);
-        if (ret == SQL_NO_DATA)
-            break;
-        else if (ret != SQL_SUCCESS)
-            return;
-
-        // add diciontary transverse here
-    }
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "KILLME DBS %d", i);
-
-}
-
-int netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc) {
-    //SQLRETURN ret = SQLExecDirect(dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, SQL_NTS);
-    SQLRETURN ret = SQLPrepare(nmc->dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, strlen(NETDATA_GET_FILE_SIZE_QUERY));
-    if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
-        goto end_data_file_size;
-    }
-
-
-
-    SQLSMALLINT columns = 0;
-    ret = SQLNumResultCols(nmc->dataFileSizeSTMT, &columns);
-    if (ret != SQL_SUCCESS || columns != NETDATA_GET_FILE_SIZE_COLUMNS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
-        goto end_data_file_size;
-    }
-
-    netdata_MSSQL_fill_data_file_size_dict(nmc);
-
-end_data_file_size:
-    SQLFreeStmt(nmc->dataFileSizeSTMT, SQL_CLOSE);
-    return 0;
-}
-
-static bool MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
-{
-    SQLRETURN ret;
-    if (nmc->netdataSQLEnv == NULL) {
-        ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &nmc->netdataSQLEnv);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
-            return FALSE;
-
-        ret = SQLSetEnvAttr(nmc->netdataSQLEnv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, 0);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
-            return FALSE;
-        }
-    }
-
-    ret = SQLAllocHandle(SQL_HANDLE_DBC, nmc->netdataSQLEnv, &nmc->netdataSQLHDBc);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
-        return FALSE;
-    }
-
-    ret = SQLSetConnectAttr(nmc->netdataSQLHDBc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
-        return FALSE;
-    }
-
-    SQLCHAR ret_conn_str[1024];
-    ret = SQLDriverConnect(
-        nmc->netdataSQLHDBc,
-        NULL,
-        connectionString,
-        SQL_NTS,
-        ret_conn_str,
-        1024,
-        NULL,
-        SQL_DRIVER_NOPROMPT);
-
-    BOOL retConn;
-    switch (ret) {
-        case SQL_NO_DATA_FOUND:
-        case SQL_INVALID_HANDLE:
-        case SQL_ERROR:
-        default:
-            netdata_MSSQL_error(SQL_HANDLE_DBC, nmc->netdataSQLHDBc);
-            retConn = FALSE;
-            break;
-        case SQL_SUCCESS:
-        case SQL_SUCCESS_WITH_INFO:
-            retConn = TRUE;
-            break;
-    }
-
-    if (retConn) {
-        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dataFileSizeSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
-            retConn = FALSE;
-    }
-
-    return retConn;
-}
-
 // Options
 
 static void netdata_read_config_options()
@@ -1693,9 +1699,6 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
             return -1;
 
         netdata_read_config_options();
-        dbconn.is_connected = MSSQL_initialize_conection(&dbconn);
-        if (dbconn.is_connected)
-            netdata_MSSQL_fill_data_file_size(&dbconn);
         initialized = true;
     }
 
