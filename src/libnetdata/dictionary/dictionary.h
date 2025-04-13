@@ -113,22 +113,11 @@ struct dictionary_stats {
 };
 
 // Create a dictionary
-#ifdef NETDATA_INTERNAL_CHECKS
-#define dictionary_create(options) dictionary_create_advanced_with_trace(options, NULL, 0, __FUNCTION__, __LINE__, __FILE__)
-#define dictionary_create_advanced(options, stats, fixed_size) dictionary_create_advanced_with_trace(options, stats, fixed_size, __FUNCTION__, __LINE__, __FILE__)
-DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size, const char *function, size_t line, const char *file);
-#else
 #define dictionary_create(options) dictionary_create_advanced(options, NULL, 0)
 DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size);
-#endif
 
 // Create a view on a dictionary
-#ifdef NETDATA_INTERNAL_CHECKS
-#define dictionary_create_view(master) dictionary_create_view_with_trace(master, __FUNCTION__, __LINE__, __FILE__)
-DICTIONARY *dictionary_create_view_with_trace(DICTIONARY *master, const char *function, size_t line, const char *file);
-#else
 DICTIONARY *dictionary_create_view(DICTIONARY *master);
-#endif
 
 // an insert callback to be called just after an item is added to the dictionary
 // this callback is called while the dictionary is write locked!

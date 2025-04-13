@@ -245,42 +245,7 @@ static inline void pointer_del(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM 
 extern ARAL *dict_items_aral;
 extern ARAL *dict_shared_items_aral;
 
-// Helper macros for reporting dictionary issues with stacktrace instead of creation fields
-#ifdef NETDATA_INTERNAL_CHECKS
-// For internal_error with dictionary stacktrace
-#define dictionary_internal_error(condition, dict, fmt, args...) do { \
-    if(unlikely(condition)) { \
-        BUFFER *__wb = buffer_create(1024, NULL); \
-        if ((dict) && (dict)->stacktrace) { \
-            buffer_sprintf(__wb, fmt " Dictionary created at:\n", ##args); \
-            stacktrace_to_buffer((dict)->stacktrace, __wb); \
-        } else { \
-            buffer_sprintf(__wb, fmt " Dictionary stacktrace not available", ##args); \
-        } \
-        netdata_logger(NDLS_DAEMON, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, "BEGIN --\n%s\n-- END", buffer_tostring(__wb)); \
-        buffer_free(__wb); \
-    } \
-} while(0)
-
-// For internal_fatal with dictionary stacktrace
-#define dictionary_internal_fatal(condition, dict, fmt, args...) do { \
-    if(unlikely(condition)) { \
-        BUFFER *__wb = buffer_create(1024, NULL); \
-        if ((dict) && (dict)->stacktrace) { \
-            buffer_sprintf(__wb, fmt " Dictionary created at:\n", ##args); \
-            stacktrace_to_buffer((dict)->stacktrace, __wb); \
-        } else { \
-            buffer_sprintf(__wb, fmt " Dictionary stacktrace not available", ##args); \
-        } \
-        netdata_logger_fatal(__FILE__, __FUNCTION__, __LINE__, "BEGIN --\n%s\n--END", buffer_tostring(__wb)); \
-        buffer_free(__wb); \
-    } \
-} while(0)
-#else
-#define dictionary_internal_error(condition, dict, fmt, args...) debug_dummy()
-#define dictionary_internal_fatal(condition, dict, fmt, args...) debug_dummy()
-#endif
-
+#include "dictionary-debug.h"
 #include "dictionary-statistics.h"
 #include "dictionary-locks.h"
 #include "dictionary-refcount.h"

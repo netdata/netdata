@@ -152,7 +152,6 @@ void dictionary_version_increment(DICTIONARY *dict) {
 // ----------------------------------------------------------------------------
 // tracking allocated dictionaries
 
-// Include the dictionary debugging header
 #include "dictionary-debug.h"
 
 // ----------------------------------------------------------------------------
@@ -314,7 +313,10 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
 
 netdata_mutex_t dictionaries_waiting_to_be_destroyed_mutex = NETDATA_MUTEX_INITIALIZER;
 static DICTIONARY *dictionaries_waiting_to_be_destroyed = NULL;
+
+#ifdef FSANITIZE_ADDRESS
 DEFINE_JUDYL_TYPED(STACKTRACE, size_t);
+#endif
 
 static void dictionary_queue_for_destruction(DICTIONARY *dict) {
     if(is_dictionary_destroyed(dict))
@@ -419,46 +421,45 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
         
         // Clean up
         // Now collect and report information about dictionary items grouped by their creation stacktrace
-        if (shutdown) {
             fprintf(stderr, "\n========= DICTIONARY ITEMS GROUPED BY CREATION STACKTRACE =========\n");
             
-            // Loop through dictionaries to collect item stacktraces
-            for(dict = dictionaries_waiting_to_be_destroyed; dict; dict = dict->next) {
-                // Iterate through all items and count by stacktrace
-                DICTIONARY_ITEM *item;
-                for(item = dict->items.list; item; item = item->next) {
-                    if (item->stacktrace) {
-                        uintptr_t item_key = (uintptr_t)item->stacktrace;
-                        size_t count = STACKTRACE_GET(&item_stacktrace_counts, item_key);
-                        count++;
-                        STACKTRACE_SET(&item_stacktrace_counts, item_key, count);
-                    }
+        // Loop through dictionaries to collect item stacktraces
+        for(dict = dictionaries_waiting_to_be_destroyed; dict; dict = dict->next) {
+            // Iterate through all items and count by stacktrace
+            DICTIONARY_ITEM *item;
+            for(item = dict->items.list; item; item = item->next) {
+                if (item->stacktrace) {
+                    uintptr_t item_key = (uintptr_t)item->stacktrace;
+                    size_t count = STACKTRACE_GET(&item_stacktrace_counts, item_key);
+                    count++;
+                    STACKTRACE_SET(&item_stacktrace_counts, item_key, count);
                 }
             }
-            
-            // Print report of items by stacktrace
-            Word_t item_st_idx = 0;
-            size_t j = 0;
-            
-            for(size_t key_index = STACKTRACE_FIRST(&item_stacktrace_counts, &item_st_idx);
-                 key_index;
-                 key_index = STACKTRACE_NEXT(&item_stacktrace_counts, &item_st_idx)) {
-                 
-                j++;
-                STACKTRACE st = (STACKTRACE)item_st_idx;
-                size_t count = STACKTRACE_GET(&item_stacktrace_counts, item_st_idx);
-                
-                // Format stacktrace to buffer
-                buffer_flush(wb);
-                stacktrace_to_buffer(st, wb);
-                
-                fprintf(stderr, "\n > DICTIONARY ITEMS DELAYED %zu: %zu items created from:\n%s\n\n",
-                        j, count, buffer_tostring(wb));
-            }
-            
-            fprintf(stderr, "==================================================================\n");
         }
-        
+
+        // Print report of items by stacktrace
+        Word_t item_st_idx = 0;
+        size_t j = 0;
+
+        for(size_t key_index = STACKTRACE_FIRST(&item_stacktrace_counts, &item_st_idx);
+             key_index;
+             key_index = STACKTRACE_NEXT(&item_stacktrace_counts, &item_st_idx)) {
+
+            j++;
+            STACKTRACE st = (STACKTRACE)item_st_idx;
+            size_t count = STACKTRACE_GET(&item_stacktrace_counts, item_st_idx);
+
+            // Format stacktrace to buffer
+            buffer_flush(wb);
+            stacktrace_to_buffer(st, wb);
+
+            fprintf(stderr, "\n > DICTIONARY ITEMS DELAYED %zu: %zu items created from:\n%s\n\n",
+                    j, count, buffer_tostring(wb));
+        }
+
+        fprintf(stderr, "Total: %zu dictionaries\n", j);
+        fprintf(stderr, "==================================================================\n");
+
         STACKTRACE_FREE(&dict_counts, NULL, NULL);
         STACKTRACE_FREE(&item_counts, NULL, NULL);
         STACKTRACE_FREE(&item_stacktrace_counts, NULL, NULL);
@@ -557,12 +558,7 @@ static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dicti
     return dict;
 }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size, const char *function, size_t line, const char *file) {
-#else
 DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size) {
-#endif
-
     DICTIONARY *dict = dictionary_create_internal(options, stats?stats:&dictionary_stats_category_other, fixed_size);
 
 #ifdef FSANITIZE_ADDRESS
@@ -575,12 +571,7 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_s
     return dict;
 }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-DICTIONARY *dictionary_create_view_with_trace(DICTIONARY *master, const char *function, size_t line, const char *file) {
-#else
 DICTIONARY *dictionary_create_view(DICTIONARY *master) {
-#endif
-
     DICTIONARY *dict = dictionary_create_internal(master->options, master->stats,
                                                   master->value_aral ? aral_requested_element_size(master->value_aral) : 0);
 
@@ -594,7 +585,7 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
     dict->hooks = master->hooks;
     __atomic_add_fetch(&master->hooks->links, 1, __ATOMIC_ACQUIRE);
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef FSANITIZE_ADDRESS
     // Capture the stack trace at creation time
     dict->stacktrace = stacktrace_get(0);
 #endif

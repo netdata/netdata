@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "dictionary-debug.h"
+#include "dictionary-internals.h"
 
 #if defined(FSANITIZE_ADDRESS)
+
 // Judyl for tracking all dictionaries ever created
 static SPINLOCK all_dictionaries_spinlock = SPINLOCK_INITIALIZER;
 static Pvoid_t all_dictionaries = NULL;
@@ -267,11 +268,6 @@ void dictionary_debug_shutdown(void) {
     spinlock_unlock(&all_dictionaries_spinlock);
 }
 
-//
-// API internal check functions moved from dictionary.c
-//
-
-#ifdef NETDATA_INTERNAL_CHECKS
 void dictionary_debug_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITEM *item, const char *function, bool allow_null_dict, bool allow_null_item) {
     if(!allow_null_dict && !dict) {
         // Create a buffer for the item's dict stacktrace
@@ -282,13 +278,13 @@ void dictionary_debug_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITE
         } else {
             buffer_strcat(wb, "\nItem's dictionary stacktrace not available");
         }
-        
+
         internal_error(
             item,
             "DICTIONARY: attempted to %s() with a NULL dictionary, passing an item. %s",
             function,
             buffer_tostring(wb));
-            
+
         buffer_free(wb);
         fatal("DICTIONARY: attempted to %s() but dict is NULL", function);
     }
@@ -303,27 +299,27 @@ void dictionary_debug_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITE
     if(dict && item && dict != item->dict) {
         // Create buffer for both dictionaries' stacktraces
         BUFFER *wb = buffer_create(1024, NULL);
-        
+
         if (dict->stacktrace) {
             buffer_strcat(wb, "\nDictionary stacktrace:\n");
             stacktrace_to_buffer(dict->stacktrace, wb);
         } else {
             buffer_strcat(wb, "\nDictionary stacktrace not available");
         }
-        
+
         if (item->dict && item->dict->stacktrace) {
             buffer_strcat(wb, "\nItem's dictionary stacktrace:\n");
             stacktrace_to_buffer(item->dict->stacktrace, wb);
         } else {
             buffer_strcat(wb, "\nItem's dictionary stacktrace not available");
         }
-        
+
         internal_error(
             true,
             "DICTIONARY: attempted to %s() an item on a dictionary different from the item's dictionary. %s",
             function,
             buffer_tostring(wb));
-            
+
         buffer_free(wb);
         fatal("DICTIONARY: %s(): item does not belong to this dictionary.", function);
     }
@@ -339,16 +335,5 @@ void dictionary_debug_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITE
         }
     }
 }
-#endif
-
-#else // !defined(FSANITIZE_ADDRESS)
-
-// Stubs for non-ASAN builds
-void dictionary_debug_init(void) {}
-void dictionary_debug_track_dict(DICTIONARY *dict) { (void)dict; }
-void dictionary_debug_untrack_dict(DICTIONARY *dict) { (void)dict; }
-void dictionary_print_still_allocated_stacktraces(void) {}
-void dictionary_debug_print_delayed_dictionaries(size_t destroyed_dicts) { (void)destroyed_dicts; }
-void dictionary_debug_shutdown(void) {}
 
 #endif // FSANITIZE_ADDRESS
