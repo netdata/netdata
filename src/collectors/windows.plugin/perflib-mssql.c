@@ -13,10 +13,6 @@
 #define SQLSERVER_MAX_NAME_LENGTH (128)
 
 BOOL is_sqlexpress = FALSE;
-BOOL is_connected = FALSE;
-SQLHENV netdataSQLEnv = NULL;
-SQLHDBC netdataSQLHDBc = NULL;
-SQLHSTMT dataFileSizeSTMT = NULL;
 
 struct netdata_mssql_conn {
     const char *driver;
@@ -25,13 +21,25 @@ struct netdata_mssql_conn {
     const char *username;
     const char *password;
     bool windows_auth;
+
+    SQLHENV netdataSQLEnv;
+    SQLHDBC netdataSQLHDBc;
+    SQLHSTMT dataFileSizeSTMT;
+
+    BOOL is_connected;
 } dbconn = {
     .driver = "SQL Server",
     .server = NULL,
     .address = NULL,
     .username = NULL,
     .password = NULL,
-    .windows_auth = FALSE};
+    .windows_auth = FALSE,
+
+    .netdataSQLEnv = NULL,
+    .netdataSQLHDBc = NULL,
+    .dataFileSizeSTMT = NULL,
+
+    .is_connected = FALSE};
 
 SQLCHAR connectionString[1024];
 
@@ -50,6 +58,8 @@ enum netdata_mssql_metrics {
 
 struct mssql_instance {
     char *instanceID;
+
+    struct netdata_mssql_conn *conn;
 
     char *objectName[NETDATA_MSSQL_METRICS_END];
 
@@ -302,6 +312,8 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 
     initialize_mssql_objects(p, instance);
     initialize_mssql_keys(p);
+
+    p->conn = &dbconn;
 }
 
 static int mssql_fill_dictionary()
@@ -1167,7 +1179,7 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!is_connected))
+    if (unlikely(!mli->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1504,7 +1516,7 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle)
 #define NETDATA_GET_FILE_SIZE_QUERY "EXEC sp_MSforeachdb 'USE ? SELECT name, size * 8/1024 AS size FROM sys.database_files WHERE type = 0;'"
 #define NETDATA_GET_FILE_SIZE_COLUMNS (2)
 
-void netdata_MSSQL_fill_data_file_size_dict() {
+void netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_conn *nmc) {
     static BOOL first_call = TRUE;
     static SQLCHAR db_name[SQLSERVER_MAX_NAME_LENGTH + 1] = { };
     static long db_size = 0;
@@ -1524,7 +1536,7 @@ void netdata_MSSQL_fill_data_file_size_dict() {
     if (first_call) {
         for (i = 0; i < NETDATA_GET_FILE_SIZE_COLUMNS; i++) {
             ret = SQLDescribeCol (
-                    dataFileSizeSTMT,
+                    nmc->dataFileSizeSTMT,
                     i+1,
                     col_name[i],
                     SQLSERVER_MAX_NAME_LENGTH,
@@ -1534,7 +1546,7 @@ void netdata_MSSQL_fill_data_file_size_dict() {
                     &col_data_digits[i],
                     &col_data_nullable[i]);
             if (ret != SQL_SUCCESS) {
-                netdata_MSSQL_error(SQL_HANDLE_STMT, dataFileSizeSTMT);
+                netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
                 return;
             }
 
@@ -1544,7 +1556,7 @@ void netdata_MSSQL_fill_data_file_size_dict() {
             else
                 ptr = &db_size;
 
-            ret = SQLBindCol(dataFileSizeSTMT,
+            ret = SQLBindCol(nmc->dataFileSizeSTMT,
                               i+1,
                               col_data_type[i],
                               ptr,
@@ -1552,7 +1564,7 @@ void netdata_MSSQL_fill_data_file_size_dict() {
                               &col_data_len[i]);
 
             if (ret != SQL_SUCCESS) {
-                netdata_MSSQL_error(SQL_HANDLE_STMT, dataFileSizeSTMT);
+                netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
                 return;
             }
         }
@@ -1560,7 +1572,7 @@ void netdata_MSSQL_fill_data_file_size_dict() {
     }
 
     for (i=0; ; i++) {
-        ret = SQLFetch(dataFileSizeSTMT);
+        ret = SQLFetch(nmc->dataFileSizeSTMT);
         if (ret == SQL_NO_DATA)
             break;
         else if (ret != SQL_SUCCESS)
@@ -1572,55 +1584,57 @@ void netdata_MSSQL_fill_data_file_size_dict() {
 
 }
 
-int netdata_MSSQL_fill_data_file_size() {
+int netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc) {
     //SQLRETURN ret = SQLExecDirect(dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, SQL_NTS);
-    SQLRETURN ret = SQLPrepare(dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, strlen(NETDATA_GET_FILE_SIZE_QUERY));
+    SQLRETURN ret = SQLPrepare(nmc->dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, strlen(NETDATA_GET_FILE_SIZE_QUERY));
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, dataFileSizeSTMT);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
         goto end_data_file_size;
     }
+
+
 
     SQLSMALLINT columns = 0;
-    ret = SQLNumResultCols(dataFileSizeSTMT, &columns);
+    ret = SQLNumResultCols(nmc->dataFileSizeSTMT, &columns);
     if (ret != SQL_SUCCESS || columns != NETDATA_GET_FILE_SIZE_COLUMNS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, dataFileSizeSTMT);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
         goto end_data_file_size;
     }
 
-    netdata_MSSQL_fill_data_file_size_dict();
+    netdata_MSSQL_fill_data_file_size_dict(nmc);
 
 end_data_file_size:
-    SQLFreeStmt(dataFileSizeSTMT, SQL_CLOSE);
+    SQLFreeStmt(nmc->dataFileSizeSTMT, SQL_CLOSE);
     return 0;
 }
 
-static bool MSSQL_initialize_conection()
+static bool MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
 {
     SQLRETURN ret;
-    if (netdataSQLEnv == NULL) {
-        ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &netdataSQLEnv);
+    if (nmc->netdataSQLEnv == NULL) {
+        ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &nmc->netdataSQLEnv);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             return FALSE;
 
-        ret = SQLSetEnvAttr(netdataSQLEnv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, 0);
+        ret = SQLSetEnvAttr(nmc->netdataSQLEnv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, 0);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             return FALSE;
         }
     }
 
-    ret = SQLAllocHandle(SQL_HANDLE_DBC, netdataSQLEnv, &netdataSQLHDBc);
+    ret = SQLAllocHandle(SQL_HANDLE_DBC, nmc->netdataSQLEnv, &nmc->netdataSQLHDBc);
     if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         return FALSE;
     }
 
-    ret = SQLSetConnectAttr(netdataSQLHDBc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
+    ret = SQLSetConnectAttr(nmc->netdataSQLHDBc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
     if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         return FALSE;
     }
 
     SQLCHAR ret_conn_str[1024];
     ret = SQLDriverConnect(
-        netdataSQLHDBc,
+        nmc->netdataSQLHDBc,
         NULL,
         connectionString,
         SQL_NTS,
@@ -1635,7 +1649,7 @@ static bool MSSQL_initialize_conection()
         case SQL_INVALID_HANDLE:
         case SQL_ERROR:
         default:
-            netdata_MSSQL_error(SQL_HANDLE_DBC, netdataSQLHDBc);
+            netdata_MSSQL_error(SQL_HANDLE_DBC, nmc->netdataSQLHDBc);
             retConn = FALSE;
             break;
         case SQL_SUCCESS:
@@ -1645,7 +1659,7 @@ static bool MSSQL_initialize_conection()
     }
 
     if (retConn) {
-        ret = SQLAllocHandle(SQL_HANDLE_STMT, netdataSQLHDBc, &dataFileSizeSTMT);
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dataFileSizeSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
     }
@@ -1679,12 +1693,10 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
             return -1;
 
         netdata_read_config_options();
-        is_connected = MSSQL_initialize_conection();
+        dbconn.is_connected = MSSQL_initialize_conection(&dbconn);
+        if (dbconn.is_connected)
+            netdata_MSSQL_fill_data_file_size(&dbconn);
         initialized = true;
-    }
-
-    if (is_connected) {
-        netdata_MSSQL_fill_data_file_size();
     }
 
     dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_charts_cb, &update_every);
