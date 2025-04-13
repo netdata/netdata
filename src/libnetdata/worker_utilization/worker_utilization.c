@@ -354,7 +354,7 @@ void worker_utilization_cleanup(void) {
         
         // If any strings remain, emit info about them
         if (total_strings > 0) {
-            fprintf(stderr, "INFO: Freeing %zu STRING objects with %zu total references\n", 
+            fprintf(stderr, "WORKERS UTILIZATION: Freeing %zu STRING objects with %zu total references\n",
                     total_strings, total_refs);
             
             // Second pass: free each string the correct number of times
@@ -417,7 +417,7 @@ void worker_utilization_cleanup(void) {
             }
             
             if (count > 0) {
-                fprintf(stderr, "INFO: Freeing %zu workers_workname structures from tracking array\n", count);
+                fprintf(stderr, "WORKERS UTILIZATION: Freeing %zu workers_workname structures from tracking array\n", count);
             }
         }
         
@@ -440,7 +440,7 @@ void worker_utilization_cleanup(void) {
                 Pvoid_t *StoreValue = JudyLIns(&worknames_to_free, (Word_t)libuv_workname, PJE0);
                 if (StoreValue != PJERR) {
                     *StoreValue = (void *)1;
-                    fprintf(stderr, "INFO: Found LIBUV workname not in tracking array\n");
+                    fprintf(stderr, "WORKERS UTILIZATION: Found LIBUV workname not in tracking array\n");
                 }
             }
         }
