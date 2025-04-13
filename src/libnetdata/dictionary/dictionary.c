@@ -340,7 +340,7 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
 
     size_t remaining = 0;
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef FSANITIZE_ADDRESS
     // Create three Judy arrays for tracking stats by stacktrace
     // We use pointer address as key - casting to uintptr_t
     STACKTRACE_JudyLSet dict_counts = { 0 };     // Count of dictionaries per stacktrace
@@ -364,7 +364,7 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
         else {
             size_t ref_items = dictionary_referenced_items(dict);
             
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef FSANITIZE_ADDRESS
             // Track this dictionary for deduplication reporting
             if (shutdown && dict->stacktrace) {
                 // Update dictionary count
@@ -386,7 +386,7 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
         }
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef FSANITIZE_ADDRESS
     if (remaining > 0 && shutdown) {
         // Print deduplicated report
         fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n", 
@@ -565,7 +565,7 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_s
 
     DICTIONARY *dict = dictionary_create_internal(options, stats?stats:&dictionary_stats_category_other, fixed_size);
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef FSANITIZE_ADDRESS
     // Capture the stack trace at creation time
     dict->stacktrace = stacktrace_get(0);
 #endif

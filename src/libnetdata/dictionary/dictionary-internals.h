@@ -75,9 +75,11 @@ typedef struct dictionary_item_shared {
 } DICTIONARY_ITEM_SHARED;
 
 struct dictionary_item {
+#ifdef FSANITIZE_ADDRESS
+    STACKTRACE stacktrace;          // stack trace captured at creation time
+#endif
 #ifdef NETDATA_INTERNAL_CHECKS
     DICTIONARY *dict;
-    STACKTRACE stacktrace;          // stack trace captured at creation time
     pid_t creator_pid;
     pid_t deleter_pid;
     pid_t ll_adder_pid;
@@ -128,7 +130,7 @@ struct dictionary_hooks {
 };
 
 struct dictionary {
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef FSANITIZE_ADDRESS
     STACKTRACE stacktrace;              // stack trace captured at creation time
 #endif
 

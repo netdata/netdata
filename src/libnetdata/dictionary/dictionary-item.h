@@ -54,6 +54,8 @@ static inline DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused,
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->creator_pid = gettid_cached();
+#endif
+#ifdef FSANITIZE_ADDRESS
     item->stacktrace = stacktrace_get(0);  // Capture the stack trace at creation time
 #endif
 
