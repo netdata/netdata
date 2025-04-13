@@ -22,6 +22,8 @@ extern void claim_config_free(void);
 extern void stream_config_free(void);
 extern void exporting_config_free(void);
 extern void rrd_functions_inflight_destroy(void);
+extern void cgroup_netdev_link_destroy(void);
+extern void bearer_tokens_destroy(void);
 
 static bool abort_on_fatal = true;
 
@@ -349,6 +351,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     dyncfg_shutdown();
     rrd_functions_inflight_destroy();
     health_plugin_destroy();
+    cgroup_netdev_link_destroy();
+    bearer_tokens_destroy();
 
     fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
     size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
@@ -395,7 +399,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     stream_config_free();
     inicfg_free(&cloud_config);
     inicfg_free(&netdata_config);
-    
+
     fprintf(stderr, "Cleaning up worker utilization...\n");
     worker_utilization_cleanup();
     
