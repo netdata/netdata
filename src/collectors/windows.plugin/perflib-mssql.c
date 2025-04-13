@@ -10,11 +10,13 @@
 // https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
 #define NETDATA_MAX_INSTANCE_NAME 32
 #define NETDATA_MAX_INSTANCE_OBJECT 128
+#define SQLSERVER_MAX_NAME_LENGTH (128)
 
 BOOL is_sqlexpress = FALSE;
 BOOL is_connected = FALSE;
 SQLHENV netdataSQLEnv = NULL;
 SQLHDBC netdataSQLHDBc = NULL;
+SQLHSTMT dataFileSizeSTMT = NULL;
 
 struct netdata_mssql_conn {
     const char *driver;
@@ -273,7 +275,6 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     struct mssql_db_instance *ptr = value;
 
     // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-databases-object
-    ptr->MSSQLDatabaseDataFileSize.key = "Data File(s) Size (KB)";
     ptr->MSSQLDatabaseActiveTransactions.key = "Active Transactions";
     ptr->MSSQLDatabaseBackupRestoreOperations.key = "Backup/Restore Throughput/sec";
     ptr->MSSQLDatabaseLogFlushed.key = "Log Bytes Flushed/sec";
@@ -1166,9 +1167,12 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!is_connected))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_db_data_file_size) {
+    if (unlikely(!mli->st_db_data_file_size)) {
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_data_files_size", db, mli->parent->instanceID);
         netdata_fix_chart_name(id);
         mli->st_db_data_file_size = rrdset_create_localhost(
@@ -1190,13 +1194,11 @@ static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, con
         rrdlabels_add(mli->st_db_data_file_size->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
     }
 
-    if (!mli->rd_db_data_file_size) {
+    if (unlikely(!mli->rd_db_data_file_size)) {
         mli->rd_db_data_file_size = rrddim_add(mli->st_db_data_file_size, "size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    // FIXME: If the value cannot be retrieved, remove the chart instead of displaying a 0 value.
-    collected_number data =
-        (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE)) ? mli->MSSQLDatabaseDataFileSize.current.Data : 0;
+    collected_number data = mli->MSSQLDatabaseDataFileSize.current.Data;
     rrddim_set_by_pointer(mli->st_db_data_file_size, mli->rd_db_data_file_size, data);
 
     rrdset_done(mli->st_db_data_file_size);
@@ -1210,9 +1212,7 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     int *update_every = data;
 
     void (*transaction_chart[])(struct mssql_db_instance *, const char *, int) = {
-        // FIXME: allegedly Netdata collects negative values (MSSQLDatabaseDataFileSize).
-        // something is wrong, perflibdump shows correct values.
-        // mssql_data_file_size_chart,
+        mssql_data_file_size_chart,
         mssql_transactions_chart,
         mssql_database_backup_restore_chart,
         mssql_database_log_flushed_chart,
@@ -1256,12 +1256,6 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
         mdi->updated = 0;
         if (!mdi->parent) {
             mdi->parent = p;
-        }
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseDataFileSize)) {
-            LONGLONG value = (LONGLONG)mdi->MSSQLDatabaseDataFileSize.current.Data;
-            if (value > 0)
-                mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE);
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseActiveTransactions))
@@ -1452,6 +1446,8 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     return 1;
 }
 
+// SQL functions
+
 void netdata_mount_mssql_connection_string(SQLCHAR *conn, size_t length, struct netdata_mssql_conn *dbInput)
 {
     const char *serverAddress;
@@ -1494,25 +1490,108 @@ void netdata_mount_mssql_connection_string(SQLCHAR *conn, size_t length, struct 
     snprintfz((char *)conn, length, "Driver={%s};%s=%s;%s", dbInput->driver, serverAddress, serverAddressArg, auth);
 }
 
-static void netdata_read_config_options()
-{
-    dbconn.driver = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "driver", dbconn.driver);
-    dbconn.server = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "server", dbconn.server);
-    dbconn.address = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "address", dbconn.address);
-    dbconn.username = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "uid", dbconn.username);
-    dbconn.password = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "pwd", dbconn.password);
-    dbconn.windows_auth = inicfg_get_boolean(
-        &netdata_config, "plugin:windows:PerflibMSSQL", "windows authentication", dbconn.windows_auth);
-
-    netdata_mount_mssql_connection_string(connectionString, sizeof(connectionString) - 1, &dbconn);
-}
-
 static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle)
 {
     SQLCHAR state[1024];
     SQLCHAR message[1024];
-    if (SQL_SUCCESS == SQLGetDiagRec(type, handle, 1, state, NULL, message, 1024, NULL))
+    if (SQL_SUCCESS == SQLGetDiagRec((short)type, handle, 1, state, NULL, message, 1024, NULL))
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to MSSQL server:  %s, %s", message, state);
+}
+
+// https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
+// The undocumented sp_MSforeachdb function is the simplest way to get data, without necessary to create
+// a stored procedure and change permissions. BUT, ODBC CLIENT CANNOT WORK PROPERLY WITH IT
+#define NETDATA_GET_FILE_SIZE_QUERY "EXEC sp_MSforeachdb 'USE ? SELECT name, size * 8/1024 AS size FROM sys.database_files WHERE type = 0;'"
+#define NETDATA_GET_FILE_SIZE_COLUMNS (2)
+
+void netdata_MSSQL_fill_data_file_size_dict() {
+    static BOOL first_call = TRUE;
+    static SQLCHAR db_name[SQLSERVER_MAX_NAME_LENGTH + 1] = { };
+    static long db_size = 0;
+    static SQLCHAR col_name[NETDATA_GET_FILE_SIZE_COLUMNS][SQLSERVER_MAX_NAME_LENGTH + 1] = { };
+    static SQLSMALLINT col_name_len[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+    static SQLSMALLINT col_data_type[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+    static SQLULEN col_data_size[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+    static SQLSMALLINT col_data_digits[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+    static SQLSMALLINT col_data_nullable[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+    static SQLLEN col_data_len[NETDATA_GET_FILE_SIZE_COLUMNS] = { };
+
+    // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
+    SQLRETURN ret;
+    SQLSMALLINT i;
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "KILLME BEGIN");
+    if (first_call) {
+        for (i = 0; i < NETDATA_GET_FILE_SIZE_COLUMNS; i++) {
+            ret = SQLDescribeCol (
+                    dataFileSizeSTMT,
+                    i+1,
+                    col_name[i],
+                    SQLSERVER_MAX_NAME_LENGTH,
+                    &col_name_len[i],
+                    &col_data_type[i],
+                    &col_data_size[i],
+                    &col_data_digits[i],
+                    &col_data_nullable[i]);
+            if (ret != SQL_SUCCESS) {
+                netdata_MSSQL_error(SQL_HANDLE_STMT, dataFileSizeSTMT);
+                return;
+            }
+
+            SQLPOINTER ptr;
+            if  (!i)
+                ptr = db_name;
+            else
+                ptr = &db_size;
+
+            ret = SQLBindCol(dataFileSizeSTMT,
+                              i+1,
+                              col_data_type[i],
+                              ptr,
+                              (long)col_data_size[i],
+                              &col_data_len[i]);
+
+            if (ret != SQL_SUCCESS) {
+                netdata_MSSQL_error(SQL_HANDLE_STMT, dataFileSizeSTMT);
+                return;
+            }
+        }
+        first_call = FALSE;
+    }
+
+    for (i=0; ; i++) {
+        ret = SQLFetch(dataFileSizeSTMT);
+        if (ret == SQL_NO_DATA)
+            break;
+        else if (ret != SQL_SUCCESS)
+            return;
+
+        // add diciontary transverse here
+    }
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "KILLME DBS %d", i);
+
+}
+
+int netdata_MSSQL_fill_data_file_size() {
+    //SQLRETURN ret = SQLExecDirect(dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, SQL_NTS);
+    SQLRETURN ret = SQLPrepare(dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, strlen(NETDATA_GET_FILE_SIZE_QUERY));
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, dataFileSizeSTMT);
+        goto end_data_file_size;
+    }
+
+    SQLSMALLINT columns = 0;
+    ret = SQLNumResultCols(dataFileSizeSTMT, &columns);
+    if (ret != SQL_SUCCESS || columns != NETDATA_GET_FILE_SIZE_COLUMNS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, dataFileSizeSTMT);
+        goto end_data_file_size;
+    }
+
+    netdata_MSSQL_fill_data_file_size_dict();
+
+end_data_file_size:
+    SQLFreeStmt(dataFileSizeSTMT, SQL_CLOSE);
+    return 0;
 }
 
 static bool MSSQL_initialize_conection()
@@ -1565,8 +1644,31 @@ static bool MSSQL_initialize_conection()
             break;
     }
 
+    if (retConn) {
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, netdataSQLHDBc, &dataFileSizeSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+    }
+
     return retConn;
 }
+
+// Options
+
+static void netdata_read_config_options()
+{
+    dbconn.driver = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "driver", dbconn.driver);
+    dbconn.server = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "server", dbconn.server);
+    dbconn.address = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "address", dbconn.address);
+    dbconn.username = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "uid", dbconn.username);
+    dbconn.password = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "pwd", dbconn.password);
+    dbconn.windows_auth = inicfg_get_boolean(
+        &netdata_config, "plugin:windows:PerflibMSSQL", "windows authentication", dbconn.windows_auth);
+
+    netdata_mount_mssql_connection_string(connectionString, sizeof(connectionString) - 1, &dbconn);
+}
+
+// Entry point
 
 int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
 {
@@ -1579,6 +1681,10 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
         netdata_read_config_options();
         is_connected = MSSQL_initialize_conection();
         initialized = true;
+    }
+
+    if (is_connected) {
+        netdata_MSSQL_fill_data_file_size();
     }
 
     dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_charts_cb, &update_every);
