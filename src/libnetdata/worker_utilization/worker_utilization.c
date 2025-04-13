@@ -420,7 +420,7 @@ void worker_utilization_cleanup(void) {
                 fprintf(stderr, "WORKERS UTILIZATION: Freeing %zu workers_workname structures from tracking array\n", count);
             }
         }
-        
+
         // Also try to get the LIBUV workname directly since it's the one leaking
         // This is a direct approach to ensure we don't miss any worknames
         const char *libuv_name = "LIBUV";
@@ -434,7 +434,7 @@ void worker_utilization_cleanup(void) {
                 Pvoid_t *ExistingValue = JudyLGet(worknames_to_free, (Word_t)libuv_workname, PJE0);
                 already_tracked = (ExistingValue != NULL);
             }
-            
+
             if (!already_tracked) {
                 // Add this workname to our list
                 Pvoid_t *StoreValue = JudyLIns(&worknames_to_free, (Word_t)libuv_workname, PJE0);
