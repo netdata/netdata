@@ -222,6 +222,7 @@ void *exporting_main(void *ptr)
         return NULL;
 #endif
     }
+    service_exits();
 
 cleanup:
     return NULL;

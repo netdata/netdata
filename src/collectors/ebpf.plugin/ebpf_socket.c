@@ -3051,7 +3051,7 @@ void *ebpf_socket_thread(void *ptr)
         NETDATA_MAX_SOCKET_VECTOR);
 
     ebpf_read_socket.thread =
-        nd_thread_create(ebpf_read_socket.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_socket_thread, em);
+        nd_thread_create(ebpf_read_socket.name, NETDATA_THREAD_OPTION_JOINABLE, ebpf_read_socket_thread, em);
 
     pthread_mutex_lock(&lock);
     ebpf_socket_create_global_charts(em);

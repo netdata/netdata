@@ -70,8 +70,7 @@ void cancel_main_threads(void) {
     if (!static_threads)
         return;
 
-    int i, found = 0;
-    usec_t max = 5 * USEC_PER_SEC, step = 100000;
+    int i;
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if (static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
             if (static_threads[i].thread) {
@@ -81,35 +80,15 @@ void cancel_main_threads(void) {
                 netdata_log_info("EXIT: No thread running (marking as EXITED): %s", static_threads[i].name);
                 static_threads[i].enabled = NETDATA_MAIN_THREAD_EXITED;
             }
-            found++;
         }
     }
 
-    while(found && max > 0) {
-        max -= step;
-        netdata_log_info("Waiting %d threads to finish...", found);
-        sleep_usec(step);
-        found = 0;
-        for (i = 0; static_threads[i].name != NULL ; i++) {
-            if (static_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED)
-                continue;
-
-            // Don't wait ourselves.
-            if (nd_thread_is_me(static_threads[i].thread))
-                continue;
-
-            found++;
-        }
+    for (i = 0; static_threads[i].name != NULL ; i++) {
+        struct netdata_static_thread *st = &static_threads[i];
+        if(st->thread && !nd_thread_is_me(static_threads[i].thread))
+            nd_thread_join(st->thread);
     }
-
-    if(found) {
-        for (i = 0; static_threads[i].name != NULL ; i++) {
-            if (static_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
-                netdata_log_error("Main thread %s takes too long to exit. Giving up...", static_threads[i].name);
-        }
-    }
-    else
-        netdata_log_info("All threads finished.");
+    netdata_log_info("All threads finished.");
 
     freez(static_threads);
     static_threads = NULL;
@@ -315,6 +294,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if (!abnormal)
         add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
 
+    nd_thread_join_threads();
     sqlite_close_databases();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();

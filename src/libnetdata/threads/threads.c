@@ -261,28 +261,25 @@ void query_target_free(void);
 void service_exits(void);
 void rrd_collector_finished(void);
 
-static void nd_thread_join_exited_detached_threads(void) {
-    while(1) {
+void nd_thread_join_threads()
+{
+    ND_THREAD *nti;
+    do {
         spinlock_lock(&threads_globals.exited.spinlock);
 
-        ND_THREAD *nti = threads_globals.exited.list;
-        while (nti && nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) == 0)
-            nti = nti->next;
+        nti = threads_globals.exited.list;
 
-        if(nti) {
+        if (nti) {
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
             nti->list = ND_THREAD_LIST_NONE;
         }
 
         spinlock_unlock(&threads_globals.exited.spinlock);
 
-        if(nti) {
-            nd_log(NDLS_DAEMON, NDLP_INFO, "Joining detached thread '%s', tid %d", nti->tag, nti->tid);
-            nd_thread_join(nti);
-        }
-        else
-            break;
-    }
+        // handles null
+        nd_thread_join(nti);
+
+    } while (nti);
 }
 
 static void nd_thread_exit(ND_THREAD *nti) {
@@ -342,12 +339,12 @@ static void nd_thread_exit(ND_THREAD *nti) {
     }
     spinlock_unlock(&threads_globals.running.spinlock);
 
-    if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) != NETDATA_THREAD_OPTION_JOINABLE) {
-        spinlock_lock(&threads_globals.exited.spinlock);
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
-        nti->list = ND_THREAD_LIST_EXITED;
-        spinlock_unlock(&threads_globals.exited.spinlock);
-    }
+    //if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) != NETDATA_THREAD_OPTION_JOINABLE) {
+    spinlock_lock(&threads_globals.exited.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+    nti->list = ND_THREAD_LIST_EXITED;
+    spinlock_unlock(&threads_globals.exited.spinlock);
+    //}
 }
 
 static void *nd_thread_starting_point(void *ptr) {
@@ -388,15 +385,17 @@ bool nd_thread_is_me(ND_THREAD *nti) {
     return nti && nti->thread == pthread_self();
 }
 
-ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine)(void *), void *arg) {
-    nd_thread_join_exited_detached_threads();
-
+ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine)(void *), void *arg)
+{
     ND_THREAD *nti = callocz(1, sizeof(*nti));
     spinlock_init(&nti->canceller.spinlock);
     nti->arg = arg;
     nti->start_routine = start_routine;
-    nti->options = options & NETDATA_THREAD_OPTIONS_ALL;
+    nti->options = (options & NETDATA_THREAD_OPTIONS_ALL);
     strncpyz(nti->tag, tag, ND_THREAD_TAG_MAX);
+
+    if ((options & NETDATA_THREAD_OPTION_JOINABLE) == 0)
+        nd_log_daemon(NDLP_INFO, "WARNING: Creating detached thread '%s'", tag);
 
     int ret = pthread_create(&nti->thread, &threads_globals.attr, nd_thread_starting_point, nti);
     if(ret != 0) {
@@ -447,7 +446,15 @@ int nd_thread_join(ND_THREAD *nti) {
     if(!nti)
         return ESRCH;
 
-    int ret = pthread_join(nti->thread, NULL);
+    if(nd_thread_status_check(nti, NETDATA_THREAD_STATUS_JOINED)) {
+        freez(nti);
+        return 0;
+    }
+
+    int ret = 0;
+    bool joinable = nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE);
+    if (joinable)
+        ret = pthread_join(nti->thread, NULL);
     if(ret != 0) {
         // we can't join the thread
 
@@ -457,8 +464,10 @@ int nd_thread_join(ND_THREAD *nti) {
     }
     else {
         // we successfully joined the thread
+        if (joinable)
+            nd_log(NDLS_DAEMON, NDLP_DEBUG, "Joining thread '%s', tid %d", nti->tag, nti->tid);
 
-        nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
+       nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
 
         spinlock_lock(&threads_globals.running.spinlock);
         if(nti->list == ND_THREAD_LIST_RUNNING) {
@@ -474,7 +483,10 @@ int nd_thread_join(ND_THREAD *nti) {
         }
         spinlock_unlock(&threads_globals.exited.spinlock);
 
-        freez(nti);
+        if (joinable)
+            freez(nti);
+        else
+            nti->thread = 0;
     }
 
     return ret;

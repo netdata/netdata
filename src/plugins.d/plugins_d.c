@@ -119,6 +119,7 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
 
 #undef SERIAL_FAILURES_THRESHOLD
 
+
 static void *pluginsd_worker_thread(void *arg) {
     struct plugind *cd = (struct plugind *) arg;
 
@@ -399,7 +400,7 @@ void *pluginsd_main(void *ptr) {
                         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "PD[%s]", pluginname);
 
                         // spawn a new thread for it
-                        cd->unsafe.thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT | NETDATA_THREAD_OPTION_JOINABLE,
+                        cd->unsafe.thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
                                                              pluginsd_worker_thread, cd);
                     }
                 }
@@ -411,5 +412,6 @@ void *pluginsd_main(void *ptr) {
         pluginsd_sleep(scan_frequency);
     }
 
+    service_exits();
     return NULL;
 }
