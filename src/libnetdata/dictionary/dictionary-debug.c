@@ -72,41 +72,56 @@ static size_t report_allocated_dictionaries(void) {
         PValue = JudyLFirst(all_dictionaries, &index, PJE0);
         while (PValue != NULL) {
             DICTIONARY *dict = (DICTIONARY *)index;
-            STACKTRACE st = dict->stacktrace;
             
-            if (st) {
-                Word_t st_key = (Word_t)st;
+            // Process each stacktrace in the array
+            for (int st_idx = 0; st_idx < dict->stacktraces.num_stacktraces; st_idx++) {
+                STACKTRACE st = dict->stacktraces.stacktraces[st_idx];
                 
-                // Update count for this stacktrace
-                Pvoid_t PCount;
-                PCount = JudyLIns(&stacktrace_counts, st_key, PJE0);
-                if (PCount) {
-                    (*(Word_t*)PCount)++;
-                } else {
-                    *(Word_t*)PCount = 1;
-                }
-                
-                // Add dictionary to the list for this stacktrace
-                Pvoid_t PDictList;
-                PDictList = JudyLGet(stacktrace_dictionaries, st_key, PJE0);
-                if (!PDictList) {
-                    // Create a new array (starting with size 16)
-                    DICTIONARY **dict_list = (DICTIONARY **)calloc(16, sizeof(DICTIONARY*));
-                    if (dict_list) {
-                        dict_list[0] = dict;
-                        JudyLIns(&stacktrace_dictionaries, st_key, PJE0);
-                        PDictList = JudyLGet(stacktrace_dictionaries, st_key, PJE0);
-                        if (PDictList) {
-                            *(void**)PDictList = dict_list;
-                        }
+                if (st) {
+                    Word_t st_key = (Word_t)st;
+                    
+                    // Update count for this stacktrace
+                    Pvoid_t PCount;
+                    PCount = JudyLIns(&stacktrace_counts, st_key, PJE0);
+                    if (PCount) {
+                        (*(Word_t*)PCount)++;
+                    } else {
+                        *(Word_t*)PCount = 1;
                     }
-                } else {
-                    // Add to existing array
-                    DICTIONARY **dict_list = *(DICTIONARY***)PDictList;
-                    size_t i = 0;
-                    while (dict_list[i] && i < 1024) i++; // Find first empty slot, limit to 1024
-                    if (i < 1024) {
-                        dict_list[i] = dict;
+                    
+                    // Add dictionary to the list for this stacktrace
+                    Pvoid_t PDictList;
+                    PDictList = JudyLGet(stacktrace_dictionaries, st_key, PJE0);
+                    if (!PDictList) {
+                        // Create a new array (starting with size 16)
+                        DICTIONARY **dict_list = (DICTIONARY **)calloc(16, sizeof(DICTIONARY*));
+                        if (dict_list) {
+                            dict_list[0] = dict;
+                            JudyLIns(&stacktrace_dictionaries, st_key, PJE0);
+                            PDictList = JudyLGet(stacktrace_dictionaries, st_key, PJE0);
+                            if (PDictList) {
+                                *(void**)PDictList = dict_list;
+                            }
+                        }
+                    } else {
+                        // Add to existing array if not already present
+                        DICTIONARY **dict_list = *(DICTIONARY***)PDictList;
+                        bool already_added = false;
+                        size_t i = 0;
+                        
+                        // Check if dictionary is already in this list
+                        while (dict_list[i] && i < 1024) {
+                            if (dict_list[i] == dict) {
+                                already_added = true;
+                                break;
+                            }
+                            i++;
+                        }
+                        
+                        // Add if not already present
+                        if (!already_added && i < 1024) {
+                            dict_list[i] = dict;
+                        }
                     }
                 }
             }
@@ -272,9 +287,17 @@ void dictionary_debug_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITE
     if(!allow_null_dict && !dict) {
         // Create a buffer for the item's dict stacktrace
         BUFFER *wb = buffer_create(1024, NULL);
-        if (item && item->dict && item->dict->stacktrace) {
-            buffer_strcat(wb, "\nItem's dictionary creation stacktrace:\n");
-            stacktrace_to_buffer(item->dict->stacktrace, wb);
+        if (item && item->dict && item->dict->stacktraces.num_stacktraces > 0) {
+            buffer_strcat(wb, "\nItem's dictionary stacktraces:\n");
+            for (int i = 0; i < item->dict->stacktraces.num_stacktraces && i < 3; i++) {
+                if (item->dict->stacktraces.stacktraces[i]) {
+                    buffer_sprintf(wb, "Stacktrace #%d:\n", i+1);
+                    stacktrace_to_buffer(item->dict->stacktraces.stacktraces[i], wb);
+                    buffer_strcat(wb, "\n");
+                }
+            }
+            if (item->dict->stacktraces.num_stacktraces > 3)
+                buffer_sprintf(wb, "...and %d more stacktraces\n", item->dict->stacktraces.num_stacktraces - 3);
         } else {
             buffer_strcat(wb, "\nItem's dictionary stacktrace not available");
         }
@@ -300,16 +323,32 @@ void dictionary_debug_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITE
         // Create buffer for both dictionaries' stacktraces
         BUFFER *wb = buffer_create(1024, NULL);
 
-        if (dict->stacktrace) {
-            buffer_strcat(wb, "\nDictionary stacktrace:\n");
-            stacktrace_to_buffer(dict->stacktrace, wb);
+        if (dict->stacktraces.num_stacktraces > 0) {
+            buffer_strcat(wb, "\nDictionary stacktraces:\n");
+            for (int i = 0; i < dict->stacktraces.num_stacktraces && i < 3; i++) {
+                if (dict->stacktraces.stacktraces[i]) {
+                    buffer_sprintf(wb, "Stacktrace #%d:\n", i+1);
+                    stacktrace_to_buffer(dict->stacktraces.stacktraces[i], wb);
+                    buffer_strcat(wb, "\n");
+                }
+            }
+            if (dict->stacktraces.num_stacktraces > 3)
+                buffer_sprintf(wb, "...and %d more stacktraces\n", dict->stacktraces.num_stacktraces - 3);
         } else {
             buffer_strcat(wb, "\nDictionary stacktrace not available");
         }
 
-        if (item->dict && item->dict->stacktrace) {
-            buffer_strcat(wb, "\nItem's dictionary stacktrace:\n");
-            stacktrace_to_buffer(item->dict->stacktrace, wb);
+        if (item->dict && item->dict->stacktraces.num_stacktraces > 0) {
+            buffer_strcat(wb, "\nItem's dictionary stacktraces:\n");
+            for (int i = 0; i < item->dict->stacktraces.num_stacktraces && i < 3; i++) {
+                if (item->dict->stacktraces.stacktraces[i]) {
+                    buffer_sprintf(wb, "Stacktrace #%d:\n", i+1);
+                    stacktrace_to_buffer(item->dict->stacktraces.stacktraces[i], wb);
+                    buffer_strcat(wb, "\n");
+                }
+            }
+            if (item->dict->stacktraces.num_stacktraces > 3)
+                buffer_sprintf(wb, "...and %d more stacktraces\n", item->dict->stacktraces.num_stacktraces - 3);
         } else {
             buffer_strcat(wb, "\nItem's dictionary stacktrace not available");
         }

@@ -235,6 +235,7 @@ void stacktrace_capture(BUFFER *wb) {
 }
 
 // Implementation-specific function to collect stack trace frames
+NEVER_INLINE
 int impl_stacktrace_get_frames(void **frames, int max_frames, int skip_frames) {
     if (!backtrace_state || !frames || max_frames <= 0)
         return 0;
@@ -244,10 +245,11 @@ int impl_stacktrace_get_frames(void **frames, int max_frames, int skip_frames) {
         .frames = frames,
         .max_frames = max_frames,
         .num_frames = 0,
-        .skip_frames = skip_frames
+        .skip_frames = skip_frames + 1  // +1 to also skip this function itself
     };
     
-    backtrace_simple(backtrace_state, skip_frames, bt_collect_frames_callback, bt_error_handler, &data);
+    // Pass 0 as skip_frames to backtrace_simple and let the callback handle skipping
+    backtrace_simple(backtrace_state, 0, bt_collect_frames_callback, bt_error_handler, &data);
     
     return data.num_frames;
 }

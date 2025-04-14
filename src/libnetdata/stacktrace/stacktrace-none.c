@@ -41,6 +41,10 @@ int impl_stacktrace_get_frames(void **frames, int max_frames, int skip_frames) {
     if (!frames || max_frames <= 0)
         return 0;
     
+    // No need to adjust skip_frames here as we're just creating a dummy frame
+    // but we include the comment for consistency with other implementations
+    // skip_frames += 1; // Skip this function itself
+    
     // Just use a counter to create a unique "frame"
     static uint64_t counter = 0;
     uint64_t id = __atomic_fetch_add(&counter, 1, __ATOMIC_SEQ_CST);

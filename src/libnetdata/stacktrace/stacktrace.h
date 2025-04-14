@@ -47,4 +47,6 @@ bool stack_trace_formatter(struct web_buffer *wb, void *data);
 // Unit testing
 int stacktrace_unittest(void);
 
+#include "stacktrace-array.h"
+
 #endif /* NETDATA_STACKTRACE_H */

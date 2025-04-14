@@ -76,7 +76,7 @@ typedef struct dictionary_item_shared {
 
 struct dictionary_item {
 #ifdef FSANITIZE_ADDRESS
-    STACKTRACE stacktrace;          // stack trace captured at creation time
+    STACKTRACE_ARRAY stacktraces;   // stack traces from all acquisition points
 #endif
 #ifdef NETDATA_INTERNAL_CHECKS
     DICTIONARY *dict;
@@ -131,7 +131,7 @@ struct dictionary_hooks {
 
 struct dictionary {
 #ifdef FSANITIZE_ADDRESS
-    STACKTRACE stacktrace;              // stack trace captured at creation time
+    STACKTRACE_ARRAY stacktraces;   // stack traces from all acquisition points
 #endif
 
     usec_t last_gc_run_us;

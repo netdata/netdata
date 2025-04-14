@@ -989,6 +989,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/stacktrace/stacktrace.h
         src/libnetdata/stacktrace/stacktrace-common.h
         src/libnetdata/stacktrace/stacktrace-common.c
+        src/libnetdata/stacktrace/stacktrace-array.h
+        src/libnetdata/stacktrace/stacktrace-array.c
         src/libnetdata/stacktrace/stacktrace-libbacktrace.c
         src/libnetdata/stacktrace/stacktrace-libunwind.c
         src/libnetdata/stacktrace/stacktrace-backtrace.c

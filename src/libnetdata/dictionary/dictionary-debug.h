@@ -33,9 +33,17 @@ void dictionary_debug_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITE
 #define dictionary_internal_error(condition, dict, fmt, args...) do { \
     if(unlikely(condition)) { \
         BUFFER *__wb = buffer_create(1024, NULL); \
-        if ((dict) && (dict)->stacktrace) { \
-            buffer_sprintf(__wb, fmt " Dictionary created at:\n", ##args); \
-            stacktrace_to_buffer((dict)->stacktrace, __wb); \
+        if ((dict) && ((dict)->stacktraces.num_stacktraces > 0)) { \
+            buffer_sprintf(__wb, fmt " Dictionary accessed at:\n", ##args); \
+            for (int i = 0; i < (dict)->stacktraces.num_stacktraces && i < 3; i++) { \
+                if ((dict)->stacktraces.stacktraces[i]) { \
+                    buffer_sprintf(__wb, "Stacktrace #%d:\n", i+1); \
+                    stacktrace_to_buffer((dict)->stacktraces.stacktraces[i], __wb); \
+                    buffer_strcat(__wb, "\n"); \
+                } \
+            } \
+            if ((dict)->stacktraces.num_stacktraces > 3) \
+                buffer_sprintf(__wb, "...and %d more stacktraces\n", (dict)->stacktraces.num_stacktraces - 3); \
         } else { \
             buffer_sprintf(__wb, fmt " Dictionary stacktrace not available", ##args); \
         } \
@@ -48,9 +56,17 @@ void dictionary_debug_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITE
 #define dictionary_internal_fatal(condition, dict, fmt, args...) do { \
     if(unlikely(condition)) { \
         BUFFER *__wb = buffer_create(1024, NULL); \
-        if ((dict) && (dict)->stacktrace) { \
-            buffer_sprintf(__wb, fmt " Dictionary created at:\n", ##args); \
-            stacktrace_to_buffer((dict)->stacktrace, __wb); \
+        if ((dict) && ((dict)->stacktraces.num_stacktraces > 0)) { \
+            buffer_sprintf(__wb, fmt " Dictionary accessed at:\n", ##args); \
+            for (int i = 0; i < (dict)->stacktraces.num_stacktraces && i < 3; i++) { \
+                if ((dict)->stacktraces.stacktraces[i]) { \
+                    buffer_sprintf(__wb, "Stacktrace #%d:\n", i+1); \
+                    stacktrace_to_buffer((dict)->stacktraces.stacktraces[i], __wb); \
+                    buffer_strcat(__wb, "\n"); \
+                } \
+            } \
+            if ((dict)->stacktraces.num_stacktraces > 3) \
+                buffer_sprintf(__wb, "...and %d more stacktraces\n", (dict)->stacktraces.num_stacktraces - 3); \
         } else { \
             buffer_sprintf(__wb, fmt " Dictionary stacktrace not available", ##args); \
         } \

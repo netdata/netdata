@@ -87,18 +87,22 @@ int impl_stacktrace_get_frames(void **frames, int max_frames, int skip_frames) {
     if (!frames || max_frames <= 0)
         return 0;
     
-    // Collect stack trace
-    void *array[100]; // Use a larger array since we'll be skipping frames
+    // Add 1 to skip_frames to also skip this function itself
+    skip_frames += 1;
+    
+    // Collect all stack frames without skipping at this level
+    void *array[100 + 50]; // Use a larger array to account for skipped frames (100) plus the max we need (50)
     int size = backtrace(array, _countof(array));
     
     if (size <= skip_frames) // Not enough frames after skipping
         return 0;
     
-    // Skip the requested number of frames
+    // Apply skip_frames here, in the aftermath of backtrace, not during capture
+    // This ensures we're not skipping inlined functions
     int available_frames = size - skip_frames;
     int frames_to_copy = available_frames < max_frames ? available_frames : max_frames;
     
-    // Copy the frames
+    // Copy the frames, skipping the requested number of frames
     memcpy(frames, array + skip_frames, frames_to_copy * sizeof(void *));
     
     return frames_to_copy;

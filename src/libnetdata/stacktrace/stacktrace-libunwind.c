@@ -109,22 +109,29 @@ void stack_trace_capture(BUFFER *wb) {
 static int collect_frames_libunwind(void **frames, int max_frames, int skip) {
     unw_cursor_t cursor;
     unw_context_t context;
-    int frame_count = 0;
     
     unw_getcontext(&context);
     unw_init_local(&cursor, &context);
     
-    // Skip initial frames
-    for (int i = 0; i < skip && unw_step(&cursor) > 0; i++);
+    // Collect all frames first, including the ones we'll skip
+    // This way we ensure we capture all frames, including inlined ones
+    void *all_frames[150]; // Allocate a larger buffer to hold all frames
+    int total_frames = 0;
     
-    // Collect frames
-    while (frame_count < max_frames && unw_step(&cursor) > 0) {
+    // Collect as many frames as possible
+    while (total_frames < 150 && unw_step(&cursor) > 0) {
         unw_word_t pc;
         unw_get_reg(&cursor, UNW_REG_IP, &pc);
         if (!pc)
             break;
             
-        frames[frame_count++] = (void *)pc;
+        all_frames[total_frames++] = (void *)pc;
+    }
+    
+    // Now copy the frames we want, skipping the requested number
+    int frame_count = 0;
+    for (int i = skip; i < total_frames && frame_count < max_frames; i++) {
+        frames[frame_count++] = all_frames[i];
     }
     
     return frame_count;
@@ -135,7 +142,8 @@ int impl_stacktrace_get_frames(void **frames, int max_frames, int skip_frames) {
     if (!frames || max_frames <= 0)
         return 0;
     
-    return collect_frames_libunwind(frames, max_frames, skip_frames);
+    // Add 1 to skip_frames to also skip this function itself
+    return collect_frames_libunwind(frames, max_frames, skip_frames + 1);
 }
 
 // Implementation-specific function to convert a stacktrace to a buffer

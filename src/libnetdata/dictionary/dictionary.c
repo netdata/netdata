@@ -343,8 +343,7 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
     size_t remaining = 0;
 
 #ifdef FSANITIZE_ADDRESS
-    // Create three Judy arrays for tracking stats by stacktrace
-    // We use pointer address as key - casting to uintptr_t
+    // Create Judy arrays for tracking stats by stacktrace
     STACKTRACE_JudyLSet dict_counts = { 0 };     // Count of dictionaries per stacktrace
     STACKTRACE_JudyLSet item_counts = { 0 };     // Count of items per stacktrace
     STACKTRACE_JudyLSet item_stacktrace_counts = { 0 }; // Count of items by their creation stacktrace
@@ -368,17 +367,22 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
             
 #ifdef FSANITIZE_ADDRESS
             // Track this dictionary for deduplication reporting
-            if (shutdown && dict->stacktrace) {
-                // Update dictionary count
-                uintptr_t key = (uintptr_t)dict->stacktrace;
-                size_t dict_count = STACKTRACE_GET(&dict_counts, key);
-                dict_count++;
-                STACKTRACE_SET(&dict_counts, key, dict_count);
+            if (shutdown) {
+                // Process all stacktraces from this dictionary
+                for (int i = 0; i < dict->stacktraces.num_stacktraces; i++) {
+                    if (dict->stacktraces.stacktraces[i]) {
+                        // Update dictionary count
+                        uintptr_t key = (uintptr_t)dict->stacktraces.stacktraces[i];
+                        size_t dict_count = STACKTRACE_GET(&dict_counts, key);
+                        dict_count++;
+                        STACKTRACE_SET(&dict_counts, key, dict_count);
 
-                // Update item count
-                size_t items_count = STACKTRACE_GET(&item_counts, key);
-                items_count += ref_items;
-                STACKTRACE_SET(&item_counts, key, items_count);
+                        // Update item count
+                        size_t items_count = STACKTRACE_GET(&item_counts, key);
+                        items_count += ref_items;
+                        STACKTRACE_SET(&item_counts, key, items_count);
+                    }
+                }
             }
 #endif
 
@@ -415,7 +419,7 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
             buffer_flush(wb);
             stacktrace_to_buffer(st, wb);
             
-            fprintf(stderr, "\n > DICTIONARY DELAYED %zu: %zu items in %zu dictionaries created from:\n%s\n\n",
+            fprintf(stderr, "\n > DICTIONARY DELAYED %zu: %zu items in %zu dictionaries accessed from:\n%s\n\n",
                     i, item_count, dict_count, buffer_tostring(wb));
         }
         
@@ -428,11 +432,14 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
             // Iterate through all items and count by stacktrace
             DICTIONARY_ITEM *item;
             for(item = dict->items.list; item; item = item->next) {
-                if (item->stacktrace) {
-                    uintptr_t item_key = (uintptr_t)item->stacktrace;
-                    size_t count = STACKTRACE_GET(&item_stacktrace_counts, item_key);
-                    count++;
-                    STACKTRACE_SET(&item_stacktrace_counts, item_key, count);
+                // Count each unique stacktrace in the item's array
+                for (int i = 0; i < item->stacktraces.num_stacktraces; i++) {
+                    if (item->stacktraces.stacktraces[i]) {
+                        uintptr_t item_key = (uintptr_t)item->stacktraces.stacktraces[i];
+                        size_t count = STACKTRACE_GET(&item_stacktrace_counts, item_key);
+                        count++;
+                        STACKTRACE_SET(&item_stacktrace_counts, item_key, count);
+                    }
                 }
             }
         }
@@ -453,7 +460,7 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
             buffer_flush(wb);
             stacktrace_to_buffer(st, wb);
 
-            fprintf(stderr, "\n > DICTIONARY ITEMS DELAYED %zu: %zu items created from:\n%s\n\n",
+            fprintf(stderr, "\n > DICTIONARY ITEMS DELAYED %zu: %zu items accessed from:\n%s\n\n",
                     j, count, buffer_tostring(wb));
         }
 
@@ -558,12 +565,22 @@ static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dicti
     return dict;
 }
 
+// Helper function to add a stacktrace to a dictionary
+#ifdef FSANITIZE_ADDRESS
+static inline void dict_add_stacktrace(DICTIONARY *dict) {
+    stacktrace_array_add(&dict->stacktraces, 1);
+}
+#endif
+
 DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size) {
     DICTIONARY *dict = dictionary_create_internal(options, stats?stats:&dictionary_stats_category_other, fixed_size);
 
 #ifdef FSANITIZE_ADDRESS
-    // Capture the stack trace at creation time
-    dict->stacktrace = stacktrace_get(0);
+    // Initialize stacktrace tracking
+    stacktrace_array_init(&dict->stacktraces);
+    
+    // Add the first stack trace at creation time
+    dict_add_stacktrace(dict);
 #endif
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);
@@ -586,8 +603,11 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
     __atomic_add_fetch(&master->hooks->links, 1, __ATOMIC_ACQUIRE);
 
 #ifdef FSANITIZE_ADDRESS
-    // Capture the stack trace at creation time
-    dict->stacktrace = stacktrace_get(0);
+    // Initialize stacktrace tracking
+    stacktrace_array_init(&dict->stacktraces);
+    
+    // Add the first stack trace at creation time
+    dict_add_stacktrace(dict);
 #endif
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);

@@ -56,7 +56,11 @@ static inline DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused,
     item->creator_pid = gettid_cached();
 #endif
 #ifdef FSANITIZE_ADDRESS
-    item->stacktrace = stacktrace_get(0);  // Capture the stack trace at creation time
+    // Initialize stacktrace tracking
+    stacktrace_array_init(&item->stacktraces);
+    
+    // Add the first stack trace at creation time
+    stacktrace_array_add(&item->stacktraces, 1);
 #endif
 
     item->refcount = 1;

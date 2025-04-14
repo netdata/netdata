@@ -53,6 +53,11 @@ static inline void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
         if(item_flag_check(item, ITEM_FLAG_DELETED))
             DICTIONARY_PENDING_DELETES_MINUS1(dict);
     }
+    
+#ifdef FSANITIZE_ADDRESS
+    // Add a stacktrace for this acquisition point
+    stacktrace_array_add(&item->stacktraces, 1);
+#endif
 }
 
 static inline void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
@@ -165,6 +170,11 @@ static inline int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_I
 
         if(desired == 1)
             DICTIONARY_REFERENCED_ITEMS_PLUS1(dict);
+            
+#ifdef FSANITIZE_ADDRESS
+        // Add a stacktrace for this acquisition point
+        stacktrace_array_add(&item->stacktraces, 1);
+#endif
     }
 
     if(unlikely(spins > 1))

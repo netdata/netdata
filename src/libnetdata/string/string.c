@@ -11,11 +11,6 @@
 #define string_partition_str(str) ((uint8_t)((str)[0]) >> STRING_PARTITION_SHIFTS)
 #define string_partition(string) (string_partition_str((string)->str))
 
-// Number of stacktraces to track per string
-#ifndef STRING_MAX_STACKTRACES
-#define STRING_MAX_STACKTRACES 10
-#endif
-
 struct netdata_string {
     uint32_t length;    // the string length including the terminating '\0'
 
@@ -24,41 +19,11 @@ struct netdata_string {
                         // If at any point this goes below zero, we have a duplicate free.
                         
 #ifdef FSANITIZE_ADDRESS
-    SPINLOCK stacktrace_spinlock;                   // spinlock to protect the stacktraces array
-    int num_stacktraces;                            // number of stored stacktraces (0 to STRING_MAX_STACKTRACES)
-    STACKTRACE stacktraces[STRING_MAX_STACKTRACES]; // array of stacktraces from different acquisition points
+    STACKTRACE_ARRAY stacktraces;   // stack traces from all acquisition points
 #endif
 
     const char str[];   // the string itself, is appended to this structure
 };
-
-#ifdef FSANITIZE_ADDRESS
-// Helper function to add a stacktrace to a string
-// Ensures no duplicate stacktraces are added
-static inline void string_add_stacktrace(STRING *string) {
-    // Get current stacktrace
-    STACKTRACE current = stacktrace_get(1);
-    
-    // Protect the stacktraces array with a spinlock
-    spinlock_lock(&string->stacktrace_spinlock);
-    
-    // Check if this stacktrace already exists in the array
-    bool found = false;
-    for (int i = 0; i < string->num_stacktraces; i++) {
-        if (string->stacktraces[i] == current) {
-            found = true;
-            break;
-        }
-    }
-    
-    // Add the stacktrace if it's unique and there's room
-    if (!found && string->num_stacktraces < STRING_MAX_STACKTRACES) {
-        string->stacktraces[string->num_stacktraces++] = current;
-    }
-    
-    spinlock_unlock(&string->stacktrace_spinlock);
-}
-#endif
 
 static struct string_partition {
     RW_SPINLOCK spinlock;       // the R/W spinlock to protect the Judy array
@@ -157,7 +122,7 @@ STRING *string_dup(STRING *string) {
 #endif
 
 #ifdef FSANITIZE_ADDRESS
-    string_add_stacktrace(string);
+    stacktrace_array_add(&string->stacktraces, 0);
 #endif
 
     // statistics
@@ -190,7 +155,7 @@ static inline STRING *string_index_search(const char *str, size_t length) {
             
 #ifdef FSANITIZE_ADDRESS
             // Also add a stacktrace when we find an existing string
-            string_add_stacktrace(string);
+            stacktrace_array_add(&string->stacktraces, 0);
 #endif
         }
         else {
@@ -255,8 +220,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
         
 #ifdef FSANITIZE_ADDRESS
         // Initialize stacktrace tracking
-        spinlock_init(&string->stacktrace_spinlock);
-        string->num_stacktraces = 0;
+        stacktrace_array_init(&string->stacktraces);
         
         // Add to JudyL array for tracking strings by pointer
         Pvoid_t *PValue;
@@ -365,7 +329,7 @@ STRING *string_strdupz(const char *str) {
 
 #ifdef FSANITIZE_ADDRESS
     // Add a stacktrace for this acquisition point too
-    string_add_stacktrace(string);
+    stacktrace_array_add(&string->stacktraces, 0);
 #endif
 
     return string;
@@ -390,7 +354,7 @@ STRING *string_strndupz(const char *str, size_t len) {
 
 #ifdef FSANITIZE_ADDRESS
     // Add a stacktrace for this acquisition point too
-    string_add_stacktrace(string);
+    stacktrace_array_add(&string->stacktraces, 0);
 #endif
 
     return string;
@@ -571,19 +535,21 @@ size_t string_destroy(void) {
             while (PValue) {
                 STRING *string = (STRING *)string_idx;
                 if(string) {
-                    for (int i = 0; i < string->num_stacktraces; i++) {
-                        Word_t key = (Word_t)string->stacktraces[i];
-                        PValue = JudyLGet(string_counts, key, PJE0);
-                        if (PValue) {
-                            // Increment existing count
-                            size_t count = (size_t)(uintptr_t)*PValue;
-                            count++;
-                            *PValue = (Pvoid_t)(uintptr_t)count;
-                        } else {
-                            // Insert new count
-                            PValue = JudyLIns(&string_counts, key, PJE0);
-                            if (PValue != PJERR)
-                                *PValue = (Pvoid_t)(uintptr_t)1;
+                    for (int i = 0; i < string->stacktraces.num_stacktraces; i++) {
+                        if (string->stacktraces.stacktraces[i]) {
+                            Word_t key = (Word_t)string->stacktraces.stacktraces[i];
+                            PValue = JudyLGet(string_counts, key, PJE0);
+                            if (PValue) {
+                                // Increment existing count
+                                size_t count = (size_t)(uintptr_t)*PValue;
+                                count++;
+                                *PValue = (Pvoid_t)(uintptr_t)count;
+                            } else {
+                                // Insert new count
+                                PValue = JudyLIns(&string_counts, key, PJE0);
+                                if (PValue != PJERR)
+                                    *PValue = (Pvoid_t)(uintptr_t)1;
+                            }
                         }
                     }
                 }
