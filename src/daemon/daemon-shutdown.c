@@ -16,14 +16,13 @@
 // External configuration structures that need cleanup
 extern struct config netdata_config;
 extern struct config cloud_config;
-extern void inicfg_free(struct config *root);
+
 // Functions to free various configurations
-extern void claim_config_free(void);
-extern void stream_config_free(void);
-extern void exporting_config_free(void);
-extern void rrd_functions_inflight_destroy(void);
-extern void cgroup_netdev_link_destroy(void);
-extern void bearer_tokens_destroy(void);
+void claim_config_free(void);
+void rrd_functions_inflight_destroy(void);
+void cgroup_netdev_link_destroy(void);
+void bearer_tokens_destroy(void);
+void alerts_by_x_cleanup(void);
 
 static bool abort_on_fatal = true;
 
@@ -402,7 +401,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     fprintf(stderr, "Cleaning up worker utilization...\n");
     worker_utilization_cleanup();
-    
+
+    alerts_by_x_cleanup();
     size_t strings_referenced = string_destroy();
     if(strings_referenced)
         fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",

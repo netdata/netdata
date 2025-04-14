@@ -192,6 +192,8 @@ void health_plugin_destroy(void) {
     health_globals.config.silencers_filename = NULL;
     health_globals.config.enabled_alerts = NULL;
 
+    alert_variable_lookup_cleanup();
+
     health_globals.initialization.done = false;
 
     spinlock_unlock(&health_globals.initialization.spinlock);
