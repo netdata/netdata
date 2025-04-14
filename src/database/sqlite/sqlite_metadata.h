@@ -26,7 +26,7 @@ typedef enum db_check_action_type {
 // To initialize and shutdown
 void metadata_sync_init(void);
 void metadata_sync_shutdown(void);
-void metadata_sync_shutdown_prepare(void);
+//void metadata_sync_shutdown_prepare(void);
 
 void metaqueue_delete_dimension_uuid(nd_uuid_t *uuid);
 void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid);
@@ -37,7 +37,7 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
 
 int sql_metadata_cache_stats(int op);
 
-int get_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
+//int get_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
 void sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
 void sql_load_node_id(RRDHOST *host);
 
@@ -57,8 +57,8 @@ void metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae);
 void metadata_queue_ae_deletion(ALARM_ENTRY *ae);
 void commit_alert_transitions(RRDHOST *host);
 
-void metadata_sync_shutdown_background(void);
-void metadata_sync_shutdown_background_wait(void);
+//void metadata_sync_shutdown_background(void);
+//void metadata_sync_shutdown_background_wait(void);
 void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context);
 void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer);
 void metadata_execute_store_statement(sqlite3_stmt *stmt);
