@@ -2,7 +2,6 @@ package snmp
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -34,13 +33,13 @@ func (c *Collector) parseMetricsFromProfiles(matchingProfiles []*ddsnmp.Profile)
 			return nil, err
 		}
 
-		for _, oid := range results.oids {
+		for _, oid := range results.OIDs {
 			response, err := c.snmpClient.Get([]string{oid})
 			if err != nil {
 				return nil, err
 			}
 			if (response != &gosnmp.SnmpPacket{}) {
-				for _, metric := range results.parsed_metrics {
+				for _, metric := range results.parsedMetrics {
 					switch s := metric.(type) {
 					case parsedSymbolMetric:
 						// find a matching metric
@@ -48,8 +47,10 @@ func (c *Collector) parseMetricsFromProfiles(matchingProfiles []*ddsnmp.Profile)
 							metricName := s.name
 							metricType := response.Variables[0].Type
 							metricValue := response.Variables[0].Value
+							metricUnit := s.unit
+							metricDescription := s.description
 
-							metricMap[oid] = processedMetric{oid: oid, name: metricName, value: metricValue, metric_type: metricType}
+							metricMap[oid] = processedMetric{oid: oid, name: metricName, value: metricValue, metricType: metricType, unit: metricUnit, description: metricDescription}
 						}
 					}
 				}
@@ -57,14 +58,14 @@ func (c *Collector) parseMetricsFromProfiles(matchingProfiles []*ddsnmp.Profile)
 			}
 		}
 
-		for _, oid := range results.next_oids {
+		for _, oid := range results.nextOIDs {
 			if len(oid) < 1 {
 				continue
 			}
 			if tableRows, err := c.walkOIDTree(oid); err != nil {
-				log.Fatalf("Error walking OID tree: %v, oid %s", err, oid)
+				return nil, fmt.Errorf("error walking OID tree: %v, oid %s", err, oid)
 			} else {
-				for _, metric := range results.parsed_metrics {
+				for _, metric := range results.parsedMetrics {
 					switch s := metric.(type) {
 					case parsedTableMetric:
 						// find a matching metric

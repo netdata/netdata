@@ -199,8 +199,16 @@ func (c *Collector) addSNMPChart(processedMetric processedMetric) {
 		chart := snmpChartTemplate.Copy()
 
 		chart.ID = fmt.Sprintf(chart.ID, processedMetric.name)
-		chart.Title = fmt.Sprintf(chart.Title, processedMetric.name)
-		chart.Units = fmt.Sprintf(chart.Units, "TBD unit")
+		if processedMetric.description == "" {
+			chart.Title = fmt.Sprintf(chart.Title, "TBD Description")
+		} else {
+			chart.Title = fmt.Sprintf(chart.Title, processedMetric.description)
+		}
+		if processedMetric.unit == "" {
+			chart.Units = fmt.Sprintf(chart.Units, "TBD unit")
+		} else {
+			chart.Units = fmt.Sprintf(chart.Units, processedMetric.unit)
+		}
 		chart.Ctx = fmt.Sprintf(chart.Ctx, processedMetric.name)
 		chart.Fam = fmt.Sprintf(chart.Fam, processedMetric.name)
 
