@@ -193,13 +193,52 @@ struct mssql_db_instance {
     uint32_t updated;
 };
 
+enum netdata_mssql_odbc_errors {
+    NETDATA_MSSQL_ODBC_NO_ERROR,
+    NETDATA_MSSQL_ODBC_CONNECT,
+    NETDATA_MSSQL_ODBC_BIND,
+    NETDATA_MSSQL_ODBC_PREPARE,
+    NETDATA_MSSQL_ODBC_QUERY,
+};
+
+static char *netdata_MSSQL_error_text(enum netdata_mssql_metrics val)
+{
+    switch(val) {
+        case NETDATA_MSSQL_ODBC_NO_ERROR:
+            return "NO ERROR";
+        case NETDATA_MSSQL_ODBC_CONNECT:
+            return "CONNECTION";
+        case NETDATA_MSSQL_ODBC_BIND:
+            return "BIND PARAMETER";
+        case NETDATA_MSSQL_ODBC_PREPARE:
+            return "PREPARE PARAMETER";
+        case NETDATA_MSSQL_ODBC_QUERY:
+        default:
+            return "QUERY PARAMETER";
+    }
+}
+
+static char *netdata_MSSQL_type_text(uint32_t type)
+{
+    switch(type) {
+        case SQL_HANDLE_STMT:
+            return "STMT";
+        case SQL_HANDLE_DBC:
+        default:
+            return "DBC";
+    }
+}
+
 // Connection and SQL
-static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle)
+static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_mssql_metrics step)
 {
     SQLCHAR state[1024];
     SQLCHAR message[1024];
-    if (SQL_SUCCESS == SQLGetDiagRec((short)type, handle, 1, state, NULL, message, 1024, NULL))
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot connect to MSSQL server:  %s, %s", message, state);
+    if (SQL_SUCCESS == SQLGetDiagRec((short)type, handle, 1, state, NULL, message, 1024, NULL)) {
+        char *str_step = netdata_MSSQL_error_text(step);
+        char *str_type = netdata_MSSQL_type_text(type);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "MSSQL server error using the handle %s running %s :  %s, %s", str_type, str_step, message, state);
+    }
 }
 
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
@@ -227,7 +266,6 @@ static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_con
     // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
     SQLSMALLINT i;
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "KILLME BEGIN");
     if (first_call) {
         ret = SQLDescribeCol(
             nmc->dataFileSizeSTMT,
@@ -241,7 +279,7 @@ static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_con
             &col_data_nullable);
 
         if (ret != SQL_SUCCESS) {
-            netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
+            netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT, NETDATA_MSSQL_ODBC_QUERY);
             return 0;
         }
 
@@ -253,7 +291,7 @@ static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_con
                          &col_data_len);
 
         if (ret != SQL_SUCCESS) {
-            netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
+            netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT, NETDATA_MSSQL_ODBC_QUERY);
             return 0;
         }
         first_call = FALSE;
@@ -273,20 +311,25 @@ static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_con
 ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char *dbname) {
     ULONGLONG value = 0;
     SQLLEN length = SQL_NTS;
+    enum netdata_mssql_metrics step = NETDATA_MSSQL_ODBC_NO_ERROR;
 
     SQLRETURN ret = SQLBindParameter(nmc->dataFileSizeSTMT, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_CHAR, strlen(dbname), 0, dbname, 0, &length);
-    if (ret != SQL_SUCCESS)
+    if (ret != SQL_SUCCESS) {
+        step = NETDATA_MSSQL_ODBC_BIND;
         goto end_data_file_size;
+    }
 
     ret = SQLPrepare(nmc->dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, strlen(NETDATA_GET_FILE_SIZE_QUERY));
-    if (ret != SQL_SUCCESS)
+    if (ret != SQL_SUCCESS) {
+        step = NETDATA_MSSQL_ODBC_PREPARE;
         goto end_data_file_size;
+    }
 
     value = netdata_MSSQL_fill_data_file_size_dict(nmc);
 
     end_data_file_size:
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT, step);
     }
     SQLFreeStmt(nmc->dataFileSizeSTMT, SQL_CLOSE);
     return value;
@@ -341,7 +384,7 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
         case SQL_INVALID_HANDLE:
         case SQL_ERROR:
         default:
-            netdata_MSSQL_error(SQL_HANDLE_DBC, nmc->netdataSQLHDBc);
+            netdata_MSSQL_error(SQL_HANDLE_DBC, nmc->netdataSQLHDBc, NETDATA_MSSQL_ODBC_CONNECT);
             retConn = FALSE;
             break;
         case SQL_SUCCESS:
