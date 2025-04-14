@@ -848,6 +848,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary.h
         src/libnetdata/eval/eval.c
         src/libnetdata/eval/eval.h
+        src/libnetdata/eval/eval-internal.h
+        src/libnetdata/eval/eval-unittest.c
         src/libnetdata/facets/facets.c
         src/libnetdata/facets/facets.h
         src/libnetdata/functions_evloop/functions_evloop.c

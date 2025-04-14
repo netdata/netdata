@@ -1,79 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../libnetdata.h"
-
-typedef enum __attribute__((packed)) {
-    EVAL_VALUE_INVALID = 0,
-    EVAL_VALUE_NUMBER,
-    EVAL_VALUE_VARIABLE,
-    EVAL_VALUE_EXPRESSION
-} EVAL_VALUE_TYPE;
-
-// ----------------------------------------------------------------------------
-// data structures for storing the parsed expression in memory
-
-typedef struct eval_variable {
-    STRING *name;
-    struct eval_variable *next;
-} EVAL_VARIABLE;
-
-typedef struct eval_value {
-    EVAL_VALUE_TYPE type;
-
-    union {
-        NETDATA_DOUBLE number;
-        EVAL_VARIABLE *variable;
-        struct eval_node *expression;
-    };
-} EVAL_VALUE;
-
-typedef struct eval_node {
-    int id;
-    unsigned char operator;
-    int precedence;
-
-    int count;
-    EVAL_VALUE ops[];
-} EVAL_NODE;
-
-struct eval_expression {
-    STRING *source;
-    STRING *parsed_as;
-
-    NETDATA_DOUBLE result;
-
-    int error;
-    BUFFER *error_msg;
-
-    EVAL_NODE *nodes;
-
-    void *variable_lookup_cb_data;
-    eval_expression_variable_lookup_t variable_lookup_cb;
-};
-
-// these are used for EVAL_NODE.operator
-// they are used as internal IDs to identify an operator
-// THEY ARE NOT USED FOR PARSING OPERATORS LIKE THAT
-#define EVAL_OPERATOR_NOP                   '\0'
-#define EVAL_OPERATOR_EXPRESSION_OPEN       '('
-#define EVAL_OPERATOR_EXPRESSION_CLOSE      ')'
-#define EVAL_OPERATOR_NOT                   '!'
-#define EVAL_OPERATOR_PLUS                  '+'
-#define EVAL_OPERATOR_MINUS                 '-'
-#define EVAL_OPERATOR_AND                   '&'
-#define EVAL_OPERATOR_OR                    '|'
-#define EVAL_OPERATOR_GREATER_THAN_OR_EQUAL 'G'
-#define EVAL_OPERATOR_LESS_THAN_OR_EQUAL    'L'
-#define EVAL_OPERATOR_NOT_EQUAL             '~'
-#define EVAL_OPERATOR_EQUAL                 '='
-#define EVAL_OPERATOR_LESS                  '<'
-#define EVAL_OPERATOR_GREATER               '>'
-#define EVAL_OPERATOR_MULTIPLY              '*'
-#define EVAL_OPERATOR_DIVIDE                '/'
-#define EVAL_OPERATOR_SIGN_PLUS             'P'
-#define EVAL_OPERATOR_SIGN_MINUS            'M'
-#define EVAL_OPERATOR_ABS                   'A'
-#define EVAL_OPERATOR_IF_THEN_ELSE          '?'
+#include "eval-internal.h"
 
 // ----------------------------------------------------------------------------
 // forward function definitions
@@ -90,6 +18,13 @@ static inline void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n);
 
 static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int *error) {
     NETDATA_DOUBLE n;
+
+    // Check if variable is NULL to avoid crashes
+    if (!v || !v->name) {
+        *error = EVAL_ERROR_UNKNOWN_VARIABLE;
+        buffer_strcat(exp->error_msg, "[ undefined variable ] ");
+        return NAN;
+    }
 
     if(exp->variable_lookup_cb && exp->variable_lookup_cb(v->name, exp->variable_lookup_cb_data, &n)) {
         buffer_sprintf(exp->error_msg, "[ ${%s} = ", string2str(v->name));
@@ -129,10 +64,14 @@ static inline NETDATA_DOUBLE eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, int
 }
 
 static inline int is_true(NETDATA_DOUBLE n) {
-    if(isnan(n)) return 0;
-    if(isinf(n)) return 1;
-    if(n == 0) return 0;
-    return 1;
+    // Handle special cases safely
+    if(isnan(n)) return 0;    // NaN is considered false
+    if(isinf(n)) {
+        // Infinity is considered true (positive or negative)
+        return 1;
+    }
+    if(n == 0) return 0;      // Zero is considered false
+    return 1;                 // Any other value is true
 }
 
 NETDATA_DOUBLE eval_and(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
@@ -196,9 +135,28 @@ NETDATA_DOUBLE eval_multiply(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
 }
 NETDATA_DOUBLE eval_divide(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
+    
     NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
-    if(isnan(n1) || isnan(n2)) return NAN;
-    if(isinf(n1) || isinf(n2)) return INFINITY;
+    if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
+    
+    if(isnan(n1) || isnan(n2)) {
+        *error = EVAL_ERROR_VALUE_IS_NAN;
+        return NAN;
+    }
+    
+    if(isinf(n1) || isinf(n2)) {
+        *error = EVAL_ERROR_VALUE_IS_INFINITE;
+        return INFINITY;
+    }
+    
+    if(n2 == 0) {
+        // In Netdata, we treat all division by zero as INFINITE error
+        // This ensures compatibility with existing code
+        *error = EVAL_ERROR_VALUE_IS_INFINITE;
+        return n1 >= 0 ? INFINITY : -INFINITY;
+    }
+    
     return n1 / n2;
 }
 NETDATA_DOUBLE eval_nop(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
@@ -964,7 +922,10 @@ static inline EVAL_NODE *parse_rest_of_expression(const char **string, int *erro
 
             skip_spaces(string);
 
-            EVAL_NODE *op3 = parse_one_full_operand(string, error);
+            // For the else part, we need to handle nested ternary operators
+            // So we use parse_full_expression instead of parse_one_full_operand
+            // This ensures proper parsing of nested ternary operators
+            EVAL_NODE *op3 = parse_full_expression(string, error);
             if(!op3) {
                 eval_node_free(op);
                 eval_node_free(op1);
