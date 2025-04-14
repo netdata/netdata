@@ -6,8 +6,6 @@
 #include "../libnetdata.h"
 
 #if defined(OS_WINDOWS)
-#define NETDATA_WIN_DETECTION_METHOD "Windows API/Registry"
-
 long netdata_registry_get_dword_from_open_key(unsigned int *out, void *lKey, char *name);
 bool netdata_registry_get_dword(unsigned int *out, void *hKey, char *subKey, char *name);
 

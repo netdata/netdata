@@ -99,7 +99,6 @@ jobs:
         with:
           languages: c-cpp
           config-file: ./.github/codeql/c-cpp-config.yml
-          build-mode: none
       - name: Prepare environment
         run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
       - name: Build netdata

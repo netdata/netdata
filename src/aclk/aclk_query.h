@@ -10,9 +10,11 @@
 #include "aclk_query_queue.h"
 
 int mark_pending_req_cancelled(const char *msg_id);
+void mark_pending_req_cancel_all();
 
 void aclk_execute_query(aclk_query_t query);
-void aclk_query_init(mqtt_wss_client client);
+void aclk_mqtt_client_set(mqtt_wss_client client);
+void aclk_mqtt_client_reset();
 int http_api_v2(mqtt_wss_client client, aclk_query_t query);
 int send_bin_msg(mqtt_wss_client client, aclk_query_t query);
 

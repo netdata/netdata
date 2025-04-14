@@ -249,13 +249,13 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
 
 static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
     RRDSET *st = rc->rrdset;
+    if(!st) return;
 
     if (!exit_initiated_get()) {
-        RRDHOST *host = st->rrdhost;
-
         time_t now = now_realtime_sec();
 
         if (likely(rc->status != RRDCALC_STATUS_REMOVED)) {
+            RRDHOST *host = st->rrdhost;
             ALARM_ENTRY *ae = health_create_alarm_entry(
                 host,
                 rc,
@@ -278,6 +278,8 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
 
     if(rc->prev)
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
+
+    rc->rrdset = NULL;
 
     if(!having_ll_wrlock)
         rw_spinlock_write_unlock(&st->alerts.spinlock);
@@ -308,7 +310,6 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     rc->chart = string_dup(st->id);
 
     health_prototype_copy_config(&rc->config, &ap->config);
-    health_prototype_copy_match_without_patterns(&rc->match, &ap->match);
 
     rc->next_event_id = 1;
     rc->value = NAN;
@@ -362,19 +363,6 @@ static void rrdcalc_rrdhost_react_callback(const DICTIONARY_ITEM *item __maybe_u
 // ----------------------------------------------------------------------------
 // RRDCALC rrdhost index management - destructor
 
-static void rrdcalc_free_internals(RRDCALC *rc) {
-    if(unlikely(!rc)) return;
-
-    rrd_alert_match_cleanup(&rc->match);
-    rrd_alert_config_cleanup(&rc->config);
-
-    string_freez(rc->key);
-    string_freez(rc->chart);
-
-    string_freez(rc->info);
-    string_freez(rc->summary);
-}
-
 static __thread bool thread_having_ll_wrlock = false;
 
 static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdhost __maybe_unused) {
@@ -386,7 +374,15 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
     // any destruction actions that require other locks
     // have to be placed in rrdcalc_del(), because the object is actually locked for deletion
 
-    rrdcalc_free_internals(rc);
+    rrd_alert_config_cleanup(&rc->config);
+
+    string_freez(rc->key);
+    string_freez(rc->chart);
+
+    string_freez(rc->info);
+    string_freez(rc->summary);
+
+    memset(rc, 0, sizeof(*rc));
 }
 
 // ----------------------------------------------------------------------------
@@ -489,6 +485,8 @@ void rrd_alert_match_cleanup(struct rrd_alert_match *am) {
 
     string_freez(am->chart_labels);
     pattern_array_free(am->chart_labels_pattern);
+
+    memset(am, 0, sizeof(*am));
 }
 
 void rrd_alert_config_cleanup(struct rrd_alert_config *ac) {
@@ -511,4 +509,6 @@ void rrd_alert_config_cleanup(struct rrd_alert_config *ac) {
     expression_free(ac->calculation);
     expression_free(ac->warning);
     expression_free(ac->critical);
+
+    memset(ac, 0, sizeof(*ac));
 }

@@ -64,10 +64,10 @@ static command_info_t command_info_array[] = {
     {"aclk-state", "[json]",  "Returns current state of ACLK and Netdata Cloud connection. (optionally in json).", cmd_aclk_state, CMD_TYPE_ORTHOGONAL},
     {"version", "", "Returns the netdata version.", cmd_version, CMD_TYPE_ORTHOGONAL},
     {"dumpconfig", "", "Returns the current netdata.conf on stdout.", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL},
+    {"mark-stale-nodes-ephemeral", "<node_id | machine_guid | hostname | ALL_NODES>",
+        "Marks one or all disconnected nodes as ephemeral, while keeping their retention\n      available for queries on both this Netdata Agent dashboard and Netdata Cloud", cmd_mark_stale_nodes_ephemeral, CMD_TYPE_ORTHOGONAL},
     {"remove-stale-node", "<node_id | machine_guid | hostname | ALL_NODES>",
      "Marks one or all disconnected nodes as ephemeral, and removes them\n      so that they are no longer available for queries, from both this\n      Netdata Agent dashboard and Netdata Cloud.", cmd_remove_stale_node, CMD_TYPE_ORTHOGONAL},
-    {"mark-stale-nodes-ephemeral", "<node_id | machine_guid | hostname | ALL_NODES>",
-     "Marks one or all disconnected nodes as ephemeral, while keeping their retention\n      available for queries on both this Netdata Agent dashboard and Netdata Cloud", cmd_mark_stale_nodes_ephemeral, CMD_TYPE_ORTHOGONAL},
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */

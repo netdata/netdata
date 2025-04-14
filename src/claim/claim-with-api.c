@@ -84,7 +84,8 @@ static size_t response_write_callback(void *ptr, size_t size, size_t nmemb, void
     return real_size;
 }
 
-static const char *curl_add_json_room(BUFFER *wb, const char *start, const char *end) {
+static const char *curl_add_json_room(BUFFER *wb, const char *start, const char *end, bool last_item)
+{
     size_t len = end - start;
 
     // copy the item to an new buffer and terminate it
@@ -96,6 +97,9 @@ static const char *curl_add_json_room(BUFFER *wb, const char *start, const char 
     const char *trimmed = trim(buf); // remove leading and trailing spaces
     if(trimmed)
         buffer_json_add_array_item_string(wb, trimmed);
+
+    if (last_item)
+        return NULL;
 
     // prepare for the next item
     start = end + 1;
@@ -117,11 +121,11 @@ void curl_add_rooms_json_array(BUFFER *wb, const char *rooms) {
 
         // Process each item in the comma-separated list
         while ((end = strchr(start, ',')) != NULL)
-            start = curl_add_json_room(wb, start, end);
+            start = curl_add_json_room(wb, start, end, false);
 
         // Process the last item if any
         if (*start)
-            curl_add_json_room(wb, start, &start[strlen(start)]);
+            curl_add_json_room(wb, start, &start[strlen(start)], true);
     }
     buffer_json_array_close(wb);
 }
@@ -380,7 +384,7 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
     bool done = false, can_retry = true;
     size_t retries = 0;
     do {
-        done = send_curl_request(registry_get_this_machine_guid(true), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, &can_retry);
+        done = send_curl_request(machine_guid_get_txt(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, &can_retry);
         if (done) break;
         sleep_usec(300 * USEC_PER_MS + 100 * retries * USEC_PER_MS);
         retries++;
@@ -417,8 +421,15 @@ bool claim_agent_from_environment(void) {
     return claim_agent(url, token, rooms, proxy, insecure);
 }
 
+// Static config for claim.conf
+static struct config claim_config = APPCONFIG_INITIALIZER;
+
+// Function to free the static claim_config for shutdown cleanup
+void claim_config_free(void) {
+    inicfg_free(&claim_config);
+}
+
 bool claim_agent_from_claim_conf(void) {
-    static struct config claim_config = APPCONFIG_INITIALIZER;
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     bool ret = false;
 

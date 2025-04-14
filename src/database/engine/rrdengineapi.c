@@ -166,8 +166,6 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
 
     bool added;
     METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
-    if (added)
-        __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
     return metric;
 }
 
@@ -1115,20 +1113,11 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    ssize_t cpus = (ssize_t)netdata_conf_cpus() / (ssize_t)nd_profile.storage_tiers;
-    if(cpus > (ssize_t)datafiles)
-        cpus = (ssize_t)datafiles;
-
-    if(cpus > (ssize_t)libuv_worker_threads)
-        cpus = (ssize_t)libuv_worker_threads;
-
-    if(cpus >= (ssize_t)netdata_conf_cpus() / 2)
-        cpus = (ssize_t)(netdata_conf_cpus() / 2 - 1);
-
+    ssize_t cpus = (ssize_t)netdata_conf_cpus();
     if(cpus < 1)
         cpus = 1;
 
-    netdata_log_info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zd threads...", datafiles, ctx->config.tier, cpus);
+    netdata_log_info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using a shared pool of %zd threads...", datafiles, ctx->config.tier, cpus);
 
     if(datafiles > 2) {
         struct rrdengine_datafile *datafile;
@@ -1149,7 +1138,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         }
     }
 
-    ctx->loading.populate_mrg.size = cpus;
+    ctx->loading.populate_mrg.size = 1;
     ctx->loading.populate_mrg.array = callocz(ctx->loading.populate_mrg.size, sizeof(struct completion));
 
     for (size_t i = 0; i < ctx->loading.populate_mrg.size; i++) {
@@ -1284,10 +1273,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    // No need to release the datafiles list
-    //finalize_rrd_files(ctx);
-
-    if (unittest_running) //(ctx->config.unittest)
+    if(unittest_running)
         freez(ctx);
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
@@ -1339,7 +1325,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
 
             time_t update_every_s;
 
-            size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile->ctx);
+            size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile_ctx(datafile));
 
             time_t start_time_s = journal_start_time_s + descr->delta_start_s;
             time_t end_time_s = journal_start_time_s + descr->delta_end_s;
@@ -1347,7 +1333,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
             if(likely(points > 1))
                 update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
             else {
-                update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile->ctx->config.tier));
+                update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile_ctx(datafile)->config.tier));
                 stats->single_point_pages++;
             }
 

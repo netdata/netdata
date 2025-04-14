@@ -66,6 +66,17 @@ void pending_req_list_rm(const char *msg_id)
     spinlock_unlock(&pending_req_list_lock);
 }
 
+void mark_pending_req_cancel_all()
+{
+    spinlock_lock(&pending_req_list_lock);
+    struct pending_req_list *curr = pending_req_list_head;
+    while (curr) {
+        curr->canceled = 1;
+        curr = curr->next;
+    }
+    spinlock_unlock(&pending_req_list_lock);
+}
+
 int mark_pending_req_cancelled(const char *msg_id)
 {
     uint32_t hash = simple_hash(msg_id);

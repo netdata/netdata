@@ -53,6 +53,10 @@ ${GITHUB_ACTIONS+echo "::group::Building"}
 cmake --build "${build}" -- ${build_args}
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
+${GITHUB_ACTIONS+echo "::group::Netdata buildinfo"}
+"${build}/netdata.exe" -W buildinfo || true
+${GITHUB_ACTIONS+echo "::endgroup::"}
+
 if [ -t 1 ]; then
     echo
     echo "Compile with:"

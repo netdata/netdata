@@ -17,17 +17,11 @@ prepare_build() {
 }
 
 build_static() {
-  EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}" USER="" ./packaging/makeself/build-static.sh "${BUILDARCH}"
+  USER="" ./packaging/makeself/build-static.sh "${BUILDARCH}"
 }
 
 prepare_assets() {
   cp packaging/version artifacts/latest-version.txt
-
-  cd artifacts || exit 1
-  ln -s "${BASENAME}.gz.run" "netdata-${BUILDARCH}-latest.gz.run"
-  if [ "${BUILDARCH}" = "x86_64" ]; then
-    ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
-  fi
 }
 
 steps="prepare_build build_static"

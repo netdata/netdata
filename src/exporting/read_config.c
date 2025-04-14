@@ -7,6 +7,16 @@ const char *global_exporting_prefix = "netdata";
 
 struct config exporting_config = APPCONFIG_INITIALIZER;
 
+/**
+ * Free exporting configuration
+ * 
+ * Free all memory associated with the exporting configuration.
+ * Called during shutdown to prevent memory leaks.
+ */
+void exporting_config_free(void) {
+    inicfg_free(&exporting_config);
+}
+
 struct instance *prometheus_exporter_instance = NULL;
 
 static _CONNECTOR_INSTANCE *find_instance(const char *section)

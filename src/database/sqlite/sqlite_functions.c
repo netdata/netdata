@@ -7,6 +7,10 @@ pthread_key_t key_pool[MAX_PREPARED_STATEMENTS];
 
 long long def_journal_size_limit = 16777216;
 
+SPINLOCK sqlite_spinlock = SPINLOCK_INITIALIZER;
+
+bool sqlite_online;
+
 SQLITE_API int sqlite3_exec_monitored(
     sqlite3 *db,                               /* An open database */
     const char *sql,                           /* SQL to be evaluated */
@@ -181,8 +185,12 @@ static void add_stmt_to_list(sqlite3_stmt *res)
 static void release_statement(void *statement)
 {
     int rc;
-    if (unlikely(rc = sqlite3_finalize((sqlite3_stmt *) statement) != SQLITE_OK))
-        error_report("Failed to finalize statement, rc = %d", rc);
+    spinlock_lock(&sqlite_spinlock);
+    if (sqlite_online) {
+        if (unlikely(rc = sqlite3_finalize((sqlite3_stmt *)statement) != SQLITE_OK))
+            error_report("Failed to finalize statement, rc = %d", rc);
+    }
+    spinlock_unlock(&sqlite_spinlock);
 }
 
 static void initialize_thread_key_pool(void)
@@ -379,6 +387,10 @@ void sqlite_close_databases(void)
 {
     add_stmt_to_list(NULL);
 
+    spinlock_lock(&sqlite_spinlock);
+    sqlite_online = false;
+    spinlock_unlock(&sqlite_spinlock);
+
     sql_close_database(db_context_meta, "CONTEXT");
     sql_close_database(db_meta, "METADATA");
 }
@@ -399,19 +411,52 @@ uint64_t get_total_database_space(void)
 */
 }
 
+#define SQLITE_HEAP_HARD_LIMIT (256 * 1024 * 1024)
+#define SQLITE_HEAP_SOFT_LIMIT (32 * 1024 * 1024)
+
 int sqlite_library_init(void)
 {
+    spinlock_lock(&sqlite_spinlock);
     initialize_thread_key_pool();
 
     int rc = sqlite3_initialize();
+    if (rc == SQLITE_OK) {
+
+        (void )sqlite3_hard_heap_limit64(SQLITE_HEAP_HARD_LIMIT);
+        int64_t hard_limit_bytes = sqlite3_hard_heap_limit64(-1);
+
+        (void) sqlite3_soft_heap_limit64(SQLITE_HEAP_SOFT_LIMIT);
+        int64_t soft_limit_bytes = sqlite3_soft_heap_limit64(-1);
+
+        const char sqlite_hard_limit_mb[32];
+        size_snprintf_bytes((char *)sqlite_hard_limit_mb, sizeof(sqlite_hard_limit_mb), hard_limit_bytes);
+
+        const char sqlite_soft_limit_mb[32];
+        size_snprintf_bytes((char *)sqlite_soft_limit_mb, sizeof(sqlite_soft_limit_mb), soft_limit_bytes);
+
+        nd_log_daemon(
+            NDLP_INFO, "SQLITE: heap memory hard limit %s, soft limit %s", sqlite_hard_limit_mb, sqlite_soft_limit_mb);
+    }
+    sqlite_online = true;
+    spinlock_unlock(&sqlite_spinlock);
 
     return (SQLITE_OK != rc);
 }
 
-SPINLOCK sqlite_spinlock = SPINLOCK_INITIALIZER;
+int sqlite_release_memory(int bytes)
+{
+    return sqlite3_release_memory(bytes);
+}
 
 void sqlite_library_shutdown(void)
 {
+#ifdef NETDATA_INTERNAL_CHECKS
+    int bytes;
+    do {
+        bytes = sqlite_release_memory(1024 * 1024);
+        netdata_log_info("SQLITE: Released %d bytes of memory", bytes);
+    } while (bytes);
+#endif
     spinlock_lock(&sqlite_spinlock);
     (void) sqlite3_shutdown();
     spinlock_unlock(&sqlite_spinlock);

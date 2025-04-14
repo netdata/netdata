@@ -5,8 +5,6 @@
 #include "daemon-service.h"
 #include "daemon-shutdown.h"
 
-#ifdef ENABLE_SYSTEMD_DBUS
-
 #include <systemd/sd-bus.h>
 
 /* Callback function to handle the PrepareForShutdown signal.
@@ -137,16 +135,12 @@ finish:
     sd_bus_unref(bus);
 }
 
-#endif
-
 void *systemd_watcher_thread(void *arg) {
     struct netdata_static_thread *static_thread = arg;
 
     service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
 
-#ifdef ENABLE_SYSTEMD_DBUS
     listen_for_systemd_dbus_events();
-#endif
 
     service_exits();
     worker_unregister();

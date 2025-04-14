@@ -5,9 +5,8 @@ package ddsnmp
 import (
 	"errors"
 
-	"github.com/DataDog/datadog-agent/pkg/networkdevice/profile/profiledefinition"
-
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 func Find(sysObjId string) []*Profile {
@@ -30,8 +29,8 @@ func Find(sysObjId string) []*Profile {
 }
 
 type Profile struct {
-	SourceFile string                               `yaml:"-"`
-	Definition *profiledefinition.ProfileDefinition `yaml:",inline"`
+	SourceFile string                                 `yaml:"-"`
+	Definition *ddprofiledefinition.ProfileDefinition `yaml:",inline"`
 }
 
 func (p *Profile) clone() *Profile {
@@ -47,19 +46,19 @@ func (p *Profile) merge(base *Profile) {
 	p.Definition.StaticTags = append(p.Definition.StaticTags, base.Definition.StaticTags...)
 
 	if p.Definition.Metadata == nil {
-		p.Definition.Metadata = make(profiledefinition.MetadataConfig)
+		p.Definition.Metadata = make(ddprofiledefinition.MetadataConfig)
 	}
 
 	for resName, baseRes := range base.Definition.Metadata {
 		targetRes, exists := p.Definition.Metadata[resName]
 		if !exists {
-			targetRes = profiledefinition.NewMetadataResourceConfig()
+			targetRes = ddprofiledefinition.NewMetadataResourceConfig()
 		}
 
 		targetRes.IDTags = append(targetRes.IDTags, baseRes.IDTags...)
 
 		if targetRes.Fields == nil && len(baseRes.Fields) > 0 {
-			targetRes.Fields = make(map[string]profiledefinition.MetadataField, len(baseRes.Fields))
+			targetRes.Fields = make(map[string]ddprofiledefinition.MetadataField, len(baseRes.Fields))
 		}
 
 		for field, symbol := range baseRes.Fields {
@@ -73,11 +72,11 @@ func (p *Profile) merge(base *Profile) {
 }
 
 func (p *Profile) validate() error {
-	profiledefinition.NormalizeMetrics(p.Definition.Metrics)
+	ddprofiledefinition.NormalizeMetrics(p.Definition.Metrics)
 
-	errs := profiledefinition.ValidateEnrichMetadata(p.Definition.Metadata)
-	errs = append(errs, profiledefinition.ValidateEnrichMetrics(p.Definition.Metrics)...)
-	errs = append(errs, profiledefinition.ValidateEnrichMetricTags(p.Definition.MetricTags)...)
+	errs := ddprofiledefinition.ValidateEnrichMetadata(p.Definition.Metadata)
+	errs = append(errs, ddprofiledefinition.ValidateEnrichMetrics(p.Definition.Metrics)...)
+	errs = append(errs, ddprofiledefinition.ValidateEnrichMetricTags(p.Definition.MetricTags)...)
 	if len(errs) > 0 {
 		errList := make([]error, 0, len(errs))
 		for _, s := range errs {

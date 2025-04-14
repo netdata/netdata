@@ -1,0 +1,5 @@
+Adapter #0
+
+Number of Virtual Disks: 0
+
+Exit Code: 0x00

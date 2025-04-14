@@ -2,41 +2,27 @@
 
 #include "claim.h"
 
-const char *cloud_status_to_string(CLOUD_STATUS status) {
-    switch(status) {
-        default:
-        case CLOUD_STATUS_AVAILABLE:
-            return "available";
+ENUM_STR_MAP_DEFINE(CLOUD_STATUS) = {
+    { CLOUD_STATUS_ONLINE, "online"},
+    { CLOUD_STATUS_INDIRECT, "indirect"},
+    { CLOUD_STATUS_AVAILABLE, "available"},
+    { CLOUD_STATUS_BANNED, "banned"},
+    { CLOUD_STATUS_OFFLINE, "offline"},
 
-        case CLOUD_STATUS_BANNED:
-            return "banned";
-
-        case CLOUD_STATUS_OFFLINE:
-            return "offline";
-
-        case CLOUD_STATUS_ONLINE:
-            return "online";
-
-        case CLOUD_STATUS_CONNECTING:
-            return "connecting";
-
-        case CLOUD_STATUS_INDIRECT:
-            return "indirect";
-    }
-}
+    // terminator
+    { 0, NULL },
+};
+ENUM_STR_DEFINE_FUNCTIONS(CLOUD_STATUS, CLOUD_STATUS_AVAILABLE, "available");
 
 CLOUD_STATUS cloud_status(void) {
     if(unlikely(aclk_disable_runtime))
         return CLOUD_STATUS_BANNED;
 
-    if(likely(aclk_online())) {
-        if (rrdhost_flag_check(localhost, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS))
-            return CLOUD_STATUS_ONLINE;
-        else
-            return CLOUD_STATUS_CONNECTING;
-    }
+    if(likely(aclk_online()))
+        return CLOUD_STATUS_ONLINE;
 
-    if(localhost->sender &&
+    if(localhost &&
+        localhost->sender &&
         rrdhost_flag_check(localhost, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS) &&
         stream_sender_has_capabilities(localhost, STREAM_CAP_NODE_ID) &&
         !UUIDiszero(localhost->node_id) &&
@@ -83,7 +69,7 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
         time_t last_change = cloud_last_change();
         time_t next_connect = cloud_next_connection_attempt();
         buffer_json_member_add_uint64(wb, "id", id);
-        buffer_json_member_add_string(wb, "status", cloud_status_to_string(status));
+        buffer_json_member_add_string(wb, "status", CLOUD_STATUS_2str(status));
         buffer_json_member_add_time_t(wb, "since", last_change);
         buffer_json_member_add_time_t(wb, "age", now_s - last_change);
 

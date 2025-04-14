@@ -42,6 +42,9 @@ void worker_register(const char *name);
 void worker_register_job_name(size_t job_id, const char *name);
 void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type);
 void worker_unregister(void);
+void worker_utilization_cleanup(void);
+
+size_t workers_get_last_job_id();
 
 void worker_is_idle(void);
 void worker_is_busy(size_t job_id);

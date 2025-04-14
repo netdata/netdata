@@ -20,23 +20,24 @@ int enable_ksm = 0;
 #endif
 
 static int memory_file_open(const char *filename, size_t size) {
-    // netdata_log_info("memory_file_open('%s', %zu", filename, size);
-
     int fd = open(filename, O_RDWR | O_CREAT | O_NOATIME | O_CLOEXEC, 0664);
-    if (fd != -1) {
-        if (lseek(fd, size, SEEK_SET) == (off_t) size) {
-            if (write(fd, "", 1) == 1) {
-                if (ftruncate(fd, size))
-                    netdata_log_error("Cannot truncate file '%s' to size %zu. Will use the larger file.", filename, size);
-            }
-            else
-                netdata_log_error("Cannot write to file '%s' at position %zu.", filename, size);
-        }
-        else
-            netdata_log_error("Cannot seek file '%s' to size %zu.", filename, size);
-    }
-    else
+    if (fd == -1) {
         netdata_log_error("Cannot create/open file '%s'.", filename);
+        return -1;
+    }
+
+    if (ftruncate(fd, size) != 0) {
+        netdata_log_error("Cannot truncate file '%s' to size %zu.", filename, size);
+        close(fd);
+        return -1;
+    }
+
+    struct stat st;
+    if (fstat(fd, &st) != 0 || (size_t)st.st_size < size) {
+        netdata_log_error("File '%s' is only %lld bytes, expected %zu!", filename, (long long)st.st_size, size);
+        close(fd);
+        return -1;
+    }
 
     return fd;
 }
@@ -182,6 +183,8 @@ void *nd_mmap_advanced(const char *filename, size_t size, int flags, int ksm, bo
 
     int fd = -1;
     void *mem = MAP_FAILED;
+
+    errno_clear();
 
     if(filename && *filename) {
         // open/create the file to be used

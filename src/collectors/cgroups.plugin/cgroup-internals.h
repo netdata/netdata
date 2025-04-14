@@ -253,10 +253,6 @@ struct cgroup {
     unsigned long long memory_limit;
     const RRDVAR_ACQUIRED *chart_var_memory_limit;
 
-    char *filename_memoryswap_limit;
-    unsigned long long memoryswap_limit;
-    const RRDVAR_ACQUIRED *chart_var_memoryswap_limit;
-
     const DICTIONARY_ITEM *cgroup_netdev_link;
 
     struct cgroup *next;

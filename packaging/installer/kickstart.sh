@@ -205,6 +205,7 @@ USAGE: kickstart.sh [options]
   --local-build-options            Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
   --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
   --offline-architecture           Limit an offline install source being prepared with --prepare-offline-install-source to only include the specified static build architecture.
+  --offline-install-source         Specify a folder to use as installation source when working offline. Use --prepare-offline-install-source first to set up this folder.
 
 The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
 

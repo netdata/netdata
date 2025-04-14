@@ -1143,6 +1143,69 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+        - name: IIS Application Pool
+          description: "These metrics refer to the IIS application pool WAS (Windows Process Activation Service)."
+          labels:
+            - name: app
+              description: The name of the Application Pool.
+          metrics:
+            - name: iis.application_pool_current_status
+              description: IIS App Pool current status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: uninitialized
+                - name: initialized
+                - name: running
+                - name: disabling
+                - name: disabled
+                - name: shutdown_pending
+                - name: delete_pending
+            - name: iis.application_pool_current_worker_processes
+              description: IIS App Pool worker processes currently running
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: running
+            - name: iis.application_pool_worker_processes_created
+              description: IIS App Pool worker processes created
+              unit: "processes/s"
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: iis.application_pool_maximum_worker_processes
+              description: IIS App Pool maximum created worker processes
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: iis.application_pool_recent_worker_process_failures
+              description: IIS App Pool worker process failures during the rapid-fail protection interval
+              unit: "failures/s"
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: iis.application_pool_worker_process_failures
+              description: IIS App Pool worker process crashes
+              unit: "failures/s"
+              chart_type: line
+              dimensions:
+                - name: crash
+                - name: ping
+                - name: startup
+                - name: shutdown
+            - name: iis.application_pool_recycles
+              description: IIS App Pool recycles
+              unit: "recycles/s"
+              chart_type: line
+              dimensions:
+                - name: recycles
+            - name: iis.application_pool_uptime
+              description: IIS App Pool uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
@@ -2675,3 +2738,96 @@ modules:
               chart_type: line
               dimensions:
                 - name: success
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibServices
+      monitored_instance:
+        name: Windows Services
+        link: "https://learn.microsoft.com/en-us/dotnet/framework/windows-services/"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - services
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Windows Services Status and States.
+        method_description: |
+          It queries Service Management to get the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibServices
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Windows Service
+          description: "These metrics refer to Windows Services."
+          labels:
+            - name: service
+              description: The service name
+          metrics:
+            - name: windows.service_state
+              description: Service state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: stopped
+                - name: start_pending
+                - name: stop_pending
+                - name: continue_pending
+                - name: pause_pending
+                - name: paused
+                - name: unknown
+

@@ -245,7 +245,8 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     rrdcontext_host_child_connected(host);
-    if (host->aclk_config)
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if (aclk_host_config)
         aclk_queue_node_info(host, true);
     else
         schedule_node_state_update(host, 100);
@@ -1115,13 +1116,10 @@ void pluginsd_process_cleanup(PARSER *parser) {
     pluginsd_cleanup_v2(parser);
     pluginsd_host_define_cleanup(parser);
 
-    parser_destroy(parser);
-}
+    rrdlabels_destroy(parser->user.new_host_labels);
+    rrdlabels_destroy(parser->user.chart_rrdlabels_linked_temporarily);
 
-void pluginsd_process_thread_cleanup(void *pptr) {
-    PARSER *parser = CLEANUP_FUNCTION_GET_PTR(pptr);
-    pluginsd_process_cleanup(parser);
-    rrd_collector_finished();
+    parser_destroy(parser);
 }
 
 bool parser_reconstruct_node(BUFFER *wb, void *ptr) {
@@ -1187,7 +1185,6 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    CLEANUP_FUNCTION_REGISTER(pluginsd_process_thread_cleanup) cleanup_parser = parser;
     buffered_reader_init(&parser->reader);
     CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
     bool send_quit = true;
@@ -1232,6 +1229,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     }
     else
         cd->serial_failures++;
+
+    pluginsd_process_cleanup(parser);
+    rrd_collector_finished();
 
     return count;
 }

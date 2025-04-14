@@ -109,3 +109,33 @@ void register_libuv_worker_jobs() {
     registered = true;
     register_libuv_worker_jobs_internal();
 }
+
+// utils
+#define MAX_THREAD_CREATE_RETRIES (10)
+#define MAX_THREAD_CREATE_WAIT_MS (1000)
+
+int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries)
+{
+    int err;
+
+    do {
+        err = uv_thread_create(thread, thread_func, arg);
+        if (err == 0)
+            break;
+
+        uv_sleep(MAX_THREAD_CREATE_WAIT_MS);
+    } while (err == UV_EAGAIN && ++(*retries) < MAX_THREAD_CREATE_RETRIES);
+
+    return err;
+}
+
+void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused)
+{
+    // Only close handles that aren't already closing
+    if (!uv_is_closing(handle)) {
+        if (handle->type == UV_TIMER) {
+            uv_timer_stop((uv_timer_t *)handle);
+        }
+        uv_close(handle, NULL);
+    }
+}

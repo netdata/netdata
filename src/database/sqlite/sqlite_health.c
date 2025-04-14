@@ -183,7 +183,8 @@ static void insert_alert_queue(
 
     int rc;
 
-    if (!host->aclk_config)
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if (!aclk_host_config)
         return;
 
     time_t submit_delay = trigger_time + calculate_delay(old_status, new_status);
@@ -375,6 +376,9 @@ void sql_health_alarm_log_cleanup(RRDHOST *host)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    
+    // After cleaning up SQLite entries, also clean up in-memory entries
+    health_alarm_log_cleanup(host);
 }
 
 #define SQL_UPDATE_TRANSITION_IN_HEALTH_LOG                                                                            \
@@ -706,7 +710,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
             }
         }
 
-        ae = callocz(1, sizeof(ALARM_ENTRY));
+        ae = health_alarm_entry_create();
 
         ae->unique_id = unique_id;
         ae->alarm_id = alarm_id;
@@ -765,8 +769,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
         ae->old_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae_units(ae), -1));
         ae->new_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae_units(ae), -1));
 
-        ae->next = host->health_log.alarms;
-        host->health_log.alarms = ae;
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
 
         if(unlikely(ae->unique_id > host->health_max_unique_id))
             host->health_max_unique_id = ae->unique_id;
@@ -793,6 +796,9 @@ void sql_health_alarm_log_load(RRDHOST *host)
     nd_log(NDLS_DAEMON, errored ? NDLP_WARNING : NDLP_DEBUG,
            "[%s]: Table health_log, loaded %zd alarm entries, errors in %zd entries.",
            rrdhost_hostname(host), loaded, errored);
+           
+    // Clean up old entries based on retention settings
+    health_alarm_log_cleanup(host);
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
@@ -987,36 +993,25 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
 {
      unsigned int max = host->health_log.max;
 
-     static __thread sqlite3_stmt *stmt_no_chart = NULL;
-     static __thread sqlite3_stmt *stmt_with_chart = NULL;
-
-     sqlite3_stmt **active_stmt;
      sqlite3_stmt *stmt_query;
 
      int rc;
 
-     active_stmt = chart ? &stmt_with_chart : &stmt_no_chart;
+     BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
+     buffer_sprintf(command, SQL_SELECT_HEALTH_LOG);
 
-     if (!*active_stmt) {
+     if (chart)
+        buffer_strcat(command, " AND hl.chart = @chart ");
 
-         BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
-         buffer_sprintf(command, SQL_SELECT_HEALTH_LOG);
+     buffer_strcat(command, " ORDER BY hld.unique_id DESC LIMIT @limit");
 
-         if (chart)
-            buffer_strcat(command, " AND hl.chart = @chart ");
+     rc = PREPARE_STATEMENT(db_meta, buffer_tostring(command), &stmt_query);
+     buffer_free(command);
 
-         buffer_strcat(command, " ORDER BY hld.unique_id DESC LIMIT @limit");
-
-         rc = prepare_statement(db_meta, buffer_tostring(command), active_stmt);
-         buffer_free(command);
-
-         if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
-            return;
-         }
+     if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
+        return;
      }
-
-     stmt_query = *active_stmt;
 
      int param = 0;
      rc = sqlite3_bind_blob(stmt_query, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC);
@@ -1127,7 +1122,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
     buffer_json_finalize(wb);
 
 finish:
-    SQLITE_RESET(stmt_query);
+    SQLITE_FINALIZE(stmt_query);
 }
 
 #define SQL_COPY_HEALTH_LOG(table) "INSERT OR IGNORE INTO health_log (host_id, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context) SELECT ?1, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context from %s", table
@@ -1330,7 +1325,7 @@ bool sql_find_alert_transition(
     void (*cb)(const char *machine_guid, const char *context, time_t alert_id, void *data),
     void *data)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
     char machine_guid[UUID_STR_LEN];
 
@@ -1338,7 +1333,7 @@ bool sql_find_alert_transition(
     if (uuid_parse(transition, transition_uuid))
         return false;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_GET_ALARM_ID_FROM_TRANSITION_ID, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_GET_ALARM_ID_FROM_TRANSITION_ID, &res))
         return false;
 
     bool ok = false;
@@ -1355,7 +1350,7 @@ bool sql_find_alert_transition(
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return ok;
 }
 

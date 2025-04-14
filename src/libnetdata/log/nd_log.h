@@ -33,12 +33,16 @@ const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 const char *nd_log_method_for_external_plugins(const char *s);
 ND_UUID nd_log_get_invocation_id(void);
 
+#define STACK_TRACE_INFO_PREFIX "info: "
 void capture_stack_trace(BUFFER *wb);
+
 void capture_stack_trace_init(void);
 void capture_stack_trace_flush(void);
 bool capture_stack_trace_available(void);
 bool capture_stack_trace_is_async_signal_safe(void);
 const char *capture_stack_trace_backend(void);
+void capture_stack_trace_set_signal_handler_function(const char *function_name);
+const char *capture_stack_trace_root_cause_function(void);
 
 typedef void (*log_event_t)(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line);
 void nd_log_register_fatal_hook_cb(log_event_t cb);

@@ -49,7 +49,6 @@ size_t pluginsd_process(struct rrdhost *host, struct plugind *cd, int fd_input, 
 
 struct parser;
 void pluginsd_process_cleanup(struct parser *parser);
-void pluginsd_process_thread_cleanup(void *pptr);
 
 size_t pluginsd_initialize_plugin_directories();
 

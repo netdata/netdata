@@ -85,6 +85,29 @@ Metrics:
 | iis.website_errors_rate | document_locked, document_not_found | errors/s |
 | iis.website_uptime | uptime | seconds |
 
+### Per IIS Application Pool
+
+These metrics refer to the IIS application pool WAS (Windows Process Activation Service).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app | The name of the Application Pool. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| iis.application_pool_current_status | uninitialized, initialized, running, disabling, disabled, shutdown_pending, delete_pending | status |
+| iis.application_pool_current_worker_processes | running | processes |
+| iis.application_pool_worker_processes_created | created | processes/s |
+| iis.application_pool_maximum_worker_processes | created | processes |
+| iis.application_pool_recent_worker_process_failures | failures | failures/s |
+| iis.application_pool_worker_process_failures | crash, ping, startup, shutdown | failures/s |
+| iis.application_pool_recycles | recycles | recycles/s |
+| iis.application_pool_uptime | uptime | seconds |
+
 
 
 ## Alerts

@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 #include "libnetdata/libnetdata.h"
+#include "rrd-metadata.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -105,6 +106,7 @@ static inline uint32_t get_uint32_id() {
 #include "health/rrdvar.h"
 #include "health/rrdcalc.h"
 #include "rrdlabels.h"
+#include "pattern-array.h"
 #include "streaming/stream-capabilities.h"
 #include "streaming/stream-path.h"
 #include "streaming/stream.h"

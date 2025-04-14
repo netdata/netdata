@@ -1065,6 +1065,8 @@ portable_add_user() {
       run dscl . create /Users/"${username}" IsHidden 1
       return 0
     fi
+  elif command -v synouser 1> /dev/null 2>&1; then
+    run synouser -add "${username}" "" "netdata agent" 0 "" 0 && return 0
   fi
 
   warning "Failed to add ${username} user account!"
@@ -1092,6 +1094,8 @@ portable_add_group() {
     run addgroup "${groupname}" && return 0
   elif command -v dseditgroup 1> /dev/null 2>&1; then
     dseditgroup -o create "${groupname}" && return 0
+  elif command -v synogroup 1> /dev/null 2>&1; then
+    run synogroup --add "${groupname}" && return 0
   fi
 
   warning >&2 "Failed to add ${groupname} user group !"
@@ -1127,6 +1131,21 @@ portable_add_user_to_group() {
       run addgroup "${username}" "${groupname}" && return 0
     elif command -v dseditgroup 1> /dev/null 2>&1; then
       dseditgroup -u "${username}" "${groupname}" && return 0
+    elif command -v synogroup 1> /dev/null 2>&1; then
+      # Get current members of the group
+      current_members_list=$(synogroup --get "${groupname}" | grep '^[0-9]')
+      current_members=$(echo "${current_members_list}" | grep -oP '\[\K[^\]]+' | tr '\n' ' ' | sed 's/ $//')
+
+      # Append username to the list
+      if [ -n "$current_members" ]; then
+        new_members="${current_members} ${username}"
+      else
+        new_members="${username}"
+      fi
+
+      # Set the member list
+      # shellcheck disable=SC2086
+      run synogroup --member "${groupname}" ${new_members} && return 0
     fi
 
     warning >&2 "Failed to add user ${username} to group ${groupname}!"

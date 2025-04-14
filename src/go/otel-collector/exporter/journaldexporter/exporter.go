@@ -1,32 +1,77 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package journaldexporter
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"os/user"
+	"strconv"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/plog"
-	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.uber.org/zap"
 )
 
-type journaldExporter struct {
-	metricsMarshaler pmetric.Marshaler
-}
+type (
+	journaldExporter struct {
+		log    *zap.Logger
+		conf   *Config
+		fields commonFields
+		s      sender
+		buf    bytes.Buffer
+	}
+	sender interface {
+		sendMessage(ctx context.Context, msg []byte) error
+		shutdown(ctx context.Context) error
+	}
 
-func newMyExporter() *journaldExporter {
+	commonFields struct {
+		syslogID  string
+		pid       string
+		uid       string
+		bootID    string
+		machineID string
+		hostname  string
+	}
+)
+
+func newJournaldExporter(cfg component.Config, logger *zap.Logger) *journaldExporter {
 	return &journaldExporter{
-		metricsMarshaler: &pmetric.JSONMarshaler{},
+		log:  logger,
+		conf: cfg.(*Config),
 	}
 }
 
-func (e *journaldExporter) consumeLogs(_ context.Context, ld plog.Logs) error {
-	fmt.Println("consume logs")
-	return nil
+func (e *journaldExporter) consumeLogs(ctx context.Context, ld plog.Logs) error {
+	if e.s == nil {
+		return nil
+	}
+
+	e.buf.Reset()
+
+	e.logsToJournaldMessages(ld, &e.buf)
+
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+		return e.s.sendMessage(ctx, e.buf.Bytes())
+	}
 }
 
-func (e *journaldExporter) Start(_ context.Context, host component.Host) error {
-	host.GetExtensions()
-	fmt.Println("Starting MyExporter")
+func (e *journaldExporter) Start(_ context.Context, _ component.Host) error {
+	e.fields.syslogID = "nd-otel-collector"
+	e.fields.pid = strconv.Itoa(os.Getpid())
+	e.fields.hostname, _ = os.Hostname()
+	e.fields.bootID = getBootID()
+	e.fields.machineID = getMachineID()
+	if cu, err := user.Current(); err == nil {
+		e.fields.uid = cu.Uid
+	}
+
 	return nil
 }
 

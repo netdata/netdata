@@ -21,11 +21,16 @@ enum aclk_database_opcode {
     ACLK_DATABASE_PUSH_ALERT,
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
     ACLK_DATABASE_NODE_UNREGISTER,
+    ACLK_MQTT_WSS_CLIENT_SET,
+    ACLK_MQTT_WSS_CLIENT_RESET,
+    ACLK_CANCEL_NODE_UPDATE_TIMER,
+    ACLK_QUEUE_NODE_INFO,
     ACLK_MQTT_WSS_CLIENT,
     ACLK_QUERY_EXECUTE,
     ACLK_QUERY_EXECUTE_SYNC,
     ACLK_QUERY_BATCH_ADD,
     ACLK_QUERY_BATCH_EXECUTE,
+    ACLK_SYNC_SHUTDOWN,
 
     // leave this last
     // we need it to check for worker utilization
@@ -54,9 +59,12 @@ typedef struct aclk_sync_cfg_t {
 
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id);
 void destroy_aclk_config(RRDHOST *host);
-void sql_aclk_sync_init(void);
+void aclk_synchronization_init(void);
+void aclk_synchronization_shutdown(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void schedule_node_state_update(RRDHOST *host, uint64_t delay);
 void unregister_node(const char *machine_guid);
+void cancel_node_update_timer(const RRDHOST *host, struct completion *completion);
+void aclk_queue_node_info(RRDHOST *host, bool immediate);
 
 #endif //NETDATA_SQLITE_ACLK_H

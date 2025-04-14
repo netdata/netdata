@@ -20,9 +20,10 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataBBUInfoOld, _     = os.ReadFile("testdata/mega-bbu-info-old.txt")
-	dataBBUInfoRecent, _  = os.ReadFile("testdata/mega-bbu-info-recent.txt")
-	dataPhysDrivesInfo, _ = os.ReadFile("testdata/mega-phys-drives-info.txt")
+	dataBBUInfoOld, _             = os.ReadFile("testdata/mega-bbu-info-old.txt")
+	dataBBUInfoRecent, _          = os.ReadFile("testdata/mega-bbu-info-recent.txt")
+	dataPhysDrivesInfo, _         = os.ReadFile("testdata/mega-phys-drives-info.txt")
+	dataPhysDrivesInfoNoDrives, _ = os.ReadFile("testdata/mega-phys-drives-info-no-drives.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -30,9 +31,10 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataConfigJSON": dataConfigJSON,
 		"dataConfigYAML": dataConfigYAML,
 
-		"dataBBUInfoOld":     dataBBUInfoOld,
-		"dataBBUInfoRecent":  dataBBUInfoRecent,
-		"dataPhysDrivesInfo": dataPhysDrivesInfo,
+		"dataBBUInfoOld":             dataBBUInfoOld,
+		"dataBBUInfoRecent":          dataBBUInfoRecent,
+		"dataPhysDrivesInfo":         dataPhysDrivesInfo,
+		"dataPhysDrivesInfoNoDrives": dataPhysDrivesInfoNoDrives,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -216,6 +218,17 @@ func TestCollector_Collect(t *testing.T) {
 				"phys_drive_5002538c4002e713_predictive_failure_count": 0,
 			},
 		},
+		"adapter with disconnected drives": {
+			prepareMock: prepareMockNoDrives,
+			wantCharts:  len(bbuChartsTmpl) * 1,
+			wantMetrics: map[string]int64{
+				"bbu_adapter_0_absolute_state_of_charge":  63,
+				"bbu_adapter_0_capacity_degradation_perc": 10,
+				"bbu_adapter_0_cycle_count":               4,
+				"bbu_adapter_0_relative_state_of_charge":  71,
+				"bbu_adapter_0_temperature":               33,
+			},
+		},
 		"err on exec": {
 			prepareMock: prepareMockErr,
 			wantMetrics: nil,
@@ -250,6 +263,13 @@ func TestCollector_Collect(t *testing.T) {
 func prepareMockOK() *mockMegaCliExec {
 	return &mockMegaCliExec{
 		physDrivesInfoData: dataPhysDrivesInfo,
+		bbuInfoData:        dataBBUInfoRecent,
+	}
+}
+
+func prepareMockNoDrives() *mockMegaCliExec {
+	return &mockMegaCliExec{
+		physDrivesInfoData: dataPhysDrivesInfoNoDrives,
 		bbuInfoData:        dataBBUInfoRecent,
 	}
 }

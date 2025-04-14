@@ -526,7 +526,8 @@
           "match": {
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "on": {
-              "ui:classNames": "dyncfg-grid-col-span-1-6"
+              "ui:classNames": "dyncfg-grid-col-span-1-6",
+              "ui:widget": "ContextWidget"
             },
             "host_labels": {
               "ui:help": "A simple pattern to match the node labels of the nodes this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard.",

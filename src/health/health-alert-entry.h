@@ -59,7 +59,7 @@ struct alarm_entry {
 
     POPEN_INSTANCE *popen_instance;
 
-    struct alarm_entry *next;
+    struct alarm_entry *next, *prev;
     struct alarm_entry *next_in_progress;
     struct alarm_entry *prev_in_progress;
 };
@@ -78,5 +78,8 @@ struct alarm_entry {
 #define ae_info(ae) string2str((ae)->info)
 #define ae_old_value_string(ae) string2str((ae)->old_value_string)
 #define ae_new_value_string(ae) string2str((ae)->new_value_string)
+
+// Function to clean up old alarm entries based on retention settings
+void health_alarm_log_cleanup(RRDHOST *host);
 
 #endif //NETDATA_HEALTH_ALERT_ENTRY_H

@@ -7,30 +7,26 @@ void mallocz_register_out_of_memory_cb(out_of_memory_cb cb) {
     out_of_memory_callback = cb;
 }
 
+
 ALWAYS_INLINE NORETURN
 void out_of_memory(const char *call, size_t size, const char *details) {
+    int errno_saved = errno;
     exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
 
     if(out_of_memory_callback)
         out_of_memory_callback();
 
-#if defined(OS_LINUX) || defined(OS_WINDOWS)
-    int rss_multiplier = 1024;
-#else
-    int rss_multiplier = 1;
-#endif
-
-    struct rusage usage = { 0 };
-    if(getrusage(RUSAGE_SELF, &usage) != 0)
-        usage.ru_maxrss = 0;
+    OS_PROCESS_MEMORY proc_mem = os_process_memory(0);
+    uint64_t max_rss = OS_PROCESS_MEMORY_OK(proc_mem) ? proc_mem.max_rss : 0;
 
     char mem_available[64];
     char rss_used[64];
 
     OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
     size_snprintf(mem_available, sizeof(mem_available), sm.ram_available_bytes, "B", false);
-    size_snprintf(rss_used, sizeof(rss_used), usage.ru_maxrss * rss_multiplier, "B", false);
+    size_snprintf(rss_used, sizeof(rss_used), max_rss, "B", false);
 
+    errno = errno_saved;
     fatal("Out of memory on %s(%zu bytes)!\n"
           "System memory available: %s, while our max RSS usage is: %s\n"
           "O/S mmap limit: %llu, while our mmap count is: %zu\n"

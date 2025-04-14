@@ -2,6 +2,14 @@
 
 #include "completion.h"
 
+ALWAYS_INLINE void completion_reset(struct completion *p)
+{
+    if (!p)
+        return;
+    p->completed = 0;
+    p->completed_jobs = 0;
+}
+
 ALWAYS_INLINE void completion_init(struct completion *p)
 {
     p->completed = 0;

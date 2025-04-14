@@ -1,44 +1,97 @@
 # Creating Alerts with Netdata Alerts Configuration Manager
 
-The Netdata Alerts Configuration Manager enables subscribers to easily set up Alerts directly from the Netdata Dashboard. More details on subscriptions can be found [here](https://www.netdata.cloud/pricing/).
+The **Netdata Alerts Configuration Manager** lets you create and fine-tune alerts directly from the Netdata Cloud Dashboard.  
+To use this feature, you’ll need an active Netdata subscription. → [View subscription plans](https://www.netdata.cloud/pricing/)
 
-## Using the Alerts Configuration Manager
+---
 
-1. Navigate to the **Metrics** tab and select the chart you want to configure for Alerts.
-2. Click the **Alert icon** in the top right corner of the chart.
-3. The Alert Configuration Manager will open, showing the default thresholds. Modify these thresholds as needed; the Alert definition on the right will update automatically.
-4. For additional settings, toggle **Show advanced**.
-5. After configuring the Alert, copy the generated Alert definition from the code box. Paste this into an existing or new custom health configuration file located at `<path to netdata install>/etc/netdata/health.d/` on a Parent Agent or a Standalone Child Agent. The guide to edit health configuration files is available [here](/src/health/REFERENCE.md#edit-health-configuration-files).
-6. To activate the new Alert, run the command `<path to netdata install>/usr/sbin/netdatacli reload-health`.
+## Creating Alerts: Quick Guide
 
-## Alerts Configuration Manager Sections
+1. Navigate to **Metrics** in your Netdata Cloud Dashboard and locate your target chart.
+2. Click the **alert icon** (🔔) in the chart's right corner, then select **Add alert** from the popup menu.
+3. Set your thresholds and watch the definition update in real-time.
+4. When finished configuring your alert, click the **Submit to nodes** button.
 
-### Alert Detection Method
+---
 
-An Alert is triggered whenever a metric crosses a threshold:
+## Alert Detection Types
 
-- **Standard Threshold**: Triggered when a metric crosses a predefined value.
-- **Metric Variance**: Triggered based on the variance of the metric.
-- **Anomaly Rate**: Triggered based on the anomaly rate of the metric.
+Netdata supports different ways of triggering alerts:
 
-### Metrics Lookup, Filtering, and Formula Section
+| Type                | Description                                             |
+|---------------------|---------------------------------------------------------|
+| **Standard**        | Fires when a metric crosses a set value                 |
+| **Metric Variance** | Fires based on variation in values over time            |
+| **Anomaly Rate**    | Fires when the anomaly rate exceeds a certain threshold |
 
-You can read more about the different options in the [Alerts reference documentation](/src/health/REFERENCE.md).
+Choose the type that best suits the behavior you want to monitor.
 
-- **Metrics Lookup**: Adjust the database lookup parameters directly in the UI, including method (`avg`, `sum`, `min`, `max`, etc.), computation style, dimensions, duration, and options like `absolute` or `percentage`.
-- **Alert Filtering**: The **show advanced** checkbox allows filtering of Alert health checks for specific infrastructure components. Options include selecting hosts, nodes, instances, chart labels, and operating systems.
-- **Formula / Calculation**: The **show advanced** checkbox allows defining a formula for the metric value, which is then used to set Alert thresholds.
+---
 
-### Alerting Conditions
+## Metrics Lookup & Filters
 
-- **Thresholds**: Set thresholds for warning and critical Alert states, specifying whether the Alert should trigger above or below these thresholds. Advanced settings allow for custom formulas.
-- **Recovery Thresholds**: Set thresholds for downgrading the Alert from critical to warning or from warning to clear.
-- **Check Interval**: Define how frequently the health check should run.
-- **Delay Notifications**: Manage notification delays for Alert escalations or de-escalations.
-- **Agent-Specific Options**: Options exclusive to the Netdata Agent, like repeat notification frequencies and notification recipients.
-- **Custom Exec Script**: Define custom scripts to execute when an Alert triggers.
+Click **Show advanced** in the Alert Configuration Manager to access these options.
 
-### Alert Name, Description, and Summary Section
+### Metrics Lookup
 
-- **Alert Template Name**: Provide a unique name for the Alert.
-- **Alert Template Description**: Offer a brief explanation of what the Alert
+You can define how Netdata should query the data before triggering an alert:
+
+| Parameter    | Description                                                        |
+|--------------|--------------------------------------------------------------------|
+| `method`     | How values are aggregated (`avg`, `min`, `max`, etc.)              |
+| `duration`   | Time window used for the check                                     |
+| `dimensions` | Which metric dimensions to include                                 |
+| `options`    | Modify how values are interpreted (e.g., `percentage`, `absolute`) |
+
+### Filtering Targets
+
+Limit the alert to specific infrastructure components:
+
+- Hosts
+- Nodes
+- Instances
+- Operating systems
+- Chart labels
+
+### Formulas
+
+Use a custom formula to manipulate values before comparing against thresholds.
+
+Example:
+
+```txt
+(metric1 - metric2) / 100
+```
+
+---
+
+## Defining Alert Conditions
+
+You can control how and when alerts are triggered, escalated, or resolved.
+
+| Setting                     | Purpose                                                         |
+|-----------------------------|-----------------------------------------------------------------|
+| **Thresholds**              | Define values for `warning` and `critical` states               |
+| **Recovery thresholds**     | Set when the alert should downgrade or clear                    |
+| **Check interval**          | How often the alert check runs (e.g., every 10 seconds)         |
+| **Notification delay**      | Delay before sending notifications for state changes            |
+| **Repeat notifications**    | How often to resend an alert if the issue persists (Agent only) |
+| **Notification recipients** | Define who gets alerted (Agent only)                            |
+| **Custom exec script**      | Run a custom shell script when an alert triggers                |
+
+---
+
+## Naming and Documentation
+
+| Field           | Description                                         |
+|-----------------|-----------------------------------------------------|
+| **Alert Name**  | A unique name for the alert                         |
+| **Description** | What the alert does, in one or two sentences        |
+| **Summary**     | Optional: a short summary for display in dashboards |
+
+---
+
+## Final Notes
+
+- You can apply alert definitions to **Parent Agents** or **Standalone Child Agents**
+- If you need help writing custom alerts, check the [full alert reference](/src/health/REFERENCE.md)

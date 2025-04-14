@@ -8,7 +8,6 @@
 typedef struct alarm_log {
     uint32_t next_log_id;
     uint32_t next_alarm_id;
-    unsigned int count;
     unsigned int max;
     uint32_t health_log_retention_s;                   // the health log retention in seconds to be kept in db
     struct alarm_entry *alarms;

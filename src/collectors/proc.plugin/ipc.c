@@ -277,14 +277,22 @@ static int ipc_shm_get_info(const char *shm_filename, struct shm_stats *shm) {
     return 0;
 }
 
-int do_ipc(int update_every, usec_t dt) {
+static const RRDVAR_ACQUIRED *arrays_max = NULL, *semaphores_max = NULL;
+void proc_ipc_cleanup(void) {
+    if(arrays_max)
+        rrdvar_host_variable_release(localhost, arrays_max);
+
+    if(semaphores_max)
+        rrdvar_host_variable_release(localhost, semaphores_max);
+}
+
+int do_proc_ipc(int update_every, usec_t dt) {
     (void)dt;
 
     static int do_sem = -1, do_msg = -1, do_shm = -1;
     static int read_limits_next = -1;
     static struct ipc_limits limits;
     static struct ipc_status status;
-    static const RRDVAR_ACQUIRED *arrays_max = NULL, *semaphores_max = NULL;
     static RRDSET *st_arrays = NULL;
     static RRDDIM *rd_arrays = NULL;
     static const char *msg_filename = NULL;

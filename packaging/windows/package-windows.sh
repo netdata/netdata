@@ -40,6 +40,7 @@ ${GITHUB_ACTIONS+echo "::endgroup::"}
 ${GITHUB_ACTIONS+echo "::group::Copy Files"}
 tar -xf /msys2-latest.tar.zst -C /opt/netdata/ || exit 1
 cp -R /opt/netdata/msys64/* /opt/netdata/ || exit 1
+cp packaging/windows/copy_files.ps1 /opt/netdata/usr/libexec/netdata/ || exit 1
 rm -rf /opt/netdata/msys64/
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 

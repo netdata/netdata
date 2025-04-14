@@ -317,7 +317,7 @@ func getChartUnits(metric string) string {
 		return "events"
 	}
 	switch suffix := metric[idx:]; suffix {
-	case "_total", "_sum", "_count":
+	case "_total", "_sum", "_count", "_ratio":
 		return getChartUnits(metric[:idx])
 	}
 	switch units := metric[idx+1:]; units {

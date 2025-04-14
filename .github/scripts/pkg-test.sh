@@ -2,6 +2,8 @@
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
+export DISABLE_TELEMETRY=1
+
 install_debian_like() {
   # This is needed to ensure package installs don't prompt for any user input.
   export DEBIAN_FRONTEND=noninteractive
@@ -127,6 +129,10 @@ case "${DISTRO}" in
     exit 1
     ;;
 esac
+
+echo "::group::Netdata buildinfo"
+/usr/sbin/netdata -W buildinfo
+echo "::endgroup::"
 
 trap dump_log EXIT
 

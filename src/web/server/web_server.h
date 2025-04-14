@@ -38,7 +38,7 @@ extern WEB_SERVER_MODE web_server_mode;
 WEB_SERVER_MODE web_server_mode_id(const char *mode);
 const char *web_server_mode_name(WEB_SERVER_MODE id);
 
-bool api_listen_sockets_setup(void);
+void web_server_listen_sockets_setup(void);
 
 #define DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST 60
 #define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60

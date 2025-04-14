@@ -402,6 +402,7 @@ static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
 // --------------------------------------------------------------------------------------------------------------------
 // public API for loggers
 
+NEVER_INLINE
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... )
 {
     int saved_errno = errno;
@@ -424,6 +425,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     va_end(args);
 }
 
+NEVER_INLINE
 void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     int saved_errno = errno;
 
@@ -477,6 +479,7 @@ static void fatal_abort_internal_checks(void) {
     _exit(1);
 }
 
+NEVER_INLINE
 void netdata_logger_fatal(const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     static size_t already_in_fatal = 0;
 
@@ -516,23 +519,9 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         va_end(args);
     }
 
-    char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-
-    char action_data[70+1];
-    snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, saved_errno);
-
-    const char *thread_tag = nd_thread_tag();
-    const char *tag_to_send = thread_tag;
-
-    // anonymize thread names
-    if(strncmp(thread_tag, THREAD_TAG_STREAM_RECEIVER, strlen(THREAD_TAG_STREAM_RECEIVER)) == 0)
-        tag_to_send = THREAD_TAG_STREAM_RECEIVER;
-    if(strncmp(thread_tag, THREAD_TAG_STREAM_SENDER, strlen(THREAD_TAG_STREAM_SENDER)) == 0)
-        tag_to_send = THREAD_TAG_STREAM_SENDER;
-
-    char action_result[200+1];
-    snprintfz(action_result, 60, "%s:%s:%s", program_name, tag_to_send, function);
+#if defined(FSANITIZE_ADDRESS)
+    fprintf(stderr, "FATAL: %04lu@%s:%s, errno = %d\n", line, file, function, saved_errno);
+#endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
     fatal_abort_internal_checks();

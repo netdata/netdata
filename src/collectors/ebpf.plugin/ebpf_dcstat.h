@@ -65,22 +65,6 @@ enum directory_cache_counters {
 
 enum directory_cache_targets { NETDATA_DC_TARGET_LOOKUP_FAST, NETDATA_DC_TARGET_D_LOOKUP };
 
-typedef struct __attribute__((packed)) netdata_publish_dcstat_pid {
-    uint64_t cache_access;
-    uint32_t file_system;
-    uint32_t not_found;
-} netdata_publish_dcstat_pid_t;
-
-typedef struct __attribute__((packed)) netdata_publish_dcstat {
-    uint64_t ct;
-
-    long long ratio;
-    long long cache_access;
-
-    netdata_publish_dcstat_pid_t curr;
-    netdata_publish_dcstat_pid_t prev;
-} netdata_publish_dcstat_t;
-
 void *ebpf_dcstat_thread(void *ptr);
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_dcstat_release(netdata_publish_dcstat_t *stat);

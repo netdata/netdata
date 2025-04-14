@@ -459,8 +459,7 @@ RRDHOST *rrdhost_create(
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         if (is_localhost) {
             BUFFER *buf = buffer_create(0, NULL);
-            size_t query_counter = 0;
-            store_host_info_and_metadata(host, buf, &query_counter);
+            store_host_info_and_metadata(host, buf);
             buffer_free(buf);
         }
         rrdhost_load_rrdcontext_data(host);
@@ -781,9 +780,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
 
     pulse_host_status(host, PULSE_HOST_STATUS_DELETED, 0);
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
-
-    if (host == localhost)
-        health_plugin_destroy();
 
     freez(host->cache_dir);
     rrdhost_stream_parents_free(host, false);

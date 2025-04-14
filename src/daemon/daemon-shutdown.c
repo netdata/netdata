@@ -2,7 +2,7 @@
 
 #include "daemon-shutdown.h"
 #include "daemon-service.h"
-#include "daemon-status-file.h"
+#include "status-file.h"
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"
@@ -12,6 +12,16 @@
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
 #endif
+
+// External configuration structures that need cleanup
+extern struct config netdata_config;
+extern struct config cloud_config;
+extern void inicfg_free(struct config *root);
+// Functions to free various configurations
+extern void claim_config_free(void);
+extern void stream_config_free(void);
+extern void exporting_config_free(void);
+extern void rrd_functions_inflight_destroy(void);
 
 static bool abort_on_fatal = true;
 
@@ -207,10 +217,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
     service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS |
-                        ABILITY_STREAMING_CONNECTIONS | SERVICE_ACLK | SERVICE_SYSTEMD);
-    watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
+                        ABILITY_STREAMING_CONNECTIONS | SERVICE_SYSTEMD);
+    watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS);
 
-    service_wait_exit(SERVICE_MAINTENANCE | SERVICE_SYSTEMD, 3 * USEC_PER_SEC);
+    service_wait_exit(SERVICE_MAINTENANCE | SERVICE_SYSTEMD, 5 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
 
     service_wait_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
@@ -227,23 +237,28 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         rrdeng_flush_everything_and_wait(false, false, true);
 #endif
 
-    service_wait_exit(SERVICE_REPLICATION, 3 * USEC_PER_SEC);
+    service_wait_exit(SERVICE_REPLICATION, 5 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
 
     ml_stop_threads();
     ml_fini();
-    watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS);
+    watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS);
 
-    service_wait_exit(SERVICE_CONTEXT, 3 * USEC_PER_SEC);
+    service_wait_exit(SERVICE_CONTEXT, 5 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_CONTEXT_THREAD);
 
     web_client_cache_destroy();
     watcher_step_complete(WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE);
 
-    service_wait_exit(SERVICE_ACLK, 3 * USEC_PER_SEC);
-    watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_THREADS);
+    aclk_synchronization_shutdown();
+    watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_SYNC_THREAD);
 
-    service_wait_exit(~0, 10 * USEC_PER_SEC);
+    service_signal_exit(SERVICE_ACLK);
+
+    service_wait_exit(SERVICE_ACLK, 3 * USEC_PER_SEC);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD);
+
+    service_wait_exit(~0, 20 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
 
     cancel_main_threads();
@@ -280,7 +295,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 nd_thread_join(th[tier]);
 
-            rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+            dbengine_shutdown();
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
@@ -305,7 +320,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     sqlite_close_databases();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
-    
+
     // unlink the pid
     if(pidfile && *pidfile && unlink(pidfile) != 0)
         netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
@@ -323,9 +338,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_shutdown_end();
     watcher_thread_stop();
 
-    daemon_status_file_shutdown_step(NULL);
-    daemon_status_file_update_status(DAEMON_STATUS_EXITED);
-
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\n");
 
@@ -334,6 +346,9 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     fprintf(stderr, "Freeing all RRDHOSTs...\n");
     rrdhost_free_all();
+    dyncfg_shutdown();
+    rrd_functions_inflight_destroy();
+    health_plugin_destroy();
 
     fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
     size_t dictionaries_referenced = cleanup_destroyed_dictionaries();
@@ -355,7 +370,15 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if(metrics_referenced)
         fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
             metrics_referenced);
-#endif    
+
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+        if(multidb_ctx[tier]) {
+            fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
+            finalize_rrd_files(multidb_ctx[tier]);
+            memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
+        }
+    }
+#endif
 
     fprintf(stderr, "Destroying UUIDMap...\n");
     size_t uuid_referenced = uuidmap_destroy();
@@ -363,6 +386,16 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
             uuid_referenced);
 
+    fprintf(stderr, "Freeing configuration resources...\n");
+    claim_config_free();
+    exporting_config_free();
+    stream_config_free();
+    inicfg_free(&cloud_config);
+    inicfg_free(&netdata_config);
+    
+    fprintf(stderr, "Cleaning up worker utilization...\n");
+    worker_utilization_cleanup();
+    
     size_t strings_referenced = string_destroy();
     if(strings_referenced)
         fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",

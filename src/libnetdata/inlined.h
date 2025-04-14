@@ -116,16 +116,23 @@ static inline uint64_t murmur64(uint64_t k) {
     return k;
 }
 
-static inline unsigned int str2u(const char *s) {
-    unsigned int n = 0;
+ALWAYS_INLINE
+static unsigned int str2u(const char *s) {
+    while(isspace((uint8_t)*s))
+        s++;
 
+    unsigned int n = 0;
     while(*s >= '0' && *s <= '9')
         n = n * 10 + (*s++ - '0');
 
     return n;
 }
 
-static inline int str2i(const char *s) {
+ALWAYS_INLINE
+static int str2i(const char *s) {
+    while(isspace((uint8_t)*s))
+        s++;
+
     if(unlikely(*s == '-')) {
         s++;
         return -(int) str2u(s);
@@ -136,16 +143,23 @@ static inline int str2i(const char *s) {
     }
 }
 
-static inline unsigned long str2ul(const char *s) {
-    unsigned long n = 0;
+ALWAYS_INLINE
+static unsigned long str2ul(const char *s) {
+    while(isspace((uint8_t)*s))
+        s++;
 
+    unsigned long n = 0;
     while(*s >= '0' && *s <= '9')
         n = n * 10 + (*s++ - '0');
 
     return n;
 }
 
-static inline long str2l(const char *s) {
+ALWAYS_INLINE
+static long str2l(const char *s) {
+    while(isspace((uint8_t)*s))
+        s++;
+
     if(unlikely(*s == '-')) {
         s++;
         return -(long) str2ul(s);
@@ -156,7 +170,11 @@ static inline long str2l(const char *s) {
     }
 }
 
-static inline uint32_t str2uint32_t(const char *s, char **endptr) {
+ALWAYS_INLINE
+static uint32_t str2uint32_t(const char *s, char **endptr) {
+    while(isspace((uint8_t)*s))
+        s++;
+
     uint32_t n = 0;
 
     while(*s >= '0' && *s <= '9')
@@ -168,7 +186,11 @@ static inline uint32_t str2uint32_t(const char *s, char **endptr) {
     return n;
 }
 
-static inline uint64_t str2uint64_t(const char *s, char **endptr) {
+ALWAYS_INLINE
+static uint64_t str2uint64_t(const char *s, char **endptr) {
+    while(isspace((uint8_t)*s))
+        s++;
+
     uint64_t n = 0;
 
 #ifdef ENV32BIT
@@ -188,11 +210,16 @@ static inline uint64_t str2uint64_t(const char *s, char **endptr) {
     return n;
 }
 
-static inline unsigned long long int str2ull(const char *s, char **endptr) {
+ALWAYS_INLINE
+static unsigned long long int str2ull(const char *s, char **endptr) {
     return str2uint64_t(s, endptr);
 }
 
-static inline long long str2ll(const char *s, char **endptr) {
+ALWAYS_INLINE
+static long long str2ll(const char *s, char **endptr) {
+    while(isspace((uint8_t)*s))
+        s++;
+
     if(unlikely(*s == '-')) {
         s++;
         return -(long long) str2uint64_t(s, endptr);
@@ -203,7 +230,11 @@ static inline long long str2ll(const char *s, char **endptr) {
     }
 }
 
-static inline uint32_t str2uint32_hex(const char *src, char **endptr) {
+ALWAYS_INLINE
+static uint32_t str2uint32_hex(const char *src, char **endptr) {
+    while(isspace((uint8_t)*src))
+        src++;
+
     uint32_t num = 0;
     const unsigned char *s = (const unsigned char *)src;
     unsigned char c;
@@ -219,7 +250,11 @@ static inline uint32_t str2uint32_hex(const char *src, char **endptr) {
     return num;
 }
 
-static inline uint64_t str2uint64_hex(const char *src, char **endptr) {
+ALWAYS_INLINE
+static uint64_t str2uint64_hex(const char *src, char **endptr) {
+    while(isspace((uint8_t)*src))
+        src++;
+
     uint64_t num = 0;
     const unsigned char *s = (const unsigned char *)src;
     unsigned char c;
@@ -235,7 +270,11 @@ static inline uint64_t str2uint64_hex(const char *src, char **endptr) {
     return num;
 }
 
-static inline uint64_t str2uint64_base64(const char *src, char **endptr) {
+ALWAYS_INLINE
+static uint64_t str2uint64_base64(const char *src, char **endptr) {
+    while(isspace((uint8_t)*src))
+        src++;
+
     uint64_t num = 0;
     const unsigned char *s = (const unsigned char *)src;
     unsigned char c;
@@ -251,7 +290,11 @@ static inline uint64_t str2uint64_base64(const char *src, char **endptr) {
     return num;
 }
 
-static inline NETDATA_DOUBLE str2ndd_parse_double_decimal_digits_internal(const char *src, int *digits) {
+ALWAYS_INLINE
+static NETDATA_DOUBLE str2ndd_parse_double_decimal_digits_internal(const char *src, int *digits) {
+    while(isspace((uint8_t)*src))
+        src++;
+
     const char *s = src;
     NETDATA_DOUBLE n = 0.0;
 
@@ -272,7 +315,11 @@ static inline NETDATA_DOUBLE str2ndd_parse_double_decimal_digits_internal(const 
     return n;
 }
 
-static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
+ALWAYS_INLINE
+static NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
+    while(isspace((uint8_t)*src))
+        src++;
+
     const char *s = src;
 
     NETDATA_DOUBLE sign = 1.0;
@@ -361,7 +408,8 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
     return sign * result;
 }
 
-static ALWAYS_INLINE unsigned long long str2ull_encoded(const char *s) {
+ALWAYS_INLINE
+static unsigned long long str2ull_encoded(const char *s) {
     if(*s == IEEE754_UINT64_B64_PREFIX[0])
         return str2uint64_base64(s + sizeof(IEEE754_UINT64_B64_PREFIX) - 1, NULL);
 
@@ -371,14 +419,16 @@ static ALWAYS_INLINE unsigned long long str2ull_encoded(const char *s) {
     return str2uint64_t(s, NULL);
 }
 
-static ALWAYS_INLINE long long str2ll_encoded(const char *s) {
+ALWAYS_INLINE
+static long long str2ll_encoded(const char *s) {
     if(*s == '-')
         return -(long long) str2ull_encoded(&s[1]);
     else
         return (long long) str2ull_encoded(s);
 }
 
-static ALWAYS_INLINE NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
+ALWAYS_INLINE
+static NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
     if (*src == IEEE754_DOUBLE_B64_PREFIX[0]) {
         // double parsing from base64
         uint64_t n = str2uint64_base64(src + sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1, endptr);
@@ -409,7 +459,8 @@ static ALWAYS_INLINE NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endp
     return str2ndd(src, endptr) * sign;
 }
 
-static inline char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1) {
+ALWAYS_INLINE
+static char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1) {
     char *p = dst;
 
     while (*src && dst_size_minus_1--)
@@ -422,10 +473,19 @@ static inline char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1
 
 // append src to dst, but only if there is space for it
 // dst is always null terminated
-static inline size_t strcatz(char *dst, size_t len, size_t size, const char *src) {
+ALWAYS_INLINE
+static size_t strcatz(char *dst, size_t len, const char *src, size_t size) {
     // If starting offset is out of bounds, do nothing.
-    if (len >= size) {
-        dst[size - 1] = '\0';
+    if (unlikely(len >= size)) {
+        if(size > 0)
+            dst[size - 1] = '\0';
+
+        return len;
+    }
+
+    // If the source is not valid or empty, do nothing.
+    if(unlikely(!src || !*src)) {
+        dst[len] = '\0';
         return len;
     }
 
@@ -449,7 +509,8 @@ static inline size_t strcatz(char *dst, size_t len, size_t size, const char *src
     return len + (initial_space - space);
 }
 
-static inline void sanitize_json_string(char *dst, const char *src, size_t dst_size) {
+ALWAYS_INLINE
+static void sanitize_json_string(char *dst, const char *src, size_t dst_size) {
     while (*src != '\0' && dst_size > 1) {
         if (*src < 0x1F) {
             *dst++ = '_';
@@ -469,7 +530,8 @@ static inline void sanitize_json_string(char *dst, const char *src, size_t dst_s
     *dst = '\0';
 }
 
-static inline bool sanitize_command_argument_string(char *dst, const char *src, size_t dst_size) {
+ALWAYS_INLINE
+static bool sanitize_command_argument_string(char *dst, const char *src, size_t dst_size) {
     if(dst_size)
         *dst = '\0';
 
@@ -513,7 +575,8 @@ static inline bool sanitize_command_argument_string(char *dst, const char *src, 
     return true;
 }
 
-static inline int read_txt_file(const char *filename, char *buffer, size_t size) {
+ALWAYS_INLINE
+static int read_txt_file(const char *filename, char *buffer, size_t size) {
     if(unlikely(!size)) return 3;
 
     int fd = open(filename, O_RDONLY | O_CLOEXEC, 0666);
@@ -534,7 +597,8 @@ static inline int read_txt_file(const char *filename, char *buffer, size_t size)
     return 0;
 }
 
-static inline bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, size_t max_size) {
+ALWAYS_INLINE
+static bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, size_t max_size) {
     // Open the file
     int fd = open(filename, O_RDONLY | O_CLOEXEC);
     if (fd == -1)
@@ -571,7 +635,8 @@ static inline bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, siz
     return true; // Success
 }
 
-static inline int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
+ALWAYS_INLINE
+static int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
     if (unlikely(!size)) return 3;
 
     int fd = open(filename, O_RDONLY | O_CLOEXEC, 0666);
@@ -604,7 +669,8 @@ static inline int read_proc_cmdline(const char *filename, char *buffer, size_t s
     return 0;
 }
 
-static inline int read_single_number_file(const char *filename, unsigned long long *result) {
+ALWAYS_INLINE
+static int read_single_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
 
     int ret = read_txt_file(filename, buffer, sizeof(buffer));
@@ -618,7 +684,8 @@ static inline int read_single_number_file(const char *filename, unsigned long lo
     return 0;
 }
 
-static inline int read_single_signed_number_file(const char *filename, long long *result) {
+ALWAYS_INLINE
+static int read_single_signed_number_file(const char *filename, long long *result) {
     char buffer[30 + 1];
 
     int ret = read_txt_file(filename, buffer, sizeof(buffer));
@@ -632,7 +699,8 @@ static inline int read_single_signed_number_file(const char *filename, long long
     return 0;
 }
 
-static inline int read_single_base64_or_hex_number_file(const char *filename, unsigned long long *result) {
+ALWAYS_INLINE
+static int read_single_base64_or_hex_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
 
     int ret = read_txt_file(filename, buffer, sizeof(buffer));
@@ -653,14 +721,16 @@ static inline int read_single_base64_or_hex_number_file(const char *filename, un
     }
 }
 
-static inline char *strsep_skip_consecutive_separators(char **ptr, char *s) {
+ALWAYS_INLINE
+static char *strsep_skip_consecutive_separators(char **ptr, char *s) {
     char *p = (char *)"";
     while (p && !p[0] && *ptr) p = strsep(ptr, s);
     return (p);
 }
 
 // remove leading and trailing spaces; may return NULL
-static inline char *trim(char *s) {
+ALWAYS_INLINE
+static char *trim(char *s) {
     char *buf = s;
 
     // skip leading spaces
@@ -687,16 +757,19 @@ static inline char *trim(char *s) {
     return s;
 }
 
-// like trim(), but also remove duplicate spaces inside the string; may return NULL
-static inline char *trim_all(char *buffer) {
+// like trim(), but also remove duplicate spaces inside the string
+ALWAYS_INLINE
+static char *trim_all(char *buffer) {
     char *d = buffer, *s = buffer;
 
     // skip spaces
-    while(isspace((uint8_t)*s)) s++;
+    while(isspace((uint8_t)*s))
+        s++;
 
     while(*s) {
         // copy the non-space part
-        while(*s && !isspace((uint8_t)*s)) *d++ = *s++;
+        while(*s && !isspace((uint8_t)*s))
+            *d++ = *s++;
 
         // add a space if we have to
         if(*s && isspace((uint8_t)*s)) {
@@ -715,11 +788,11 @@ static inline char *trim_all(char *buffer) {
         if(isspace((uint8_t)*d)) *d = '\0';
     }
 
-    if(!buffer[0]) return NULL;
     return buffer;
 }
 
-static inline bool streq(const char *a, const char *b) {
+ALWAYS_INLINE
+static bool streq(const char *a, const char *b) {
     if (a == b)
         return true;
 
@@ -729,7 +802,8 @@ static inline bool streq(const char *a, const char *b) {
     return strcmp(a, b) == 0;
 }
 
-static inline bool strstartswith(const char *string, const char *prefix) {
+ALWAYS_INLINE
+static bool strstartswith(const char *string, const char *prefix) {
     if (string == NULL || prefix == NULL)
         return false;
 
@@ -742,7 +816,8 @@ static inline bool strstartswith(const char *string, const char *prefix) {
     return strncmp(string, prefix, prefix_len) == 0;
 }
 
-static inline bool strendswith(const char *string, const char *suffix) {
+ALWAYS_INLINE
+static bool strendswith(const char *string, const char *suffix) {
     if (string == NULL || suffix == NULL)
         return false;
 
@@ -755,7 +830,8 @@ static inline bool strendswith(const char *string, const char *suffix) {
     return strcmp(string + string_len - suffix_len, suffix) == 0;
 }
 
-static inline bool strendswith_lengths(const char *string, size_t string_len, const char *suffix, size_t suffix_len) {
+ALWAYS_INLINE
+static bool strendswith_lengths(const char *string, size_t string_len, const char *suffix, size_t suffix_len) {
     if (string == NULL || suffix == NULL)
         return false;
 

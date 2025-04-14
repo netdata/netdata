@@ -183,7 +183,7 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not
     buffer_json_object_close(w->response.data);
 
     CLOUD_STATUS status = cloud_status();
-    buffer_json_member_add_string(w->response.data, "cloud_status", cloud_status_to_string(status));
+    buffer_json_member_add_string(w->response.data, "cloud_status", CLOUD_STATUS_2str(status));
     buffer_json_member_add_string(w->response.data, "cloud_base_url", registry.cloud_base_url);
 
     buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
