@@ -201,9 +201,9 @@ enum netdata_mssql_odbc_errors {
     NETDATA_MSSQL_ODBC_QUERY,
 };
 
-static char *netdata_MSSQL_error_text(enum netdata_mssql_metrics val)
+static char *netdata_MSSQL_error_text(enum netdata_mssql_odbc_errors val)
 {
-    switch(val) {
+    switch (val) {
         case NETDATA_MSSQL_ODBC_NO_ERROR:
             return "NO ERROR";
         case NETDATA_MSSQL_ODBC_CONNECT:
@@ -220,7 +220,7 @@ static char *netdata_MSSQL_error_text(enum netdata_mssql_metrics val)
 
 static char *netdata_MSSQL_type_text(uint32_t type)
 {
-    switch(type) {
+    switch (type) {
         case SQL_HANDLE_STMT:
             return "STMT";
         case SQL_HANDLE_DBC:
@@ -230,14 +230,21 @@ static char *netdata_MSSQL_type_text(uint32_t type)
 }
 
 // Connection and SQL
-static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_mssql_metrics step)
+static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_mssql_odbc_errors step)
 {
     SQLCHAR state[1024];
     SQLCHAR message[1024];
     if (SQL_SUCCESS == SQLGetDiagRec((short)type, handle, 1, state, NULL, message, 1024, NULL)) {
         char *str_step = netdata_MSSQL_error_text(step);
         char *str_type = netdata_MSSQL_type_text(type);
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "MSSQL server error using the handle %s running %s :  %s, %s", str_type, str_step, message, state);
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "MSSQL server error using the handle %s running %s :  %s, %s",
+            str_type,
+            str_step,
+            message,
+            state);
     }
 }
 
@@ -246,11 +253,12 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_ms
 // a stored procedure and change permissions. BUT, ODBC CLIENT CANNOT WORK PROPERLY WITH IT
 #define NETDATA_GET_FILE_SIZE_QUERY "USE ? SELECT size * 8/1024 AS size FROM sys.database_files WHERE type = 0;"
 
-static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_conn *nmc) {
+static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_conn *nmc)
+{
     static BOOL first_call = TRUE;
-    static SQLCHAR db_name[SQLSERVER_MAX_NAME_LENGTH + 1] = { };
+    static SQLCHAR db_name[SQLSERVER_MAX_NAME_LENGTH + 1] = {};
     static long db_size = 0;
-    static SQLCHAR col_name[SQLSERVER_MAX_NAME_LENGTH + 1] = { };
+    static SQLCHAR col_name[SQLSERVER_MAX_NAME_LENGTH + 1] = {};
     static SQLSMALLINT col_name_len = 0;
     static SQLSMALLINT col_data_type = 0;
     static SQLULEN col_data_size = 0;
@@ -283,12 +291,7 @@ static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_con
             return 0;
         }
 
-        ret = SQLBindCol(nmc->dataFileSizeSTMT,
-                         1,
-                         col_data_type,
-                         &db_size,
-                         (long)col_data_size,
-                         &col_data_len);
+        ret = SQLBindCol(nmc->dataFileSizeSTMT, 1, col_data_type, &db_size, (long)col_data_size, &col_data_len);
 
         if (ret != SQL_SUCCESS) {
             netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT, NETDATA_MSSQL_ODBC_QUERY);
@@ -308,18 +311,21 @@ static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_con
     return (ULONGLONG)db_size;
 }
 
-ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char *dbname) {
+ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char *dbname)
+{
     ULONGLONG value = 0;
     SQLLEN length = SQL_NTS;
-    enum netdata_mssql_metrics step = NETDATA_MSSQL_ODBC_NO_ERROR;
+    enum netdata_mssql_odbc_errors step = NETDATA_MSSQL_ODBC_NO_ERROR;
 
-    SQLRETURN ret = SQLBindParameter(nmc->dataFileSizeSTMT, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_CHAR, strlen(dbname), 0, dbname, 0, &length);
+    SQLRETURN ret = SQLBindParameter(
+        nmc->dataFileSizeSTMT, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_CHAR, strlen(dbname), 0, dbname, 0, &length);
     if (ret != SQL_SUCCESS) {
         step = NETDATA_MSSQL_ODBC_BIND;
         goto end_data_file_size;
     }
 
-    ret = SQLPrepare(nmc->dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, strlen(NETDATA_GET_FILE_SIZE_QUERY));
+    ret =
+        SQLPrepare(nmc->dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, strlen(NETDATA_GET_FILE_SIZE_QUERY));
     if (ret != SQL_SUCCESS) {
         step = NETDATA_MSSQL_ODBC_PREPARE;
         goto end_data_file_size;
@@ -327,7 +333,7 @@ ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char
 
     value = netdata_MSSQL_fill_data_file_size_dict(nmc);
 
-    end_data_file_size:
+end_data_file_size:
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT, step);
     }
@@ -369,14 +375,7 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
 
     SQLCHAR ret_conn_str[1024];
     ret = SQLDriverConnect(
-        nmc->netdataSQLHDBc,
-        NULL,
-        connectionString,
-        SQL_NTS,
-        ret_conn_str,
-        1024,
-        NULL,
-        SQL_DRIVER_NOPROMPT);
+        nmc->netdataSQLHDBc, NULL, connectionString, SQL_NTS, ret_conn_str, 1024, NULL, SQL_DRIVER_NOPROMPT);
 
     BOOL retConn;
     switch (ret) {
@@ -400,7 +399,7 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
     }
 
     return retConn;
-    }
+}
 
 // Dictionary
 static DICTIONARY *mssql_instances = NULL;
