@@ -4,4 +4,4 @@
 // Copyright 2023-present Datadog, Inc.
 
 // Package profiledefinition contain the structure used to parse SNMP Profiles
-package profiledefinition
+package ddprofiledefinition

@@ -3,7 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2024-present Datadog, Inc.
 
-package profiledefinition
+package ddprofiledefinition
 
 // Cloneable is a generic type for objects that can duplicate themselves.
 // It is exclusively used in the form [T Cloneable[T]], i.e. a type that

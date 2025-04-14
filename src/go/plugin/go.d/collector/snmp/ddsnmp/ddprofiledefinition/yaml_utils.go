@@ -3,7 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-package profiledefinition
+package ddprofiledefinition
 
 // StringArray is list of string with a yaml un-marshaller that support both array and string.
 // See test file for example usage.

@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/profiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func parseMetrics(metrics []profiledefinition.MetricsConfig) (parsedResult, error) {
-	OIDs := []string{}
-	nextOIDs := []string{}
-	bulkOIDs := []string{}
-	parsedMetrics := []parsedMetric{}
-	OIDsToResolve := []map[string]string{}
-	indexesToResolve := []indexMapping{}
+func parseMetrics(metrics []ddprofiledefinition.MetricsConfig) (parsedResult, error) {
+	var (
+		OIDs, nextOIDs, bulkOIDs []string
+		OIDsToResolve            []map[string]string
+		parsedMetrics            []parsedMetric
+		indexesToResolve         []indexMapping
+	)
+
 	bulkThreshold := 0
 	for _, metric := range metrics {
 		result, err := parseMetric(metric)
@@ -52,7 +53,7 @@ func parseMetrics(metrics []profiledefinition.MetricsConfig) (parsedResult, erro
 		parsedMetrics: parsedMetrics}, nil
 }
 
-func parseMetric(metric profiledefinition.MetricsConfig) (metricParseResult, error) {
+func parseMetric(metric ddprofiledefinition.MetricsConfig) (metricParseResult, error) {
 	/*Can either be:
 
 	* An OID metric:
@@ -95,7 +96,7 @@ func parseMetric(metric profiledefinition.MetricsConfig) (metricParseResult, err
 
 	} else if len(metric.MIB) == 0 {
 		return metricParseResult{}, fmt.Errorf("unsupported metric {%v}", metric)
-	} else if metric.Symbol != (profiledefinition.SymbolConfig{}) {
+	} else if metric.Symbol != (ddprofiledefinition.SymbolConfig{}) {
 		// Single Metric
 		return (parseSymbolMetric(metric.Symbol, metric.MIB)) // TODO metric tags might be needed here.
 		//Can't support tables at the moment
@@ -105,7 +106,7 @@ func parseMetric(metric profiledefinition.MetricsConfig) (metricParseResult, err
 }
 
 // TODO error outs on functions
-func parseSymbolMetric(symbol profiledefinition.SymbolConfig, mib string) (metricParseResult, error) {
+func parseSymbolMetric(symbol ddprofiledefinition.SymbolConfig, mib string) (metricParseResult, error) {
 	/*    Parse a symbol metric (= an OID in a MIB).
 	Example:
 
@@ -167,7 +168,7 @@ func parseSymbol(symbol interface{}) (parsedSymbol, error) {
 	*/
 
 	switch s := symbol.(type) {
-	case profiledefinition.SymbolConfig:
+	case ddprofiledefinition.SymbolConfig:
 		oid := s.OID
 		name := s.Name
 		if s.ExtractValue != "" {
