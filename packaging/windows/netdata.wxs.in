@@ -46,6 +46,10 @@
                 <ComponentRef Id="NetdataRoot" />
                 <ComponentRef Id="NetdataVarLib" />
                 <ComponentRef Id="NetdataVarLibNetdata" />
+                <ComponentRef Id="NetdataEtcGo" />
+                <ComponentRef Id="NetdataEtcHealth" />
+                <ComponentRef Id="NetdataEtcPython" />
+                <ComponentRef Id="NetdataEtcStatsd" />
                 <ComponentGroupRef Id="WevtComponents" />
                 <ComponentRef Id="NetdataService" />
             </Feature>
@@ -65,7 +69,12 @@
                         </Directory>
                     </Directory>
                     <Directory Id="ETCDIR" Name="etc">
-                        <Directory Id="ETCDIRNETDATA" Name="netdata" />
+                        <Directory Id="ETCDIRNETDATA" Name="netdata">
+                            <Directory Id="ETCDIRNETDATAGO" Name="go.d" />
+                            <Directory Id="ETCDIRNETDATAHEALTH" Name="health.d" />
+                            <Directory Id="ETCDIRNETDATAPYTHON" Name="python.d" />
+                            <Directory Id="ETCDIRNETDATASTATSD" Name="statsd.d" />
+                        </Directory>
                     </Directory>
                     <Directory Id="DEVDIR" Name="dev">
                         <Directory Id="DEVSHMDIR" Name="shm" />
@@ -128,6 +137,22 @@
             </Component>
 
             <Component Id="NetdataHome" Directory="HOMEDIR" Guid="13056229-7734-45ac-a982-572fa99f8e72">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataEtcGo" Directory="ETCDIRNETDATAGO" Guid="9d9b7859-75c0-4119-b2fc-a704599a3157">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataEtcHealth" Directory="ETCDIRNETDATAHEALTH" Guid="177b08a0-7bb6-4878-9bcf-c68642c1aa23">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataEtcPython" Directory="ETCDIRNETDATAPYTHON" Guid="9f4f1e99-47e1-4d88-8836-c02a98d30056">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataEtcStatsd" Directory="ETCDIRNETDATASTATSD" Guid="5f53221b-691f-4026-8396-52c6b2ac025f">
                 <CreateFolder />
             </Component>
 
