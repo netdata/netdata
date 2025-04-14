@@ -152,11 +152,6 @@ static inline STRING *string_index_search(const char *str, size_t length) {
         if(string_entry_check_and_acquire(string)) {
             // we can use this entry
             string_internal_stats_add(partition, found_available_on_search, 1);
-            
-#ifdef FSANITIZE_ADDRESS
-            // Also add a stacktrace when we find an existing string
-            stacktrace_array_add(&string->stacktraces, 0);
-#endif
         }
         else {
             // this entry is about to be deleted by another thread
