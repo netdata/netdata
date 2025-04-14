@@ -37,7 +37,7 @@ static struct proc_module {
     {.name = "/sys/kernel/mm/ksm",           .dim = "ksm",          .func = do_sys_kernel_mm_ksm},
     {.name = "/sys/block/zram",              .dim = "zram",         .func = do_sys_block_zram},
     {.name = "/sys/devices/system/edac/mc",  .dim = "edac",         .func = do_proc_sys_devices_system_edac_mc},
-    {.name = "/sys/devices/pci/aer",         .dim = "pci_aer",      .func = do_proc_sys_devices_pci_aer},
+    {.name = "/sys/devices/pci/aer",         .dim = "pci_aer",      .func = do_proc_sys_devices_pci_aer, .cleanup = pci_aer_plugin_cleanup},
     {.name = "/sys/devices/system/node",     .dim = "numa",         .func = do_proc_sys_devices_system_node},
     {.name = "/proc/pagetypeinfo",           .dim = "pagetypeinfo", .func = do_proc_pagetypeinfo},
 

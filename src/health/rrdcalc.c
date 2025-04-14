@@ -310,7 +310,6 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     rc->chart = string_dup(st->id);
 
     health_prototype_copy_config(&rc->config, &ap->config);
-    health_prototype_copy_match_without_patterns(&rc->match, &ap->match);
 
     rc->next_event_id = 1;
     rc->value = NAN;
@@ -375,7 +374,6 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
     // any destruction actions that require other locks
     // have to be placed in rrdcalc_del(), because the object is actually locked for deletion
 
-    rrd_alert_match_cleanup(&rc->match);
     rrd_alert_config_cleanup(&rc->config);
 
     string_freez(rc->key);
