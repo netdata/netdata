@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- chore\(otel/journaldexporter\): add socket/remote clients [\#20121](https://github.com/netdata/netdata/pull/20121) ([ilyam8](https://github.com/ilyam8))
 - feat\(system-info\): improve Windows OS detection and categorization [\#20117](https://github.com/netdata/netdata/pull/20117) ([ktsaou](https://github.com/ktsaou))
 - fix memory leaks [\#20116](https://github.com/netdata/netdata/pull/20116) ([ktsaou](https://github.com/ktsaou))
 - netdatacli remove/mark stale, swap order in help output [\#20113](https://github.com/netdata/netdata/pull/20113) ([ilyam8](https://github.com/ilyam8))
