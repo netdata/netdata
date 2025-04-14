@@ -169,10 +169,11 @@ void simple_connector_init(struct instance *instance)
     if (connector_specific_data->first_buffer)
         return;
 
+    // Initialize the active buffers that will be used for sending data
     connector_specific_data->header = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     connector_specific_data->buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
 
-    // create a ring buffer
+    // create a ring buffer with all buffers initialized
     struct simple_connector_buffer *first_buffer = NULL;
 
     if (instance->config.buffer_on_failures < 1)
@@ -180,6 +181,11 @@ void simple_connector_init(struct instance *instance)
 
     for (int i = 0; i < instance->config.buffer_on_failures; i++) {
         struct simple_connector_buffer *current_buffer = callocz(1, sizeof(struct simple_connector_buffer));
+        
+        // Initialize both header and buffer for each ring buffer entry
+        // This ensures we never have NULL pointers during buffer swapping
+        current_buffer->header = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
+        current_buffer->buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
 
         if (!connector_specific_data->first_buffer)
             first_buffer = current_buffer;
