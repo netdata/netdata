@@ -62,7 +62,7 @@ func TestListMap_JSONSchema(t *testing.T) {
 
 	expectedSchema := `
 {
-  "$id": "https://github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/profiledefinition/example-struct",
+  "$id": "https://github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition/example-struct",
   "$ref": "#/$defs/ExampleStruct",
   "$defs": {
     "ExampleStruct": {
