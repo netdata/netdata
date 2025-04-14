@@ -1,61 +1,100 @@
-# Windows Installer Guide
+# Install Netdata on Windows
 
-Netdata provides a straightforward Windows installer for easy setup. The installer offers two installation modes, each with specific features outlined below.
+Netdata provides a simple Windows installer for quick setup.
 
-**Important Note**: The Netdata Windows Agent is intended for users with paid Netdata subscriptions. If you're using a free account or no account at all, certain features of the Windows Agent will be restricted.
+> Note  
+> The Windows Agent is available for users with paid Netdata subscriptions.  
+> Free users will have limited functionality.
 
-**Key Limitations for Free Users**:
+---
 
-- **Standalone Agents**: The user interface will be locked, and you will not have access to monitoring data.
-- **Child Agents**: If the Windows Agent streams data to a Linux-based parent Netdata instance, you will be unable to view the Windows Agent’s monitoring data in the parent dashboard.
+## 🚫 Limitations for Free Users
 
-## Download the MSI Installer
+| Agent Type       | Limitation                             |
+|-----------------|----------------------------------------|
+| Standalone Agent | UI is locked — No local monitoring    |
+| Child Agent      | No monitoring data in parent dashboard when streaming to a Linux-based Netdata parent |
 
-You can download the Netdata Windows installer (MSI) from the official releases page. Choose between the following versions:
+---
 
-| Version                                                                                          | Description                                                                                                                                 |
-|--------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
-| [Stable](https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi)            | Recommended for most users; offers the most reliable and well-tested features.                                                              |
-| [Nightly](https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi) | Contains the latest features but may have bugs or instability. Choose this if you need the newest features and can handle potential issues. |
+## Download the Windows Installer (MSI)
 
-## Silent Installation (Command Line)
+Choose the version that suits your needs:
 
-Silent mode allows for automated deployments without user interaction.
+| Version | Download Link | Recommended For |
+|---------|----------------|----------------|
+| Stable  | [Download Stable](https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi) | Most users — stable, well-tested |
+| Nightly | [Download Nightly](https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi) | Users who need the latest features and can handle potential bugs |
 
-> **Note**: Run the installer as an administrator to avoid prompts.
+---
 
-By using silent mode, you implicitly agree to the terms of the [GPL-3](https://raw.githubusercontent.com/netdata/netdata/refs/heads/master/LICENSE) (Netdata Agent) and [NCUL1](https://app.netdata.cloud/LICENSE.txt) (Netdata Web Interface) licenses, and the agreements will not be displayed during installation.
+## 🤐 Silent Installation (Command Line)
 
-### Installation Options
+Use silent mode to deploy Netdata without user interaction (ideal for automation).
 
-| Option       | Description                                                                            |
-|--------------|----------------------------------------------------------------------------------------|
-| `/qn`        | Enables silent mode installation.                                                      |
-| `/i`         | Specifies the path to the MSI installer file.                                          |
-| `INSECURE=1` | Forces insecure connections, bypassing hostname verification. Use only when necessary. |
-| `TOKEN=`     | Sets the Claim Token for your Netdata Cloud Space.                                     |
-| `ROOMS=`     | Comma-separated list of Room IDs where your node will appear.                          |
-| `PROXY=`     | Specifies the proxy server address for networks requiring one.                         |
+> [!TIP]
+> Run the command prompt as Administrator.
 
-### Example Usage
+---
 
-To connect your Agent to your Cloud Space, use the following command:
+### Installation Command Options
+
+| Option        | Description |
+|---------------|-------------|
+| `/qn`         | Enables silent mode (no user interaction) |
+| `/i`          | Specifies the path to the MSI installer |
+| `TOKEN=`      | Claim token from your Netdata Cloud Space |
+| `ROOMS=`      | Comma-separated Room IDs for your node |
+| `PROXY=`      | (Optional) Proxy address if required |
+| `INSECURE=1`  | (Optional) Allow insecure connections (hostname verification disabled) |
+
+---
+
+### Example Command
+
+Install Netdata and connect to your Cloud Space:
 
 ```bash
 msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 ```
 
-Replace `<YOUR_TOKEN>` with your Netdata Cloud Space claim token and `<YOUR_ROOMS>` with your Room ID(s).
+Replace:
 
-You can also download and install Netdata in one step with the following command:
+- `<YOUR_TOKEN>` with your claim token  
+- `<YOUR_ROOMS>` with your Room ID(s)
+
+---
+
+### Download & Install in One Command (PowerShell)
 
 ```powershell
 $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile "netdata-x64.msi"; msiexec /qn /i netdata-x64.msi TOKEN=<YOUR_TOKEN> ROOMS=<YOUR_ROOMS>
 ```
 
-## Graphical User Interface (GUI) Installation
+---
 
-1. **Double-click** the MSI installer to begin the installation process.
-2. **Grant Administrator Privileges**: You will be prompted to provide administrator permissions to install the Netdata service.
+## 🖥️ Graphical Installation (GUI)
 
-After installation, you can access your Netdata dashboard by opening your browser and going to `localhost:19999`.
+1. Download the `.msi` installer.  
+2. Double-click to run it.  
+3. Grant Administrator privileges when prompted.  
+4. Complete the setup wizard.
+
+---
+
+## Access Netdata Dashboard
+
+After installation, open your browser and go to:
+
+```
+http://localhost:19999
+```
+
+---
+
+## License Information
+
+By using silent installation, you agree to:
+
+- [GPL-3 License](https://raw.githubusercontent.com/netdata/netdata/refs/heads/master/LICENSE) — Netdata Agent  
+- [NCUL1 License](https://app.netdata.cloud/LICENSE.txt) — Netdata Web Interface
