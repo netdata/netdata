@@ -1,11 +1,6 @@
 [submodule "aclk/aclk-schemas"]
 	path = src/aclk/aclk-schemas
 	url = https://github.com/netdata/aclk-schemas.git
-[submodule "ml/kmeans/dlib"]
-	path = src/ml/dlib
-	url = https://github.com/davisking/dlib.git
-	shallow = true
-	ignore = dirty
 [submodule "src/web/server/h2o/libh2o"]
 	path = src/web/server/h2o/libh2o
 	url = https://github.com/h2o/h2o.git

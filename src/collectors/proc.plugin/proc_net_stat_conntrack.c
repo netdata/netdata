@@ -6,13 +6,19 @@
 #define RRD_TYPE_NET_STAT_CONNTRACK     "conntrack"
 #define PLUGIN_PROC_MODULE_CONNTRACK_NAME "/proc/net/stat/nf_conntrack"
 
+static const RRDVAR_ACQUIRED *rrdvar_max = NULL;
+
+void proc_net_stat_conntrack_cleanup(void) {
+    if(rrdvar_max)
+        rrdvar_host_variable_release(localhost, rrdvar_max);
+}
+
 int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int do_sockets = -1, do_new = -1, do_changes = -1, do_expect = -1, do_search = -1, do_errors = -1;
     static usec_t get_max_every = 10 * USEC_PER_SEC, usec_since_last_max = 0;
     static int read_full = 1;
     static const char *nf_conntrack_filename, *nf_conntrack_count_filename, *nf_conntrack_max_filename;
-    static const RRDVAR_ACQUIRED *rrdvar_max = NULL;
 
     unsigned long long aentries = 0, asearched = 0, afound = 0, anew = 0, ainvalid = 0, aignore = 0, adelete = 0, adelete_list = 0,
             ainsert = 0, ainsert_failed = 0, adrop = 0, aearly_drop = 0, aicmp_error = 0, aexpect_new = 0, aexpect_create = 0, aexpect_delete = 0, asearch_restart = 0;

@@ -76,7 +76,6 @@ static void copy_and_clean_thread_name_if_empty(DAEMON_STATUS_FILE *ds, const ch
         *p = '\0';
 }
 
-#define STACK_TRACE_INFO_PREFIX "info: "
 static bool stack_trace_is_empty(DAEMON_STATUS_FILE *ds) {
     return !ds->fatal.stack_trace[0] || strncmp(ds->fatal.stack_trace, STACK_TRACE_INFO_PREFIX, strlen(STACK_TRACE_INFO_PREFIX)) == 0;
 }
@@ -212,6 +211,8 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string_or_empty(wb, "cloud_instance", ds->cloud_instance_type);
             buffer_json_member_add_string_or_empty(wb, "cloud_region", ds->cloud_instance_region);
         }
+        
+        buffer_json_member_add_uint64(wb, "system_cpus", ds->system_cpus);
 
         buffer_json_member_add_object(wb, "boot");
         {
@@ -477,6 +478,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "virtualization", ds->virtualization, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "container", ds->container, error, required_v1);
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->boottime, error, required_v1);
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "system_cpus", ds->system_cpus, error, required_v27);
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "boot", error, required_v1, {
             JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->boot_id.uuid, error, required_v1);
@@ -792,6 +794,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
     session_status.memory = os_system_memory(true);
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
+    session_status.system_cpus = os_get_system_cpus();
     
     // Collect metrics metadata statistics
     session_status.metrics_metadata = rrdstats_metadata_collect();
@@ -1051,8 +1054,14 @@ void daemon_status_file_init(void) {
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
     status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status);
+
+    // fill missing information on older versions of the status file
+
     if(last_session_status.v <= 26)
         fill_dmi_info(&last_session_status);
+    
+    if(last_session_status.v <= 27)
+        last_session_status.system_cpus = os_get_system_cpus();
 
     daemon_status_file_migrate_once();
 }
@@ -1522,7 +1531,7 @@ void daemon_status_file_shutdown_timeout(BUFFER *trace) {
     // keep the spinlock locked, to prevent further steps updating the status
 }
 
-void daemon_status_file_shutdown_step(const char *step) {
+void daemon_status_file_shutdown_step(const char *step, const char *step_timings) {
     if(session_status.fatal.filename[0] || !spinlock_trylock(&shutdown_timeout_spinlock))
         // we have a fatal logged
         return;
@@ -1531,6 +1540,9 @@ void daemon_status_file_shutdown_step(const char *step) {
         snprintfz(session_status.fatal.function, sizeof(session_status.fatal.function), "shutdown(%s)", step);
     else
         session_status.fatal.function[0] = '\0';
+
+    if(step_timings && *step_timings && stack_trace_is_empty(&session_status))
+        safecpy(session_status.fatal.stack_trace, step_timings);
 
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 

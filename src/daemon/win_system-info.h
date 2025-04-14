@@ -9,6 +9,7 @@
 #define NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN "unknown"
 #define NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE "none"
 #define NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE "false"
+#define NETDATA_WIN_DETECTION_METHOD "windows-api"
 
 #ifdef OS_WINDOWS
 #include "windows.h"

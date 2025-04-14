@@ -23,4 +23,8 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
 
 bool command_argument_sanitization_tests();
 
+#ifdef OS_WINDOWS
+int perflibnamestest_main(void);
+#endif
+
 #endif /* NETDATA_UNIT_TEST_H */

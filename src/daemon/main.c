@@ -256,7 +256,7 @@ int netdata_main(int argc, char **argv) {
 
     int i;
     int config_loaded = 0;
-    bool close_open_fds = true;
+    bool close_open_fds = true; (void)close_open_fds;
     size_t default_stacksize;
     const char *user = NULL;
 
@@ -404,6 +404,9 @@ int netdata_main(int argc, char **argv) {
                             if (dyncfg_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
+#ifdef OS_WINDOWS
+                            if (perflibnamestest_main()) return 1;
+#endif
                             sqlite_library_shutdown();
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
@@ -454,6 +457,10 @@ int netdata_main(int argc, char **argv) {
 #ifdef OS_WINDOWS
                         else if(strcmp(optarg, "perflibdump") == 0) {
                             return windows_perflib_dump(optind + 1 > argc ? NULL : argv[optind]);
+                        }
+                        else if(strcmp(optarg, "perflibnamestest") == 0) {
+                            unittest_running = true;
+                            return perflibnamestest_main();
                         }
 #endif
 #ifdef ENABLE_DBENGINE

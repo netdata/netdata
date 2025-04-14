@@ -1121,6 +1121,9 @@ jobs:
         id: test-agent
         if: needs.file-check.outputs.run == 'true'
         run: |
+          echo "::group::Netdata buildinfo"
+          /usr/local/netdata/usr/sbin/netdata -W buildinfo
+          echo "::endgroup::"
           /usr/local/netdata/usr/sbin/netdata -D > ./netdata.log 2>&1 &
           ./packaging/runtime-check.sh
       - name: Failure Notification

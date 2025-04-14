@@ -99,6 +99,7 @@ typedef struct daemon_status_file {
     char cloud_instance_type[32];
     char cloud_instance_region[32];
     bool read_system_info;
+    size_t system_cpus;
 
     DMI_INFO hw;
 
@@ -145,7 +146,7 @@ bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds);
 bool daemon_status_file_was_incomplete_shutdown(void);
 
 void daemon_status_file_startup_step(const char *step);
-void daemon_status_file_shutdown_step(const char *step);
+void daemon_status_file_shutdown_step(const char *step, const char *step_timings);
 void daemon_status_file_shutdown_timeout(BUFFER *trace);
 
 void daemon_status_file_init(void);

@@ -13,6 +13,15 @@
 #include "sentry-native/sentry-native.h"
 #endif
 
+// External configuration structures that need cleanup
+extern struct config netdata_config;
+extern struct config cloud_config;
+extern void inicfg_free(struct config *root);
+// Functions to free various configurations
+extern void claim_config_free(void);
+extern void stream_config_free(void);
+extern void exporting_config_free(void);
+
 static bool abort_on_fatal = true;
 
 void abort_on_fatal_disable(void) {
@@ -328,9 +337,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_shutdown_end();
     watcher_thread_stop();
 
-    daemon_status_file_shutdown_step(NULL);
-    daemon_status_file_update_status(DAEMON_STATUS_EXITED);
-
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\n");
 
@@ -376,6 +382,16 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
             uuid_referenced);
 
+    fprintf(stderr, "Freeing configuration resources...\n");
+    claim_config_free();
+    exporting_config_free();
+    stream_config_free();
+    inicfg_free(&cloud_config);
+    inicfg_free(&netdata_config);
+    
+    fprintf(stderr, "Cleaning up worker utilization...\n");
+    worker_utilization_cleanup();
+    
     size_t strings_referenced = string_destroy();
     if(strings_referenced)
         fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
