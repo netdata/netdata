@@ -36,12 +36,12 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibADFS = yes
 ```
 
-### MSSQL
+## Configuration
 
 To collect certain metrics for [Microsoft SQL Server](https://www.microsoft.com/en-us/sql-server),
-Netdata needs access to internal server data.
+Netdata needs access to internal server data. To collect this data, you need to configure both your server and Netdata.
 
-#### Windows Defender Firewall with Advanced Security
+### Windows Defender Firewall with Advanced Security
 
 To connect to your SQL Server, Netdata uses TCP port 1433 (or any other configured port).
 This port is typically blocked by Windows Defender, so you must allow access before proceeding:
@@ -56,7 +56,7 @@ This port is typically blocked by Windows Defender, so you must allow access bef
 7. Finally, provide a `Name` and an optional `Description` for the new rule,
    then click `Finish`.
 
-#### Microsoft SQL Server (Configuration)
+### Microsoft SQL Server (Configuration)
 
 After enabling access through the firewall, you will need to configure your SQL Server instance to accept TCP
 connections:
@@ -70,7 +70,7 @@ connections:
    - Enter a value in the `TCP Port` field. By default, SQL Server uses `1433`.
 6. Finally, select `SQL Server Services`, and restart your SQL Server instance.
 
-#### Microsoft SQL Server (User)
+### Microsoft SQL Server (User)
 
 Netdata requires a user with the `VIEW SERVER STATE` permission to collect data from the server.
 Once the user is created, it must be added to the databases.
@@ -118,7 +118,7 @@ If you want to allow connections using SQL Server authentication, you must modif
 5. Click `OK`.
 6. Finally, right-click your server, and select`Restart`.
 
-#### Netdata Configuration
+### Netdata Configuration
 
 Now that the user has been created inside your server, update `netdata.conf` by adding the following section:
 
@@ -135,3 +135,14 @@ Now that the user has been created inside your server, update `netdata.conf` by 
 For additional information on how to set these parameters, refer to the
 [Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16)
 
+When configuring Netdata to access SQL Server, some errors may occur. You can check your configuration using the
+Microsoft Event Viewer by looking for entries that begin with `MSSQL server error using the handle`.
+
+#### Data source name not found and no default driver
+
+This error occurs when the driver is not specified correctly. You can check the available drivers by following
+these steps:
+
+- Access `ODBC Data Sources`.
+- Go to `Drivers` tab.
+- Look for `Name` of the `ODBC` or `SQL Server` driver .
