@@ -780,27 +780,32 @@ static int _optimized_add(struct header_buffer *buf, void *data, size_t data_len
     return 0;
 }
 
-#define TRY_GENERATE_MESSAGE(generator_function, ...) \
-    int rc = generator_function(&client->main_buffer, ##__VA_ARGS__); \
-    if (rc == MQTT_NG_MSGGEN_BUFFER_OOM) { \
-        LOCK_HDR_BUFFER(&client->main_buffer); \
-        transaction_buffer_garbage_collect((&client->main_buffer)); \
-        UNLOCK_HDR_BUFFER(&client->main_buffer); \
-        rc = generator_function(&client->main_buffer, ##__VA_ARGS__); \
-        if (rc == MQTT_NG_MSGGEN_BUFFER_OOM && client->max_mem_bytes) { \
-            LOCK_HDR_BUFFER(&client->main_buffer); \
-            transaction_buffer_grow((&client->main_buffer),GROWTH_FACTOR, client->max_mem_bytes); \
-            UNLOCK_HDR_BUFFER(&client->main_buffer); \
-            rc = generator_function(&client->main_buffer, ##__VA_ARGS__); \
-        } \
-        if (rc == MQTT_NG_MSGGEN_BUFFER_OOM) \
-            nd_log(NDLS_DAEMON, NDLP_ERR, "%s failed to generate message due to insufficient buffer space (line %d)", __FUNCTION__, __LINE__); \
-    } \
-    if (rc == MQTT_NG_MSGGEN_OK) { \
-        spinlock_lock(&client->stats_spinlock); \
-        client->stats.tx_messages_queued++; \
-        spinlock_unlock(&client->stats_spinlock); \
-    } \
+#define TRY_GENERATE_MESSAGE(generator_function, ...)                                                                  \
+    int rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                                  \
+    if (rc == MQTT_NG_MSGGEN_BUFFER_OOM) {                                                                             \
+        LOCK_HDR_BUFFER(&client->main_buffer);                                                                         \
+        transaction_buffer_garbage_collect((&client->main_buffer));                                                    \
+        UNLOCK_HDR_BUFFER(&client->main_buffer);                                                                       \
+        rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                                  \
+        if (rc == MQTT_NG_MSGGEN_BUFFER_OOM && client->max_mem_bytes) {                                                \
+            LOCK_HDR_BUFFER(&client->main_buffer);                                                                     \
+            transaction_buffer_grow((&client->main_buffer), GROWTH_FACTOR, client->max_mem_bytes);                     \
+            UNLOCK_HDR_BUFFER(&client->main_buffer);                                                                   \
+            rc = generator_function(&client->main_buffer, ##__VA_ARGS__);                                              \
+        }                                                                                                              \
+        if (rc == MQTT_NG_MSGGEN_BUFFER_OOM)                                                                           \
+            nd_log(                                                                                                    \
+                NDLS_DAEMON,                                                                                           \
+                NDLP_ERR,                                                                                              \
+                "%s failed to generate message due to insufficient buffer space (line %d)",                            \
+                __FUNCTION__,                                                                                          \
+                __LINE__);                                                                                             \
+    }                                                                                                                  \
+    if (rc == MQTT_NG_MSGGEN_OK) {                                                                                     \
+        spinlock_lock(&client->stats_spinlock);                                                                        \
+        client->stats.tx_messages_queued++;                                                                            \
+        spinlock_unlock(&client->stats_spinlock);                                                                      \
+    }                                                                                                                  \
     return rc;
 
 mqtt_msg_data mqtt_ng_generate_connect(struct transaction_buffer *trx_buf,
@@ -1123,6 +1128,8 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
 
     if (client->max_msg_size && PUBLISH_SP_SIZE + mqtt_ng_publish_size(topic, msg_len, topic_id) > client->max_msg_size) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Message too big for server: %zu", msg_len);
+        if (msg_free)
+            msg_free(msg);
         return MQTT_NG_MSGGEN_MSG_TOO_BIG;
     }
 
@@ -1298,8 +1305,8 @@ int mqtt_ng_ping(struct mqtt_ng_client *client)
 #define MQTT_NG_CLIENT_NOT_IMPL_YET           -3
 #define MQTT_NG_CLIENT_INTERNAL_ERROR         -5
 
-#define BUF_READ_CHECK_AT_LEAST(buf, x)                 \
-    if (rbuf_bytes_available(buf) < (x)) \
+#define BUF_READ_CHECK_AT_LEAST(buf, x)                                                                                \
+    if (rbuf_bytes_available(buf) < (x))                                                                               \
         return MQTT_NG_CLIENT_NEED_MORE_BYTES;
 
 #define vbi_parser_reset_ctx(ctx) memset(ctx, 0, sizeof(struct mqtt_vbi_parser_ctx))
