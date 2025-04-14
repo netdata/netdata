@@ -1738,10 +1738,10 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
     static bool initialized = false;
 
     if (unlikely(!initialized)) {
+        netdata_read_config_options();
         if (initialize())
             return -1;
 
-        netdata_read_config_options();
         initialized = true;
     }
 
