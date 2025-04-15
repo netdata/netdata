@@ -7,6 +7,7 @@
 #include "rrdlabels.h"
 
 struct pattern_array {
+    Word_t key_count;
     Pvoid_t JudyL;
 };
 
