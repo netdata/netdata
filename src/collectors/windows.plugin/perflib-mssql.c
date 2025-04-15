@@ -67,8 +67,6 @@ struct mssql_instance {
     RRDSET *st_sql_errors;
     RRDDIM *rd_sql_errors;
 
-    RRDSET *st_lockWait;
-    RRDSET *st_deadLocks;
     DICTIONARY *locks_instances;
 
     DICTIONARY *databases;
@@ -111,7 +109,10 @@ struct mssql_lock_instance {
     COUNTER_DATA lockWait;
     COUNTER_DATA deadLocks;
 
+    RRDSET *st_lockWait;
     RRDDIM *rd_lockWait;
+
+    RRDSET *st_deadLocks;
     RRDDIM *rd_deadLocks;
 
     uint32_t updated;
@@ -778,12 +779,12 @@ static void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
 
 int dict_mssql_locks_wait_charts(struct mssql_lock_instance *mli, int update_every, const char *instance)
 {
-    if (!mli->parent->st_lockWait) {
+    if (!mli->st_lockWait) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_locks_lock_wait", mli->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->parent->st_lockWait = rrdset_create_localhost(
+        mli->st_lockWait = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -797,25 +798,25 @@ int dict_mssql_locks_wait_charts(struct mssql_lock_instance *mli, int update_eve
             update_every,
             RRDSET_TYPE_LINE);
 
-        mli->rd_lockWait = rrddim_add(mli->parent->st_lockWait, instance, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mli->rd_lockWait = rrddim_add(mli->st_lockWait, instance, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(
-            mli->parent->st_lockWait->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
+            mli->st_lockWait->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-        mli->parent->st_lockWait, mli->rd_lockWait, (collected_number)(mli->lockWait.current.Data));
-    rrdset_done(mli->parent->st_lockWait);
+        mli->st_lockWait, mli->rd_lockWait, (collected_number)(mli->lockWait.current.Data));
+    rrdset_done(mli->st_lockWait);
 }
 
 int dict_mssql_dead_locks_charts(struct mssql_lock_instance *mli, int update_every, const char *instance)
 {
-    if (!mli->parent->st_deadLocks) {
+    if (!mli->st_deadLocks) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_locks_deadlocks", mli->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->parent->st_deadLocks = rrdset_create_localhost(
+        mli->st_deadLocks = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -829,15 +830,15 @@ int dict_mssql_dead_locks_charts(struct mssql_lock_instance *mli, int update_eve
             update_every,
             RRDSET_TYPE_LINE);
 
-        mli->rd_deadLocks = rrddim_add(mli->parent->st_deadLocks, instance, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mli->rd_deadLocks = rrddim_add(mli->st_deadLocks, instance, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(
-            mli->parent->st_deadLocks->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
+            mli->st_deadLocks->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-        mli->parent->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);
-    rrdset_done(mli->parent->st_deadLocks);
+        mli->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);
+    rrdset_done(mli->st_deadLocks);
 
     return 1;
 }
