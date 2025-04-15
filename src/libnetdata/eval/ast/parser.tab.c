@@ -69,9 +69,7 @@
 /* First part of user prologue.  */
 #line 1 "parser.y"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "libnetdata/libnetdata.h"
 #include "ast.h"
 
 extern int yylex();
@@ -79,9 +77,10 @@ extern char* yytext;
 extern FILE* yyin;
 
 void yyerror(const char *s);
-ASTNode* ast_root = NULL;
+static __thread ASTNode* ast_root = NULL;
 
-#line 85 "parser.tab.c"
+
+#line 84 "parser.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -530,9 +529,9 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int8 yyrline[] =
 {
-       0,    51,    51,    56,    64,    65,    66,    67,    68,    69,
-      70,    71,    72,    73,    74,    75,    76,    77,    78,    79,
-      80,    81,    82,    83,    84,    87,    91,    92,    97
+       0,    50,    50,    55,    63,    64,    65,    66,    67,    68,
+      69,    70,    71,    72,    73,    74,    75,    76,    77,    78,
+      79,    80,    81,    82,    83,    86,    90,    91,    96
 };
 #endif
 
@@ -1145,187 +1144,187 @@ yyreduce:
   switch (yyn)
     {
   case 2: /* program: expr  */
-#line 51 "parser.y"
+#line 50 "parser.y"
                                 { 
                                   ast_root = (yyvsp[0].node); 
                                   printf("AST built successfully\n");
                                   (yyval.node) = (yyvsp[0].node);
                                 }
-#line 1155 "parser.tab.c"
+#line 1154 "parser.tab.c"
     break;
 
   case 3: /* program: VARIABLE ASSIGN expr  */
-#line 56 "parser.y"
+#line 55 "parser.y"
                                 { 
                                   ast_root = create_assignment_node((yyvsp[-2].sval), (yyvsp[0].node));
                                   printf("Assignment AST built successfully\n");
                                   (yyval.node) = ast_root;
                                 }
-#line 1165 "parser.tab.c"
+#line 1164 "parser.tab.c"
     break;
 
   case 4: /* expr: expr PLUS expr  */
-#line 64 "parser.y"
+#line 63 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_ADD, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1171 "parser.tab.c"
+#line 1170 "parser.tab.c"
     break;
 
   case 5: /* expr: expr MINUS expr  */
-#line 65 "parser.y"
+#line 64 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_SUB, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1177 "parser.tab.c"
+#line 1176 "parser.tab.c"
     break;
 
   case 6: /* expr: expr MULTIPLY expr  */
-#line 66 "parser.y"
+#line 65 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_MUL, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1183 "parser.tab.c"
+#line 1182 "parser.tab.c"
     break;
 
   case 7: /* expr: expr DIVIDE expr  */
-#line 67 "parser.y"
+#line 66 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_DIV, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1189 "parser.tab.c"
+#line 1188 "parser.tab.c"
     break;
 
   case 8: /* expr: expr MODULO expr  */
-#line 68 "parser.y"
+#line 67 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_MOD, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1195 "parser.tab.c"
+#line 1194 "parser.tab.c"
     break;
 
   case 9: /* expr: expr POWER expr  */
-#line 69 "parser.y"
+#line 68 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_POW, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1201 "parser.tab.c"
+#line 1200 "parser.tab.c"
     break;
 
   case 10: /* expr: expr EQ expr  */
-#line 70 "parser.y"
+#line 69 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_EQ, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1207 "parser.tab.c"
+#line 1206 "parser.tab.c"
     break;
 
   case 11: /* expr: expr NE expr  */
-#line 71 "parser.y"
+#line 70 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_NE, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1213 "parser.tab.c"
+#line 1212 "parser.tab.c"
     break;
 
   case 12: /* expr: expr LT expr  */
-#line 72 "parser.y"
+#line 71 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_LT, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1219 "parser.tab.c"
+#line 1218 "parser.tab.c"
     break;
 
   case 13: /* expr: expr LE expr  */
-#line 73 "parser.y"
+#line 72 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_LE, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1225 "parser.tab.c"
+#line 1224 "parser.tab.c"
     break;
 
   case 14: /* expr: expr GT expr  */
-#line 74 "parser.y"
+#line 73 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_GT, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1231 "parser.tab.c"
+#line 1230 "parser.tab.c"
     break;
 
   case 15: /* expr: expr GE expr  */
-#line 75 "parser.y"
+#line 74 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_GE, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1237 "parser.tab.c"
+#line 1236 "parser.tab.c"
     break;
 
   case 16: /* expr: expr AND expr  */
-#line 76 "parser.y"
+#line 75 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_AND, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1243 "parser.tab.c"
+#line 1242 "parser.tab.c"
     break;
 
   case 17: /* expr: expr OR expr  */
-#line 77 "parser.y"
+#line 76 "parser.y"
                                 { (yyval.node) = create_binary_op_node(OP_OR, (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1249 "parser.tab.c"
+#line 1248 "parser.tab.c"
     break;
 
   case 18: /* expr: NOT expr  */
-#line 78 "parser.y"
+#line 77 "parser.y"
                                 { (yyval.node) = create_unary_op_node(OP_NOT, (yyvsp[0].node)); }
-#line 1255 "parser.tab.c"
+#line 1254 "parser.tab.c"
     break;
 
   case 19: /* expr: MINUS expr  */
-#line 79 "parser.y"
+#line 78 "parser.y"
                                 { (yyval.node) = create_unary_op_node(OP_NEG, (yyvsp[0].node)); }
-#line 1261 "parser.tab.c"
+#line 1260 "parser.tab.c"
     break;
 
   case 20: /* expr: PLUS expr  */
-#line 80 "parser.y"
+#line 79 "parser.y"
                                 { (yyval.node) = (yyvsp[0].node); }
-#line 1267 "parser.tab.c"
+#line 1266 "parser.tab.c"
     break;
 
   case 21: /* expr: LPAREN expr RPAREN  */
-#line 81 "parser.y"
+#line 80 "parser.y"
                                 { (yyval.node) = (yyvsp[-1].node); }
-#line 1273 "parser.tab.c"
+#line 1272 "parser.tab.c"
     break;
 
   case 22: /* expr: NUMBER  */
-#line 82 "parser.y"
+#line 81 "parser.y"
                                 { (yyval.node) = create_literal_node((yyvsp[0].dval)); }
-#line 1279 "parser.tab.c"
+#line 1278 "parser.tab.c"
     break;
 
   case 23: /* expr: VARIABLE  */
-#line 83 "parser.y"
+#line 82 "parser.y"
                                 { (yyval.node) = create_variable_node((yyvsp[0].sval)); }
-#line 1285 "parser.tab.c"
+#line 1284 "parser.tab.c"
     break;
 
   case 24: /* expr: FUNCTION LPAREN arg_list RPAREN  */
-#line 84 "parser.y"
+#line 83 "parser.y"
                                       { 
-                                  (yyval.node) = create_function_call_node((yyvsp[-3].sval), (yyvsp[-1].arg_list)); 
+                                  (yyval.node) = create_function_call_node((yyvsp[-3].sval), (yyvsp[-1].arg_list));
                                 }
-#line 1293 "parser.tab.c"
+#line 1292 "parser.tab.c"
     break;
 
   case 25: /* expr: expr QMARK expr COLON expr  */
-#line 87 "parser.y"
+#line 86 "parser.y"
                                  { (yyval.node) = create_ternary_op_node((yyvsp[-4].node), (yyvsp[-2].node), (yyvsp[0].node)); }
-#line 1299 "parser.tab.c"
+#line 1298 "parser.tab.c"
     break;
 
   case 26: /* arg_list: %empty  */
-#line 91 "parser.y"
+#line 90 "parser.y"
                                 { (yyval.arg_list).args = NULL; (yyval.arg_list).count = 0; }
-#line 1305 "parser.tab.c"
+#line 1304 "parser.tab.c"
     break;
 
   case 27: /* arg_list: expr  */
-#line 92 "parser.y"
+#line 91 "parser.y"
                                 { 
-                                  (yyval.arg_list).args = malloc(sizeof(ASTNode*)); 
-                                  (yyval.arg_list).args[0] = (yyvsp[0].node); 
+                                  (yyval.arg_list).args = create_ast_nodes_array(NULL, 1);
+                                  (yyval.arg_list).args[0] = (yyvsp[0].node);
                                   (yyval.arg_list).count = 1; 
                                 }
-#line 1315 "parser.tab.c"
+#line 1314 "parser.tab.c"
     break;
 
   case 28: /* arg_list: arg_list COMMA expr  */
-#line 97 "parser.y"
+#line 96 "parser.y"
                                 { 
                                   (yyval.arg_list).count = (yyvsp[-2].arg_list).count + 1;
-                                  (yyval.arg_list).args = realloc((yyvsp[-2].arg_list).args, (yyval.arg_list).count * sizeof(ASTNode*));
+                                  (yyval.arg_list).args = create_ast_nodes_array((yyvsp[-2].arg_list).args, (yyval.arg_list).count);
                                   (yyval.arg_list).args[(yyval.arg_list).count - 1] = (yyvsp[0].node);
                                 }
-#line 1325 "parser.tab.c"
+#line 1324 "parser.tab.c"
     break;
 
 
-#line 1329 "parser.tab.c"
+#line 1328 "parser.tab.c"
 
       default: break;
     }
@@ -1518,7 +1517,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 104 "parser.y"
+#line 103 "parser.y"
 
 
 void yyerror(const char *s) {
@@ -1540,7 +1539,7 @@ int main(int argc, char **argv) {
     if (result == 0 && ast_root != NULL) {
         printf("Printing AST:\n");
         print_ast(ast_root, 0);
-        free_ast(ast_root);
+        eval_ast_node_free(ast_root);
     }
     
     return result;
@@ -1553,7 +1552,7 @@ extern YY_BUFFER_STATE yy_scan_buffer(char *, size_t);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
 /* Parse a string and return the AST */
-ASTNode* parse_string(const char* input) {
+ASTNode* eval_ast_parse_string(const char* input) {
     void* buffer;
     ASTNode* result = NULL;
     
@@ -1567,10 +1566,11 @@ ASTNode* parse_string(const char* input) {
     if (yyparse() == 0 && ast_root != NULL) {
         result = ast_root;
     }
+    else
+        eval_ast_node_free(ast_root);
     
     /* Clean up */
     yy_delete_buffer(buffer);
     
     return result;
 }
-

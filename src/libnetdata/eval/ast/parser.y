@@ -1,7 +1,5 @@
 %{
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "libnetdata/libnetdata.h"
 #include "ast.h"
 
 extern int yylex();
@@ -9,7 +7,8 @@ extern char* yytext;
 extern FILE* yyin;
 
 void yyerror(const char *s);
-ASTNode* ast_root = NULL;
+static __thread ASTNode* ast_root = NULL;
+
 %}
 
 %union {
@@ -82,7 +81,7 @@ expr
     | NUMBER                    { $$ = create_literal_node($1); }
     | VARIABLE                  { $$ = create_variable_node($1); }
     | FUNCTION LPAREN arg_list RPAREN { 
-                                  $$ = create_function_call_node($1, $3); 
+                                  $$ = create_function_call_node($1, $3);
                                 }
     | expr QMARK expr COLON expr { $$ = create_ternary_op_node($1, $3, $5); }
     ;
@@ -90,13 +89,13 @@ expr
 arg_list
     : /* empty */               { $$.args = NULL; $$.count = 0; }
     | expr                      { 
-                                  $$.args = malloc(sizeof(ASTNode*)); 
-                                  $$.args[0] = $1; 
+                                  $$.args = create_ast_nodes_array(NULL, 1);
+                                  $$.args[0] = $1;
                                   $$.count = 1; 
                                 }
     | arg_list COMMA expr       { 
                                   $$.count = $1.count + 1;
-                                  $$.args = realloc($1.args, $$.count * sizeof(ASTNode*));
+                                  $$.args = create_ast_nodes_array($1.args, $$.count);
                                   $$.args[$$.count - 1] = $3;
                                 }
     ;
@@ -122,7 +121,7 @@ int main(int argc, char **argv) {
     if (result == 0 && ast_root != NULL) {
         printf("Printing AST:\n");
         print_ast(ast_root, 0);
-        free_ast(ast_root);
+        eval_ast_node_free(ast_root);
     }
     
     return result;
@@ -135,7 +134,7 @@ extern YY_BUFFER_STATE yy_scan_buffer(char *, size_t);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
 /* Parse a string and return the AST */
-ASTNode* parse_string(const char* input) {
+ASTNode* eval_ast_parse_string(const char* input) {
     void* buffer;
     ASTNode* result = NULL;
     
@@ -149,10 +148,12 @@ ASTNode* parse_string(const char* input) {
     if (yyparse() == 0 && ast_root != NULL) {
         result = ast_root;
     }
+    else {
+        eval_ast_node_free(ast_root);
+    }
     
     /* Clean up */
     yy_delete_buffer(buffer);
     
     return result;
 }
-

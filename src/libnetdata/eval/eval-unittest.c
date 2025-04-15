@@ -611,7 +611,6 @@ static TestGroup test_groups[] = {
     {"Crash Tests", crash_tests, ARRAY_SIZE(crash_tests)},
 };
 
-ASTNode *parse_string(const char *input);
 void eval_unittest_ast(void) {
     for (size_t i = 0; i < ARRAY_SIZE(test_groups); i++) {
         TestGroup *group = &test_groups[i];
@@ -621,13 +620,12 @@ void eval_unittest_ast(void) {
         for (int j = 0; j < group->test_count; j++) {
             TestCase *tc = &group->test_cases[j];
             printf("Test %d: %s\n", j + 1, tc->expression);
-            ASTNode *ast = parse_string(tc->expression);
+            ASTNode *ast = parse_expression_ast(tc->expression);
 
             if (ast != NULL) {
                 printf("AST Structure:\n");
                 print_ast(ast, 2);
-
-                free_ast(ast);
+                eval_ast_node_free(ast);
             } else {
                 printf("Failed to parse expression\n");
             }

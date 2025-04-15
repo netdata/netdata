@@ -86,7 +86,13 @@ ASTNode *create_unary_op_node(UnaryOp op, ASTNode *operand);
 ASTNode *create_function_call_node(char *name, ArgList args);
 ASTNode *create_ternary_op_node(ASTNode *condition, ASTNode *true_expr, ASTNode *false_expr);
 ASTNode *create_assignment_node(char *variable, ASTNode *value);
-void free_ast(ASTNode *node);
+
+ASTNode *create_ast_node(void);
+ASTNode **create_ast_nodes_array(ASTNode **nodes, int count);
+
+void eval_ast_node_free(ASTNode *node);
 void print_ast(ASTNode *node, int indent);
+
+ASTNode *parse_expression_ast(const char *expression);
 
 #endif /* AST_H */
