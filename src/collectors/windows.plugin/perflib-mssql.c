@@ -807,7 +807,7 @@ void dict_mssql_locks_wait_dimension(struct mssql_instance *mi, struct mssql_loc
 {
     if (!mli->rd_lockWait) {
         char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_resource_%s_locks_lock_wait", mi->instanceID, mli->resourceID);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "%s", mli->resourceID);
         netdata_fix_chart_name(id);
 
         mli->rd_lockWait = rrddim_add(mi->st_lockWait, id, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -846,7 +846,7 @@ void dict_mssql_deadlocks_dimension(struct mssql_instance *mi, struct mssql_lock
 {
     if (!mli->rd_deadLocks) {
         char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_resource_%s_locks_deadlocks", mi->instanceID, mli->resourceID);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "%s", mli->resourceID);
         netdata_fix_chart_name(id);
 
         mli->rd_deadLocks = rrddim_add(mi->st_deadLocks, id, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
