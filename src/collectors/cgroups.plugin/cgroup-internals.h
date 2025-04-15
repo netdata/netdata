@@ -394,6 +394,8 @@ int cgroup_function_cgroup_top(BUFFER *wb, const char *function, BUFFER *payload
 int cgroup_function_systemd_top(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 
 void cgroup_netdev_link_init(void);
+void cgroup_netdev_link_destroy(void);
+
 const DICTIONARY_ITEM *cgroup_netdev_get(struct cgroup *cg);
 void cgroup_netdev_delete(struct cgroup *cg);
 

@@ -339,6 +339,11 @@ void bearer_tokens_init(void) {
     bearer_tokens_load_from_disk();
 }
 
+void bearer_tokens_destroy(void) {
+    dictionary_destroy(netdata_authorized_bearers);
+    netdata_authorized_bearers = NULL;
+}
+
 bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
     if(!web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_BEARER) || dst_len != UUID_STR_LEN)
         return false;

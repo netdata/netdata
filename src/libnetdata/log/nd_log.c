@@ -6,6 +6,7 @@
 
 #include "../libnetdata.h"
 #include "nd_log-internals.h"
+#include "../stacktrace/stacktrace.h"
 
 const char *program_name = "";
 uint64_t debug_flags = 0;

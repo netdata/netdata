@@ -10,8 +10,17 @@ struct cgroup_netdev_link {
 
 static DICTIONARY *cgroup_netdev_link_dict = NULL;
 
+void netdev_renames_destroy(void);
+
 void cgroup_netdev_link_init(void) {
     cgroup_netdev_link_dict = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE|DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, sizeof(struct cgroup_netdev_link));
+}
+
+void cgroup_netdev_link_destroy(void) {
+    dictionary_destroy(cgroup_netdev_link_dict);
+    cgroup_netdev_link_dict = NULL;
+
+    netdev_renames_destroy();
 }
 
 const DICTIONARY_ITEM *cgroup_netdev_get(struct cgroup *cg) {

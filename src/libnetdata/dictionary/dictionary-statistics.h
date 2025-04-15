@@ -78,11 +78,8 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
         entries = __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_RELAXED);
     }
 
-    internal_fatal(entries == 0,
-                   "DICT: negative number of entries in dictionary created from %s() (%zu@%s)",
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
+    dictionary_internal_fatal(entries == 0, dict,
+                   "DICT: negative number of entries in dictionary");
 }
 
 static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict) {
@@ -188,12 +185,9 @@ static inline void DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
     else
         referenced_items = __atomic_sub_fetch(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
 
-    internal_fatal(referenced_items < 0,
-                   "DICT: negative number of referenced items (%ld) in dictionary created from %s() (%zu@%s)",
-                   referenced_items,
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
+    dictionary_internal_fatal(referenced_items < 0, dict,
+                   "DICT: negative number of referenced items (%ld) in dictionary",
+                   referenced_items);
 }
 
 static inline void DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {

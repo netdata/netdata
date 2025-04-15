@@ -404,6 +404,7 @@ int netdata_main(int argc, char **argv) {
                             if (dyncfg_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
+                            if (stacktrace_unittest()) return 1;
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
 #endif
@@ -453,6 +454,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "uuidtest") == 0) {
                             unittest_running = true;
                             return uuid_unittest();
+                        }
+                        else if(strcmp(optarg, "stacktracetest") == 0) {
+                            unittest_running = true;
+                            return stacktrace_unittest();
                         }
 #ifdef OS_WINDOWS
                         else if(strcmp(optarg, "perflibdump") == 0) {

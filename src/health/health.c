@@ -178,6 +178,22 @@ void health_plugin_destroy(void) {
         health_globals.prototypes.dict = NULL;
     }
 
+    // Free allocated strings
+    string_freez(health_globals.config.default_exec);
+    string_freez(health_globals.config.default_recipient);
+    string_freez(health_globals.config.silencers_filename);
+    
+    // Free the enabled_alerts pattern
+    simple_pattern_free(health_globals.config.enabled_alerts);
+
+    // Reset pointers to NULL
+    health_globals.config.default_exec = NULL;
+    health_globals.config.default_recipient = NULL;
+    health_globals.config.silencers_filename = NULL;
+    health_globals.config.enabled_alerts = NULL;
+
+    alert_variable_lookup_cleanup();
+
     health_globals.initialization.done = false;
 
     spinlock_unlock(&health_globals.initialization.spinlock);
