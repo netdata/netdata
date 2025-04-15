@@ -285,7 +285,6 @@ static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(SQLHSTMT *stmt, SQLCHAR 
 ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char *dbname)
 {
     ULONGLONG value = 0;
-    enum netdata_mssql_odbc_errors step = NETDATA_MSSQL_ODBC_NO_ERROR;
 
     // We cannot access data for these tables without additional changes.
     // They should be blacklisted.
@@ -298,7 +297,6 @@ ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char
 
     value = netdata_MSSQL_fill_data_file_size_dict(nmc->dataFileSizeSTMT, query);
 
-end_data_file_size:
     SQLFreeStmt(nmc->dataFileSizeSTMT, SQL_CLOSE);
     return value;
 }
