@@ -15,6 +15,9 @@ void pattern_array_add_lblkey_with_sp(struct pattern_array *pa, const char *key,
         return;
     }
 
+    if (!sp)
+        return;
+
     STRING *string_key = string_strdupz(key);
     Pvoid_t *Pvalue = JudyLIns(&pa->JudyL, (Word_t) string_key, PJE0);
     if (!Pvalue || Pvalue == PJERR ) {
