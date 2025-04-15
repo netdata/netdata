@@ -10,9 +10,9 @@ Netdata provides a simple Windows installer for quick setup.
 
 ## 🚫 Limitations for Free Users
 
-| Agent Type       | Limitation                             |
-|-----------------|----------------------------------------|
-| Standalone Agent | UI is locked — No local monitoring    |
+| Agent Type       | Limitation                                                                            |
+|------------------|---------------------------------------------------------------------------------------|
+| Standalone Agent | UI is locked — No local monitoring                                                    |
 | Child Agent      | No monitoring data in parent dashboard when streaming to a Linux-based Netdata parent |
 
 ---
@@ -21,9 +21,9 @@ Netdata provides a simple Windows installer for quick setup.
 
 Choose the version that suits your needs:
 
-| Version | Download Link | Recommended For |
-|---------|----------------|----------------|
-| Stable  | [Download Stable](https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi) | Most users — stable, well-tested |
+| Version | Download Link                                                                                             | Recommended For                                                  |
+|---------|-----------------------------------------------------------------------------------------------------------|------------------------------------------------------------------|
+| Stable  | [Download Stable](https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi)            | Most users — stable, well-tested                                 |
 | Nightly | [Download Nightly](https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi) | Users who need the latest features and can handle potential bugs |
 
 ---
@@ -39,14 +39,14 @@ Use silent mode to deploy Netdata without user interaction (ideal for automation
 
 ### Installation Command Options
 
-| Option        | Description |
-|---------------|-------------|
-| `/qn`         | Enables silent mode (no user interaction) |
-| `/i`          | Specifies the path to the MSI installer |
-| `TOKEN=`      | Claim token from your Netdata Cloud Space |
-| `ROOMS=`      | Comma-separated Room IDs for your node |
-| `PROXY=`      | (Optional) Proxy address if required |
-| `INSECURE=1`  | (Optional) Allow insecure connections (hostname verification disabled) |
+| Option       | Description                                                            |
+|--------------|------------------------------------------------------------------------|
+| `/qn`        | Enables silent mode (no user interaction)                              |
+| `/i`         | Specifies the path to the MSI installer                                |
+| `TOKEN=`     | Claim token from your Netdata Cloud Space                              |
+| `ROOMS=`     | Comma-separated Room IDs for your node                                 |
+| `PROXY=`     | (Optional) Proxy address if required                                   |
+| `INSECURE=1` | (Optional) Allow insecure connections (hostname verification disabled) |
 
 ---
 
@@ -60,7 +60,7 @@ msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 
 Replace:
 
-- `<YOUR_TOKEN>` with your claim token  
+- `<YOUR_TOKEN>` with your claim token
 - `<YOUR_ROOMS>` with your Room ID(s)
 
 ---
@@ -75,9 +75,9 @@ $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/n
 
 ## 🖥️ Graphical Installation (GUI)
 
-1. Download the `.msi` installer.  
-2. Double-click to run it.  
-3. Grant Administrator privileges when prompted.  
+1. Download the `.msi` installer.
+2. Double-click to run it.
+3. Grant Administrator privileges when prompted.
 4. Complete the setup wizard.
 
 ---
@@ -96,5 +96,5 @@ http://localhost:19999
 
 By using silent installation, you agree to:
 
-- [GPL-3 License](https://raw.githubusercontent.com/netdata/netdata/refs/heads/master/LICENSE) — Netdata Agent  
+- [GPL-3 License](https://raw.githubusercontent.com/netdata/netdata/refs/heads/master/LICENSE) — Netdata Agent
 - [NCUL1 License](https://app.netdata.cloud/LICENSE.txt) — Netdata Web Interface
