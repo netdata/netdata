@@ -129,11 +129,26 @@ Now that the user has been created inside your server, update `netdata.conf` by 
         #address = [protocol:]Address[,port |\pipe\pipename]
         uid = netdata_user
         pwd = AReallyStrongPasswordShouldBeInsertedHere
+        # additional instances = 0
         #windows authentication = no
 ```
 
+In next table, we give a short description about them:
+
+| Option                   | Description                                                                       |
+|--------------------------|-----------------------------------------------------------------------------------|
+|`driver`                  | ODBC driver used to connect to the MSSQL server.                                  |
+|`server`                  | Server address or instance name to connect to.                                    |
+|`address`                 | Similar to `server`. You can also use named pipes if your server supports them.   |
+|`uid`                     | User identifier (`uid`) created on your server.                                   |
+|`pwd`                     | Password for the specified user.                                                  |
+|`additional instances`    | Number of additional MSSQL instances to monitor.                                  |
+|`windows authentications` | Use Windows credentials to connect to the MSSQL server.                           |
+
 For additional information on how to set these parameters, refer to the
 [Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16)
+
+### Errors
 
 When configuring Netdata to access SQL Server, some errors may occur. You can check your configuration using the
 Microsoft Event Viewer by looking for entries that begin with `MSSQL server error using the handle`.
