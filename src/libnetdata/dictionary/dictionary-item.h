@@ -83,7 +83,7 @@ static inline DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused,
         *allocated_bytes += size;
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#if defined(FSANITIZE_ADDRESS) || defined(NETDATA_INTERNAL_CHECKS)
     item->dict = dict;
 #endif
     return item;
