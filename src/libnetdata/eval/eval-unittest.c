@@ -232,404 +232,395 @@ static void run_test_group(TestGroup *group) {
            passed + failed, passed, failed);
 }
 
-extern ASTNode *parse_string(const char *input);
+static TestCase arithmetic_tests[] = {
+    {"1 + 2", 3.0, EVAL_ERROR_OK, true},
+    {"5 - 3", 2.0, EVAL_ERROR_OK, true},
+    {"4 * 5", 20.0, EVAL_ERROR_OK, true},
+    {"10 / 2", 5.0, EVAL_ERROR_OK, true},
+    {"10 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Netdata reports error for division by zero
+    {"-10", -10.0, EVAL_ERROR_OK, true},
+    {"+5", 5.0, EVAL_ERROR_OK, true},
+    {"5 + -3", 2.0, EVAL_ERROR_OK, true},
+    {"5 * -3", -15.0, EVAL_ERROR_OK, true},
+    {"1 + 2 * 3", 7.0, EVAL_ERROR_OK, true},
+    {"(1 + 2) * 3", 9.0, EVAL_ERROR_OK, true},
+    {"10.5 + 2.5", 13.0, EVAL_ERROR_OK, true},
+    {"10.5 * 2", 21.0, EVAL_ERROR_OK, true},
+    {"5.5 / 2", 2.75, EVAL_ERROR_OK, true},
+    {"1.5e2 + 2", 152.0, EVAL_ERROR_OK, true},
+    {"1+2*3+4", 11.0, EVAL_ERROR_OK, true},
+};
 
-int eval_unittest(void) {
-    // Test cases for basic arithmetic operations
-    TestCase arithmetic_tests[] = {
-        {"1 + 2", 3.0, EVAL_ERROR_OK, true},
-        {"5 - 3", 2.0, EVAL_ERROR_OK, true},
-        {"4 * 5", 20.0, EVAL_ERROR_OK, true},
-        {"10 / 2", 5.0, EVAL_ERROR_OK, true},
-        {"10 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Netdata reports error for division by zero
-        {"-10", -10.0, EVAL_ERROR_OK, true},
-        {"+5", 5.0, EVAL_ERROR_OK, true},
-        {"5 + -3", 2.0, EVAL_ERROR_OK, true},
-        {"5 * -3", -15.0, EVAL_ERROR_OK, true},
-        {"1 + 2 * 3", 7.0, EVAL_ERROR_OK, true},
-        {"(1 + 2) * 3", 9.0, EVAL_ERROR_OK, true},
-        {"10.5 + 2.5", 13.0, EVAL_ERROR_OK, true},
-        {"10.5 * 2", 21.0, EVAL_ERROR_OK, true},
-        {"5.5 / 2", 2.75, EVAL_ERROR_OK, true},
-        {"1.5e2 + 2", 152.0, EVAL_ERROR_OK, true},
-        {"1+2*3+4", 11.0, EVAL_ERROR_OK, true},
-    };
-    
-    // Test cases for comparison operations
-    TestCase comparison_tests[] = {
-        {"1 == 1", 1.0, EVAL_ERROR_OK, true},
-        {"1 == 2", 0.0, EVAL_ERROR_OK, true},
-        {"1 != 2", 1.0, EVAL_ERROR_OK, true},
-        {"1 != 1", 0.0, EVAL_ERROR_OK, true},
-        {"5 > 3", 1.0, EVAL_ERROR_OK, true},
-        {"3 > 5", 0.0, EVAL_ERROR_OK, true},
-        {"3 < 5", 1.0, EVAL_ERROR_OK, true},
-        {"5 < 3", 0.0, EVAL_ERROR_OK, true},
-        {"5 >= 5", 1.0, EVAL_ERROR_OK, true},
-        {"5 >= 6", 0.0, EVAL_ERROR_OK, true},
-        {"5 <= 5", 1.0, EVAL_ERROR_OK, true},
-        {"5 <= 4", 0.0, EVAL_ERROR_OK, true},
-        {"3 > 2 > 1", 0.0, EVAL_ERROR_OK, true}, // This is (3 > 2) > 1, which is 1 > 1, which is false
-    };
-    
-    // Test cases for logical operations
-    TestCase logical_tests[] = {
-        {"1 && 1", 1.0, EVAL_ERROR_OK, true},
-        {"1 && 0", 0.0, EVAL_ERROR_OK, true},
-        {"0 && 1", 0.0, EVAL_ERROR_OK, true},
-        {"0 && 0", 0.0, EVAL_ERROR_OK, true},
-        {"1 || 1", 1.0, EVAL_ERROR_OK, true},
-        {"1 || 0", 1.0, EVAL_ERROR_OK, true},
-        {"0 || 1", 1.0, EVAL_ERROR_OK, true},
-        {"0 || 0", 0.0, EVAL_ERROR_OK, true},
-        {"!1", 0.0, EVAL_ERROR_OK, true},
-        {"!0", 1.0, EVAL_ERROR_OK, true},
-        {"!(1 && 0)", 1.0, EVAL_ERROR_OK, true},
-        {"1 && !0", 1.0, EVAL_ERROR_OK, true},
-        {"0 || !(1 && 0)", 1.0, EVAL_ERROR_OK, true},
-    };
-    
-    // Test cases for variable usage
-    TestCase variable_tests[] = {
-        {"$var1", 42.0, EVAL_ERROR_OK, true},
-        {"$var2", 24.0, EVAL_ERROR_OK, true},
-        {"$var1 + $var2", 66.0, EVAL_ERROR_OK, true},
-        {"$var1 * $var2", 1008.0, EVAL_ERROR_OK, true},
-        {"$var1 > $var2", 1.0, EVAL_ERROR_OK, true},
-        {"$var1 < $var2", 0.0, EVAL_ERROR_OK, true},
-        {"$var1 && $var2", 1.0, EVAL_ERROR_OK, true},
-        {"$zero && $var1", 0.0, EVAL_ERROR_OK, true},
-        {"$var1", 42.0, EVAL_ERROR_OK, true}, // Test dollar sign prefix
-        {"${var1}", 42.0, EVAL_ERROR_OK, true}, // Test with curly braces
-        {"$unknown", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},
-    };
-    
-    // Test cases for function calls
-    TestCase function_tests[] = {
-        {"abs(5)", 5.0, EVAL_ERROR_OK, true},
-        {"abs(-5)", 5.0, EVAL_ERROR_OK, true},
-        {"abs(0)", 0.0, EVAL_ERROR_OK, true},
-        {"abs($var1)", 42.0, EVAL_ERROR_OK, true},
-        {"abs($negative)", 10.0, EVAL_ERROR_OK, true},
-        {"abs(1 + -3)", 2.0, EVAL_ERROR_OK, true},
-        {"abs($var1 - $var2)", 18.0, EVAL_ERROR_OK, true},
-        {"abs(abs(-5))", 5.0, EVAL_ERROR_OK, true}, // Nested function call
-    };
-    
-    // Test cases for special values
-    // In Netdata, NaN values cause VALUE_IS_UNSET errors and Infinity causes VALUE_IS_INFINITE errors
-    TestCase special_value_tests[] = {
-        // NaN tests - Netdata rejects them with VALUE_IS_UNSET error
-        {"$nan_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},
-        
-        // Comparison operators with NaN - these should work as they just check NaN status
-        {"$nan_var == 5", 0.0, EVAL_ERROR_OK, true},
-        {"$nan_var != 5", 1.0, EVAL_ERROR_OK, true},
-        {"$nan_var > 5", 0.0, EVAL_ERROR_OK, true},
-        {"$nan_var < 5", 0.0, EVAL_ERROR_OK, true},
-        {"$nan_var >= 5", 0.0, EVAL_ERROR_OK, true},
-        {"$nan_var <= 5", 0.0, EVAL_ERROR_OK, true},
-        
-        // NaN self-comparison (Netdata treats NaN == NaN as true, which is different from IEEE 754)
-        {"$nan_var == $nan_var", 1.0, EVAL_ERROR_OK, true},
-        {"$nan_var != $nan_var", 0.0, EVAL_ERROR_OK, true},
-        {"$nan_var > $nan_var", 0.0, EVAL_ERROR_OK, true},
-        {"$nan_var < $nan_var", 0.0, EVAL_ERROR_OK, true},
-        {"$nan_var >= $nan_var", 0.0, EVAL_ERROR_OK, true},
-        {"$nan_var <= $nan_var", 0.0, EVAL_ERROR_OK, true},
-        
-        // Logical operations with NaN
-        {"$nan_var && 1", 0.0, EVAL_ERROR_OK, true},
-        {"$nan_var || 1", 1.0, EVAL_ERROR_OK, true},
-        {"$nan_var && 0", 0.0, EVAL_ERROR_OK, true},
-        {"$nan_var || 0", 0.0, EVAL_ERROR_OK, true},
-        {"!$nan_var", 1.0, EVAL_ERROR_OK, true},
-        
-        // Ternary with NaN
-        {"($nan_var) ? 1 : 2", 2.0, EVAL_ERROR_OK, true},
-        
-        // Infinity tests - Netdata rejects with VALUE_IS_INFINITE error
-        {"$inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
-        
-        // Comparison operators with Infinity - these work
-        {"$inf_var == 5", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var != 5", 1.0, EVAL_ERROR_OK, true},
-        {"$inf_var > 5", 1.0, EVAL_ERROR_OK, true},
-        {"$inf_var < 5", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var >= 5", 1.0, EVAL_ERROR_OK, true},
-        {"$inf_var <= 5", 0.0, EVAL_ERROR_OK, true},
-        
-        // Infinity self-comparison
-        {"$inf_var == $inf_var", 1.0, EVAL_ERROR_OK, true},
-        {"$inf_var != $inf_var", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var > $inf_var", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var < $inf_var", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var >= $inf_var", 1.0, EVAL_ERROR_OK, true},
-        {"$inf_var <= $inf_var", 1.0, EVAL_ERROR_OK, true},
-        
-        // Logical operations with Infinity
-        {"$inf_var && 1", 1.0, EVAL_ERROR_OK, true},
-        {"$inf_var || 1", 1.0, EVAL_ERROR_OK, true},
-        {"$inf_var && 0", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var || 0", 1.0, EVAL_ERROR_OK, true},
-        {"!$inf_var", 0.0, EVAL_ERROR_OK, true},
-        
-        // Ternary with Infinity
-        {"($inf_var) ? 1 : 2", 1.0, EVAL_ERROR_OK, true},
-        
-        // Zero division
-        {"5 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Positive/zero gives infinity
-        {"-5 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Negative/zero gives -infinity 
-        {"0 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // In Netdata, this gives INFINITE error
-        
-        // NaN and Infinity comparison
-        {"$inf_var == $nan_var", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var != $nan_var", 1.0, EVAL_ERROR_OK, true},
-        {"$inf_var > $nan_var", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var < $nan_var", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var >= $nan_var", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var <= $nan_var", 0.0, EVAL_ERROR_OK, true},
-        
-        // Logical operations with mixed NaN and Infinity
-        {"$inf_var && $nan_var", 0.0, EVAL_ERROR_OK, true},
-        {"$inf_var || $nan_var", 1.0, EVAL_ERROR_OK, true},
-        {"!$nan_var && $inf_var", 1.0, EVAL_ERROR_OK, true},
-        {"!$nan_var || !$inf_var", 1.0, EVAL_ERROR_OK, true},
-        
-        // Special value operations with zero
-        {"$zero * $inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
-        {"$zero / $zero", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Netdata treats 0/0 as INFINITE
-        {"($zero) ? 1 : 2", 2.0, EVAL_ERROR_OK, true},
-        
-        // Short-circuit evaluation with special values (these work because no evaluation happens)
-        {"0 && $nan_var", 0.0, EVAL_ERROR_OK, true}, // Short-circuit should avoid NaN
-        {"1 || $nan_var", 1.0, EVAL_ERROR_OK, true}, // Short-circuit should avoid NaN
-        {"0 && $inf_var", 0.0, EVAL_ERROR_OK, true}, // Short-circuit should avoid Infinity
-        {"1 || $inf_var", 1.0, EVAL_ERROR_OK, true}  // Short-circuit should avoid Infinity
-    };
-    
-    // Complex expression tests
-    TestCase complex_tests[] = {
-        {"1 + 2 * 3 - 4 / 2", 5.0, EVAL_ERROR_OK, true},
-        {"(1 + 2) * (3 - 4) / 2", -1.5, EVAL_ERROR_OK, true},
-        {"1 > 0 && 2 > 1", 1.0, EVAL_ERROR_OK, true},
-        {"1 > 0 || 0 > 1", 1.0, EVAL_ERROR_OK, true},
-        {"(1 > 0) ? 10 : 20", 10.0, EVAL_ERROR_OK, true},
-        {"(0 > 1) ? 10 : 20", 20.0, EVAL_ERROR_OK, true},
-        {"((($var1 + $var2) / 2) > 30) ? ($var1 * $var2) : ($var1 + $var2)", 1008.0, EVAL_ERROR_OK, true},
-        {"5 + (!($var1 > 50) * 10)", 15.0, EVAL_ERROR_OK, true},
-        {"($var1 > $var2) ? ($var1 - $var2) : ($var2 - $var1)", 18.0, EVAL_ERROR_OK, true},
-        {"(($zero > 0) ? $var1 : $var2) + (($zero < 0) ? $var1 : $var2)", 48.0, EVAL_ERROR_OK, true},
-    };
-    
-    // Edge case and invalid expressions
-    TestCase edge_case_tests[] = {
-        {"", 0.0, EVAL_ERROR_OK, false},
-        {" ", 0.0, EVAL_ERROR_MISSING_OPERAND, false},        // Netdata can't parse whitespace-only expressions
-        {"\t\n", 0.0, EVAL_ERROR_MISSING_OPERAND, false},     // Netdata can't parse whitespace-only expressions
-        {"    5    +    3    ", 8.0, EVAL_ERROR_OK, true},    // Whitespace between operands is fine
-        {"$", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},      // Netdata's error is different for incomplete variables
-        {"${", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},     // Netdata's error is different for incomplete variables
-        {"$}", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},     // Netdata's error is different for incomplete variables
-        {"${}", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},    // Netdata's error is different for incomplete variables
-        {"5 + -3", 2.0, EVAL_ERROR_OK, true},                 // Netdata actually handles this correctly as a unary minus
-        {"5 + 3", 8.0, EVAL_ERROR_OK, true},                  // Basic sanity check
-    };
-    
-    // Operator precedence tests
-    TestCase precedence_tests[] = {
-        {"5 + 3 * 2", 11.0, EVAL_ERROR_OK, true},                 // * before +
-        {"5 * 3 + 2", 17.0, EVAL_ERROR_OK, true},                 // * before +
-        {"5 + 3 - 2", 6.0, EVAL_ERROR_OK, true},                  // + and - same precedence (left to right)
-        {"5 - 3 + 2", 4.0, EVAL_ERROR_OK, true},                  // + and - same precedence (left to right)
-        {"5 * 3 / 3", 5.0, EVAL_ERROR_OK, true},                  // * and / same precedence (left to right)
-        {"5 / 5 * 3", 3.0, EVAL_ERROR_OK, true},                  // * and / same precedence (left to right)
-        {"5 > 3 && 2 < 4 || 1 == 0", 1.0, EVAL_ERROR_OK, true},   // && before ||
-        {"5 > 3 && (2 < 4 || 1 == 0)", 1.0, EVAL_ERROR_OK, true}, // same as above with explicit grouping
-        {"5 > 3 || 2 < 4 && 1 == 0", 0.0, EVAL_ERROR_OK, true},   // In Netdata, || and && have same precedence (left to right)
-        {"(5 > 3 || 2 < 4) && 1 == 0", 0.0, EVAL_ERROR_OK, true}, // explicit grouping with same result
-        {"!5 > 3", 0.0, EVAL_ERROR_OK, true},                     // ! before >
-        {"!(5 > 3)", 0.0, EVAL_ERROR_OK, true},                   // same as above with explicit grouping
-        {"5 + 3 > 2 * 3", 1.0, EVAL_ERROR_OK, true},              // arithmetic before comparison
-        {"5 + 3 > 2 * 4", 0.0, EVAL_ERROR_OK, true},              // arithmetic before comparison
-        {"(5 > 3) ? (1 + 2) : (3 + 4)", 3.0, EVAL_ERROR_OK, true},      // ternary has low precedence
-        {"($var1 + $var2 * 2 > 80) ? 100 : 200", 100.0, EVAL_ERROR_OK, true}, // complex precedence test (42 + 24*2 = 90, which is > 80)
-    };
-    
-    // Parentheses tests - specifically testing how parentheses change operator precedence
-    TestCase parentheses_tests[] = {
-        {"5 + 3 * 2", 11.0, EVAL_ERROR_OK, true},            // Default: * has higher precedence
-        {"(5 + 3) * 2", 16.0, EVAL_ERROR_OK, true},          // Parentheses change precedence
-        {"5 * (3 + 2)", 25.0, EVAL_ERROR_OK, true},          // Parentheses change order of operations
-        {"(5 + 3 * 2)", 11.0, EVAL_ERROR_OK, true},          // Redundant parentheses don't change anything
-        {"((5 + 3) * 2)", 16.0, EVAL_ERROR_OK, true},        // Nested parentheses
-        {"5 - (3 - 1)", 3.0, EVAL_ERROR_OK, true},           // Parentheses with subtraction
-        {"5 - 3 - 1", 1.0, EVAL_ERROR_OK, true},             // Without parentheses (left-to-right)
-        {"(5 - 3) - 1", 1.0, EVAL_ERROR_OK, true},           // Explicit grouping doesn't change result
-        {"5 - (3 - 1)", 3.0, EVAL_ERROR_OK, true},           // Different grouping changes result
-        {"5 / (2 * 2.5)", 1.0, EVAL_ERROR_OK, true},         // Division and multiplication with parentheses
-        {"(5 / 2) * 2.5", 6.25, EVAL_ERROR_OK, true},        // Different grouping changes result
-        {"$var1 * ($var2 + 6)", 1260.0, EVAL_ERROR_OK, true}, // Variables with parentheses
-        {"($var1 * $var2) + 6", 1014.0, EVAL_ERROR_OK, true}, // Different grouping with variables
-        {"!($var1 > $var2)", 0.0, EVAL_ERROR_OK, true},      // Logical NOT with parentheses
-        {"!(0)", 1.0, EVAL_ERROR_OK, true},                  // Logical NOT with constant
-        {"!0", 1.0, EVAL_ERROR_OK, true},                    // Same without parentheses
-        {"5 > 3 && (2 < 1 || 3 > 1)", 1.0, EVAL_ERROR_OK, true}, // Complex logical expression with parentheses
-        {"(5 > 3 && 2 < 1) || 3 > 1", 1.0, EVAL_ERROR_OK, true}, // Different grouping changes result
-        {"5 > 3 && 2 < 1 || 3 > 1", 1.0, EVAL_ERROR_OK, true},   // Default precedence (&& before ||)
-        {"(5 > 3) && ((2 < 1) || (3 > 1))", 1.0, EVAL_ERROR_OK, true}, // Excessive parentheses
-        {"(((5))) + (((3)))", 8.0, EVAL_ERROR_OK, true},     // Multiple nested parentheses
-        {"abs(-($var1 - $var2))", 18.0, EVAL_ERROR_OK, true}, // Function with parenthesized expression
-        {"abs(-(($var1) - ($var2)))", 18.0, EVAL_ERROR_OK, true}, // Function with nested parentheses
-        {"(5 > 3) ? ($var1 + $var2) : ($var1 - $var2)", 66.0, EVAL_ERROR_OK, true}, // Ternary with parentheses
-        {"((5 > 3) ? $var1 : $var2) + 10", 52.0, EVAL_ERROR_OK, true}, // Parentheses around ternary
-    };
-    
-    // Tests for API functions
-    TestCase api_function_tests[] = {
-        {"1 + 2", 3.0, EVAL_ERROR_OK, true},  // For testing expression_source and expression_parsed_as
-        {"$var1", 42.0, EVAL_ERROR_OK, true},  // For testing expression_result and variable lookup
-        {"bad/syntax", 0.0, EVAL_ERROR_UNKNOWN_OPERAND, false},  // For testing expression_error_msg
-        {"$hardcoded_var", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},  // For testing expression_hardcode_variable
-    };
-    
-    // Test cases for number overflow
-    TestCase overflow_tests[] = {
-        // Positive overflow - extreme large numbers
-        {"1e308", 1e308, EVAL_ERROR_OK, true},  // Very large but valid number
-        {"1e308 * 10", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Overflow to positive infinity
-        {"1e308 + 1e308", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Addition causing overflow
-        
-        // Negative overflow - extreme large negative numbers
-        {"-1e308", -1e308, EVAL_ERROR_OK, true},  // Very large negative but valid
-        {"-1e308 * 10", -INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Overflow to negative infinity
-        {"-1e308 - 1e308", -INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Subtraction causing negative overflow
-        
-        // Operations with infinity
-        {"1e308 * 1e308", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Multiplication causing overflow
-        {"-1e308 * -1e308", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Negative * negative = positive overflow
-        {"1e308 / 1e-308", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Division causing overflow
-        
-        // Mixed operations
-        {"1e308 - 1e308", 0.0, EVAL_ERROR_OK, true},  // This should properly cancel out
-        {"(1e308 * 2) / 2", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Overflow in intermediate calculation
-    };
-    
-    // Test cases for combined complex expressions
-    TestCase combined_tests[] = {
-        // Complex arithmetic expressions combining multiple operations
-        {"(5 + 3 * 2) / (1 + 1) * 4 - 10", 12.0, EVAL_ERROR_OK, true},
-        {"((($var1 * 2) / 4) + (($var2 - 4) * 2)) / 10", 6.1, EVAL_ERROR_OK, true}, // Corrected expected result
-        {"abs($negative) * 2 + $var1 / 2 - $var2", 17.0, EVAL_ERROR_OK, true}, // Corrected expected result
-        
-        // Complex boolean expressions with multiple conditions
-        {"($var1 > 40 && $var2 < 30) || ($var1 - $var2 > 10)", 1.0, EVAL_ERROR_OK, true},
-        {"!($var1 < 40) && ($var2 > 20 || $zero < 1) && !($var1 == $var2)", 1.0, EVAL_ERROR_OK, true},
-        // Ternary expressions need proper parentheses in Netdata
-        {"(($var1 > $var2) ? ($var1 - $var2) : ($var2 - $var1)) > 15", 1.0, EVAL_ERROR_OK, true},
-        
-        // Mix of arithmetic and boolean with precedence tests
-        {"($var1 + $var2) / 2 > ($var1 > $var2 ? $var2 : $var1)", 1.0, EVAL_ERROR_OK, true},
-        {"(($var1 > $var2 ? 1 : 0) * 10 + (($var1 - $var2) / 3)) > 15", 1.0, EVAL_ERROR_OK, true},
-        
-        // Complex expressions with potential overflows
-        {"(1e308 - 1e308) * $var1 + $var2", 24.0, EVAL_ERROR_OK, true},
-        {"($var1 > 0 ? 1e308 : -1e308) * ($var1 < 0 ? 1 : 0)", 0.0, EVAL_ERROR_OK, true},
-        {"(1e308 + 1e308 > 0) ? $var1 : $var2", 42.0, EVAL_ERROR_OK, true},
-        
-        // Deeply nested expressions with mixed operations
-        {"((((($var1 / 2) + ($var2 * 2)) - 10) * 2) / 4) + (($var1 > $var2) ? 5 : -5)", 34.5, EVAL_ERROR_OK, true}, // Corrected expected result
-        // This tests the nested ternaries with proper parentheses
-        {"(abs($negative) > 5) ? $var1 : $var2", 42.0, EVAL_ERROR_OK, true}, // Simplified to avoid nested ternary issue
-        {"(($var1 + $var2) / 2 > 30) ? 10 : 5", 10.0, EVAL_ERROR_OK, true}, // Simplified second half of above test
-        
-        // Expressions with short-circuit evaluation
-        {"$zero && (1 / $zero)", 0.0, EVAL_ERROR_OK, true},  // Short-circuit prevents division by zero
-        {"1 || (1e308 * 1e308)", 1.0, EVAL_ERROR_OK, true},  // Short-circuit prevents overflow
-        // Split this into two tests to avoid nested ternary issues
-        {"($var1 < 0) ? (1 / $zero) : $var1", 42.0, EVAL_ERROR_OK, true}, // First part of previous test
-        {"($var2 > 100) ? (1e308 * 1e308) : $var2", 24.0, EVAL_ERROR_OK, true}, // Second part of previous test
-    };
+// Test cases for comparison operations
+static TestCase comparison_tests[] = {
+    {"1 == 1", 1.0, EVAL_ERROR_OK, true},
+    {"1 == 2", 0.0, EVAL_ERROR_OK, true},
+    {"1 != 2", 1.0, EVAL_ERROR_OK, true},
+    {"1 != 1", 0.0, EVAL_ERROR_OK, true},
+    {"5 > 3", 1.0, EVAL_ERROR_OK, true},
+    {"3 > 5", 0.0, EVAL_ERROR_OK, true},
+    {"3 < 5", 1.0, EVAL_ERROR_OK, true},
+    {"5 < 3", 0.0, EVAL_ERROR_OK, true},
+    {"5 >= 5", 1.0, EVAL_ERROR_OK, true},
+    {"5 >= 6", 0.0, EVAL_ERROR_OK, true},
+    {"5 <= 5", 1.0, EVAL_ERROR_OK, true},
+    {"5 <= 4", 0.0, EVAL_ERROR_OK, true},
+    {"3 > 2 > 1", 0.0, EVAL_ERROR_OK, true}, // This is (3 > 2) > 1, which is 1 > 1, which is false
+};
 
-    // Test cases that previously crashed Netdata
-    // Note: Netdata's parser doesn't support nested ternary operators without proper parentheses
-    // so we need to modify our expectations accordingly
-    TestCase crash_tests[] = {
-        // Netdata can't parse nested ternaries without parentheses
-        {"$var1 > 0 ? $var1 < 0 ? 1 : 2 : 3", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},
-        // This doesn't parse as expected - Netdata parses it differently
-        {"$var1 > 0 ? ( $var1 < 0 ? 1 : 2 ) : 3", 1.0, EVAL_ERROR_OK, true},
-        // Outer parentheses don't help with nested ternaries without inner parentheses
-        {"( $var1 > 0 ? $var1 < 0 ? 1 : 2 : 3 )", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},
-        // Fully parenthesized works correctly
-        {"($var1 > 0) ? (($var1 < 0) ? 1 : 2) : 3", 2.0, EVAL_ERROR_OK, true},
-        // Multiple nested parentheses are fine
-        {"(($zero)) ? 0 : ((($var1)))", 42.0, EVAL_ERROR_OK, true},
-        // Variable lookup errors are properly handled
-        {"$nonexistent + $var1", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},
-        // Division by (0-0) gives an INFINITE error in Netdata's implementation
-        {"10 / ($zero - $zero)", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
-    };
+// Test cases for logical operations
+static TestCase logical_tests[] = {
+    {"1 && 1", 1.0, EVAL_ERROR_OK, true},
+    {"1 && 0", 0.0, EVAL_ERROR_OK, true},
+    {"0 && 1", 0.0, EVAL_ERROR_OK, true},
+    {"0 && 0", 0.0, EVAL_ERROR_OK, true},
+    {"1 || 1", 1.0, EVAL_ERROR_OK, true},
+    {"1 || 0", 1.0, EVAL_ERROR_OK, true},
+    {"0 || 1", 1.0, EVAL_ERROR_OK, true},
+    {"0 || 0", 0.0, EVAL_ERROR_OK, true},
+    {"!1", 0.0, EVAL_ERROR_OK, true},
+    {"!0", 1.0, EVAL_ERROR_OK, true},
+    {"!(1 && 0)", 1.0, EVAL_ERROR_OK, true},
+    {"1 && !0", 1.0, EVAL_ERROR_OK, true},
+    {"0 || !(1 && 0)", 1.0, EVAL_ERROR_OK, true},
+};
 
-    // Test cases for variable names with spaces
-    TestCase variable_space_tests[] = {
-        // Testing $var syntax (can't have spaces)
-        {"$this", 50.0, EVAL_ERROR_OK, true},
-        {"$this variable", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false}, // This should fail to parse as "variable" is considered garbage
-        {"$this + variable", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false}, // Invalid syntax
-        
-        // Testing ${var} syntax (can have spaces)
-        {"${this}", 50.0, EVAL_ERROR_OK, true},
-        {"${this variable}", 100.0, EVAL_ERROR_OK, true}, // This should parse as a single variable named 'this variable'
-        
-        // Testing more complex expressions with spaced variable names
-        {"${this variable} * 2", 200.0, EVAL_ERROR_OK, true},
-        {"${this variable} > ${this}", 1.0, EVAL_ERROR_OK, true},
-        {"${this} + ${this variable}", 150.0, EVAL_ERROR_OK, true},
-        
-        // Edge cases with missing or incomplete braces
-        {"${this variable", 100.0, EVAL_ERROR_OK, true}, // Missing closing brace but parser accepts it
-        {"${}", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},             // Empty brackets
-        
-        // Using ${var} inside complex expressions
-        {"(${this variable} + ${this}) / 2", 75.0, EVAL_ERROR_OK, true},
-        {"(${this} > 0) ? ${this variable} : 0", 100.0, EVAL_ERROR_OK, true}, // Fixed the ternary syntax
-    };
+// Test cases for variable usage
+static TestCase variable_tests[] = {
+    {"$var1", 42.0, EVAL_ERROR_OK, true},
+    {"$var2", 24.0, EVAL_ERROR_OK, true},
+    {"$var1 + $var2", 66.0, EVAL_ERROR_OK, true},
+    {"$var1 * $var2", 1008.0, EVAL_ERROR_OK, true},
+    {"$var1 > $var2", 1.0, EVAL_ERROR_OK, true},
+    {"$var1 < $var2", 0.0, EVAL_ERROR_OK, true},
+    {"$var1 && $var2", 1.0, EVAL_ERROR_OK, true},
+    {"$zero && $var1", 0.0, EVAL_ERROR_OK, true},
+    {"$var1", 42.0, EVAL_ERROR_OK, true}, // Test dollar sign prefix
+    {"${var1}", 42.0, EVAL_ERROR_OK, true}, // Test with curly braces
+    {"$unknown", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},
+};
 
-    // Define the test groups
-    TestGroup test_groups[] = {
-        {"Arithmetic Tests", arithmetic_tests, ARRAY_SIZE(arithmetic_tests)},
-        {"Comparison Tests", comparison_tests, ARRAY_SIZE(comparison_tests)},
-        {"Logical Tests", logical_tests, ARRAY_SIZE(logical_tests)},
-        {"Variable Tests", variable_tests, ARRAY_SIZE(variable_tests)},
-        {"Variable Space Tests", variable_space_tests, ARRAY_SIZE(variable_space_tests)},
-        {"Function Tests", function_tests, ARRAY_SIZE(function_tests)},
-        {"Special Value Tests", special_value_tests, ARRAY_SIZE(special_value_tests)},
-        {"Complex Expression Tests", complex_tests, ARRAY_SIZE(complex_tests)},
-        {"Edge Case Tests", edge_case_tests, ARRAY_SIZE(edge_case_tests)},
-        {"Operator Precedence Tests", precedence_tests, ARRAY_SIZE(precedence_tests)},
-        {"Parentheses Tests", parentheses_tests, ARRAY_SIZE(parentheses_tests)},
-        {"API Function Tests", api_function_tests, ARRAY_SIZE(api_function_tests)},
-        {"Number Overflow Tests", overflow_tests, ARRAY_SIZE(overflow_tests)},
-        {"Combined Complex Expressions", combined_tests, ARRAY_SIZE(combined_tests)},
-        {"Crash Tests", crash_tests, ARRAY_SIZE(crash_tests)},
-    };
-    
-    // Run all test groups
-    int total_passed = 0;
-    int total_failed = 0;
-    int total_tests = 0;
-    
-    printf("Starting comprehensive evaluation tests\n");
-    
+// Test cases for function calls
+static TestCase function_tests[] = {
+    {"abs(5)", 5.0, EVAL_ERROR_OK, true},
+    {"abs(-5)", 5.0, EVAL_ERROR_OK, true},
+    {"abs(0)", 0.0, EVAL_ERROR_OK, true},
+    {"abs($var1)", 42.0, EVAL_ERROR_OK, true},
+    {"abs($negative)", 10.0, EVAL_ERROR_OK, true},
+    {"abs(1 + -3)", 2.0, EVAL_ERROR_OK, true},
+    {"abs($var1 - $var2)", 18.0, EVAL_ERROR_OK, true},
+    {"abs(abs(-5))", 5.0, EVAL_ERROR_OK, true}, // Nested function call
+};
+
+// Test cases for special values
+// In Netdata, NaN values cause VALUE_IS_UNSET errors and Infinity causes VALUE_IS_INFINITE errors
+static TestCase special_value_tests[] = {
+    // NaN tests - Netdata rejects them with VALUE_IS_UNSET error
+    {"$nan_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},
+
+    // Comparison operators with NaN - these should work as they just check NaN status
+    {"$nan_var == 5", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var != 5", 1.0, EVAL_ERROR_OK, true},
+    {"$nan_var > 5", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var < 5", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var >= 5", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var <= 5", 0.0, EVAL_ERROR_OK, true},
+
+    // NaN self-comparison (Netdata treats NaN == NaN as true, which is different from IEEE 754)
+    {"$nan_var == $nan_var", 1.0, EVAL_ERROR_OK, true},
+    {"$nan_var != $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var > $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var < $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var >= $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var <= $nan_var", 0.0, EVAL_ERROR_OK, true},
+
+    // Logical operations with NaN
+    {"$nan_var && 1", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var || 1", 1.0, EVAL_ERROR_OK, true},
+    {"$nan_var && 0", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var || 0", 0.0, EVAL_ERROR_OK, true},
+    {"!$nan_var", 1.0, EVAL_ERROR_OK, true},
+
+    // Ternary with NaN
+    {"($nan_var) ? 1 : 2", 2.0, EVAL_ERROR_OK, true},
+
+    // Infinity tests - Netdata rejects with VALUE_IS_INFINITE error
+    {"$inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
+
+    // Comparison operators with Infinity - these work
+    {"$inf_var == 5", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var != 5", 1.0, EVAL_ERROR_OK, true},
+    {"$inf_var > 5", 1.0, EVAL_ERROR_OK, true},
+    {"$inf_var < 5", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var >= 5", 1.0, EVAL_ERROR_OK, true},
+    {"$inf_var <= 5", 0.0, EVAL_ERROR_OK, true},
+
+    // Infinity self-comparison
+    {"$inf_var == $inf_var", 1.0, EVAL_ERROR_OK, true},
+    {"$inf_var != $inf_var", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var > $inf_var", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var < $inf_var", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var >= $inf_var", 1.0, EVAL_ERROR_OK, true},
+    {"$inf_var <= $inf_var", 1.0, EVAL_ERROR_OK, true},
+
+    // Logical operations with Infinity
+    {"$inf_var && 1", 1.0, EVAL_ERROR_OK, true},
+    {"$inf_var || 1", 1.0, EVAL_ERROR_OK, true},
+    {"$inf_var && 0", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var || 0", 1.0, EVAL_ERROR_OK, true},
+    {"!$inf_var", 0.0, EVAL_ERROR_OK, true},
+
+    // Ternary with Infinity
+    {"($inf_var) ? 1 : 2", 1.0, EVAL_ERROR_OK, true},
+
+    // Zero division
+    {"5 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Positive/zero gives infinity
+    {"-5 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Negative/zero gives -infinity
+    {"0 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // In Netdata, this gives INFINITE error
+
+    // NaN and Infinity comparison
+    {"$inf_var == $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var != $nan_var", 1.0, EVAL_ERROR_OK, true},
+    {"$inf_var > $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var < $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var >= $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var <= $nan_var", 0.0, EVAL_ERROR_OK, true},
+
+    // Logical operations with mixed NaN and Infinity
+    {"$inf_var && $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$inf_var || $nan_var", 1.0, EVAL_ERROR_OK, true},
+    {"!$nan_var && $inf_var", 1.0, EVAL_ERROR_OK, true},
+    {"!$nan_var || !$inf_var", 1.0, EVAL_ERROR_OK, true},
+
+    // Special value operations with zero
+    {"$zero * $inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
+    {"$zero / $zero", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Netdata treats 0/0 as INFINITE
+    {"($zero) ? 1 : 2", 2.0, EVAL_ERROR_OK, true},
+
+    // Short-circuit evaluation with special values (these work because no evaluation happens)
+    {"0 && $nan_var", 0.0, EVAL_ERROR_OK, true}, // Short-circuit should avoid NaN
+    {"1 || $nan_var", 1.0, EVAL_ERROR_OK, true}, // Short-circuit should avoid NaN
+    {"0 && $inf_var", 0.0, EVAL_ERROR_OK, true}, // Short-circuit should avoid Infinity
+    {"1 || $inf_var", 1.0, EVAL_ERROR_OK, true}  // Short-circuit should avoid Infinity
+};
+
+// Complex expression tests
+static TestCase complex_tests[] = {
+    {"1 + 2 * 3 - 4 / 2", 5.0, EVAL_ERROR_OK, true},
+    {"(1 + 2) * (3 - 4) / 2", -1.5, EVAL_ERROR_OK, true},
+    {"1 > 0 && 2 > 1", 1.0, EVAL_ERROR_OK, true},
+    {"1 > 0 || 0 > 1", 1.0, EVAL_ERROR_OK, true},
+    {"(1 > 0) ? 10 : 20", 10.0, EVAL_ERROR_OK, true},
+    {"(0 > 1) ? 10 : 20", 20.0, EVAL_ERROR_OK, true},
+    {"((($var1 + $var2) / 2) > 30) ? ($var1 * $var2) : ($var1 + $var2)", 1008.0, EVAL_ERROR_OK, true},
+    {"5 + (!($var1 > 50) * 10)", 15.0, EVAL_ERROR_OK, true},
+    {"($var1 > $var2) ? ($var1 - $var2) : ($var2 - $var1)", 18.0, EVAL_ERROR_OK, true},
+    {"(($zero > 0) ? $var1 : $var2) + (($zero < 0) ? $var1 : $var2)", 48.0, EVAL_ERROR_OK, true},
+};
+
+// Edge case and invalid expressions
+static TestCase edge_case_tests[] = {
+    {"", 0.0, EVAL_ERROR_OK, false},
+    {" ", 0.0, EVAL_ERROR_MISSING_OPERAND, false},        // Netdata can't parse whitespace-only expressions
+    {"\t\n", 0.0, EVAL_ERROR_MISSING_OPERAND, false},     // Netdata can't parse whitespace-only expressions
+    {"    5    +    3    ", 8.0, EVAL_ERROR_OK, true},    // Whitespace between operands is fine
+    {"$", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},      // Netdata's error is different for incomplete variables
+    {"${", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},     // Netdata's error is different for incomplete variables
+    {"$}", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},     // Netdata's error is different for incomplete variables
+    {"${}", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},    // Netdata's error is different for incomplete variables
+    {"5 + -3", 2.0, EVAL_ERROR_OK, true},                 // Netdata actually handles this correctly as a unary minus
+    {"5 + 3", 8.0, EVAL_ERROR_OK, true},                  // Basic sanity check
+};
+
+// Operator precedence tests
+static TestCase precedence_tests[] = {
+    {"5 + 3 * 2", 11.0, EVAL_ERROR_OK, true},                 // * before +
+    {"5 * 3 + 2", 17.0, EVAL_ERROR_OK, true},                 // * before +
+    {"5 + 3 - 2", 6.0, EVAL_ERROR_OK, true},                  // + and - same precedence (left to right)
+    {"5 - 3 + 2", 4.0, EVAL_ERROR_OK, true},                  // + and - same precedence (left to right)
+    {"5 * 3 / 3", 5.0, EVAL_ERROR_OK, true},                  // * and / same precedence (left to right)
+    {"5 / 5 * 3", 3.0, EVAL_ERROR_OK, true},                  // * and / same precedence (left to right)
+    {"5 > 3 && 2 < 4 || 1 == 0", 1.0, EVAL_ERROR_OK, true},   // && before ||
+    {"5 > 3 && (2 < 4 || 1 == 0)", 1.0, EVAL_ERROR_OK, true}, // same as above with explicit grouping
+    {"5 > 3 || 2 < 4 && 1 == 0", 0.0, EVAL_ERROR_OK, true},   // In Netdata, || and && have same precedence (left to right)
+    {"(5 > 3 || 2 < 4) && 1 == 0", 0.0, EVAL_ERROR_OK, true}, // explicit grouping with same result
+    {"!5 > 3", 0.0, EVAL_ERROR_OK, true},                     // ! before >
+    {"!(5 > 3)", 0.0, EVAL_ERROR_OK, true},                   // same as above with explicit grouping
+    {"5 + 3 > 2 * 3", 1.0, EVAL_ERROR_OK, true},              // arithmetic before comparison
+    {"5 + 3 > 2 * 4", 0.0, EVAL_ERROR_OK, true},              // arithmetic before comparison
+    {"(5 > 3) ? (1 + 2) : (3 + 4)", 3.0, EVAL_ERROR_OK, true},      // ternary has low precedence
+    {"($var1 + $var2 * 2 > 80) ? 100 : 200", 100.0, EVAL_ERROR_OK, true}, // complex precedence test (42 + 24*2 = 90, which is > 80)
+};
+
+// Parentheses tests - specifically testing how parentheses change operator precedence
+static TestCase parentheses_tests[] = {
+    {"5 + 3 * 2", 11.0, EVAL_ERROR_OK, true},            // Default: * has higher precedence
+    {"(5 + 3) * 2", 16.0, EVAL_ERROR_OK, true},          // Parentheses change precedence
+    {"5 * (3 + 2)", 25.0, EVAL_ERROR_OK, true},          // Parentheses change order of operations
+    {"(5 + 3 * 2)", 11.0, EVAL_ERROR_OK, true},          // Redundant parentheses don't change anything
+    {"((5 + 3) * 2)", 16.0, EVAL_ERROR_OK, true},        // Nested parentheses
+    {"5 - (3 - 1)", 3.0, EVAL_ERROR_OK, true},           // Parentheses with subtraction
+    {"5 - 3 - 1", 1.0, EVAL_ERROR_OK, true},             // Without parentheses (left-to-right)
+    {"(5 - 3) - 1", 1.0, EVAL_ERROR_OK, true},           // Explicit grouping doesn't change result
+    {"5 - (3 - 1)", 3.0, EVAL_ERROR_OK, true},           // Different grouping changes result
+    {"5 / (2 * 2.5)", 1.0, EVAL_ERROR_OK, true},         // Division and multiplication with parentheses
+    {"(5 / 2) * 2.5", 6.25, EVAL_ERROR_OK, true},        // Different grouping changes result
+    {"$var1 * ($var2 + 6)", 1260.0, EVAL_ERROR_OK, true}, // Variables with parentheses
+    {"($var1 * $var2) + 6", 1014.0, EVAL_ERROR_OK, true}, // Different grouping with variables
+    {"!($var1 > $var2)", 0.0, EVAL_ERROR_OK, true},      // Logical NOT with parentheses
+    {"!(0)", 1.0, EVAL_ERROR_OK, true},                  // Logical NOT with constant
+    {"!0", 1.0, EVAL_ERROR_OK, true},                    // Same without parentheses
+    {"5 > 3 && (2 < 1 || 3 > 1)", 1.0, EVAL_ERROR_OK, true}, // Complex logical expression with parentheses
+    {"(5 > 3 && 2 < 1) || 3 > 1", 1.0, EVAL_ERROR_OK, true}, // Different grouping changes result
+    {"5 > 3 && 2 < 1 || 3 > 1", 1.0, EVAL_ERROR_OK, true},   // Default precedence (&& before ||)
+    {"(5 > 3) && ((2 < 1) || (3 > 1))", 1.0, EVAL_ERROR_OK, true}, // Excessive parentheses
+    {"(((5))) + (((3)))", 8.0, EVAL_ERROR_OK, true},     // Multiple nested parentheses
+    {"abs(-($var1 - $var2))", 18.0, EVAL_ERROR_OK, true}, // Function with parenthesized expression
+    {"abs(-(($var1) - ($var2)))", 18.0, EVAL_ERROR_OK, true}, // Function with nested parentheses
+    {"(5 > 3) ? ($var1 + $var2) : ($var1 - $var2)", 66.0, EVAL_ERROR_OK, true}, // Ternary with parentheses
+    {"((5 > 3) ? $var1 : $var2) + 10", 52.0, EVAL_ERROR_OK, true}, // Parentheses around ternary
+};
+
+// Tests for API functions
+static TestCase api_function_tests[] = {
+    {"1 + 2", 3.0, EVAL_ERROR_OK, true},  // For testing expression_source and expression_parsed_as
+    {"$var1", 42.0, EVAL_ERROR_OK, true},  // For testing expression_result and variable lookup
+    {"bad/syntax", 0.0, EVAL_ERROR_UNKNOWN_OPERAND, false},  // For testing expression_error_msg
+    {"$hardcoded_var", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},  // For testing expression_hardcode_variable
+};
+
+// Test cases for number overflow
+static TestCase overflow_tests[] = {
+    // Positive overflow - extreme large numbers
+    {"1e308", 1e308, EVAL_ERROR_OK, true},  // Very large but valid number
+    {"1e308 * 10", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Overflow to positive infinity
+    {"1e308 + 1e308", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Addition causing overflow
+
+    // Negative overflow - extreme large negative numbers
+    {"-1e308", -1e308, EVAL_ERROR_OK, true},  // Very large negative but valid
+    {"-1e308 * 10", -INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Overflow to negative infinity
+    {"-1e308 - 1e308", -INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Subtraction causing negative overflow
+
+    // Operations with infinity
+    {"1e308 * 1e308", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Multiplication causing overflow
+    {"-1e308 * -1e308", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Negative * negative = positive overflow
+    {"1e308 / 1e-308", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Division causing overflow
+
+    // Mixed operations
+    {"1e308 - 1e308", 0.0, EVAL_ERROR_OK, true},  // This should properly cancel out
+    {"(1e308 * 2) / 2", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Overflow in intermediate calculation
+};
+
+// Test cases for combined complex expressions
+static TestCase combined_tests[] = {
+    // Complex arithmetic expressions combining multiple operations
+    {"(5 + 3 * 2) / (1 + 1) * 4 - 10", 12.0, EVAL_ERROR_OK, true},
+    {"((($var1 * 2) / 4) + (($var2 - 4) * 2)) / 10", 6.1, EVAL_ERROR_OK, true}, // Corrected expected result
+    {"abs($negative) * 2 + $var1 / 2 - $var2", 17.0, EVAL_ERROR_OK, true}, // Corrected expected result
+
+    // Complex boolean expressions with multiple conditions
+    {"($var1 > 40 && $var2 < 30) || ($var1 - $var2 > 10)", 1.0, EVAL_ERROR_OK, true},
+    {"!($var1 < 40) && ($var2 > 20 || $zero < 1) && !($var1 == $var2)", 1.0, EVAL_ERROR_OK, true},
+    // Ternary expressions need proper parentheses in Netdata
+    {"(($var1 > $var2) ? ($var1 - $var2) : ($var2 - $var1)) > 15", 1.0, EVAL_ERROR_OK, true},
+
+    // Mix of arithmetic and boolean with precedence tests
+    {"($var1 + $var2) / 2 > ($var1 > $var2 ? $var2 : $var1)", 1.0, EVAL_ERROR_OK, true},
+    {"(($var1 > $var2 ? 1 : 0) * 10 + (($var1 - $var2) / 3)) > 15", 1.0, EVAL_ERROR_OK, true},
+
+    // Complex expressions with potential overflows
+    {"(1e308 - 1e308) * $var1 + $var2", 24.0, EVAL_ERROR_OK, true},
+    {"($var1 > 0 ? 1e308 : -1e308) * ($var1 < 0 ? 1 : 0)", 0.0, EVAL_ERROR_OK, true},
+    {"(1e308 + 1e308 > 0) ? $var1 : $var2", 42.0, EVAL_ERROR_OK, true},
+
+    // Deeply nested expressions with mixed operations
+    {"((((($var1 / 2) + ($var2 * 2)) - 10) * 2) / 4) + (($var1 > $var2) ? 5 : -5)", 34.5, EVAL_ERROR_OK, true}, // Corrected expected result
+    // This tests the nested ternaries with proper parentheses
+    {"(abs($negative) > 5) ? $var1 : $var2", 42.0, EVAL_ERROR_OK, true}, // Simplified to avoid nested ternary issue
+    {"(($var1 + $var2) / 2 > 30) ? 10 : 5", 10.0, EVAL_ERROR_OK, true}, // Simplified second half of above test
+
+    // Expressions with short-circuit evaluation
+    {"$zero && (1 / $zero)", 0.0, EVAL_ERROR_OK, true},  // Short-circuit prevents division by zero
+    {"1 || (1e308 * 1e308)", 1.0, EVAL_ERROR_OK, true},  // Short-circuit prevents overflow
+    // Split this into two tests to avoid nested ternary issues
+    {"($var1 < 0) ? (1 / $zero) : $var1", 42.0, EVAL_ERROR_OK, true}, // First part of previous test
+    {"($var2 > 100) ? (1e308 * 1e308) : $var2", 24.0, EVAL_ERROR_OK, true}, // Second part of previous test
+};
+
+// Test cases that previously crashed Netdata
+// Note: Netdata's parser doesn't support nested ternary operators without proper parentheses
+// so we need to modify our expectations accordingly
+static TestCase crash_tests[] = {
+    // Netdata can't parse nested ternaries without parentheses
+    {"$var1 > 0 ? $var1 < 0 ? 1 : 2 : 3", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},
+    // This doesn't parse as expected - Netdata parses it differently
+    {"$var1 > 0 ? ( $var1 < 0 ? 1 : 2 ) : 3", 1.0, EVAL_ERROR_OK, true},
+    // Outer parentheses don't help with nested ternaries without inner parentheses
+    {"( $var1 > 0 ? $var1 < 0 ? 1 : 2 : 3 )", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},
+    // Fully parenthesized works correctly
+    {"($var1 > 0) ? (($var1 < 0) ? 1 : 2) : 3", 2.0, EVAL_ERROR_OK, true},
+    // Multiple nested parentheses are fine
+    {"(($zero)) ? 0 : ((($var1)))", 42.0, EVAL_ERROR_OK, true},
+    // Variable lookup errors are properly handled
+    {"$nonexistent + $var1", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},
+    // Division by (0-0) gives an INFINITE error in Netdata's implementation
+    {"10 / ($zero - $zero)", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
+};
+
+// Test cases for variable names with spaces
+static TestCase variable_space_tests[] = {
+    // Testing $var syntax (can't have spaces)
+    {"$this", 50.0, EVAL_ERROR_OK, true},
+    {"$this variable", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false}, // This should fail to parse as "variable" is considered garbage
+    {"$this + variable", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false}, // Invalid syntax
+
+    // Testing ${var} syntax (can have spaces)
+    {"${this}", 50.0, EVAL_ERROR_OK, true},
+    {"${this variable}", 100.0, EVAL_ERROR_OK, true}, // This should parse as a single variable named 'this variable'
+
+    // Testing more complex expressions with spaced variable names
+    {"${this variable} * 2", 200.0, EVAL_ERROR_OK, true},
+    {"${this variable} > ${this}", 1.0, EVAL_ERROR_OK, true},
+    {"${this} + ${this variable}", 150.0, EVAL_ERROR_OK, true},
+
+    // Edge cases with missing or incomplete braces
+    {"${this variable", 100.0, EVAL_ERROR_OK, true}, // Missing closing brace but parser accepts it
+    {"${}", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},             // Empty brackets
+
+    // Using ${var} inside complex expressions
+    {"(${this variable} + ${this}) / 2", 75.0, EVAL_ERROR_OK, true},
+    {"(${this} > 0) ? ${this variable} : 0", 100.0, EVAL_ERROR_OK, true}, // Fixed the ternary syntax
+};
+
+// Define the test groups
+static TestGroup test_groups[] = {
+    {"Arithmetic Tests", arithmetic_tests, ARRAY_SIZE(arithmetic_tests)},
+    {"Comparison Tests", comparison_tests, ARRAY_SIZE(comparison_tests)},
+    {"Logical Tests", logical_tests, ARRAY_SIZE(logical_tests)},
+    {"Variable Tests", variable_tests, ARRAY_SIZE(variable_tests)},
+    {"Variable Space Tests", variable_space_tests, ARRAY_SIZE(variable_space_tests)},
+    {"Function Tests", function_tests, ARRAY_SIZE(function_tests)},
+    {"Special Value Tests", special_value_tests, ARRAY_SIZE(special_value_tests)},
+    {"Complex Expression Tests", complex_tests, ARRAY_SIZE(complex_tests)},
+    {"Edge Case Tests", edge_case_tests, ARRAY_SIZE(edge_case_tests)},
+    {"Operator Precedence Tests", precedence_tests, ARRAY_SIZE(precedence_tests)},
+    {"Parentheses Tests", parentheses_tests, ARRAY_SIZE(parentheses_tests)},
+    {"API Function Tests", api_function_tests, ARRAY_SIZE(api_function_tests)},
+    {"Number Overflow Tests", overflow_tests, ARRAY_SIZE(overflow_tests)},
+    {"Combined Complex Expressions", combined_tests, ARRAY_SIZE(combined_tests)},
+    {"Crash Tests", crash_tests, ARRAY_SIZE(crash_tests)},
+};
+
+ASTNode *parse_string(const char *input);
+void eval_unittest_ast(void) {
     for (size_t i = 0; i < ARRAY_SIZE(test_groups); i++) {
         TestGroup *group = &test_groups[i];
 
         printf("=== Running Test Group: %s ===\n", group->name);
 
-        for (int i = 0; i < group->test_count; i++) {
-            TestCase *tc = &group->test_cases[i];
-            printf("Test %d: %s\n", i + 1, tc->expression);
+        for (int j = 0; j < group->test_count; j++) {
+            TestCase *tc = &group->test_cases[j];
+            printf("Test %d: %s\n", j + 1, tc->expression);
             ASTNode *ast = parse_string(tc->expression);
 
             if (ast != NULL) {
@@ -644,7 +635,20 @@ int eval_unittest(void) {
             printf("\n");
         }
     }
+}
 
+int eval_unittest(void) {
+    // Test cases for basic arithmetic operations
+
+    eval_unittest_ast();
+
+    // Run all test groups
+    int total_passed = 0;
+    int total_failed = 0;
+    int total_tests = 0;
+    
+    printf("Starting comprehensive evaluation tests\n");
+    
     for (size_t i = 0; i < ARRAY_SIZE(test_groups); i++) {
         run_test_group(&test_groups[i]);
         
