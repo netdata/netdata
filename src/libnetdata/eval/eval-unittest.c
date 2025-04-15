@@ -31,6 +31,14 @@ static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NE
         *result = INFINITY;
         return true;
     }
+    else if (strcmp(var_name, "this variable") == 0) {
+        *result = 100.0;
+        return true;
+    }
+    else if (strcmp(var_name, "this") == 0) {
+        *result = 50.0;
+        return true;
+    }
     
     return false; // Variable not found
 }
@@ -560,12 +568,38 @@ int eval_unittest(void) {
         {"10 / ($zero - $zero)", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
     };
 
+    // Test cases for variable names with spaces
+    TestCase variable_space_tests[] = {
+        // Testing $var syntax (can't have spaces)
+        {"$this", 50.0, EVAL_ERROR_OK, true},
+        {"$this variable", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false}, // This should fail to parse as "variable" is considered garbage
+        {"$this + variable", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false}, // Invalid syntax
+        
+        // Testing ${var} syntax (can have spaces)
+        {"${this}", 50.0, EVAL_ERROR_OK, true},
+        {"${this variable}", 100.0, EVAL_ERROR_OK, true}, // This should parse as a single variable named 'this variable'
+        
+        // Testing more complex expressions with spaced variable names
+        {"${this variable} * 2", 200.0, EVAL_ERROR_OK, true},
+        {"${this variable} > ${this}", 1.0, EVAL_ERROR_OK, true},
+        {"${this} + ${this variable}", 150.0, EVAL_ERROR_OK, true},
+        
+        // Edge cases with missing or incomplete braces
+        {"${this variable", 100.0, EVAL_ERROR_OK, true}, // Missing closing brace but parser accepts it
+        {"${}", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},             // Empty brackets
+        
+        // Using ${var} inside complex expressions
+        {"(${this variable} + ${this}) / 2", 75.0, EVAL_ERROR_OK, true},
+        {"(${this} > 0) ? ${this variable} : 0", 100.0, EVAL_ERROR_OK, true}, // Fixed the ternary syntax
+    };
+
     // Define the test groups
     TestGroup test_groups[] = {
         {"Arithmetic Tests", arithmetic_tests, ARRAY_SIZE(arithmetic_tests)},
         {"Comparison Tests", comparison_tests, ARRAY_SIZE(comparison_tests)},
         {"Logical Tests", logical_tests, ARRAY_SIZE(logical_tests)},
         {"Variable Tests", variable_tests, ARRAY_SIZE(variable_tests)},
+        {"Variable Space Tests", variable_space_tests, ARRAY_SIZE(variable_space_tests)},
         {"Function Tests", function_tests, ARRAY_SIZE(function_tests)},
         {"Special Value Tests", special_value_tests, ARRAY_SIZE(special_value_tests)},
         {"Complex Expression Tests", complex_tests, ARRAY_SIZE(complex_tests)},
