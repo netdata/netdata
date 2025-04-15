@@ -6,3 +6,4 @@ metadata:
     fields:
       vendor:
         value: "opengear"
+      description: Opengear device vendor

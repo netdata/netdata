@@ -10,6 +10,8 @@ metrics:
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.6
           name: lldpRemPortIdSubtype
+        description: The port identifier subtype of the LLDP remote system.
+        unit: "{port_id_subtype}"
         tag: lldp_rem_port_id_subtype
         mapping:
           1: interface_alias
@@ -22,8 +24,12 @@ metrics:
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.7
           name: lldpRemPortId
+        description: The port identifier of the LLDP remote system.
+        unit: "{port_id}"
         tag: lldp_rem_port_id
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.9
           name: lldpRemSysName
+        description: The system name of the LLDP remote system.
+        unit: "{system_name}"
         tag: lldp_rem_sys_name

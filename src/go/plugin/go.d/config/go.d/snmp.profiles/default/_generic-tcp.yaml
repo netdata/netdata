@@ -6,48 +6,67 @@ metrics:
   symbol:
     OID: 1.3.6.1.2.1.6.5.0
     name: tcpActiveOpens
+  description: Number of active TCP connections opened.
+  unit: connection
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.6.0
     name: tcpPassiveOpens
+  description: Number of passive TCP connections opened.
+  unit: connection
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.7.0
     name: tcpAttemptFails
+  description: Number of failed TCP connection attempts.
+  unit: connection
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.8.0
     name: tcpEstabResets
+  description: Number of reset TCP connections.
+  unit: connection
 - MIB: TCP-MIB
   symbol:
     OID: 1.3.6.1.2.1.6.9.0
     name: tcpCurrEstab
+  description: The number of currently established TCP connections.
+  unit: connection
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.17.0
     name: tcpHCInSegs
+  description: Total number of TCP segments received.
+  unit: segment
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.18.0
     name: tcpHCOutSegs
+  description: Total number of TCP segments sent.
+  unit: segment
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.12.0
     name: tcpRetransSegs
+  description: Number of retransmitted TCP segments.
+  unit: segment
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.14.0
     name: tcpInErrs
+  description: Number of TCP segments received with errors.
+  unit: segment
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.15.0
     name: tcpOutRsts
-
+  description: Number of TCP segments sent with the RST flag.
+  unit: segment

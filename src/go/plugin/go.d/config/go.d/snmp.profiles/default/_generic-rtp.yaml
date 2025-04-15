@@ -6,21 +6,33 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.87.1.3.1.6
         name: rtpSessionSenderJoins
+        description: Number of sender joins for the RTP session.
+        unit: join
       - OID: 1.3.6.1.2.1.87.1.3.1.7
         name: rtpSessionReceiverJoins
+        description: Number of receiver joins for the RTP session.
+        unit: join
       - OID: 1.3.6.1.2.1.87.1.3.1.8
         name: rtpSessionByes
+        description: Number of BYE messages sent for the RTP session.
+        unit: bye
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
+        description: The index of the RTP session.
+        unit: {session}
       - tag: rtpSessionRemAddr
         symbol:
           OID: 1.3.6.1.2.1.87.1.3.1.3
           name: rtpSessionRemAddr
+        description: The remote address for the RTP session.
+        unit: {address}
       - tag: rtpSessionLocAddr
         symbol:
           OID: 1.3.6.1.2.1.87.1.3.1.4
           name: rtpSessionLocAddr
+        description: The local address for the RTP session.
+        unit: {address}
   - MIB: RTP-MIB
     table:
       name: rtpSenderTable
@@ -28,13 +40,21 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.87.1.5.1.4
         name: rtpSenderPackets
+        description: Number of RTP packets sent.
+        unit: packet
       - OID: 1.3.6.1.2.1.87.1.5.1.5
         name: rtpSenderOctets
+        description: Number of RTP octets sent.
+        unit: byte
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
+        description: The index of the RTP session.
+        unit: {session}
       - index: 2
         tag: rtpSenderSSRC
+        description: The SSRC of the RTP sender.
+        unit: {ssrc}
   - MIB: RTP-MIB
     table:
       name: rtpRcvrTable
@@ -42,16 +62,30 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.87.1.7.1.12
         name: rtpRcvrPackets
+        description: Number of RTP packets received.
+        unit: packet
       - OID: 1.3.6.1.2.1.87.1.7.1.13
         name: rtpRcvrOctets
+        description: Number of RTP octets received.
+        unit: byte
       - OID: 1.3.6.1.2.1.87.1.7.1.6
         name: rtpRcvrLostPackets
+        description: Number of RTP packets lost.
+        unit: packet
       - OID: 1.3.6.1.2.1.87.1.7.1.7
         name: rtpRcvrJitter
+        description: Interarrival jitter.
+        unit: s
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
+        description: The index of the RTP session.
+        unit: {session}
       - index: 2
         tag: rtpRcvrSRCSSRC
+        description: The SSRC of the RTP sender.
+        unit: {ssrc}
       - index: 3
         tag: rtpRcvrSSRC
+        description: The SSRC of the RTP receiver.
+        unit: {ssrc}

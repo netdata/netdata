@@ -10,9 +10,13 @@ metrics:
     # The number of packets received on this interface, belonging to this address family that match this Destination Class.
     - OID: 1.3.6.1.4.1.2636.3.6.2.1.4
       name: jnxDcuStatsPackets
+      description: The number of packets received on this interface, belonging to this address family that match this Destination Class.
+      unit: packets
     # The number of bytes received on this interface, belonging to this address family that match this Destination Class.
     - OID: 1.3.6.1.4.1.2636.3.6.2.1.5
       name: jnxDcuStatsBytes
+      description: The number of bytes received on this interface, belonging to this address family that match this Destination Class.
+      unit: byte
     metric_tags:
     - symbol:
         OID: 1.3.6.1.2.1.31.1.1.1.1

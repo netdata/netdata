@@ -6,10 +6,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.14.10.1.6
         name: ospfNbrState
+        description: The OSPF neighbor state.
+        unit: "{neighbor_state}"
       - OID: 1.3.6.1.2.1.14.10.1.7
         name: ospfNbrEvents
+        description: The number of OSPF neighbor events.
+        unit: "{event}"
       - OID: 1.3.6.1.2.1.14.10.1.8
         name: ospfNbrLsRetransQLen
+        description: The length of the OSPF neighbor link-state retransmission queue.
+        unit: packet
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.10.1.3
@@ -39,6 +45,8 @@ metrics:
     symbols:
       - name: ospfNbr
         constant_value_one: true
+        description: Indicates a constant value of one for OSPF neighbors.
+        unit: "{neighbor}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.10.1.3
@@ -68,10 +76,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.14.11.1.5
         name: ospfVirtNbrState
+        description: The OSPF virtual neighbor state.
+        unit: "{neighbor_state}"
       - OID: 1.3.6.1.2.1.14.11.1.6
         name: ospfVirtNbrEvents
+        description: The number of OSPF virtual neighbor events.
+        unit: "{event}"
       - OID: 1.3.6.1.2.1.14.11.1.7
         name: ospfVirtNbrLsRetransQLen
+        description: The length of the OSPF virtual neighbor link-state retransmission queue.
+        unit: packet
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.3
@@ -101,6 +115,8 @@ metrics:
     symbols:
       - name: ospfVirtNbr
         constant_value_one: true
+        description: Indicates a constant value of one for OSPF virtual neighbors.
+        unit: "{neighbor}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.3
@@ -130,10 +146,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.14.7.1.8
         name: ospfIfRetransInterval
+        description: The time between retransmitting lost link-state packets.
+        unit: s
       - OID: 1.3.6.1.2.1.14.7.1.12
         name: ospfIfState
+        description: The OSPF interface state.
+        unit: "{interface_state}"
       - OID: 1.3.6.1.2.1.14.7.1.21
         name: ospfIfLsaCount
+        description: The number of link-state advertisements for the OSPF interface.
+        unit: "{advertisement}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.7.1.1
@@ -164,6 +186,8 @@ metrics:
     symbols:
       - name: ospfIf
         constant_value_one: true
+        description: Indicates a constant value of one for OSPF interfaces.
+        unit: "{interface}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.7.1.1
@@ -194,10 +218,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.14.9.1.4
         name: ospfVirtIfRetransInterval
+        description: The time between retransmitting lost link-state packets for the virtual interface.
+        unit: s
       - OID: 1.3.6.1.2.1.14.9.1.7
         name: ospfVirtIfState
+        description: The OSPF virtual interface state.
+        unit: "{interface_state}"
       - OID: 1.3.6.1.2.1.14.9.1.12
         name: ospfVirtIfLsaCount
+        description: The number of link-state advertisements for the virtual OSPF interface.
+        unit: "{advertisement}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.2
@@ -219,6 +249,8 @@ metrics:
     symbols:
       - name: ospfVirtIf
         constant_value_one: true
+        description: Indicates a constant value of one for virtual OSPF interfaces.
+        unit: "{interface}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.2

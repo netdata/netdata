@@ -9,24 +9,44 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.1
         name: adapterRxPackets
+        description: Number of packets received by the adapter.
+        unit: packets
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.2
         name: adapterTxPackets
+        description: Number of packets transmitted by the adapter.
+        unit: packets
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.3
         name: adapterRxBytes
+        description: Number of bytes received by the adapter.
+        unit: By
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.4
         name: adapterTxBytes
+        description: Number of bytes transmitted by the adapter.
+        unit: By
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.5
         name: adapterRxErrors
+        description: Number of receive errors on the adapter.
+        unit: errors
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.6
         name: adapterTxErrors
+        description: Number of transmit errors on the adapter.
+        unit: errors
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.7
         name: adapterRxDropped
+        description: Number of receive packets dropped by the adapter.
+        unit: packets
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.8
         name: adapterTxDropped
+        description: Number of transmit packets dropped by the adapter.
+        unit: packets
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.9
         name: adapterRxMulticast
+        description: Number of multicast packets received by the adapter.
+        unit: packets
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.10
         name: adapterCollisions
+        description: Number of collisions on the adapter.
+        unit: collisions
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.343.2.7.2.2.1.1.1.2

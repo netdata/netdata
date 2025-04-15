@@ -8,12 +8,16 @@ metrics:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.44.0
         # core check only
       name: memory.total
+    description: Memory stats
+    unit: By
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.45.0
         # core check only
       name: memory.used
+    description: Memory stats
+    unit: By
   # CPU
   - MIB: F5-BIGIP-SYSTEM-MIB
     table:
@@ -23,8 +27,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.27
         name: cpu.usage # sysMultiHostCpuUsageRatio1m
+        description: sysMultiHostCpuUsageRatio1m
+        unit: '%'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
           name: sysMultiHostCpuId
         tag: cpu
+        description: Index of the CPU
+        unit: '{cpu}'

@@ -5,4 +5,5 @@ metadata:
   device:
     fields:
       vendor:
+        description: "The vendor of the device"
         value: "vertiv"

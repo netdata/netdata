@@ -8,20 +8,36 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.8
         name: cpqDaPhyDrvUsedReallocs
+        description: Physical drive used reallocations.
+        unit: ct
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.9
         name: cpqDaPhyDrvRefHours
+        description: Physical drive reference hours.
+        unit: h
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.16
         name: cpqDaPhyDrvHardReadErrs
+        description: Physical drive hard read errors.
+        unit: ct
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.17
         name: cpqDaPhyDrvRecvReadErrs
+        description: Physical drive receive read errors.
+        unit: ct
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.18
         name: cpqDaPhyDrvHardWriteErrs
+        description: Physical drive hard write errors.
+        unit: ct
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.19
         name: cpqDaPhyDrvRecvWriteErrs
+        description: Physical drive receive write errors.
+        unit: ct
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.20
         name: cpqDaPhyDrvHSeekErrs
+        description: Physical drive H seek errors.
+        unit: ct
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.21
         name: cpqDaPhyDrvSeekErrs
+        description: Physical drive seek errors.
+        unit: ct
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.3.2.5.1.1.1
@@ -38,16 +54,28 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.6
         name: cpqDaPhyDrvStatus
+        description: Physical drive status.
+        unit: {drive_status}
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.7
         name: cpqDaPhyDrvFactReallocs
+        description: Physical drive factory reallocations.
+        unit: ct
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.22
         name: cpqDaPhyDrvSpinupTime
+        description: Physical drive spin up time.
+        unit: s
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.45
         name: cpqDaPhyDrvSize
+        description: Physical drive size.
+        unit: B
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.57
         name: cpqDaPhyDrvSmartStatus
+        description: Physical drive SMART status.
+        unit: {drive_status}
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.70
         name: cpqDaPhyDrvCurrentTemperature
+        description: Physical drive current temperature.
+        unit: Cel
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.3.2.5.1.1.1

@@ -1,3 +1,4 @@
+```yaml
 # Provide metrics that can be found in Dell devices that are or contain DRAC components
 
 metrics:
@@ -8,30 +9,56 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.4
         name: systemStateChassisStatus
+        description: Status of the chassis
+        unit: '{chassis}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.6
         name: systemStatePowerUnitStatusRedundancy
+        description: Redundancy status of the power unit
+        unit: '{power_unit}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.9
         name: systemStatePowerSupplyStatusCombined
+        description: Combined status of the power supply
+        unit: '{power_supply}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.15
         name: systemStateAmperageStatusCombined
+        description: Combined amperage status
+        unit: '{amperage}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.18
         name: systemStateCoolingUnitStatusRedundancy
+        description: Redundancy status of the cooling unit
+        unit: '{cooling_unit}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.21
         name: systemStateCoolingDeviceStatusCombined
+        description: Combined status of the cooling device
+        unit: '{cooling_device}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.24
         name: systemStateTemperatureStatusCombined
+        description: Combined temperature status
+        unit: '{temperature}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.27
         name: systemStateMemoryDeviceStatusCombined
+        description: Combined status of the memory device
+        unit: '{memory_device}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.30
         name: systemStateChassisIntrusionStatusCombined
+        description: Combined status of chassis intrusion
+        unit: '{intrusion}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.42
         name: systemStatePowerUnitStatusCombined
+        description: Combined status of the power unit
+        unit: '{power_unit}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.44
         name: systemStateCoolingUnitStatusCombined
+        description: Combined status of the cooling unit
+        unit: '{cooling_unit}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.50
         name: systemStateProcessorDeviceStatusCombined
+        description: Combined status of the processor device
+        unit: '{processor_device}'
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.63
         name: systemStateTemperatureStatisticsStatusCombined
+        description: Combined status of temperature statistics
+        unit: '{temperature_statistics}'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.1
@@ -44,6 +71,8 @@ metrics:
     symbols:
       - name: dell.systemState
         constant_value_one: true
+        description: Constant value of one for system state
+        unit: '1'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.1
@@ -201,12 +230,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.4
         name: physicalDiskState
+        description: State of the physical disk
+        unit: '{disk}'
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.11
         name: physicalDiskCapacityInMB
+        description: Capacity of the physical disk in MB
+        unit: MB
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.17
         name: physicalDiskUsedSpaceInMB
+        description: Used space of the physical disk in MB
+        unit: MB
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.19
         name: physicalDiskFreeSpaceInMB
+        description: Free space of the physical disk in MB
+        unit: MB
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.2
@@ -219,6 +256,8 @@ metrics:
     symbols:
       - name: dell.physicalDisk
         constant_value_one: true
+        description: Constant value of one for a physical disk
+        unit: '1'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.4
@@ -250,6 +289,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.4
         name: enclosurePowerSupplyState
+        description: State of the enclosure power supply
+        unit: '{power_supply}'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.2
@@ -270,6 +311,8 @@ metrics:
     symbols:
       - name: enclosurePowerSupply
         constant_value_one: true
+        description: Constant value of one for enclosure power supply
+        unit: '1'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.4
@@ -300,6 +343,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.4
         name: batteryState
+        description: State of the battery
+        unit: '{battery}'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.20
@@ -316,6 +361,8 @@ metrics:
     symbols:
       - name: dell.battery
         constant_value_one: true
+        description: Constant value of one for the battery
+        unit: '1'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.4
@@ -344,6 +391,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.37
         name: controllerRollUpStatus
+        description: Roll-up status of the controller
+        unit: '{controller}'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.1
@@ -368,6 +417,8 @@ metrics:
     symbols:
       - name: dell.controller
         constant_value_one: true
+        description: Constant value of one for a controller
+        unit: '1'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.37
@@ -403,6 +454,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.5
         name: pCIDeviceStatus
+        description: Status of the PCI device
+        unit: '{device}'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.9
@@ -419,6 +472,8 @@ metrics:
     symbols:
       - name: dell.pCIDevice
         constant_value_one: true
+        description: Constant value of one for a PCI device
+        unit: '1'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.5
@@ -446,6 +501,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.5
         name: systemSlotStatus
+        description: Status of the system slot
+        unit: '{slot}'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.8
@@ -462,6 +519,8 @@ metrics:
     symbols:
       - name: dell.systemSlot
         constant_value_one: true
+        description: Constant value of one for a system slot
+        unit: '1'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.5
@@ -489,6 +548,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.3
         name: networkDeviceStatus
+        description: Status of the network device
+        unit: '{network_device}'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.1
@@ -509,6 +570,8 @@ metrics:
     symbols:
       - name: dell.networkDevice
         constant_value_one: true
+        description: Constant value of one for a network device
+        unit: '1'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.3
@@ -526,668 +589,4 @@ metrics:
           name: networkDeviceChassisIndex
         tag: chassis_index
       - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.2
-          name: networkDeviceIndex
-        tag: device_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.16
-          name: networkDevicePermanentMACAddress
-        tag: mac_addr
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.30
-          name: networkDeviceFQDD
-        tag: device_fqdd
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.300.50
-      name: systemBIOSTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.5
-        name: systemBIOSStatus
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.1
-          name: systemBIOSchassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.2
-          name: systemBIOSIndex
-        tag: system_bios_index
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.300.50
-      name: systemBIOSTable
-    symbols:
-      - name: dell.systemBIOS
-        constant_value_one: true
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.1
-          name: systemBIOSchassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.2
-          name: systemBIOSIndex
-        tag: system_bios_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.5
-          name: systemBIOSStatus
-        tag: system_bios_status
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.300.70
-      name: intrusionTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.5
-        name: intrusionStatus
-      - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.6
-        name: intrusionReading
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.1
-          name: intrusionchassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.2
-          name: intrusionIndex
-        tag: intrusion_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.8
-          name: intrusionLocationName
-        tag: intrusion_location_name
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.600.12
-      name: powerSupplyTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.6
-        name: powerSupplyOutputWatts
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.9
-        name: powerSupplyMaximumInputVoltage
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.16
-        name: powerSupplyCurrentInputVoltage
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.1
-          name: powerSupplychassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.2
-          name: powerSupplyIndex
-        tag: power_supply_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.15
-          name: powerSupplyFQDD
-        tag: power_supply_fqdd
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.600.30
-      name: amperageProbeTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.5
-        name: amperageProbeStatus
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.6
-        name: amperageProbeReading
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.7
-          name: amperageProbeType
-        tag: probe_type
-        mapping:
-          1: amperage_probe_type_is_other
-          2: amperage_probe_type_is_unknown
-          3: amperage_probe_type_is_1point5_volt    # 1.5 volt
-          4: amperage_probe_type_is_3point3_volt    # 3.3 volt
-          5: amperage_probe_type_is_5_volt          # 5 volt
-          6: amperage_probe_type_is_minus5_volt     # -5 volt
-          7: amperage_probe_type_is_12_volt         # 12 volt
-          8: amperage_probe_type_is_minus12_volt    # -12 volt
-          9: amperage_probe_type_is_io
-          10: amperage_probe_type_is_core
-          11: amperage_probe_type_is_flea
-          12: amperage_probe_type_is_battery
-          13: amperage_probe_type_is_terminator
-          14: amperage_probe_type_is_2point5_volt   # 2.5 volt
-          15: amperage_probe_type_is_gtl
-          16: amperage_probe_type_is_discrete
-          23: amperage_probe_type_is_power_supply_amps
-          24: amperage_probe_type_is_power_supply_watts
-          25: amperage_probe_type_is_system_amps
-          26: amperage_probe_type_is_system_watts
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.1
-          name: amperageProbechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.2
-          name: amperageProbeIndex
-        tag: amperage_probe_index
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.600.30
-      name: amperageProbeTable
-    symbols:
-      - name: dell.amperageProbe
-        constant_value_one: true
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.7
-          name: amperageProbeType
-        tag: probe_type
-        mapping:
-          1: amperage_probe_type_is_other
-          2: amperage_probe_type_is_unknown
-          3: amperage_probe_type_is_1point5_volt    # 1.5 volt
-          4: amperage_probe_type_is_3point3_volt    # 3.3 volt
-          5: amperage_probe_type_is_5_volt          # 5 volt
-          6: amperage_probe_type_is_minus5_volt     # -5 volt
-          7: amperage_probe_type_is_12_volt         # 12 volt
-          8: amperage_probe_type_is_minus12_volt    # -12 volt
-          9: amperage_probe_type_is_io
-          10: amperage_probe_type_is_core
-          11: amperage_probe_type_is_flea
-          12: amperage_probe_type_is_battery
-          13: amperage_probe_type_is_terminator
-          14: amperage_probe_type_is_2point5_volt   # 2.5 volt
-          15: amperage_probe_type_is_gtl
-          16: amperage_probe_type_is_discrete
-          23: amperage_probe_type_is_power_supply_amps
-          24: amperage_probe_type_is_power_supply_watts
-          25: amperage_probe_type_is_system_amps
-          26: amperage_probe_type_is_system_watts
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.1
-          name: amperageProbechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.2
-          name: amperageProbeIndex
-        tag: amperage_probe_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.5
-          name: amperageProbeStatus
-        tag: amperage_probe_status
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical_upper
-          5: critical_upper
-          6: non_recoverable_upper
-          7: non_critical_lower
-          8: critical_lower
-          9: non_recoverable_lower
-          10: failed
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.600.60
-      name: powerUsageTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.5
-        name: powerUsageStatus
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.1
-          name: powerUsageChassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.2
-          name: powerUsageIndex
-        tag: power_usage_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.6
-          name: powerUsageEntityName
-        tag: power_usage_entity_name
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.600.20
-      name: voltageProbeTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.5
-        name: voltageProbeStatus
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.6
-        name: voltageProbeReading
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.1
-          name: voltageProbechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.2
-          name: voltageProbeIndex
-        tag: voltage_probe_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.7
-          name: voltageProbeType
-        tag: probe_type
-        mapping:
-          1: voltage_probe_type_is_other
-          2: voltage_probe_type_is_unknown
-          3: voltage_probe_type_is_1point5_volt   # 1.5 volt
-          4: voltage_probe_type_is_3point3_volt   # 3.3 volt
-          5: voltage_probe_type_is_5_volt         # 5 volt
-          6: voltage_probe_type_is_minus5_volt    # -5 volt
-          7: voltage_probe_type_is_12_volt        # 12 volt
-          8: voltage_probe_type_is_minus12_volt   # -12 volt
-          9: voltage_probe_type_is_io
-          10: voltage_probe_type_is_core
-          11: voltage_probe_type_is_flea
-          12: voltage_probe_type_is_battery
-          13: voltage_probe_type_is_terminator
-          14: voltage_probe_type_is_2point5_volt  # 2.5 volt
-          15: voltage_probe_type_is_gtl
-          16: voltage_probe_type_is_discrete
-          17: voltage_probe_type_is_generic_discrete
-          18: voltage_probe_type_is_ps_voltage
-          19: voltage_probe_type_is_memory_status
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.600.20
-      name: voltageProbeTable
-    symbols:
-      - name: dell.voltageProbe
-        constant_value_one: true
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.1
-          name: voltageProbechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.2
-          name: voltageProbeIndex
-        tag: voltage_probe_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.7
-          name: voltageProbeType
-        tag: probe_type
-        mapping:
-          1: voltage_probe_type_is_other
-          2: voltage_probe_type_is_unknown
-          3: voltage_probe_type_is_1point5_volt   # 1.5 volt
-          4: voltage_probe_type_is_3point3_volt   # 3.3 volt
-          5: voltage_probe_type_is_5_volt         # 5 volt
-          6: voltage_probe_type_is_minus5_volt    # -5 volt
-          7: voltage_probe_type_is_12_volt        # 12 volt
-          8: voltage_probe_type_is_minus12_volt   # -12 volt
-          9: voltage_probe_type_is_io
-          10: voltage_probe_type_is_core
-          11: voltage_probe_type_is_flea
-          12: voltage_probe_type_is_battery
-          13: voltage_probe_type_is_terminator
-          14: voltage_probe_type_is_2point5_volt  # 2.5 volt
-          15: voltage_probe_type_is_gtl
-          16: voltage_probe_type_is_discrete
-          17: voltage_probe_type_is_generic_discrete
-          18: voltage_probe_type_is_ps_voltage
-          19: voltage_probe_type_is_memory_status
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.5
-          name: voltageProbeStatus
-        tag: voltage_probe_status
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical_upper
-          5: critical_upper
-          6: non_recoverable_upper
-          7: non_critical_lower
-          8: critical_lower
-          9: non_recoverable_lower
-          10: failed
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.600.50
-      name: systemBatteryTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.5
-        name: systemBatteryStatus
-      - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.6
-        name: systemBatteryReading
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.1
-          name: systemBatteryChassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.2
-          name: systemBatteryIndex
-        tag: system_battery_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.7
-          name: systemBatteryLocationName
-        tag: system_battery_location_name
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.700.10
-      name: coolingUnitTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.5
-        name: coolingUnitRedundancyStatus
-      - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.8
-        name: coolingUnitStatus
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.1
-          name: coolingUnitchassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.2
-          name: coolingUnitIndex
-        tag: cooling_unit_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.7
-          name: coolingUnitName
-        tag: cooling_unit_name
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.700.12
-      name: coolingDeviceTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.5
-        name: coolingDeviceStatus
-      - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.6
-        name: coolingDeviceReading
-      - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.18
-        name: coolingDeviceDiscreteReading
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.1
-          name: coolingDevicechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.2
-          name: coolingDeviceIndex
-        tag: cooling_device_name
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.7
-          name: coolingDeviceType
-        tag: cooling_device_type
-        mapping:
-          1: cooling_device_type_is_other
-          2: cooling_device_type_is_unknown
-          3: cooling_device_type_is_a_fan
-          4: cooling_device_type_is_a_blower
-          5: cooling_device_type_is_a_chip_fan
-          6: cooling_device_type_is_a_cabinet_fan
-          7: cooling_device_type_is_a_power_supply_fan
-          8: cooling_device_type_is_a_heat_pipe
-          9: cooling_device_type_is_refrigeration
-          10: cooling_device_type_is_active_cooling
-          11: cooling_device_type_is_passive_cooling
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.8
-          name: coolingDeviceLocationName
-        tag: cooling_device_location_name
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.19
-          name: coolingDeviceFQDD
-        tag: cooling_device_fqdd
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.700.20
-      name: temperatureProbeTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.5
-        name: temperatureProbeStatus
-      - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.6
-        name: temperatureProbeReading
-      - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.16
-        name: temperatureProbeDiscreteReading
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.1
-          name: temperatureProbechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.2
-          name: temperatureProbeIndex
-        tag: temperature_probe_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.7
-          name: temperatureProbeType
-        tag: temperature_probe_type
-        mapping:
-          1: temperature_probe_type_is_other
-          2: temperature_probe_type_is_unknown
-          3: temperature_probe_type_is_ambient_esm
-          16: temperature_probe_type_is_discrete
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.8
-          name: temperatureProbeLocationName
-        tag: temperature_probe_location_name
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.1100.30
-      name: processorDeviceTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.5
-        name: processorDeviceStatus
-      - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.11
-        name: processorDeviceMaximumSpeed
-      - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.12
-        name: processorDeviceCurrentSpeed
-      - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.14
-        name: processorDeviceVoltage
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.1
-          name: processorDevicechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.2
-          name: processorDeviceIndex
-        tag: processor_device_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.23
-          name: processorDeviceBrandName
-        tag: processor_device_brand_name
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.26
-          name: processorDeviceFQDD
-        tag: processor_device_fqdd
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.1100.32
-      name: processorDeviceStatusTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.5
-        name: processorDeviceStatusStatus
-      - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.6
-        name: processorDeviceStatusReading
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.1
-          name: processorDeviceStatusChassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.2
-          name: processorDeviceStatusIndex
-        tag: processor_device_status_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.7
-          name: processorDeviceStatusLocationName
-        tag: processor_device_status_location_name
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.1100.50
-      name: memoryDeviceTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.5
-        name: memoryDeviceStatus
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7
-          name: memoryDeviceType
-        tag: device_type
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.2
-          name: memoryDeviceIndex
-        tag: device_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.1
-          name: memoryDevicechassisIndex
-        tag: chassis_index
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.1100.50
-      name: memoryDeviceTable
-    symbols:
-      - name: dell.memoryDevice
-        constant_value_one: true
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7
-          name: memoryDeviceType
-        tag: device_type
-        mapping:
-          1: device_type_is_other
-          2: device_type_is_unknown
-          3: device_type_is_dram
-          4: device_type_is_edram
-          5: device_type_is_vram
-          6: device_type_is_sram
-          7: device_type_is_ram
-          8: device_type_is_rom
-          9: device_type_is_flash
-          10: device_type_is_eeprom
-          11: device_type_is_feprom
-          12: device_type_is_eprom
-          13: device_type_is_cdram
-          14: device_type_is_3dram
-          15: device_type_is_sdram
-          16: device_type_is_sgram
-          17: device_type_is_rdram
-          18: device_type_is_ddr
-          19: device_type_is_ddr2
-          20: device_type_is_ddr2_fbdimm
-          24: device_type_is_ddr3
-          25: device_type_is_fbd2
-          26: device_type_is_ddr4
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.2
-          name: memoryDeviceIndex
-        tag: device_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.1
-          name: memoryDevicechassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.5
-          name: memoryDeviceStatus
-        tag: memory_device_status
-        mapping:
-          1: other
-          2: unknown
-          3: ok
-          4: non_critical
-          5: critical
-          6: non_recoverable
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.4.2000.10
-      name: fruTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.3
-        name: fruInformationStatus
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.1
-          name: fruChassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.2
-          name: fruIndex
-        tag: fru_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.12
-          name: fruFQDD
-        tag: fru_fqdd
-  - MIB: IDRAC-MIB-SMIv2
-    table:
-      OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1
-      name: virtualDiskTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.4
-        name: virtualDiskState
-      - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.6
-        name: virtualDiskSizeInMB
-      - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.20
-        name: virtualDiskComponentStatus
-      - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.37
-        name: virtualDiskT10PIStatus
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.1
-          name: virtualDiskNumber
-        tag: virtual_disk_number
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.2
-          name: virtualDiskName
-        tag: virtual_disk_name
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.35
-          name: virtualDiskFQDD
-        tag: virtual_disk_fqdd
-  - MIB: DELL-RAC-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.674.10892.2.3.1.9.0
-      name: drsCMCCurrStatus
-  - MIB: DELL-RAC-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.674.10892.2.3.1.1.0
-      name: drsGlobalCurrStatus
-  - MIB: DELL-RAC-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.674.10892.2.3.1.5.0
-      name: drsPowerCurrStatus
-  - MIB: DELL-RAC-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.674.10892.2.3.1.4.0
-      name: drsRedCurrStatus
-  - MIB: DELL-RAC-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.674.10892.2.2.1.0
-      name: drsGlobalSystemStatus
-  - MIB: DELL-RAC-MIB
-    table:
-      OID: 1.3.6.1.4.1.674.10892.2.4.1
-      name: drsCMCPowerTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.13
-        name: drsWattsReading
-      - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.14
-        name: drsAmpsReading
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.2.4.1.1.1
-          name: drsChassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.2.4.2.1.2
-          name: drsPSUIndex
-        tag: drs_psu_index
-  - MIB: DELL-RAC-MIB
-    metric_type: monotonic_count
-    table:
-      OID: 1.3.6.1.4.1.674.10892.2.4.1
-      name: drsCMCPowerTable
-    symbols:
-      - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.6
-        name: drsKWhCumulative
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.2.4.1.1.1
-          name: drsChassisIndex
-        tag: chassis_index
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10892.2.4.2.1.2
-          name: drsPSUIndex
-        tag: drs_psu_index
+          OID: 1.3.

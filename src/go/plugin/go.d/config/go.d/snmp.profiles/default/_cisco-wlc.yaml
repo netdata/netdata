@@ -46,6 +46,8 @@ metrics:
           1: enable
           2: disable
         tag: ap_admin_status
+    description: "Connected APs metrics"
+    unit: "{access_point}"
 
   # Connected APs 802.11 interfaces metrics
 
@@ -107,6 +109,8 @@ metrics:
           1: enable
           2: disable
         tag: ap_if_admin_status
+    description: "Connected APs 802.11 interfaces metrics"
+    unit: "{access_point_interface}"
 
   - MIB: AIRESPACE-WIRELESS-MIB
     table:
@@ -116,6 +120,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.15
         name: bsnApIfNoOfUsers
+        description: "The number of users on the interface"
+        unit: user
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
@@ -163,12 +169,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.1
         name: bsnAPIfLoadRxUtilization
+        description: "The receive utilization of the interface"
+        unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.2
         name: bsnAPIfLoadTxUtilization
+        description: "The transmit utilization of the interface"
+        unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.24
         name: bsnAPIfPoorSNRClients
+        description: "Number of clients with poor SNR on the interface"
+        unit: client
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.3
         name: bsnAPIfLoadChannelUtilization
+        description: "The channel utilization of the interface"
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
@@ -244,6 +258,8 @@ metrics:
           5: createAndWait
           6: destroy
         tag: wlan_row_status
+    description: "WLAN Metrics"
+    unit: "{wlan}"
 
   - MIB: AIRESPACE-WIRELESS-MIB
     table:
@@ -253,6 +269,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.38
         name: bsnDot11EssNumberOfMobileStations
+        description: "Number of mobile stations associated with the WLAN"
+        unit: station
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.1

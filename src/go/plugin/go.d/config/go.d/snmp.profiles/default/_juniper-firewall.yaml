@@ -7,20 +7,33 @@ metrics:
       name: jnxFirewallCounterTable
     metric_type: monotonic_count
     symbols:
+    #jnxFWCounterPacketCount
     - OID: 1.3.6.1.4.1.2636.3.5.2.1.4
       name: jnxFWCounterPacketCount
+      description: jnxFWCounterPacketCount
+      unit: packets
+    #jnxFWCounterByteCount
     - OID: 1.3.6.1.4.1.2636.3.5.2.1.5
       name: jnxFWCounterByteCount
+      description: jnxFWCounterByteCount
+      unit: By
     metric_tags:
     - symbol:
+        #jnxFWCounterFilterName
         OID: 1.3.6.1.4.1.2636.3.5.2.1.1
         name: jnxFWCounterFilterName
       tag: firewall_filter_name
+      description: jnxFWCounterFilterName
     - symbol:
+        #jnxFWCounterName
         OID: 1.3.6.1.4.1.2636.3.5.2.1.2
         name:  jnxFWCounterName
       tag: counter_name
+      description: jnxFWCounterName
     - symbol: 
+        #jnxFWCounterType
         OID: 1.3.6.1.4.1.2636.3.5.2.1.3  
         name: jnxFWCounterType
       tag: counter_type
+      description: jnxFWCounterType
+      unit: "{counter_type}"
