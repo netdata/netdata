@@ -8,35 +8,39 @@ struct pattern_array *pattern_array_allocate()
     return pa;
 }
 
-void pattern_array_add_lblkey_with_sp(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *sp) {
+void pattern_array_add_lblkey_with_sp(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *sp)
+{
     if (!pa || !key) {
         simple_pattern_free(sp);
         return;
     }
 
-    if(!sp)
+    if (!sp)
         return;
 
     STRING *string_key = string_strdupz(key);
     Pvoid_t *Pvalue = JudyLIns(&pa->JudyL, (Word_t) string_key, PJE0);
+    if (!Pvalue || Pvalue == PJERR ) {
+        string_freez(string_key);
+        simple_pattern_free(sp);
+        return;
+    }
+
+    struct pattern_array *pai;
+    if (*Pvalue)
+        string_freez(string_key);
+    else
+        *Pvalue = callocz(1, sizeof(*pai));
+
+    pai = *Pvalue;
+
+    Pvalue = JudyLIns(&pai->JudyL, (Word_t) ++pai->key_count, PJE0);
     if (!Pvalue || Pvalue == PJERR) {
-        string_freez(string_key);
         simple_pattern_free(sp);
         return;
     }
 
-    if(*Pvalue) {
-        // the string was already there
-        string_freez(string_key);
-    }
-
-    Pvoid_t *Pvalue2 = JudyLIns(Pvalue, (Word_t)sp, PJE0);
-    if (!Pvalue2 || Pvalue2 == PJERR || *Pvalue2 == sp) {
-        simple_pattern_free(sp);
-        return;
-    }
-
-    *Pvalue2 = sp;
+    *Pvalue = sp;
 }
 
 bool pattern_array_label_match(
@@ -54,20 +58,20 @@ bool pattern_array_label_match(
     while ((Pvalue = JudyLFirstThenNext(pa->JudyL, &Index, &first_then_next))) {
         // for each label key in the pattern array
 
+        struct pattern_array *pai = *Pvalue;
         SIMPLE_PATTERN_RESULT match = SP_NOT_MATCHED;
-        Pvoid_t *Pvalue2;
         Word_t Index2 = 0;
         bool first_then_next2 = true;
-        while((Pvalue2 = JudyLFirstThenNext(*Pvalue, &Index2, &first_then_next2))) {
+        while ((Pvalue = JudyLFirstThenNext(pai->JudyL, &Index2, &first_then_next2))) {
             // for each pattern in the label key pattern list
+            if (!*Pvalue)
+                continue;
 
-            SIMPLE_PATTERN *sp = *Pvalue2;
-            match = rrdlabels_match_simple_pattern_parsed(labels, sp, eq, searches);
+            match = rrdlabels_match_simple_pattern_parsed(labels, (SIMPLE_PATTERN *)(*Pvalue), eq, searches);
 
-            if(match != SP_NOT_MATCHED)
+            if (match != SP_NOT_MATCHED)
                 break;
         }
-
         if (match != SP_MATCHED_POSITIVE)
             return false;
     }
@@ -134,17 +138,18 @@ void pattern_array_free(struct pattern_array *pa)
     Word_t Index = 0;
     bool first = true;
     while ((Pvalue = JudyLFirstThenNext(pa->JudyL, &Index, &first))) {
+        struct pattern_array *pai = *Pvalue;
 
         Word_t Index2 = 0;
-        Pvoid_t *Pvalue2;
         bool first2 = true;
-        while ((Pvalue2 = JudyLFirstThenNext(*Pvalue, &Index2, &first2))) {
-            SIMPLE_PATTERN *sp = (SIMPLE_PATTERN *)*Pvalue2;
+        while ((Pvalue = JudyLFirstThenNext(pai->JudyL, &Index2, &first2))) {
+            SIMPLE_PATTERN *sp = (SIMPLE_PATTERN *)*Pvalue;
             simple_pattern_free(sp);
         }
 
-        JudyLFreeArray(Pvalue, PJE0);
+        JudyLFreeArray(&(pai->JudyL), PJE0);
         string_freez((STRING *)Index);
+        freez(pai);
     }
 
     JudyLFreeArray(&(pa->JudyL), PJE0);
