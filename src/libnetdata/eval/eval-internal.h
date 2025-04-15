@@ -39,6 +39,18 @@ typedef struct eval_node {
     EVAL_VALUE ops[];
 } EVAL_NODE;
 
+// Definition of operators structure
+struct operator {
+    const char *print_as;
+    char precedence;
+    char parameters;
+    char isfunction;
+    NETDATA_DOUBLE (*eval)(struct eval_expression *exp, EVAL_NODE *op, int *error);
+};
+
+// External declaration of operators array (defined in eval-execute.c)
+extern struct operator operators[256];
+
 struct eval_expression {
     STRING *source;
     STRING *parsed_as;
@@ -78,5 +90,27 @@ struct eval_expression {
 #define EVAL_OPERATOR_SIGN_MINUS            'M'
 #define EVAL_OPERATOR_ABS                   'A'
 #define EVAL_OPERATOR_IF_THEN_ELSE          '?'
+
+// Function declarations for shared functions
+
+// From eval-utils.c
+extern EVAL_NODE *eval_node_alloc(int count);
+extern void eval_node_set_value_to_node(EVAL_NODE *op, int pos, EVAL_NODE *value);
+extern void eval_node_set_value_to_constant(EVAL_NODE *op, int pos, NETDATA_DOUBLE value);
+extern void eval_node_set_value_to_variable(EVAL_NODE *op, int pos, const char *variable);
+extern void eval_variable_free(EVAL_VARIABLE *v);
+extern void eval_value_free(EVAL_VALUE *v);
+extern void eval_node_free(EVAL_NODE *op);
+extern void print_parsed_as_variable(BUFFER *out, EVAL_VARIABLE *v, int *error);
+extern void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n);
+extern void print_parsed_as_value(BUFFER *out, EVAL_VALUE *v, int *error);
+extern void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error);
+
+// From eval-execute.c
+extern NETDATA_DOUBLE eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error);
+extern int eval_precedence(unsigned char operator);
+
+// Functions for bison/flex integration
+extern EVAL_NODE *parse_expression_with_bison(const char *string, const char **failed_at, int *error);
 
 #endif //NETDATA_EVAL_INTERNAL_H
