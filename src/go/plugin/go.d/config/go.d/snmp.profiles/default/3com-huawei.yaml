@@ -12,6 +12,8 @@ metrics:
     symbols:
       - name: cpu.usage
         OID: 1.3.6.1.4.1.43.45.1.6.1.1.1.3
+        description: CPU utilization
+        unit: '%'
     metric_tags:
       - index: 1
         tag: cpu
@@ -22,8 +24,12 @@ metrics:
     symbols:
       - name: memory.total
         OID: 1.3.6.1.4.1.43.45.1.6.1.2.1.1.2
+        description: Total memory
+        unit: B
       - name: memory.free
         OID: 1.3.6.1.4.1.43.45.1.6.1.2.1.1.3
+        description: Free memory
+        unit: B
     metric_tags:
       - index: 1
         tag: mem
@@ -34,6 +40,8 @@ metrics:
     symbols:
       - name: hwdevMFanStatus
         constant_value_one: true
+        description: hwdevMFanStatus
+        unit: TBD
     metric_tags:
       - index: 1
         tag: fan_num
@@ -53,6 +61,8 @@ metrics:
     symbols:
       - name: hwdevMPowerStatus
         constant_value_one: true
+        description: hwdevMPowerStatus
+        unit: TBD
     metric_tags:
       - index: 1
         tag: power_num

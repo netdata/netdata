@@ -15,23 +15,33 @@ metrics:
     symbols:
       - name: netbotz.enclosure
         constant_value_one: true
+        description: Indicates if an enclosure is present.
+        unit: "{enclosure}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.2.1.1.7
           name: enclosureIndex
         tag: netbotz_enclosure_index
+        description: The index of the enclosure.
+        unit: "{enclosure}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.2.1.1.1
           name: enclosureId
         tag: netbotz_enclosure_id
+        description: The ID of the enclosure.
+        unit: "{enclosure}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.2.1.1.4
           name: enclosureLabel
         tag: netbotz_enclosure_label
+        description: The label of the enclosure.
+        unit: "{enclosure}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.2.1.1.2
           name: enclosureStatus
         tag: netbotz_enclosure_status
+        description: The status of the enclosure.
+        unit: "{enclosure}"
         mapping:
           0: disconnected
           1: error
@@ -40,6 +50,8 @@ metrics:
           OID: 1.3.6.1.4.1.5528.100.2.1.1.3
           name: enclosureErrorStatus
         tag: netbotz_enclosure_error_status
+        description: The error status of the enclosure.
+        unit: "{enclosure}"
         mapping:
           0: normal
           1: info
@@ -54,19 +66,27 @@ metrics:
     symbols:
       - name: netbotz.dinPort
         constant_value_one: true
+        description: Indicates if a dinPort is present.
+        unit: "{din_port}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.3.1.1.9
           name: dinPortIndex
         tag: netbotz_din_port_index
+        description: The index of the dinPort.
+        unit: "{din_port}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.3.1.1.1
           name: dinPortId
         tag: netbotz_din_port_id
+        description: The ID of the dinPort.
+        unit: "{din_port}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.3.1.1.2
           name: dinPortStatus
         tag: netbotz_din_port_status
+        description: The status of the dinPort.
+        unit: "{din_port}"
         mapping:
           0: disconnected
           1: error
@@ -78,27 +98,39 @@ metrics:
     symbols:
       - name: netbotz.otherPort
         constant_value_one: true
+        description: Indicates if otherPort is present.
+        unit: "{other_port}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.3.10.1.5
           name: otherPortIndex
         tag: netbotz_other_port_index
+        description: The index of the otherPort.
+        unit: "{other_port}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.3.10.1.1
           name: otherPortId
         tag: netbotz_other_port_id
+        description: The ID of the otherPort.
+        unit: "{other_port}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.3.10.1.3
           name: otherPortLabel
         tag: netbotz_other_port_label
+        description: The label of the otherPort.
+        unit: "{other_port}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.3.10.1.4
           name: otherPortEncId
         tag: netbotz_other_port_enc_id
+        description: The enclosure ID of the otherPort.
+        unit: "{other_port}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.3.10.1.2
           name: otherPortStatus
         tag: netbotz_other_port_status
+        description: The status of the otherPort.
+        unit: "{other_port}"
         mapping:
           0: disconnected
           1: error
@@ -110,29 +142,43 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.4.1.1.1.8
         name: netbotz.tempSensorValueInt
+        description: The temperature sensor value in integer format.
+        unit: degC
       - OID: 1.3.6.1.4.1.5528.100.4.1.1.1.9
         name: netbotz.tempSensorValueIntF
+        description: The temperature sensor value in integer format.
+        unit: degF
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.1.1.10
           name: tempSensorIndex
         tag: netbotz_temp_sensor_index
+        description: The index of the temperature sensor.
+        unit: "{temp_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.1.1.1
           name: tempSensorId
         tag: netbotz_temp_sensor_id
+        description: The ID of the temperature sensor.
+        unit: "{temp_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.1.1.4
           name: tempSensorLabel
         tag: netbotz_temp_sensor_label
+        description: The label of the temperature sensor.
+        unit: "{temp_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.1.1.5
           name: tempSensorEncId
         tag: netbotz_temp_sensor_enc_id
+        description: The enclosure ID of the temperature sensor.
+        unit: "{temp_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.1.1.3
           name: tempSensorErrorStatus
         tag: netbotz_temp_sensor_error_status
+        description: The error status of the temperature sensor.
+        unit: "{temp_sensor}"
         mapping:
           0: normal
           1: info
@@ -147,27 +193,39 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.4.1.2.1.8
         name: netbotz.humiSensorValueInt
+        description: The humidity sensor value in integer format.
+        unit: '%'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.2.1.9
           name: humiSensorIndex
         tag: netbotz_humi_sensor_index
+        description: The index of the humidity sensor.
+        unit: "{humi_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.2.1.1
           name: humiSensorId
         tag: netbotz_humi_sensor_id
+        description: The ID of the humidity sensor.
+        unit: "{humi_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.2.1.4
           name: humiSensorLabel
         tag: netbotz_humi_sensor_label
+        description: The label of the humidity sensor.
+        unit: "{humi_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.2.1.5
           name: humiSensorEncId
         tag: netbotz_humi_sensor_enc_id
+        description: The enclosure ID of the humidity sensor.
+        unit: "{humi_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.2.1.3
           name: humiSensorErrorStatus
         tag: netbotz_humi_sensor_error_status
+        description: The error status of the humidity sensor.
+        unit: "{humi_sensor}"
         mapping:
           0: normal
           1: info
@@ -182,25 +240,37 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.4.1.3.1.8
         name: netbotz.dewPointSensorValueInt
+        description: The dew point sensor value in integer format.
+        unit: degC
       - OID: 1.3.6.1.4.1.5528.100.4.1.3.1.9
         name: netbotz.dewPointSensorValueIntF
+        description: The dew point sensor value in integer format.
+        unit: degF
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.3.1.10
           name: dewPointSensorIndex
         tag: netbotz_dew_point_sensor_index
+        description: The index of the dew point sensor.
+        unit: "{dew_point_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.3.1.1
           name: dewPointSensorId
         tag: netbotz_dew_point_sensor_id
+        description: The ID of the dew point sensor.
+        unit: "{dew_point_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.3.1.4
           name: dewPointSensorLabel
         tag: netbotz_dew_point_sensor_label
+        description: The label of the dew point sensor.
+        unit: "{dew_point_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.3.1.5
           name: dewPointSensorEncId
         tag: netbotz_dew_point_sensor_enc_id
+        description: The enclosure ID of the dew point sensor.
+        unit: "{dew_point_sensor}"
   - MIB: NETBOTZV2-MIB
     table:
       OID: 1.3.6.1.4.1.5528.100.4.1.10
@@ -208,31 +278,45 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.4.1.10.1.8
         name: netbotz.otherNumericSensorValueInt
+        description: The other numeric sensor value in integer format.
+        unit: TBD
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.10.1.12
           name: otherNumericSensorIndex
         tag: netbotz_other_numeric_sensor_index
+        description: The index of the other numeric sensor.
+        unit: "{other_numeric_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.10.1.1
           name: otherNumericSensorId
         tag: netbotz_other_numeric_sensor_id
+        description: The ID of the other numeric sensor.
+        unit: "{other_numeric_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.10.1.4
           name: otherNumericSensorLabel
         tag: netbotz_other_numeric_sensor_label
+        description: The label of the other numeric sensor.
+        unit: "{other_numeric_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.10.1.5
           name: otherNumericSensorEncId
         tag: netbotz_other_numeric_sensor_enc_id
+        description: The enclosure ID of the other numeric sensor.
+        unit: "{other_numeric_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.10.1.9
           name: otherNumericSensorUnits
         tag: netbotz_other_numeric_sensor_units
+        description: The units of the other numeric sensor.
+        unit: "{other_numeric_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.1.10.1.3
           name: otherNumericSensorErrorStatus
         tag: netbotz_other_numeric_sensor_error_status
+        description: The error status of the other numeric sensor.
+        unit: "{other_numeric_sensor}"
         mapping:
           0: normal
           1: info
@@ -247,31 +331,45 @@ metrics:
     symbols:
       - name: netbotz.doorSwitchSensor
         constant_value_one: true
+        description: Indicates if a door switch sensor is present.
+        unit: "{door_switch_sensor}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.2.1.8
           name: doorSwitchSensorIndex
         tag: netbotz_door_switch_sensor_index
+        description: The index of the door switch sensor.
+        unit: "{door_switch_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.2.1.1
           name: doorSwitchSensorId
         tag: netbotz_door_switch_sensor_id
+        description: The ID of the door switch sensor.
+        unit: "{door_switch_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.2.1.4
           name: doorSwitchSensorLabel
         tag: netbotz_door_switch_sensor_label
+        description: The label of the door switch sensor.
+        unit: "{door_switch_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.2.1.5
           name: doorSwitchSensorEncId
         tag: netbotz_door_switch_sensor_enc_id
+        description: The enclosure ID of the door switch sensor.
+        unit: "{door_switch_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.2.1.7
           name: doorSwitchSensorValueStr
         tag: netbotz_door_switch_sensor_value_str
+        description: The value string of the door switch sensor.
+        unit: "{door_switch_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.2.1.2
           name: doorSwitchSensorValue
         tag: netbotz_door_switch_sensor_value
+        description: The value of the door switch sensor.
+        unit: "{door_switch_sensor}"
         mapping:
           -1: 'null'
           0: open
@@ -283,27 +381,39 @@ metrics:
     symbols:
       - name: netbotz.otherStateSensor
         constant_value_one: true
+        description: Indicates if other state sensor is present.
+        unit: "{other_state_sensor}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.10.1.4
           name: otherStateSensorLabel
         tag: netbotz_other_state_sensor_label
+        description: The label of the other state sensor.
+        unit: "{other_state_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.10.1.5
           name: otherStateSensorEncId
         tag: netbotz_other_state_sensor_enc_id
+        description: The enclosure ID of the other state sensor.
+        unit: "{other_state_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.10.1.7
           name: otherStateSensorValueStr
         tag: netbotz_other_state_sensor_value_str
+        description: The value string of the other state sensor.
+        unit: "{other_state_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.10.1.1
           name: otherStateSensorId
         tag: netbotz_other_state_sensor_id
+        description: The ID of the other state sensor.
+        unit: "{other_state_sensor}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.4.2.10.1.3
           name: otherStateSensorErrorStatus
         tag: netbotz_other_state_sensor_error_status
+        description: The error status of the other state sensor.
+        unit: "{other_state_sensor}"
         mapping:
           0: normal
           1: info
@@ -318,31 +428,45 @@ metrics:
     symbols:
       - name: netbotz.errorCond
         constant_value_one: true
+        description: Indicates if an error condition is present.
+        unit: "{error_condition}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.5.1.1.12
           name: errorCondIndex
         tag: netbotz_error_cond_index
+        description: The index of the error condition.
+        unit: "{error_condition}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.5.1.1.1
           name: errorCondId
         tag: netbotz_error_cond_id
+        description: The ID of the error condition.
+        unit: "{error_condition}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.5.1.1.3
           name: errorCondTypeId
         tag: netbotz_error_cond_type_id
+        description: The type ID of the error condition.
+        unit: "{error_condition}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.5.1.1.9
           name: errorCondEncId
         tag: netbotz_error_cond_enc_id
+        description: The enclosure ID of the error condition.
+        unit: "{error_condition}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.5.1.1.11
           name: errorCondSensorId
         tag: netbotz_error_cond_sensor_id
+        description: The sensor ID of the error condition.
+        unit: "{error_condition}"
       - symbol:
           OID: 1.3.6.1.4.1.5528.100.5.1.1.2
           name: errorCondSeverity
         tag: netbotz_error_cond_severity
+        description: The severity of the error condition.
+        unit: "{error_condition}"
         mapping:
           0: normal
           1: info
@@ -354,6 +478,8 @@ metrics:
           OID: 1.3.6.1.4.1.5528.100.5.1.1.6
           name: errorCondResolved
         tag: netbotz_error_cond_resolved
+        description: Indicates if the error condition is resolved.
+        unit: "{error_condition}"
         mapping:
           0: no
           1: yes

@@ -10,17 +10,24 @@ metrics:
     symbol:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.5.1
+      description: The total amount of physical memory.
+      unit: bytes
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.1
+      description: The amount of physical memory being used.
+      unit: bytes
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.2.1.25.3.3.1.2.1
+      description: The CPU usage percentage.
+      unit: '%'
 
 metadata:
   device:
     fields:
       vendor:
         value: "audiocodes"
+        description: The device vendor.

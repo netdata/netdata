@@ -13,10 +13,12 @@ metadata:
         symbol:
           OID: 1.3.6.1.4.1.318.1.1.1.1.2.1.0
           name: upsAdvIdentFirmwareRevision
+        description: The firmware revision of the UPS system's microprocessor.
       product_name:
         symbol:
           OID: 1.3.6.1.4.1.318.1.1.1.1.1.1.0
           name: upsBasicIdentModel
+        description: The UPS model name.
       type:
         value: "UPS"
 
@@ -25,90 +27,134 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.5.0
       name: upsAdvBatteryNumOfBattPacks
+    description: The number of battery packs.
+    unit: '{battery_pack}'
   - MIB: POWERNET-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.6.0
       name: upsAdvBatteryNumOfBadBattPacks
+    description: The number of bad battery packs.
+    unit: '{battery_pack}'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.4.0
       name: upsAdvBatteryReplaceIndicator
+    description: Indicates if the battery needs replacement.
+    unit: '{indicator}'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.3.0
       name: upsAdvBatteryRunTimeRemaining
+    description: The estimated remaining battery runtime.
+    unit: s
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.2.0
       name: upsAdvBatteryTemperature
+    description: The temperature of the battery.
+    unit: K
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.1.0
       name: upsAdvBatteryCapacity
+    description: The remaining battery capacity.
+    unit: '%'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.3.2.0
       name: upsHighPrecExtdBatteryTemperature
+    description: The external battery temperature with high precision.
+    unit: K
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.3.2.1.0
       name: upsAdvInputLineVoltage
+    description: The input line voltage.
+    unit: V
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.3.2.4.0
       name: upsAdvInputFrequency
+    description: The input frequency.
+    unit: Hz
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.3.3.4.0
       name: upsHighPrecInputFrequency
+    description: The input frequency with high precision.
+    unit: Hz
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.3.3.1.0
       name: upsHighPrecInputLineVoltage
+    description: The input line voltage with high precision.
+    unit: V
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.3.4.0
       name: upsHighPrecOutputCurrent
+    description: The output current with high precision.
+    unit: A
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.3.2.5.0
       name: upsAdvInputLineFailCause
+    description: The cause of the input line failure.
+    unit: '{cause}'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.1.0
       name: upsAdvOutputVoltage
+    description: The output voltage.
+    unit: V
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.2.0
       name: upsAdvOutputFrequency
+    description: The output frequency.
+    unit: Hz
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.3.0
       name: upsAdvOutputLoad
+    description: The output load.
+    unit: '%'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.4.0
       name: upsAdvOutputCurrent
+    description: The output current.
+    unit: A
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.8.0
       name: upsAdvOutputActivePower
+    description: The output active power.
+    unit: W
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.9.0
       name: upsAdvOutputApparentPower
+    description: The output apparent power.
+    unit: VA
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.12.0
       name: upsAdvOutputEnergyUsage
+    description: The output energy usage.
+    unit: J
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.1.2.0
       name: upsBasicBatteryTimeOnBattery
+    description: The time the UPS has been running on battery.
+    unit: s
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.7.2.3.0
       name: upsAdvTestDiagnosticsResults
+    description: The results of the UPS diagnostic test.
+    unit: '{result}'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
@@ -117,6 +163,8 @@ metrics:
     options:
       placement: 4
       metric_suffix: OnLine
+    description: The online state of the UPS.
+    unit: '{state}'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
@@ -125,6 +173,8 @@ metrics:
     options:
       placement: 5
       metric_suffix: ReplaceBattery
+    description: The battery replacement status.
+    unit: '{state}'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
@@ -133,6 +183,8 @@ metrics:
     options:
       placement: 8
       metric_suffix: AVRTrimActive
+    description: The AVR trim active status.
+    unit: '{state}'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
@@ -141,6 +193,8 @@ metrics:
     options:
       placement: 11
       metric_suffix: BatteriesDischarged
+    description: The battery discharge status.
+    unit: '{state}'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
@@ -149,6 +203,8 @@ metrics:
     options:
       placement: 19
       metric_suffix: "On"
+    description: The on state of the UPS.
+    unit: '{state}'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
@@ -157,6 +213,8 @@ metrics:
     options:
       placement: 30
       metric_suffix: LowBatteryOnBattery
+    description: The low battery on battery status.
+    unit: '{state}'
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
@@ -165,6 +223,8 @@ metrics:
     options:
       placement: 33
       metric_suffix: NoBatteriesAttached
+    description: The no batteries attached status.
+    unit: '{state}'
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.1.12.1.2
@@ -172,8 +232,12 @@ metrics:
     symbols:
       - name: upsOutletGroupStatus
         constant_value_one: true
+        description: The outlet group status.
+        unit: '{status}'
       - OID: 1.3.6.1.4.1.318.1.1.1.12.1.2.1.3
         name: upsOutletGroupStatusGroupState
+        description: The state of the outlet group.
+        unit: '{state}'
     metric_tags:
       - tag: outlet_group_name
         symbol:
@@ -191,6 +255,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.25.1.2.1.6.0
       name: uioSensorStatusTemperatureDegC
+    description: The temperature reported by the sensor.
+    unit: K
 metric_tags:
   - tag: model
     OID: 1.3.6.1.4.1.318.1.1.1.1.1.1.0  # The UPS model name (e.g. 'APC Smart-UPS 600', 'Smart-UPS RT 6000 RM XL').

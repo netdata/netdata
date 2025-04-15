@@ -1,3 +1,4 @@
+```yaml
 extends:
   - _arista.yaml
   - _arista-queue.yaml
@@ -13,6 +14,7 @@ metadata:
     fields:
       type:
         value: "switch"
+        description: "The device type is a switch."
 
 sysobjectid:
   - 1.3.6.1.4.1.30065.1.3011.7010.427.48
@@ -169,14 +171,20 @@ metrics:
     symbol:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.5.1
+      description: "Total amount of physical memory."
+      unit: By
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.100
+      description: "Amount of used memory."
+      unit: By
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.2.1.25.3.3.1.2.1
+      description: "CPU usage."
+      unit: '%'
   - MIB: ARISTA-BGP4V2-MIB
     table:
       name: aristaBgp4V2PeerTable
@@ -184,12 +192,20 @@ metrics:
     symbols:
       - name: aristaBgp4V2PeerLocalPort
         OID: 1.3.6.1.4.1.30065.4.1.1.2.1.6
+        description: "BGP Peer Local Port"
+        unit: '{port}'
       - name: aristaBgp4V2PeerLocalAs
         OID: 1.3.6.1.4.1.30065.4.1.1.2.1.7
+        description: "BGP Peer Local AS"
+        unit: '{AS}'
       - name: aristaBgp4V2PeerRemotePort
         OID: 1.3.6.1.4.1.30065.4.1.1.2.1.9
+        description: "BGP Peer Remote Port"
+        unit: '{port}'
       - name: aristaBgp4V2PeerRemoteAs
         OID: 1.3.6.1.4.1.30065.4.1.1.2.1.10
+        description: "BGP Peer Remote AS"
+        unit: '{AS}'
     metric_tags:
       - symbol:
           name: aristaBgp4V2PeerLocalAddr
@@ -246,20 +262,4 @@ metrics:
     symbols:
       - name: aristaIfInPktRate
         OID: 1.3.6.1.4.1.30065.3.15.1.1.1.3
-      - name: aristaIfOutPktRate
-        OID: 1.3.6.1.4.1.30065.3.15.1.1.1.4
-      - name: aristaIfInOctetRate
-        OID: 1.3.6.1.4.1.30065.3.15.1.1.1.5
-      - name: aristaIfOutOctetRate
-        OID: 1.3.6.1.4.1.30065.3.15.1.1.1.6
-    metric_tags:
-      - symbol:
-          name: aristaIfRateInterval
-          OID: 1.3.6.1.4.1.30065.3.15.1.1.1.2
-        tag: arista_if_rate_interval
-      - MIB: IF-MIB
-        symbol:
-          OID: 1.3.6.1.2.1.31.1.1.1.1
-          name: ifName
-        table: ifXTable
-        tag: if_name
+        description: "Interface Inbound Packet Rate

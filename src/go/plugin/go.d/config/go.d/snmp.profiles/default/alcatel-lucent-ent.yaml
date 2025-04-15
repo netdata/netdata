@@ -10,6 +10,8 @@ metrics:
     symbols:
       - name: cpu.usage
         OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.11
+        description: CPU utilization
+        unit: '%'
     metric_tags:
       - symbol:
           name: alcatel.ent.healthModuleChassisId
@@ -24,6 +26,8 @@ metrics:
     symbols:
       - name: memory.usage
         OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.8
+        description: Memory utilization
+        unit: '%'
     metric_tags:
       - symbol:
           name: alcatel.ent.healthModuleChassisId
@@ -38,6 +42,8 @@ metrics:
     symbols:
       - name: alcatel.ent.chasEntPhysical
         constant_value_one: true
+        description: alcatel.ent.chasEntPhysical
+        unit: '{entity}'
     metric_tags:
       - # MIB: ENTITY-MIB
         # table: entPhysicalTable
@@ -238,6 +244,8 @@ metrics:
     symbols:
       - name: alcatel.ent.chasEntTempCurrent
         OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.2.1.1
+        description: Temperature
+        unit: 'K'
     metric_tags:
       - # MIB: ENTITY-MIB
         # table: entPhysicalTable
@@ -296,6 +304,8 @@ metrics:
     symbols:
       - name: alcatel.ent.alaChasEntPhysFanSpeed
         OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.4
+        description: Fan speed
+        unit: 'r/s'
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.2
@@ -312,6 +322,8 @@ metrics:
     symbols:
       - name: alcatel.ent.alaChasBpsPowerSupply
         constant_value_one: true
+        description: alcatel.ent.alaChasBpsPowerSupply
+        unit: '{power_supply}'
     metric_tags:
       - symbol:
           name: alcatel.ent.alaChasBpsPowerSupplyName

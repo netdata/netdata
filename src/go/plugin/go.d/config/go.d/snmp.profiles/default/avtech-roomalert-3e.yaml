@@ -15,10 +15,14 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.1.1.0
       name: roomalert.3e.digital_sen1_1
+    description: roomalert.3e.digital_sen1_1
+    unit: TBD
   - MIB: ROOMALERT3E-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.1.2.0
       name: roomalert.3e.digital_sen1_2
+    description: roomalert.3e.digital_sen1_2
+    unit: TBD
 #  - MIB: ROOMALERT3E-MIB
 #    symbol:
 #      OID: 1.3.6.1.4.1.20916.1.9.1.1.1.3.0
@@ -28,22 +32,32 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.1.0
       name: roomalert.3e.digital_sen2_1
+    description: roomalert.3e.digital_sen2_1
+    unit: TBD
   - MIB: ROOMALERT3E-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.2.0
       name: roomalert.3e.digital_sen2_2
+    description: roomalert.3e.digital_sen2_2
+    unit: TBD
   - MIB: ROOMALERT3E-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.3.0
       name: roomalert.3e.digital_sen2_3
+    description: roomalert.3e.digital_sen2_3
+    unit: TBD
   - MIB: ROOMALERT3E-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.4.0
       name: roomalert.3e.digital_sen2_4
+    description: roomalert.3e.digital_sen2_4
+    unit: TBD
   - MIB: ROOMALERT3E-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.5.0
       name: roomalert.3e.digital_sen2_5
+    description: roomalert.3e.digital_sen2_5
+    unit: TBD
 #  - MIB: ROOMALERT3E-MIB
 #    symbol:
 #      OID: 1.3.6.1.4.1.20916.1.9.1.1.2.6.0
@@ -53,6 +67,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.7.0
       name: roomalert.3e.digital_sen2_7
+    description: roomalert.3e.digital_sen2_7
+    unit: TBD
 #  - MIB: ROOMALERT3E-MIB
 #    symbol:
 #      OID: 1.3.6.1.4.1.20916.1.9.1.1.2.8.0
@@ -62,6 +78,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.2.1.0
       name: roomalert.3e.switch_sen1
+    description: roomalert.3e.switch_sen1
+    unit: {switch}
 #  - MIB: ROOMALERT3E-MIB
 #    symbol:
 #      OID: 1.3.6.1.4.1.20916.1.9.1.2.2.0
