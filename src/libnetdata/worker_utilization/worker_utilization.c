@@ -113,6 +113,15 @@ void workers_utilization_enable(void) {
     workers_globals.enabled = true;
 }
 
+void worker_utilization_cleanup(void) {
+    if(!workers_globals.enabled)
+        return;
+
+    spinlock_lock(&workers_globals.spinlock);
+    JudyHSFreeArray(&workers_globals.worknames_JudyHS, PJE0);
+    spinlock_unlock(&workers_globals.spinlock);
+}
+
 size_t workers_allocated_memory(void) {
     if(!workers_globals.enabled)
         return 0;
@@ -213,7 +222,8 @@ void worker_unregister(void) {
     workers_globals.memory -= sizeof(struct worker) + strlen(worker->tag) + 1 + strlen(worker->workname) + 1;
     spinlock_unlock(&workers_globals.spinlock);
 
-    for(int i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+    // Free all thread-local resources associated with this worker
+    for(int i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
         string_freez(worker->per_job_type[i].name);
         string_freez(worker->per_job_type[i].units);
     }
@@ -241,6 +251,7 @@ static void worker_is_idle_with_time(usec_t now) {
 ALWAYS_INLINE void worker_is_idle(void) {
     if(likely(!worker || worker->last_action != WORKER_BUSY)) return;
 
+    last_job_id = WORKER_UTILIZATION_MAX_JOB_TYPES;
     worker_is_idle_with_time(worker_now_monotonic_usec());
 }
 

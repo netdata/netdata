@@ -421,8 +421,15 @@ bool claim_agent_from_environment(void) {
     return claim_agent(url, token, rooms, proxy, insecure);
 }
 
+// Static config for claim.conf
+static struct config claim_config = APPCONFIG_INITIALIZER;
+
+// Function to free the static claim_config for shutdown cleanup
+void claim_config_free(void) {
+    inicfg_free(&claim_config);
+}
+
 bool claim_agent_from_claim_conf(void) {
-    static struct config claim_config = APPCONFIG_INITIALIZER;
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     bool ret = false;
 

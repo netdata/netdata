@@ -164,6 +164,11 @@ mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # High-level features
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
+
+if(ENABLE_ML)
+  set(NETDATA_DLIB_SOURCE_DIR "" CACHE PATH "Path to local dlib sources for building ML code")
+endif()
+
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 option(ENABLE_DASHBOARD "Enable local dashboard" True)
 mark_as_advanced(ENABLE_DASHBOARD)
@@ -394,6 +399,7 @@ endif()
 include(NetdataJSONC)
 include(NetdataYAML)
 include(NetdataBacktrace)
+include(NetdataDlib)
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         include(NetdataEBPFLegacy)
@@ -416,6 +422,10 @@ endif()
 
 if(ENABLE_SENTRY)
         netdata_bundle_sentry()
+endif()
+
+if(ENABLE_ML)
+  netdata_bundle_dlib()
 endif()
 
 #
@@ -1086,6 +1096,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/signals/signals.h
         src/libnetdata/os/machine_id.c
         src/libnetdata/os/machine_id.h
+        src/libnetdata/os/process_memory.c
+        src/libnetdata/os/process_memory.h
+        src/libnetdata/os/dir_size.c
+        src/libnetdata/os/dir_size.h
         src/libnetdata/signals/signal-code.c
         src/libnetdata/signals/signal-code.h
 )
@@ -1290,6 +1304,8 @@ set(DAEMON_FILES
         src/daemon/status-file-dmi.h
         src/daemon/status-file-product.c
         src/daemon/status-file-product.h
+        src/daemon/protected-access.c
+        src/daemon/protected-access.h
 )
 
 set(DAEMON_SYSTEMD_WATCHER_FILES
@@ -1483,7 +1499,6 @@ if(ENABLE_ML)
         set(ML_FILES
                 src/ml/ad_charts.h
                 src/ml/ad_charts.cc
-                src/ml/dlib/dlib/all/source.cpp
                 src/ml/ml.cc
                 src/ml/ml_calculated_number.h
                 src/ml/ml_host.h
@@ -1584,6 +1599,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdlabels.c
         src/database/rrd.c
         src/database/rrd.h
+        src/database/rrd-metadata.c
+        src/database/rrd-metadata.h
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h
@@ -1922,6 +1939,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
         src/collectors/windows.plugin/perflib-web-service.c
+        src/collectors/windows.plugin/perflib-services.c
         src/collectors/windows.plugin/perflib-hyperv.c
 )
 
@@ -2968,15 +2986,15 @@ add_executable(netdata
         "$<$<BOOL:${OS_WINDOWS}>:${NETDATA_RES_FILES}>"
 )
 
+if(ENABLE_ML)
+  netdata_add_dlib_to_target(netdata)
+endif()
+
 if(OS_WINDOWS)
         add_executable(NetdataClaim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(NetdataClaim shell32 gdi32 msftedit)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
 endif()
-
-target_compile_definitions(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_ML}>:DLIB_NO_GUI_SUPPORT>"
-)
 
 target_compile_options(netdata PRIVATE
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_CFLAGS_OTHER}>"

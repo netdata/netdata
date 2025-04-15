@@ -173,6 +173,16 @@ extern struct config netdata_config;
 bool stream_conf_needs_dbengine(struct config *root);
 bool stream_conf_has_api_enabled(struct config *root);
 
+/**
+ * Free all configuration resources
+ * 
+ * This function frees all memory associated with a configuration,
+ * including all sections and options.
+ * 
+ * @param root The config structure to free
+ */
+void inicfg_free(struct config *root);
+
 const char *inicfg_get(struct config *root, const char *section, const char *name, const char *default_value);
 const char *inicfg_set(struct config *root, const char *section, const char *name, const char *value);
 

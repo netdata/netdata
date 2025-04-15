@@ -130,6 +130,10 @@ case "${DISTRO}" in
     ;;
 esac
 
+echo "::group::Netdata buildinfo"
+/usr/sbin/netdata -W buildinfo
+echo "::endgroup::"
+
 trap dump_log EXIT
 
 export NETDATA_LIBEXEC_PREFIX=/usr/libexec/netdata

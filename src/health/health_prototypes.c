@@ -244,20 +244,16 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
         ap->_internal.is_on_disk = nap->_internal.is_on_disk = true;
 
     if(!replace) {
-        if(ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG) {
-            // the existing is a dyncfg and the new one is read from the config
-            health_prototype_cleanup(nap);
-        }
-        else {
+        if(ap->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG) {
             // alerts with the same name are appended to the existing one
-            nap = callocz(1, sizeof(*nap));
-            memcpy(nap, new_value, sizeof(*nap));
+            RRD_ALERT_PROTOTYPE *alloced = callocz(1, sizeof(*alloced));
+            SWAP(*alloced, *nap);
 
             rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, nap, _internal.prev, _internal.next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, alloced, _internal.prev, _internal.next);
             rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
 
-            if(nap->_internal.enabled)
+            if(alloced->_internal.enabled)
                 ap->_internal.enabled = true;
         }
     }
@@ -270,9 +266,9 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
         SWAP(*ap, *nap);
         rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
         rw_spinlock_write_unlock(&nap->_internal.rw_spinlock);
-
-        health_prototype_cleanup(nap);
     }
+
+    health_prototype_cleanup(nap);
 
     return true;
 }

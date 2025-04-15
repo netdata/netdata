@@ -1794,7 +1794,7 @@ void *replication_thread_main(void *ptr) {
                 time_t total = now_s - started_s;
                 time_t done = current_s - started_s;
 
-                worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION,
+                worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, total == 0 ? 0.0 :
                                   (NETDATA_DOUBLE) done * 100.0 / (NETDATA_DOUBLE) total);
             }
             else

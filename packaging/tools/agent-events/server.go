@@ -303,11 +303,23 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	
 	bytesReceived.Add(ctx, int64(len(body)), metric.WithAttributes(attribute.String("status", "success")))
 
-	// Add Cloudflare Headers to all requests
+	// Add Cloudflare Headers to all requests, excluding IP addresses for GDPR compliance
 	cfHeaders := make(map[string]string)
-	cfHeaderPrefixes := []string{"CF-IPCountry", "CF-Ray", "CF-Connecting-IP", "CF-IPCity", "CF-IPContinent", "CF-IPLatitude", "CF-IPLongitude", "CF-IPRegion", "CF-IPTimeZone", "CF-Visitor", "CF-IPCOLO"}
+	cfHeaderPrefixes := []string{"CF-IPCountry", "CF-Ray", "CF-IPCity", "CF-IPContinent", "CF-IPRegion", "CF-IPTimeZone", "CF-IPCOLO"}
+	// Explicitly excluding IP-related headers: CF-Connecting-IP, CF-IPLatitude, CF-IPLongitude, CF-Visitor
 	for _, name := range cfHeaderPrefixes { if value := r.Header.Get(name); value != "" { key := strings.TrimPrefix(name, "CF-"); cfHeaders[key] = value } }
-	for name, values := range r.Header { if strings.HasPrefix(name, "CF-") && len(values) > 0 { key := strings.TrimPrefix(name, "CF-"); if _, exists := cfHeaders[key]; !exists { cfHeaders[key] = values[0] } } }
+	for name, values := range r.Header { 
+		if strings.HasPrefix(name, "CF-") && len(values) > 0 { 
+			// Skip IP-related headers for GDPR compliance
+			if name == "CF-Connecting-IP" || name == "CF-IPLatitude" || name == "CF-IPLongitude" || name == "CF-Visitor" {
+				continue
+			}
+			key := strings.TrimPrefix(name, "CF-"); 
+			if _, exists := cfHeaders[key]; !exists { 
+				cfHeaders[key] = values[0] 
+			} 
+		} 
+	}
 	if len(cfHeaders) > 0 { fullData["cf"] = cfHeaders; slog.Debug("added cloudflare headers", "count", len(cfHeaders)) }
 	
 	// Deduplication Logic

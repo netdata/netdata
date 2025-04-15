@@ -3,7 +3,7 @@
 #ifndef NETDATA_ML_CALCULATED_NUMBER_H
 #define NETDATA_ML_CALCULATED_NUMBER_H
 
-#include "dlib/dlib/matrix.h"
+#include <dlib/matrix.h>
 
 // CentOS 7 shenanigans
 #include <cmath>

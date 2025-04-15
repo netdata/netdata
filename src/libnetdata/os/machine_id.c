@@ -69,7 +69,11 @@ static ND_UUID get_machine_id(void) {
     ND_UUID machine_id = { 0 };
 
     // First try to get the platform UUID
+#if defined(MAC_OS_VERSION_12_0) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_12_0
+    io_registry_entry_t ioRegistryRoot = IORegistryEntryFromPath(kIOMainPortDefault, "IOService:/");
+#else
     io_registry_entry_t ioRegistryRoot = IORegistryEntryFromPath(kIOMasterPortDefault, "IOService:/");
+#endif
     if (ioRegistryRoot) {
         CFStringRef uuidCf = (CFStringRef) IORegistryEntryCreateCFProperty(
             ioRegistryRoot,
@@ -92,9 +96,15 @@ static ND_UUID get_machine_id(void) {
     }
 
     // Fallback to IOPlatformExpertDevice's IOPlatformSerialNumber
+#if defined(MAC_OS_VERSION_12_0) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_12_0
+    io_service_t platformExpert = IOServiceGetMatchingService(
+        kIOMainPortDefault,
+        IOServiceMatching("IOPlatformExpertDevice"));
+#else
     io_service_t platformExpert = IOServiceGetMatchingService(
         kIOMasterPortDefault,
         IOServiceMatching("IOPlatformExpertDevice"));
+#endif
 
     if (platformExpert) {
         CFStringRef serialNumberCf = (CFStringRef) IORegistryEntryCreateCFProperty(

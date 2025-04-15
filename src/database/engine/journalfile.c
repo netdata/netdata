@@ -1103,7 +1103,16 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: checking integrity of '%s'", path_v2);
 
     usec_t validation_start_ut = now_monotonic_usec();
-    int rc = journalfile_v2_validate(data_start, journal_v2_file_size, journal_v1_file_size);
+
+    int rc = 0;
+    PROTECTED_ACCESS_SETUP(data_start, journal_v2_file_size, path_v2, "validate");
+    if(no_signal_received) {
+        rc = journalfile_v2_validate(data_start, journal_v2_file_size, journal_v1_file_size);
+    }
+    else {
+        rc = 2;
+    }
+
     if (unlikely(rc)) {
         if (rc == 2)
             error_report("File %s needs to be rebuilt", path_v2);
@@ -1145,6 +1154,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     if (!db_engine_journal_check)
         journalfile->v2.flags |= JOURNALFILE_FLAG_METRIC_CRC_CHECK;
+
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);
 
     ctx_current_disk_space_increase(ctx, journal_v2_file_size);
@@ -1351,179 +1361,178 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         return false;
     }
 
-    fatal_assert(extent_offset <= total_file_size);
-    memset(data_start, 0, extent_offset);
+    struct journal_metric_list_to_sort *uuid_list = NULL;
 
-    // Write header
-    struct journal_v2_header j2_header;
-    memset(&j2_header, 0, sizeof(j2_header));
+    PROTECTED_ACCESS_SETUP(data_start, total_file_size, path, "migrate");
+    if(no_signal_received) {
+        fatal_assert(extent_offset <= total_file_size);
+        memset(data_start, 0, extent_offset);
 
-    j2_header.magic = JOURVAL_V2_MAGIC;
-    j2_header.start_time_ut = 0;
-    j2_header.end_time_ut = 0;
-    j2_header.extent_count = number_of_extents;
-    j2_header.extent_offset = extent_offset;
-    j2_header.metric_count = number_of_metrics;
-    j2_header.metric_offset = metrics_offset;
-    j2_header.page_count = number_of_pages;
-    j2_header.page_offset = pages_offset;
-    j2_header.extent_trailer_offset = extent_offset_trailer;
-    j2_header.metric_trailer_offset = metric_offset_trailer;
-    j2_header.journal_v2_file_size = total_file_size;
-    j2_header.journal_v1_file_size = (uint32_t)journalfile_current_size(journalfile);
-    j2_header.data = data_start;                        // Used during migration
+        // Write header
+        struct journal_v2_header j2_header;
+        memset(&j2_header, 0, sizeof(j2_header));
 
-    struct journal_v2_block_trailer *journal_v2_trailer;
+        j2_header.magic = JOURVAL_V2_MAGIC;
+        j2_header.start_time_ut = 0;
+        j2_header.end_time_ut = 0;
+        j2_header.extent_count = number_of_extents;
+        j2_header.extent_offset = extent_offset;
+        j2_header.metric_count = number_of_metrics;
+        j2_header.metric_offset = metrics_offset;
+        j2_header.page_count = number_of_pages;
+        j2_header.page_offset = pages_offset;
+        j2_header.extent_trailer_offset = extent_offset_trailer;
+        j2_header.metric_trailer_offset = metric_offset_trailer;
+        j2_header.journal_v2_file_size = total_file_size;
+        j2_header.journal_v1_file_size = (uint32_t)journalfile_current_size(journalfile);
+        j2_header.data = data_start; // Used during migration
 
-    uint8_t *data = journalfile_v2_write_extent_list(JudyL_extents_pos, data_start + extent_offset);
-    internal_error(true, "DBENGINE: write extent list so far %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
+        struct journal_v2_block_trailer *journal_v2_trailer;
 
-    fatal_assert(data == data_start + extent_offset_trailer);
+        uint8_t *data = journalfile_v2_write_extent_list(JudyL_extents_pos, data_start + extent_offset);
+        internal_error(
+            true, "DBENGINE: write extent list so far %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
-    // Calculate CRC for extents
-    journal_v2_trailer = (struct journal_v2_block_trailer *) (data_start + extent_offset_trailer);
-    uLong crc;
-    crc = crc32(0L, Z_NULL, 0);
-    crc = crc32(crc, (uint8_t *) data_start + extent_offset, number_of_extents * sizeof(struct journal_extent_list));
-    crc32set(journal_v2_trailer->checksum, crc);
+        fatal_assert(data == data_start + extent_offset_trailer);
 
-    internal_error(true, "DBENGINE: CALCULATE CRC FOR EXTENT %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
-    // Skip the trailer, point to the metrics off
-    data += sizeof(struct journal_v2_block_trailer);
+        // Calculate CRC for extents
+        journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + extent_offset_trailer);
+        uLong crc;
+        crc = crc32(0L, Z_NULL, 0);
+        crc = crc32(crc, (uint8_t *)data_start + extent_offset, number_of_extents * sizeof(struct journal_extent_list));
+        crc32set(journal_v2_trailer->checksum, crc);
 
-    // Sanity check -- we must be at the metrics_offset
-    fatal_assert(data == data_start + metrics_offset);
+        internal_error(
+            true, "DBENGINE: CALCULATE CRC FOR EXTENT %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
+        // Skip the trailer, point to the metrics off
+        data += sizeof(struct journal_v2_block_trailer);
 
-    // Allocate array to sort UUIDs and keep them sorted in the journal because we want to do binary search when we do lookups
-    struct journal_metric_list_to_sort *uuid_list = mallocz(number_of_metrics * sizeof(struct journal_metric_list_to_sort));
+        // Sanity check -- we must be at the metrics_offset
+        fatal_assert(data == data_start + metrics_offset);
 
-    Word_t Index = 0;
-    size_t count = 0;
-    bool first_then_next = true;
-    while ((PValue = JudyLFirstThenNext(JudyL_metrics, &Index, &first_then_next))) {
-        metric_info = *PValue;
+        // Allocate array to sort UUIDs and keep them sorted in the journal because we want to do binary search when we do lookups
+        uuid_list = mallocz(number_of_metrics * sizeof(struct journal_metric_list_to_sort));
 
-        fatal_assert(metric_info != NULL);
-        fatal_assert(count < number_of_metrics);
-        uuid_list[count++].metric_info = metric_info;
-        min_time_s = MIN(min_time_s, metric_info->first_time_s);
-        max_time_s = MAX(max_time_s, metric_info->last_time_s);
-    }
+        Word_t Index = 0;
+        size_t count = 0;
+        bool first_then_next = true;
+        while ((PValue = JudyLFirstThenNext(JudyL_metrics, &Index, &first_then_next))) {
+            metric_info = *PValue;
 
-    fatal_assert(count == number_of_metrics);
+            fatal_assert(metric_info != NULL);
+            fatal_assert(count < number_of_metrics);
+            uuid_list[count++].metric_info = metric_info;
+            min_time_s = MIN(min_time_s, metric_info->first_time_s);
+            max_time_s = MAX(max_time_s, metric_info->last_time_s);
+        }
 
-    // Check if not properly set in the loop above to prevent overflow
-    if (min_time_s == LONG_MAX)
-        min_time_s = 0;
+        fatal_assert(count == number_of_metrics);
 
-    // Store in the header
-    j2_header.start_time_ut = min_time_s * USEC_PER_SEC;
-    j2_header.end_time_ut = max_time_s * USEC_PER_SEC;
+        // Check if not properly set in the loop above to prevent overflow
+        if (min_time_s == LONG_MAX)
+            min_time_s = 0;
 
-    qsort(&uuid_list[0], number_of_metrics, sizeof(struct journal_metric_list_to_sort), journalfile_metric_compare);
-    internal_error(true, "DBENGINE: traverse and qsort  UUID %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
+        // Store in the header
+        j2_header.start_time_ut = min_time_s * USEC_PER_SEC;
+        j2_header.end_time_ut = max_time_s * USEC_PER_SEC;
 
-    uint32_t resize_file_to = total_file_size;
+        qsort(&uuid_list[0], number_of_metrics, sizeof(struct journal_metric_list_to_sort), journalfile_metric_compare);
+        internal_error(
+            true, "DBENGINE: traverse and qsort  UUID %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
-    for (Index = 0; Index < number_of_metrics; Index++) {
-        metric_info = uuid_list[Index].metric_info;
+        for (Index = 0; Index < number_of_metrics; Index++) {
+            metric_info = uuid_list[Index].metric_info;
 
-        // Calculate current UUID offset from start of file. We will store this in the data page header
-        uint32_t uuid_offset = data - data_start;
+            // Calculate current UUID offset from start of file. We will store this in the data page header
+            uint32_t uuid_offset = data - data_start;
 
-        struct journal_metric_list *current_metric = (void *) data;
-        // Write the UUID we are processing
-        data  = (void *) journalfile_v2_write_metric_page(&j2_header, data, metric_info, pages_offset);
-        if (unlikely(!data))
-            break;
+            struct journal_metric_list *current_metric = (void *)data;
+            // Write the UUID we are processing
+            data = (void *)journalfile_v2_write_metric_page(&j2_header, data, metric_info, pages_offset);
+            if (unlikely(!data))
+                break;
 
-        // Next we will write
-        //   Header
-        //   Detailed entries (descr @ time)
-        //   Trailer (checksum)
+            // Next we will write
+            //   Header
+            //   Detailed entries (descr @ time)
+            //   Trailer (checksum)
 
-        // Keep the page_list_header, to be used for migration when where agent is running
-        metric_info->page_list_header = pages_offset;
-        // Write page header
-        void *metric_page = journalfile_v2_write_data_page_header(&j2_header, data_start + pages_offset, metric_info,
-                                                                  uuid_offset);
+            // Keep the page_list_header, to be used for migration when where agent is running
+            metric_info->page_list_header = pages_offset;
+            // Write page header
+            void *metric_page =
+                journalfile_v2_write_data_page_header(&j2_header, data_start + pages_offset, metric_info, uuid_offset);
 
-        // Start writing descr @ time
-        void *page_trailer = journalfile_v2_write_descriptors(&j2_header, metric_page, metric_info, current_metric);
-        if (unlikely(!page_trailer))
-            break;
+            // Start writing descr @ time
+            void *page_trailer = journalfile_v2_write_descriptors(&j2_header, metric_page, metric_info, current_metric);
+            if (unlikely(!page_trailer))
+                break;
 
-        // Trailer (checksum)
-        uint8_t *next_page_address = journalfile_v2_write_data_page_trailer(&j2_header, page_trailer,
-                                                                            data_start + pages_offset);
+            // Trailer (checksum)
+            uint8_t *next_page_address =
+                journalfile_v2_write_data_page_trailer(&j2_header, page_trailer, data_start + pages_offset);
 
-        // Calculate start of the pages start for next descriptor
-        pages_offset += (metric_info->number_of_pages * (sizeof(struct journal_page_list)) + sizeof(struct journal_page_header) + sizeof(struct journal_v2_block_trailer));
-        // Verify we are at the right location
-        if (pages_offset != (uint32_t)(next_page_address - data_start)) {
-            // make sure checks fail so that we abort
-            data = data_start;
-            break;
+            // Calculate start of the pages start for next descriptor
+            pages_offset +=
+                (metric_info->number_of_pages * (sizeof(struct journal_page_list)) +
+                 sizeof(struct journal_page_header) + sizeof(struct journal_v2_block_trailer));
+            // Verify we are at the right location
+            if (pages_offset != (uint32_t)(next_page_address - data_start)) {
+                // make sure checks fail so that we abort
+                data = data_start;
+                break;
+            }
+        }
+
+        if (data == data_start + metric_offset_trailer) {
+            internal_error(
+                true, "DBENGINE: WRITE METRICS AND PAGES  %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
+
+            // Calculate CRC for metrics
+            journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + metric_offset_trailer);
+            crc = crc32(0L, Z_NULL, 0);
+            crc = crc32(
+                crc, (uint8_t *)data_start + metrics_offset, number_of_metrics * sizeof(struct journal_metric_list));
+            crc32set(journal_v2_trailer->checksum, crc);
+            internal_error(
+                true, "DBENGINE: CALCULATE CRC FOR UUIDs  %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
+
+            // Prepare to write checksum for the file
+            j2_header.data = NULL;
+            journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + trailer_offset);
+            crc = crc32(0L, Z_NULL, 0);
+            crc = crc32(crc, (void *)&j2_header, sizeof(j2_header));
+            crc32set(journal_v2_trailer->checksum, crc);
+
+            // Write header to the file
+            memcpy(data_start, &j2_header, sizeof(j2_header));
+
+            internal_error(
+                true, "DBENGINE: FILE COMPLETED --------> %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
+
+            netdata_log_info("DBENGINE: migrated journal file '%s', file size %zu", path, total_file_size);
+
+            // msync(data_start, total_file_size, MS_SYNC);
+            journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
+
+            internal_error(
+                true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
+            ctx_current_disk_space_increase(ctx, total_file_size);
+            freez(uuid_list);
+            return true;
         }
     }
-
-    if (data == data_start + metric_offset_trailer) {
-        internal_error(true, "DBENGINE: WRITE METRICS AND PAGES  %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
-
-        // Calculate CRC for metrics
-        journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + metric_offset_trailer);
-        crc = crc32(0L, Z_NULL, 0);
-        crc =
-            crc32(crc, (uint8_t *)data_start + metrics_offset, number_of_metrics * sizeof(struct journal_metric_list));
-        crc32set(journal_v2_trailer->checksum, crc);
-        internal_error(true, "DBENGINE: CALCULATE CRC FOR UUIDs  %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
-
-        // Prepare to write checksum for the file
-        j2_header.data = NULL;
-        journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + trailer_offset);
-        crc = crc32(0L, Z_NULL, 0);
-        crc = crc32(crc, (void *)&j2_header, sizeof(j2_header));
-        crc32set(journal_v2_trailer->checksum, crc);
-
-        // Write header to the file
-        memcpy(data_start, &j2_header, sizeof(j2_header));
-
-        internal_error(true, "DBENGINE: FILE COMPLETED --------> %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
-
-        netdata_log_info("DBENGINE: migrated journal file '%s', file size %zu", path, total_file_size);
-
-        // msync(data_start, total_file_size, MS_SYNC);
-        journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
-
-        internal_error(true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
-        ctx_current_disk_space_increase(ctx, total_file_size);
-        freez(uuid_list);
-        return true;
-    }
     else {
-        netdata_log_info("DBENGINE: failed to build index '%s', file will be skipped", path);
-        j2_header.data = NULL;
-        j2_header.magic = JOURVAL_V2_SKIP_MAGIC;
-        memcpy(data_start, &j2_header, sizeof(j2_header));
-        resize_file_to = sizeof(j2_header);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: failed to write journal file '%s' (SIGBUS)", path);
     }
 
-    nd_munmap(data_start, total_file_size);
     freez(uuid_list);
 
-    if (likely(resize_file_to == total_file_size))
-        return true;
+    netdata_log_info("DBENGINE: failed to build index '%s', file will be skipped", path);
 
-    int ret = truncate(path, (long) resize_file_to);
-    if (ret < 0) {
-        ctx_current_disk_space_increase(ctx, total_file_size);
-        ctx_fs_error(ctx);
-        netdata_log_error("DBENGINE: failed to resize file '%s'", path);
-    }
-    else
-        ctx_current_disk_space_increase(ctx, resize_file_to);
-
-    return true;
+    nd_munmap(data_start, total_file_size);
+    unlink(path);
+    return false;
 }
 
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,

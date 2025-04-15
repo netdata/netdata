@@ -4,7 +4,7 @@
 
 bool nd_log_forked = false;
 
-#define NO_STACK_TRACE_PREFIX "info: stack trace is not available, "
+#define NO_STACK_TRACE_PREFIX STACK_TRACE_INFO_PREFIX "stack trace is not available, "
 
 // The signal handler function name to filter out in stack traces
 static const char *signal_handler_function = "nd_signal_handler";
@@ -298,6 +298,8 @@ bool capture_stack_trace_available(void) {
 
 NEVER_INLINE
 void capture_stack_trace(BUFFER *wb) {
+    root_cause_function[0] = '\0';
+
     if (!backtrace_state) {
         buffer_strcat(wb, NO_STACK_TRACE_PREFIX "libbacktrace not initialized");
         return;
@@ -353,6 +355,8 @@ bool capture_stack_trace_available(void) {
 NEVER_INLINE
 void capture_stack_trace(BUFFER *wb) {
     // this function is async-signal-safe, if the buffer has enough space to hold the stack trace
+
+    root_cause_function[0] = '\0';
 
     unw_cursor_t cursor;
     unw_context_t context;
@@ -446,6 +450,8 @@ void capture_stack_trace(BUFFER *wb) {
     char **messages;
     int size, i;
 
+    root_cause_function[0] = '\0';
+
     size = backtrace(array, _countof(array));
     messages = backtrace_symbols(array, size);
 
@@ -518,6 +524,8 @@ bool capture_stack_trace_is_async_signal_safe(void) {
 
 NEVER_INLINE
 void capture_stack_trace(BUFFER *wb) {
+    root_cause_function[0] = '\0';
+
     buffer_strcat(wb, NO_STACK_TRACE_PREFIX "no back-end available");
 
     // probably we can have something like this?
@@ -545,12 +553,7 @@ bool stack_trace_formatter(BUFFER *wb, void *data __maybe_unused) {
 
     in_stack_trace = true;
 
-    root_cause_function[0] = '\0';
-
     capture_stack_trace(wb);
-
-    if(!root_cause_function[0])
-        strncpyz(root_cause_function, "unknown_root_cause_function", sizeof(root_cause_function) - 1);
 
     in_stack_trace = false; // Ensure the flag is reset
     return true;

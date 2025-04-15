@@ -99,4 +99,12 @@ bool stream_conf_api_key_allows_client(const char *api_key, const char *client_i
 
 void stream_conf_set_sender_compression_levels(ND_COMPRESSION_PROFILE profile);
 
+/**
+ * Free stream configuration
+ * 
+ * Free all memory associated with the stream configuration.
+ * Called during shutdown to prevent memory leaks.
+ */
+void stream_config_free(void);
+
 #endif //NETDATA_STREAM_CONF_H

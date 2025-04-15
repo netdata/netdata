@@ -87,6 +87,7 @@ PERF_INSTANCE_DEFINITION *getInstanceByPosition(
 
 void PerflibNamesRegistryInitialize(void);
 void PerflibNamesRegistryUpdate(void);
+void PerflibNamesRegistryCleanup(void);
 
 #endif // OS_WINDOWS
 #endif //NETDATA_PERFLIB_H

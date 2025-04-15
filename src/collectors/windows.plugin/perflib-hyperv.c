@@ -26,7 +26,7 @@ static void get_and_sanitize_instance_value(
 
 #define DICT_PERF_OPTION (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE)
 
-#define DEFINE_RD(counter_name) RRDDIM *rd_##counter_name
+#define DEFINE_RD(counter_name) RRDDIM(*rd_##counter_name)
 
 #define GET_INSTANCE_COUNTER(counter)                                                                                  \
     do {                                                                                                               \
@@ -142,10 +142,14 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
         if (!p->charts_created) {
             p->charts_created = true;
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+
             if (!p->st_vm_memory_physical) {
                 p->st_vm_memory_physical = rrdset_create_localhost(
                     "vm_memory_physical",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_memory_physical",
@@ -246,10 +250,13 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
 
         if (!p->charts_created) {
             p->charts_created = true;
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
 
             p->st_vm_vid_physical_pages_allocated = rrdset_create_localhost(
                 "vm_vid_physical_pages_allocated",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_vid_physical_pages_allocated",
@@ -332,7 +339,7 @@ static bool do_hyperv_health_summary(PERF_DATA_BLOCK *pDataBlock, int update_eve
         p->charts_created = true;
         p->st_health = rrdset_create_localhost(
             "vms_health",
-            windows_shared_buffer,
+            "hyperv_health_status",
             NULL,
             HYPERV,
             HYPERV ".vms_health",
@@ -369,7 +376,7 @@ struct hypervisor_root_partition {
     RRDSET *st_DeviceDMAErrors;
     RRDSET *st_DeviceInterruptErrors;
     RRDSET *st_DeviceInterruptThrottleEvents;
-    RRDSET *st_IOΤLBFlushesSec;
+    RRDSET *st_IOTLBFlushesSec;
     RRDSET *st_AddressSpaces;
     RRDSET *st_VirtualTLBPages;
     RRDSET *st_VirtualTLBFlushEntiresSec;
@@ -388,7 +395,7 @@ struct hypervisor_root_partition {
     DEFINE_RD(DeviceDMAErrors);
     DEFINE_RD(DeviceInterruptErrors);
     DEFINE_RD(DeviceInterruptThrottleEvents);
-    DEFINE_RD(IOΤLBFlushesSec);
+    DEFINE_RD(IOTLBFlushesSec);
     DEFINE_RD(AddressSpaces);
     DEFINE_RD(VirtualTLBPages);
     DEFINE_RD(VirtualTLBFlushEntiresSec);
@@ -405,7 +412,7 @@ struct hypervisor_root_partition {
     COUNTER_DATA DeviceDMAErrors;
     COUNTER_DATA DeviceInterruptErrors;
     COUNTER_DATA DeviceInterruptThrottleEvents;
-    COUNTER_DATA IOΤLBFlushesSec;
+    COUNTER_DATA IOTLBFlushesSec;
     COUNTER_DATA AddressSpaces;
     COUNTER_DATA VirtualTLBPages;
     COUNTER_DATA VirtualTLBFlushEntiresSec;
@@ -429,7 +436,7 @@ void initialize_hyperv_root_partition_keys(struct hypervisor_root_partition *p)
     p->DeviceDMAErrors.key = "Device DMA Errors";
     p->DeviceInterruptErrors.key = "Device Interrupt Errors";
     p->DeviceInterruptThrottleEvents.key = "Device Interrupt Throttle Events";
-    p->IOΤLBFlushesSec.key = "I/O TLB Flushes/sec";
+    p->IOTLBFlushesSec.key = "I/O TLB Flushes/sec";
     p->AddressSpaces.key = "Address Spaces";
     p->VirtualTLBPages.key = "Virtual TLB Pages";
     p->VirtualTLBFlushEntiresSec.key = "Virtual TLB Flush Entires/sec";
@@ -486,7 +493,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         GET_INSTANCE_COUNTER(DeviceDMAErrors);
         GET_INSTANCE_COUNTER(DeviceInterruptErrors);
         GET_INSTANCE_COUNTER(DeviceInterruptThrottleEvents);
-        GET_INSTANCE_COUNTER(IOΤLBFlushesSec);
+        GET_INSTANCE_COUNTER(IOTLBFlushesSec);
         GET_INSTANCE_COUNTER(AddressSpaces);
         GET_INSTANCE_COUNTER(VirtualTLBPages);
         GET_INSTANCE_COUNTER(VirtualTLBFlushEntiresSec);
@@ -494,9 +501,13 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         // Create charts
         if (!p->charts_created) {
             p->charts_created = true;
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+
             p->st_device_space_pages = rrdset_create_localhost(
                 "root_partition_device_space_pages",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_device_space_pages",
@@ -630,7 +641,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
             p->rd_DeviceInterruptThrottleEvents =
                 rrddim_add(p->st_DeviceInterruptThrottleEvents, "throttling", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-            p->st_IOΤLBFlushesSec = rrdset_create_localhost(
+            p->st_IOTLBFlushesSec = rrdset_create_localhost(
                 "root_partition_io_tlb_flush",
                 windows_shared_buffer,
                 NULL,
@@ -644,7 +655,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_IOΤLBFlushesSec = rrddim_add(p->st_IOΤLBFlushesSec, "gpa", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_IOTLBFlushesSec = rrddim_add(p->st_IOTLBFlushesSec, "gpa", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             p->st_AddressSpaces = rrdset_create_localhost(
                 "root_partition_address_space",
@@ -714,7 +725,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         SETP_DIM_VALUE(st_DeviceDMAErrors, DeviceDMAErrors);
         SETP_DIM_VALUE(st_DeviceInterruptErrors, DeviceInterruptErrors);
         SETP_DIM_VALUE(st_DeviceInterruptThrottleEvents, DeviceInterruptThrottleEvents);
-        SETP_DIM_VALUE(st_IOΤLBFlushesSec, IOΤLBFlushesSec);
+        SETP_DIM_VALUE(st_IOTLBFlushesSec, IOTLBFlushesSec);
         SETP_DIM_VALUE(st_AddressSpaces, AddressSpaces);
         SETP_DIM_VALUE(st_VirtualTLBPages, VirtualTLBPages);
         SETP_DIM_VALUE(st_VirtualTLBFlushEntiresSec, VirtualTLBFlushEntiresSec);
@@ -727,7 +738,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         rrdset_done(p->st_deposited_pages);
         rrdset_done(p->st_DeviceInterruptErrors);
         rrdset_done(p->st_DeviceInterruptThrottleEvents);
-        rrdset_done(p->st_IOΤLBFlushesSec);
+        rrdset_done(p->st_IOTLBFlushesSec);
         rrdset_done(p->st_AddressSpaces);
         rrdset_done(p->st_DeviceDMAErrors);
         rrdset_done(p->st_VirtualTLBPages);
@@ -819,10 +830,14 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
         if (!p->charts_created) {
             p->charts_created = true;
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+
             if (!p->st_operations) {
                 p->st_operations = rrdset_create_localhost(
                     "vm_storage_device_operations",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_storage_device_operations",
@@ -1054,10 +1069,13 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
         if (!p->charts_created) {
             p->charts_created = true;
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
 
             p->st_bytes = rrdset_create_localhost(
                 "vswitch_traffic",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_traffic",
@@ -1418,9 +1436,13 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
         if (!p->charts_created) {
             p->charts_created = true;
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+
             p->st_dropped_packets = rrdset_create_localhost(
                 "vm_net_interface_packets_dropped",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_net_interface_packets_dropped",
@@ -1679,9 +1701,13 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
 
         if (!p->charts_created) {
             p->charts_created = true;
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+
             p->st_HypervisorProcessorTotal = rrdset_create_localhost(
                 "vm_cpu_usage",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_cpu_usage",

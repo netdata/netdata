@@ -76,7 +76,6 @@ static void copy_and_clean_thread_name_if_empty(DAEMON_STATUS_FILE *ds, const ch
         *p = '\0';
 }
 
-#define STACK_TRACE_INFO_PREFIX "info: "
 static bool stack_trace_is_empty(DAEMON_STATUS_FILE *ds) {
     return !ds->fatal.stack_trace[0] || strncmp(ds->fatal.stack_trace, STACK_TRACE_INFO_PREFIX, strlen(STACK_TRACE_INFO_PREFIX)) == 0;
 }
@@ -163,6 +162,41 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     }
     buffer_json_object_close(wb);
 
+    // Add metrics stats as a top-level node
+    buffer_json_member_add_object(wb, "metrics");
+    {
+        buffer_json_member_add_object(wb, "nodes");
+        {
+            buffer_json_member_add_uint64(wb, "total", ds->metrics_metadata.nodes.total);
+            buffer_json_member_add_uint64(wb, "receiving", ds->metrics_metadata.nodes.receiving);
+            buffer_json_member_add_uint64(wb, "sending", ds->metrics_metadata.nodes.sending);
+            buffer_json_member_add_uint64(wb, "archived", ds->metrics_metadata.nodes.archived);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "metrics");
+        {
+            buffer_json_member_add_uint64(wb, "collected", ds->metrics_metadata.metrics.collected);
+            buffer_json_member_add_uint64(wb, "available", ds->metrics_metadata.metrics.available);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "instances");
+        {
+            buffer_json_member_add_uint64(wb, "collected", ds->metrics_metadata.instances.collected);
+            buffer_json_member_add_uint64(wb, "available", ds->metrics_metadata.instances.available);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "contexts");
+        {
+            buffer_json_member_add_uint64(wb, "collected", ds->metrics_metadata.contexts.collected);
+            buffer_json_member_add_uint64(wb, "available", ds->metrics_metadata.contexts.available);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb);
+
     buffer_json_member_add_object(wb, "host");
     {
         buffer_json_member_add_uuid_compact(wb, "id", ds->machine_id.uuid);
@@ -177,6 +211,8 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string_or_empty(wb, "cloud_instance", ds->cloud_instance_type);
             buffer_json_member_add_string_or_empty(wb, "cloud_region", ds->cloud_instance_region);
         }
+        
+        buffer_json_member_add_uint64(wb, "system_cpus", ds->system_cpus);
 
         buffer_json_member_add_object(wb, "boot");
         {
@@ -207,11 +243,18 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
                 buffer_json_member_add_boolean(wb, "read_only", ds->var_cache.is_read_only);
             }
             buffer_json_object_close(wb);
+            
+            buffer_json_member_add_object(wb, "netdata");
+            buffer_json_member_add_uint64(wb, "dbengine", ds->disk_footprint.dbengine);
+            buffer_json_member_add_uint64(wb, "sqlite", ds->disk_footprint.sqlite);
+            buffer_json_member_add_uint64(wb, "other", ds->disk_footprint.other);
+            buffer_json_member_add_datetime_rfc3339(wb, "last_updated", ds->disk_footprint.last_updated_ut, true);
+            buffer_json_object_close(wb);
         }
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
-
+    
     buffer_json_member_add_object(wb, "os");
     {
         buffer_json_member_add_string(wb, "type", DAEMON_OS_TYPE_2str(ds->os_type));
@@ -269,8 +312,6 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string(wb, "release", ds->hw.bios.release);
             buffer_json_member_add_string(wb, "version", ds->hw.bios.version);
             buffer_json_member_add_string(wb, "vendor", ds->hw.bios.vendor);
-            buffer_json_member_add_string(wb, "mode", ds->hw.bios.mode);
-            buffer_json_member_add_boolean(wb, "secure_boot", ds->hw.bios.secure_boot);
         }
         buffer_json_object_close(wb);
     }
@@ -437,6 +478,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "virtualization", ds->virtualization, error, required_v1);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "container", ds->container, error, required_v1);
         JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "uptime", ds->boottime, error, required_v1);
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "system_cpus", ds->system_cpus, error, required_v27);
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "boot", error, required_v1, {
             JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "id", ds->boot_id.uuid, error, required_v1);
@@ -464,6 +506,14 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
                 if(!OS_SYSTEM_DISK_SPACE_OK(ds->var_cache))
                     ds->var_cache = OS_SYSTEM_DISK_SPACE_EMPTY;
             });
+            
+            JSONC_PARSE_SUBOBJECT(jobj, path, "netdata", error, required_v27, {
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "dbengine", ds->disk_footprint.dbengine, error, required_v27);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "sqlite", ds->disk_footprint.sqlite, error, required_v27);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "other", ds->disk_footprint.other, error, required_v27);
+                JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "last_updated", ds->disk_footprint.last_updated_ut, error, required_v27);
+                // Don't reset if not OK since this is a new field
+            });
         });
 
         if(version >= 20) {
@@ -472,6 +522,31 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "cloud_instance", ds->cloud_instance_type, error, required_v20);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "cloud_region", ds->cloud_instance_region, error, required_v20);
         }
+    });
+    
+    // Parse metrics metadata
+    JSONC_PARSE_SUBOBJECT(jobj, path, "metrics", error, required_v27, {
+        JSONC_PARSE_SUBOBJECT(jobj, path, "nodes", error, required_v27, {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->metrics_metadata.nodes.total, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "receiving", ds->metrics_metadata.nodes.receiving, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "sending", ds->metrics_metadata.nodes.sending, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "archived", ds->metrics_metadata.nodes.archived, error, required_v27);
+        });
+        
+        JSONC_PARSE_SUBOBJECT(jobj, path, "metrics", error, required_v27, {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "collected", ds->metrics_metadata.metrics.collected, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "available", ds->metrics_metadata.metrics.available, error, required_v27);
+        });
+        
+        JSONC_PARSE_SUBOBJECT(jobj, path, "instances", error, required_v27, {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "collected", ds->metrics_metadata.instances.collected, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "available", ds->metrics_metadata.instances.available, error, required_v27);
+        });
+        
+        JSONC_PARSE_SUBOBJECT(jobj, path, "contexts", error, required_v27, {
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "collected", ds->metrics_metadata.contexts.collected, error, required_v27);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "available", ds->metrics_metadata.contexts.available, error, required_v27);
+        });
     });
 
     // Parse os object
@@ -521,8 +596,6 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "release", ds->hw.bios.release, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->hw.bios.version, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->hw.bios.vendor, error, required_v25);
-            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "mode", ds->hw.bios.mode, error, required_v27);
-            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "secure_boot", ds->hw.bios.secure_boot, error, required_v27);
         });
     });
 
@@ -692,7 +765,10 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         session_status.cloud_status = cs;
 
     session_status.oom_protection = dbengine_out_of_memory_protection;
-    session_status.netdata_max_rss = process_max_rss();
+    
+    OS_PROCESS_MEMORY proc_mem = os_process_memory(0);
+    if(OS_PROCESS_MEMORY_OK(proc_mem))
+        session_status.netdata_max_rss = proc_mem.max_rss;
 
     session_status.claim_id = claim_id_get_uuid();
 
@@ -718,6 +794,45 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
     session_status.memory = os_system_memory(true);
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
+    session_status.system_cpus = os_get_system_cpus();
+    
+    // Collect metrics metadata statistics
+    session_status.metrics_metadata = rrdstats_metadata_collect();
+    
+    // Update disk footprint at most once every 10 minutes (600 seconds)
+    if ((now_ut - session_status.disk_footprint.last_updated_ut) >= 600 * USEC_PER_SEC ||
+        session_status.disk_footprint.last_updated_ut == 0) {
+        // Calculate disk footprint by categories
+        const char *dirs_to_measure[] = {
+            netdata_configured_varlib_dir,
+            netdata_configured_cache_dir
+        };
+        
+        // Create patterns for different file types
+        SIMPLE_PATTERN *dbengine_pattern = simple_pattern_create("*dbengine*/*.ndf *dbengine*/*.njf*", " ", SIMPLE_PATTERN_EXACT, false);
+        SIMPLE_PATTERN *sqlite_pattern = simple_pattern_create("*.db *.wal *.shm", " ", SIMPLE_PATTERN_EXACT, false);
+        
+        // Get total size first
+        DIR_SIZE total_size = dir_size_multiple(dirs_to_measure, 2, NULL, 0);
+        
+        // Get DBEngine files size
+        DIR_SIZE dbengine_size = dir_size_multiple(dirs_to_measure, 2, dbengine_pattern, 0);
+        session_status.disk_footprint.dbengine = dbengine_size.bytes;
+        
+        // Get SQLite files size
+        DIR_SIZE sqlite_size = dir_size_multiple(dirs_to_measure, 2, sqlite_pattern, 0);
+        session_status.disk_footprint.sqlite = sqlite_size.bytes;
+        
+        // Calculate other files (total - dbengine - sqlite)
+        session_status.disk_footprint.other = total_size.bytes - dbengine_size.bytes - sqlite_size.bytes;
+        
+        // Update last updated timestamp
+        session_status.disk_footprint.last_updated_ut = now_ut;
+        
+        // Clean up patterns
+        simple_pattern_free(dbengine_pattern);
+        simple_pattern_free(sqlite_pattern);
+    }
 
     spinlock_unlock(&session_status.spinlock);
     dsf_release(session_status);
@@ -939,8 +1054,14 @@ void daemon_status_file_init(void) {
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
     status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status);
+
+    // fill missing information on older versions of the status file
+
     if(last_session_status.v <= 26)
         fill_dmi_info(&last_session_status);
+    
+    if(last_session_status.v <= 27)
+        last_session_status.system_cpus = os_get_system_cpus();
 
     daemon_status_file_migrate_once();
 }
@@ -1177,6 +1298,7 @@ void daemon_status_file_check_crash(void) {
             last_session_status = session_status;
             last_session_status.status = DAEMON_STATUS_NONE;
             last_session_status.exit_reason = 0;
+            memset(&last_session_status.fatal, 0, sizeof(last_session_status.fatal));
         }
 
         struct post_status_file_thread_data d = {
@@ -1215,7 +1337,8 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
 
     // Store the first netdata function from the stack trace if available
     const char *first_nd_fn = capture_stack_trace_root_cause_function();
-    if (first_nd_fn && *first_nd_fn && !ds->fatal.function[0])
+    if (first_nd_fn && *first_nd_fn &&
+        (!ds->fatal.function[0] || strncmp(ds->fatal.function, "thread:", 7) == 0))
         safecpy(ds->fatal.function, first_nd_fn);
 
     if(buffer_strlen(wb) > 0) {
@@ -1336,6 +1459,18 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
     copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag_async_safe());
 
+    if(!session_status.fatal.function[0] ||
+        strncmp(session_status.fatal.function, "startup(", 8) == 0 ||
+        strncmp(session_status.fatal.function, "shutdown(", 9) == 0) {
+        size_t len = 0;
+        len = strcatz(session_status.fatal.function, len, "thread:", sizeof(session_status.fatal.function));
+        len = strcatz(session_status.fatal.function, len, session_status.fatal.thread, sizeof(session_status.fatal.function));
+        if(session_status.fatal.worker_job_id <= WORKER_UTILIZATION_MAX_JOB_TYPES) {
+            len = strcatz(session_status.fatal.function, len, ":", sizeof(session_status.fatal.function));
+            len += print_uint64(&session_status.fatal.function[len], session_status.fatal.worker_job_id);
+        }
+    }
+
     dsf_release(session_status);
 
     // the buffer should already be allocated, so this should normally do nothing
@@ -1396,7 +1531,7 @@ void daemon_status_file_shutdown_timeout(BUFFER *trace) {
     // keep the spinlock locked, to prevent further steps updating the status
 }
 
-void daemon_status_file_shutdown_step(const char *step) {
+void daemon_status_file_shutdown_step(const char *step, const char *step_timings) {
     if(session_status.fatal.filename[0] || !spinlock_trylock(&shutdown_timeout_spinlock))
         // we have a fatal logged
         return;
@@ -1405,6 +1540,9 @@ void daemon_status_file_shutdown_step(const char *step) {
         snprintfz(session_status.fatal.function, sizeof(session_status.fatal.function), "shutdown(%s)", step);
     else
         session_status.fatal.function[0] = '\0';
+
+    if(step_timings && *step_timings && stack_trace_is_empty(&session_status))
+        safecpy(session_status.fatal.stack_trace, step_timings);
 
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 

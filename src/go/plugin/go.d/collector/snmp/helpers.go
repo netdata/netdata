@@ -13,18 +13,18 @@ func sliceToStrings(items []interface{}) []string {
 	return strs
 }
 
-func sliceToTableMetricTags(items []interface{}) []TableMetricTag {
-	var metricTag []TableMetricTag
-	for _, v := range items {
-		s, ok := v.(TableMetricTag)
-		if !ok {
-			// Handle error if an element is not a string.
-			continue
-		}
-		metricTag = append(metricTag, s)
-	}
-	return metricTag
-}
+// func sliceToTableMetricTags(items []interface{}) []TableMetricTag {
+// 	var metricTag []TableMetricTag
+// 	for _, v := range items {
+// 		s, ok := v.(TableMetricTag)
+// 		if !ok {
+// 			// Handle error if an element is not a string.
+// 			continue
+// 		}
+// 		metricTag = append(metricTag, s)
+// 	}
+// 	return metricTag
+// }
 
 func mergeTableBatches(target tableBatches, source tableBatches) tableBatches {
 	merged := tableBatches{}

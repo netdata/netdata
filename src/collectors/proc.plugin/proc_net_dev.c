@@ -1692,6 +1692,14 @@ static void netdev_main_cleanup(void *pptr) {
     if(CLEANUP_FUNCTION_GET_PTR(pptr) != (void *)0x01)
         return;
 
+    netdata_mutex_lock(&netdev_mutex);
+    while(netdev_root) {
+        struct netdev *d = netdev_root;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(netdev_root, d, prev, next);
+        netdev_free(d);
+    }
+    netdata_mutex_unlock(&netdev_mutex);
+
     worker_unregister();
 }
 
