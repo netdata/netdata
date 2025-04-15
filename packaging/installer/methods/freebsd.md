@@ -18,86 +18,86 @@ Approve any prompts that appear.
 
 ---
 
-## 2. Install Netdata (Recommended)
+## 2. Choose an Installation Method
 
-Use our one-line [kickstart installer](/packaging/installer/methods/kickstart.md).
+### Option A: Kickstart Installer (Recommended)
 
-If you're using Netdata Cloud:
+The simplest approach is to use our one-line [kickstart installer](/packaging/installer/methods/kickstart.md).
 
-- In your Space, click **Add Nodes** → Copy the suggested command from the "Linux" tab.
+- Prepare the installation command:
+    - For Netdata Cloud users: Navigate to your Space, click **Add Nodes** → Copy the command from the "Linux" tab.
+    - For standalone installation, use the example below.
 
-Example command:
+- Run the installation command:
+   ```bash
+   wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token <YOUR_TOKEN> --claim-url https://app.netdata.cloud
+   ```
+  > Replace `<YOUR_TOKEN>` with your actual claim token.
 
-```bash
-wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token <YOUR_TOKEN> --claim-url https://app.netdata.cloud
-```
+- After installation, access your Netdata dashboard at:
 
-> Replace `<YOUR_TOKEN>` with your claim token.
+   ```
+   http://NODE:19999
+   ```
 
-Once installed, access Netdata at:
-
-```
-http://NODE:19999
-```
-
-(`NODE` = your FreeBSD machine's hostname or IP)
+  (`NODE` = your FreeBSD machine's hostname or IP)
 
 ---
 
-## 3. Alternative: Install via FreeBSD Ports
+### Option B: FreeBSD Ports Installation
 
-You can also install Netdata using FreeBSD Ports:
+Netdata is also available through the FreeBSD Ports collection:
 
 https://www.freshports.org/net-mgmt/netdata/
 
 ---
 
-## 4. Manual installation (Advanced)
+### Option C: Manual Installation (For Advanced Users)
 
-Download the latest Netdata release:
+- Download the latest Netdata release:
 
-```bash
-fetch https://github.com/netdata/netdata/releases/latest/download/netdata-latest.tar.gz
-```
+   ```bash
+   fetch https://github.com/netdata/netdata/releases/latest/download/netdata-latest.tar.gz
+   ```
 
-Or fetch a specific version:
+  Or download a specific version:
 
-```bash
-fetch https://github.com/netdata/netdata/releases/download/v2.3.2/netdata-v2.3.2.tar.gz
-```
+   ```bash
+   fetch https://github.com/netdata/netdata/releases/download/v2.3.2/netdata-v2.3.2.tar.gz
+   ```
 
-Extract the archive:
+- Extract the downloaded archive:
 
-```bash
-tar -xzf netdata*.tar.gz && rm netdata*.tar.gz
-```
+   ```bash
+   tar -xzf netdata*.tar.gz && rm netdata*.tar.gz
+   ```
 
-Install Netdata to `/opt/netdata`:
+- Install Netdata to `/opt/netdata`:
 
-```bash
-cd netdata-v*
-./netdata-installer.sh --install-prefix /opt
-```
+   ```bash
+   cd netdata-v*
+   ./netdata-installer.sh --install-prefix /opt
+   ```
 
-Enable Netdata to start automatically:
+- Configure Netdata to start automatically at boot:
 
-```bash
-sysrc netdata_enable="YES"
-```
+   ```bash
+   sysrc netdata_enable="YES"
+   ```
 
-Start Netdata:
+- Start the Netdata service:
 
-```bash
-service netdata start
-```
+   ```bash
+   service netdata start
+   ```
 
 ---
 
-## 5. Updating Netdata on FreeBSD
+## 3. Updating Netdata Installation
 
-If you enabled auto-updates with `--auto-update`, you're done!
+If you enabled auto-updates with `--auto-update`, no further action is needed.
 
-Otherwise, update manually:
+For manual updates:
 
 ```bash
 cd /opt/netdata/usr/libexec/netdata/
@@ -108,27 +108,27 @@ cd /opt/netdata/usr/libexec/netdata/
 
 ## Optional Kickstart Parameters
 
-| Option                         | Description                                                                                     |
-|--------------------------------|-------------------------------------------------------------------------------------------------|
-| `--non-interactive`            | Skip prompts and assume yes.                                                                    |
-| `--interactive`                | Force interactive prompts.                                                                      |
-| `--release-channel stable`     | Install stable builds (instead of nightly).                                                     |
-| `--no-updates`                 | Disable auto-updates.                                                                           |
-| `--disable-telemetry`          | Disable anonymous statistics.                                                                   |
-| `--native-only`                | Install only if native packages are available.                                                  |
-| `--static-only`                | Install only if static builds are available.                                                    |
-| `--install-prefix /opt`        | Change installation directory.                                                                 |
+| Option                                               | Description                                                                                                |
+|------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
+| `--non-interactive`                                  | Skip prompts and assume yes.                                                                               |
+| `--interactive`                                      | Force interactive prompts.                                                                                 |
+| `--release-channel stable`                           | Install stable builds (instead of nightly).                                                                |
+| `--no-updates`                                       | Disable auto-updates.                                                                                      |
+| `--disable-telemetry`                                | Disable anonymous statistics.                                                                              |
+| `--native-only`                                      | Install only if native packages are available.                                                             |
+| `--static-only`                                      | Install only if static builds are available.                                                               |
+| `--install-prefix /opt`                              | Change installation directory.                                                                             |
 | `--prepare-offline-install-source ./netdata-offline` | Prepare offline installation source. See [Offline Install Guide](/packaging/installer/methods/offline.md). |
 
 ---
 
 ## Environment Variables (Advanced Users)
 
-| Variable        | Purpose                                                    |
-|-----------------|------------------------------------------------------------|
-| `TMPDIR`        | Directory for temporary files.                             |
-| `ROOTCMD`       | Command used for privilege escalation (default: sudo/doas).|
-| `DISABLE_TELEMETRY=1` | Disable anonymous telemetry data.                   |
+| Variable              | Purpose                                                     |
+|-----------------------|-------------------------------------------------------------|
+| `TMPDIR`              | Directory for temporary files.                              |
+| `ROOTCMD`             | Command used for privilege escalation (default: sudo/doas). |
+| `DISABLE_TELEMETRY=1` | Disable anonymous telemetry data.                           |
 
 ---
 
