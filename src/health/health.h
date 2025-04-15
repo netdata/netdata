@@ -111,4 +111,6 @@ uint64_t rrdhost_health_evloop_last_iteration(RRDHOST *host);
 
 void health_load_config_defaults(void);
 
+void alert_variable_lookup_cleanup(void);
+
 #endif //NETDATA_HEALTH_H

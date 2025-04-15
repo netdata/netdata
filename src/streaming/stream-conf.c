@@ -14,7 +14,22 @@ static struct config stream_config = APPCONFIG_INITIALIZER;
  * Called during shutdown to prevent memory leaks.
  */
 void stream_config_free(void) {
+    // Free the configuration
     inicfg_free(&stream_config);
+    
+    // Free the allocated strings in stream_send structure
+    string_freez(stream_send.api_key);
+    string_freez(stream_send.send_charts_matching);
+    string_freez(stream_send.parents.destination);
+    string_freez(stream_send.parents.ssl_ca_path);
+    string_freez(stream_send.parents.ssl_ca_file);
+    
+    // Reset the pointers to NULL
+    stream_send.api_key = NULL;
+    stream_send.send_charts_matching = NULL;
+    stream_send.parents.destination = NULL;
+    stream_send.parents.ssl_ca_path = NULL;
+    stream_send.parents.ssl_ca_file = NULL;
 }
 
 struct _stream_send stream_send = {

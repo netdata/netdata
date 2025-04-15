@@ -41,16 +41,22 @@ static bool dictionary_netdev_rename_conflict_cb(const DICTIONARY_ITEM *item __m
     return true;
 }
 
+static SPINLOCK netdev_renames_spinlock = SPINLOCK_INITIALIZER;
 void netdev_renames_init(void) {
-    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-
-    spinlock_lock(&spinlock);
+    spinlock_lock(&netdev_renames_spinlock);
     if(!netdev_renames) {
         netdev_renames = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, sizeof(struct rename_task));
         dictionary_register_conflict_callback(netdev_renames, dictionary_netdev_rename_conflict_cb, NULL);
         dictionary_register_delete_callback(netdev_renames, dictionary_netdev_rename_delete_cb, NULL);
     }
-    spinlock_unlock(&spinlock);
+    spinlock_unlock(&netdev_renames_spinlock);
+}
+
+void netdev_renames_destroy(void) {
+    spinlock_lock(&netdev_renames_spinlock);
+    dictionary_destroy(netdev_renames);
+    netdev_renames = NULL;
+    spinlock_unlock(&netdev_renames_spinlock);
 }
 
 void cgroup_rename_task_add(

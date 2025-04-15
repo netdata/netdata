@@ -709,7 +709,7 @@ static void daemon_status_file_migrate_once(void) {
         session_status.reliability++;
     }
 
-    safecpy(session_status.stack_traces, capture_stack_trace_backend());
+    safecpy(session_status.stack_traces, stacktrace_backend());
 
     fill_dmi_info(&session_status);
 
@@ -1320,7 +1320,7 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
-    if(capture_stack_trace_available())
+    if(stacktrace_available())
         set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "will now attempt to get stack trace - if you see this message, we couldn't get it.");
     else
         set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
@@ -1332,11 +1332,11 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
         return;
 
     buffer_flush(wb);
-    
-    capture_stack_trace(wb);
+
+    stacktrace_capture(wb);
 
     // Store the first netdata function from the stack trace if available
-    const char *first_nd_fn = capture_stack_trace_root_cause_function();
+    const char *first_nd_fn = stacktrace_root_cause_function();
     if (first_nd_fn && *first_nd_fn &&
         (!ds->fatal.function[0] || strncmp(ds->fatal.function, "thread:", 7) == 0))
         safecpy(ds->fatal.function, first_nd_fn);
@@ -1487,14 +1487,14 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         }
     }
 
-    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT || capture_stack_trace_is_async_signal_safe();
-    bool get_stack_trace = capture_stack_trace_available() && safe_to_get_stack_trace && stack_trace_is_empty(&session_status);
+    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT || stacktrace_capture_is_async_signal_safe();
+    bool get_stack_trace = stacktrace_available() && safe_to_get_stack_trace && stack_trace_is_empty(&session_status);
 
     // save it
     if(get_stack_trace)
         daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
     else {
-        if (!capture_stack_trace_available())
+        if (!stacktrace_available())
             set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
         else
             set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
