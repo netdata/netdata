@@ -4,11 +4,11 @@ To install the latest git version of Netdata, please follow these 2 steps:
 
 1. [Prepare your system](#prepare-your-system)
 
-    Install the required packages on your system.
+   Install the required packages on your system.
 
 2. [Install Netdata](#install-netdata)
 
-    Download and install Netdata. You can also update it the same way.
+   Download and install Netdata. You can also update it the same way.
 
 ## Prepare your system
 
@@ -20,23 +20,23 @@ should be installed on your system to build and run Netdata. It supports a large
 and other operating systems and is regularly tested. You can find this tool [here](https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh) or run it directly with `bash <(curl -sSL https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh)`. Otherwise read on for how to get requires packages manually:
 
 - **Alpine** Linux and its derivatives
-  - You have to install `bash` yourself, before using the installer.
+    - You have to install `bash` yourself, before using the installer.
 
 - **Gentoo** Linux and its derivatives
 
 - **Debian** Linux and its derivatives (including **Ubuntu**, **Mint**)
 
 - **Red Hat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
-  - Please note that for RHEL/CentOS you need
-        [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
-        In addition, RHEL/CentOS version 6 also need
-        [OKay](https://okay.com.mx) for package libuv version 1.
-  - CentOS 8 / RHEL 8 requires a bit of extra work. See the dedicated section below.
+    - Please note that for RHEL/CentOS you need
+      [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
+      In addition, RHEL/CentOS version 6 also need
+      [OKay](https://okay.com.mx) for package libuv version 1.
+    - CentOS 8 / RHEL 8 requires a bit of extra work. See the dedicated section below.
 
 - **SUSE** Linux and its derivatives (including **openSUSE**)
 
 - **SLE12** Must have your system registered with SUSE Customer Center or have the DVD. See
-    [#1162](https://github.com/netdata/netdata/issues/1162)
+  [#1162](https://github.com/netdata/netdata/issues/1162)
 
 Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `named`, hardware sensors and `SNMP`):
 
@@ -196,14 +196,14 @@ cd netdata
 - `--stable-channel`: Automatically update only on the release of new major versions.
 - `--nightly-channel`: Automatically update on every new nightly build.
 - `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) we use to make
-    Netdata better.
+  Netdata better.
 - `--no-updates`: Prevent automatic updates of any kind.
 - `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
-    cannot be used to change installation types.
+  cannot be used to change installation types.
 - `--local-files`: Used for [offline installations](/packaging/installer/methods/offline.md). Pass four file paths: the Netdata
-    tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
-    process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
-    `--stable-channel`, Netdata will use the local files.
+  tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
+  process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
+  `--stable-channel`, Netdata will use the local files.
 
 ### Connect node to Netdata Cloud during installation
 
