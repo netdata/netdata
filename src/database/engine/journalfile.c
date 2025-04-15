@@ -1012,7 +1012,6 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         return;
 
     uint8_t *data_start = (uint8_t *)j2_header;
-    uint32_t entries = j2_header->metric_count;
 
     if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
         journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
@@ -1023,21 +1022,35 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         }
     }
 
-    struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
-    time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-    time_t global_first_time_s = header_start_time_s;
-    time_t now_s = max_acceptable_collected_time();
-    for (size_t i=0; i < entries; i++) {
-        time_t start_time_s = header_start_time_s + metric->delta_start_s;
-        time_t end_time_s = header_start_time_s + metric->delta_end_s;
+    char path_v2[RRDENG_PATH_MAX];
+    journalfile_v2_generate_path(journalfile->datafile, path_v2, sizeof(path_v2));
+    time_t global_first_time_s;
+    bool failed = false;
+    uint32_t entries;
+    PROTECTED_ACCESS_SETUP(data_start, journalfile->mmap.size, path_v2, "mrg-load");
+    if(no_signal_received) {
+        entries = j2_header->metric_count;
+        struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
+        time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+        global_first_time_s = header_start_time_s;
+        time_t now_s = max_acceptable_collected_time();
+        for (size_t i=0; i < entries; i++) {
+            time_t start_time_s = header_start_time_s + metric->delta_start_s;
+            time_t end_time_s = header_start_time_s + metric->delta_end_s;
 
-        mrg_update_metric_retention_and_granularity_by_uuid(
+            mrg_update_metric_retention_and_granularity_by_uuid(
                 main_mrg, (Word_t)ctx, &metric->uuid, start_time_s, end_time_s, metric->update_every_s, now_s);
 
-        metric++;
-    }
+            metric++;
+        }
+    } else
+        failed = true;
 
     journalfile_v2_data_release(journalfile);
+
+    if (unlikely(failed))
+        return;
+
     usec_t ended_ut = now_monotonic_usec();
 
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal v2 of tier %d, datafile %u populated, size: %0.2f MiB, metrics: %0.2f k, %0.2f ms"
