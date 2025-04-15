@@ -846,6 +846,11 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-debug.c
         src/libnetdata/dictionary/dictionary-debug.h
         src/libnetdata/dictionary/dictionary.h
+        src/libnetdata/eval/ast/ast.c
+        src/libnetdata/eval/ast/ast.h
+        src/libnetdata/eval/ast/lexer.yy.c
+        src/libnetdata/eval/ast/parser.tab.h
+        src/libnetdata/eval/ast/parser.tab.c
         src/libnetdata/eval/eval-parser.c
         src/libnetdata/eval/eval-execute.c
         src/libnetdata/eval/eval-utils.c
