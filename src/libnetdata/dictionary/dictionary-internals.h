@@ -78,8 +78,10 @@ struct dictionary_item {
 #ifdef FSANITIZE_ADDRESS
     STACKTRACE_ARRAY stacktraces;   // stack traces from all acquisition points
 #endif
+#if defined(FSANITIZE_ADDRESS) || defined(NETDATA_INTERNAL_CHECKS)
+    DICTIONARY *dict;                     // the dictionary this item belongs to
+#endif
 #ifdef NETDATA_INTERNAL_CHECKS
-    DICTIONARY *dict;
     pid_t creator_pid;
     pid_t deleter_pid;
     pid_t ll_adder_pid;
