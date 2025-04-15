@@ -863,6 +863,9 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p
     if (!pObjectType)
         return;
 
+    if (!pObjectType->NumInstances)
+        return;
+
     dict_mssql_locks_wait_charts(p, update_every);
     dict_mssql_dead_locks_charts(p, update_every);
     PERF_INSTANCE_DEFINITION *pi = NULL;
