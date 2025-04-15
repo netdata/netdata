@@ -1,6 +1,6 @@
 # Deploy Netdata with Ansible
 
-How do you quickly set up infrastructure monitoring? How can you efficiently deploy Netdata across multiple nodes? How do you ensure the deployment is **reliable, repeatable, and idempotent**? And how can you manage monitoring as **code**?
+How can you establish infrastructure monitoring with minimal effort? What's the most efficient way to deploy Netdata across your entire infrastructure? What strategies ensure your monitoring setup remains reliable, consistent, and idempotent? And how can you apply infrastructure-as-code principles for your monitoring environment?
 
 Meet [Ansible](https://ansible.com), a popular tool for provisioning, configuration management, and infrastructure as code (IaC). It uses **playbooks** to streamline operations with simple syntax, running them securely over SSH—no agent required. That means less setup and more focus on your application and monitoring.
 
@@ -14,7 +14,7 @@ This guide walks you through deploying the **Netdata Agent** across multiple nod
 
 ## Prerequisites
 
-- A Netdata Cloud account. [Sign in and create one](https://app.netdata.cloud) if you don't have one already.
+- Netdata Cloud account. [Sign in and create one](https://app.netdata.cloud) if you don't have one already.
 - An administration system with [Ansible](https://www.ansible.com/) installed.
 - One or more nodes that your administration system can access via [SSH public keys](https://git-scm.com/book/en/v2/Git-on-the-Server-Generating-Your-SSH-Public-Key) (preferably password-less).
 
@@ -98,8 +98,8 @@ To find your `claim_token` and `claim_rooms`, go to Netdata Cloud, click on your
 Copy those strings into the `claim_token` and `claim_rooms` variables.
 
 ```yml
-claim_token: XXXXX
-claim_rooms: XXXXX
+claim_token: YOUR_CLAIM_TOKEN
+claim_rooms: YOUR_CLAIM_ROOMS
 ```
 
 Adjust the `dbengine_multihost_disk_space` variable to change the metrics retention policy by allocating more or less disk space for storing metrics. The default is 2048 MiB (2 GiB).
