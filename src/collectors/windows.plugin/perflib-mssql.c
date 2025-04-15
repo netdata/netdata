@@ -235,11 +235,11 @@ static inline void initialize_mssql_keys(struct mssql_instance *p)
 
 void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
-    const char *instance = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    const char *resource = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
     // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object
     struct mssql_lock_instance *ptr = value;
-    ptr->instanceID = strdupz(instance);
+    ptr->resourceID = strdupz(resource);
     ptr->deadLocks.key = "Number of Deadlocks/sec";
     ptr->lockWait.key = "Lock Waits/sec";
 }
@@ -840,8 +840,6 @@ void dict_mssql_dead_locks_charts(struct mssql_instance *mi, int update_every)
         rrdlabels_add(
             mi->st_deadLocks->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
     }
-
-    return 1;
 }
 
 void dict_mssql_deadlocks_dimension(struct mssql_instance *mi, struct mssql_lock_instance *mli)
@@ -888,7 +886,7 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p
             dict_mssql_locks_wait_dimension(p, mli);
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &mli->deadLocks))
-            dict_mssql_deadlocks_dimension(p, mli, p->instanceID);
+            dict_mssql_deadlocks_dimension(p, mli);
     }
 
     if (p->st_lockWait)
