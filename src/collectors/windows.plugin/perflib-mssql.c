@@ -7,9 +7,11 @@
 #include <sqltypes.h>
 #include <sql.h>
 
+#define MEGA_FACTOR (1048576)     // 1024 * 1024
 // https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
 #define NETDATA_MAX_INSTANCE_NAME 32
 #define NETDATA_MAX_INSTANCE_OBJECT 128
+// https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
 #define SQLSERVER_MAX_NAME_LENGTH (128)
 
 BOOL is_sqlexpress = FALSE;
@@ -199,6 +201,7 @@ enum netdata_mssql_odbc_errors {
     NETDATA_MSSQL_ODBC_BIND,
     NETDATA_MSSQL_ODBC_PREPARE,
     NETDATA_MSSQL_ODBC_QUERY,
+    NETDATA_MSSQL_ODBC_FETCH
 };
 
 static char *netdata_MSSQL_error_text(enum netdata_mssql_odbc_errors val)
@@ -213,8 +216,10 @@ static char *netdata_MSSQL_error_text(enum netdata_mssql_odbc_errors val)
         case NETDATA_MSSQL_ODBC_PREPARE:
             return "PREPARE PARAMETER";
         case NETDATA_MSSQL_ODBC_QUERY:
-        default:
             return "QUERY PARAMETER";
+        case NETDATA_MSSQL_ODBC_FETCH:
+        default:
+            return "QUERY FETCH";
     }
 }
 
@@ -248,95 +253,52 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_ms
     }
 }
 
-// https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
-// The undocumented sp_MSforeachdb function is the simplest way to get data, without necessary to create
-// a stored procedure and change permissions. BUT, ODBC CLIENT CANNOT WORK PROPERLY WITH IT
-#define NETDATA_GET_FILE_SIZE_QUERY "USE ? SELECT size * 8/1024 AS size FROM sys.database_files WHERE type = 0;"
-
-static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(struct netdata_mssql_conn *nmc)
+static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(SQLHSTMT *stmt, SQLCHAR *query)
 {
-    static BOOL first_call = TRUE;
-    static SQLCHAR db_name[SQLSERVER_MAX_NAME_LENGTH + 1] = {};
     static long db_size = 0;
-    static SQLCHAR col_name[SQLSERVER_MAX_NAME_LENGTH + 1] = {};
-    static SQLSMALLINT col_name_len = 0;
-    static SQLSMALLINT col_data_type = 0;
-    static SQLULEN col_data_size = 0;
-    static SQLSMALLINT col_data_digits = 0;
-    static SQLSMALLINT col_data_nullable = 0;
     static SQLLEN col_data_len = 0;
 
-    SQLSMALLINT columns = 0;
-    SQLRETURN ret = SQLNumResultCols(nmc->dataFileSizeSTMT, &columns);
-    if (ret != SQL_SUCCESS)
+    SQLRETURN ret;
+
+    ret = SQLExecDirect(stmt, query, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_QUERY);
         return 0;
-
-    // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
-    SQLSMALLINT i;
-
-    if (first_call) {
-        ret = SQLDescribeCol(
-            nmc->dataFileSizeSTMT,
-            1,
-            col_name,
-            SQLSERVER_MAX_NAME_LENGTH,
-            &col_name_len,
-            &col_data_type,
-            &col_data_size,
-            &col_data_digits,
-            &col_data_nullable);
-
-        if (ret != SQL_SUCCESS) {
-            netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT, NETDATA_MSSQL_ODBC_QUERY);
-            return 0;
-        }
-
-        ret = SQLBindCol(nmc->dataFileSizeSTMT, 1, col_data_type, &db_size, (long)col_data_size, &col_data_len);
-
-        if (ret != SQL_SUCCESS) {
-            netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT, NETDATA_MSSQL_ODBC_QUERY);
-            return 0;
-        }
-        first_call = FALSE;
     }
 
-    ret = SQLExecute(nmc->dataFileSizeSTMT);
-    if (ret != SQL_SUCCESS)
-        return 0;
+    ret = SQLBindCol(stmt, 1, SQL_C_LONG, &db_size, sizeof(long), &col_data_len);
 
-    ret = SQLFetch(nmc->dataFileSizeSTMT);
-    if (ret != SQL_SUCCESS)
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_PREPARE);
         return 0;
+    }
 
-    return (ULONGLONG)db_size;
+    ret = SQLFetch(stmt);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_FETCH);
+        return 0;
+    }
+
+    return (ULONGLONG)(db_size*MEGA_FACTOR);
 }
 
 ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char *dbname)
 {
     ULONGLONG value = 0;
-    SQLLEN length = SQL_NTS;
     enum netdata_mssql_odbc_errors step = NETDATA_MSSQL_ODBC_NO_ERROR;
 
-    SQLRETURN ret = SQLBindParameter(
-        nmc->dataFileSizeSTMT, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_CHAR, strlen(dbname), 0, dbname, 0, &length);
-    if (ret != SQL_SUCCESS) {
-        step = NETDATA_MSSQL_ODBC_BIND;
-        goto end_data_file_size;
-    }
+    // We cannot access data for these tables without additional changes.
+    // They should be blacklisted.
+    if (!strcmp(dbname, "model") || !strcmp(dbname, "mssqlsystemresource"))
+        return ULONG_LONG_MAX;
 
-    ret =
-        SQLPrepare(nmc->dataFileSizeSTMT, (SQLCHAR *)NETDATA_GET_FILE_SIZE_QUERY, strlen(NETDATA_GET_FILE_SIZE_QUERY));
-    if (ret != SQL_SUCCESS) {
-        step = NETDATA_MSSQL_ODBC_PREPARE;
-        goto end_data_file_size;
-    }
+    // https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
+    SQLCHAR query[512];
+    snprintfz((char *)query, 511, "SELECT size * 8/1024 FROM %s.sys.database_files WHERE type = 0;", dbname);
 
-    value = netdata_MSSQL_fill_data_file_size_dict(nmc);
+    value = netdata_MSSQL_fill_data_file_size_dict(nmc->dataFileSizeSTMT, query);
 
 end_data_file_size:
-    if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, nmc->dataFileSizeSTMT, step);
-    }
     SQLFreeStmt(nmc->dataFileSizeSTMT, SQL_CLOSE);
     return value;
 }
@@ -369,6 +331,11 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
     }
 
     ret = SQLSetConnectAttr(nmc->netdataSQLHDBc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        return FALSE;
+    }
+
+    ret = SQLSetConnectAttr(nmc->netdataSQLHDBc, SQL_ATTR_AUTOCOMMIT, (SQLPOINTER)TRUE, 0);
     if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         return FALSE;
     }
@@ -1389,7 +1356,7 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn->is_connected))
+    if (unlikely(!mli->parent->conn->is_connected) || mli->MSSQLDatabaseDataFileSize.current.Data == ULONG_LONG_MAX)
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
