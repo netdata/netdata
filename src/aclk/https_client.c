@@ -892,13 +892,17 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
     rc = HTTPS_CLIENT_RESP_OK;
 
 exit_SSL:
-    SSL_free(ctx->ssl);
+    if(ctx->ssl)
+        SSL_free(ctx->ssl);
 exit_CTX:
-    SSL_CTX_free(ctx->ssl_ctx);
+    if(ctx->ssl_ctx)
+        SSL_CTX_free(ctx->ssl_ctx);
 exit_sock:
-    close(ctx->sock);
+    if(ctx->sock != -1)
+        close(ctx->sock);
 exit_buf_rx:
-    rbuf_free(ctx->buf_rx);
+    if(ctx->buf_rx)
+        rbuf_free(ctx->buf_rx);
 exit_req_ctx:
     freez(ctx);
     return rc;
