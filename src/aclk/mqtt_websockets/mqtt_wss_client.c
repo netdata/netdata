@@ -982,11 +982,15 @@ int mqtt_wss_publish5(mqtt_wss_client client,
 {
     if (client->mqtt_disconnecting) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "mqtt_wss is disconnecting can't publish");
+        if (msg_free)
+            msg_free(msg);
         return 1;
     }
 
     if (!client->mqtt_connected) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MQTT is offline. Can't send message.");
+        if (msg_free)
+            msg_free(msg);
         return 1;
     }
     uint8_t mqtt_flags = 0;
