@@ -91,6 +91,13 @@ struct eval_expression {
 #define EVAL_OPERATOR_ABS                   'A'
 #define EVAL_OPERATOR_IF_THEN_ELSE          '?'
 
+// Function identifiers for parsing
+typedef struct eval_function {
+    const char *name;      // Function name (lower case)
+    unsigned char op;      // Operator ID
+    int precedence;        // Operator precedence
+} EVAL_FUNCTION;
+
 // Function declarations for shared functions
 
 // From eval-utils.c

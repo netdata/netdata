@@ -2,6 +2,7 @@
 
 #include "../libnetdata.h"
 #include "eval-internal.h"
+#include <ctype.h> // For tolower
 
 // Character validation functions for parsing
 ALWAYS_INLINE
@@ -321,16 +322,40 @@ static int parse_constant(const char **string, NETDATA_DOUBLE *number) {
     return 1;
 }
 
+// Define the functions we support
+static EVAL_FUNCTION eval_functions[] = {
+    {"abs", EVAL_OPERATOR_ABS, 6},
+    {NULL, 0, 0}  // Terminator
+};
+
+// Parse function call
 ALWAYS_INLINE
-static int parse_abs(const char **string) {
+static int parse_function(const char **string, unsigned char *op, int *precedence) {
     const char *s = *string;
-
-    // ABS
-    if((s[0] == 'A' || s[0] == 'a') && (s[1] == 'B' || s[1] == 'b') && (s[2] == 'S' || s[2] == 's') && s[3] == '(') {
-        *string = &s[3];
-        return 1;
+    skip_spaces(&s);
+    
+    // Check for each function in our list
+    for (int i = 0; eval_functions[i].name != NULL; i++) {
+        const char *name = eval_functions[i].name;
+        int len = strlen(name);
+        int j;
+        
+        // Case-insensitive comparison of function name
+        for (j = 0; j < len; j++) {
+            if (!s[j] || (tolower((unsigned char)s[j]) != name[j])) {
+                break;
+            }
+        }
+        
+        // Check if we matched the entire function name and it's followed by '('
+        if (j == len && s[j] == '(') {
+            *string = &s[j+1]; // Move past "function_name("
+            *op = eval_functions[i].op;
+            if (precedence) *precedence = eval_functions[i].precedence;
+            return 1;
+        }
     }
-
+    
     return 0;
 }
 
@@ -400,9 +425,134 @@ static unsigned char parse_operator(const char **string, int *precedence) {
 // ----------------------------------------------------------------------------
 // the parsing logic
 
-// helper function to avoid allocations all over the place
-ALWAYS_INLINE
+// Forward declarations needed for recursive parsing
+static inline EVAL_NODE *parse_expression(const char **string, int *error, int allow_functions);
+static int starts_with_function(const char *s);
+
+// Helper function to parse a function call
+static EVAL_NODE *parse_function_call(const char **string, int *error) {
+    unsigned char op_type;
+    int precedence;
+    
+    // Parse the function name and opening parenthesis
+    if (!parse_function(string, &op_type, &precedence)) {
+        *error = EVAL_ERROR_UNKNOWN_OPERAND;
+        return NULL;
+    }
+    
+    // Special handling for nested expressions that may include unary operators
+    // followed by function calls
+    const char *arg_start = *string;
+    skip_spaces(&arg_start);
+    
+    // Check if what follows inside the function's argument is a unary operator followed by another function
+    if (arg_start[0] == '-' || arg_start[0] == '+' || arg_start[0] == '!') {
+        // Move past this operator character
+        arg_start++;
+        skip_spaces(&arg_start);
+        
+        // If what follows is a function call, we need special handling
+        if (starts_with_function(arg_start)) {
+            // Go back to normal parsing at the start of function arguments
+            // and use parse_expression which will handle unary operators correctly
+            EVAL_NODE *func_arg = parse_expression(string, error, 1);
+            if (!func_arg) {
+                *error = EVAL_ERROR_MISSING_OPERAND;
+                return NULL;
+            }
+            
+            // Skip the closing parenthesis
+            if (!parse_close_subexpression(string)) {
+                *error = EVAL_ERROR_MISSING_CLOSE_SUBEXPRESSION;
+                eval_node_free(func_arg);
+                return NULL;
+            }
+            
+            // Create the function node
+            EVAL_NODE *func_node = eval_node_alloc(1);
+            func_node->operator = op_type;
+            func_node->precedence = precedence;
+            eval_node_set_value_to_node(func_node, 0, func_arg);
+            
+            return func_node;
+        }
+    }
+    
+    // Regular parsing for function arguments
+    EVAL_NODE *func_arg = parse_full_expression(string, error);
+    if (!func_arg) {
+        *error = EVAL_ERROR_MISSING_OPERAND;
+        return NULL;
+    }
+    
+    // Skip the closing parenthesis
+    if (!parse_close_subexpression(string)) {
+        *error = EVAL_ERROR_MISSING_CLOSE_SUBEXPRESSION;
+        eval_node_free(func_arg);
+        return NULL;
+    }
+    
+    // Create the function node
+    EVAL_NODE *func_node = eval_node_alloc(1);
+    func_node->operator = op_type;
+    func_node->precedence = precedence;
+    eval_node_set_value_to_node(func_node, 0, func_arg);
+    
+    return func_node;
+}
+
+// Helper function to check if a string starts with a function name
+static int starts_with_function(const char *s) {
+    for (int i = 0; eval_functions[i].name != NULL; i++) {
+        const char *name = eval_functions[i].name;
+        int len = strlen(name);
+        int j;
+        
+        // Case-insensitive comparison of function name
+        for (j = 0; j < len; j++) {
+            if (!s[j] || (tolower((unsigned char)s[j]) != name[j])) {
+                break;
+            }
+        }
+        
+        // Check if we matched the entire function name and it's followed by '('
+        if (j == len && s[j] == '(') {
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
+// Helper function to avoid allocations all over the place
 static EVAL_NODE *parse_next_operand_given_its_operator(const char **string, unsigned char operator_type, int *error) {
+    // Save current position to check for function calls
+    const char *current_pos = *string;
+    skip_spaces(&current_pos);
+    
+    // Check if what follows is a function call
+    if (starts_with_function(current_pos)) {
+        // This is a function - we need special handling
+        
+        // Parse the function call
+        EVAL_NODE *func_node = parse_function_call(&current_pos, error);
+        if (!func_node) {
+            return NULL;
+        }
+        
+        // Create the unary operator node
+        EVAL_NODE *op = eval_node_alloc(1);
+        op->operator = operator_type;
+        op->precedence = eval_precedence(operator_type);
+        eval_node_set_value_to_node(op, 0, func_node);
+        
+        // Update the string position
+        *string = current_pos;
+        
+        return op;
+    }
+    
+    // Standard parsing for normal operands
     EVAL_NODE *sub = parse_one_full_operand(string, error);
     if(!sub) return NULL;
 
@@ -413,7 +563,7 @@ static EVAL_NODE *parse_next_operand_given_its_operator(const char **string, uns
 }
 
 // parse a full operand, including its sign or other associative operator (e.g. NOT)
-static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error) {
+static EVAL_NODE *parse_one_full_operand(const char **string, int *error) {
     char variable_buffer[EVAL_MAX_VARIABLE_NAME_LENGTH + 1];
     EVAL_NODE *op1 = NULL;
     NETDATA_DOUBLE number;
@@ -427,20 +577,59 @@ static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error)
     }
 
     if(parse_not(string)) {
-        op1 = parse_next_operand_given_its_operator(string, EVAL_OPERATOR_NOT, error);
-        op1->precedence = eval_precedence(EVAL_OPERATOR_NOT);
+        // Check if what follows is a function
+        skip_spaces(string);
+        if (starts_with_function(*string)) {
+            // Special case: !function_call()
+            EVAL_NODE *func_node = parse_function_call(string, error);
+            if (!func_node) return NULL;
+            
+            op1 = eval_node_alloc(1);
+            op1->operator = EVAL_OPERATOR_NOT;
+            op1->precedence = eval_precedence(EVAL_OPERATOR_NOT);
+            eval_node_set_value_to_node(op1, 0, func_node);
+        } else {
+            op1 = parse_next_operand_given_its_operator(string, EVAL_OPERATOR_NOT, error);
+            if (op1) op1->precedence = eval_precedence(EVAL_OPERATOR_NOT);
+        }
     }
     else if(parse_plus(string)) {
-        op1 = parse_next_operand_given_its_operator(string, EVAL_OPERATOR_SIGN_PLUS, error);
-        op1->precedence = eval_precedence(EVAL_OPERATOR_SIGN_PLUS);
+        // Check if what follows is a function
+        skip_spaces(string);
+        if (starts_with_function(*string)) {
+            // Special case: +function_call()
+            EVAL_NODE *func_node = parse_function_call(string, error);
+            if (!func_node) return NULL;
+            
+            op1 = eval_node_alloc(1);
+            op1->operator = EVAL_OPERATOR_SIGN_PLUS;
+            op1->precedence = eval_precedence(EVAL_OPERATOR_SIGN_PLUS);
+            eval_node_set_value_to_node(op1, 0, func_node);
+        } else {
+            op1 = parse_next_operand_given_its_operator(string, EVAL_OPERATOR_SIGN_PLUS, error);
+            if (op1) op1->precedence = eval_precedence(EVAL_OPERATOR_SIGN_PLUS);
+        }
     }
     else if(parse_minus(string)) {
-        op1 = parse_next_operand_given_its_operator(string, EVAL_OPERATOR_SIGN_MINUS, error);
-        op1->precedence = eval_precedence(EVAL_OPERATOR_SIGN_MINUS);
+        // Check if what follows is a function
+        skip_spaces(string);
+        if (starts_with_function(*string)) {
+            // Special case: -function_call()
+            EVAL_NODE *func_node = parse_function_call(string, error);
+            if (!func_node) return NULL;
+            
+            op1 = eval_node_alloc(1);
+            op1->operator = EVAL_OPERATOR_SIGN_MINUS;
+            op1->precedence = eval_precedence(EVAL_OPERATOR_SIGN_MINUS);
+            eval_node_set_value_to_node(op1, 0, func_node);
+        } else {
+            op1 = parse_next_operand_given_its_operator(string, EVAL_OPERATOR_SIGN_MINUS, error);
+            if (op1) op1->precedence = eval_precedence(EVAL_OPERATOR_SIGN_MINUS);
+        }
     }
-    else if(parse_abs(string)) {
-        op1 = parse_next_operand_given_its_operator(string, EVAL_OPERATOR_ABS, error);
-        op1->precedence = eval_precedence(EVAL_OPERATOR_ABS);
+    else if (starts_with_function(*string)) {
+        // Handle the function call
+        op1 = parse_function_call(string, error);
     }
     else if(parse_open_subexpression(string)) {
         EVAL_NODE *sub = parse_full_expression(string, error);
@@ -476,7 +665,6 @@ static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error)
 
 // parse an operator and the rest of the expression
 // precedence processing is handled here
-ALWAYS_INLINE
 static EVAL_NODE *parse_rest_of_expression(const char **string, int *error, EVAL_NODE *op1) {
     EVAL_NODE *op2 = NULL;
     unsigned char operator;
@@ -554,6 +742,53 @@ static EVAL_NODE *parse_rest_of_expression(const char **string, int *error, EVAL
     return op1;
 }
 
+// Parse an expression with optional function support
+static inline EVAL_NODE *parse_expression(const char **string, int *error, int allow_functions) {
+    // Special handling for functions as arguments
+    if (allow_functions) {
+        const char *s = *string;
+        skip_spaces(&s);
+        
+        // Check for unary operators
+        if (s[0] == '-' || s[0] == '+' || s[0] == '!') {
+            unsigned char op_type;
+            if (s[0] == '-') op_type = EVAL_OPERATOR_SIGN_MINUS;
+            else if (s[0] == '+') op_type = EVAL_OPERATOR_SIGN_PLUS;
+            else op_type = EVAL_OPERATOR_NOT;
+            
+            // Move past the unary operator
+            s++;
+            skip_spaces(&s);
+            
+            // Check if followed by a function
+            if (starts_with_function(s)) {
+                // Update the string position to include the consumed unary operator
+                *string = s;
+                
+                // Parse the function
+                EVAL_NODE *func_node = parse_function_call(string, error);
+                if (!func_node) return NULL;
+                
+                // Create the unary operator node
+                EVAL_NODE *op = eval_node_alloc(1);
+                op->operator = op_type;
+                op->precedence = eval_precedence(op_type);
+                eval_node_set_value_to_node(op, 0, func_node);
+                
+                return op;
+            }
+        }
+        // Check for a direct function call
+        else if (starts_with_function(s)) {
+            *string = s;
+            return parse_function_call(string, error);
+        }
+    }
+    
+    // If no special handling needed, fall back to normal parsing
+    return parse_full_expression(string, error);
+}
+
 // high level function to parse an expression or a sub-expression
 static inline EVAL_NODE *parse_full_expression(const char **string, int *error) {
     EVAL_NODE *op1 = parse_one_full_operand(string, error);
@@ -575,7 +810,30 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
     const char *s = string;
     int err = EVAL_ERROR_OK;
 
-    EVAL_NODE *op = parse_full_expression(&s, &err);
+    // First, let's check if the expression starts with a function
+    skip_spaces(&s);
+    EVAL_NODE *op = NULL;
+    
+    // Check if the expression starts with a unary op followed by function
+    // Removed condition that was too restrictive - we want to handle any unary operator
+    // followed by a function, not just when there's whitespace after the operator
+    if (s[0] == '-' || s[0] == '+' || s[0] == '!') {
+        
+        const char *after_op = s + 1;
+        skip_spaces(&after_op);
+        
+        if (starts_with_function(after_op)) {
+            // This is a special case like "-abs(...)" - use our special parser
+            s = string; // Reset to beginning
+            op = parse_expression(&s, &err, 1);
+        }
+    }
+    
+    // If we haven't parsed it with the special function, use regular parsing
+    if (!op) {
+        s = string; // Reset to beginning
+        op = parse_full_expression(&s, &err);
+    }
 
     if(*s) {
         if(op) {

@@ -592,6 +592,65 @@ static TestCase variable_space_tests[] = {
     {"(${this} > 0) ? ${this variable} : 0", 100.0, EVAL_ERROR_OK, true}, // Fixed the ternary syntax
 };
 
+// Test cases for nested unary operators
+static TestCase nested_unary_tests[] = {
+    // Nested minus operator
+    {"-(-5)", 5.0, EVAL_ERROR_OK, true},
+    {"-(-0)", 0.0, EVAL_ERROR_OK, true},
+    {"-(-$negative)", -10.0, EVAL_ERROR_OK, true},
+    {"-(-$nan_var)", NAN, EVAL_ERROR_VALUE_IS_NAN, true},
+    {"-(-$inf_var)", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},
+    
+    // Nested plus operator
+    {"+(-5)", -5.0, EVAL_ERROR_OK, true},
+    {"+(-0)", 0.0, EVAL_ERROR_OK, true},
+    {"+($negative)", -10.0, EVAL_ERROR_OK, true},
+    {"+($nan_var)", NAN, EVAL_ERROR_VALUE_IS_NAN, true},
+    {"+($inf_var)", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},
+    {"+(+5)", 5.0, EVAL_ERROR_OK, true},
+    
+    // Nested not operator
+    {"!(!0)", 0.0, EVAL_ERROR_OK, true},
+    {"!(!1)", 1.0, EVAL_ERROR_OK, true},
+    {"!(!$zero)", 0.0, EVAL_ERROR_OK, true},
+    {"!(!$negative)", 1.0, EVAL_ERROR_OK, true},
+    {"!(!$nan_var)", 0.0, EVAL_ERROR_OK, true},
+    {"!(!$inf_var)", 1.0, EVAL_ERROR_OK, true},
+    
+    // Multiple nested unary operators
+    {"-(-(-5))", -5.0, EVAL_ERROR_OK, true},
+    {"+(-(-5))", 5.0, EVAL_ERROR_OK, true},
+    {"-(-(-(-5)))", 5.0, EVAL_ERROR_OK, true},
+    {"!(!(!0))", 1.0, EVAL_ERROR_OK, true},
+    {"!(!(!1))", 0.0, EVAL_ERROR_OK, true},
+    
+    // Nested abs function
+    {"abs(abs(-5))", 5.0, EVAL_ERROR_OK, true},
+    {"abs(-abs(-5))", 5.0, EVAL_ERROR_OK, true}, // Now fixed
+    {"abs(abs($negative))", 10.0, EVAL_ERROR_OK, true},
+    {"abs(abs($nan_var))", NAN, EVAL_ERROR_VALUE_IS_NAN, true},
+    {"abs(abs($inf_var))", INFINITY, EVAL_ERROR_VALUE_IS_INFINITE, true},
+    
+    // Mixed unary operators - fix the expected value for abs(!1)
+    // For now, let's correct the test case for abs(!1)
+    {"abs(-(-5))", 5.0, EVAL_ERROR_OK, true},
+    {"abs(+(-5))", 5.0, EVAL_ERROR_OK, true},
+    {"abs(!0)", 1.0, EVAL_ERROR_OK, true},
+    {"abs(!1)", 0.0, EVAL_ERROR_OK, true}, // Changed from 1.0 to 0.0 because !1 is 0, abs(0) is 0
+    {"-(!0)", -1.0, EVAL_ERROR_OK, true},
+    {"-(!1)", 0.0, EVAL_ERROR_OK, true},
+    {"+(!0)", 1.0, EVAL_ERROR_OK, true},
+    {"+(!1)", 0.0, EVAL_ERROR_OK, true},
+    
+    // Complex nested expressions
+    {"-(5 + -3)", -2.0, EVAL_ERROR_OK, true},
+    {"+(5 + -3)", 2.0, EVAL_ERROR_OK, true},
+    {"!(5 > 3)", 0.0, EVAL_ERROR_OK, true},
+    {"!!(5 > 3)", 1.0, EVAL_ERROR_OK, true},
+    {"abs(-(5 - 10))", 5.0, EVAL_ERROR_OK, true},
+    {"-abs(-(5 - 10))", -5.0, EVAL_ERROR_OK, true}, // Now fixed
+};
+
 // Define the test groups
 static TestGroup test_groups[] = {
     {"Arithmetic Tests", arithmetic_tests, ARRAY_SIZE(arithmetic_tests)},
@@ -605,6 +664,7 @@ static TestGroup test_groups[] = {
     {"Edge Case Tests", edge_case_tests, ARRAY_SIZE(edge_case_tests)},
     {"Operator Precedence Tests", precedence_tests, ARRAY_SIZE(precedence_tests)},
     {"Parentheses Tests", parentheses_tests, ARRAY_SIZE(parentheses_tests)},
+    {"Nested Unary Tests", nested_unary_tests, ARRAY_SIZE(nested_unary_tests)},
     {"API Function Tests", api_function_tests, ARRAY_SIZE(api_function_tests)},
     {"Number Overflow Tests", overflow_tests, ARRAY_SIZE(overflow_tests)},
     {"Combined Complex Expressions", combined_tests, ARRAY_SIZE(combined_tests)},
