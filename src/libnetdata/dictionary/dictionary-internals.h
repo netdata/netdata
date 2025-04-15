@@ -75,6 +75,9 @@ typedef struct dictionary_item_shared {
 } DICTIONARY_ITEM_SHARED;
 
 struct dictionary_item {
+#ifdef FSANITIZE_ADDRESS
+    STACKTRACE_ARRAY stacktraces;   // stack traces from all acquisition points
+#endif
 #ifdef NETDATA_INTERNAL_CHECKS
     DICTIONARY *dict;
     pid_t creator_pid;
@@ -127,11 +130,8 @@ struct dictionary_hooks {
 };
 
 struct dictionary {
-#ifdef NETDATA_INTERNAL_CHECKS
-    const char *creation_function;
-    const char *creation_file;
-    size_t creation_line;
-    pid_t creation_tid;
+#ifdef FSANITIZE_ADDRESS
+    STACKTRACE_ARRAY stacktraces;   // stack traces from all acquisition points
 #endif
 
     usec_t last_gc_run_us;
@@ -245,6 +245,7 @@ static inline void pointer_del(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM 
 extern ARAL *dict_items_aral;
 extern ARAL *dict_shared_items_aral;
 
+#include "dictionary-debug.h"
 #include "dictionary-statistics.h"
 #include "dictionary-locks.h"
 #include "dictionary-refcount.h"

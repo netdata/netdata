@@ -129,6 +129,15 @@ void simple_connector_send_buffer(
     flags += MSG_NOSIGNAL;
 #endif
 
+    // Safety check to prevent NULL pointer crashes, but don't allocate new memory
+    if (unlikely(!buffer || !header)) {
+        netdata_log_error("EXPORTING: NULL %s passed to simple_connector_send_buffer for instance %s", 
+                          (!buffer && !header) ? "buffer and header" : (!buffer ? "buffer" : "header"),
+                          instance->config.name ? instance->config.name : "unknown");
+        (*failures)++;
+        return;
+    }
+
     uint32_t options = (uint32_t)instance->config.options;
     struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 

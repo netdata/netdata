@@ -1380,6 +1380,10 @@ void *cgroups_main(void *ptr) {
         goto exit;
     }
 
+    // we register this only on localhost
+    // for the other nodes, the origin server should register it
+    cgroup_netdev_link_init();
+
     discovery_thread.exited = 0;
 
     if (uv_mutex_init(&discovery_thread.mutex)) {
@@ -1396,10 +1400,6 @@ void *cgroups_main(void *ptr) {
         collector_error("CGROUP: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
         goto exit;
     }
-
-    // we register this only on localhost
-    // for the other nodes, the origin server should register it
-    cgroup_netdev_link_init();
 
     rrd_function_add_inline(localhost, NULL, "containers-vms", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT / 2, RRDFUNCTIONS_VERSION_DEFAULT,
@@ -1458,6 +1458,8 @@ void *cgroups_main(void *ptr) {
         worker_is_idle();
         uv_mutex_unlock(&cgroup_root_mutex);
     }
+
+    // uv_thread_join(&discovery_thread.thread);
 
 exit:
     return NULL;

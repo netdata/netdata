@@ -201,9 +201,6 @@ const char *errno_annotator(struct log_field *lf);
 const char *priority_annotator(struct log_field *lf);
 const char *timestamp_usec_annotator(struct log_field *lf);
 
-extern bool nd_log_forked;
-bool stack_trace_formatter(BUFFER *wb, void *data);
-
 #if defined(OS_WINDOWS)
 const char *winerror_annotator(struct log_field *lf);
 #endif

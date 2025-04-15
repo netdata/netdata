@@ -134,6 +134,7 @@ extern const char *netdata_configured_host_prefix;
 #include "facets/facets.h"
 #include "functions_evloop/functions_evloop.h"
 #include "query_progress/progress.h"
+#include "stacktrace/stacktrace.h"
 
 static ALWAYS_INLINE PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
     if(unlikely(*first)) {

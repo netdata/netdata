@@ -153,22 +153,50 @@ bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
     return found;
 }
 
+static STRING *this_string = NULL,
+              *now_string = NULL,
+              *after_string = NULL,
+              *before_string = NULL,
+              *status_string = NULL,
+              *removed_string = NULL,
+              *uninitialized_string = NULL,
+              *undefined_string = NULL,
+              *clear_string = NULL,
+              *warning_string = NULL,
+              *critical_string = NULL,
+              *last_collected_t_string = NULL,
+              *update_every_string = NULL;
+
+void alert_variable_lookup_cleanup(void) {
+    string_freez(this_string);
+    string_freez(now_string);
+    string_freez(after_string);
+    string_freez(before_string);
+    string_freez(status_string);
+    string_freez(removed_string);
+    string_freez(uninitialized_string);
+    string_freez(undefined_string);
+    string_freez(clear_string);
+    string_freez(warning_string);
+    string_freez(critical_string);
+    string_freez(last_collected_t_string);
+    string_freez(update_every_string);
+    this_string = NULL;
+    now_string = NULL;
+    after_string = NULL;
+    before_string = NULL;
+    status_string = NULL;
+    removed_string = NULL;
+    uninitialized_string = NULL;
+    undefined_string = NULL;
+    clear_string = NULL;
+    warning_string = NULL;
+    critical_string = NULL;
+    last_collected_t_string = NULL;
+    update_every_string = NULL;
+}
+
 bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE *result, BUFFER *wb) {
-    static STRING *this_string = NULL,
-                  *now_string = NULL,
-                  *after_string = NULL,
-                  *before_string = NULL,
-                  *status_string = NULL,
-                  *removed_string = NULL,
-                  *uninitialized_string = NULL,
-                  *undefined_string = NULL,
-                  *clear_string = NULL,
-                  *warning_string = NULL,
-                  *critical_string = NULL,
-                  *last_collected_t_string = NULL,
-                  *update_every_string = NULL;
-
-
     struct variable_lookup_job vbd = { 0 };
 
 //    const char *v_name = string2str(variable);

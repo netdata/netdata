@@ -55,6 +55,13 @@ static inline DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused,
 #ifdef NETDATA_INTERNAL_CHECKS
     item->creator_pid = gettid_cached();
 #endif
+#ifdef FSANITIZE_ADDRESS
+    // Initialize stacktrace tracking
+    stacktrace_array_init(&item->stacktraces);
+    
+    // Add the first stack trace at creation time
+    stacktrace_array_add(&item->stacktraces, 1);
+#endif
 
     item->refcount = 1;
     item->flags = ITEM_FLAG_BEING_CREATED;
@@ -404,13 +411,9 @@ static inline bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t nam
 
 static inline DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data, DICTIONARY_ITEM *master_item) {
     if(unlikely(!name || !*name)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
-            __FUNCTION__,
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
+        dictionary_internal_error(true, dict,
+            "DICTIONARY: attempted to %s() without a name on a dictionary.", 
+            __FUNCTION__);
         return NULL;
     }
 
@@ -520,13 +523,9 @@ static inline DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONA
 
 static inline DICTIONARY_ITEM *dict_item_find_and_acquire(DICTIONARY *dict, const char *name, ssize_t name_len) {
     if(unlikely(!name || !*name)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
-            __FUNCTION__,
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
+        dictionary_internal_error(true, dict,
+            "DICTIONARY: attempted to %s() without a name on a dictionary.", 
+            __FUNCTION__);
         return NULL;
     }
 

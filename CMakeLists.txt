@@ -219,7 +219,7 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
-cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
+cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS OR OS_FREEBSD" False)
 mark_as_advanced(ENABLE_LIBBACKTRACE)
 cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
 mark_as_advanced(ENABLE_LIBUNWIND)
@@ -843,6 +843,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/datetime/rfc3339.c
         src/libnetdata/datetime/rfc3339.h
         src/libnetdata/dictionary/dictionary.c
+        src/libnetdata/dictionary/dictionary-debug.c
+        src/libnetdata/dictionary/dictionary-debug.h
         src/libnetdata/dictionary/dictionary.h
         src/libnetdata/eval/eval.c
         src/libnetdata/eval/eval.h
@@ -984,6 +986,17 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setproctitle.h
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
+        src/libnetdata/stacktrace/stacktrace.h
+        src/libnetdata/stacktrace/stacktrace-common.h
+        src/libnetdata/stacktrace/stacktrace-common.c
+        src/libnetdata/stacktrace/stacktrace-array.h
+        src/libnetdata/stacktrace/stacktrace-array.c
+        src/libnetdata/stacktrace/stacktrace-libbacktrace.c
+        src/libnetdata/stacktrace/stacktrace-libunwind.c
+        src/libnetdata/stacktrace/stacktrace-backtrace.c
+        src/libnetdata/stacktrace/stacktrace-none.c
+        src/libnetdata/stacktrace/stacktrace-log.c
+        src/libnetdata/stacktrace/stacktrace-unittest.c
         src/libnetdata/json/json-c-parser-inline.c
         src/libnetdata/parsers/duration.h
         src/libnetdata/parsers/timeframe.c
@@ -1064,7 +1077,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/benchmark.h
         src/libnetdata/locks/benchmark-rw.c
         src/libnetdata/locks/benchmark-rw.h
-        src/libnetdata/log/nd_log-stacktrace.c
         src/libnetdata/memory/nd-mallocz.c
         src/libnetdata/memory/nd-mallocz.h
         src/libnetdata/memory/nd-mmap.c

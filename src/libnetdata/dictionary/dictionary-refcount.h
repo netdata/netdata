@@ -32,15 +32,10 @@ static inline void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 
 
     if(refcount <= 0) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to acquire item which is deleted (refcount = %d): "
-            "'%s' on dictionary created by %s() (%zu@%s)",
+        dictionary_internal_error(true, dict,
+            "DICTIONARY: attempted to acquire item which is deleted (refcount = %d): '%s'",
             refcount - 1,
-            item_get_name(item),
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
+            item_get_name(item));
 
         fatal(
             "DICTIONARY: request to acquire item '%s', which is deleted (refcount = %d)!",
@@ -58,6 +53,11 @@ static inline void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
         if(item_flag_check(item, ITEM_FLAG_DELETED))
             DICTIONARY_PENDING_DELETES_MINUS1(dict);
     }
+    
+#ifdef FSANITIZE_ADDRESS
+    // Add a stacktrace for this acquisition point
+    stacktrace_array_add(&item->stacktraces, 1);
+#endif
 }
 
 static inline void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
@@ -81,15 +81,10 @@ static inline void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     }
 
     if(refcount < 0) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to release item without references (refcount = %d): "
-            "'%s' on dictionary created by %s() (%zu@%s)",
+        dictionary_internal_error(true, dict,
+            "DICTIONARY: attempted to release item without references (refcount = %d): '%s'",
             refcount + 1,
-            item_get_name(item),
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
+            item_get_name(item));
 
         fatal(
             "DICTIONARY: attempted to release item '%s' without references (refcount = %d)",
@@ -175,6 +170,11 @@ static inline int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_I
 
         if(desired == 1)
             DICTIONARY_REFERENCED_ITEMS_PLUS1(dict);
+            
+#ifdef FSANITIZE_ADDRESS
+        // Add a stacktrace for this acquisition point
+        stacktrace_array_add(&item->stacktraces, 1);
+#endif
     }
 
     if(unlikely(spins > 1))

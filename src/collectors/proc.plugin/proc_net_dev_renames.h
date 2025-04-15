@@ -27,6 +27,7 @@ struct rename_task {
 } while(0)
 
 void netdev_renames_init(void);
+void netdev_renames_destroy(void);
 
 void cgroup_netdev_reset_all(void);
 void cgroup_netdev_release(const DICTIONARY_ITEM *link);

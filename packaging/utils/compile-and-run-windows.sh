@@ -90,7 +90,7 @@ if [ $RUN_AS_SERVICE -eq 1 ]; then
   sc delete "Netdata" || echo "delete Failed, ok"
 fi
 
-rm -f /opt/netdata/usr/bin/*.dll || echo "deleting old .dll files failed, ok"
+rm -f /opt/netdata/usr/bin/*.dll /opt/netdata/usr/libexec/netdata/plugins.d/*.dll || echo "deleting old .dll files failed, ok"
 ninja -v -C "${build}" install
 
 # register the event log publisher
@@ -108,8 +108,12 @@ if [ $RUN_AS_SERVICE -eq 1 ]; then
     sed -e 's|\s\+| |g' -e 's|^ ||g' |\
      cut -d ' ' -f 3 |\
       while read x; do
-        cp $x /opt/netdata/usr/bin/
+        cp "$x" /opt/netdata/usr/bin/
       done
+
+  for x in bash.exe sh.exe; do
+    cp "/usr/bin/$x" /opt/netdata/usr/bin/
+  done
 
   echo
   echo "Registering Netdata service..."
