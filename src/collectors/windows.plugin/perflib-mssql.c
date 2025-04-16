@@ -7,7 +7,7 @@
 #include <sqltypes.h>
 #include <sql.h>
 
-#define MEGA_FACTOR (1048576)     // 1024 * 1024
+#define MEGA_FACTOR (1048576) // 1024 * 1024
 // https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
 #define NETDATA_MAX_INSTANCE_NAME 32
 #define NETDATA_MAX_INSTANCE_OBJECT 128
@@ -268,7 +268,7 @@ static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(SQLHSTMT *stmt, SQLCHAR 
         return 0;
     }
 
-    return (ULONGLONG)(db_size*MEGA_FACTOR);
+    return (ULONGLONG)(db_size * MEGA_FACTOR);
 }
 
 ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char *dbname)
@@ -497,9 +497,10 @@ void netdata_mount_mssql_connection_string(struct netdata_mssql_conn *dbInput)
         snprintfz(auth, sizeof(auth) - 1, "UID=%s;PWD=%s;", dbInput->username, dbInput->password);
     }
 
-    snprintfz((char *)conn, sizeof(conn) - 1, "Driver={%s};%s=%s;%s", dbInput->driver, serverAddress, serverAddressArg, auth);
+    snprintfz(
+        (char *)conn, sizeof(conn) - 1, "Driver={%s};%s=%s;%s", dbInput->driver, serverAddress, serverAddressArg, auth);
     dbInput->connectionString = (SQLCHAR *)strdupz((char *)conn);
- }
+}
 
 static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
 {
@@ -516,9 +517,8 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
     dbconn->address = inicfg_get(&netdata_config, section_name, "address", NULL);
     dbconn->username = inicfg_get(&netdata_config, section_name, "uid", NULL);
     dbconn->password = inicfg_get(&netdata_config, section_name, "pwd", NULL);
-    dbconn->instances = (int)inicfg_get_number(&netdata_config, section_name, "pwd",0);
-    dbconn->windows_auth = inicfg_get_boolean(
-        &netdata_config, section_name, "windows authentication", false);
+    dbconn->instances = (int)inicfg_get_number(&netdata_config, section_name, "pwd", 0);
+    dbconn->windows_auth = inicfg_get_boolean(&netdata_config, section_name, "windows authentication", false);
 
     dbconn->netdataSQLEnv = NULL;
     dbconn->netdataSQLHDBc = NULL;
@@ -618,7 +618,8 @@ static void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_ins
 {
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_GENERAL_STATS]);
+    PERF_OBJECT_TYPE *pObjectType =
+        perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_GENERAL_STATS]);
     if (!pObjectType)
         return;
 
@@ -751,7 +752,8 @@ static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLStatSafeAutoParameterization)) {
         if (!mi->st_stats_safe_auto) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_safe_auto_parameterization_attempts", mi->instanceID);
+            snprintfz(
+                id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_safe_auto_parameterization_attempts", mi->instanceID);
             netdata_fix_chart_name(id);
             mi->st_stats_safe_auto = rrdset_create_localhost(
                 "mssql",
@@ -865,7 +867,8 @@ static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            mi->rd_buff_cache_hits = rrddim_add(mi->st_buff_cache_hits, "hit_ratio", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            mi->rd_buff_cache_hits =
+                rrddim_add(mi->st_buff_cache_hits, "hit_ratio", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
             rrdlabels_add(mi->st_buff_cache_hits->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
         }
@@ -1073,8 +1076,7 @@ void dict_mssql_locks_wait_charts(struct mssql_instance *mi, int update_every)
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(
-            mi->st_lockWait->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mi->st_lockWait->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
     }
 }
 
@@ -1087,8 +1089,7 @@ void dict_mssql_locks_wait_dimension(struct mssql_instance *mi, struct mssql_loc
 
         mli->rd_lockWait = rrddim_add(mi->st_lockWait, id, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    rrddim_set_by_pointer(
-        mi->st_lockWait, mli->rd_lockWait, (collected_number)(mli->lockWait.current.Data));
+    rrddim_set_by_pointer(mi->st_lockWait, mli->rd_lockWait, (collected_number)(mli->lockWait.current.Data));
 }
 
 void dict_mssql_dead_locks_charts(struct mssql_instance *mi, int update_every)
@@ -1112,8 +1113,7 @@ void dict_mssql_dead_locks_charts(struct mssql_instance *mi, int update_every)
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(
-            mi->st_deadLocks->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mi->st_deadLocks->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
     }
 }
 
@@ -1126,8 +1126,7 @@ void dict_mssql_deadlocks_dimension(struct mssql_instance *mi, struct mssql_lock
 
         mli->rd_deadLocks = rrddim_add(mi->st_deadLocks, id, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    rrddim_set_by_pointer(
-        mi->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);
+    rrddim_set_by_pointer(mi->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);
 }
 
 static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
@@ -1153,7 +1152,8 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
         if (!strcasecmp(windows_shared_buffer, "_Total"))
             continue;
 
-        struct mssql_lock_instance *mli = dictionary_set(mi->locks_instances, windows_shared_buffer, NULL, sizeof(*mli));
+        struct mssql_lock_instance *mli =
+            dictionary_set(mi->locks_instances, windows_shared_buffer, NULL, sizeof(*mli));
         if (!mli)
             continue;
 
