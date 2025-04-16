@@ -1556,10 +1556,8 @@ static struct metadata_cmd metadata_deq_cmd(struct meta_config_s *wc)
         ret = *t;
         to_free = t;
     }
-    else {
+    else
         ret.opcode = METADATA_DATABASE_NOOP;
-//        ret.completion = NULL;
-    }
     spinlock_unlock(&wc->cmd_queue_lock);
 
     aral_freez(wc->ar, to_free);
@@ -2592,7 +2590,7 @@ static void metadata_event_loop(void *arg)
                     }
                     break;
                 case METADATA_LOAD_HOST_CONTEXT:
-                    if (unittest_running)
+                    if (config->ctx_load_running || unittest_running)
                         break;
 
                     config->ctx_load_running = true;
@@ -2613,12 +2611,14 @@ static void metadata_event_loop(void *arg)
                         pending_alert_list = callocz(1, sizeof(*pending_alert_list));
 
                     Pvalue = JudyLIns(&pending_alert_list->JudyL, ++pending_alert_list->count, PJE0);
-                    if (Pvalue)
-                        *Pvalue = (void *)host;
+                    if (!Pvalue || Pvalue == PJERR)
+                        fatal("METASYNC: Corrupted pending_alert_list Judy array");
+                    *Pvalue = (void *)host;
 
                     Pvalue = JudyLIns(&pending_alert_list->JudyL, ++pending_alert_list->count, PJE0);
-                    if (Pvalue)
-                        *Pvalue = (void *)ae;
+                    if (!Pvalue || Pvalue == PJERR)
+                        fatal("METASYNC: Corrupted pending_alert_list Judy array");
+                    *Pvalue = (void *)ae;
                     break;
                 case METADATA_DEL_HOST_AE:
                     (void)JudyLIns(&config->ae_DelJudyL, (Word_t)(void *)cmd.param[0], PJE0);

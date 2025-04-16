@@ -26,7 +26,6 @@ typedef enum db_check_action_type {
 // To initialize and shutdown
 void metadata_sync_init(void);
 void metadata_sync_shutdown(void);
-//void metadata_sync_shutdown_prepare(void);
 
 void metaqueue_delete_dimension_uuid(nd_uuid_t *uuid);
 void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid);
@@ -37,7 +36,6 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
 
 int sql_metadata_cache_stats(int op);
 
-//int get_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
 void sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
 void sql_load_node_id(RRDHOST *host);
 
