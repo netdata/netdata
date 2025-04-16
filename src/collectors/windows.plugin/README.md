@@ -75,7 +75,7 @@ connections:
 Netdata requires a user with the `VIEW SERVER STATE` permission to collect data from the server.
 Once the user is created, it must be added to the databases.
 
-```sql
+```tsql
 USE master;
 CREATE LOGIN netdata_user WITH PASSWORD = 'netdata';
 CREATE USER netdata_user FOR LOGIN netdata_user;
@@ -87,7 +87,7 @@ In addition to creating the user, you must enable the
 [query store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16),
 on each database you wish to monitor.
 
-```sql
+```tsql
 USE master;
 CREATE LOGIN netdata_user WITH PASSWORD = 'AReallyStrongPasswordShouldBeInsertedHere';
 CREATE USER netdata_user FOR LOGIN netdata_user;
@@ -147,6 +147,32 @@ In next table, we give a short description about them:
 
 For additional information on how to set these parameters, refer to the
 [Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16)
+
+#### Additional Instance
+
+Microsoft SQL Server can host multiple instances. To connect to them, you need to create additional sections in your
+`netdata.conf` file, specifying their respective connection options.
+
+Let’s suppose you have an additional instance named `Production`. To enable Netdata to monitor both the `Production`
+and `Dev` instances, you’ll need to add the following configuration section:
+
+```text
+[plugin:windows:PerflibMSSQL1]
+        driver = SQL Server
+        server = 127.0.0.1\\Production, 1433
+        uid = netdata_user
+        pwd = AnotherReallyStrongPasswordShouldBeInsertedHere
+```
+
+You must also update the main section to indicate how many additional instances you want to monitor:
+
+```text
+[plugin:windows:PerflibMSSQL]
+        additional instances = 1
+```
+
+Each additional instance section must follow the naming pattern `plugin:windows:PerflibMSSQL`, with a sequential number
+from 1 to 65535, based on the number of instances you want to monitor.
 
 ### Errors
 
