@@ -56,6 +56,9 @@ This port is typically blocked by Windows Defender, so you must allow access bef
 7. Finally, provide a `Name` and an optional `Description` for the new rule,
    then click `Finish`.
 
+You can use the same rule to allow connections to other instances. To do this,
+specify the ports for each instance in the `Port` field separated by commas.
+
 ### Microsoft SQL Server (Configuration)
 
 After enabling access through the firewall, you will need to configure your SQL Server instance to accept TCP
@@ -70,10 +73,21 @@ connections:
    - Enter a value in the `TCP Port` field. By default, SQL Server uses `1433`.
 6. Finally, select `SQL Server Services`, and restart your SQL Server instance.
 
+You need to apply this configuration to every instance.
+
 ### Microsoft SQL Server (User)
 
-Netdata requires a user with the `VIEW SERVER STATE` permission to collect data from the server.
-Once the user is created, it must be added to the databases.
+If you want to allow connections using SQL Server authentication, you must modify the server configuration:
+
+1. Open `Microsoft Server Management Studio`.
+2. Right-click your server, and select `Properties`.
+3. In the left panel, select `Security`.
+4. Under `Server authentication`, choose `SQL Server and Windows Authentication mode`.
+5. Click `OK`.
+6. Finally, right-click your server, and select`Restart`.
+
+After that, you need to create a user with the `VIEW SERVER STATE` permission to collect data from the server.
+Once the user is created, it must also be granted access to the databases.
 
 ```tsql
 USE master;
@@ -81,6 +95,7 @@ CREATE LOGIN netdata_user WITH PASSWORD = 'netdata';
 CREATE USER netdata_user FOR LOGIN netdata_user;
 GRANT CONNECT SQL TO netdata_user;
 GRANT VIEW SERVER STATE TO netdata_user;
+GO
 ```
 
 In addition to creating the user, you must enable the
@@ -88,12 +103,6 @@ In addition to creating the user, you must enable the
 on each database you wish to monitor.
 
 ```tsql
-USE master;
-CREATE LOGIN netdata_user WITH PASSWORD = 'AReallyStrongPasswordShouldBeInsertedHere';
-CREATE USER netdata_user FOR LOGIN netdata_user;
-GRANT CONNECT SQL TO netdata_user;
-GRANT VIEW SERVER STATE TO netdata_user;
-
 DECLARE @dbname NVARCHAR(max)
 DECLARE nd_user_cursor CURSOR FOR SELECT name FROM master.dbo.sysdatabases WHERE NAME NOT IN ('master','msdb','tempdb','model')
 
@@ -108,15 +117,7 @@ DEALLOCATE nd_user_cursor
 GO
 ```
 
-By default, Microsoft SQL Server is installed with "integrated authentication only".
-If you want to allow connections using SQL Server authentication, you must modify the server configuration:
-
-1. Open `Microsoft Server Management Studio`.
-2. Right-click your server, and select `Properties`.
-3. In the left panel, select `Security`.
-4. Under `Server authentication`, choose `SQL Server and Windows Authentication mode`.
-5. Click `OK`.
-6. Finally, right-click your server, and select`Restart`.
+You need to apply this configuration to every instance.
 
 ### Netdata Configuration
 
@@ -159,7 +160,7 @@ and `Dev` instances, you’ll need to add the following configuration section:
 ```text
 [plugin:windows:PerflibMSSQL1]
         driver = SQL Server
-        server = 127.0.0.1\\Production, 1433
+        server = 127.0.0.1\\Production, 1434
         uid = netdata_user
         pwd = AnotherReallyStrongPasswordShouldBeInsertedHere
 ```
