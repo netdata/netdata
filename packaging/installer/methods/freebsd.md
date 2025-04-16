@@ -1,6 +1,8 @@
 # Install Netdata on FreeBSD
 
-> 💡 This guide is community-maintained and might not always reflect the latest details (like package versions).  
+> **Note** 
+>
+> This guide is community-maintained and might not always reflect the latest details (like package versions).  
 > Double-check before proceeding!  
 > Want to help? [Submit a PR!](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md)
 
