@@ -49,3 +49,15 @@ if [ -f /opt/netdata/etc/profile ]; then
     echo 'EDITOR="/usr/bin/nano.exe"' >> /opt/netdata/etc/profile
 fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
+
+${GITHUB_ACTIONS+echo "::group::Generate Winget Manifest"}
+manifest_file="${repo_root}/packaging/windows/netdata.manifest.in"
+output_manifest="${repo_root}/packaging/windows/netdata.manifest"
+cp "${manifest_file}" "${output_manifest}"
+sed -i "s/<SHA256_HASH>/$(sha256sum /opt/netdata/netdata-x64.msi | awk '{print $1}')/" "${output_manifest}"
+sed -i "s/<PRODUCT_CODE>/$(uuidgen)/" "${output_manifest}"
+${GITHUB_ACTIONS+echo "::endgroup::"}
+
+${GITHUB_ACTIONS+echo "::group::Publish Winget Package"}
+winget create --manifest "${output_manifest}" --token "${WINGET_TOKEN}"
+${GITHUB_ACTIONS+echo "::endgroup::"}

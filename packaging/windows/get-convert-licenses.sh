@@ -27,3 +27,19 @@ function check_and_get_file() {
 check_and_get_file "gpl-3.0.rtf" "https://www.gnu.org/licenses/gpl-3.0.txt"
 check_and_get_file "ncul1.rtf" "https://app.netdata.cloud/LICENSE.txt"
 
+function create_unified_license() {
+    OUTPUT="unified-license.rtf"
+    echo '{\rtf1\ansi\deff0 {\fonttbl {\f0 Times New Roman;}}' > "$OUTPUT"
+    echo '\paperh15840 \paperw12240' >> "$OUTPUT"
+    echo '\margl720 \margr720 \margt720 \margb720' >> "$OUTPUT"
+    echo '\f0\fs24' >> "$OUTPUT"
+
+    for file in "$@"; do
+        cat "$file" >> "$OUTPUT"
+        echo '\\page' >> "$OUTPUT"
+    done
+
+    echo '}' >> "$OUTPUT"
+}
+
+create_unified_license "gpl-3.0.rtf" "ncul1.rtf"
