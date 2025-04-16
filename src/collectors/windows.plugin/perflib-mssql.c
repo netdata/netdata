@@ -373,30 +373,30 @@ static void initialize_mssql_objects(struct mssql_instance *p, const char *insta
     size_t length = strlen(prefix);
     char name[NETDATA_MAX_INSTANCE_OBJECT];
     snprintfz(name, sizeof(name) - 1, "%s%s", prefix, "General Statistics");
-    p->objectName[NETDATA_MSSQL_GENERAL_STATS] = strdup(name);
+    p->objectName[NETDATA_MSSQL_GENERAL_STATS] = strdupz(name);
 
     strncpyz(&name[length], "SQL Errors", sizeof(name) - length);
-    p->objectName[NETDATA_MSSQL_SQL_ERRORS] = strdup(name);
+    p->objectName[NETDATA_MSSQL_SQL_ERRORS] = strdupz(name);
 
     strncpyz(&name[length], "Databases", sizeof(name) - length);
-    p->objectName[NETDATA_MSSQL_DATABASE] = strdup(name);
+    p->objectName[NETDATA_MSSQL_DATABASE] = strdupz(name);
 
     strncpyz(&name[length], "SQL Statistics", sizeof(name) - length);
-    p->objectName[NETDATA_MSSQL_SQL_STATS] = strdup(name);
+    p->objectName[NETDATA_MSSQL_SQL_STATS] = strdupz(name);
 
     strncpyz(&name[length], "Buffer Manager", sizeof(name) - length);
-    p->objectName[NETDATA_MSSQL_BUFFER_MANAGEMENT] = strdup(name);
+    p->objectName[NETDATA_MSSQL_BUFFER_MANAGEMENT] = strdupz(name);
 
     strncpyz(&name[length], "Memory Manager", sizeof(name) - length);
-    p->objectName[NETDATA_MSSQL_MEMORY] = strdup(name);
+    p->objectName[NETDATA_MSSQL_MEMORY] = strdupz(name);
 
     strncpyz(&name[length], "Locks", sizeof(name) - length);
-    p->objectName[NETDATA_MSSQL_LOCKS] = strdup(name);
+    p->objectName[NETDATA_MSSQL_LOCKS] = strdupz(name);
 
     strncpyz(&name[length], "Access Methods", sizeof(name) - length);
-    p->objectName[NETDATA_MSSQL_ACCESS_METHODS] = strdup(name);
+    p->objectName[NETDATA_MSSQL_ACCESS_METHODS] = strdupz(name);
 
-    p->instanceID = strdup(instance);
+    p->instanceID = strdupz(instance);
 }
 
 static inline void initialize_mssql_keys(struct mssql_instance *p)
