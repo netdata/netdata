@@ -6,10 +6,12 @@ Netdata supports offline installation of the Agent using our `kickstart.sh` scri
 
 This method:
 
-- Downloads all required files on an internet-connected machine
-- Transfers these files to the offline system
-- Supports static builds only (currently)
-- Does not support automatic updates on offline systems
+- Downloads all required files in advance.
+- Works with static builds only (for now).
+- Does *not* support automatic updates on offline systems.
+
+>[!NOTE]
+>Local package tools like `apt-offline` may work for DEB/RPM installs — but we don’t officially support them.
 
 ---
 
@@ -17,11 +19,11 @@ This method:
 
 On your internet-connected machine, you'll need::
 
-| Requirement             | Purpose                       |
-|-------------------------|-------------------------------|
-| `curl` or `wget`        | Download the kickstart script |
-| `sha256sum` or `shasum` | Verify download integrity     |
-| POSIX-compliant shell   | Run the installation scripts  |
+| Requirement             | Purpose                    |
+|-------------------------|----------------------------|
+| `curl` or `wget`        | Download the script        |
+| `sha256sum` or `shasum` | Verify script downloads    |
+| POSIX-compliant shell   | Required to run the script |
 
 Run the following command:
 
@@ -60,13 +62,59 @@ The script creates a directory with all necessary files:
 
 Copy the entire `netdata-offline` directory to your offline system using your preferred method (USB drive, secure copy, etc.).
 
-> [!IMPORTANT]  
-> Do not rename or modify any files in the package.
-> The installation script expects the exact directory structure and filenames.
+>[!IMPORTANT]  
+>Do not rename or modify any files in the package.
+>The installation script expects the exact directory structure and filenames.
 
-## Step 3: Install on the Offline System
+>[!TIP]
+>The folder name `netdata-offline` is just an example — use any name you want.
 
-Navigate to the transferred directory rand un the installation script with elevated privileges:
+---
+
+### Output
+
+This will create a directory like:
+
+```
+./netdata-offline/
+```
+
+It will contain everything required to install Netdata offline.
+
+---
+
+## Choose Release Channel (Optional)
+
+To prepare for a specific channel (`nightly` or `stable`), add:
+
+```bash
+--release-channel nightly
+```
+
+or
+
+```bash
+--release-channel stable
+```
+
+Example:
+
+```bash
+sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+```
+
+---
+
+## Install Netdata on the Target (Offline) System
+
+1. Copy the entire `netdata-offline` directory to your offline system.
+
+>⚠️ Warning  
+>Don't rename or modify the files.
+
+---
+
+2. On the offline system, run:
 
 ```bash
 cd netdata-offline
@@ -77,9 +125,5 @@ The `install.sh` script accepts the [same parameters](/packaging/installer/metho
 
 ## Automatic Updates
 
-For offline installations, automatic updates are **disabled by default** since there's no internet connection to fetch updates.
-
-To update an offline installation, repeat the steps in this guide with a newer version of the installation package.
-
-> [!NOTE]   
-> Local package tools like `apt-offline` may work for DEB/RPM installations — but we don’t officially support them.
+>[!NOTE]  
+>Automatic updates are *disabled* by default for offline installations — since there’s no network connection.

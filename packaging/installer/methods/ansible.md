@@ -1,14 +1,16 @@
 # Deploy Netdata with Ansible
 
-How can you establish infrastructure monitoring with minimal effort? What's the most efficient way to deploy Netdata across your entire infrastructure? What strategies ensure your monitoring setup remains reliable, consistent, and idempotent? And how can you apply infrastructure-as-code principles for your monitoring environment?
+Meet [Ansible](https://ansible.com), a popular tool for provisioning, configuration management, and infrastructure as code (IaC). 
 
-Meet [Ansible](https://ansible.com), a popular tool for provisioning, configuration management, and infrastructure as code (IaC). It uses **playbooks** to streamline operations with simple syntax, running them securely over SSH—no agent required. That means less setup and more focus on your application and monitoring.
+This guide walks you through deploying the **Netdata Agent** across multiple nodes using an [Ansible playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/), managing configurations, and connecting to **Netdata Cloud**—all in minutes.
 
 What does **idempotent** mean? From the [Ansible glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html):
 
-> An operation is **idempotent** if running it once produces the same result as running it multiple times, without unintended changes. With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
+>With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
 
 This guide walks you through deploying the **Netdata Agent** across multiple nodes using an [Ansible playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/), managing configurations, and connecting to **Netdata Cloud**—all in minutes.
+
+>With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
 
 ---
 
@@ -108,7 +110,7 @@ Since this node connects to Netdata Cloud, we'll view its dashboards there inste
 
 You can read more about this decision, or other ways to lock down the local dashboard, in our [node security documentation](https://learn.netdata.cloud/docs/netdata-agent/security/overview).
 
-> Curious about why Netdata's dashboard is open by default? Read our [blog post](https://www.netdata.cloud/blog/netdata-agent-dashboard/) on that zero-configuration design decision.
+>Curious about why Netdata's dashboard is open by default? Read our [blog post](https://www.netdata.cloud/blog/netdata-agent-dashboard/) on that zero-configuration design decision.
 
 ---
 
@@ -123,7 +125,3 @@ ansible-playbook -i hosts tasks/main.yml
 Ansible connects to your node(s) via SSH, collects [facts](https://docs.ansible.com/ansible/latest/user_guide/playbooks_vars_facts.html#ansible-facts) about the system, and then applies the defined tasks.
 
 The task to install Netdata may take a few minutes per node. Once the playbook reaches the "connect to Cloud" task, your nodes will start appearing in your Space in Netdata Cloud.
-
----
-
-By following this guide, you can efficiently deploy Netdata across multiple nodes using Ansible, ensuring a reliable and repeatable monitoring setup.

@@ -6,12 +6,12 @@ Our [kickstart.sh installer](/packaging/installer/methods/kickstart.md) uses the
 
 Add `--native-only` when running `kickstart.sh` to force native packages. The script will fail if native packages aren’t available.
 
-> **Note**  
-> Until late 2024, Netdata packages were hosted on Package Cloud. All packages are now provided exclusively from our own repositories.
+>[!NOTE]  
+>Until late 2024, Netdata packages were hosted on Package Cloud. All packages are now provided exclusively from our own repositories.
 
 ---
 
-## 🛠️ Manual Setup of RPM Packages
+## Manual Setup of RPM Packages
 
 Repositories: [https://repository.netdata.cloud/repos/index.html](https://repository.netdata.cloud/repos/index.html)
 
@@ -60,7 +60,7 @@ Public key:
 
 ---
 
-## 🛠️ Manual Setup of DEB Packages
+## Manual Setup of DEB Packages
 
 Repositories: [https://repository.netdata.cloud/repos/index.html](https://repository.netdata.cloud/repos/index.html)
 
@@ -116,7 +116,7 @@ Public key:
 
 ---
 
-## 🌐 Local Mirrors of the Official Netdata Repositories
+## Local Mirrors of the Official Netdata Repositories
 
 You can mirror Netdata’s repositories:
 
@@ -144,7 +144,7 @@ Mirror root URL:
 
 ---
 
-## 🌍 Public Mirrors of the Official Netdata Repositories
+## Public Mirrors of the Official Netdata Repositories
 
 > **There are no official public mirrors**.
 

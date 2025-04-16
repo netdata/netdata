@@ -9,7 +9,7 @@ import TabItem from '@theme/TabItem';
 
 This installation script works on all major Linux distributions. It automatically detects the best way to install Netdata for your system.
 
-<details><summary>🧩 What does kickstart.sh actually do?</summary>
+<details><summary>What does kickstart.sh actually do?</summary>
 
 1. Detects your OS and environment
 2. Checks for an existing Netdata installation

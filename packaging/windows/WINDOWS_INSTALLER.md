@@ -2,13 +2,13 @@
 
 Netdata provides a simple Windows installer for quick setup.
 
-> Note  
-> The Windows Agent is available for users with paid Netdata subscriptions.  
-> Free users will have limited functionality.
+>[!NOTE]  
+>The Windows Agent is available for users with paid Netdata subscriptions.  
+>Free users will have limited functionality.
 
 ---
 
-## 🚫 Limitations for Free Users
+## Limitations for Free Users
 
 | Agent Type       | Limitation                                                                            |
 |------------------|---------------------------------------------------------------------------------------|
@@ -28,12 +28,12 @@ Choose the version that suits your needs:
 
 ---
 
-## 🤐 Silent Installation (Command Line)
+## Silent Installation (Command Line)
 
 Use silent mode to deploy Netdata without user interaction (ideal for automation).
 
-> [!TIP]
-> Run the command prompt as Administrator.
+>[!TIP]
+>Run the command prompt as Administrator.
 
 ---
 
@@ -73,7 +73,7 @@ $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/n
 
 ---
 
-## 🖥️ Graphical Installation (GUI)
+## Graphical Installation (GUI)
 
 1. Download the `.msi` installer.
 2. Double-click to run it.
