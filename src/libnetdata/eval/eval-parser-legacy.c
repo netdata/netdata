@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/*
+ * THIS CODE IS NOT USED ANY MORE
+ * IT IS KEPT HERE ONLY FOR REFERENCE (AND POTENTIALLY RUNNING UNIT TESTS)
+ */
+
 #include "../libnetdata.h"
 #include "eval-internal.h"
 #include <ctype.h> // For tolower

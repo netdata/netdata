@@ -2,7 +2,6 @@
 
 #include "libnetdata/libnetdata.h"
 #include "eval-internal.h"
-#include "ast/ast.h"
 
 // Mock variable lookup function for testing
 static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NETDATA_DOUBLE *result) {
@@ -1111,35 +1110,8 @@ static TestGroup test_groups[] = {
     {"Crash Tests", crash_tests, ARRAY_SIZE(crash_tests)},
 };
 
-void eval_unittest_ast(void) {
-    for (size_t i = 0; i < ARRAY_SIZE(test_groups); i++) {
-        TestGroup *group = &test_groups[i];
-
-        printf("=== Running Test Group: %s ===\n", group->name);
-
-        for (int j = 0; j < group->test_count; j++) {
-            TestCase *tc = &group->test_cases[j];
-            printf("Test %d: %s\n", j + 1, tc->expression);
-            ASTNode *ast = parse_expression_ast(tc->expression);
-
-            if (ast != NULL) {
-                printf("AST Structure:\n");
-                print_ast(ast, 2);
-                eval_ast_node_free(ast);
-            } else {
-                printf("Failed to parse expression\n");
-            }
-
-            printf("\n");
-        }
-    }
-}
-
 int eval_unittest(void) {
     // Test cases for basic arithmetic operations
-
-    // the ast experiment is commented out
-    // eval_unittest_ast();
 
     // Run all test groups
     int total_passed = 0;
