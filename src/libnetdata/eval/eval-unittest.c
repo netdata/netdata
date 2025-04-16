@@ -40,7 +40,27 @@ static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NE
         *result = 50.0;
         return true;
     }
-    
+    else if (strcmp(var_name, "1var") == 0) {
+        *result = 75.0;
+        return true;
+    }
+    else if (strcmp(var_name, "_var") == 0) {
+        *result = 76.0;
+        return true;
+    }
+    else if (strcmp(var_name, "1.var") == 0) {
+        *result = 77.0;
+        return true;
+    }
+    else if (strcmp(var_name, "var.1") == 0) {
+        *result = 78.0;
+        return true;
+    }
+    else if (strcmp(var_name, "var-1") == 0) {
+        *result = 79.0;
+        return true;
+    }
+
     return false; // Variable not found
 }
 
@@ -220,7 +240,11 @@ static void run_test_group(TestGroup *group) {
         
         // Report test result
         if (test_failed) {
-            printf("  FAILED: %s\n", error_message);
+#ifdef USE_RE2C_LEMON_PARSER
+            printf("  [RE2C_LEMON] FAILED: %s\n", error_message);
+#else
+            printf("  [RECURSIVE] FAILED: %s\n", error_message);
+#endif
             failed++;
         } else {
             printf("  PASSED\n");
@@ -283,6 +307,35 @@ static TestCase logical_tests[] = {
     {"!(1 && 0)", 1.0, EVAL_ERROR_OK, true},
     {"1 && !0", 1.0, EVAL_ERROR_OK, true},
     {"0 || !(1 && 0)", 1.0, EVAL_ERROR_OK, true},
+    
+    // Tests for word operators (AND, OR)
+    {"1 AND 1", 1.0, EVAL_ERROR_OK, true},
+    {"1 AND 0", 0.0, EVAL_ERROR_OK, true},
+    {"0 AND 1", 0.0, EVAL_ERROR_OK, true},
+    {"0 AND 0", 0.0, EVAL_ERROR_OK, true},
+    {"1 OR 1", 1.0, EVAL_ERROR_OK, true},
+    {"1 OR 0", 1.0, EVAL_ERROR_OK, true},
+    {"0 OR 1", 1.0, EVAL_ERROR_OK, true},
+    {"0 OR 0", 0.0, EVAL_ERROR_OK, true},
+    {"NOT 1", 0.0, EVAL_ERROR_OK, true},
+    {"NOT 0", 1.0, EVAL_ERROR_OK, true},
+    {"NOT(1 AND 0)", 1.0, EVAL_ERROR_OK, true},
+    {"1 AND NOT 0", 1.0, EVAL_ERROR_OK, true},
+    {"0 OR NOT(1 AND 0)", 1.0, EVAL_ERROR_OK, true},
+    {"(1 AND 1) OR (0 AND 1)", 1.0, EVAL_ERROR_OK, true},
+    
+    // Mixed symbol and word operators
+    {"1 AND (0 || 1)", 1.0, EVAL_ERROR_OK, true},
+    {"(1 && 0) OR 1", 1.0, EVAL_ERROR_OK, true},
+    {"NOT (1 && 0) OR (NOT 0 AND 1)", 1.0, EVAL_ERROR_OK, true},
+    
+    // Case-insensitive logical operators
+    {"1 and 1", 1.0, EVAL_ERROR_OK, true},
+    {"0 or 1", 1.0, EVAL_ERROR_OK, true},
+    {"not 0", 1.0, EVAL_ERROR_OK, true},
+    {"1 And 0", 0.0, EVAL_ERROR_OK, true},
+    {"0 Or 1", 1.0, EVAL_ERROR_OK, true},
+    {"Not 1", 0.0, EVAL_ERROR_OK, true},
 };
 
 // Test cases for variable usage
@@ -548,16 +601,20 @@ static TestCase combined_tests[] = {
 };
 
 // Test cases that previously crashed Netdata
-// Note: Netdata's parser doesn't support nested ternary operators without proper parentheses
-// so we need to modify our expectations accordingly
+// Note: When using the re2c/lemon parser, nested ternary operators without parentheses
+// are properly supported (unlike the original recursive descent parser)
 static TestCase crash_tests[] = {
-    // Netdata can't parse nested ternaries without parentheses
+#ifdef USE_RE2C_LEMON_PARSER
+    {"$var1 > 0 ? $var1 < 0 ? 1 : 2 : 3", 2.0, EVAL_ERROR_OK, true},
+    {"$var1 > 0 ? ( $var1 < 0 ? 1 : 2 ) : 3", 2.0, EVAL_ERROR_OK, true},
+    {"( $var1 > 0 ? $var1 < 0 ? 1 : 2 : 3 )", 2.0, EVAL_ERROR_OK, true},
+#else
+    // Original recursive descent parser can't handle nested ternaries without parentheses
     {"$var1 > 0 ? $var1 < 0 ? 1 : 2 : 3", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},
-    // This doesn't parse as expected - Netdata parses it differently
     {"$var1 > 0 ? ( $var1 < 0 ? 1 : 2 ) : 3", 1.0, EVAL_ERROR_OK, true},
-    // Outer parentheses don't help with nested ternaries without inner parentheses
     {"( $var1 > 0 ? $var1 < 0 ? 1 : 2 : 3 )", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},
-    // Fully parenthesized works correctly
+#endif
+    // Fully parenthesized works correctly in both parsers
     {"($var1 > 0) ? (($var1 < 0) ? 1 : 2) : 3", 2.0, EVAL_ERROR_OK, true},
     // Multiple nested parentheses are fine
     {"(($zero)) ? 0 : ((($var1)))", 42.0, EVAL_ERROR_OK, true},
@@ -565,6 +622,8 @@ static TestCase crash_tests[] = {
     {"$nonexistent + $var1", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},
     // Division by (0-0) gives an INFINITE error in Netdata's implementation
     {"10 / ($zero - $zero)", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
+    {"true", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},
+    {"false", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},
 };
 
 // Test cases for variable names with spaces
@@ -584,12 +643,26 @@ static TestCase variable_space_tests[] = {
     {"${this} + ${this variable}", 150.0, EVAL_ERROR_OK, true},
 
     // Edge cases with missing or incomplete braces
+#ifdef USE_RE2C_LEMON_PARSER
+    {"${this variable", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false}, // Missing closing brace is a syntax error
+#else
     {"${this variable", 100.0, EVAL_ERROR_OK, true}, // Missing closing brace but parser accepts it
+#endif
     {"${}", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},             // Empty brackets
 
     // Using ${var} inside complex expressions
     {"(${this variable} + ${this}) / 2", 75.0, EVAL_ERROR_OK, true},
     {"(${this} > 0) ? ${this variable} : 0", 100.0, EVAL_ERROR_OK, true}, // Fixed the ternary syntax
+    {"$1var", 75.0, EVAL_ERROR_OK, true},
+    {"${1var}", 75.0, EVAL_ERROR_OK, true},
+    {"$_var", 76.0, EVAL_ERROR_OK, true},
+    {"${_var}", 76.0, EVAL_ERROR_OK, true},
+    {"$1.var", 77.0, EVAL_ERROR_OK, true},
+    {"${1.var}", 77.0, EVAL_ERROR_OK, true},
+    {"$var.1", 78.0, EVAL_ERROR_OK, true},
+    {"${var.1}", 78.0, EVAL_ERROR_OK, true},
+    {"$var-1", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},
+    {"${var-1}", 79.0, EVAL_ERROR_OK, true},
 };
 
 // Test cases for nested unary operators
@@ -698,14 +771,19 @@ void eval_unittest_ast(void) {
 int eval_unittest(void) {
     // Test cases for basic arithmetic operations
 
-    eval_unittest_ast();
+    // the ast experiment is commented out
+    // eval_unittest_ast();
 
     // Run all test groups
     int total_passed = 0;
     int total_failed = 0;
     int total_tests = 0;
     
-    printf("Starting comprehensive evaluation tests\n");
+#ifdef USE_RE2C_LEMON_PARSER
+    printf("Starting comprehensive evaluation tests using RE2C/LEMON PARSER\n");
+#else
+    printf("Starting comprehensive evaluation tests using RECURSIVE DESCENT PARSER\n");
+#endif
     
     for (size_t i = 0; i < ARRAY_SIZE(test_groups); i++) {
         run_test_group(&test_groups[i]);

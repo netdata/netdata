@@ -117,7 +117,11 @@ extern void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error);
 extern NETDATA_DOUBLE eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error);
 extern int eval_precedence(unsigned char operator);
 
-// Functions for bison/flex integration
+// Functions for other parsers
 extern EVAL_NODE *parse_expression_with_bison(const char *string, const char **failed_at, int *error);
+extern EVAL_NODE *parse_expression_with_re2c_lemon(const char *string, const char **failed_at, int *error);
+
+// Parser selection - comment/uncomment to switch between implementations
+#define USE_RE2C_LEMON_PARSER
 
 #endif //NETDATA_EVAL_INTERNAL_H

@@ -155,7 +155,7 @@ void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error) {
         print_parsed_as_value(out, &op->ops[0], error);
         return;
     }
-
+    
     if(op->operator == EVAL_OPERATOR_IF_THEN_ELSE) {
         print_parsed_as_value(out, &op->ops[0], error);
         buffer_strcat(out, " ? ");

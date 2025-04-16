@@ -809,10 +809,16 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
 
     const char *s = string;
     int err = EVAL_ERROR_OK;
+    EVAL_NODE *op = NULL;
 
+#ifdef USE_RE2C_LEMON_PARSER
+    // Use the re2c/lemon parser
+    op = parse_expression_with_re2c_lemon(string, &s, &err);
+#else
+    // Use the original recursive descent parser
+    
     // First, let's check if the expression starts with a function
     skip_spaces(&s);
-    EVAL_NODE *op = NULL;
     
     // Check if the expression starts with a unary op followed by function
     // Removed condition that was too restrictive - we want to handle any unary operator
@@ -834,8 +840,9 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
         s = string; // Reset to beginning
         op = parse_full_expression(&s, &err);
     }
+#endif
 
-    if(*s) {
+    if(s && *s) {
         if(op) {
             eval_node_free(op);
             op = NULL;

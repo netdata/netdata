@@ -857,6 +857,9 @@ set(LIBNETDATA_FILES
         src/libnetdata/eval/eval.h
         src/libnetdata/eval/eval-internal.h
         src/libnetdata/eval/eval-unittest.c
+        src/libnetdata/eval/re2c_lemon/lexer.c
+        src/libnetdata/eval/re2c_lemon/parser.c
+        src/libnetdata/eval/re2c_lemon/parser_wrapper.c
         src/libnetdata/facets/facets.c
         src/libnetdata/facets/facets.h
         src/libnetdata/functions_evloop/functions_evloop.c
