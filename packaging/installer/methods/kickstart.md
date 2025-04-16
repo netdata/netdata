@@ -52,7 +52,7 @@ To install and connect to Netdata Cloud in a single step from your terminal:
   </TabItem>
 </Tabs>
 
-> [!TIP]
+> **Tip**
 > Pick **Stable** or **Nightly**: Check the [guide](/docs/netdata-agent/versions-and-platforms.md) for differences.
 
 <details><summary>🔍 Where to find your claim token</summary>
