@@ -31,7 +31,8 @@ void metaqueue_delete_dimension_uuid(nd_uuid_t *uuid);
 void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid);
 void metaqueue_ml_load_models(RRDDIM *rd);
 void detect_machine_guid_change(nd_uuid_t *host_uuid);
-void metadata_queue_load_host_context();
+bool metadata_queue_load_host_context();
+void reset_host_context_load_flag();
 void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc);
 
 int sql_metadata_cache_stats(int op);

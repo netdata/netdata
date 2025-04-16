@@ -200,7 +200,7 @@ enum metadata_opcode {
     METADATA_DATABASE_NOOP = 0,
     METADATA_DEL_DIMENSION,
     METADATA_STORE_CLAIM_ID,
-    METADATA_SCAN_HOSTS,
+    METADATA_STORE,
     METADATA_LOAD_HOST_CONTEXT,
     METADATA_DELETE_HOST_CHART_LABELS,
     METADATA_ADD_HOST_AE,
@@ -1584,7 +1584,7 @@ static void timer_cb(uv_timer_t* handle)
    if (wc->metadata_check_after <  now_realtime_sec()) {
        struct metadata_cmd cmd;
        memset(&cmd, 0, sizeof(cmd));
-       cmd.opcode = METADATA_SCAN_HOSTS;
+       cmd.opcode = METADATA_STORE;
        (void) metadata_enq_cmd(&cmd);
    }
 }
@@ -1881,6 +1881,16 @@ static bool cleanup_finished_threads(struct host_context_load_thread *hclt, size
         sleep_usec(10 * USEC_PER_MS);
     }
     return found_slot || wait;
+}
+
+void reset_host_context_load_flag()
+{
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host)
+    {
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
+    }
+    dfe_done(host);
 }
 
 static void ctx_hosts_load(uv_work_t *req)
@@ -2282,6 +2292,20 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool
         worker_is_idle();
 }
 
+static int execute_statement(sqlite3_stmt *stmt)
+{
+    if (!stmt)
+        return SQLITE_OK;
+
+    int rc = sqlite3_step_monitored(stmt);
+    if (unlikely(rc != SQLITE_DONE))
+        nd_log_daemon(NDLP_ERR, "Failed to execute sql statement, rc = %d", rc);
+
+    SQLITE_FINALIZE(stmt);
+
+    return rc;
+}
+
 static void store_sql_statements(struct judy_list_t *pending_sql_statement, bool is_worker)
 {
     if (!pending_sql_statement)
@@ -2298,15 +2322,7 @@ static void store_sql_statements(struct judy_list_t *pending_sql_statement, bool
     Pvoid_t *Pvalue;
     while ((Pvalue = JudyLFirstThenNext(pending_sql_statement->JudyL, &Index, &first))) {
         sqlite3_stmt *stmt = *Pvalue;
-
-        if (unlikely(!stmt))
-            continue;
-
-        int rc = sqlite3_step_monitored(stmt);
-        if (unlikely(rc != SQLITE_DONE))
-            nd_log_daemon(NDLP_ERR, "Failed to execute sql statement, rc = %d", rc);
-
-        SQLITE_FINALIZE(stmt);
+        execute_statement(stmt);
     }
     (void) JudyLFreeArray(&pending_sql_statement->JudyL, PJE0);
     freez(pending_sql_statement);
@@ -2471,7 +2487,7 @@ static void metadata_event_loop(void *arg)
     worker_register_job_name(METADATA_DEL_DIMENSION, "delete dimension");
     worker_register_job_name(METADATA_STORE_CLAIM_ID, "add claim id");
     worker_register_job_name(METADATA_ADD_CTX_CLEANUP, "host ctx cleanup");
-    worker_register_job_name(METADATA_SCAN_HOSTS, "host metadata store");
+    worker_register_job_name(METADATA_STORE, "host metadata store");
     worker_register_job_name(METADATA_LOAD_HOST_CONTEXT, "host load context");
     worker_register_job_name(METADATA_ADD_HOST_AE, "add host alert entry");
     worker_register_job_name(METADATA_DEL_HOST_AE, "delete host alert entry");
@@ -2552,7 +2568,7 @@ static void metadata_event_loop(void *arg)
 
                     struct host_ctx_cleanup_s *ctx_cleanup = (struct host_ctx_cleanup_s *)cmd.param[0];
                     Pvalue = JudyLIns(&pending_ctx_cleanup_list->JudyL, ++pending_ctx_cleanup_list->count, PJE0);
-                    if (Pvalue != PJERR)
+                    if (Pvalue && Pvalue != PJERR)
                         *Pvalue = ctx_cleanup;
                     else {
                         // Failure in Judy, attempt to continue running anyway
@@ -2561,8 +2577,7 @@ static void metadata_event_loop(void *arg)
                         freez(ctx_cleanup);
                     }
                     break;
-                case METADATA_SCAN_HOSTS:
-
+                case METADATA_STORE:
                     if (config->metadata_running || unittest_running)
                         break;
 
@@ -2600,7 +2615,8 @@ static void metadata_event_loop(void *arg)
                     if (uv_queue_work(loop, &data->request, ctx_hosts_load, after_ctx_hosts_load)) {
                         freez(data);
                         config->ctx_load_running = false;
-                        // TODO: Handle failure
+                        // Fallback reset context so hosts will load on demand
+                        reset_host_context_load_flag();
                     }
                     break;
                 case METADATA_ADD_HOST_AE:
@@ -2629,8 +2645,12 @@ static void metadata_event_loop(void *arg)
                         pending_sql_statement = callocz(1, sizeof(*pending_sql_statement));
 
                     Pvalue = JudyLIns(&pending_sql_statement->JudyL, ++pending_sql_statement->count, PJE0);
-                    if (Pvalue)
+                    if (Pvalue && Pvalue != PJERR)
                         *Pvalue = (void *)stmt;
+                    else {
+                        // Fallback execute immediately
+                        execute_statement(stmt);
+                    }
                     break;
                 case METADATA_SYNC_SHUTDOWN:
                     config->shutdown_requested = true;
@@ -2781,10 +2801,9 @@ void metaqueue_ml_load_models(RRDDIM *rd)
     rrddim_flag_set(rd, RRDDIM_FLAG_ML_MODEL_LOAD);
 }
 
-void metadata_queue_load_host_context()
+bool metadata_queue_load_host_context()
 {
-    if (unlikely(!queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, NULL, NULL)))
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to queue command to load host contexts");
+    return queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, NULL, NULL);
 }
 
 void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context)
@@ -2832,7 +2851,7 @@ void metadata_execute_store_statement(sqlite3_stmt *stmt)
 
 void commit_alert_transitions(RRDHOST *host __maybe_unused)
 {
-    (void) queue_metadata_cmd(METADATA_SCAN_HOSTS, NULL, NULL);
+    (void) queue_metadata_cmd(METADATA_STORE, NULL, NULL);
 }
 
 uint64_t sqlite_get_meta_space(void)
