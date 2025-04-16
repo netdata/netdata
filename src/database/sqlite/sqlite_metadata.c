@@ -2822,10 +2822,10 @@ void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context)
     }
 }
 
-void metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae)
+bool metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae)
 {
     if (unlikely(!host || !ae))
-        return;
+        return true;
 
     __atomic_add_fetch(&host->health.pending_transitions, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
@@ -2834,7 +2834,9 @@ void metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae)
         // Failed to queue, reset counters
         __atomic_sub_fetch(&host->health.pending_transitions, 1, __ATOMIC_RELAXED);
         __atomic_sub_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
+        return false;
     }
+    return true;
 }
 
 void metadata_queue_ae_deletion(ALARM_ENTRY *ae)
