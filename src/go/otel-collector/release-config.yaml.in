@@ -8,13 +8,13 @@ dist:
   debug_compilation: @DEBUG_BUILD@
 
 receivers:
-  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.123.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.123.0
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.124.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.124.0
 
 exporters:
-  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.123.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.123.0
-  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.123.0
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.124.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.124.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.124.0
   - gomod: github.com/netdata/netdata/otel-collector/exporter/journaldexporter v0.0.0
 
 replaces:
