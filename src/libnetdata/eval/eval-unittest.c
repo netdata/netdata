@@ -8,6 +8,7 @@
 static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NETDATA_DOUBLE *result) {
     const char *var_name = string2str(variable);
     
+    // Basic variables
     if (strcmp(var_name, "var1") == 0) {
         *result = 42.0;
         return true;
@@ -24,6 +25,8 @@ static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NE
         *result = -10.0;
         return true;
     }
+    
+    // Special values
     else if (strcmp(var_name, "nan_var") == 0) {
         *result = NAN;
         return true;
@@ -32,6 +35,8 @@ static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NE
         *result = INFINITY;
         return true;
     }
+    
+    // Variables with spaces (for braced variables)
     else if (strcmp(var_name, "this variable") == 0) {
         *result = 100.0;
         return true;
@@ -40,8 +45,10 @@ static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NE
         *result = 50.0;
         return true;
     }
+    
+    // Variables that start with numbers
     else if (strcmp(var_name, "1var") == 0) {
-        *result = 75.0;
+        *result = 42.0;  // Using the same value as var1 for consistency
         return true;
     }
     else if (strcmp(var_name, "_var") == 0) {
@@ -52,12 +59,270 @@ static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NE
         *result = 77.0;
         return true;
     }
+    
+    // Variables with dots
     else if (strcmp(var_name, "var.1") == 0) {
         *result = 78.0;
         return true;
     }
+    
+    // Variables with hyphens
     else if (strcmp(var_name, "var-1") == 0) {
         *result = 79.0;
+        return true;
+    }
+    else if (strcmp(var_name, "var-with-hyphens") == 0) {
+        *result = 100.0;
+        return true;
+    }
+    
+    // Indexed variables with spaces (Core X)
+    else if (strcmp(var_name, "Core 0") == 0) {
+        *result = 25.0;
+        return true;
+    }
+    else if (strcmp(var_name, "Core 1") == 0) {
+        *result = 35.0;
+        return true;
+    }
+    else if (strcmp(var_name, "Core 2") == 0) {
+        *result = 15.0;
+        return true;
+    }
+    else if (strcmp(var_name, "Core 3") == 0) {
+        *result = 40.0;
+        return true;
+    }
+    else if (strcmp(var_name, "Core 02") == 0) {
+        *result = 15.0;  // Same as Core 2 for testing
+        return true;
+    }
+    
+    // Alternative CPU core notation
+    else if (strcmp(var_name, "Core1") == 0) {
+        *result = 35.0;  // Same as Core 1
+        return true;
+    }
+    else if (strcmp(var_name, "Core2") == 0) {
+        *result = 15.0;  // Same as Core 2
+        return true;
+    }
+    else if (strcmp(var_name, "Core3") == 0) {
+        *result = 40.0;  // Same as Core 3
+        return true;
+    }
+    
+    // Time-related variables
+    else if (strcmp(var_name, "last_collected_t") == 0) {
+        *result = 1713400000.0;  // Example timestamp
+        return true;
+    }
+    else if (strcmp(var_name, "now") == 0) {
+        *result = 1713400030.0;  // 30 seconds after last_collected_t
+        return true;
+    }
+    else if (strcmp(var_name, "last_scrub") == 0) {
+        *result = 3600.0;  // 1 hour in seconds
+        return true;
+    }
+    
+    // Special variables with numeric modifiers
+    else if (strcmp(var_name, "1hour_packet_drops_inbound") == 0) {
+        *result = 250.0;
+        return true;
+    }
+    else if (strcmp(var_name, "1hour_packet_drops_outbound") == 0) {
+        *result = 150.0;
+        return true;
+    }
+    else if (strcmp(var_name, "1m_ipv4_udp_receive_buffer_errors") == 0) {
+        *result = 5000.0;
+        return true;
+    }
+    else if (strcmp(var_name, "active_processors") == 0) {
+        *result = 8.0;
+        return true;
+    }
+    
+    // Bandwidth related
+    else if (strcmp(var_name, "bandwidth_1m_avg_of_now") == 0) {
+        *result = 1050.0;
+        return true;
+    }
+    else if (strcmp(var_name, "bandwidth_1m_avg_of_previous_1m") == 0) {
+        *result = 1000.0;
+        return true;
+    }
+    else if (strcmp(var_name, "bandwidth_1m_max_of_now") == 0) {
+        *result = 1500.0;
+        return true;
+    }
+    else if (strcmp(var_name, "bandwidth_1m_max_of_previous_1m") == 0) {
+        *result = 1400.0;
+        return true;
+    }
+    
+    // Additional variables for memory tests
+    else if (strcmp(var_name, "mem") == 0) {
+        *result = 12000.0;
+        return true;
+    }
+    else if (strcmp(var_name, "tcp_mem_pressure") == 0) {
+        *result = 10000.0;
+        return true;
+    }
+    else if (strcmp(var_name, "tcp_mem_high") == 0) {
+        *result = 9000.0;
+        return true;
+    }
+    else if (strcmp(var_name, "pidmax") == 0) {
+        *result = 32768.0;
+        return true;
+    }
+    else if (strcmp(var_name, "arrays") == 0) {
+        *result = 128.0;
+        return true;
+    }
+    else if (strcmp(var_name, "ipc.semaphores.arrays.max") == 0) {
+        *result = 256.0;
+        return true;
+    }
+    else if (strcmp(var_name, "ipc_semaphores_arrays_max") == 0) {
+        *result = 256.0;  // Same as above for testing alternative notation
+        return true;
+    }
+    
+    // Labels syntax test
+    else if (strcmp(var_name, "label:host") == 0) {
+        *result = 1.0;  // Non-zero value to simulate a non-match
+        return true;
+    }
+    
+    // Color thresholds
+    else if (strcmp(var_name, "green") == 0) {
+        *result = 30.0;
+        return true;
+    }
+    else if (strcmp(var_name, "red") == 0) {
+        *result = 80.0;
+        return true;
+    }
+    
+    // Hierarchical variable names for system metrics
+    else if (strcmp(var_name, "system.ram.free") == 0) {
+        *result = 1000.0;
+        return true;
+    }
+    else if (strcmp(var_name, "system.ram.used") == 0) {
+        *result = 2000.0;
+        return true;
+    }
+    else if (strcmp(var_name, "system.ram.cached") == 0) {
+        *result = 500.0;
+        return true;
+    }
+    else if (strcmp(var_name, "system.ram.buffers") == 0) {
+        *result = 300.0;
+        return true;
+    }
+    else if (strcmp(var_name, "system.ram.swap") == 0) {
+        *result = 1000.0;
+        return true;
+    }
+    else if (strcmp(var_name, "system.ram.active") == 0) {
+        *result = 1500.0;
+        return true;
+    }
+    else if (strcmp(var_name, "system.ram.inactive") == 0) {
+        *result = 400.0;
+        return true;
+    }
+    else if (strcmp(var_name, "system.ram.wired") == 0) {
+        *result = 500.0;
+        return true;
+    }
+    else if (strcmp(var_name, "system.ram.cache") == 0) {
+        *result = 800.0;
+        return true;
+    }
+    else if (strcmp(var_name, "system.ram.laundry") == 0) {
+        *result = 200.0;
+        return true;
+    }
+    else if (strcmp(var_name, "system.ram.used_ram_to_ignore") == 0) {
+        *result = 200.0;
+        return true;
+    }
+    
+    // Variables for real-world test expressions
+    else if (strcmp(var_name, "avail") == 0) {
+        *result = 950.0;
+        return true;
+    }
+    else if (strcmp(var_name, "active") == 0) {
+        *result = 1500.0;
+        return true;
+    }
+    else if (strcmp(var_name, "wired") == 0) {
+        *result = 500.0;
+        return true;
+    }
+    else if (strcmp(var_name, "laundry") == 0) {
+        *result = 200.0;
+        return true;
+    }
+    else if (strcmp(var_name, "buffers") == 0) {
+        *result = 300.0;
+        return true;
+    }
+    else if (strcmp(var_name, "cache") == 0) {
+        *result = 800.0;
+        return true;
+    }
+    else if (strcmp(var_name, "free") == 0) {
+        *result = 1000.0;
+        return true;
+    }
+    else if (strcmp(var_name, "inactive") == 0) {
+        *result = 400.0;
+        return true;
+    }
+    else if (strcmp(var_name, "used_ram_to_ignore") == 0) {
+        *result = 200.0;
+        return true;
+    }
+    
+    // From dataset examples with status variables
+    else if (strcmp(var_name, "status") == 0) {
+        *result = 1.0;  // WARNING status
+        return true;
+    }
+    else if (strcmp(var_name, "CRITICAL") == 0) {
+        *result = 2.0;
+        return true;
+    }
+    else if (strcmp(var_name, "WARNING") == 0) {
+        *result = 1.0;
+        return true;
+    }
+    else if (strcmp(var_name, "10m_acquiring_requests") == 0) {
+        *result = 100.0;
+        return true;
+    }
+    else if (strcmp(var_name, "sent") == 0) {
+        *result = 1000.0;
+        return true;
+    }
+    else if (strcmp(var_name, "buffered") == 0) {
+        *result = 500.0;
+        return true;
+    }
+    else if (strcmp(var_name, "lost") == 0) {
+        *result = -10.0;
+        return true;
+    }
+    else if (strcmp(var_name, "offset") == 0) {
+        *result = -5.0;
         return true;
     }
 
@@ -340,6 +605,7 @@ static TestCase logical_tests[] = {
 
 // Test cases for variable usage
 static TestCase variable_tests[] = {
+    // Basic variable tests
     {"$var1", 42.0, EVAL_ERROR_OK, true},
     {"$var2", 24.0, EVAL_ERROR_OK, true},
     {"$var1 + $var2", 66.0, EVAL_ERROR_OK, true},
@@ -348,9 +614,30 @@ static TestCase variable_tests[] = {
     {"$var1 < $var2", 0.0, EVAL_ERROR_OK, true},
     {"$var1 && $var2", 1.0, EVAL_ERROR_OK, true},
     {"$zero && $var1", 0.0, EVAL_ERROR_OK, true},
+    
+    // Variables with different notations
     {"$var1", 42.0, EVAL_ERROR_OK, true}, // Test dollar sign prefix
     {"${var1}", 42.0, EVAL_ERROR_OK, true}, // Test with curly braces
+    {"${this variable}", 100.0, EVAL_ERROR_OK, true}, // Variable with space
     {"$unknown", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},
+    
+    // Variables starting with numbers (from real-world usage)
+    {"$1var", 42.0, EVAL_ERROR_OK, true},
+    {"$1.var", 77.0, EVAL_ERROR_OK, true},
+    {"$var.1", 78.0, EVAL_ERROR_OK, true},
+    
+    // Variables with special characters
+    {"$var-1", 79.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},
+    {"${var-with-hyphens}", 100.0, EVAL_ERROR_OK, true},
+    
+    // Hierarchical variable names with dots
+    {"$system.ram.free", 1000.0, EVAL_ERROR_OK, true},
+    {"$system.ram.used", 2000.0, EVAL_ERROR_OK, true},
+    {"$system.ram.cached", 500.0, EVAL_ERROR_OK, true},
+    {"$system.ram.buffers", 300.0, EVAL_ERROR_OK, true},
+    
+    // Real-world examples from the dataset - variable with math expressions
+    {"$avail * 100 / ($system.ram.used + $system.ram.cached + $system.ram.free + $system.ram.buffers)", 25.0, EVAL_ERROR_OK, true},
 };
 
 // Test cases for function calls
@@ -653,8 +940,8 @@ static TestCase variable_space_tests[] = {
     // Using ${var} inside complex expressions
     {"(${this variable} + ${this}) / 2", 75.0, EVAL_ERROR_OK, true},
     {"(${this} > 0) ? ${this variable} : 0", 100.0, EVAL_ERROR_OK, true}, // Fixed the ternary syntax
-    {"$1var", 75.0, EVAL_ERROR_OK, true},
-    {"${1var}", 75.0, EVAL_ERROR_OK, true},
+    {"$1var", 42.0, EVAL_ERROR_OK, true},
+    {"${1var}", 42.0, EVAL_ERROR_OK, true},
     {"$_var", 76.0, EVAL_ERROR_OK, true},
     {"${_var}", 76.0, EVAL_ERROR_OK, true},
     {"$1.var", 77.0, EVAL_ERROR_OK, true},
@@ -724,6 +1011,85 @@ static TestCase nested_unary_tests[] = {
     {"-abs(-(5 - 10))", -5.0, EVAL_ERROR_OK, true}, // Now fixed
 };
 
+// Test cases for real-world expressions from the dataset
+static TestCase real_world_tests[] = {
+    // Expressions with nested ternary operators and status comparisons
+    {"$10m_acquiring_requests >= 50 && $this < (($status == $CRITICAL) ? (80) : (50))", 0.0, EVAL_ERROR_OK, true},
+    {"$10m_acquiring_requests >= 50 && $this < (($status == $CRITICAL) ? (95) : (85))", 1.0, EVAL_ERROR_OK, true},
+    {"$10m_acquiring_requests >= 50 && $this < (($status >= $WARNING) ? (90) : (75))", 1.0, EVAL_ERROR_OK, true},
+    {"$10m_acquiring_requests >= 50 && $this < (($status >= $WARNING) ? (99) : (95))", 1.0, EVAL_ERROR_OK, true},
+    
+    // Expressions with nested ternary operators and varying syntax
+    {"($10m_acquiring_requests > 120) ? ($this > (($status == $CRITICAL) ? ( 2 ) : ( 5 )) ) : ( 0 )", 0.0, EVAL_ERROR_OK, true},
+    {"($10m_acquiring_requests > 120) ? ($this < (($status == $CRITICAL) ? ( 85 ) : ( 75 )) ) : ( 0 )", 0.0, EVAL_ERROR_OK, true},
+    {"($10m_acquiring_requests > 120) ? ($this > (($status >= $WARNING) ? ( 10 ) : ( 30 )) ) : ( 0 )", 0.0, EVAL_ERROR_OK, true},
+    {"($10m_acquiring_requests > 120) ? ($this > (($status >= $WARNING ) ? ( 1 ) : ( 20 )) ) : ( 0 )", 0.0, EVAL_ERROR_OK, true},
+    
+    // Expressions with whitespace variations
+    {"($10m_acquiring_requests > 120) ? ($this > (($status >= $WARNING ) ? ( 1 ) : ( 20 )) ) : ( 0 )", 0.0, EVAL_ERROR_OK, true},
+    {"($10m_acquiring_requests>120)?($this>(($status>=$WARNING)?(1):(20))):(0)", 0.0, EVAL_ERROR_OK, true},
+    
+    // Complex variable expressions with hierarchical variables
+    {"$avail * 100 / ($system.ram.used + $system.ram.cached + $system.ram.free + $system.ram.buffers)", 25.0, EVAL_ERROR_OK, true},
+    {"($active + $wired + $laundry + $buffers - $used_ram_to_ignore) * 100 / ($active + $wired + $laundry + $buffers - $used_ram_to_ignore + $cache + $free + $inactive)", 51.111111, EVAL_ERROR_OK, true},
+    
+    // CPU Core variables with spaces in braced syntax
+    {"(${Core 0} + ${Core 1} + ${Core 2} + ${Core 3}) / 4", 28.75, EVAL_ERROR_OK, true},
+    {"${Core 0} > 15", 1.0, EVAL_ERROR_OK, true},
+    {"${Core 0} > 15 OR ${Core 1} > 15 OR ${Core 02} > 15 OR ${Core 3} > 15", 1.0, EVAL_ERROR_OK, true},
+    {"${Core 0} > 15 OR ${Core 1} > 15 OR ${Core 02} > 15 OR ${Core 3} > 60", 1.0, EVAL_ERROR_OK, true},
+    {"${Core 0} > 15 OR $Core1 > 55 OR $Core2 > 55 OR $Core3 > 55", 1.0, EVAL_ERROR_OK, true},
+    
+    // NaN checking patterns
+    {"(($1hour_packet_drops_inbound != nan AND $this > 0) ? ($1hour_packet_drops_inbound * 100 / $this) : (0))", 500.0, EVAL_ERROR_OK, true},
+    {"(($1hour_packet_drops_outbound != nan AND $this > 0) ? ($1hour_packet_drops_outbound * 100 / $this) : (0))", 300.0, EVAL_ERROR_OK, true},
+    {"(($1m_ipv4_udp_receive_buffer_errors != nan AND $this > 30000) ? ($1m_ipv4_udp_receive_buffer_errors * 100 / $this) : (0))", 0.0, EVAL_ERROR_OK, true},
+    
+    // Complex expressions with `or` and `and` lowercase keywords and nan/inf checks
+    {"($active_processors == nan or $active_processors == 0) ? (nan) : (($active_processors < 2) ? (2) : ($active_processors))", 8.0, EVAL_ERROR_OK, true},
+    {"($active_processors == nan or $active_processors == inf or $active_processors < 2) ? (2) : ($active_processors)", 8.0, EVAL_ERROR_OK, true},
+    {"($active_processors == nan or $active_processors == inf or $active_processors < 2) ? (2) : ($active_processors / 1.2)", 6.666666666666667, EVAL_ERROR_OK, true},
+    
+    // Time-based expressions with variable comparisons
+    {"$last_collected_t < $now - 60", 0.0, EVAL_ERROR_OK, true},
+    {"$last_scrub > (15*60*60)", 0.0, EVAL_ERROR_OK, true},
+    
+    // Floating point operations
+    {"$mem > (($status == $CRITICAL) ? ($tcp_mem_pressure) : ($tcp_mem_high * 0.9))", 1.0, EVAL_ERROR_OK, true},
+    {"$mem > (($status >= $WARNING) ? ($tcp_mem_pressure * 0.8) : ($tcp_mem_pressure))", 1.0, EVAL_ERROR_OK, true},
+    
+    // Memory expressions with various notations and hierarchical variables
+    {"$avail * 100 / ($system.ram.free + $system.ram.active + $system.ram.inactive + $system.ram.wired + $system.ram.cache + $system.ram.laundry + $system.ram.buffers)", 20.212766, EVAL_ERROR_OK, true},
+    {"$avail * 100 / ($system.ram.used + $system.ram.cached + $system.ram.free + $system.ram.buffers + $system.ram.swap)", 19.791667, EVAL_ERROR_OK, true},
+    
+    // Pattern usages of abs() function
+    {"($this != 0) || ($status == $CRITICAL && abs($sent) == 0)", 1.0, EVAL_ERROR_OK, true},
+    {"abs($bandwidth_1m_avg_of_now - $bandwidth_1m_avg_of_previous_1m) * 100 / $bandwidth_1m_avg_of_previous_1m", 5.0, EVAL_ERROR_OK, true},
+    {"abs($offset)", 5.0, EVAL_ERROR_OK, true},
+    {"abs($sent) * 100 / abs($buffered)", 200.0, EVAL_ERROR_OK, true},
+    
+    // Label syntax
+    {"(${label:host} != \"wg-manage-lte\") AND ($this > $green OR $this > $red)", 0.0, EVAL_ERROR_REMAINING_GARBAGE, false},
+    
+    // Used with pidmax (common system metrics pattern)
+    {"$active * 100 / $pidmax", 4.577637, EVAL_ERROR_OK, true},
+    {"$arrays * 100 / $ipc.semaphores.arrays.max", 50.0, EVAL_ERROR_OK, true},
+    {"$arrays * 100 / $ipc_semaphores_arrays_max", 50.0, EVAL_ERROR_OK, true},
+    
+    // Basic patterns with lowercase logical operators
+    {"$netdata.uptime.uptime > 30 AND $this > 0 and $this < 24", 0.0, EVAL_ERROR_OK, true},
+    {"($this > $green OR $var1 > $red) and $this > 2", 1.0, EVAL_ERROR_OK, true},
+    
+    // Expressions with word operators and comparisons
+    {"$var1 > 40 AND $var2 < 30", 1.0, EVAL_ERROR_OK, true},
+    {"$var1 > 40 OR $var2 < 30", 1.0, EVAL_ERROR_OK, true},
+    {"NOT($var1 < 40 AND $var2 > 20)", 1.0, EVAL_ERROR_OK, true},
+    
+    // Mixed symbol and word operators
+    {"$var1 > 40 AND ($var2 < 30 || $this > 45)", 1.0, EVAL_ERROR_OK, true},
+    {"($var1 > 30 && $var2 < 30) OR $this > 45", 1.0, EVAL_ERROR_OK, true},
+};
+
 // Define the test groups
 static TestGroup test_groups[] = {
     {"Arithmetic Tests", arithmetic_tests, ARRAY_SIZE(arithmetic_tests)},
@@ -738,6 +1104,7 @@ static TestGroup test_groups[] = {
     {"Operator Precedence Tests", precedence_tests, ARRAY_SIZE(precedence_tests)},
     {"Parentheses Tests", parentheses_tests, ARRAY_SIZE(parentheses_tests)},
     {"Nested Unary Tests", nested_unary_tests, ARRAY_SIZE(nested_unary_tests)},
+    {"Real-World Expression Tests", real_world_tests, ARRAY_SIZE(real_world_tests)},
     {"API Function Tests", api_function_tests, ARRAY_SIZE(api_function_tests)},
     {"Number Overflow Tests", overflow_tests, ARRAY_SIZE(overflow_tests)},
     {"Combined Complex Expressions", combined_tests, ARRAY_SIZE(combined_tests)},

@@ -45,6 +45,23 @@ int scan(Scanner *s, YYSTYPE *lval) {
     // Skip whitespace
     [ \t\r\n]+ { continue; }
     
+    // Special numeric literals - more comprehensive handling for various capitalizations
+    // Support NaN with all case variations 
+    // Matching str2ndd behavior in inlined.h which accepts "nan" (any case) and also "null"
+    [nN][aA][nN] | [nN][uU][lL][lL] {
+        lval->dval = NAN;
+        s->cursor = YYCURSOR;
+        return TOK_NUMBER;
+    }
+    
+    // Support Infinity with all case variations
+    // Matching str2ndd behavior in inlined.h which accepts "inf" in any case
+    [iI][nN][fF]([iI][nN][iI][tT][yY])? {
+        lval->dval = INFINITY;
+        s->cursor = YYCURSOR;
+        return TOK_NUMBER;
+    }
+    
     // Numbers
     [0-9]+ | 
     [0-9]+"."[0-9]* |
@@ -58,8 +75,10 @@ int scan(Scanner *s, YYSTYPE *lval) {
         return TOK_NUMBER;
     }
     
-    // Variables - can start with letter, number, or underscore and can contain dots
-    "$"[a-zA-Z0-9_][a-zA-Z0-9_.]* {
+    // Variables - can contain any characters that aren't operators or closing brackets
+    // The original parser allows any character that passes !is_operator_first_symbol_or_space(s) && s != ')' && s != '}'
+    // Note that % is not explicitly excluded by is_operator_first_symbol_or_space in the original parser
+    "$"[^\000 \t\r\n&|!><=%+\-*/?()}{]+ {
         size_t len = YYCURSOR - s->token - 1; // -1 to skip the $
         if (len >= EVAL_MAX_VARIABLE_NAME_LENGTH) {
             len = EVAL_MAX_VARIABLE_NAME_LENGTH - 1;
@@ -95,10 +114,22 @@ int scan(Scanner *s, YYSTYPE *lval) {
     "/" { s->cursor = YYCURSOR; return TOK_DIVIDE; }
     "%" { s->cursor = YYCURSOR; return TOK_MODULO; }
     
-    // Logical operators - accepting case-insensitive AND, OR, NOT alternatives as well as && and ||
-    "&&" | "AND" | "and" | "And" { s->cursor = YYCURSOR; return TOK_AND; }
-    "||" | "OR" | "or" | "Or"    { s->cursor = YYCURSOR; return TOK_OR; }
-    "!" | "NOT" | "not" | "Not"  { s->cursor = YYCURSOR; return TOK_NOT; }
+    // Logical operators - full case-insensitive handling for AND, OR, NOT
+    // Exactly matching the original parser's behavior from parse_and, parse_or, and parse_not
+    "&&" | [aA][nN][dD] { 
+        s->cursor = YYCURSOR; 
+        return TOK_AND; 
+    }
+    
+    "||" | [oO][rR] { 
+        s->cursor = YYCURSOR; 
+        return TOK_OR; 
+    }
+    
+    "!" | [nN][oO][tT] { 
+        s->cursor = YYCURSOR; 
+        return TOK_NOT; 
+    }
     
     // Comparison operators
     "==" | "="  { s->cursor = YYCURSOR; return TOK_EQ; }
@@ -116,8 +147,9 @@ int scan(Scanner *s, YYSTYPE *lval) {
     "("         { s->cursor = YYCURSOR; return TOK_LPAREN; }
     ")"         { s->cursor = YYCURSOR; return TOK_RPAREN; }
     
-    // Function names
-    "abs"       { s->cursor = YYCURSOR; return TOK_FUNCTION_ABS; }
+    // Function names - case-insensitive support
+    // Exactly matching the original parser's behavior from parse_function
+    [aA][bB][sS] { s->cursor = YYCURSOR; return TOK_FUNCTION_ABS; }
     
     // Empty variable placeholders - these should be errors
     "${"        { s->cursor = YYCURSOR; s->error = 1; return 0; }
