@@ -6,8 +6,9 @@ Our [kickstart.sh installer](/packaging/installer/methods/kickstart.md) uses the
 
 Add `--native-only` when running `kickstart.sh` to force native packages. The script will fail if native packages aren’t available.
 
-> [!NOTE]  
-> Until late 2024, Netdata packages were hosted on Package Cloud. All packages are now provided exclusively from our own repositories.
+:::note  
+Until late 2024, Netdata packages were hosted on Package Cloud. All packages are now provided exclusively from our own repositories.
+:::
 
 ---
 
@@ -146,7 +147,9 @@ Mirror root URL:
 
 ## Public Mirrors of the Official Netdata Repositories
 
-> **There are no official public mirrors**.
+:::note
+**There are no official public mirrors**.
+:::
 
 If you wish to provide a public mirror of Netdata repositories:
 

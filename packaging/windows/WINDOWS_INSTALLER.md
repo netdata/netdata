@@ -2,9 +2,10 @@
 
 Netdata provides a simple Windows installer for quick setup.
 
-> [!NOTE]  
-> The Windows Agent is available for users with paid Netdata subscriptions.  
-> Free users will have limited functionality.
+:::note 
+The Windows Agent is available for users with paid Netdata subscriptions.  
+Free users will have limited functionality.
+:::
 
 ---
 
@@ -32,8 +33,9 @@ Choose the version that suits your needs:
 
 Use silent mode to deploy Netdata without user interaction (ideal for automation).
 
-> [!TIP]
-> Run the command prompt as Administrator.
+:::tip
+Run the command prompt as Administrator.
+:::
 
 ---
 
