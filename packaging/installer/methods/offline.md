@@ -1,38 +1,129 @@
-# Install Netdata on offline systems
+# Install Netdata on Offline Systems
 
+This guide explains how to install Netdata Agent on systems without internet access.
 
-Our kickstart script enables offline Netdata Agent installation by prefetching required files (static installs only for now). Future support for local builds is possible, but no ETA. For offline systems, users can try their distro’s package tools (e.g., `apt-offline`), though it's not officially supported.
+Netdata supports offline installation of the Agent using our `kickstart.sh` script.
 
-## Preparing the offline installation source
+This method:
 
-The first step in installing Netdata on an offline system is preparing the offline installation source. This can be done as a regular user on any internet-connected system with the following tools available:
+- Downloads all required files in advance.
+- Works with static builds only (for now).
+- Does *not* support automatic updates on offline systems.
 
-- cURL or wget
-- sha256sum or shasum
-- A standard POSIX compliant shell
+> [!NOTE]
+> Local package tools like `apt-offline` may work for DEB/RPM installs — but we don’t officially support them.
 
-To prepare the offline installation source, simply run:
+---
+
+## Step 1: Prepare the Offline Installation Package
+
+On your internet-connected machine, you'll need::
+
+| Requirement             | Purpose                    |
+|-------------------------|----------------------------|
+| `curl` or `wget`        | Download the script        |
+| `sha256sum` or `shasum` | Verify script downloads    |
+| POSIX-compliant shell   | Required to run the script |
+
+Run the following command:
+
+- using `wget`
+  ```bash
+  wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
+  sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+  ```
+- or using `curl`
+  ```bash
+  curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh
+  sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+  ```
+
+  > [!NOTE]
+  > The folder name `netdata-offline` is just an example — use any name you want.
+  >
+  > To use the nightly channel instead, replace `stable` with `nightly`.
+
+**What's Included**:
+
+The script creates a directory with all necessary files:
+
+```
+── netdata-offline
+   ├── channel             # Release channel info
+   ├── install.sh          # Installation script
+   ├── kickstart.sh        # Original kickstart script
+   ├── netdata-*.gz.run    # Netdata static packages for different architectures
+   └── sha256sums.txt      # Verification hashes
+```
+
+---
+
+## Step 2: Transfer to Offline System
+
+Copy the entire `netdata-offline` directory to your offline system using your preferred method (USB drive, secure copy, etc.).
+
+> [!IMPORTANT]  
+> Do not rename or modify any files in the package.
+> The installation script expects the exact directory structure and filenames.
+
+> [!TIP]
+> The folder name `netdata-offline` is just an example — use any name you want.
+
+---
+
+### Output
+
+This will create a directory like:
+
+```
+./netdata-offline/
+```
+
+It will contain everything required to install Netdata offline.
+
+---
+
+## Choose Release Channel (Optional)
+
+To prepare for a specific channel (`nightly` or `stable`), add:
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --prepare-offline-install-source ./netdata-offline
+--release-channel nightly
 ```
 
 or
 
 ```bash
-curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --prepare-offline-install-source ./netdata-offline
+--release-channel stable
 ```
 
-> The exact name used for the directory does not matter, you can specify any other name you want in place of `./netdata-offline`.
+Example:
 
-This will create a directory called `netdata-offline` in the current directory and place all the files required for an offline install in it.
+```bash
+sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+```
 
-If you want to use a specific release channel (nightly or stable), it _must_ be specified on this step using the
-appropriate option for the kickstart script.
+---
 
-## Installing on the target system
+## Install Netdata on the Target (Offline) System
 
-Once you have prepared the offline install source, you need to copy the offline install source directory to the target system. This can be done in any manner you like, as long as filenames are not changed.
+1. Copy the entire `netdata-offline` directory to your offline system.
 
-After copying the files, simply run the `install.sh` script located in the
-offline install source directory. It accepts all the [same options as the kickstart script](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further customization of the installation, though it will default to not enabling automatic updates (as they are not supported on offline installs).
+> ⚠️ Warning  
+> Don't rename or modify the files.
+
+---
+
+2. On the offline system, run:
+
+```bash
+cd netdata-offline
+sudo ./install.sh
+```
+
+The `install.sh` script accepts the [same parameters](/packaging/installer/methods/kickstart.md#optional-parameters-for-kickstartsh) as `kickstart.sh`, allowing you to customize your installation.
+
+## Automatic Updates
+
+> [!NOTE]  
+> Automatic updates are *disabled* by default for offline installations — since there’s no network connection.
