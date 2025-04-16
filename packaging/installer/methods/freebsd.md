@@ -136,7 +136,4 @@ cd /opt/netdata/usr/libexec/netdata/
 
 ## Telemetry Notice 📊
 
-Starting with Netdata v1.30, anonymous usage data is collected by default.
-
-Learn more or opt-out:  
-[Anonymous Telemetry Events](/docs/netdata-agent/configuration/anonymous-telemetry-events.md)
+Anonymous usage data is collected by default. You can learn more or opt-out [here](/docs/netdata-agent/configuration/anonymous-telemetry-events.md)
