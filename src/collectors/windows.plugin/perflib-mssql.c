@@ -15,6 +15,7 @@
 #define SQLSERVER_MAX_NAME_LENGTH (128)
 
 BOOL is_sqlexpress = FALSE;
+uint16_t total_instances = 0;
 
 struct netdata_mssql_conn {
     const char *driver;
@@ -22,28 +23,17 @@ struct netdata_mssql_conn {
     const char *address;
     const char *username;
     const char *password;
+    int instances;
     bool windows_auth;
+
+    SQLCHAR *connectionString;
 
     SQLHENV netdataSQLEnv;
     SQLHDBC netdataSQLHDBc;
     SQLHSTMT dataFileSizeSTMT;
 
     BOOL is_connected;
-} dbconn = {
-    .driver = "SQL Server",
-    .server = NULL,
-    .address = NULL,
-    .username = NULL,
-    .password = NULL,
-    .windows_auth = FALSE,
-
-    .netdataSQLEnv = NULL,
-    .netdataSQLHDBc = NULL,
-    .dataFileSizeSTMT = NULL,
-
-    .is_connected = FALSE};
-
-SQLCHAR connectionString[1024];
+};
 
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
@@ -61,7 +51,7 @@ enum netdata_mssql_metrics {
 struct mssql_instance {
     char *instanceID;
 
-    struct netdata_mssql_conn *conn;
+    struct netdata_mssql_conn conn;
 
     char *objectName[NETDATA_MSSQL_METRICS_END];
 
@@ -154,7 +144,6 @@ struct mssql_lock_instance {
 };
 
 enum db_instance_idx {
-    NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE,
     NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS,
     NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP,
     NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED,
@@ -306,7 +295,7 @@ int dict_mssql_databases_run_query(const DICTIONARY_ITEM *item __maybe_unused, v
     struct mssql_db_instance *mdi = value;
     const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
-    mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_data_file_size(mdi->parent->conn, (char *)dbname);
+    mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_data_file_size(&mdi->parent->conn, (char *)dbname);
 }
 
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
@@ -340,7 +329,7 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
 
     SQLCHAR ret_conn_str[1024];
     ret = SQLDriverConnect(
-        nmc->netdataSQLHDBc, NULL, connectionString, SQL_NTS, ret_conn_str, 1024, NULL, SQL_DRIVER_NOPROMPT);
+        nmc->netdataSQLHDBc, NULL, nmc->connectionString, SQL_NTS, ret_conn_str, 1024, NULL, SQL_DRIVER_NOPROMPT);
 
     BOOL retConn;
     switch (ret) {
@@ -467,6 +456,80 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     ptr->MSSQLDatabaseWriteTransactions.key = "Write Transactions/sec";
 }
 
+// Options
+void netdata_mount_mssql_connection_string(struct netdata_mssql_conn *dbInput)
+{
+    SQLCHAR conn[1024];
+    const char *serverAddress;
+    const char *serverAddressArg;
+    if (!dbInput) {
+        return;
+    }
+
+    char auth[512];
+    if (dbInput->server && dbInput->address) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "Collector is not expecting server and address defined together, please, select one of them.");
+        dbInput->connectionString = NULL;
+        return;
+    }
+
+    if (dbInput->server) {
+        serverAddress = "Server";
+        serverAddressArg = dbInput->server;
+    } else {
+        serverAddressArg = "Address";
+        serverAddress = dbInput->address;
+    }
+
+    if (dbInput->windows_auth)
+        snprintfz(auth, sizeof(auth) - 1, "Trusted_Connection = yes");
+    else if (!dbInput->username || !dbInput->password) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "You are not using Windows Authentication. Thus, it is necessary to specify user and password.");
+        dbInput->connectionString = NULL;
+        return;
+    } else {
+        snprintfz(auth, sizeof(auth) - 1, "UID=%s;PWD=%s;", dbInput->username, dbInput->password);
+    }
+
+    snprintfz((char *)conn, sizeof(conn) - 1, "Driver={%s};%s=%s;%s", dbInput->driver, serverAddress, serverAddressArg, auth);
+    dbInput->connectionString = (SQLCHAR *)strdupz((char *)conn);
+ }
+
+static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
+{
+#define NETDATA_MAX_MSSSQL_SECTION_LENGTH (40)
+#define NETDATA_DEFAULT_MSSQL_SECTION "plugin:windows:PerflibMSSQL"
+    char section_name[NETDATA_MAX_MSSSQL_SECTION_LENGTH + 1];
+    strncpyz(section_name, NETDATA_DEFAULT_MSSQL_SECTION, sizeof(NETDATA_DEFAULT_MSSQL_SECTION));
+    if (total_instances) {
+        snprintfz(&section_name[sizeof(NETDATA_DEFAULT_MSSQL_SECTION)], 5, "%d", total_instances);
+    }
+
+    dbconn->driver = inicfg_get(&netdata_config, section_name, "driver", "SQL Server");
+    dbconn->server = inicfg_get(&netdata_config, section_name, "server", NULL);
+    dbconn->address = inicfg_get(&netdata_config, section_name, "address", NULL);
+    dbconn->username = inicfg_get(&netdata_config, section_name, "uid", NULL);
+    dbconn->password = inicfg_get(&netdata_config, section_name, "pwd", NULL);
+    dbconn->instances = (int)inicfg_get_number(&netdata_config, section_name, "pwd",0);
+    dbconn->windows_auth = inicfg_get_boolean(
+        &netdata_config, section_name, "windows authentication", false);
+
+    dbconn->netdataSQLEnv = NULL;
+    dbconn->netdataSQLHDBc = NULL;
+    dbconn->dataFileSizeSTMT = NULL;
+
+    dbconn->is_connected = FALSE;
+
+    netdata_mount_mssql_connection_string(dbconn);
+    total_instances++;
+}
+
 void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_instance *p = value;
@@ -486,9 +549,9 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 
     initialize_mssql_objects(p, instance);
     initialize_mssql_keys(p);
+    netdata_read_config_options(&p->conn);
 
-    p->conn = &dbconn;
-    p->conn->is_connected = netdata_MSSQL_initialize_conection(p->conn);
+    p->conn.is_connected = netdata_MSSQL_initialize_conection(&p->conn);
 }
 
 static int mssql_fill_dictionary()
@@ -1354,7 +1417,7 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn->is_connected) || mli->MSSQLDatabaseDataFileSize.current.Data == ULONG_LONG_MAX)
+    if (unlikely(!mli->parent->conn.is_connected) || mli->MSSQLDatabaseDataFileSize.current.Data == ULONG_LONG_MAX)
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1604,7 +1667,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     struct mssql_instance *p = value;
     int *update_every = data;
 
-    if (p->conn->is_connected) {
+    if (p->conn.is_connected) {
         dictionary_sorted_walkthrough_read(p->databases, dict_mssql_databases_run_query, NULL);
     }
 
@@ -1637,65 +1700,6 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     return 1;
 }
 
-// SQL functions
-
-void netdata_mount_mssql_connection_string(SQLCHAR *conn, size_t length, struct netdata_mssql_conn *dbInput)
-{
-    const char *serverAddress;
-    const char *serverAddressArg;
-    if (!conn || !dbInput)
-        return;
-
-    char auth[512];
-
-    if (dbInput->server && dbInput->address) {
-        nd_log(
-            NDLS_COLLECTORS,
-            NDLP_ERR,
-            "Collector is not expecting server and address defined together, please, select one of them.");
-        conn[0] = '\0';
-        return;
-    }
-
-    if (dbInput->server) {
-        serverAddress = "Server";
-        serverAddressArg = dbInput->server;
-    } else {
-        serverAddressArg = "Address";
-        serverAddress = dbInput->address;
-    }
-
-    if (dbInput->windows_auth)
-        snprintfz(auth, sizeof(auth) - 1, "Trusted_Connection = yes");
-    else if (!dbInput->username || !dbInput->password) {
-        nd_log(
-            NDLS_COLLECTORS,
-            NDLP_ERR,
-            "You are not using Windows Authentication. Thus, it is necessary to specify user and password.");
-        conn[0] = '\0';
-        return;
-    } else {
-        snprintfz(auth, sizeof(auth) - 1, "UID=%s;PWD=%s;", dbInput->username, dbInput->password);
-    }
-
-    snprintfz((char *)conn, length, "Driver={%s};%s=%s;%s", dbInput->driver, serverAddress, serverAddressArg, auth);
-}
-
-// Options
-
-static void netdata_read_config_options()
-{
-    dbconn.driver = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "driver", dbconn.driver);
-    dbconn.server = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "server", dbconn.server);
-    dbconn.address = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "address", dbconn.address);
-    dbconn.username = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "uid", dbconn.username);
-    dbconn.password = inicfg_get(&netdata_config, "plugin:windows:PerflibMSSQL", "pwd", dbconn.password);
-    dbconn.windows_auth = inicfg_get_boolean(
-        &netdata_config, "plugin:windows:PerflibMSSQL", "windows authentication", dbconn.windows_auth);
-
-    netdata_mount_mssql_connection_string(connectionString, sizeof(connectionString) - 1, &dbconn);
-}
-
 // Entry point
 
 int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
@@ -1703,7 +1707,6 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
     static bool initialized = false;
 
     if (unlikely(!initialized)) {
-        netdata_read_config_options();
         if (initialize())
             return -1;
 
