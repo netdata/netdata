@@ -1487,7 +1487,7 @@ validate_tree_centos() {
 
   echo >&2 " > CentOS Version: ${version} ..."
 
-  if [[ "${version}" =~ ^9(\..*)?$ ]]; then
+  if [[ "${version}" =~ ^(9|10)(\..*)?$ ]]; then
     echo >&2 " > Checking for config-manager ..."
     if ! run ${sudo} dnf config-manager --help; then
       if prompt "config-manager not found, shall I install it?"; then
@@ -1498,7 +1498,7 @@ validate_tree_centos() {
 
     echo >&2 " > Checking for CRB ..."
     # shellcheck disable=2086
-    if ! run dnf ${sudo} repolist | grep CRB; then
+    if ! run ${sudo} dnf repolist | grep CRB; then
       if prompt "CRB not found, shall I install it?"; then
         # shellcheck disable=2086
         run ${sudo} dnf ${opts} config-manager --set-enabled crb
@@ -1515,7 +1515,7 @@ validate_tree_centos() {
 
     echo >&2 " > Checking for PowerTools ..."
     # shellcheck disable=2086
-    if ! run yum ${sudo} repolist | grep PowerTools; then
+    if ! run ${sudo} yum  repolist | grep PowerTools; then
       if prompt "PowerTools not found, shall I install it?"; then
         # shellcheck disable=2086
         run ${sudo} yum ${opts} config-manager --set-enabled powertools
