@@ -6,9 +6,15 @@
 
 **Merged pull requests:**
 
+- Make sure pattern array items are added and evaluated in order [\#20130](https://github.com/netdata/netdata/pull/20130) ([stelfrag](https://github.com/stelfrag))
+- Fix compilation when using FSANITIZE\_ADDRESS [\#20129](https://github.com/netdata/netdata/pull/20129) ([stelfrag](https://github.com/stelfrag))
+- Handle corrupted journal data when populating the MRG during startup. [\#20128](https://github.com/netdata/netdata/pull/20128) ([stelfrag](https://github.com/stelfrag))
+- Free ACLK message [\#20125](https://github.com/netdata/netdata/pull/20125) ([stelfrag](https://github.com/stelfrag))
 - Create Empty Directories \(Windows installer\) [\#20124](https://github.com/netdata/netdata/pull/20124) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix cleanup and exit and memory leaks [\#20120](https://github.com/netdata/netdata/pull/20120) ([ktsaou](https://github.com/ktsaou))
+- Work to find leaks easily [\#20106](https://github.com/netdata/netdata/pull/20106) ([ktsaou](https://github.com/ktsaou))
 - SNMP, Custom descriptions and units [\#20100](https://github.com/netdata/netdata/pull/20100) ([Ancairon](https://github.com/Ancairon))
+- Sqlite upgrade to version 3.49.1 [\#19933](https://github.com/netdata/netdata/pull/19933) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
@@ -467,13 +473,6 @@
 - Add agent version during ACLK handshake [\#19583](https://github.com/netdata/netdata/pull/19583) ([stelfrag](https://github.com/stelfrag))
 - Format missing file \(eBPF.plugin\) [\#19582](https://github.com/netdata/netdata/pull/19582) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(go.d/apache\): make ?auto param check non-fatal [\#19580](https://github.com/netdata/netdata/pull/19580) ([ilyam8](https://github.com/ilyam8))
-- Fix static build conditions to run on release and nightly builds. [\#19579](https://github.com/netdata/netdata/pull/19579) ([Ferroin](https://github.com/Ferroin))
-- build\(deps\): update go toolchain to v1.23.6 [\#19578](https://github.com/netdata/netdata/pull/19578) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/nvme\): add missing "/dev/" prefix to device path for v2.11 [\#19577](https://github.com/netdata/netdata/pull/19577) ([ilyam8](https://github.com/ilyam8))
-- Generate protobuf source files in build dir. [\#19576](https://github.com/netdata/netdata/pull/19576) ([vkalintiris](https://github.com/vkalintiris))
-- Switch from x86 to ARM build host for POWER8+ builds. [\#19575](https://github.com/netdata/netdata/pull/19575) ([Ferroin](https://github.com/Ferroin))
-- fix\(go.d\): clean up charts for stopped and removed jobs [\#19573](https://github.com/netdata/netdata/pull/19573) ([ilyam8](https://github.com/ilyam8))
-- Modify eBPF.plugin integration \(Part II, the sockets\) [\#19572](https://github.com/netdata/netdata/pull/19572) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
