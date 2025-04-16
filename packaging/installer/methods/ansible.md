@@ -1,16 +1,16 @@
 # Deploy Netdata with Ansible
 
-Meet [Ansible](https://ansible.com), a popular tool for provisioning, configuration management, and infrastructure as code (IaC). 
+Meet [Ansible](https://ansible.com), a popular tool for provisioning, configuration management, and infrastructure as code (IaC).
 
 This guide walks you through deploying the **Netdata Agent** across multiple nodes using an [Ansible playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/), managing configurations, and connecting to **Netdata Cloud**—all in minutes.
 
 What does **idempotent** mean? From the [Ansible glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html):
 
->With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
+> With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
 
 This guide walks you through deploying the **Netdata Agent** across multiple nodes using an [Ansible playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/), managing configurations, and connecting to **Netdata Cloud**—all in minutes.
 
->With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
+> With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
 
 ---
 
@@ -110,7 +110,7 @@ Since this node connects to Netdata Cloud, we'll view its dashboards there inste
 
 You can read more about this decision, or other ways to lock down the local dashboard, in our [node security documentation](https://learn.netdata.cloud/docs/netdata-agent/security/overview).
 
->Curious about why Netdata's dashboard is open by default? Read our [blog post](https://www.netdata.cloud/blog/netdata-agent-dashboard/) on that zero-configuration design decision.
+> Curious about why Netdata's dashboard is open by default? Read our [blog post](https://www.netdata.cloud/blog/netdata-agent-dashboard/) on that zero-configuration design decision.
 
 ---
 

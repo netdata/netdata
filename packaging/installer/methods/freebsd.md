@@ -1,8 +1,8 @@
 # Install Netdata on FreeBSD
 
->💡 This guide is community-maintained and might not always reflect the latest details (like package versions).  
->Double-check before proceeding!  
->Want to help? [Submit a PR!](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md)
+> 💡 This guide is community-maintained and might not always reflect the latest details (like package versions).  
+> Double-check before proceeding!  
+> Want to help? [Submit a PR!](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md)
 
 ---
 
@@ -108,27 +108,27 @@ cd /opt/netdata/usr/libexec/netdata/
 
 ## Optional Kickstart Parameters
 
-| Option                                             | Description                                                                                              |
-|----------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| `--non-interactive`                                | Skip prompts and assume yes.                                                                             |
-| `--interactive`                                    | Force interactive prompts.                                                                               |
-| `--release-channel stable`                         | Install stable builds (instead of nightly).                                                              |
-| `--no-updates`                                     | Disable auto-updates.                                                                                    |
-| `--disable-telemetry`                              | Disable anonymous statistics.                                                                            |
-| `--native-only`                                    | Install only if native packages are available.                                                           |
-| `--static-only`                                    | Install only if static builds are available.                                                             |
-| `--install-prefix /opt`                            | Change installation directory.                                                                           |
+| Option                                               | Description                                                                                                |
+|------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
+| `--non-interactive`                                  | Skip prompts and assume yes.                                                                               |
+| `--interactive`                                      | Force interactive prompts.                                                                                 |
+| `--release-channel stable`                           | Install stable builds (instead of nightly).                                                                |
+| `--no-updates`                                       | Disable auto-updates.                                                                                      |
+| `--disable-telemetry`                                | Disable anonymous statistics.                                                                              |
+| `--native-only`                                      | Install only if native packages are available.                                                             |
+| `--static-only`                                      | Install only if static builds are available.                                                               |
+| `--install-prefix /opt`                              | Change installation directory.                                                                             |
 | `--prepare-offline-install-source ./netdata-offline` | Prepare offline installation source. See [Offline Install Guide](/packaging/installer/methods/offline.md). |
 
 ---
 
 ## Environment Variables (Advanced Users)
 
-| Variable               | Purpose                                                                 |
-|------------------------|-------------------------------------------------------------------------|
-| `TMPDIR`               | Directory for temporary files.                                          |
-| `ROOTCMD`              | Command used for privilege escalation (default: `sudo` or `doas`).      |
-| `DISABLE_TELEMETRY=1`  | Disables anonymous telemetry data.                                      |
+| Variable              | Purpose                                                            |
+|-----------------------|--------------------------------------------------------------------|
+| `TMPDIR`              | Directory for temporary files.                                     |
+| `ROOTCMD`             | Command used for privilege escalation (default: `sudo` or `doas`). |
+| `DISABLE_TELEMETRY=1` | Disables anonymous telemetry data.                                 |
 
 ---
 
