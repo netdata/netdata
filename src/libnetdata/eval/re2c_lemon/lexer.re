@@ -89,8 +89,8 @@ int scan(Scanner *s, YYSTYPE *lval) {
     
     // Variables - can contain any characters that aren't operators or closing brackets
     // The original parser allows any character that passes !is_operator_first_symbol_or_space(s) && s != ')' && s != '}'
-    // Note that % is not explicitly excluded by is_operator_first_symbol_or_space in the original parser
-    "$"[^\000 \t\r\n&|!><=%+\-*/?()}{;]+ {
+    // We also need to exclude comma for proper function parameter parsing
+    "$"[^\000 \t\r\n&|!><=%+\-*/?()}{;,]+ {
         size_t len = YYCURSOR - s->token - 1; // -1 to skip the $
         if (len >= EVAL_MAX_VARIABLE_NAME_LENGTH) {
             len = EVAL_MAX_VARIABLE_NAME_LENGTH - 1;
@@ -130,19 +130,37 @@ int scan(Scanner *s, YYSTYPE *lval) {
     ";" { s->cursor = YYCURSOR; s->in_assignment = 0; return TOK_SEMICOLON; }
     
     // Logical operators - full case-insensitive handling for AND, OR, NOT
-    // Exactly matching the original parser's behavior from parse_and, parse_or, and parse_not
-    "&&" | [aA][nN][dD] { 
+    // Including versions with parentheses that push back the parenthesis
+    "&&" | [aA][nN][dD][ \t]* {
         s->cursor = YYCURSOR; 
         return TOK_AND; 
     }
     
-    "||" | [oO][rR] { 
+    [aA][nN][dD]"(" { 
+        // Move cursor back to just before the '('
+        s->cursor = YYCURSOR - 1; 
+        return TOK_AND; 
+    }
+    
+    "||" | [oO][rR][ \t]* {
         s->cursor = YYCURSOR; 
         return TOK_OR; 
     }
     
-    "!" | [nN][oO][tT] { 
+    [oO][rR]"(" { 
+        // Move cursor back to just before the '('
+        s->cursor = YYCURSOR - 1; 
+        return TOK_OR; 
+    }
+    
+    "!" | [nN][oO][tT][ \t]* {
         s->cursor = YYCURSOR; 
+        return TOK_NOT; 
+    }
+    
+    [nN][oO][tT]"(" { 
+        // Move cursor back to just before the '('
+        s->cursor = YYCURSOR - 1; 
         return TOK_NOT; 
     }
     
@@ -165,13 +183,36 @@ int scan(Scanner *s, YYSTYPE *lval) {
     "?"         { s->cursor = YYCURSOR; return TOK_QMARK; }
     ":"         { s->cursor = YYCURSOR; return TOK_COLON; }
     
-    // Parentheses
+    // Parentheses and comma
     "("         { s->cursor = YYCURSOR; return TOK_LPAREN; }
     ")"         { s->cursor = YYCURSOR; return TOK_RPAREN; }
+    ","         { s->cursor = YYCURSOR; return TOK_COMMA; }
     
-    // Function names - case-insensitive support
-    // Exactly matching the original parser's behavior from parse_function
-    [aA][bB][sS] { s->cursor = YYCURSOR; return TOK_FUNCTION_ABS; }
+    // Function names - now supports any valid function name followed by "("
+    [a-zA-Z_][a-zA-Z0-9_]*"(" {
+        // Get the function name (excluding the trailing parenthesis)
+        size_t len = YYCURSOR - s->token - 1; // -1 to exclude the "("
+        char func_name[256] = {0};
+        if(len >= sizeof(func_name) - 1) {
+            len = sizeof(func_name) - 1;
+        }
+        memcpy(func_name, s->token, len);
+        func_name[len] = '\0';
+        
+        // Check if this is a registered function
+        EVAL_DYNAMIC_FUNCTION *func = eval_function_lookup(func_name);
+        if(func) {
+            // It's a registered function
+            lval->op = func->operator;
+            s->cursor = YYCURSOR;
+            return TOK_FUNCTION;
+        }
+        
+        // Not a registered function - report error
+        s->cursor = YYCURSOR;
+        s->error = 1;
+        return 0;
+    }
     
     // Empty variable placeholders - these should be errors
     "${"        { s->cursor = YYCURSOR; s->error = 1; return 0; }
@@ -190,7 +231,7 @@ int scan(Scanner *s, YYSTYPE *lval) {
 }
 
 // Function to parse an expression with re2c/lemon
-EVAL_NODE *parse_expression_with_re2c_lemon(const char *string, const char **failed_at, int *error) {
+EVAL_NODE *parse_expression_with_re2c_lemon(const char *string, const char **failed_at, EVAL_ERROR *error) {
     Scanner scanner;
     scanner_init(&scanner, string);
 

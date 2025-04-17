@@ -849,6 +849,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/eval/eval-parser-legacy.c
         src/libnetdata/eval/eval-assignment.c
         src/libnetdata/eval/eval-evaluate.c
+        src/libnetdata/eval/eval-functions.c
         src/libnetdata/eval/eval-utils.c
         src/libnetdata/eval/eval.h
         src/libnetdata/eval/eval-internal.h

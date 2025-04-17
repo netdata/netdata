@@ -7,7 +7,7 @@
 // evaluation of expressions
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int *error) {
+static NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, EVAL_ERROR *error) {
     // Check if variable is NULL to avoid crashes
     if (!v || !v->name) {
         *error = EVAL_ERROR_UNKNOWN_VARIABLE;
@@ -30,7 +30,7 @@ static NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int 
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, int *error) {
+NETDATA_DOUBLE eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, EVAL_ERROR *error) {
     NETDATA_DOUBLE n;
 
     switch(v->type) {
@@ -64,7 +64,7 @@ static bool is_true(NETDATA_DOUBLE n) {
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_and(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_and(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
@@ -78,7 +78,7 @@ static NETDATA_DOUBLE eval_and(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) 
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_or(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_or(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
@@ -92,7 +92,7 @@ static NETDATA_DOUBLE eval_or(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_greater_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_greater_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
@@ -103,7 +103,7 @@ static NETDATA_DOUBLE eval_greater_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_less_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_less_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
@@ -114,7 +114,7 @@ static NETDATA_DOUBLE eval_less_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *o
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
@@ -138,12 +138,12 @@ static NETDATA_DOUBLE eval_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_not_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_not_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     return !eval_equal(exp, op, error);
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_less(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_less(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
@@ -154,7 +154,7 @@ static NETDATA_DOUBLE eval_less(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error)
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_greater(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_greater(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
@@ -165,7 +165,7 @@ static NETDATA_DOUBLE eval_greater(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *err
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors like UNKNOWN_VARIABLE
     
@@ -194,7 +194,7 @@ static NETDATA_DOUBLE eval_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error)
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors like UNKNOWN_VARIABLE
     
@@ -235,7 +235,7 @@ static NETDATA_DOUBLE eval_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_multiply(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_multiply(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors like UNKNOWN_VARIABLE
     
@@ -267,7 +267,7 @@ static NETDATA_DOUBLE eval_multiply(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *er
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_divide(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_divide(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
@@ -315,14 +315,14 @@ static NETDATA_DOUBLE eval_divide(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *erro
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_nop(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_nop(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     // No special error handling needed - just pass through the value and any error
     return n1;
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_not(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_not(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
@@ -330,28 +330,29 @@ static NETDATA_DOUBLE eval_not(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) 
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_sign_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_sign_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     return n1;
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_sign_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_sign_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     return -n1;
 }
 
+// this is used by the legacy parser - it is not used by re2c/lemon parser
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_abs(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_abs(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     return ABS(n1);
 }
 
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_if_then_else(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_if_then_else(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     NETDATA_DOUBLE condition = eval_value(exp, &op->ops[0], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
@@ -363,7 +364,7 @@ static NETDATA_DOUBLE eval_if_then_else(EVAL_EXPRESSION *exp, EVAL_NODE *op, int
 
 // Function to evaluate variable assignment
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_assignment(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_assignment(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     // First operand should be a variable node
     EVAL_NODE *var_node = op->ops[0].expression;
     if (!var_node || var_node->count < 1 || var_node->ops[0].type != EVAL_VALUE_VARIABLE) {
@@ -398,7 +399,7 @@ static NETDATA_DOUBLE eval_assignment(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *
 
 // Function to evaluate semicolon-separated expressions
 ALWAYS_INLINE
-static NETDATA_DOUBLE eval_semicolon(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+static NETDATA_DOUBLE eval_semicolon(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     // First evaluate the left expression and store its result
     // The side effects (variable assignments) from this will be used in the right expression
     NETDATA_DOUBLE left_result = eval_value(exp, &op->ops[0], error);
@@ -416,7 +417,7 @@ static NETDATA_DOUBLE eval_semicolon(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *e
 }
 
 // Define operators table - use the struct definition from eval-internal.h
-struct operator operators[256] = {
+struct operator operators[EVAL_OPERATOR_CUSTOM_FUNCTION_END + 1] = {
     // this is a random access array
     // we always access it with a known EVAL_OPERATOR_X
 
@@ -435,10 +436,21 @@ struct operator operators[256] = {
     [EVAL_OPERATOR_NOT]                   = { "!",  6, 1, 0, eval_not },
     [EVAL_OPERATOR_SIGN_PLUS]             = { "+",  6, 1, 0, eval_sign_plus },
     [EVAL_OPERATOR_SIGN_MINUS]            = { "-",  6, 1, 0, eval_sign_minus },
+
+    // this is only used by the legacy parser - not used by re2c/lemon parser
     [EVAL_OPERATOR_ABS]                   = { "abs(",6,1, 1, eval_abs },
+
     [EVAL_OPERATOR_IF_THEN_ELSE]          = { "?",  7, 3, 0, eval_if_then_else },
-    [EVAL_OPERATOR_ASSIGNMENT]            = { "=",  1, 2, 0, eval_assignment }, // Lower precedence than arithmetic
-    [EVAL_OPERATOR_SEMICOLON]             = { ";",  0, 2, 0, eval_semicolon }, // Lowest precedence
+
+    // Lower precedence than arithmetic
+    [EVAL_OPERATOR_ASSIGNMENT]            = { "=",  1, 2, 0, eval_assignment },
+
+    // Lowest precedence
+    [EVAL_OPERATOR_SEMICOLON]             = { ";",  0, 2, 0, eval_semicolon },
+
+    // Dynamic functions
+    [EVAL_OPERATOR_FUNCTION]              = { NULL, 6, 0, 1, eval_execute_function },
+
     [EVAL_OPERATOR_NOP]                   = { NULL, 9, 1, 0, eval_nop },
     [EVAL_OPERATOR_EXPRESSION_OPEN]       = { NULL, 9, 1, 0, eval_nop },
 
@@ -448,18 +460,27 @@ struct operator operators[256] = {
 
 // Helper function to get precedence
 ALWAYS_INLINE
-int eval_precedence(unsigned char operator) {
-    return operators[(unsigned char)(operator)].precedence;
+char eval_precedence(EVAL_OPERATOR operator) {
+    return operators[operator].precedence;
+}
+
+bool has_the_right_number_of_operands(EVAL_NODE *op) {
+    return op->operator >= EVAL_OPERATOR_CUSTOM_FUNCTION_START || operators[op->operator].parameters == op->count;
 }
 
 ALWAYS_INLINE
-NETDATA_DOUBLE eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+NETDATA_DOUBLE eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, EVAL_ERROR *error) {
     if(unlikely(!op)) {
         *error = EVAL_ERROR_MISSING_OPERAND;
         return NAN;
     }
 
-    if(unlikely(op->count != operators[op->operator].parameters)) {
+    if(op->operator >= EVAL_OPERATOR_CUSTOM_FUNCTION_END) {
+        *error = EVAL_ERROR_INVALID_OPERATOR;
+        return NAN;
+    }
+
+    if(unlikely(!has_the_right_number_of_operands(op))) {
         *error = EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS;
         return NAN;
     }
@@ -500,7 +521,7 @@ int expression_evaluate(EVAL_EXPRESSION *expression) {
         if(buffer_strlen(expression->error_msg))
             buffer_strcat(expression->error_msg, "; ");
 
-        buffer_sprintf(expression->error_msg, "failed to evaluate expression with error %d (%s)", expression->error, expression_strerror(expression->error));
+        buffer_sprintf(expression->error_msg, "failed to evaluate expression with error %u (%s)", expression->error, expression_strerror(expression->error));
         return 0;
     }
 

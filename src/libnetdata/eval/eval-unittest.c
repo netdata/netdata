@@ -335,7 +335,7 @@ static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NE
 typedef struct {
     const char *expression;
     NETDATA_DOUBLE expected_result;
-    int expected_error;
+    EVAL_ERROR expected_error;
     bool should_parse;
 } TestCase;
 
@@ -356,7 +356,7 @@ static void run_test_group(TestGroup *group) {
     for (int i = 0; i < group->test_count; i++) {
         TestCase *tc = &group->test_cases[i];
         const char *failed_at = NULL;
-        int error = 0;
+        EVAL_ERROR error = EVAL_ERROR_OK;
         bool test_failed = false;
         char error_message[1024] = "";
         
@@ -368,7 +368,7 @@ static void run_test_group(TestGroup *group) {
         // Check if parsing succeeded as expected
         if (tc->should_parse && !exp) {
             snprintf(error_message, sizeof(error_message), 
-                     "Expected parsing to succeed, but it failed with error %d (%s)",
+                     "Expected parsing to succeed, but it failed with error %u (%s)",
                      error, expression_strerror(error));
             test_failed = true;
         }
@@ -389,19 +389,19 @@ static void run_test_group(TestGroup *group) {
             // Check if there was an error during evaluation
             if (tc->expected_error != EVAL_ERROR_OK && exp->error == EVAL_ERROR_OK) {
                 snprintf(error_message, sizeof(error_message),
-                         "Expected evaluation error %d, but got no error",
+                         "Expected evaluation error %u, but got no error",
                          tc->expected_error);
                 test_failed = true;
             }
             else if (tc->expected_error == EVAL_ERROR_OK && exp->error != EVAL_ERROR_OK) {
                 snprintf(error_message, sizeof(error_message),
-                         "Expected no evaluation error, but got error %d (%s)",
+                         "Expected no evaluation error, but got error %u (%s)",
                          exp->error, expression_strerror(exp->error));
                 test_failed = true;
             }
             else if (tc->expected_error != EVAL_ERROR_OK && exp->error != tc->expected_error) {
                 snprintf(error_message, sizeof(error_message),
-                         "Expected evaluation error %d, but got error %d (%s)",
+                         "Expected evaluation error %u, but got error %u (%s)",
                          tc->expected_error, exp->error, expression_strerror(exp->error));
                 test_failed = true;
             }
@@ -451,7 +451,7 @@ static void run_test_group(TestGroup *group) {
                     // Check if hardcoded variable works correctly
                     if (exp->error != EVAL_ERROR_OK || fabs(exp->result - 123.456) > 0.000001) {
                         snprintf(error_message, sizeof(error_message),
-                                "expression_hardcode_variable failed: expected 123.456, got %f (error: %d)",
+                                "expression_hardcode_variable failed: expected 123.456, got %f (error: %u)",
                                 exp->result, exp->error);
                         test_failed = true;
                     } else {
@@ -1285,7 +1285,7 @@ int eval_unittest(void) {
         for (int j = 0; j < group_tests; j++) {
             TestCase *tc = &test_groups[i].test_cases[j];
             const char *failed_at = NULL;
-            int error = 0;
+            EVAL_ERROR error = EVAL_ERROR_OK;
             
             // Try to parse the expression
             EVAL_EXPRESSION *exp = expression_parse(tc->expression, &failed_at, &error);

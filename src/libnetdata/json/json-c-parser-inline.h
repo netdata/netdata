@@ -139,9 +139,9 @@
         const char *_t = json_object_get_string(_j);                                                            \
         if(_t && *_t && strcmp(_t, "*") != 0) {                                                                 \
             const char *_failed_at = NULL;                                                                      \
-            int _err = 0;                                                                                       \
+            EVAL_ERROR _err = EVAL_ERROR_OK;                                                                    \
             expression_free(dst);                                                                               \
-            dst = expression_parse(_t, &_failed_at, &_err);                                                     \
+            (dst) = expression_parse(_t, &_failed_at, &_err);                                                   \
             if(!dst) {                                                                                          \
                 buffer_sprintf(error, "expression '%s.%s' has a non-parseable expression '%s': %s at '%s'",     \
                                path, member, _t, expression_strerror(_err), _failed_at);                        \
