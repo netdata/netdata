@@ -90,7 +90,7 @@ int scan(Scanner *s, YYSTYPE *lval) {
     // Variables - can contain any characters that aren't operators or closing brackets
     // The original parser allows any character that passes !is_operator_first_symbol_or_space(s) && s != ')' && s != '}'
     // Note that % is not explicitly excluded by is_operator_first_symbol_or_space in the original parser
-    "$"[^\000 \t\r\n&|!><=%+\-*/?()}{]+ {
+    "$"[^\000 \t\r\n&|!><=%+\-*/?()}{;]+ {
         size_t len = YYCURSOR - s->token - 1; // -1 to skip the $
         if (len >= EVAL_MAX_VARIABLE_NAME_LENGTH) {
             len = EVAL_MAX_VARIABLE_NAME_LENGTH - 1;
