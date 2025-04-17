@@ -849,8 +849,6 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     journalfile_extent_build(ctx, xt_io_descr);
 
     ctx_last_flush_fileno_set(ctx, datafile->fileno);
-//    ctx_current_disk_space_increase(ctx, real_io_size);
-//    ctx_io_write_op_bytes(ctx, real_io_size);
     xt_io_descr->real_io_size = real_io_size;
 
     return xt_io_descr;
