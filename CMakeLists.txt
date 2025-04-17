@@ -847,6 +847,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-debug.h
         src/libnetdata/dictionary/dictionary.h
         src/libnetdata/eval/eval-parser-legacy.c
+        src/libnetdata/eval/eval-assignment.c
         src/libnetdata/eval/eval-evaluate.c
         src/libnetdata/eval/eval-utils.c
         src/libnetdata/eval/eval.h

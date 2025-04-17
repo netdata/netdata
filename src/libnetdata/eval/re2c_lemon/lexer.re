@@ -18,6 +18,7 @@ void scanner_init(Scanner *s, const char *input) {
         s->limit = s->cursor;
         s->line = 1;
         s->error = 1;  // Set error flag for NULL input
+        s->in_assignment = 0; // Initialize assignment context flag
         return;
     }
     
@@ -27,6 +28,7 @@ void scanner_init(Scanner *s, const char *input) {
     s->limit = s->cursor + strlen(s->cursor);
     s->line = 1;
     s->error = 0;  // Initialize error flag
+    s->in_assignment = 0; // Initialize assignment context flag
 }
 
 int scan(Scanner *s, YYSTYPE *lval) {
@@ -42,8 +44,15 @@ int scan(Scanner *s, YYSTYPE *lval) {
     re2c:define:YYCTYPE = char;
     re2c:yyfill:enable = 0;
     
-    // Skip whitespace
-    [ \t\r\n]+ { continue; }
+    // Skip spaces and tabs (but treat newlines as semicolons for multi-line scripts)
+    [ \t]+ { continue; }
+    
+    // Treat newlines as semicolons
+    [\r\n]+ { 
+        s->cursor = YYCURSOR; 
+        s->in_assignment = 0; 
+        return TOK_SEMICOLON; 
+    }
     
     // Special numeric literals - more comprehensive handling for various capitalizations
     // Support NaN with all case variations 
@@ -51,6 +60,7 @@ int scan(Scanner *s, YYSTYPE *lval) {
     [nN][aA][nN] | [nN][uU][lL][lL] {
         lval->dval = NAN;
         s->cursor = YYCURSOR;
+        s->in_assignment = 0; // Reset assignment context
         return TOK_NUMBER;
     }
     
@@ -59,6 +69,7 @@ int scan(Scanner *s, YYSTYPE *lval) {
     [iI][nN][fF]([iI][nN][iI][tT][yY])? {
         lval->dval = INFINITY;
         s->cursor = YYCURSOR;
+        s->in_assignment = 0; // Reset assignment context
         return TOK_NUMBER;
     }
     
@@ -72,6 +83,7 @@ int scan(Scanner *s, YYSTYPE *lval) {
         char *endptr;
         lval->dval = str2ndd(s->token, &endptr);
         s->cursor = YYCURSOR;
+        s->in_assignment = 0; // Reset assignment context
         return TOK_NUMBER;
     }
     
@@ -87,6 +99,7 @@ int scan(Scanner *s, YYSTYPE *lval) {
         variable_buffer[len] = '\0';
         lval->strval = strdupz(variable_buffer);
         s->cursor = YYCURSOR;
+        s->in_assignment = 1; // Mark that we just saw a variable, potential assignment context
         return TOK_VARIABLE;
     }
     
@@ -104,15 +117,17 @@ int scan(Scanner *s, YYSTYPE *lval) {
         variable_buffer[len] = '\0';
         lval->strval = strdupz(variable_buffer);
         s->cursor = YYCURSOR;
+        s->in_assignment = 1; // Mark that we just saw a variable, potential assignment context
         return TOK_VARIABLE;
     }
     
     // Operators
-    "+" { s->cursor = YYCURSOR; return TOK_PLUS; }
-    "-" { s->cursor = YYCURSOR; return TOK_MINUS; }
-    "*" { s->cursor = YYCURSOR; return TOK_MULTIPLY; }
-    "/" { s->cursor = YYCURSOR; return TOK_DIVIDE; }
-    "%" { s->cursor = YYCURSOR; return TOK_MODULO; }
+    "+" { s->cursor = YYCURSOR; s->in_assignment = 0; return TOK_PLUS; }
+    "-" { s->cursor = YYCURSOR; s->in_assignment = 0; return TOK_MINUS; }
+    "*" { s->cursor = YYCURSOR; s->in_assignment = 0; return TOK_MULTIPLY; }
+    "/" { s->cursor = YYCURSOR; s->in_assignment = 0; return TOK_DIVIDE; }
+    "%" { s->cursor = YYCURSOR; s->in_assignment = 0; return TOK_MODULO; }
+    ";" { s->cursor = YYCURSOR; s->in_assignment = 0; return TOK_SEMICOLON; }
     
     // Logical operators - full case-insensitive handling for AND, OR, NOT
     // Exactly matching the original parser's behavior from parse_and, parse_or, and parse_not
@@ -131,8 +146,15 @@ int scan(Scanner *s, YYSTYPE *lval) {
         return TOK_NOT; 
     }
     
-    // Comparison operators
-    "==" | "="  { s->cursor = YYCURSOR; return TOK_EQ; }
+    // Comparison operators and assignment
+    "=="        { s->cursor = YYCURSOR; return TOK_EQ; }
+    "="         { 
+        s->cursor = YYCURSOR;
+        // If we're after a variable, it's an assignment, otherwise it's equality
+        int token = s->in_assignment ? TOK_ASSIGN : TOK_EQ;
+        s->in_assignment = 0; // Reset assignment context
+        return token;
+    }
     "!=" | "<>" { s->cursor = YYCURSOR; return TOK_NE; }
     "<"         { s->cursor = YYCURSOR; return TOK_LT; }
     "<="        { s->cursor = YYCURSOR; return TOK_LE; }

@@ -1076,7 +1076,7 @@ static TestCase real_world_tests[] = {
     {"$arrays * 100 / $ipc_semaphores_arrays_max", 50.0, EVAL_ERROR_OK, true},
     
     // Basic patterns with lowercase logical operators
-    {"$netdata.uptime.uptime > 30 AND $this > 0 and $this < 24", 0.0, EVAL_ERROR_OK, true},
+    {"$netdata.uptime.uptime > 30 AND $this > 0 and $this < 24", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},
     {"($this > $green OR $var1 > $red) and $this > 2", 1.0, EVAL_ERROR_OK, true},
     
     // Expressions with word operators and comparisons
@@ -1087,6 +1087,82 @@ static TestCase real_world_tests[] = {
     // Mixed symbol and word operators
     {"$var1 > 40 AND ($var2 < 30 || $this > 45)", 1.0, EVAL_ERROR_OK, true},
     {"($var1 > 30 && $var2 < 30) OR $this > 45", 1.0, EVAL_ERROR_OK, true},
+};
+
+// Test cases for variable assignment and local variables
+static TestCase variable_assignment_tests[] = {
+    // Basic variable assignment
+    {"$x = 5", 5.0, EVAL_ERROR_OK, true},
+    {"$x = 5 + 3", 8.0, EVAL_ERROR_OK, true},
+    {"$x = -10", -10.0, EVAL_ERROR_OK, true},
+    {"${my_var} = 42", 42.0, EVAL_ERROR_OK, true},
+
+    // Assignment with existing variables
+    {"$x = $var1", 42.0, EVAL_ERROR_OK, true},
+    {"$x = $var1 + $var2", 66.0, EVAL_ERROR_OK, true},
+    {"$x = $var1 * $var2", 1008.0, EVAL_ERROR_OK, true},
+
+    // Reassignment
+    {"$x = 5; $x = 10", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $x = $x + 1", 6.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $x = $x * 2", 10.0, EVAL_ERROR_OK, true},
+
+    // Multiple assignments
+    {"$x = 5; $y = 10", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $y = $x * 2", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $y = $x + 3; $z = $x + $y", 13.0, EVAL_ERROR_OK, true},
+
+    // Assignments with expressions
+    {"$x = 5; $y = $x > 3 ? 10 : 20", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 1; $y = $x > 3 ? 10 : 20", 20.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $y = abs($x - 10)", 5.0, EVAL_ERROR_OK, true},
+
+    // Assignments with complex expressions
+    {"$x = 5; $y = 10; $z = ($x + $y) * 2", 30.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $y = 10; $z = $x > $y ? $x : $y", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 1; $y = 2; $z = $x && $y", 1.0, EVAL_ERROR_OK, true},
+    {"$x = 0; $y = 2; $z = $x && $y", 0.0, EVAL_ERROR_OK, true},
+
+    // Variable shadowing (local variables overriding globals)
+    {"$var1 = 100; $var1", 100.0, EVAL_ERROR_OK, true},
+    {"$var1 = 100; $var1 + $var2", 124.0, EVAL_ERROR_OK, true},
+    {"$var2 = 100; $var1 * $var2", 4200.0, EVAL_ERROR_OK, true},
+
+    // Mixed operations with assignments
+    {"$x = 5; $y = $x + 3; $x = $y * 2", 16.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $y = $x + 3; $z = $x * $y", 40.0, EVAL_ERROR_OK, true},
+    {"$x = $var1; $y = $var2; $z = $x > $y ? $x - $y : $y - $x", 18.0, EVAL_ERROR_OK, true},
+
+    // Edge cases
+    {"$x = 5; ; $y = 10", 10.0, EVAL_ERROR_OK, true},  // Empty expression in the middle
+    {"$x = 5;", 5.0, EVAL_ERROR_OK, true},              // Trailing semicolon
+    {"$x = $undefined_var", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true}, // Undefined variable
+
+    // Assignment to complex variable names
+    {"${complex var} = 42", 42.0, EVAL_ERROR_OK, true},
+    {"${complex var} = 42; ${complex var} + 8", 50.0, EVAL_ERROR_OK, true},
+
+    // Assignments with newlines instead of semicolons
+    {"$x = 5\n$y = 10", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 5\n$y = $x * 2", 10.0, EVAL_ERROR_OK, true},
+
+    // Multiple assignments with arithmetic
+    {"$a = 1; $b = 2; $c = 3; $d = $a + $b + $c", 6.0, EVAL_ERROR_OK, true},
+    {"$a = 1; $b = $a + 1; $c = $b + 1; $d = $c + 1", 4.0, EVAL_ERROR_OK, true},
+
+    // Reassignment with arithmetic
+    {"$x = 1; $x = $x + 1; $x = $x + 1; $x = $x + 1", 4.0, EVAL_ERROR_OK, true},
+    {"$x = 10; $x = $x - 1; $x = $x - 1; $x = $x - 1", 7.0, EVAL_ERROR_OK, true},
+    {"$x = 2; $x = $x * 2; $x = $x * 2; $x = $x * 2", 16.0, EVAL_ERROR_OK, true},
+
+    // Variables in conditions
+    {"$x = 5; $y = $x > 3 ? 10 : 20; $z = $y < 15 ? 30 : 40", 30.0, EVAL_ERROR_OK, true},
+    {"$x = 1; $y = $x > 3 ? 10 : 20; $z = $y < 15 ? 30 : 40", 40.0, EVAL_ERROR_OK, true},
+
+    // Special values
+    {"$x = NaN", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},
+    {"$x = Infinity", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
+    {"$x = 1 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}
 };
 
 // Define the test groups
@@ -1108,6 +1184,9 @@ static TestGroup test_groups[] = {
     {"Number Overflow Tests", overflow_tests, ARRAY_SIZE(overflow_tests)},
     {"Combined Complex Expressions", combined_tests, ARRAY_SIZE(combined_tests)},
     {"Crash Tests", crash_tests, ARRAY_SIZE(crash_tests)},
+#ifdef USE_RE2C_LEMON_PARSER
+    {"Variable Assignment Tests", variable_assignment_tests, ARRAY_SIZE(variable_assignment_tests)},
+#endif
 };
 
 int eval_unittest(void) {

@@ -28,6 +28,7 @@ typedef bool (*eval_expression_variable_lookup_t)(STRING *variable, void *data, 
 #define EVAL_ERROR_VALUE_IS_NAN                 103
 #define EVAL_ERROR_VALUE_IS_INFINITE            104
 #define EVAL_ERROR_UNKNOWN_VARIABLE             105
+#define EVAL_ERROR_INVALID_OPERAND              106
 
 // parse the given string as an expression and return:
 //   a pointer to an expression if it parsed OK
