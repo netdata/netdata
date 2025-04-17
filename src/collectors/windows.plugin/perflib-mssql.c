@@ -15,7 +15,6 @@
 #define SQLSERVER_MAX_NAME_LENGTH (128)
 
 BOOL is_sqlexpress = FALSE;
-uint16_t total_instances = 0;
 
 struct netdata_mssql_conn {
     const char *driver;
@@ -277,7 +276,7 @@ ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char
 
     // We cannot access data for these tables without additional changes.
     // They should be blacklisted.
-    if (!strcmp(dbname, "model") || !strcmp(dbname, "mssqlsystemresource"))
+    if (!strcmp(dbname, "model") || !!strcmp(dbname, "model_msdb") || !!strcmp(dbname, "model_replicatedmaster")  || strcmp(dbname, "mssqlsystemresource"))
         return ULONG_LONG_MAX;
 
     // https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
@@ -504,12 +503,23 @@ void netdata_mount_mssql_connection_string(struct netdata_mssql_conn *dbInput)
 
 static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
 {
+    dbconn->netdataSQLEnv = NULL;
+    dbconn->netdataSQLHDBc = NULL;
+    dbconn->dataFileSizeSTMT = NULL;
+
+    dbconn->is_connected = FALSE;
+
+    static uint16_t expected_instances = 1;
+    static uint16_t total_instances = 0;
+    if (total_instances > expected_instances)
+        return;
+
 #define NETDATA_MAX_MSSSQL_SECTION_LENGTH (40)
 #define NETDATA_DEFAULT_MSSQL_SECTION "plugin:windows:PerflibMSSQL"
     char section_name[NETDATA_MAX_MSSSQL_SECTION_LENGTH + 1];
     strncpyz(section_name, NETDATA_DEFAULT_MSSQL_SECTION, sizeof(NETDATA_DEFAULT_MSSQL_SECTION));
     if (total_instances) {
-        snprintfz(&section_name[sizeof(NETDATA_DEFAULT_MSSQL_SECTION)], 5, "%d", total_instances);
+        snprintfz(&section_name[sizeof(NETDATA_DEFAULT_MSSQL_SECTION) - 1], 5, "%d", total_instances);
     }
 
     dbconn->driver = inicfg_get(&netdata_config, section_name, "driver", "SQL Server");
@@ -517,16 +527,13 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
     dbconn->address = inicfg_get(&netdata_config, section_name, "address", NULL);
     dbconn->username = inicfg_get(&netdata_config, section_name, "uid", NULL);
     dbconn->password = inicfg_get(&netdata_config, section_name, "pwd", NULL);
-    dbconn->instances = (int)inicfg_get_number(&netdata_config, section_name, "pwd", 0);
+    dbconn->instances = (int)inicfg_get_number(&netdata_config, section_name, "additional instances", 0);
     dbconn->windows_auth = inicfg_get_boolean(&netdata_config, section_name, "windows authentication", false);
 
-    dbconn->netdataSQLEnv = NULL;
-    dbconn->netdataSQLHDBc = NULL;
-    dbconn->dataFileSizeSTMT = NULL;
-
-    dbconn->is_connected = FALSE;
-
     netdata_mount_mssql_connection_string(dbconn);
+    if (!total_instances)
+        expected_instances = dbconn->instances;
+
     total_instances++;
 }
 
@@ -551,7 +558,8 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
     initialize_mssql_keys(mi);
     netdata_read_config_options(&mi->conn);
 
-    mi->conn.is_connected = netdata_MSSQL_initialize_conection(&mi->conn);
+    if (mi->conn.connectionString)
+        mi->conn.is_connected = netdata_MSSQL_initialize_conection(&mi->conn);
 }
 
 static int mssql_fill_dictionary()
