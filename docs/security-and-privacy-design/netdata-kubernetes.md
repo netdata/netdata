@@ -40,9 +40,9 @@ Mounting specific host directories into the Netdata container provides essential
 | `/proc` | hostPath | child | `cgroups.plugin` | Detect available memory to calculate container memory limits. Detect paused containers in k8s to improve discovery performance. |
 | `/proc` | hostPath | child | `cgroup-network` | Discover container virtual network interfaces and associates them with running containers. |
 | `/proc` | hostPath | child | `network-viewer.plugin` | Monitor all TCP/UDP sockets of running processes. |
-| `/proc` | hostPath | child<br/>parent<br/>k8sState | `netdata` | Collect system information and detect various system characteristics like number of CPU cores, total and available memory protection, and more. |
+| `/proc` | hostPath | child<br/>k8sState | `netdata` | Collect system information and detect various system characteristics like number of CPU cores, total and available memory protection, and more. |
 | `/sys` | hostPath | child | `cgroups.plugin` | Monitor containers. |
-| `/sys` | hostPath | child<br/>parent<br/>k8sState | `netdata` | Detect `netdata` container limits. Detect host hardware (part of system info). |
+| `/sys` | hostPath | child<br/>k8sState | `netdata` | Detect `netdata` container limits. Detect host hardware (part of system info). |
 | `/sys` | hostPath | child | `proc.plugin` | Detect network interface types. Monitor software RAID block devices. Detect ZRAM, GPUs, Numa Nodes, Infiniband, BTRFS, PCI AEC, EDAC MC, KSM, BCACHE, CPU thermal throttling. |
 | `/sys` | hostPath | child | `debugfs.plugin` | Monitor hardware sensors, ZSWAP, Numa Memory Fragmentation, PowerCap. |
 | `/var/log` | hostPath | child | `systemd-journal.plugin` | Enable the Logs pipeline of Netdata to process and query system logs. |
