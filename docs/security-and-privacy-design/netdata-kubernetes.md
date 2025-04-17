@@ -19,7 +19,7 @@ Using this design, Netdata minimizes the potential attack surface. The main daem
 
 ### Netdata Network Exposure
 
-Netdata helm charts limit Netdata children connectivity to `localhost`. Netdata children are not allowed to accept any Network connections from outside the local node, and the only outbound network connection they need is towards the Netdata Parent to stream their data. The Netdata children also do not maintain a database on disk. All information they collect is streaming in real-time to their Netdata Parent.
+Netdata helm charts limit Netdata children connectivity to `localhost`. Netdata children are not allowed to accept any Network connections from outside the local node, and the only outbound network connection they need is towards the Netdata Parent to stream their data. The Netdata children also do not maintain a database on disk. All information they collect is streamed in real-time to their Netdata Parent.
 
 Netdata Parents on the other hand, do not require any mounts, host namespaces, or capabilities. They run in an unprivileged container, ingesting data in real-time from Netdata children and exposing this information via their APIs.
 
@@ -29,7 +29,7 @@ Netdata Children do not need to connect to Netdata Cloud. Netdata Parents only n
 
 Mounting specific host directories into the Netdata container provides essential data access for various collection plugins.
 
-| Mount | Type | Node | Component | Why |
+| Mount | Type | Role | Component | Why |
 |:---:|:---:|:---:|:---:|:---|
 | `/`| hostPath | child | `diskspace.plugin` | Detect host mount points (only in Docker deployments, not in Kubernetes deployments). |
 | `/etc/os-release` | hostPath | child | `netdata` | Collect host labels. |
@@ -56,7 +56,7 @@ Notes:
 
 Utilizing host namespaces allows Netdata to observe network activity and processes as they appear on the host, rather than being confined to the container's isolated view.
 
-| Namespace | Node | Component | Why |
+| Namespace | Role | Component | Why |
 |:---:|:---:|:---:|:---|
 | Host Network Namespace | child | `proc.plugin` | Monitor host's networking stack. |
 | Host Network Namespace | child | `cgroup-network` | Detect containers' network interfaces. |
@@ -68,7 +68,7 @@ Utilizing host namespaces allows Netdata to observe network activity and process
 
 Specific Linux capabilities grant elevated privileges necessary for certain monitoring functions, particularly those involving process inspection and namespace manipulation.
 
-| Capability | Node | Component | Why |
+| Capability | Role | Component | Why |
 |:---:|:---:|:---:|:---|
 | SYS_ADMIN | child | `cgroup-network` | Associate containers' network interfaces with the containers (it does so by switching Network Namespaces). Without it, `veth` network interfaces will not be associated to their respective containers, so they will be monitored as host network interfaces. |
 | SYS_ADMIN | child | `network-viewer.plugin` | Discover containers' network connections (it does so by switching Network Namespaces). Without it, network connections of other containers will not be monitored, limiting the scope of network connections to the host system. |
