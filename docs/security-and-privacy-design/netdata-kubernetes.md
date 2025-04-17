@@ -37,7 +37,8 @@ Mounting specific host directories into the Netdata container provides essential
 | `/etc/passwd`<br/>`/etc/group` | hostPath | child | `network-viewer.plugin` | Resolve numeric users and groups to names. |
 | `/proc` | hostPath | child | `proc.plugin` | Monitor host system resources (CPU, Memory, Network, uptime, etc). |
 | `/proc` | hostPath | child | `apps.plugin` | Monitor all running processes. |
-| `/proc` | hostPath | child | `cgroups.plugin` | Detect available memory to calculate container memory limits. Detect paused containers in k8s to improve discovery performance. Discover container virtual network interfaces and associates them with running containers. |
+| `/proc` | hostPath | child | `cgroups.plugin` | Detect available memory to calculate container memory limits. Detect paused containers in k8s to improve discovery performance. |
+| `/proc` | hostPath | child | `cgroup-network` | Discover container virtual network interfaces and associates them with running containers. |
 | `/proc` | hostPath | child | `network-viewer.plugin` | Monitor all TCP/UDP sockets of running processes. |
 | `/proc` | hostPath | child<br/>parent<br/>k8sState | `netdata` | Collect system information and detect various system characteristics like number of CPU cores, total and available memory protection, and more. |
 | `/sys` | hostPath | child | `cgroups.plugin` | Monitor containers. |
