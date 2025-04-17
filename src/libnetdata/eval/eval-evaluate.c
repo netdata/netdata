@@ -121,10 +121,19 @@ static NETDATA_DOUBLE eval_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error
     NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
-    if(isnan(n1) && isnan(n2)) return 1.0;
-    if(isinf(n1) && isinf(n2)) return 1.0;
+    // According to IEEE 754, NaN is never equal to anything, including itself
     if(isnan(n1) || isnan(n2)) return 0.0;
+    
+    // For infinities, we need to check the sign
+    if(isinf(n1) && isinf(n2)) {
+        // +Infinity equals +Infinity, -Infinity equals -Infinity
+        return (signbit(n1) == signbit(n2)) ? 1.0 : 0.0;
+    }
+    
+    // If only one value is infinite, they can't be equal
     if(isinf(n1) || isinf(n2)) return 0.0;
+    
+    // Regular comparison for finite values
     return considered_equal_ndd(n1, n2);
 }
 
@@ -163,14 +172,24 @@ static NETDATA_DOUBLE eval_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error)
     NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
+    // NaN propagation - any operation with NaN results in NaN
     if(isnan(n1) || isnan(n2)) {
         *error = EVAL_ERROR_VALUE_IS_NAN;
         return NAN;
     }
+    
+    // Special case: Infinity + (-Infinity) = NaN (indeterminate form)
+    if(isinf(n1) && isinf(n2) && signbit(n1) != signbit(n2)) {
+        *error = EVAL_ERROR_VALUE_IS_NAN;
+        return NAN;
+    }
+    
+    // Other infinity cases
     if(isinf(n1) || isinf(n2)) {
         *error = EVAL_ERROR_VALUE_IS_INFINITE;
         return INFINITY;
     }
+    
     return n1 + n2;
 }
 
@@ -182,14 +201,36 @@ static NETDATA_DOUBLE eval_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error
     NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
+    // NaN propagation
     if(isnan(n1) || isnan(n2)) {
         *error = EVAL_ERROR_VALUE_IS_NAN;
         return NAN;
     }
+    
+    // Special case: Infinity - Infinity = NaN (indeterminate form)
+    if(isinf(n1) && isinf(n2) && signbit(n1) == signbit(n2)) {
+        *error = EVAL_ERROR_VALUE_IS_NAN;
+        return NAN;
+    }
+    
+    // Other infinity cases
     if(isinf(n1) || isinf(n2)) {
         *error = EVAL_ERROR_VALUE_IS_INFINITE;
-        return INFINITY;
+        // Need to determine the sign of infinity correctly
+        if(isinf(n1) && isinf(n2)) {
+            // Different signs: result will match sign of first operand
+            return signbit(n1) ? -INFINITY : INFINITY;
+        }
+        else if(isinf(n1)) {
+            // n1 is infinity, n2 is finite: result has same sign as n1
+            return signbit(n1) ? -INFINITY : INFINITY;
+        }
+        else {
+            // n1 is finite, n2 is infinity: result has opposite sign of n2
+            return signbit(n2) ? INFINITY : -INFINITY;
+        }
     }
+    
     return n1 - n2;
 }
 
@@ -201,14 +242,27 @@ static NETDATA_DOUBLE eval_multiply(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *er
     NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
+    // NaN propagation
     if(isnan(n1) || isnan(n2)) {
         *error = EVAL_ERROR_VALUE_IS_NAN;
         return NAN;
     }
+    
+    // Special case: 0 * Infinity = NaN (indeterminate form)
+    if((n1 == 0 && isinf(n2)) || (isinf(n1) && n2 == 0)) {
+        *error = EVAL_ERROR_VALUE_IS_NAN;
+        return NAN;
+    }
+    
+    // Infinity * finite number (not zero) cases
     if(isinf(n1) || isinf(n2)) {
         *error = EVAL_ERROR_VALUE_IS_INFINITE;
-        return INFINITY;
+        
+        // Determine sign of the result (product of the signs)
+        bool neg_result = (signbit(n1) != signbit(n2));
+        return neg_result ? -INFINITY : INFINITY;
     }
+    
     return n1 * n2;
 }
 
@@ -220,21 +274,41 @@ static NETDATA_DOUBLE eval_divide(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *erro
     NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
     if(*error != EVAL_ERROR_OK) return NAN;  // Propagate previous errors
     
+    // NaN propagation
     if(isnan(n1) || isnan(n2)) {
         *error = EVAL_ERROR_VALUE_IS_NAN;
         return NAN;
     }
     
-    if(isinf(n1) || isinf(n2)) {
-        *error = EVAL_ERROR_VALUE_IS_INFINITE;
-        return INFINITY;
+    // Indeterminate form: 0/0 = NaN
+    if(n1 == 0 && n2 == 0) {
+        *error = EVAL_ERROR_VALUE_IS_NAN;
+        return NAN;
     }
     
+    // Indeterminate form: Infinity/Infinity = NaN
+    if(isinf(n1) && isinf(n2)) {
+        *error = EVAL_ERROR_VALUE_IS_NAN;
+        return NAN;
+    }
+    
+    // Division by zero (when numerator is not zero): +/-Infinity
     if(n2 == 0) {
-        // In Netdata, we treat all division by zero as INFINITE error
-        // This ensures compatibility with existing code
         *error = EVAL_ERROR_VALUE_IS_INFINITE;
-        return n1 >= 0 ? INFINITY : -INFINITY;
+        return signbit(n1) ? -INFINITY : INFINITY;
+    }
+    
+    // Other infinity cases with finite non-zero divisor
+    if(isinf(n1)) {
+        *error = EVAL_ERROR_VALUE_IS_INFINITE;
+        // Result sign depends on signs of both operands
+        bool neg_result = (signbit(n1) != signbit(n2));
+        return neg_result ? -INFINITY : INFINITY;
+    }
+    
+    // Finite divided by infinity = 0 (but with correct sign)
+    if(isinf(n2)) {
+        return 0.0; // IEEE 754 says this is a signed zero, but we'll return regular 0
     }
     
     return n1 / n2;
@@ -331,6 +405,7 @@ static NETDATA_DOUBLE eval_semicolon(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *e
     if (*error != EVAL_ERROR_OK) {
         return NAN;
     }
+    (void)left_result;  // Ignore the result of the left expression
     
     // Now evaluate the right expression with any new variable values set by the left expression
     NETDATA_DOUBLE right_result = eval_value(exp, &op->ops[1], error);

@@ -25,13 +25,17 @@ static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NE
         return true;
     }
     
-    // Special values
+    // Special IEEE 754 values
     else if (strcmp(var_name, "nan_var") == 0) {
         *result = NAN;
         return true;
     }
     else if (strcmp(var_name, "inf_var") == 0) {
         *result = INFINITY;
+        return true;
+    }
+    else if (strcmp(var_name, "neg_inf_var") == 0) {
+        *result = -INFINITY;
         return true;
     }
     
@@ -665,9 +669,9 @@ static TestCase special_value_tests[] = {
     {"$nan_var >= 5", 0.0, EVAL_ERROR_OK, true},
     {"$nan_var <= 5", 0.0, EVAL_ERROR_OK, true},
 
-    // NaN self-comparison (Netdata treats NaN == NaN as true, which is different from IEEE 754)
-    {"$nan_var == $nan_var", 1.0, EVAL_ERROR_OK, true},
-    {"$nan_var != $nan_var", 0.0, EVAL_ERROR_OK, true},
+    // NaN self-comparison (according to IEEE 754)
+    {"$nan_var == $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var != $nan_var", 1.0, EVAL_ERROR_OK, true},
     {"$nan_var > $nan_var", 0.0, EVAL_ERROR_OK, true},
     {"$nan_var < $nan_var", 0.0, EVAL_ERROR_OK, true},
     {"$nan_var >= $nan_var", 0.0, EVAL_ERROR_OK, true},
@@ -715,7 +719,7 @@ static TestCase special_value_tests[] = {
     // Zero division
     {"5 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Positive/zero gives infinity
     {"-5 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Negative/zero gives -infinity
-    {"0 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // In Netdata, this gives INFINITE error
+    {"0 / 0", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // According to IEEE 754, this is NaN
 
     // NaN and Infinity comparison
     {"$inf_var == $nan_var", 0.0, EVAL_ERROR_OK, true},
@@ -732,8 +736,8 @@ static TestCase special_value_tests[] = {
     {"!$nan_var || !$inf_var", 1.0, EVAL_ERROR_OK, true},
 
     // Special value operations with zero
-    {"$zero * $inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
-    {"$zero / $zero", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Netdata treats 0/0 as INFINITE
+    {"$zero * $inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // Infinity * 0 = NaN per IEEE 754
+    {"$zero / $zero", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // 0/0 = NaN per IEEE 754
     {"($zero) ? 1 : 2", 2.0, EVAL_ERROR_OK, true},
 
     // Short-circuit evaluation with special values (these work because no evaluation happens)
@@ -741,6 +745,73 @@ static TestCase special_value_tests[] = {
     {"1 || $nan_var", 1.0, EVAL_ERROR_OK, true}, // Short-circuit should avoid NaN
     {"0 && $inf_var", 0.0, EVAL_ERROR_OK, true}, // Short-circuit should avoid Infinity
     {"1 || $inf_var", 1.0, EVAL_ERROR_OK, true}  // Short-circuit should avoid Infinity
+};
+
+// Detailed IEEE 754 test cases focusing on negative infinity and more specific behaviors
+static TestCase ieee754_tests[] = {
+    // NaN direct comparison tests (according to IEEE 754)
+    {"NaN == NaN", 0.0, EVAL_ERROR_OK, true},          // Should be false according to IEEE 754
+    {"NaN != NaN", 1.0, EVAL_ERROR_OK, true},          // Should be true according to IEEE 754
+    {"NaN > NaN", 0.0, EVAL_ERROR_OK, true},           // Should be false
+    {"NaN < NaN", 0.0, EVAL_ERROR_OK, true},           // Should be false
+    {"NaN >= NaN", 0.0, EVAL_ERROR_OK, true},          // Should be false
+    {"NaN <= NaN", 0.0, EVAL_ERROR_OK, true},          // Should be false
+    
+    // NaN comparison with regular values
+    {"NaN == 0", 0.0, EVAL_ERROR_OK, true},            // Any comparison with NaN is false
+    {"0 == NaN", 0.0, EVAL_ERROR_OK, true},            // Any comparison with NaN is false
+    {"NaN > 0", 0.0, EVAL_ERROR_OK, true},             // Any comparison with NaN is false
+    {"0 > NaN", 0.0, EVAL_ERROR_OK, true},             // Any comparison with NaN is false
+    
+    // Negative infinity tests
+    {"$neg_inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Should be rejected with INFINITE error
+    {"$neg_inf_var < 0", 1.0, EVAL_ERROR_OK, true},     // -Infinity is less than any finite number
+    {"$neg_inf_var > 0", 0.0, EVAL_ERROR_OK, true},     // -Infinity is not greater than any finite number
+    {"$neg_inf_var == 0", 0.0, EVAL_ERROR_OK, true},    // -Infinity is not equal to any finite number
+
+    // Infinity vs Infinity
+    {"$inf_var == $inf_var", 1.0, EVAL_ERROR_OK, true},         // +Infinity equals +Infinity
+    {"$neg_inf_var == $neg_inf_var", 1.0, EVAL_ERROR_OK, true}, // -Infinity equals -Infinity
+    {"$inf_var == $neg_inf_var", 0.0, EVAL_ERROR_OK, true},     // +Infinity does not equal -Infinity
+    {"$inf_var != $neg_inf_var", 1.0, EVAL_ERROR_OK, true},     // +Infinity is not equal to -Infinity
+    {"$inf_var > $neg_inf_var", 1.0, EVAL_ERROR_OK, true},      // +Infinity is greater than -Infinity
+    {"$neg_inf_var < $inf_var", 1.0, EVAL_ERROR_OK, true},      // -Infinity is less than +Infinity
+    
+    // Special arithmetic with infinities
+    {"$inf_var + 1", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},   // +Infinity + anything = +Infinity
+    {"$inf_var - 1", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},   // +Infinity - anything = +Infinity
+    {"$neg_inf_var + 1", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // -Infinity + anything = -Infinity
+    {"$neg_inf_var - 1", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // -Infinity - anything = -Infinity
+    {"$inf_var * 2", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},   // +Infinity * positive = +Infinity
+    {"$inf_var * (-2)", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // +Infinity * negative = -Infinity
+    {"$neg_inf_var * 2", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // -Infinity * positive = -Infinity
+    {"$neg_inf_var * (-2)", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // -Infinity * negative = +Infinity
+    
+    // Indeterminate forms (should all return NaN according to IEEE 754)
+    {"$inf_var - $inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},     // +Infinity - +Infinity = NaN
+    {"$neg_inf_var - $neg_inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // -Infinity - (-Infinity) = NaN
+    {"$inf_var * 0", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},            // +Infinity * 0 = NaN
+    {"$neg_inf_var * 0", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},        // -Infinity * 0 = NaN
+    {"$inf_var / $inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},     // +Infinity / +Infinity = NaN
+    {"$neg_inf_var / $neg_inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // -Infinity / -Infinity = NaN
+    {"$inf_var / $neg_inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // +Infinity / -Infinity = NaN
+    
+    // Infinity with NaN operations
+    {"$inf_var + $nan_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},     // +Infinity + NaN = NaN
+    {"$neg_inf_var + $nan_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // -Infinity + NaN = NaN
+    {"$inf_var * $nan_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},     // +Infinity * NaN = NaN
+    {"$neg_inf_var * $nan_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // -Infinity * NaN = NaN
+    
+    // Logical operations with infinities
+    {"$neg_inf_var && 1", 1.0, EVAL_ERROR_OK, true},                 // -Infinity is truthy
+    {"$neg_inf_var || 0", 1.0, EVAL_ERROR_OK, true},                 // -Infinity is truthy
+    {"!$neg_inf_var", 0.0, EVAL_ERROR_OK, true},                     // -Infinity is truthy, so !(-Infinity) is false
+    
+    // Ternary operations with infinities
+    {"1 ? $inf_var : 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},   // Should yield +Infinity
+    {"0 ? 0 : $neg_inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Should yield -Infinity
+    {"$inf_var ? 1 : 0", 1.0, EVAL_ERROR_OK, true},                  // +Infinity is truthy
+    {"$neg_inf_var ? 1 : 0", 1.0, EVAL_ERROR_OK, true}               // -Infinity is truthy
 };
 
 // Complex expression tests
@@ -1174,6 +1245,7 @@ static TestGroup test_groups[] = {
     {"Variable Space Tests", variable_space_tests, ARRAY_SIZE(variable_space_tests)},
     {"Function Tests", function_tests, ARRAY_SIZE(function_tests)},
     {"Special Value Tests", special_value_tests, ARRAY_SIZE(special_value_tests)},
+    {"IEEE 754 Compliance Tests", ieee754_tests, ARRAY_SIZE(ieee754_tests)},
     {"Complex Expression Tests", complex_tests, ARRAY_SIZE(complex_tests)},
     {"Edge Case Tests", edge_case_tests, ARRAY_SIZE(edge_case_tests)},
     {"Operator Precedence Tests", precedence_tests, ARRAY_SIZE(precedence_tests)},
