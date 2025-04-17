@@ -243,24 +243,21 @@
             <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
             <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
 
-            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ViewLicenseDlg1" Condition="NOT Installed" />
+            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ViewLicenseDlg" Condition="NOT Installed" />
             <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
 
-            <Publish Dialog="ViewLicenseDlg1" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
-            <Publish Dialog="ViewLicenseDlg1" Control="Next" Event="NewDialog" Value="ViewLicenseDlg2" />
-
-            <Publish Dialog="ViewLicenseDlg2" Control="Back" Event="NewDialog" Value="ViewLicenseDlg1" />
-            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" />
+            <Publish Dialog="ViewLicenseDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+            <Publish Dialog="ViewLicenseDlg" Control="Next" Event="NewDialog" Value="NDConfigDialog" />
 
             <!-- We are hidden for while the directory to install netdata and forcing a default, because it is still necessary adjusts to test claim.conf in different directories -->
 
-            <!-- Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
+            <!-- Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ViewLicenseDlg" />
             <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="NDConfigDialog" Order="20" />
             <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="10" />
             <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="10" />
             <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="20" / -->
 
-            <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
+            <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg" />
             <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
 
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="NDConfigDialog" Order="1" Condition="NOT Installed OR WixUI_InstallMode = &quot;Change&quot;" />
@@ -285,12 +282,12 @@
 
     <Fragment>
         <UI>
-            <Dialog Id="ViewLicenseDlg1" Width="370" Height="270" Title="!(loc.LicenseAgreementDlg_Title)">
+            <Dialog Id="ViewLicenseDlg" Width="370" Height="270" Title="!(loc.LicenseAgreementDlg_Title)">
                 <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
                 <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
                 <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
                 <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
-                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="The Cloud UI License covers the Netdata User Interface." />
+                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Netdata on Windows End User License Agreement" />
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="I &amp;Accept">
                     <Publish Event="SpawnWaitDialog" Value="WaitForCostingDlg" Condition="!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1" />
@@ -299,30 +296,7 @@
                     <Publish Event="SpawnDialog" Value="CancelDlg" />
                 </Control>
                 <Control Id="LicenseText" Type="ScrollableText" X="20" Y="60" Width="330" Height="158" Sunken="yes" TabSkip="no">
-                    <Text SourceFile="ncul1.rtf" />
-                </Control>
-            </Dialog>
-        </UI>
-    </Fragment>
-
-    <Fragment>
-        <UI>
-            <Dialog Id="ViewLicenseDlg2" Width="370" Height="270" Title="!(loc.LicenseAgreementDlg_Title)">
-                <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
-                <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
-                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
-                <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
-                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="The GPL-3.0 License covers the Agent source code." />
-
-                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
-                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="I &amp;Accept">
-                    <Publish Event="SpawnWaitDialog" Value="WaitForCostingDlg" Condition="!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1" />
-                </Control>
-                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
-                    <Publish Event="SpawnDialog" Value="CancelDlg" />
-                </Control>
-                <Control Id="LicenseText" Type="ScrollableText" X="20" Y="60" Width="330" Height="158" Sunken="yes" TabSkip="no">
-                    <Text SourceFile="gpl-3.0.rtf" />
+                    <Text SourceFile="eula.rtf" />
                 </Control>
             </Dialog>
         </UI>
