@@ -45,20 +45,21 @@
 #define TOK_MINUS                           9
 #define TOK_UMINUS                         10
 #define TOK_NOT                            11
-#define TOK_FUNCTION_ABS                   12
-#define TOK_MULTIPLY                       13
-#define TOK_DIVIDE                         14
-#define TOK_MODULO                         15
-#define TOK_AND                            16
-#define TOK_OR                             17
-#define TOK_EQ                             18
-#define TOK_NE                             19
-#define TOK_LT                             20
-#define TOK_LE                             21
-#define TOK_GT                             22
-#define TOK_GE                             23
-#define TOK_QMARK                          24
-#define TOK_COLON                          25
+#define TOK_FUNCTION                       12
+#define TOK_COMMA                          13
+#define TOK_MULTIPLY                       14
+#define TOK_DIVIDE                         15
+#define TOK_MODULO                         16
+#define TOK_AND                            17
+#define TOK_OR                             18
+#define TOK_EQ                             19
+#define TOK_NE                             20
+#define TOK_LT                             21
+#define TOK_LE                             22
+#define TOK_GT                             23
+#define TOK_GE                             24
+#define TOK_QMARK                          25
+#define TOK_COLON                          26
 #endif
 /**************** End token definitions ***************************************/
 
@@ -123,13 +124,13 @@
 #endif
 /************* Begin control #defines *****************************************/
 #define YYCODETYPE unsigned char
-#define YYNOCODE 29
+#define YYNOCODE 30
 #define YYACTIONTYPE unsigned char
 #define ParseTOKENTYPE YYSTYPE
 typedef union {
   int yyinit;
   ParseTOKENTYPE yy0;
-  EVAL_NODE * yy54;
+  EVAL_NODE * yy12;
 } YYMINORTYPE;
 #ifndef YYSTACKDEPTH
 #define YYSTACKDEPTH 100
@@ -147,20 +148,20 @@ typedef union {
 #define ParseCTX_PARAM
 #define ParseCTX_FETCH
 #define ParseCTX_STORE
-#define YYNSTATE             43
-#define YYNRULE              27
-#define YYNRULE_WITH_ACTION  27
-#define YYNTOKEN             26
-#define YY_MAX_SHIFT         42
-#define YY_MIN_SHIFTREDUCE   54
-#define YY_MAX_SHIFTREDUCE   80
-#define YY_ERROR_ACTION      81
-#define YY_ACCEPT_ACTION     82
-#define YY_NO_ACTION         83
-#define YY_MIN_REDUCE        84
-#define YY_MAX_REDUCE        110
-#define YY_MIN_DSTRCTR       26
-#define YY_MAX_DSTRCTR       27
+#define YYNSTATE             52
+#define YYNRULE              33
+#define YYNRULE_WITH_ACTION  33
+#define YYNTOKEN             27
+#define YY_MAX_SHIFT         51
+#define YY_MIN_SHIFTREDUCE   69
+#define YY_MAX_SHIFTREDUCE   101
+#define YY_ERROR_ACTION      102
+#define YY_ACCEPT_ACTION     103
+#define YY_NO_ACTION         104
+#define YY_MIN_REDUCE        105
+#define YY_MAX_REDUCE        137
+#define YY_MIN_DSTRCTR       27
+#define YY_MAX_DSTRCTR       28
 /************* End control #defines *******************************************/
 #define YY_NLOOKAHEAD ((int)(sizeof(yy_lookahead)/sizeof(yy_lookahead[0])))
 
@@ -243,72 +244,95 @@ typedef union {
 **  yy_default[]       Default action for each state.
 **
 *********** Begin parsing tables **********************************************/
-#define YY_ACTTAB_COUNT (166)
+#define YY_ACTTAB_COUNT (271)
 static const YYACTIONTYPE yy_action[] = {
- /*     0 */    27,   42,   82,   27,   87,   27,   88,   22,   28,   20,
- /*    10 */    24,   34,   35,   18,   16,   14,   12,   11,   10,    9,
- /*    20 */     8,    7,    6,    5,    4,    3,   66,   22,   36,   20,
- /*    30 */    18,   16,   14,   18,   16,   14,   12,   11,   10,    9,
- /*    40 */     8,    7,    6,    5,    4,   62,   22,   37,   20,   32,
- /*    50 */    33,   30,   18,   16,   14,   12,   11,   10,    9,    8,
- /*    60 */     7,    6,    5,    4,    2,   23,   31,   22,   25,   20,
- /*    70 */    22,  101,   20,   18,   16,   14,   18,   16,   14,   12,
- /*    80 */    11,   10,    9,    8,    7,    6,    5,    4,   22,   83,
- /*    90 */    20,   95,   13,  100,   18,   16,   14,   12,   11,   10,
- /*   100 */     9,    8,    7,    6,    5,    4,   22,   84,   20,   94,
- /*   110 */    99,   93,   18,   16,   14,   39,   83,   10,    9,    8,
- /*   120 */     7,    6,    5,   26,   38,   22,   29,   20,   83,   83,
- /*   130 */    83,   18,   16,   14,   83,   83,   83,   83,    8,    7,
- /*   140 */     6,    5,    1,   41,   83,   60,   21,   83,   19,   83,
- /*   150 */    17,   83,   15,   40,   83,   41,   83,   60,   21,   83,
- /*   160 */    19,   83,   17,   83,   15,   40,
+ /*     0 */    37,   51,  103,   37,  108,   33,   86,   27,   38,   25,
+ /*    10 */    37,  109,   34,   14,   23,   21,   19,   13,   12,   11,
+ /*    20 */    10,    9,    8,    7,    6,    5,   85,   27,   44,   25,
+ /*    30 */    23,   21,   19,   15,   23,   21,   19,   13,   12,   11,
+ /*    40 */    10,    9,    8,    7,    6,    5,   84,   27,   45,   25,
+ /*    50 */    46,   47,   42,   16,   23,   21,   19,   13,   12,   11,
+ /*    60 */    10,    9,    8,    7,    6,    5,   83,   27,   43,   25,
+ /*    70 */    40,   41,   35,   17,   23,   21,   19,   13,   12,   11,
+ /*    80 */    10,    9,    8,    7,    6,    5,   82,   27,   29,   25,
+ /*    90 */    30,   31,   32,   18,   23,   21,   19,   13,   12,   11,
+ /*   100 */    10,    9,    8,    7,    6,    5,   27,  105,   25,  128,
+ /*   110 */   116,  127,  115,   23,   21,   19,   13,   12,   11,   10,
+ /*   120 */     9,    8,    7,    6,    5,    4,   87,   27,  126,   25,
+ /*   130 */   114,   49,   36,   48,   23,   21,   19,   13,   12,   11,
+ /*   140 */    10,    9,    8,    7,    6,    5,   77,   27,   39,   25,
+ /*   150 */    28,  104,  104,  104,   23,   21,   19,   13,   12,   11,
+ /*   160 */    10,    9,    8,    7,    6,    5,    2,    1,   50,  104,
+ /*   170 */    75,   26,   27,   24,   25,   22,  104,   20,    3,   23,
+ /*   180 */    21,   19,   13,   12,   11,   10,    9,    8,    7,    6,
+ /*   190 */     5,   27,  104,   25,  104,  104,  104,  104,   23,   21,
+ /*   200 */    19,   13,   12,   11,   10,    9,    8,    7,    6,    5,
+ /*   210 */    27,  104,   25,  104,  104,  104,  104,   23,   21,   19,
+ /*   220 */   104,  104,   11,   10,    9,    8,    7,    6,  104,  104,
+ /*   230 */    27,  104,   25,   27,  104,   25,  104,   23,   21,   19,
+ /*   240 */    23,   21,   19,  104,    9,    8,    7,    6,   50,  104,
+ /*   250 */    75,   26,   81,   24,  104,   22,  104,   20,    3,  104,
+ /*   260 */    50,  104,   75,   26,  104,   24,  104,   22,  104,   20,
+ /*   270 */     3,
 };
 static const YYCODETYPE yy_lookahead[] = {
- /*     0 */    26,   27,   28,   26,   27,   26,   27,    7,   26,    9,
- /*    10 */    26,   26,   26,   13,   14,   15,   16,   17,   18,   19,
- /*    20 */    20,   21,   22,   23,   24,   25,    6,    7,   26,    9,
- /*    30 */    13,   14,   15,   13,   14,   15,   16,   17,   18,   19,
- /*    40 */    20,   21,   22,   23,   24,    6,    7,   26,    9,   26,
- /*    50 */    26,   26,   13,   14,   15,   16,   17,   18,   19,   20,
- /*    60 */    21,   22,   23,   24,    1,    3,   26,    7,   26,    9,
- /*    70 */     7,   26,    9,   13,   14,   15,   13,   14,   15,   16,
- /*    80 */    17,   18,   19,   20,   21,   22,   23,   24,    7,   29,
- /*    90 */     9,   26,    5,   26,   13,   14,   15,   16,   17,   18,
- /*   100 */    19,   20,   21,   22,   23,   24,    7,    0,    9,   26,
- /*   110 */    26,   26,   13,   14,   15,   26,   29,   18,   19,   20,
- /*   120 */    21,   22,   23,   26,   26,    7,   26,    9,   29,   29,
- /*   130 */    29,   13,   14,   15,   29,   29,   29,   29,   20,   21,
- /*   140 */    22,   23,    1,    2,   29,    4,    5,   29,    7,   29,
- /*   150 */     9,   29,   11,   12,   29,    2,   29,    4,    5,   29,
- /*   160 */     7,   29,    9,   29,   11,   12,   29,   29,   29,   29,
- /*   170 */    29,   29,   29,   29,   29,   29,   29,   29,   29,   29,
- /*   180 */    29,   29,   26,   26,   26,   26,   26,   26,   26,   26,
- /*   190 */    26,   26,
+ /*     0 */    27,   28,   29,   27,   28,   27,    6,    7,   27,    9,
+ /*    10 */    27,   28,   27,   13,   14,   15,   16,   17,   18,   19,
+ /*    20 */    20,   21,   22,   23,   24,   25,    6,    7,   27,    9,
+ /*    30 */    14,   15,   16,   13,   14,   15,   16,   17,   18,   19,
+ /*    40 */    20,   21,   22,   23,   24,   25,    6,    7,   27,    9,
+ /*    50 */    27,   27,   27,   13,   14,   15,   16,   17,   18,   19,
+ /*    60 */    20,   21,   22,   23,   24,   25,    6,    7,   27,    9,
+ /*    70 */    27,   27,   27,   13,   14,   15,   16,   17,   18,   19,
+ /*    80 */    20,   21,   22,   23,   24,   25,    6,    7,   27,    9,
+ /*    90 */    27,   27,   27,   13,   14,   15,   16,   17,   18,   19,
+ /*   100 */    20,   21,   22,   23,   24,   25,    7,    0,    9,   27,
+ /*   110 */    27,   27,   27,   14,   15,   16,   17,   18,   19,   20,
+ /*   120 */    21,   22,   23,   24,   25,   26,    6,    7,   27,    9,
+ /*   130 */    27,   27,   27,   27,   14,   15,   16,   17,   18,   19,
+ /*   140 */    20,   21,   22,   23,   24,   25,    6,    7,   27,    9,
+ /*   150 */     3,   30,   30,   30,   14,   15,   16,   17,   18,   19,
+ /*   160 */    20,   21,   22,   23,   24,   25,    1,    1,    2,   30,
+ /*   170 */     4,    5,    7,    7,    9,    9,   30,   11,   12,   14,
+ /*   180 */    15,   16,   17,   18,   19,   20,   21,   22,   23,   24,
+ /*   190 */    25,    7,   30,    9,   30,   30,   30,   30,   14,   15,
+ /*   200 */    16,   17,   18,   19,   20,   21,   22,   23,   24,   25,
+ /*   210 */     7,   30,    9,   30,   30,   30,   30,   14,   15,   16,
+ /*   220 */    30,   30,   19,   20,   21,   22,   23,   24,   30,   30,
+ /*   230 */     7,   30,    9,    7,   30,    9,   30,   14,   15,   16,
+ /*   240 */    14,   15,   16,   30,   21,   22,   23,   24,    2,   30,
+ /*   250 */     4,    5,    6,    7,   30,    9,   30,   11,   12,   30,
+ /*   260 */     2,   30,    4,    5,   30,    7,   30,    9,   30,   11,
+ /*   270 */    12,   30,   30,   30,   30,   30,   30,   30,   30,   30,
+ /*   280 */    30,   30,   30,   30,   30,   30,   30,   30,   27,   27,
+ /*   290 */    27,   27,   27,   27,   27,   27,   27,   27,
 };
-#define YY_SHIFT_COUNT    (42)
+#define YY_SHIFT_COUNT    (51)
 #define YY_SHIFT_MIN      (0)
-#define YY_SHIFT_MAX      (153)
-static const unsigned char yy_shift_ofst[] = {
- /*     0 */   141,  141,  141,  153,  153,  153,  153,  153,  153,  153,
- /*    10 */   153,  153,  153,  153,  153,  153,  153,  153,  153,  153,
- /*    20 */   153,  153,  153,  153,    0,   20,   39,   63,   81,   81,
- /*    30 */    99,   99,  118,  118,   60,   60,   60,   60,   17,   17,
- /*    40 */    87,   62,  107,
+#define YY_SHIFT_MAX      (258)
+static const unsigned short int yy_shift_ofst[] = {
+ /*     0 */   166,  166,  166,  246,  258,  258,  258,  258,  258,  258,
+ /*    10 */   258,  258,  258,  258,  258,  258,  258,  258,  258,  258,
+ /*    20 */   258,  258,  258,  258,  258,  258,  258,  258,  258,    0,
+ /*    30 */    20,   40,   60,   80,   99,  120,  140,  165,  184,  184,
+ /*    40 */   203,  203,  223,  223,  226,  226,  226,  226,   16,   16,
+ /*    50 */   147,  107,
 };
-#define YY_REDUCE_COUNT (23)
-#define YY_REDUCE_MIN   (-26)
-#define YY_REDUCE_MAX   (100)
+#define YY_REDUCE_COUNT (28)
+#define YY_REDUCE_MIN   (-27)
+#define YY_REDUCE_MAX   (121)
 static const signed char yy_reduce_ofst[] = {
- /*     0 */   -26,  -23,  -21,  -18,  -16,  -15,  -14,    2,   21,   23,
- /*    10 */    24,   25,   40,   42,   45,   65,   67,   83,   84,   85,
- /*    20 */    89,   97,   98,  100,
+ /*     0 */   -27,  -24,  -17,  -22,  -19,  -15,    1,   21,   23,   24,
+ /*    10 */    25,   41,   43,   44,   45,   61,   63,   64,   65,   82,
+ /*    20 */    83,   84,   85,  101,  103,  104,  105,  106,  121,
 };
 static const YYACTIONTYPE yy_default[] = {
- /*     0 */    81,   81,   86,   81,   81,   81,   81,   81,   81,   81,
- /*    10 */    81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
- /*    20 */    81,   81,   81,   81,   81,   81,   81,   85,  110,   89,
- /*    30 */   103,  102,  105,  104,  109,  108,  107,  106,   97,   98,
- /*    40 */    81,   91,   81,
+ /*     0 */   102,  102,  107,  102,  102,  102,  102,  102,  102,  102,
+ /*    10 */   102,  102,  102,  102,  102,  102,  102,  102,  102,  102,
+ /*    20 */   102,  102,  102,  102,  102,  102,  102,  102,  102,  102,
+ /*    30 */   102,  102,  102,  102,  102,  102,  102,  106,  137,  110,
+ /*    40 */   130,  129,  132,  131,  136,  135,  134,  133,  124,  125,
+ /*    50 */   112,  102,
 };
 /********** End of lemon-generated parsing tables *****************************/
 
@@ -423,23 +447,24 @@ static const char *const yyTokenName[] = {
   /*    9 */ "MINUS",
   /*   10 */ "UMINUS",
   /*   11 */ "NOT",
-  /*   12 */ "FUNCTION_ABS",
-  /*   13 */ "MULTIPLY",
-  /*   14 */ "DIVIDE",
-  /*   15 */ "MODULO",
-  /*   16 */ "AND",
-  /*   17 */ "OR",
-  /*   18 */ "EQ",
-  /*   19 */ "NE",
-  /*   20 */ "LT",
-  /*   21 */ "LE",
-  /*   22 */ "GT",
-  /*   23 */ "GE",
-  /*   24 */ "QMARK",
-  /*   25 */ "COLON",
-  /*   26 */ "expr",
-  /*   27 */ "expr_list",
-  /*   28 */ "program",
+  /*   12 */ "FUNCTION",
+  /*   13 */ "COMMA",
+  /*   14 */ "MULTIPLY",
+  /*   15 */ "DIVIDE",
+  /*   16 */ "MODULO",
+  /*   17 */ "AND",
+  /*   18 */ "OR",
+  /*   19 */ "EQ",
+  /*   20 */ "NE",
+  /*   21 */ "LT",
+  /*   22 */ "LE",
+  /*   23 */ "GT",
+  /*   24 */ "GE",
+  /*   25 */ "QMARK",
+  /*   26 */ "COLON",
+  /*   27 */ "expr",
+  /*   28 */ "expr_list",
+  /*   29 */ "program",
 };
 #endif /* defined(YYCOVERAGE) || !defined(NDEBUG) */
 
@@ -459,21 +484,27 @@ static const char *const yyRuleName[] = {
  /*   9 */ "expr ::= PLUS expr",
  /*  10 */ "expr ::= MINUS expr",
  /*  11 */ "expr ::= NOT expr",
- /*  12 */ "expr ::= FUNCTION_ABS LPAREN expr RPAREN",
- /*  13 */ "expr ::= expr PLUS expr",
- /*  14 */ "expr ::= expr MINUS expr",
- /*  15 */ "expr ::= expr MULTIPLY expr",
- /*  16 */ "expr ::= expr DIVIDE expr",
- /*  17 */ "expr ::= expr MODULO expr",
- /*  18 */ "expr ::= expr AND expr",
- /*  19 */ "expr ::= expr OR expr",
- /*  20 */ "expr ::= expr EQ expr",
- /*  21 */ "expr ::= expr NE expr",
- /*  22 */ "expr ::= expr LT expr",
- /*  23 */ "expr ::= expr LE expr",
- /*  24 */ "expr ::= expr GT expr",
- /*  25 */ "expr ::= expr GE expr",
- /*  26 */ "expr ::= expr QMARK expr COLON expr",
+ /*  12 */ "expr ::= FUNCTION RPAREN",
+ /*  13 */ "expr ::= FUNCTION expr RPAREN",
+ /*  14 */ "expr ::= FUNCTION expr COMMA expr RPAREN",
+ /*  15 */ "expr ::= FUNCTION expr COMMA expr COMMA expr RPAREN",
+ /*  16 */ "expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN",
+ /*  17 */ "expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN",
+ /*  18 */ "expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN",
+ /*  19 */ "expr ::= expr PLUS expr",
+ /*  20 */ "expr ::= expr MINUS expr",
+ /*  21 */ "expr ::= expr MULTIPLY expr",
+ /*  22 */ "expr ::= expr DIVIDE expr",
+ /*  23 */ "expr ::= expr MODULO expr",
+ /*  24 */ "expr ::= expr AND expr",
+ /*  25 */ "expr ::= expr OR expr",
+ /*  26 */ "expr ::= expr EQ expr",
+ /*  27 */ "expr ::= expr NE expr",
+ /*  28 */ "expr ::= expr LT expr",
+ /*  29 */ "expr ::= expr LE expr",
+ /*  30 */ "expr ::= expr GT expr",
+ /*  31 */ "expr ::= expr GE expr",
+ /*  32 */ "expr ::= expr QMARK expr COLON expr",
 };
 #endif /* NDEBUG */
 
@@ -597,16 +628,16 @@ static void yy_destructor(
     ** inside the C code.
     */
 /********* Begin destructor definitions ***************************************/
-    case 26: /* expr */
-    case 27: /* expr_list */
+    case 27: /* expr */
+    case 28: /* expr_list */
 {
 #line 35 "parser.y"
 
-    if ((yypminor->yy54)) {
-        eval_node_free((yypminor->yy54));
+    if ((yypminor->yy12)) {
+        eval_node_free((yypminor->yy12));
     }
 
-#line 609 "parser.c"
+#line 640 "parser.c"
 }
       break;
 /********* End destructor definitions *****************************************/
@@ -906,33 +937,39 @@ static void yy_shift(
 /* For rule J, yyRuleInfoLhs[J] contains the symbol on the left-hand side
 ** of that rule */
 static const YYCODETYPE yyRuleInfoLhs[] = {
-    28,  /* (0) program ::= expr_list */
-    27,  /* (1) expr_list ::= expr */
-    27,  /* (2) expr_list ::= expr SEMICOLON */
-    27,  /* (3) expr_list ::= SEMICOLON expr_list */
-    27,  /* (4) expr_list ::= expr SEMICOLON expr_list */
-    26,  /* (5) expr ::= VARIABLE ASSIGN expr */
-    26,  /* (6) expr ::= NUMBER */
-    26,  /* (7) expr ::= VARIABLE */
-    26,  /* (8) expr ::= LPAREN expr RPAREN */
-    26,  /* (9) expr ::= PLUS expr */
-    26,  /* (10) expr ::= MINUS expr */
-    26,  /* (11) expr ::= NOT expr */
-    26,  /* (12) expr ::= FUNCTION_ABS LPAREN expr RPAREN */
-    26,  /* (13) expr ::= expr PLUS expr */
-    26,  /* (14) expr ::= expr MINUS expr */
-    26,  /* (15) expr ::= expr MULTIPLY expr */
-    26,  /* (16) expr ::= expr DIVIDE expr */
-    26,  /* (17) expr ::= expr MODULO expr */
-    26,  /* (18) expr ::= expr AND expr */
-    26,  /* (19) expr ::= expr OR expr */
-    26,  /* (20) expr ::= expr EQ expr */
-    26,  /* (21) expr ::= expr NE expr */
-    26,  /* (22) expr ::= expr LT expr */
-    26,  /* (23) expr ::= expr LE expr */
-    26,  /* (24) expr ::= expr GT expr */
-    26,  /* (25) expr ::= expr GE expr */
-    26,  /* (26) expr ::= expr QMARK expr COLON expr */
+    29,  /* (0) program ::= expr_list */
+    28,  /* (1) expr_list ::= expr */
+    28,  /* (2) expr_list ::= expr SEMICOLON */
+    28,  /* (3) expr_list ::= SEMICOLON expr_list */
+    28,  /* (4) expr_list ::= expr SEMICOLON expr_list */
+    27,  /* (5) expr ::= VARIABLE ASSIGN expr */
+    27,  /* (6) expr ::= NUMBER */
+    27,  /* (7) expr ::= VARIABLE */
+    27,  /* (8) expr ::= LPAREN expr RPAREN */
+    27,  /* (9) expr ::= PLUS expr */
+    27,  /* (10) expr ::= MINUS expr */
+    27,  /* (11) expr ::= NOT expr */
+    27,  /* (12) expr ::= FUNCTION RPAREN */
+    27,  /* (13) expr ::= FUNCTION expr RPAREN */
+    27,  /* (14) expr ::= FUNCTION expr COMMA expr RPAREN */
+    27,  /* (15) expr ::= FUNCTION expr COMMA expr COMMA expr RPAREN */
+    27,  /* (16) expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN */
+    27,  /* (17) expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN */
+    27,  /* (18) expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN */
+    27,  /* (19) expr ::= expr PLUS expr */
+    27,  /* (20) expr ::= expr MINUS expr */
+    27,  /* (21) expr ::= expr MULTIPLY expr */
+    27,  /* (22) expr ::= expr DIVIDE expr */
+    27,  /* (23) expr ::= expr MODULO expr */
+    27,  /* (24) expr ::= expr AND expr */
+    27,  /* (25) expr ::= expr OR expr */
+    27,  /* (26) expr ::= expr EQ expr */
+    27,  /* (27) expr ::= expr NE expr */
+    27,  /* (28) expr ::= expr LT expr */
+    27,  /* (29) expr ::= expr LE expr */
+    27,  /* (30) expr ::= expr GT expr */
+    27,  /* (31) expr ::= expr GE expr */
+    27,  /* (32) expr ::= expr QMARK expr COLON expr */
 };
 
 /* For rule J, yyRuleInfoNRhs[J] contains the negative of the number
@@ -950,21 +987,27 @@ static const signed char yyRuleInfoNRhs[] = {
    -2,  /* (9) expr ::= PLUS expr */
    -2,  /* (10) expr ::= MINUS expr */
    -2,  /* (11) expr ::= NOT expr */
-   -4,  /* (12) expr ::= FUNCTION_ABS LPAREN expr RPAREN */
-   -3,  /* (13) expr ::= expr PLUS expr */
-   -3,  /* (14) expr ::= expr MINUS expr */
-   -3,  /* (15) expr ::= expr MULTIPLY expr */
-   -3,  /* (16) expr ::= expr DIVIDE expr */
-   -3,  /* (17) expr ::= expr MODULO expr */
-   -3,  /* (18) expr ::= expr AND expr */
-   -3,  /* (19) expr ::= expr OR expr */
-   -3,  /* (20) expr ::= expr EQ expr */
-   -3,  /* (21) expr ::= expr NE expr */
-   -3,  /* (22) expr ::= expr LT expr */
-   -3,  /* (23) expr ::= expr LE expr */
-   -3,  /* (24) expr ::= expr GT expr */
-   -3,  /* (25) expr ::= expr GE expr */
-   -5,  /* (26) expr ::= expr QMARK expr COLON expr */
+   -2,  /* (12) expr ::= FUNCTION RPAREN */
+   -3,  /* (13) expr ::= FUNCTION expr RPAREN */
+   -5,  /* (14) expr ::= FUNCTION expr COMMA expr RPAREN */
+   -7,  /* (15) expr ::= FUNCTION expr COMMA expr COMMA expr RPAREN */
+   -9,  /* (16) expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN */
+  -11,  /* (17) expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN */
+  -13,  /* (18) expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN */
+   -3,  /* (19) expr ::= expr PLUS expr */
+   -3,  /* (20) expr ::= expr MINUS expr */
+   -3,  /* (21) expr ::= expr MULTIPLY expr */
+   -3,  /* (22) expr ::= expr DIVIDE expr */
+   -3,  /* (23) expr ::= expr MODULO expr */
+   -3,  /* (24) expr ::= expr AND expr */
+   -3,  /* (25) expr ::= expr OR expr */
+   -3,  /* (26) expr ::= expr EQ expr */
+   -3,  /* (27) expr ::= expr NE expr */
+   -3,  /* (28) expr ::= expr LT expr */
+   -3,  /* (29) expr ::= expr LE expr */
+   -3,  /* (30) expr ::= expr GT expr */
+   -3,  /* (31) expr ::= expr GE expr */
+   -5,  /* (32) expr ::= expr QMARK expr COLON expr */
 };
 
 static void yy_accept(yyParser*);  /* Forward Declaration */
@@ -1009,307 +1052,388 @@ static YYACTIONTYPE yy_reduce(
       case 0: /* program ::= expr_list */
 #line 48 "parser.y"
 {
-    *result = yymsp[0].minor.yy54;
+    *result = yymsp[0].minor.yy12;
 }
-#line 1014 "parser.c"
+#line 1057 "parser.c"
         break;
       case 1: /* expr_list ::= expr */
 #line 53 "parser.y"
 {
-    yylhsminor.yy54 = yymsp[0].minor.yy54;
+    yylhsminor.yy12 = yymsp[0].minor.yy12;
 }
-#line 1021 "parser.c"
-  yymsp[0].minor.yy54 = yylhsminor.yy54;
+#line 1064 "parser.c"
+  yymsp[0].minor.yy12 = yylhsminor.yy12;
         break;
       case 2: /* expr_list ::= expr SEMICOLON */
 #line 57 "parser.y"
 {
     // Handle a trailing semicolon
-    yylhsminor.yy54 = yymsp[-1].minor.yy54;
+    yylhsminor.yy12 = yymsp[-1].minor.yy12;
 }
-#line 1030 "parser.c"
-  yymsp[-1].minor.yy54 = yylhsminor.yy54;
+#line 1073 "parser.c"
+  yymsp[-1].minor.yy12 = yylhsminor.yy12;
         break;
       case 3: /* expr_list ::= SEMICOLON expr_list */
 #line 63 "parser.y"
 {
-    yymsp[-1].minor.yy54 = yymsp[0].minor.yy54;
+    yymsp[-1].minor.yy12 = yymsp[0].minor.yy12;
 }
-#line 1038 "parser.c"
+#line 1081 "parser.c"
         break;
       case 4: /* expr_list ::= expr SEMICOLON expr_list */
 #line 67 "parser.y"
 {
     // Create a special node for sequence of expressions
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_SEMICOLON;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_SEMICOLON);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_SEMICOLON;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_SEMICOLON);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
 }
-#line 1050 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+#line 1093 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
         break;
       case 5: /* expr ::= VARIABLE ASSIGN expr */
 #line 77 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_ASSIGNMENT;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_ASSIGNMENT);
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_ASSIGNMENT;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_ASSIGNMENT);
 
     // First operand is the variable name
     EVAL_NODE *var_node = eval_node_alloc(1);
     var_node->operator = EVAL_OPERATOR_NOP;
     eval_node_set_value_to_variable(var_node, 0, yymsp[-2].minor.yy0.strval);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, var_node);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, var_node);
 
     // Second operand is the expression to assign
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
 
     freez(yymsp[-2].minor.yy0.strval); // Free the strdup'd string
 }
-#line 1071 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+#line 1114 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
         break;
       case 6: /* expr ::= NUMBER */
 #line 95 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(1);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_NOP;
-    eval_node_set_value_to_constant(yylhsminor.yy54, 0, yymsp[0].minor.yy0.dval);
+    yylhsminor.yy12 = eval_node_alloc(1);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_NOP;
+    eval_node_set_value_to_constant(yylhsminor.yy12, 0, yymsp[0].minor.yy0.dval);
 }
-#line 1081 "parser.c"
-  yymsp[0].minor.yy54 = yylhsminor.yy54;
+#line 1124 "parser.c"
+  yymsp[0].minor.yy12 = yylhsminor.yy12;
         break;
       case 7: /* expr ::= VARIABLE */
 #line 101 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(1);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_NOP;
-    eval_node_set_value_to_variable(yylhsminor.yy54, 0, yymsp[0].minor.yy0.strval);
+    yylhsminor.yy12 = eval_node_alloc(1);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_NOP;
+    eval_node_set_value_to_variable(yylhsminor.yy12, 0, yymsp[0].minor.yy0.strval);
     freez(yymsp[0].minor.yy0.strval); // Free the strdup'd string
 }
-#line 1092 "parser.c"
-  yymsp[0].minor.yy54 = yylhsminor.yy54;
+#line 1135 "parser.c"
+  yymsp[0].minor.yy12 = yylhsminor.yy12;
         break;
       case 8: /* expr ::= LPAREN expr RPAREN */
 #line 109 "parser.y"
 {
-    yymsp[-2].minor.yy54 = eval_node_alloc(1);
-    yymsp[-2].minor.yy54->operator = EVAL_OPERATOR_EXPRESSION_OPEN;
-    yymsp[-2].minor.yy54->precedence = eval_precedence(EVAL_OPERATOR_EXPRESSION_OPEN);
-    eval_node_set_value_to_node(yymsp[-2].minor.yy54, 0, yymsp[-1].minor.yy54);
+    yymsp[-2].minor.yy12 = eval_node_alloc(1);
+    yymsp[-2].minor.yy12->operator = EVAL_OPERATOR_EXPRESSION_OPEN;
+    yymsp[-2].minor.yy12->precedence = eval_precedence(EVAL_OPERATOR_EXPRESSION_OPEN);
+    eval_node_set_value_to_node(yymsp[-2].minor.yy12, 0, yymsp[-1].minor.yy12);
 }
-#line 1103 "parser.c"
+#line 1146 "parser.c"
         break;
       case 9: /* expr ::= PLUS expr */
 #line 117 "parser.y"
 {
-    yymsp[-1].minor.yy54 = eval_node_alloc(1);
-    yymsp[-1].minor.yy54->operator = EVAL_OPERATOR_SIGN_PLUS;
-    yymsp[-1].minor.yy54->precedence = eval_precedence(EVAL_OPERATOR_SIGN_PLUS);
-    eval_node_set_value_to_node(yymsp[-1].minor.yy54, 0, yymsp[0].minor.yy54);
+    yymsp[-1].minor.yy12 = eval_node_alloc(1);
+    yymsp[-1].minor.yy12->operator = EVAL_OPERATOR_SIGN_PLUS;
+    yymsp[-1].minor.yy12->precedence = eval_precedence(EVAL_OPERATOR_SIGN_PLUS);
+    eval_node_set_value_to_node(yymsp[-1].minor.yy12, 0, yymsp[0].minor.yy12);
 }
-#line 1113 "parser.c"
+#line 1156 "parser.c"
         break;
       case 10: /* expr ::= MINUS expr */
 #line 124 "parser.y"
 {
-    yymsp[-1].minor.yy54 = eval_node_alloc(1);
-    yymsp[-1].minor.yy54->operator = EVAL_OPERATOR_SIGN_MINUS;
-    yymsp[-1].minor.yy54->precedence = eval_precedence(EVAL_OPERATOR_SIGN_MINUS);
-    eval_node_set_value_to_node(yymsp[-1].minor.yy54, 0, yymsp[0].minor.yy54);
+    yymsp[-1].minor.yy12 = eval_node_alloc(1);
+    yymsp[-1].minor.yy12->operator = EVAL_OPERATOR_SIGN_MINUS;
+    yymsp[-1].minor.yy12->precedence = eval_precedence(EVAL_OPERATOR_SIGN_MINUS);
+    eval_node_set_value_to_node(yymsp[-1].minor.yy12, 0, yymsp[0].minor.yy12);
 }
-#line 1123 "parser.c"
+#line 1166 "parser.c"
         break;
       case 11: /* expr ::= NOT expr */
 #line 131 "parser.y"
 {
-    yymsp[-1].minor.yy54 = eval_node_alloc(1);
-    yymsp[-1].minor.yy54->operator = EVAL_OPERATOR_NOT;
-    yymsp[-1].minor.yy54->precedence = eval_precedence(EVAL_OPERATOR_NOT);
-    eval_node_set_value_to_node(yymsp[-1].minor.yy54, 0, yymsp[0].minor.yy54);
+    yymsp[-1].minor.yy12 = eval_node_alloc(1);
+    yymsp[-1].minor.yy12->operator = EVAL_OPERATOR_NOT;
+    yymsp[-1].minor.yy12->precedence = eval_precedence(EVAL_OPERATOR_NOT);
+    eval_node_set_value_to_node(yymsp[-1].minor.yy12, 0, yymsp[0].minor.yy12);
 }
-#line 1133 "parser.c"
+#line 1176 "parser.c"
         break;
-      case 12: /* expr ::= FUNCTION_ABS LPAREN expr RPAREN */
-#line 139 "parser.y"
+      case 12: /* expr ::= FUNCTION RPAREN */
+#line 140 "parser.y"
 {
-    yymsp[-3].minor.yy54 = eval_node_alloc(1);
-    yymsp[-3].minor.yy54->operator = EVAL_OPERATOR_ABS;
-    yymsp[-3].minor.yy54->precedence = eval_precedence(EVAL_OPERATOR_ABS);
-    eval_node_set_value_to_node(yymsp[-3].minor.yy54, 0, yymsp[-1].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(0);
+    yylhsminor.yy12->operator = yymsp[-1].minor.yy0.op;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
 }
-#line 1143 "parser.c"
+#line 1185 "parser.c"
+  yymsp[-1].minor.yy12 = yylhsminor.yy12;
         break;
-      case 13: /* expr ::= expr PLUS expr */
+      case 13: /* expr ::= FUNCTION expr RPAREN */
 #line 147 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_PLUS;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_PLUS);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(1);
+    yylhsminor.yy12->operator = yymsp[-2].minor.yy0.op;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-1].minor.yy12);
 }
-#line 1154 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+#line 1196 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
         break;
-      case 14: /* expr ::= expr MINUS expr */
+      case 14: /* expr ::= FUNCTION expr COMMA expr RPAREN */
 #line 155 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_MINUS;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_MINUS);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = yymsp[-4].minor.yy0.op;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-3].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[-1].minor.yy12);
 }
-#line 1166 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+#line 1208 "parser.c"
+  yymsp[-4].minor.yy12 = yylhsminor.yy12;
         break;
-      case 15: /* expr ::= expr MULTIPLY expr */
-#line 163 "parser.y"
+      case 15: /* expr ::= FUNCTION expr COMMA expr COMMA expr RPAREN */
+#line 164 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_MULTIPLY;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_MULTIPLY);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(3);
+    yylhsminor.yy12->operator = yymsp[-6].minor.yy0.op;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-5].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[-3].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 2, yymsp[-1].minor.yy12);
 }
-#line 1178 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+#line 1221 "parser.c"
+  yymsp[-6].minor.yy12 = yylhsminor.yy12;
         break;
-      case 16: /* expr ::= expr DIVIDE expr */
-#line 171 "parser.y"
+      case 16: /* expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN */
+#line 174 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_DIVIDE;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_DIVIDE);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(4);
+    yylhsminor.yy12->operator = yymsp[-8].minor.yy0.op;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-7].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[-5].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 2, yymsp[-3].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 3, yymsp[-1].minor.yy12);
 }
-#line 1190 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+#line 1235 "parser.c"
+  yymsp[-8].minor.yy12 = yylhsminor.yy12;
         break;
-      case 17: /* expr ::= expr MODULO expr */
-#line 179 "parser.y"
+      case 17: /* expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN */
+#line 185 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_MODULO;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_MODULO);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
-}
-#line 1202 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
-        break;
-      case 18: /* expr ::= expr AND expr */
-#line 187 "parser.y"
-{
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_AND;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_AND);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
-}
-#line 1214 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
-        break;
-      case 19: /* expr ::= expr OR expr */
-#line 195 "parser.y"
-{
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_OR;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_OR);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
-}
-#line 1226 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
-        break;
-      case 20: /* expr ::= expr EQ expr */
-#line 203 "parser.y"
-{
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_EQUAL;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_EQUAL);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
-}
-#line 1238 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
-        break;
-      case 21: /* expr ::= expr NE expr */
-#line 211 "parser.y"
-{
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_NOT_EQUAL;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_NOT_EQUAL);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(5);
+    yylhsminor.yy12->operator = yymsp[-10].minor.yy0.op;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-9].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[-7].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 2, yymsp[-5].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 3, yymsp[-3].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 4, yymsp[-1].minor.yy12);
 }
 #line 1250 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+  yymsp[-10].minor.yy12 = yylhsminor.yy12;
         break;
-      case 22: /* expr ::= expr LT expr */
-#line 219 "parser.y"
+      case 18: /* expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN */
+#line 197 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_LESS;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_LESS);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(6);
+    yylhsminor.yy12->operator = yymsp[-12].minor.yy0.op;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_FUNCTION);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-11].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[-9].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 2, yymsp[-7].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 3, yymsp[-5].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 4, yymsp[-3].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 5, yymsp[-1].minor.yy12);
 }
-#line 1262 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+#line 1266 "parser.c"
+  yymsp[-12].minor.yy12 = yylhsminor.yy12;
         break;
-      case 23: /* expr ::= expr LE expr */
-#line 227 "parser.y"
+      case 19: /* expr ::= expr PLUS expr */
+#line 210 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_LESS_THAN_OR_EQUAL;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_LESS_THAN_OR_EQUAL);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_PLUS;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_PLUS);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
 }
-#line 1274 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+#line 1278 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
         break;
-      case 24: /* expr ::= expr GT expr */
-#line 235 "parser.y"
+      case 20: /* expr ::= expr MINUS expr */
+#line 218 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_GREATER;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_GREATER);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_MINUS;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_MINUS);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
 }
-#line 1286 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+#line 1290 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
         break;
-      case 25: /* expr ::= expr GE expr */
-#line 243 "parser.y"
+      case 21: /* expr ::= expr MULTIPLY expr */
+#line 226 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(2);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_GREATER_THAN_OR_EQUAL;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_GREATER_THAN_OR_EQUAL);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_MULTIPLY;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_MULTIPLY);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
 }
-#line 1298 "parser.c"
-  yymsp[-2].minor.yy54 = yylhsminor.yy54;
+#line 1302 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
         break;
-      case 26: /* expr ::= expr QMARK expr COLON expr */
-#line 254 "parser.y"
+      case 22: /* expr ::= expr DIVIDE expr */
+#line 234 "parser.y"
 {
-    yylhsminor.yy54 = eval_node_alloc(3);
-    yylhsminor.yy54->operator = EVAL_OPERATOR_IF_THEN_ELSE;
-    yylhsminor.yy54->precedence = eval_precedence(EVAL_OPERATOR_IF_THEN_ELSE);
-    eval_node_set_value_to_node(yylhsminor.yy54, 0, yymsp[-4].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 1, yymsp[-2].minor.yy54);
-    eval_node_set_value_to_node(yylhsminor.yy54, 2, yymsp[0].minor.yy54);
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_DIVIDE;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_DIVIDE);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
 }
-#line 1311 "parser.c"
-  yymsp[-4].minor.yy54 = yylhsminor.yy54;
+#line 1314 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
+        break;
+      case 23: /* expr ::= expr MODULO expr */
+#line 242 "parser.y"
+{
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_MODULO;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_MODULO);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
+}
+#line 1326 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
+        break;
+      case 24: /* expr ::= expr AND expr */
+#line 250 "parser.y"
+{
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_AND;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_AND);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
+}
+#line 1338 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
+        break;
+      case 25: /* expr ::= expr OR expr */
+#line 258 "parser.y"
+{
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_OR;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_OR);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
+}
+#line 1350 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
+        break;
+      case 26: /* expr ::= expr EQ expr */
+#line 266 "parser.y"
+{
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_EQUAL;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_EQUAL);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
+}
+#line 1362 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
+        break;
+      case 27: /* expr ::= expr NE expr */
+#line 274 "parser.y"
+{
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_NOT_EQUAL;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_NOT_EQUAL);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
+}
+#line 1374 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
+        break;
+      case 28: /* expr ::= expr LT expr */
+#line 282 "parser.y"
+{
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_LESS;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_LESS);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
+}
+#line 1386 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
+        break;
+      case 29: /* expr ::= expr LE expr */
+#line 290 "parser.y"
+{
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_LESS_THAN_OR_EQUAL;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_LESS_THAN_OR_EQUAL);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
+}
+#line 1398 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
+        break;
+      case 30: /* expr ::= expr GT expr */
+#line 298 "parser.y"
+{
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_GREATER;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_GREATER);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
+}
+#line 1410 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
+        break;
+      case 31: /* expr ::= expr GE expr */
+#line 306 "parser.y"
+{
+    yylhsminor.yy12 = eval_node_alloc(2);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_GREATER_THAN_OR_EQUAL;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_GREATER_THAN_OR_EQUAL);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[0].minor.yy12);
+}
+#line 1422 "parser.c"
+  yymsp[-2].minor.yy12 = yylhsminor.yy12;
+        break;
+      case 32: /* expr ::= expr QMARK expr COLON expr */
+#line 317 "parser.y"
+{
+    yylhsminor.yy12 = eval_node_alloc(3);
+    yylhsminor.yy12->operator = EVAL_OPERATOR_IF_THEN_ELSE;
+    yylhsminor.yy12->precedence = eval_precedence(EVAL_OPERATOR_IF_THEN_ELSE);
+    eval_node_set_value_to_node(yylhsminor.yy12, 0, yymsp[-4].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 1, yymsp[-2].minor.yy12);
+    eval_node_set_value_to_node(yylhsminor.yy12, 2, yymsp[0].minor.yy12);
+}
+#line 1435 "parser.c"
+  yymsp[-4].minor.yy12 = yylhsminor.yy12;
         break;
       default:
         break;
@@ -1360,7 +1484,7 @@ static void yy_parse_failed(
         eval_node_free(*result);
         *result = NULL;
     }
-#line 1363 "parser.c"
+#line 1487 "parser.c"
 /************ End %parse_failure code *****************************************/
   ParseARG_STORE /* Suppress warning about unused %extra_argument variable */
   ParseCTX_STORE
@@ -1385,7 +1509,7 @@ static void yy_syntax_error(
     EVAL_NODE *error_node = eval_node_alloc(0);
     error_node->operator = EVAL_OPERATOR_NOP;
     *result = error_node;
-#line 1388 "parser.c"
+#line 1512 "parser.c"
 /************ End %syntax_error code ******************************************/
   ParseARG_STORE /* Suppress warning about unused %extra_argument variable */
   ParseCTX_STORE
@@ -1414,7 +1538,7 @@ static void yy_accept(
 #line 21 "parser.y"
 
     // Successfully parsed the expression
-#line 1417 "parser.c"
+#line 1541 "parser.c"
 /*********** End %parse_accept code *******************************************/
   ParseARG_STORE /* Suppress warning about unused %extra_argument variable */
   ParseCTX_STORE

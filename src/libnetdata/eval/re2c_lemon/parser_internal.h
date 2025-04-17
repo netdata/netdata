@@ -9,6 +9,7 @@ typedef union {
     NETDATA_DOUBLE dval;
     char *strval;
     EVAL_NODE *node;  // Added for handling node pointers
+    EVAL_OPERATOR op; // Operator ID for dynamic functions
 } YYSTYPE;
 
 // Scanner structure definition

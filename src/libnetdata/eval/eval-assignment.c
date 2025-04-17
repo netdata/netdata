@@ -4,7 +4,7 @@
 #include "eval-internal.h"
 
 // Function to get a local variable's value
-NETDATA_DOUBLE get_local_variable_value(EVAL_EXPRESSION *exp, STRING *var_name, int *error) {
+NETDATA_DOUBLE get_local_variable_value(EVAL_EXPRESSION *exp, STRING *var_name, EVAL_ERROR *error) {
     *error = EVAL_ERROR_OK;
     
     // Check if the variable exists in the local variable list
