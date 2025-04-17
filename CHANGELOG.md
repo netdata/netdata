@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- Update README.md [\#20133](https://github.com/netdata/netdata/pull/20133) ([kanelatechnical](https://github.com/kanelatechnical))
+- Fix Locks \(Windows Locks\) [\#20131](https://github.com/netdata/netdata/pull/20131) ([thiagoftsm](https://github.com/thiagoftsm))
 - Make sure pattern array items are added and evaluated in order [\#20130](https://github.com/netdata/netdata/pull/20130) ([stelfrag](https://github.com/stelfrag))
 - Fix compilation when using FSANITIZE\_ADDRESS [\#20129](https://github.com/netdata/netdata/pull/20129) ([stelfrag](https://github.com/stelfrag))
 - Handle corrupted journal data when populating the MRG during startup. [\#20128](https://github.com/netdata/netdata/pull/20128) ([stelfrag](https://github.com/stelfrag))
 - Free ACLK message [\#20125](https://github.com/netdata/netdata/pull/20125) ([stelfrag](https://github.com/stelfrag))
 - Create Empty Directories \(Windows installer\) [\#20124](https://github.com/netdata/netdata/pull/20124) ([thiagoftsm](https://github.com/thiagoftsm))
+- Installation-Static Build-Windows [\#20122](https://github.com/netdata/netdata/pull/20122) ([kanelatechnical](https://github.com/kanelatechnical))
 - fix cleanup and exit and memory leaks [\#20120](https://github.com/netdata/netdata/pull/20120) ([ktsaou](https://github.com/ktsaou))
 - Work to find leaks easily [\#20106](https://github.com/netdata/netdata/pull/20106) ([ktsaou](https://github.com/ktsaou))
 - SNMP, Custom descriptions and units [\#20100](https://github.com/netdata/netdata/pull/20100) ([Ancairon](https://github.com/Ancairon))
@@ -470,9 +473,6 @@
 - Streaming alerts [\#19586](https://github.com/netdata/netdata/pull/19586) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations docs [\#19585](https://github.com/netdata/netdata/pull/19585) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/zookeeper\): add more metrics [\#19584](https://github.com/netdata/netdata/pull/19584) ([ilyam8](https://github.com/ilyam8))
-- Add agent version during ACLK handshake [\#19583](https://github.com/netdata/netdata/pull/19583) ([stelfrag](https://github.com/stelfrag))
-- Format missing file \(eBPF.plugin\) [\#19582](https://github.com/netdata/netdata/pull/19582) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix\(go.d/apache\): make ?auto param check non-fatal [\#19580](https://github.com/netdata/netdata/pull/19580) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
