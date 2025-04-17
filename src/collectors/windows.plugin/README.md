@@ -5,7 +5,6 @@ This internal plugin is only available for Microsoft Windows operating systems.
 ## The Collector
 
 This plugin primarily collects metrics from Microsoft Windows [Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new). All detected metrics are automatically displayed without requiring additional configuration.
-=======
 Most of the metrics collected by this plugin originate from Microsoft Windows
 [Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new).
 
