@@ -5,7 +5,9 @@ Meet [Ansible](https://ansible.com), a popular tool for provisioning, configurat
 This guide walks you through deploying the **Netdata Agent** across multiple nodes using an [Ansible playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/), managing configurations, and connecting to **Netdata Cloud**—all in minutes.
 
 :::note
+
 With Ansible, you can deploy Netdata repeatedly without disrupting your infrastructure—ensuring monitoring as code.
+
 :::
 
 ---

@@ -11,7 +11,9 @@ This method:
 - Does *not* support automatic updates on offline systems.
 
 :::note
+
 Local package tools like `apt-offline` may work for DEB/RPM installs — but we don’t officially support them.
+
 :::
 
 ---
@@ -40,8 +42,10 @@ Run the following command:
   ```
 
 :::note
+
 The folder name `netdata-offline` is just an example — use any name you want.
 To use the nightly channel instead, replace `stable` with `nightly`.
+
 :::
 
 **What's Included**:
@@ -63,13 +67,17 @@ The script creates a directory with all necessary files:
 
 Copy the entire `netdata-offline` directory to your offline system using your preferred method (USB drive, secure copy, etc.).
 
-:::warning 
+:::warning
+
 Do not rename or modify any files in the package.
 The installation script expects the exact directory structure and filenames.
+
 :::
 
 :::tip
+
 The folder name `netdata-offline` is just an example — use any name you want.
+
 :::
 
 ---
@@ -112,8 +120,10 @@ sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-
 
 1. Copy the entire `netdata-offline` directory to your offline system.
 
-:::warning  
+:::warning
+
 Don't rename or modify the files.
+
 :::
 
 ---
@@ -129,6 +139,8 @@ The `install.sh` script accepts the [same parameters](/packaging/installer/metho
 
 ## Automatic Updates
 
-:::note 
+:::note
+
 Automatic updates are *disabled* by default for offline installations — since there’s no network connection.
+
 :::
