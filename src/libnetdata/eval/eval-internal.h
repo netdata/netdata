@@ -51,6 +51,13 @@ struct operator {
 // External declaration of operators array (defined in eval-execute.c)
 extern struct operator operators[256];
 
+// Structure to store local variables in the expression
+typedef struct eval_local_variable {
+    STRING *name;
+    NETDATA_DOUBLE value;
+    struct eval_local_variable *next;
+} EVAL_LOCAL_VARIABLE;
+
 struct eval_expression {
     STRING *source;
     STRING *parsed_as;
@@ -64,6 +71,9 @@ struct eval_expression {
 
     void *variable_lookup_cb_data;
     eval_expression_variable_lookup_t variable_lookup_cb;
+    
+    // Local variables defined within the expression
+    EVAL_LOCAL_VARIABLE *local_variables;
 };
 
 // these are used for EVAL_NODE.operator
@@ -90,6 +100,8 @@ struct eval_expression {
 #define EVAL_OPERATOR_SIGN_MINUS            'M'
 #define EVAL_OPERATOR_ABS                   'A'
 #define EVAL_OPERATOR_IF_THEN_ELSE          '?'
+#define EVAL_OPERATOR_ASSIGNMENT            '$'
+#define EVAL_OPERATOR_SEMICOLON             ';'
 
 // Function identifiers for parsing
 typedef struct eval_function {
@@ -116,6 +128,10 @@ extern void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error);
 // From eval-execute.c
 extern NETDATA_DOUBLE eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error);
 extern int eval_precedence(unsigned char operator);
+
+// Functions for variable handling
+extern NETDATA_DOUBLE get_local_variable_value(EVAL_EXPRESSION *exp, STRING *var_name, int *error);
+extern void set_local_variable_value(EVAL_EXPRESSION *exp, STRING *var_name, NETDATA_DOUBLE value);
 
 // Functions for other parsers
 extern EVAL_NODE *parse_expression_with_bison(const char *string, const char **failed_at, int *error);

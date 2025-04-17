@@ -881,6 +881,7 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
 
     exp->error_msg = buffer_create(100, NULL);
     exp->nodes = op;
+    exp->local_variables = NULL; // Initialize local variables list
 
     return exp;
 }
