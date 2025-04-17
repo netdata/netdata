@@ -38,7 +38,7 @@ Use this table to choose and set up your preferred alerting method:
 3. Choose an integration (e.g. Slack, Amazon SNS, Splunk).
 4. Set alert severity filters as needed.
 
-→ [See all supported Cloud integrations](/docs/alerts-&-notifications/notifications/centralized-cloud-notifications)
+→ [See all supported Cloud integrations](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications)
 
 ---
 
@@ -64,7 +64,7 @@ DEFAULT_RECIPIENT_EMAIL="you@example.com"
 sudo systemctl restart netdata
 ```
 
-→ [See all Agent-based integrations](/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)
+→ [See all Agent-based integrations](/docs/alerts-and-notifications/notifications/agent-dispatched-notifications)
 
 ---
 
