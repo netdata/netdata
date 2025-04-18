@@ -124,6 +124,147 @@ Specific Linux capabilities grant elevated privileges necessary for certain moni
 
 IMPORTANT: All the plugins or helpers that utilize these capabilities are isolated from the rest of Netdata. This means that all the other plugins of Netdata and the main Netdata daemon cannot utilize these capabilities, even when the capabilities have been given to the whole container Netdata is installed.
 
+### Overview
+
+An overview of the structure, related to permissions:
+
+1. The Netdata Child Agent and its internal plugins (`proc.plugin`, `diskspace.plugin`, `cgroups.plugin`) run unprivileged.
+2. External Plugins are requiring access to resources depending on their job.
+3. Helpers (`local-listeners`, `cgroup-network`) are command line tools that unprivileged plugins call to enrich the information they collect.
+
+Netdata allows configuring the available capabilities, namespaces and mounts, but also allows disabling specific plugins or features.
+
+```mermaid
+flowchart TB
+    classDef unprivileged fill:#9d9,stroke:#333,stroke-width:1px,color:#000
+    classDef privileged fill:#eec,stroke:#333,stroke-width:1px,color:#000
+    classDef parent fill:#99f,stroke:#333,stroke-width:1px,color:#000
+    classDef child fill:#4caf50,stroke:#333,stroke-width:1px,color:#000
+    classDef agentGroup fill:#eee,stroke:#333,stroke-width:1px
+    classDef helper fill:#dd8,stroke:#333,stroke-width:1px,color:#000
+
+    Parent["<big><b>Netdata Parent Pod</b></big>
+        <i>Central aggregation point for all Child agents</i><br/>
+        <b>Unprivileged</b>
+        - No host path mounts
+        - No host namespaces
+        - No special capabilities
+        - Exposes API and dashboard
+    "]
+
+    class Parent parent
+    Parent <---> Child
+
+    subgraph Child ["<b>Child Pod/Agent (DaemonSet)</b>"]
+
+        NetdataDaemon <---> GoPlugin
+        GoPlugin ==> LocalListeners
+        NetdataDaemon <-.-> ProcPlugin
+        NetdataDaemon <-.-> CgroupsPlugin
+        CgroupsPlugin ---> CgroupNetwork
+        NetdataDaemon <-.-> DiskspacePlugin
+        NetdataDaemon <---> AppsPlugin
+        NetdataDaemon <---> NetworkViewerPlugin
+        NetdataDaemon <---> SystemdJournalPlugin
+        NetdataDaemon <---> DebugfsPlugin
+
+        NetdataDaemon["<big><b>Netdata Child Daemon</b></big>
+            <i>Orchestrates collection, streams to Parent</i><br/>
+            <b>Unprivileged</b>
+            - Runs as 'netdata' user
+            - Listens to localhost only
+        "]
+
+        GoPlugin["<big><b>go.d.plugin</b></big>
+            <i>Collects application provided metrics from Host applications and sibling containers</i><br/>
+            <b>Unprivileged</b>
+            No special needs
+        "]
+
+        LocalListeners["<big><b>local-listeners</b></big>
+            <i>Discovers listening ports on host and sibling containers, mapping them to process names</i><br/>
+            <b>Privileged Helper</b>
+            Needs: Host Network NS, CAP_SYS_ADMIN, CAP_SYS_PTRACE
+        "]
+
+        ProcPlugin["<big><b>proc.plugin</b></big>
+            <i>Monitors Host CPU, Memory, Network, Storage, etc.</i><br/>
+            <b>Unprivileged</b>
+            Needs: /proc, /sys, Host Network NS
+        "]
+
+        CgroupsPlugin["<big><b>cgroups.plugin</b></big>
+            <i>Monitors all Running Containers</i><br/>
+            <b>Unprivileged</b>
+            - Needs: /proc, /sys
+        "]
+
+        CgroupNetwork["<big><b>cgroup-network</b></big>
+            <i>Maps network interfaces to containers</i><br/>
+            <b>Privileged Helper</b>
+            Needs: /proc, Host Network NS, Host PID NS, CAP_SYS_ADMIN
+        "]
+
+        AppsPlugin["<big><b>apps.plugin</b></big>
+            <i>Monitors all Host and sibling container processes</i><br/>
+            <b>Privileged Plugin</b>
+            Needs: /proc, /etc/passwd, /etc/group, CAP_SYS_PTRACE
+        "]
+
+        DiskspacePlugin["<big><b>diskspace.plugin</b></big>
+            <i>Detects and monitors host mount points</i><br/>
+            <b>Unprivileged</b>
+            Needs: / (Docker only)
+        "]
+
+        NetworkViewerPlugin["<big><b>network-viewer.plugin</b></big>
+            <i>Monitors TCP/UDP sockets and connections on host and containers</i><br/>
+            <b>Privileged Plugin</b>
+            Needs: /proc, /etc/passwd, /etc/group, Host Network NS, CAP_SYS_ADMIN, CAP_SYS_PTRACE
+        "]
+
+        SystemdJournalPlugin["<big><b>systemd-journal.plugin</b></big>
+            <i>Processes and queries system logs</i><br/>
+            <b>Privileged Plugin</b>
+            Needs: /var/log
+        "]
+
+        DebugfsPlugin["<big><b>debugfs.plugin</b></big>
+            <i>Monitors hardware sensors and kernel subsystems</i><br/>
+            <b>Unprivileged</b>
+            Needs: /sys
+        "]
+
+    end
+
+    linkStyle 0 stroke:#000,stroke-width:5px;
+    linkStyle 1 stroke:#000,stroke-width:4px;
+    linkStyle 2 stroke:#000,stroke-width:4px;
+    linkStyle 3 stroke:#000,stroke-width:4px;
+    linkStyle 4 stroke:#000,stroke-width:4px;
+    linkStyle 5 stroke:#000,stroke-width:4px;
+    linkStyle 6 stroke:#000,stroke-width:4px;
+    linkStyle 7 stroke:#000,stroke-width:4px;
+    linkStyle 8 stroke:#000,stroke-width:4px;
+    linkStyle 9 stroke:#000,stroke-width:4px;
+    linkStyle 10 stroke:#000,stroke-width:4px;
+
+    class NetdataDaemon unprivileged
+    class ProcPlugin unprivileged
+    class CgroupsPlugin unprivileged
+    class DiskspacePlugin unprivileged
+    class GoPlugin unprivileged
+
+    class AppsPlugin privileged
+    class CgroupNetwork helper
+    class NetworkViewerPlugin privileged
+    class SystemdJournalPlugin privileged
+    class LocalListeners helper
+    class DebugfsPlugin privileged
+    
+    class Child agentGroup
+```
+
 ## Configuration Strategies and Monitoring Scope
 
 Administrators can configure Netdata `child` agents with varying levels of host access, directly impacting both the depth of observability achieved and the security posture of the deployment. Understanding the trade-offs associated with different configurations is essential for aligning Netdata with organizational security policies and monitoring requirements. We outline three primary approaches below:
