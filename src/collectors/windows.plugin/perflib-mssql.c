@@ -291,7 +291,8 @@ int dict_mssql_databases_run_query(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // We failed to collect this for the database, so we are not going to try again
     if (mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)
-        mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_data_file_size(&mdi->parent->conn, (char *)dbname);
+        mdi->MSSQLDatabaseDataFileSize.current.Data =
+            netdata_MSSQL_fill_data_file_size(&mdi->parent->conn, (char *)dbname);
 }
 
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
