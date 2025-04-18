@@ -237,7 +237,7 @@ flowchart TB
 
     end
 
-    linkStyle 0 stroke:#000,stroke-width:5px;
+    linkStyle 0 stroke:#888,stroke-width:5px;
     linkStyle 1 stroke:#000,stroke-width:4px;
     linkStyle 2 stroke:#000,stroke-width:4px;
     linkStyle 3 stroke:#000,stroke-width:4px;
