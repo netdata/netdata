@@ -251,20 +251,20 @@ static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(SQLHSTMT *stmt, SQLCHAR 
     ret = SQLExecDirect(stmt, query, SQL_NTS);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_QUERY);
-        return 0;
+        return ULONG_LONG_MAX;
     }
 
     ret = SQLBindCol(stmt, 1, SQL_C_LONG, &db_size, sizeof(long), &col_data_len);
 
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_PREPARE);
-        return 0;
+        return ULONG_LONG_MAX;
     }
 
     ret = SQLFetch(stmt);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_FETCH);
-        return 0;
+        return ULONG_LONG_MAX;
     }
 
     return (ULONGLONG)(db_size * MEGA_FACTOR);
@@ -273,11 +273,6 @@ static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(SQLHSTMT *stmt, SQLCHAR 
 ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char *dbname)
 {
     ULONGLONG value = 0;
-
-    // We cannot access data for these tables without additional changes.
-    // They should be blacklisted.
-    if (!strcmp(dbname, "model") || !!strcmp(dbname, "model_msdb") || !!strcmp(dbname, "model_replicatedmaster")  || strcmp(dbname, "mssqlsystemresource"))
-        return ULONG_LONG_MAX;
 
     // https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
     SQLCHAR query[512];
@@ -294,7 +289,9 @@ int dict_mssql_databases_run_query(const DICTIONARY_ITEM *item __maybe_unused, v
     struct mssql_db_instance *mdi = value;
     const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
-    mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_data_file_size(&mdi->parent->conn, (char *)dbname);
+    // We failed to collect this for the database, so we are not going to try again
+    if (mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)
+        mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_data_file_size(&mdi->parent->conn, (char *)dbname);
 }
 
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
