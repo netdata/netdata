@@ -1,110 +1,102 @@
 # Netdata Container Security Considerations
 
-This document outlines the necessary permissions and security considerations when deploying Netdata within containerized environments, such as Kubernetes. Achieving comprehensive monitoring of the host system and other containers necessitates granting specific privileges to the Netdata agent container. Understanding the implications of these permissions is crucial for balancing observability requirements with security posture.
+This document outlines the necessary permissions and security considerations when deploying Netdata in containerized environments like Kubernetes. To effectively monitor both the host system and other containers, the Netdata agent container requires specific privileges. Understanding these permissions is essential for balancing robust monitoring capabilities with a strong security posture.
 
-## Recommended Permissions for Comprehensive Host and Container Monitoring
+## Recommended Permissions for Comprehensive Monitoring
 
-To enable full monitoring capabilities, including host-level metrics, process information, and container resource usage, the Netdata child pods (agents running on each node) require access to specific host resources and namespaces, as well as certain Linux capabilities.
+For full monitoring capabilities (host-level metrics, process information, and container resource usage), Netdata child pods (agents running on each node) need access to specific host resources and namespaces, as well as certain Linux capabilities.
 
 ### Privilege Separation Security Model
 
-Netdata uses a privilege separation model for its processes in order to isolate the risk associated with permissions and capabilities required to achieve comprehensive observability:
+Netdata uses a privilege separation model to isolate risks associated with the permissions required for comprehensive observability:
 
-1. The Netdata daemon and it internal plugins run unprivileged as a normal user, without any access to sensitive system information or capabilities. This includes `proc.plugin`, `cgroups.plugin` and the core Netdata daemon.
-2. When elevated permissions are needed to access sensitive or protected information, either a dedicated/isolated external plugin is used, or an external helper process is utilized to collect the needed information. When Netdata runs in a container, only some of the Netdata external plugins and helpers have elevated privileges, while the core of Netdata with its internal plugins do not.
+1. **Unprivileged Core**: The Netdata daemon and internal plugins (`proc.plugin`, `cgroups.plugin`, etc.) run as a normal user without access to sensitive system information or capabilities.
+2. **Isolated Privileged Components**: When elevated permissions are needed, Netdata uses either dedicated external plugins or helper processes to collect the sensitive information. Only these specific components receive elevated privileges, not the core daemon.
 
-Netdata talks to its plugins using a text based protocol, which eliminates the possibility of any binary data being exchanged, especially from the Netdata daemon to its plugins.
-
-Using this design, Netdata minimizes the potential attack surface. The main daemon does not require anything special and external plugins perform a hard-coded task for reading some specific sensitive information and returning it back to the main daemon.
+Netdata communicates with its plugins using a text-based protocol, which prevents any binary data exchange between the main daemon and its plugins, minimizing the potential attack surface.
 
 ### Netdata Network Exposure
 
-Netdata helm charts limit Netdata children connectivity to `localhost`. Netdata children are not allowed to accept any Network connections from outside the local node, and the only outbound network connection they need is towards the Netdata Parent to stream their data. The Netdata children also do not maintain a database on disk. All information they collect is streamed in real-time to their Netdata Parent.
-
-Netdata Parents on the other hand, do not require any mounts, host namespaces, or capabilities. They run in an unprivileged container, ingesting data in real-time from Netdata children and exposing this information via their APIs.
-
-Netdata Children do not need to connect to Netdata Cloud. Netdata Parents only need to connect to Netdata Cloud. 
+- **Netdata Children**: Limited to `localhost` connectivity, cannot accept external network connections, and only connect outbound to their Netdata Parent for data streaming. They don’t maintain a database on disk.
+- **Netdata Parents**: Run in unprivileged containers without requiring host mounts, namespaces, or capabilities. They ingest data from Netdata Children and expose information via APIs.
+- **Cloud Connectivity**: Only Netdata Parents need to connect to Netdata Cloud; Children do not require this connection.
 
 ### Container Mounts
 
-Mounting specific host directories into the Netdata container provides essential data access for various collection plugins.
+The following table lists the main host-mounted devices required for monitoring:
 
-| Mount | Type | Role | Component | Why |
-|:---:|:---:|:---:|:---:|:---|
-| `/`| hostPath | child | `diskspace.plugin` | Detect host mount points (only in Docker deployments, not in Kubernetes deployments). |
-| `/etc/os-release` | hostPath | child | `netdata` | Collect host labels. |
-| `/etc/passwd`<br/>`/etc/group` | hostPath | child | `apps.plugin` | Resolve numeric users and groups to names. |
-| `/etc/passwd`<br/>`/etc/group` | hostPath | child | `network-viewer.plugin` | Resolve numeric users and groups to names. |
-| `/proc` | hostPath | child | `proc.plugin` | Monitor host system resources (CPU, Memory, Network, uptime, etc). |
-| `/proc` | hostPath | child | `apps.plugin` | Monitor all running processes. |
-| `/proc` | hostPath | child | `cgroups.plugin` | Detect available memory to calculate container memory limits. Detect paused containers in k8s to improve discovery performance. |
-| `/proc` | hostPath | child | `cgroup-network` | Discover container virtual network interfaces and associates them with running containers. |
-| `/proc` | hostPath | child | `network-viewer.plugin` | Monitor all TCP/UDP sockets of running processes. |
-| `/proc` | hostPath | child<br/>k8sState | `netdata` | Collect system information and detect various system characteristics like number of CPU cores, total and available memory protection, and more. |
-| `/sys` | hostPath | child | `cgroups.plugin` | Monitor containers. |
-| `/sys` | hostPath | child<br/>k8sState | `netdata` | Detect `netdata` container limits. Detect host hardware (part of system info). |
-| `/sys` | hostPath | child | `proc.plugin` | Detect network interface types. Monitor software RAID block devices. Detect ZRAM, GPUs, Numa Nodes, Infiniband, BTRFS, PCI AEC, EDAC MC, KSM, BCACHE, CPU thermal throttling. |
-| `/sys` | hostPath | child | `debugfs.plugin` | Monitor hardware sensors, ZSWAP, Numa Memory Fragmentation, PowerCap. |
-| `/var/log` | hostPath | child | `systemd-journal.plugin` | Enable the Logs pipeline of Netdata to process and query system logs. |
-| `/var/lib/netdata`* | hostPath | child | `netdata` | Persist of Netdata's private data. |
+| Mount                          | Type     | Node                          | Component & Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+|--------------------------------|----------|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/`                            | hostPath | child                         | • `diskspace.plugin`: Monitor host mount points (Docker only, not Kubernetes)                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `/etc/os-release`              | hostPath | child<br/>parent<br/>k8sState | • `netdata`: Collect OS info                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `/etc/passwd`<br/>`/etc/group` | hostPath | child                         | • `apps.plugin`: Resolve numeric users and groups to names<br/>• `network-viewer.plugin`: Resolve numeric users and groups to names                                                                                                                                                                                                                                                                                                                                                                         |
+| `/proc`                        | hostPath | child                         | • `proc.plugin`: Monitor host system resources (CPU, Memory, Network, uptime)<br/>• `apps.plugin`: Monitor all running processes<br/>• `cgroups.plugin`: Detect memory limits and pause containers (improves discovery performance in k8s) <br/>• `cgroup-network`: Discover container virtual network interfaces. Map virtual interfaces in the system namespace to interfaces inside containers <br/>• `network-viewer.plugin`: Monitor TCP/UDP sockets<br/>• `netdata`: Collect system and hardware info |
+| `/sys`                         | hostPath | child                         | • `cgroups.plugin`: Monitor containers<br/>• `netdata`: Detect container limits and host hardware<br/>• `proc.plugin`: Detect network interfaces type, RAID devices, ZRAM, GPUs, Numa Nodes, Infiniband, BTRFS, PCI AEC, EDAC MC, KSM, BCACHE, CPU thermal throttling.<br/>• `debugfs.plugin`: Monitor hardware sensors, ZSWAP, NUMA memory fragmentation, PowerCap                                                                                                                                         |
+| `/var/log`                     | hostPath | child                         | • `systemd-journal.plugin`: Process and query system logs                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `/var/lib/netdata`*            | hostPath | child                         | • `netdata`: Persist Netdata's identity data                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
-Notes:
+**Notes**:
 
--   **Persistence Note:** The `/var/lib/netdata` host path mount (configurable via `{{ .Values.child.persistence.hostPath }}/var/lib/netdata` in Helm charts) is critical for maintaining node identity across restarts. This directory stores metadata, _not_ the time-series database, and is relatively small. Without this persistence, each pod restart registers as a new node.
-- **Read-Only Mounts**: All the mounts described above, except `/var/lib/netdata`, are mounted read-only.
+- **Persistence**: The `/var/lib/netdata` mount is critical for maintaining node identity across pod recreations (updates, reinstalls, rescheduling). This directory stores only metadata, not the time-series database, and requires minimal storage space. Without it, each pod recreation registers as a new node.
+- **Read-Only Access**: All mounts except `/var/lib/netdata` are mounted read-only.
 
 ### Host Namespaces
 
-Utilizing host namespaces allows Netdata to observe network activity and processes as they appear on the host, rather than being confined to the container's isolated view.
+Access to host namespaces allows Netdata to observe network activity and processes from the host's perspective:
 
-| Namespace | Role | Component | Why |
-|:---:|:---:|:---:|:---|
-| Host Network Namespace | child | `proc.plugin` | Monitor host's networking stack. |
-| Host Network Namespace | child | `cgroup-network` | Detect containers' network interfaces. |
-| Host Network Namespace | child | `network-viewer.plugin` | Discover host's network connections. |
-| Host Network Namespace | child | `go.d.plugin` | Discover applications running at the host. |
-| Host PID Namespace | child | `cgroup-network` | Monitor containers' network interfaces (it does so by switching Network Namespaces, using the PID of processes associated with containers). |
+| Namespace    | Node  | Component & Purpose                                                                                                                                                                                                                              |
+|--------------|-------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Host Network | child | • `proc.plugin`: Monitor host's networking stack<br/>• `cgroup-network`: Detect containers' network interfaces<br/>• `network-viewer.plugin`: Discover host's network connections<br/>• `go.d.plugin`: Discover applications running at the host |
+| Host PID     | child | • `cgroup-network`: Monitor containers' network interfaces by switching Network Namespaces using process PIDs                                                                                                                                    |
 
 ### Container Capabilities
 
-Specific Linux capabilities grant elevated privileges necessary for certain monitoring functions, particularly those involving process inspection and namespace manipulation.
+Specific Linux capabilities grant elevated privileges for certain monitoring functions:
 
-| Capability | Role | Component | Why |
-|:---:|:---:|:---:|:---|
-| SYS_ADMIN | child | `cgroup-network` | Associate containers' network interfaces with the containers (it does so by switching Network Namespaces). Without it, `veth` network interfaces will not be associated to their respective containers, so they will be monitored as host network interfaces. |
-| SYS_ADMIN | child | `network-viewer.plugin` | Discover containers' network connections (it does so by switching Network Namespaces). Without it, network connections of other containers will not be monitored, limiting the scope of network connections to the host system. |
-| SYS_PTRACE | child | `apps.plugin` | Collect the I/O per running process at the host (including the ones in containers). Without it, processes will be monitored excluding their physical or logical disk I/O. |
-| SYS_PTRACE | child | `network-viewer.plugin` | Discover host's network connections per application. Without it all host network connections will still be monitored, but Netdata will not be able to associate them with processes. |
-| SYS_PTRACE | child | `go.d.plugin` | Discover listening applications running at the host. Without it, localhost service discovery (not the kubernetes one), `go.d.plugin` will judge about the applications running based only on port number, without the process name. |
+| Capability | Component & Purpose                                                                                                                                                                                                                                                                                                                                                                                                             | 
+|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| SYS_ADMIN  | • `cgroup-network`: Links host virtual interfaces to their containers. Without it, interfaces are monitored but not associated with containers.<br/>• `network-viewer.plugin`: Discovers and monitors network connections from containers. Without it, network connections originating from containers will not be monitored at all.                                                                                            |
+| SYS_PTRACE | • `apps.plugin`: Collect I/O per running process at the host<br/>• `network-viewer.plugin`: Associates host network connections with specific processes. Without it, connections are monitored but not linked to their source processes.<br/>• `go.d.plugin`: Discovers applications running on the host system and automatically creates monitoring jobs for them. Without it, automatic application discovery won't function. |
 
-IMPORTANT: All the plugins or helpers that utilize these capabilities are isolated from the rest of Netdata. This means that all the other plugins of Netdata and the main Netdata daemon cannot utilize these capabilities, even when the capabilities have been given to the whole container Netdata is installed.
+**IMPORTANT**: All plugins or helpers using these capabilities are isolated from the rest of Netdata. The main daemon and other plugins can’t use these capabilities, even when granted to the whole container.
 
 ## Impact of Security Restrictions on Monitoring Scope
 
-### Operating with Minimal Privileges (Restricted Permissions)
+### Operating with Minimal Privileges
 
-If Netdata child pods are deployed without the aforementioned host path mounts, host namespace access, and container capabilities, the monitoring scope will be significantly reduced.
+When Netdata is deployed without the recommended mounts, namespaces, and capabilities, its monitoring scope becomes significantly restricted:
 
--   **Functionality:** Netdata will start and operate, but it will primarily monitor **only the resources consumed by the Netdata container itself**. This includes its own CPU/memory usage, internal processes, and network activity within its isolated namespace.
--   **Limitations:** Host-level metrics (overall CPU, memory, network stack, disk I/O), processes running outside the Netdata container, direct container resource usage monitoring (via cgroups), and host system logs will **not** be available.
--   **Kubernetes Integration:** If appropriate RBAC permissions are granted to query the Kubernetes API, Netdata can still provide Kubernetes state metrics (e.g., pod counts, node status). Kubernetes-based application discovery may also function, allowing Netdata to collect metrics from _other_ containers if they expose compatible endpoints accessible via the K8s API/network, but without the deep host-level process correlation.
--   **Persistence Issue:** Without the persistent `/var/lib/netdata` volume mount, the Netdata agent will lose its unique identity upon restart. Each time the pod is rescheduled or restarted, it will appear as a completely new node in the Netdata UI or Cloud dashboard.
+**Limited To:**
+
+- Kubernetes state metrics and application discovery (with appropriate RBAC permissions)
+- Metrics of the Netdata container itself (CPU, memory, internal processes), not the host system
+
+**Missing Capabilities:**
+
+- No host-level metrics (system-wide CPU, memory, network, disk I/O)
+- No visibility into processes running outside the Netdata container
+- No direct container resource usage monitoring via cgroups
+- No access to host system logs
+
+**Identity Issue:**
+
+- Without the persistent volume mount (`/var/lib/netdata`), Netdata will appear as a new node after each pod recreation (during updates, reinstalls, or rescheduling)
 
 ### Balanced approach
 
-This approach aims to provide substantial host and container observability while significantly reducing the security risks compared to the "full monitoring" configuration. It operates on the principle of least privilege, excluding the most dangerous capabilities and mounts by default, while retaining access needed for core monitoring functions. This involves accepting certain trade-offs in the depth or context of collected data.
+For environments with stricter security requirements, a balanced approach would be to maintain host mounts and namespaces while excluding certain capabilities. If you must disable some Netdata monitoring features for security reasons, starting with capabilities creates the least monitoring impact while providing the most security benefit.
 
-#### Capabilities: Exclude `SYS_ADMIN` and `SYS_PTRACE`
+#### Exclude `SYS_ADMIN` and `SYS_PTRACE` Capabilities
 
-These capabilities grant excessive privileges with high potential for misuse or exploitation. `SYS_ADMIN` offers broad administrative control, while `SYS_PTRACE` allows invasive inspection of any process. Excluding them dramatically reduces the potential impact of a container compromise.
+These capabilities grant the broadest system access. If you need to restrict permissions, these can be excluded while preserving many essential monitoring functions.
 
-**Impact:**
-* Container network interfaces (`veth`) may appear as host interfaces, lacking direct container attribution within Netdata's network interface metrics.
-* Direct discovery of _other_ containers' network connections via namespace switching will be disabled.
-* Per-process physical/logical disk I/O metrics via `apps.plugin` will be unavailable.
-* Network connections and listening ports will not be directly associated with specific process names by `network-viewer.plugin` or `go.d.plugin`.
+**Trade-offs when removing these capabilities**:
 
-We suggest to keep the rest (mounts and host namespaces) enabled, so that Netdata can still provide its full monitoring features.
+- Container interfaces are monitored but not associated with containers
+- Container network traffic remains invisible
+- No per-process disk I/O metrics
+- Network connections are monitored but not linked to specific processes
+- Automatic application discovery won't function
 
 ## Conclusion
 
