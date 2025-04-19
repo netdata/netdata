@@ -57,7 +57,7 @@ Designed for organizations seeking simplified operations, reduced overhead, and 
 
   Per-second data collection and real-time processing provides immediate visibility into your infrastructure's behavior.
 
-  _**Unique**: Netdata works in a beat and everything happens at this pace. You hit Enter in the terminal, and just a second later, the result appears on the dashboard._
+  _**Unique**: Netdata works in a beat, and everything happens at this pace. You hit Enter in the terminal, and just a second later, the result appears on the dashboard._
 
 - **Zero-Configuration**
 
