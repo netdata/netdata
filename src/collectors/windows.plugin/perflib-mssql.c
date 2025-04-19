@@ -29,7 +29,9 @@ struct netdata_mssql_conn {
 
     SQLHENV netdataSQLEnv;
     SQLHDBC netdataSQLHDBc;
+
     SQLHSTMT dataFileSizeSTMT;
+    SQLHSTMT dataActiveTransactionSTMT;
 
     BOOL is_connected;
 };
@@ -143,7 +145,6 @@ struct mssql_lock_instance {
 };
 
 enum db_instance_idx {
-    NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS,
     NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP,
     NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED,
     NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES,
@@ -284,6 +285,22 @@ ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char
     return value;
 }
 
+ULONGLONG netdata_MSSQL_active_transactions(struct netdata_mssql_conn *nmc, char *dbname)
+{
+    ULONGLONG value = 0;
+
+    // https://learn.microsoft.com/en-us/sql/relational-databases/system-compatibility-views/sys-sysprocesses-transact-sql?view=sql-server-ver16
+    SQLCHAR query[512];
+    // SQL SERVER BEFORE 2008 DOES NOT HAVE DATA IN THIS TABLE
+    // https://github.com/influxdata/telegraf/blob/081dfa26e80d8764fb7f9aac5230e81584b62b56/plugins/inputs/sqlserver/sqlqueriesV2.go#L1259
+    snprintfz((char *)query, 511, "SELECT sum(open_tran) FROM %s.sys.sysprocesses WHERE spid > 50 AND (open_tran != 0 OR cmd != 'AWAITING_COMMAND');", dbname);
+
+    value = netdata_MSSQL_fill_data_file_size_dict(nmc->dataActiveTransactionSTMT, query);
+
+    SQLFreeStmt(nmc->dataActiveTransactionSTMT, SQL_CLOSE);
+    return value;
+}
+
 int dict_mssql_databases_run_query(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
@@ -293,6 +310,10 @@ int dict_mssql_databases_run_query(const DICTIONARY_ITEM *item __maybe_unused, v
     if (mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)
         mdi->MSSQLDatabaseDataFileSize.current.Data =
             netdata_MSSQL_fill_data_file_size(&mdi->parent->conn, (char *)dbname);
+
+    if (mdi->MSSQLDatabaseActiveTransactions.current.Data != ULONG_LONG_MAX)
+        mdi->MSSQLDatabaseActiveTransactions.current.Data =
+            netdata_MSSQL_active_transactions(&mdi->parent->conn, (char *)dbname);
 }
 
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
@@ -345,6 +366,10 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
 
     if (retConn) {
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dataFileSizeSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dataActiveTransactionSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
     }
@@ -504,6 +529,7 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
     dbconn->netdataSQLEnv = NULL;
     dbconn->netdataSQLHDBc = NULL;
     dbconn->dataFileSizeSTMT = NULL;
+    dbconn->dataActiveTransactionSTMT = NULL;
 
     dbconn->is_connected = FALSE;
 
@@ -1382,6 +1408,9 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const 
 
 static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected) || mli->MSSQLDatabaseActiveTransactions.current.Data == ULONG_LONG_MAX)
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_active_transactions) {
@@ -1411,12 +1440,10 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
             rrddim_add(mli->st_db_active_transactions, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS)) {
-        rrddim_set_by_pointer(
-            mli->st_db_active_transactions,
-            mli->rd_db_active_transactions,
-            (collected_number)mli->MSSQLDatabaseActiveTransactions.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_active_transactions,
+        mli->rd_db_active_transactions,
+        (collected_number)mli->MSSQLDatabaseActiveTransactions.current.Data);
 
     rrdset_done(mli->st_db_active_transactions);
 }
@@ -1513,9 +1540,6 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
         if (!mdi->parent) {
             mdi->parent = mi;
         }
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseActiveTransactions))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS);
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseBackupRestoreOperations))
             mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP);
