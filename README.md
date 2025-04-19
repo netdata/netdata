@@ -43,7 +43,7 @@ Key Advantages:
 
 - **Instant Insights**<br/>Real-time, per-second metrics and visualizations for rapid problem detection.
 - **Automated and Zero-Configuration**<br/>Easy deployment with immediate monitoring—no complex setup needed.
-- **ML-Driven Intelligence**<br/>Built-in machine learning detects anomalies, predicts issues, and assists in root-cause analysis automatically.
+- **ML-Driven Intelligence**<br/>Built-in machine learning automatically detects anomalies, predicts issues, and assists in root-cause analysis.
 - **Highly Efficient**<br/>Proven minimal resource usage, exceptional scalability, and best-in-class energy efficiency validated by independent research.
 - **Distributed & Secure**<br/>Data stays securely within your infrastructure; no centralization required.
 
@@ -57,7 +57,7 @@ Designed for organizations seeking simplified operations, reduced overhead, and 
 
   Per-second data collection and real-time processing provides immediate visibility into your infrastructure's behavior.
 
-  _**Unique**: Netdata works in a beat and everything happens at this pace. You hit enter on a terminal and a second later you see the result on the dashboard._
+  _**Unique**: Netdata works in a beat, and everything happens at this pace. You hit Enter in the terminal, and just a second later, the result appears on the dashboard._
 
 - **Zero-Configuration**
 
