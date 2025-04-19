@@ -1034,7 +1034,11 @@ void aclk_synchronization_init(void)
 
     nd_log_daemon(NDLP_INFO, "Created %d archived hosts", number_of_children);
     // Trigger host context load for hosts that have been created
-    metadata_queue_load_host_context();
+    if (unlikely(!metadata_queue_load_host_context())) {
+        nd_log_daemon(NDLP_WARNING, "Failed to queue command to load contexts for archived hosts");
+        // Reset context load flag so that contexts will be loaded on demand
+        reset_host_context_load_flag();
+    }
 
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES, aclk_config_parameters, NULL, &err_msg);
 
