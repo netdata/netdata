@@ -61,15 +61,15 @@ ml_kmeans_anomaly_score(const ml_kmeans_inlined_t *inlined_km, const DSample &DS
 }
 
 static void ml_buffer_json_member_add_double(BUFFER *wb, const char *key, calculated_number_t cn) {
-    if (!isnan(cn) && !isinf(cn)) {
+    if (!std::isnan(cn) && !std::isinf(cn)) {
         buffer_json_member_add_double(wb, key, cn);
         return;
     }
 
     const char *classification = nullptr;
-    if (isnan(cn)) {
+    if (std::isnan(cn)) {
         classification = "nan";
-    } else if (isinf(cn)) {
+    } else if (std::isinf(cn)) {
         if (cn > 0) {
             classification = "+inf";
         } else {
@@ -81,15 +81,15 @@ static void ml_buffer_json_member_add_double(BUFFER *wb, const char *key, calcul
 }
 
 static void ml_buffer_json_add_array_item_double(BUFFER *wb, calculated_number_t cn) {
-    if (!isnan(cn) && !isinf(cn)) {
+    if (!std::isnan(cn) && !std::isinf(cn)) {
         buffer_json_add_array_item_double(wb, cn);
         return;
     }
 
     const char *classification = nullptr;
-    if (isnan(cn)) {
+    if (std::isnan(cn)) {
         classification = "nan";
-    } else if (isinf(cn)) {
+    } else if (std::isinf(cn)) {
         if (cn > 0) {
             classification = "+inf";
         } else if (cn < 0) {

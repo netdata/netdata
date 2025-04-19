@@ -3,7 +3,12 @@
 #ifndef NETDATA_ADJTIMEX_H
 #define NETDATA_ADJTIMEX_H
 
-#if defined(OS_LINUX) || defined(OS_FREEBSD) || defined(OS_MACOS)
+#ifdef OS_MACOS
+#include <AvailabilityMacros.h>
+#endif
+
+#if defined(OS_LINUX) || defined(OS_FREEBSD) || \
+    (defined(OS_MACOS) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 101300))
 #include <sys/timex.h>
 #endif
 

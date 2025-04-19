@@ -2,6 +2,12 @@
 
 #include "database/rrd.h"
 
+#ifdef OS_MACOS
+#include <AvailabilityMacros.h>
+#endif
+
+#if !defined(OS_MACOS) || (MAC_OS_X_VERSION_MIN_REQUIRED >= 101300)
+
 #define PLUGIN_TIMEX_NAME "timex.plugin"
 
 #define CONFIG_SECTION_TIMEX "plugin:timex"
@@ -182,3 +188,5 @@ void *timex_main(void *ptr)
 exit:
     return NULL;
 }
+
+#endif // !defined(OS_MACOS) || (MAC_OS_X_VERSION_MIN_REQUIRED >= 101300)
