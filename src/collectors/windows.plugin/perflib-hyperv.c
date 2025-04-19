@@ -1797,18 +1797,6 @@ hyperv_perf_item hyperv_perf_list[] = {
         .function_collect = do_hyperv_health_summary,
     },
 
-    {
-        .registry_name = "Hyper-V Hypervisor Root Partition",
-        .function_collect = do_hyperv_root_partition,
-        .dict_insert_cb = dict_hyperv_root_partition_insert_cb,
-        .dict_size = sizeof(struct hypervisor_root_partition),
-    },
-
-    {.registry_name = "Hyper-V Virtual Storage Device",
-     .function_collect = do_hyperv_storage_device,
-     .dict_insert_cb = dict_hyperv_storage_device_insert_cb,
-     .dict_size = sizeof(struct hypervisor_storage_device)},
-
     {.registry_name = "Hyper-V Virtual Switch",
      .function_collect = do_hyperv_switch,
      .dict_insert_cb = dict_hyperv_switch_insert_cb,
@@ -1823,6 +1811,16 @@ hyperv_perf_item hyperv_perf_list[] = {
      .function_collect = do_hyperv_processor,
      .dict_insert_cb = dict_hyperv_processor_insert_cb,
      .dict_size = sizeof(struct hypervisor_processor)},
+
+    {.registry_name = "Hyper-V Hypervisor Root Partition",
+     .function_collect = do_hyperv_root_partition,
+     .dict_insert_cb = dict_hyperv_root_partition_insert_cb,
+     .dict_size = sizeof(struct hypervisor_root_partition)},
+
+    {.registry_name = "Hyper-V Virtual Storage Device",
+     .function_collect = do_hyperv_storage_device,
+     .dict_insert_cb = dict_hyperv_storage_device_insert_cb,
+     .dict_size = sizeof(struct hypervisor_storage_device)},
 
     {.registry_name = NULL, .function_collect = NULL}};
 
@@ -1845,7 +1843,7 @@ int do_PerflibHyperV(int update_every, usec_t dt __maybe_unused)
         // Find the registry ID using the registry name
         DWORD id = RegistryFindIDByName(hyperv_perf_list[i].registry_name);
         if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
-            continue;
+            return -1;
 
         // Get the performance data using the registry ID
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
