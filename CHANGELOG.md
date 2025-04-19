@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- chore\(otel/journaldexporter\): improve remote tests [\#20143](https://github.com/netdata/netdata/pull/20143) ([ilyam8](https://github.com/ilyam8))
 - Install fix admonition docs [\#20136](https://github.com/netdata/netdata/pull/20136) ([kanelatechnical](https://github.com/kanelatechnical))
 - Update MSI to use a single unified EULA instead of multiple license pages. [\#20134](https://github.com/netdata/netdata/pull/20134) ([Ferroin](https://github.com/Ferroin))
 - Update README.md [\#20133](https://github.com/netdata/netdata/pull/20133) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -469,8 +470,6 @@
 - build\(deps\): bump golang.org/x/text from 0.21.0 to 0.22.0 in /src/go [\#19597](https://github.com/netdata/netdata/pull/19597) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Cleanup code that writes extents to the database [\#19596](https://github.com/netdata/netdata/pull/19596) ([stelfrag](https://github.com/stelfrag))
 - Add check for available active instances when checking for extreme cardinality [\#19594](https://github.com/netdata/netdata/pull/19594) ([stelfrag](https://github.com/stelfrag))
-- Free resources where writing datafile extents [\#19593](https://github.com/netdata/netdata/pull/19593) ([stelfrag](https://github.com/stelfrag))
-- fix incomplete implementation of journal watcher [\#19592](https://github.com/netdata/netdata/pull/19592) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
