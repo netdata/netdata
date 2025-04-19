@@ -25,13 +25,17 @@ static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NE
         return true;
     }
     
-    // Special values
+    // Special IEEE 754 values
     else if (strcmp(var_name, "nan_var") == 0) {
         *result = NAN;
         return true;
     }
     else if (strcmp(var_name, "inf_var") == 0) {
         *result = INFINITY;
+        return true;
+    }
+    else if (strcmp(var_name, "neg_inf_var") == 0) {
+        *result = -INFINITY;
         return true;
     }
     
@@ -331,7 +335,7 @@ static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NE
 typedef struct {
     const char *expression;
     NETDATA_DOUBLE expected_result;
-    int expected_error;
+    EVAL_ERROR expected_error;
     bool should_parse;
 } TestCase;
 
@@ -352,7 +356,7 @@ static void run_test_group(TestGroup *group) {
     for (int i = 0; i < group->test_count; i++) {
         TestCase *tc = &group->test_cases[i];
         const char *failed_at = NULL;
-        int error = 0;
+        EVAL_ERROR error = EVAL_ERROR_OK;
         bool test_failed = false;
         char error_message[1024] = "";
         
@@ -364,7 +368,7 @@ static void run_test_group(TestGroup *group) {
         // Check if parsing succeeded as expected
         if (tc->should_parse && !exp) {
             snprintf(error_message, sizeof(error_message), 
-                     "Expected parsing to succeed, but it failed with error %d (%s)",
+                     "Expected parsing to succeed, but it failed with error %u (%s)",
                      error, expression_strerror(error));
             test_failed = true;
         }
@@ -385,19 +389,19 @@ static void run_test_group(TestGroup *group) {
             // Check if there was an error during evaluation
             if (tc->expected_error != EVAL_ERROR_OK && exp->error == EVAL_ERROR_OK) {
                 snprintf(error_message, sizeof(error_message),
-                         "Expected evaluation error %d, but got no error",
+                         "Expected evaluation error %u, but got no error",
                          tc->expected_error);
                 test_failed = true;
             }
             else if (tc->expected_error == EVAL_ERROR_OK && exp->error != EVAL_ERROR_OK) {
                 snprintf(error_message, sizeof(error_message),
-                         "Expected no evaluation error, but got error %d (%s)",
+                         "Expected no evaluation error, but got error %u (%s)",
                          exp->error, expression_strerror(exp->error));
                 test_failed = true;
             }
             else if (tc->expected_error != EVAL_ERROR_OK && exp->error != tc->expected_error) {
                 snprintf(error_message, sizeof(error_message),
-                         "Expected evaluation error %d, but got error %d (%s)",
+                         "Expected evaluation error %u, but got error %u (%s)",
                          tc->expected_error, exp->error, expression_strerror(exp->error));
                 test_failed = true;
             }
@@ -447,7 +451,7 @@ static void run_test_group(TestGroup *group) {
                     // Check if hardcoded variable works correctly
                     if (exp->error != EVAL_ERROR_OK || fabs(exp->result - 123.456) > 0.000001) {
                         snprintf(error_message, sizeof(error_message),
-                                "expression_hardcode_variable failed: expected 123.456, got %f (error: %d)",
+                                "expression_hardcode_variable failed: expected 123.456, got %f (error: %u)",
                                 exp->result, exp->error);
                         test_failed = true;
                     } else {
@@ -665,9 +669,9 @@ static TestCase special_value_tests[] = {
     {"$nan_var >= 5", 0.0, EVAL_ERROR_OK, true},
     {"$nan_var <= 5", 0.0, EVAL_ERROR_OK, true},
 
-    // NaN self-comparison (Netdata treats NaN == NaN as true, which is different from IEEE 754)
-    {"$nan_var == $nan_var", 1.0, EVAL_ERROR_OK, true},
-    {"$nan_var != $nan_var", 0.0, EVAL_ERROR_OK, true},
+    // NaN self-comparison (according to IEEE 754)
+    {"$nan_var == $nan_var", 0.0, EVAL_ERROR_OK, true},
+    {"$nan_var != $nan_var", 1.0, EVAL_ERROR_OK, true},
     {"$nan_var > $nan_var", 0.0, EVAL_ERROR_OK, true},
     {"$nan_var < $nan_var", 0.0, EVAL_ERROR_OK, true},
     {"$nan_var >= $nan_var", 0.0, EVAL_ERROR_OK, true},
@@ -715,7 +719,7 @@ static TestCase special_value_tests[] = {
     // Zero division
     {"5 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Positive/zero gives infinity
     {"-5 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Negative/zero gives -infinity
-    {"0 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // In Netdata, this gives INFINITE error
+    {"0 / 0", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // According to IEEE 754, this is NaN
 
     // NaN and Infinity comparison
     {"$inf_var == $nan_var", 0.0, EVAL_ERROR_OK, true},
@@ -732,8 +736,8 @@ static TestCase special_value_tests[] = {
     {"!$nan_var || !$inf_var", 1.0, EVAL_ERROR_OK, true},
 
     // Special value operations with zero
-    {"$zero * $inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
-    {"$zero / $zero", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Netdata treats 0/0 as INFINITE
+    {"$zero * $inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // Infinity * 0 = NaN per IEEE 754
+    {"$zero / $zero", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // 0/0 = NaN per IEEE 754
     {"($zero) ? 1 : 2", 2.0, EVAL_ERROR_OK, true},
 
     // Short-circuit evaluation with special values (these work because no evaluation happens)
@@ -741,6 +745,73 @@ static TestCase special_value_tests[] = {
     {"1 || $nan_var", 1.0, EVAL_ERROR_OK, true}, // Short-circuit should avoid NaN
     {"0 && $inf_var", 0.0, EVAL_ERROR_OK, true}, // Short-circuit should avoid Infinity
     {"1 || $inf_var", 1.0, EVAL_ERROR_OK, true}  // Short-circuit should avoid Infinity
+};
+
+// Detailed IEEE 754 test cases focusing on negative infinity and more specific behaviors
+static TestCase ieee754_tests[] = {
+    // NaN direct comparison tests (according to IEEE 754)
+    {"NaN == NaN", 0.0, EVAL_ERROR_OK, true},          // Should be false according to IEEE 754
+    {"NaN != NaN", 1.0, EVAL_ERROR_OK, true},          // Should be true according to IEEE 754
+    {"NaN > NaN", 0.0, EVAL_ERROR_OK, true},           // Should be false
+    {"NaN < NaN", 0.0, EVAL_ERROR_OK, true},           // Should be false
+    {"NaN >= NaN", 0.0, EVAL_ERROR_OK, true},          // Should be false
+    {"NaN <= NaN", 0.0, EVAL_ERROR_OK, true},          // Should be false
+    
+    // NaN comparison with regular values
+    {"NaN == 0", 0.0, EVAL_ERROR_OK, true},            // Any comparison with NaN is false
+    {"0 == NaN", 0.0, EVAL_ERROR_OK, true},            // Any comparison with NaN is false
+    {"NaN > 0", 0.0, EVAL_ERROR_OK, true},             // Any comparison with NaN is false
+    {"0 > NaN", 0.0, EVAL_ERROR_OK, true},             // Any comparison with NaN is false
+    
+    // Negative infinity tests
+    {"$neg_inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},  // Should be rejected with INFINITE error
+    {"$neg_inf_var < 0", 1.0, EVAL_ERROR_OK, true},     // -Infinity is less than any finite number
+    {"$neg_inf_var > 0", 0.0, EVAL_ERROR_OK, true},     // -Infinity is not greater than any finite number
+    {"$neg_inf_var == 0", 0.0, EVAL_ERROR_OK, true},    // -Infinity is not equal to any finite number
+
+    // Infinity vs Infinity
+    {"$inf_var == $inf_var", 1.0, EVAL_ERROR_OK, true},         // +Infinity equals +Infinity
+    {"$neg_inf_var == $neg_inf_var", 1.0, EVAL_ERROR_OK, true}, // -Infinity equals -Infinity
+    {"$inf_var == $neg_inf_var", 0.0, EVAL_ERROR_OK, true},     // +Infinity does not equal -Infinity
+    {"$inf_var != $neg_inf_var", 1.0, EVAL_ERROR_OK, true},     // +Infinity is not equal to -Infinity
+    {"$inf_var > $neg_inf_var", 1.0, EVAL_ERROR_OK, true},      // +Infinity is greater than -Infinity
+    {"$neg_inf_var < $inf_var", 1.0, EVAL_ERROR_OK, true},      // -Infinity is less than +Infinity
+    
+    // Special arithmetic with infinities
+    {"$inf_var + 1", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},   // +Infinity + anything = +Infinity
+    {"$inf_var - 1", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},   // +Infinity - anything = +Infinity
+    {"$neg_inf_var + 1", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // -Infinity + anything = -Infinity
+    {"$neg_inf_var - 1", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // -Infinity - anything = -Infinity
+    {"$inf_var * 2", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},   // +Infinity * positive = +Infinity
+    {"$inf_var * (-2)", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // +Infinity * negative = -Infinity
+    {"$neg_inf_var * 2", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // -Infinity * positive = -Infinity
+    {"$neg_inf_var * (-2)", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // -Infinity * negative = +Infinity
+    
+    // Indeterminate forms (should all return NaN according to IEEE 754)
+    {"$inf_var - $inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},     // +Infinity - +Infinity = NaN
+    {"$neg_inf_var - $neg_inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // -Infinity - (-Infinity) = NaN
+    {"$inf_var * 0", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},            // +Infinity * 0 = NaN
+    {"$neg_inf_var * 0", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},        // -Infinity * 0 = NaN
+    {"$inf_var / $inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},     // +Infinity / +Infinity = NaN
+    {"$neg_inf_var / $neg_inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // -Infinity / -Infinity = NaN
+    {"$inf_var / $neg_inf_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // +Infinity / -Infinity = NaN
+    
+    // Infinity with NaN operations
+    {"$inf_var + $nan_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},     // +Infinity + NaN = NaN
+    {"$neg_inf_var + $nan_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // -Infinity + NaN = NaN
+    {"$inf_var * $nan_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},     // +Infinity * NaN = NaN
+    {"$neg_inf_var * $nan_var", 0.0, EVAL_ERROR_VALUE_IS_NAN, true}, // -Infinity * NaN = NaN
+    
+    // Logical operations with infinities
+    {"$neg_inf_var && 1", 1.0, EVAL_ERROR_OK, true},                 // -Infinity is truthy
+    {"$neg_inf_var || 0", 1.0, EVAL_ERROR_OK, true},                 // -Infinity is truthy
+    {"!$neg_inf_var", 0.0, EVAL_ERROR_OK, true},                     // -Infinity is truthy, so !(-Infinity) is false
+    
+    // Ternary operations with infinities
+    {"1 ? $inf_var : 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},   // Should yield +Infinity
+    {"0 ? 0 : $neg_inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}, // Should yield -Infinity
+    {"$inf_var ? 1 : 0", 1.0, EVAL_ERROR_OK, true},                  // +Infinity is truthy
+    {"$neg_inf_var ? 1 : 0", 1.0, EVAL_ERROR_OK, true}               // -Infinity is truthy
 };
 
 // Complex expression tests
@@ -1076,7 +1147,7 @@ static TestCase real_world_tests[] = {
     {"$arrays * 100 / $ipc_semaphores_arrays_max", 50.0, EVAL_ERROR_OK, true},
     
     // Basic patterns with lowercase logical operators
-    {"$netdata.uptime.uptime > 30 AND $this > 0 and $this < 24", 0.0, EVAL_ERROR_OK, true},
+    {"$netdata.uptime.uptime > 30 AND $this > 0 and $this < 24", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true},
     {"($this > $green OR $var1 > $red) and $this > 2", 1.0, EVAL_ERROR_OK, true},
     
     // Expressions with word operators and comparisons
@@ -1089,6 +1160,82 @@ static TestCase real_world_tests[] = {
     {"($var1 > 30 && $var2 < 30) OR $this > 45", 1.0, EVAL_ERROR_OK, true},
 };
 
+// Test cases for variable assignment and local variables
+static TestCase variable_assignment_tests[] = {
+    // Basic variable assignment
+    {"$x = 5", 5.0, EVAL_ERROR_OK, true},
+    {"$x = 5 + 3", 8.0, EVAL_ERROR_OK, true},
+    {"$x = -10", -10.0, EVAL_ERROR_OK, true},
+    {"${my_var} = 42", 42.0, EVAL_ERROR_OK, true},
+
+    // Assignment with existing variables
+    {"$x = $var1", 42.0, EVAL_ERROR_OK, true},
+    {"$x = $var1 + $var2", 66.0, EVAL_ERROR_OK, true},
+    {"$x = $var1 * $var2", 1008.0, EVAL_ERROR_OK, true},
+
+    // Reassignment
+    {"$x = 5; $x = 10", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $x = $x + 1", 6.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $x = $x * 2", 10.0, EVAL_ERROR_OK, true},
+
+    // Multiple assignments
+    {"$x = 5; $y = 10", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $y = $x * 2", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $y = $x + 3; $z = $x + $y", 13.0, EVAL_ERROR_OK, true},
+
+    // Assignments with expressions
+    {"$x = 5; $y = $x > 3 ? 10 : 20", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 1; $y = $x > 3 ? 10 : 20", 20.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $y = abs($x - 10)", 5.0, EVAL_ERROR_OK, true},
+
+    // Assignments with complex expressions
+    {"$x = 5; $y = 10; $z = ($x + $y) * 2", 30.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $y = 10; $z = $x > $y ? $x : $y", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 1; $y = 2; $z = $x && $y", 1.0, EVAL_ERROR_OK, true},
+    {"$x = 0; $y = 2; $z = $x && $y", 0.0, EVAL_ERROR_OK, true},
+
+    // Variable shadowing (local variables overriding globals)
+    {"$var1 = 100; $var1", 100.0, EVAL_ERROR_OK, true},
+    {"$var1 = 100; $var1 + $var2", 124.0, EVAL_ERROR_OK, true},
+    {"$var2 = 100; $var1 * $var2", 4200.0, EVAL_ERROR_OK, true},
+
+    // Mixed operations with assignments
+    {"$x = 5; $y = $x + 3; $x = $y * 2", 16.0, EVAL_ERROR_OK, true},
+    {"$x = 5; $y = $x + 3; $z = $x * $y", 40.0, EVAL_ERROR_OK, true},
+    {"$x = $var1; $y = $var2; $z = $x > $y ? $x - $y : $y - $x", 18.0, EVAL_ERROR_OK, true},
+
+    // Edge cases
+    {"$x = 5; ; $y = 10", 10.0, EVAL_ERROR_OK, true},  // Empty expression in the middle
+    {"$x = 5;", 5.0, EVAL_ERROR_OK, true},              // Trailing semicolon
+    {"$x = $undefined_var", 0.0, EVAL_ERROR_UNKNOWN_VARIABLE, true}, // Undefined variable
+
+    // Assignment to complex variable names
+    {"${complex var} = 42", 42.0, EVAL_ERROR_OK, true},
+    {"${complex var} = 42; ${complex var} + 8", 50.0, EVAL_ERROR_OK, true},
+
+    // Assignments with newlines instead of semicolons
+    {"$x = 5\n$y = 10", 10.0, EVAL_ERROR_OK, true},
+    {"$x = 5\n$y = $x * 2", 10.0, EVAL_ERROR_OK, true},
+
+    // Multiple assignments with arithmetic
+    {"$a = 1; $b = 2; $c = 3; $d = $a + $b + $c", 6.0, EVAL_ERROR_OK, true},
+    {"$a = 1; $b = $a + 1; $c = $b + 1; $d = $c + 1", 4.0, EVAL_ERROR_OK, true},
+
+    // Reassignment with arithmetic
+    {"$x = 1; $x = $x + 1; $x = $x + 1; $x = $x + 1", 4.0, EVAL_ERROR_OK, true},
+    {"$x = 10; $x = $x - 1; $x = $x - 1; $x = $x - 1", 7.0, EVAL_ERROR_OK, true},
+    {"$x = 2; $x = $x * 2; $x = $x * 2; $x = $x * 2", 16.0, EVAL_ERROR_OK, true},
+
+    // Variables in conditions
+    {"$x = 5; $y = $x > 3 ? 10 : 20; $z = $y < 15 ? 30 : 40", 30.0, EVAL_ERROR_OK, true},
+    {"$x = 1; $y = $x > 3 ? 10 : 20; $z = $y < 15 ? 30 : 40", 40.0, EVAL_ERROR_OK, true},
+
+    // Special values
+    {"$x = NaN", 0.0, EVAL_ERROR_VALUE_IS_NAN, true},
+    {"$x = Infinity", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},
+    {"$x = 1 / 0", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true}
+};
+
 // Define the test groups
 static TestGroup test_groups[] = {
     {"Arithmetic Tests", arithmetic_tests, ARRAY_SIZE(arithmetic_tests)},
@@ -1098,6 +1245,7 @@ static TestGroup test_groups[] = {
     {"Variable Space Tests", variable_space_tests, ARRAY_SIZE(variable_space_tests)},
     {"Function Tests", function_tests, ARRAY_SIZE(function_tests)},
     {"Special Value Tests", special_value_tests, ARRAY_SIZE(special_value_tests)},
+    {"IEEE 754 Compliance Tests", ieee754_tests, ARRAY_SIZE(ieee754_tests)},
     {"Complex Expression Tests", complex_tests, ARRAY_SIZE(complex_tests)},
     {"Edge Case Tests", edge_case_tests, ARRAY_SIZE(edge_case_tests)},
     {"Operator Precedence Tests", precedence_tests, ARRAY_SIZE(precedence_tests)},
@@ -1108,6 +1256,9 @@ static TestGroup test_groups[] = {
     {"Number Overflow Tests", overflow_tests, ARRAY_SIZE(overflow_tests)},
     {"Combined Complex Expressions", combined_tests, ARRAY_SIZE(combined_tests)},
     {"Crash Tests", crash_tests, ARRAY_SIZE(crash_tests)},
+#ifdef USE_RE2C_LEMON_PARSER
+    {"Variable Assignment Tests", variable_assignment_tests, ARRAY_SIZE(variable_assignment_tests)},
+#endif
 };
 
 int eval_unittest(void) {
@@ -1134,7 +1285,7 @@ int eval_unittest(void) {
         for (int j = 0; j < group_tests; j++) {
             TestCase *tc = &test_groups[i].test_cases[j];
             const char *failed_at = NULL;
-            int error = 0;
+            EVAL_ERROR error = EVAL_ERROR_OK;
             
             // Try to parse the expression
             EVAL_EXPRESSION *exp = expression_parse(tc->expression, &failed_at, &error);

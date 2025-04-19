@@ -78,7 +78,7 @@ void eval_node_free(EVAL_NODE *op) {
 // ----------------------------------------------------------------------------
 // parsed-as generation
 
-void print_parsed_as_variable(BUFFER *out, EVAL_VARIABLE *v, int *error __maybe_unused) {
+void print_parsed_as_variable(BUFFER *out, EVAL_VARIABLE *v, EVAL_ERROR *error __maybe_unused) {
     buffer_sprintf(out, "${%s}", string2str(v->name));
 }
 
@@ -108,7 +108,7 @@ void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n) {
     buffer_strcat(out, b);
 }
 
-void print_parsed_as_value(BUFFER *out, EVAL_VALUE *v, int *error) {
+void print_parsed_as_value(BUFFER *out, EVAL_VALUE *v, EVAL_ERROR *error) {
     switch(v->type) {
         case EVAL_VALUE_EXPRESSION:
             print_parsed_as_node(out, v->expression, error);
@@ -128,7 +128,7 @@ void print_parsed_as_value(BUFFER *out, EVAL_VALUE *v, int *error) {
     }
 }
 
-void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error) {
+void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, EVAL_ERROR *error) {
     extern struct operator operators[];
 
     if(unlikely(!op)) {
@@ -137,16 +137,31 @@ void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error) {
         return;
     }
 
-    if(unlikely(op->count != operators[op->operator].parameters)) {
+    if(unlikely(!has_the_right_number_of_operands(op))) {
         buffer_sprintf(out, "INVALID PARAMETERS (operator requires %d, but node has %d)", operators[op->operator].parameters, op->count);
         *error = EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS;
         return;
     }
 
     if(operators[op->operator].isfunction) {
+        if(op->operator < EVAL_OPERATOR_CUSTOM_FUNCTION_START || !operators[op->operator].print_as) {
+            buffer_sprintf(out, "INVALID FUNCTION (operator %d)", op->operator);
+            *error = EVAL_ERROR_INVALID_OPERAND;
+            return;
+        }
+
         buffer_strcat(out, operators[op->operator].print_as);
         buffer_strcat(out, "(");
-        print_parsed_as_value(out, &op->ops[0], error);
+        
+        // Print function parameters
+        // Dynamic functions have variable parameter counts
+        int param_count = op->count;
+        
+        for(int i = 0; i < param_count; i++) {
+            if(i > 0) buffer_strcat(out, ", ");
+            print_parsed_as_value(out, &op->ops[i], error);
+        }
+
         buffer_strcat(out, ")");
         return;
     }
@@ -185,7 +200,7 @@ void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error) {
 // ----------------------------------------------------------------------------
 // public API utility functions
 
-const char *expression_strerror(int error) {
+const char *expression_strerror(EVAL_ERROR error) {
     switch(error) {
         case EVAL_ERROR_OK:
             return "success";
@@ -219,6 +234,12 @@ const char *expression_strerror(int error) {
 
         case EVAL_ERROR_UNKNOWN_VARIABLE:
             return "undefined variable";
+
+        case EVAL_ERROR_INVALID_OPERAND:
+            return "invalid operand";
+
+        case EVAL_ERROR_INVALID_OPERATOR:
+            return "invalid operator";
 
         case EVAL_ERROR_IF_THEN_ELSE_MISSING_ELSE:
             return "missing second sub-expression of inline conditional";
