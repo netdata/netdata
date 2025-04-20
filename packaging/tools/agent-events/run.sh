@@ -4,15 +4,23 @@ MYDIR="/opt/agent-events"
 
 BLACKLIST_FILE="${MYDIR}/blacklist"
 
-if [[ -f "${BLACKLIST_FILE}" ]]; then
-    # File exists: Use grep. Handles both non-empty (filters) and empty (passes through) files.
-    filter_command=(grep -v -F -f "${BLACKLIST_FILE}")
-    echo "Info: Using blacklist file '${BLACKLIST_FILE}' for filtering." >&2
-else
-    # File does not exist: Use cat as a pass-through filter.
-    filter_command=(cat)
-    echo "Warning: Blacklist file '${BLACKLIST_FILE}' not found. No UUID filtering will be applied." >&2
-fi
+[[ ! -f "${BLACKLIST_FILE}" ]] && \
+  echo "# Blacklist file - comments allowed" > "${BLACKLIST_FILE}"
+
+blacklist_preprocess() {
+  # Run awk to preprocess the blacklist file
+  awk '
+    # Step 1: Remove comments first (# and everything after it, including preceding space)
+    sub(/[[:space:]]*#.*/,"");
+
+    # Step 2: Then, remove leading/trailing whitespace from what remains
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "");
+
+    # Step 3: Finally, print the line only if it is not empty (NF > 0).
+    #        NF is the number of fields; it is non-zero for non-empty lines after stripping.
+    NF
+  ' "${BLACKLIST_FILE}"
+}
 
 # --- The Main Pipeline ---
 
@@ -24,7 +32,7 @@ stdbuf -oL "${MYDIR}/server" \
     --dedup-key=exit_cause \
     --dedup-window=86400 \
     2>"${MYDIR}/log/stderr.log" \
-| stdbuf -oL "${filter_command[@]}" \
+| stdbuf -oL grep -v -F -f <(blacklist_preprocess) \
 | stdbuf -oL log2journal json \
         --prefix 'AE_' \
         --inject 'SYSLOG_IDENTIFIER=agent-events' \
