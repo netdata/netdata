@@ -21,7 +21,7 @@ stdbuf -oL "${MYDIR}/server" \
     --dedup-key=host.id \
     --dedup-key=host.boot.id \
     --dedup-key=exit_cause \
-    --dedup-window=86400 \
+    --dedup-window=14400 \
     2>"${MYDIR}/log/stderr.log" \
 | stdbuf -oL grep -v -F -f <(blacklist_preprocess) \
 | stdbuf -oL log2journal json \
