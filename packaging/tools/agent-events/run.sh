@@ -8,18 +8,9 @@ BLACKLIST_FILE="${MYDIR}/blacklist"
   echo "# Blacklist file - comments allowed" > "${BLACKLIST_FILE}"
 
 blacklist_preprocess() {
-  # Run awk to preprocess the blacklist file
-  awk '
-    # Step 1: Remove comments first (# and everything after it, including preceding space)
-    sub(/[[:space:]]*#.*/,"");
-
-    # Step 2: Then, remove leading/trailing whitespace from what remains
-    gsub(/^[[:space:]]+|[[:space:]]+$/, "");
-
-    # Step 3: Finally, print the line only if it is not empty (NF > 0).
-    #        NF is the number of fields; it is non-zero for non-empty lines after stripping.
-    NF
-  ' "${BLACKLIST_FILE}"
+  sed -e 's/#.*$//g' -e 's/^[[:space:]]*//g' -e 's/[[:space:]]*$//g' <"${BLACKLIST_FILE}" |\
+    sort -u |\
+      grep -v '^$'
 }
 
 # --- The Main Pipeline ---
