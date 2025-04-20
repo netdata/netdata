@@ -265,6 +265,22 @@ flowchart TB
     class Child agentGroup
 ```
 
+Netdata's design incorporates specific strategies aimed at mitigating practical attack vectors:
+
+#### Multiple Layers of Validation
+
+Any malicious request must pass rigorous input sanitization at multiple points, initially by the unprivileged parent and subsequently by the unprivileged child agent. This redundancy ensures a robust defense against attempts to exploit vulnerabilities via malformed inputs.
+
+#### Limited Plugin Interaction
+
+Privileged helpers (`local-listeners` and `cgroup-network`) execute predefined operations at specific events (startup and container creation respectively), not in response to dynamic external inputs. Consequently, these components cannot be externally manipulated by an attacker.
+
+Privileged plugins (`apps.plugin`, `network-viewer.plugin`, `systemd-journal.plugin`, and `debugfs.plugin`) perform strictly defined, hardcoded tasks, insulated from dynamic external influence. They merely respond to straightforward data-fetch requests.
+
+#### Functional Isolation
+
+Privileged plugins are structurally isolated, interacting with the broader system through highly controlled interfaces, thereby substantially reducing their susceptibility to injection or remote execution exploits.
+
 ## Configuration Strategies and Monitoring Scope
 
 Administrators can configure Netdata `child` agents with varying levels of host access, directly impacting both the depth of observability achieved and the security posture of the deployment. Understanding the trade-offs associated with different configurations is essential for aligning Netdata with organizational security policies and monitoring requirements. We outline three primary approaches below:
