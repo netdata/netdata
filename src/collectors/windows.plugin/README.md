@@ -5,7 +5,6 @@ This internal plugin is only available for Microsoft Windows operating systems.
 ## The Collector
 
 This plugin primarily collects metrics from Microsoft Windows [Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new). All detected metrics are automatically displayed without requiring additional configuration.
-=======
 Most of the metrics collected by this plugin originate from Microsoft Windows
 [Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new).
 
@@ -104,7 +103,7 @@ on each database you wish to monitor.
 
 ```tsql
 DECLARE @dbname NVARCHAR(max)
-DECLARE nd_user_cursor CURSOR FOR SELECT name FROM master.dbo.sysdatabases WHERE NAME NOT IN ('master','msdb','tempdb','model')
+DECLARE nd_user_cursor CURSOR FOR SELECT name FROM master.dbo.sysdatabases WHERE NAME NOT IN ('master','msdb','tempdb','model', 'model_msdb', 'model_replicatedmaster')
 
 OPEN nd_user_cursor
 FETCH NEXT FROM nd_user_cursor INTO @dbname WHILE @@FETCH_STATUS = 0
