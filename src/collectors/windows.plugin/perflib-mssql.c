@@ -501,7 +501,6 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     struct mssql_db_instance *ptr = value;
 
     // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-databases-object
-    ptr->MSSQLDatabaseActiveTransactions.key = "Active Transactions";
     ptr->MSSQLDatabaseBackupRestoreOperations.key = "Backup/Restore Throughput/sec";
     ptr->MSSQLDatabaseLogFlushed.key = "Log Bytes Flushed/sec";
     ptr->MSSQLDatabaseLogFlushes.key = "Log Flushes/sec";
