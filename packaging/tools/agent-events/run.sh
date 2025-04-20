@@ -8,10 +8,13 @@ BLACKLIST_FILE="${MYDIR}/blacklist"
   echo "# Blacklist file - comments allowed" > "${BLACKLIST_FILE}"
 
 blacklist_preprocess() {
-  sed -e 's/#.*$//g' -e 's/^[[:space:]]*//g' -e 's/[[:space:]]*$//g' <"${BLACKLIST_FILE}" |\
+  sed -e 's/#.*$//g' -e 's/^[[:space:]]*//g' -e 's/[[:space:]]*$//g' |\
     sort -u |\
       grep -v '^$'
 }
+
+# Preprocess the blacklist file
+blacklist_preprocess <"${BLACKLIST_FILE}" >"${BLACKLIST_FILE}.running"
 
 # --- The Main Pipeline ---
 
@@ -23,7 +26,7 @@ stdbuf -oL "${MYDIR}/server" \
     --dedup-key=exit_cause \
     --dedup-window=14400 \
     2>"${MYDIR}/log/stderr.log" \
-| stdbuf -oL grep -v -F -f <(blacklist_preprocess) \
+| stdbuf -oL grep -v -F -f "${BLACKLIST_FILE}.running" \
 | stdbuf -oL log2journal json \
         --prefix 'AE_' \
         --inject 'SYSLOG_IDENTIFIER=agent-events' \
