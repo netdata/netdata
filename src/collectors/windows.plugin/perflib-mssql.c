@@ -11,8 +11,6 @@
 // https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
 #define NETDATA_MAX_INSTANCE_NAME 32
 #define NETDATA_MAX_INSTANCE_OBJECT 128
-// https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
-#define SQLSERVER_MAX_NAME_LENGTH (128)
 
 BOOL is_sqlexpress = FALSE;
 
@@ -30,6 +28,7 @@ struct netdata_mssql_conn {
     SQLHENV netdataSQLEnv;
     SQLHDBC netdataSQLHDBc;
 
+    SQLHSTMT databaseList;
     SQLHSTMT dataFileSizeSTMT;
     SQLHSTMT dataActiveTransactionSTMT;
 
@@ -275,6 +274,8 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
     return (ULONGLONG)(db_size * MEGA_FACTOR);
 }
 
+#define NETDATA_QUERY_LIST_DB "SELECT name FROM sys.databases;"
+
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_DATA_FILE_SIZE_MASK "SELECT size * 8/1024 FROM %s.sys.database_files WHERE type = 0;"
 
@@ -297,6 +298,49 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     if (mdi->MSSQLDatabaseActiveTransactions.current.Data != ULONG_LONG_MAX)
         mdi->MSSQLDatabaseActiveTransactions.current.Data = netdata_MSSQL_fill_long_value(
             mdi->parent->conn.dataActiveTransactionSTMT, NETDATA_QUERY_ACT_TRANSACTION_MASK, dbname);
+
+    return 0;
+}
+
+void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi) {
+// https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
+#define SQLSERVER_MAX_NAME_LENGTH (128)
+    static char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
+    static SQLLEN col_data_len = 0;
+
+    SQLRETURN ret;
+
+    ret = SQLExecDirect(mi->conn.databaseList, (SQLCHAR *)NETDATA_QUERY_LIST_DB, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseList, NETDATA_MSSQL_ODBC_QUERY);
+        goto enddblist;
+    }
+
+    ret = SQLBindCol(mi->conn.databaseList, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_data_len);
+
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseList, NETDATA_MSSQL_ODBC_PREPARE);
+        goto enddblist;
+    }
+
+    do {
+        ret = SQLFetch(mi->conn.databaseList);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            goto enddblist;
+        }
+
+        struct mssql_db_instance *mdi = dictionary_set(mi->databases, dbname, NULL, sizeof(*mdi));
+        if (!mdi)
+            continue;
+
+        mdi->updated = 0;
+        if (!mdi->parent) {
+            mdi->parent = mi;
+        }
+    } while (true);
+
+enddblist:
+    SQLFreeStmt(mi->conn.databaseList, SQL_CLOSE);
 }
 
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
@@ -348,6 +392,10 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
     }
 
     if (retConn) {
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->databaseList);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dataFileSizeSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
@@ -511,6 +559,7 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
 {
     dbconn->netdataSQLEnv = NULL;
     dbconn->netdataSQLHDBc = NULL;
+    dbconn->databaseList = NULL;
     dbconn->dataFileSizeSTMT = NULL;
     dbconn->dataActiveTransactionSTMT = NULL;
 
@@ -1682,6 +1731,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     int *update_every = data;
 
     if (mi->conn.is_connected) {
+        metdata_mssql_fill_dictionary_from_db(mi);
         dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
     }
 
