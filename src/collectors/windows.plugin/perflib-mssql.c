@@ -28,7 +28,7 @@ struct netdata_mssql_conn {
     SQLHENV netdataSQLEnv;
     SQLHDBC netdataSQLHDBc;
 
-    SQLHSTMT databaseList;
+    SQLHSTMT databaseListSTMT;
     SQLHSTMT dataFileSizeSTMT;
     SQLHSTMT dataActiveTransactionSTMT;
 
@@ -310,21 +310,21 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi) {
 
     SQLRETURN ret;
 
-    ret = SQLExecDirect(mi->conn.databaseList, (SQLCHAR *)NETDATA_QUERY_LIST_DB, SQL_NTS);
+    ret = SQLExecDirect(mi->conn.databaseListSTMT, (SQLCHAR *)NETDATA_QUERY_LIST_DB, SQL_NTS);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseList, NETDATA_MSSQL_ODBC_QUERY);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseListSTMT, NETDATA_MSSQL_ODBC_QUERY);
         goto enddblist;
     }
 
-    ret = SQLBindCol(mi->conn.databaseList, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_data_len);
+    ret = SQLBindCol(mi->conn.databaseListSTMT, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_data_len);
 
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseList, NETDATA_MSSQL_ODBC_PREPARE);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseListSTMT, NETDATA_MSSQL_ODBC_PREPARE);
         goto enddblist;
     }
 
     do {
-        ret = SQLFetch(mi->conn.databaseList);
+        ret = SQLFetch(mi->conn.databaseListSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             goto enddblist;
         }
@@ -340,7 +340,7 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi) {
     } while (true);
 
 enddblist:
-    SQLFreeStmt(mi->conn.databaseList, SQL_CLOSE);
+    SQLFreeStmt(mi->conn.databaseListSTMT, SQL_CLOSE);
 }
 
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
@@ -392,7 +392,7 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
     }
 
     if (retConn) {
-        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->databaseList);
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->databaseListSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
 
@@ -558,7 +558,7 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
 {
     dbconn->netdataSQLEnv = NULL;
     dbconn->netdataSQLHDBc = NULL;
-    dbconn->databaseList = NULL;
+    dbconn->databaseListSTMT = NULL;
     dbconn->dataFileSizeSTMT = NULL;
     dbconn->dataActiveTransactionSTMT = NULL;
 
