@@ -90,7 +90,7 @@ Once the user is created, it must also be granted access to the databases.
 
 ```tsql
 USE master;
-CREATE LOGIN netdata_user WITH PASSWORD = 'netdata';
+CREATE LOGIN netdata_user WITH PASSWORD = 'AReallyStrongPasswordShouldBeInsertedHere';
 CREATE USER netdata_user FOR LOGIN netdata_user;
 GRANT CONNECT SQL TO netdata_user;
 GRANT VIEW SERVER STATE TO netdata_user;
