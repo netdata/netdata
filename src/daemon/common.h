@@ -74,6 +74,7 @@ extern "C" {
 #include "commands.h"
 #include "pipename.h"
 #include "analytics.h"
+#include "maintenance.h"
 
 // global netdata daemon variables
 extern const char *netdata_configured_hostname;

@@ -1228,7 +1228,8 @@ set(DAEMON_FILES
         src/daemon/win_system-info.h
         src/daemon/signal-handler.c
         src/daemon/signal-handler.h
-        src/daemon/service.c
+        src/daemon/maintenance.c
+        src/daemon/maintenance.h
         src/daemon/daemon-shutdown-watcher.c
         src/daemon/daemon-shutdown-watcher.h
         src/daemon/static_threads.c

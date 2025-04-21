@@ -128,8 +128,6 @@ void service_signal_exit(SERVICE_TYPE service) {
 }
 
 static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
-    if(service & SERVICE_MAINTENANCE)
-        buffer_strcat(wb, "MAINTENANCE ");
     if(service & SERVICE_COLLECTORS)
         buffer_strcat(wb, "COLLECTORS ");
     if(service & SERVICE_REPLICATION)
