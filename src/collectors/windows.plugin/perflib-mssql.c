@@ -28,6 +28,7 @@ struct netdata_mssql_conn {
     SQLHENV netdataSQLEnv;
     SQLHDBC netdataSQLHDBc;
 
+    SQLHSTMT checkPermSTMT;
     SQLHSTMT databaseListSTMT;
     SQLHSTMT dataFileSizeSTMT;
     SQLHSTMT dataActiveTransactionSTMT;
@@ -302,6 +303,37 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     return 0;
 }
 
+#define NETDATA_QUERY_CHECK_PERM "SELECT CASE WHEN IS_SRVROLEMEMBER('sysadmin') = 1 OR HAS_PERMS_BY_NAME(null, null, 'VIEW SERVER STATE') = 1 THEN 1 ELSE 0 END AS has_permission;"
+long metdata_mssql_check_permission(struct mssql_instance *mi) {
+    static long perm = 0;
+    static SQLLEN col_data_len = 0;
+
+    SQLRETURN ret;
+
+    ret = SQLExecDirect(mi->conn.checkPermSTMT, (SQLCHAR *)NETDATA_QUERY_CHECK_PERM, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_QUERY);
+        goto endperm;
+    }
+
+    ret = SQLBindCol(mi->conn.checkPermSTMT, 1, SQL_C_LONG, &perm, sizeof(perm), &col_data_len);
+
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        goto endperm;
+    }
+
+    ret = SQLFetch(mi->conn.checkPermSTMT);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_FETCH);
+        return (ULONGLONG)ULONG_LONG_MAX;
+    }
+
+    SQLFreeStmt(mi->conn.checkPermSTMT, SQL_CLOSE);
+endperm:
+    return perm;
+}
+
 void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi) {
 // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
 #define SQLSERVER_MAX_NAME_LENGTH (128)
@@ -392,6 +424,10 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
     }
 
     if (retConn) {
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->checkPermSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->databaseListSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
@@ -558,6 +594,7 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
 {
     dbconn->netdataSQLEnv = NULL;
     dbconn->netdataSQLHDBc = NULL;
+    dbconn->checkPermSTMT = NULL;
     dbconn->databaseListSTMT = NULL;
     dbconn->dataFileSizeSTMT = NULL;
     dbconn->dataActiveTransactionSTMT = NULL;
@@ -1724,14 +1761,39 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
     }
 }
 
+int netdata_mssql_set_error_value(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct mssql_db_instance *mdi = value;
+
+    mdi->MSSQLDatabaseActiveTransactions.current.Data = ULONG_LONG_MAX;
+    mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = ULONG_LONG_MAX;
+    mdi->MSSQLDatabaseDataFileSize.current.Data = ULONG_LONG_MAX;
+    mdi->MSSQLDatabaseLogFlushed.current.Data = ULONG_LONG_MAX;
+    mdi->MSSQLDatabaseLogFlushes.current.Data = ULONG_LONG_MAX;
+    mdi->MSSQLDatabaseTransactions.current.Data = ULONG_LONG_MAX;
+    mdi->MSSQLDatabaseWriteTransactions.current.Data = ULONG_LONG_MAX;
+}
+
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_instance *mi = value;
+    static long have_perm = 1;
     int *update_every = data;
 
-    if (mi->conn.is_connected) {
-        metdata_mssql_fill_dictionary_from_db(mi);
-        dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
+    if (mi->conn.is_connected && have_perm) {
+        have_perm = metdata_mssql_check_permission(mi);
+        if (!have_perm) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "User %s does not have permission to run queries on %s", mi->conn.username, mi->instanceID);
+            dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_set_error_value, NULL);
+        } else {
+            metdata_mssql_fill_dictionary_from_db(mi);
+            dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
+        }
+    } else {
+        dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_set_error_value, NULL);
     }
 
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
