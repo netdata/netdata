@@ -1,38 +1,55 @@
-# Dashboards and Charts
+# **Dashboards and Charts**
 
-This guide covers how to access both Agent and Cloud dashboards, along with links to explore specific sections in more detail.
+This guide explains how to access both **Agent** and **Cloud** dashboards in Netdata, with direct links to explore each section in more detail.
 
-When you access the Netdata dashboard through the Cloud, you'll always have the latest version available.
+When you access the Netdata dashboard through Cloud, you always see the latest available version.
 
-By default, the Agent dashboard shows the latest version (matching Netdata Cloud). However, there are a few exceptions:
+By default, the **Agent dashboard** also shows the latest version (matching Netdata Cloud). However, there are a few exceptions:
 
-- Without internet access, the Agent can't download the newest dashboards. In this case, it will automatically use the bundled version.
-- Users have defined, e.g., through URL bookmark that they want to see the previous version of the dashboard (accessible `http://NODE:19999/v1`, replacing `NODE` with the IP address or hostname of your Agent).
+- If the Agent has **no internet access**, it will automatically use the bundled dashboard version.
+- Users can manually load the previous dashboard version (for example, through a bookmark) using:  
+  `http://NODE:19999/v1`  
+  Replace `NODE` with the IP address or hostname of your Agent.
 
-## Main sections
+---
+
+## **Main Sections**
 
 The Netdata dashboard consists of the following main sections:
 
-- [Home tab](/docs/dashboards-and-charts/home-tab.md)
-- [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md)
-- [Netdata charts](/docs/dashboards-and-charts/netdata-charts.md)
-- [Metrics tab and single node tabs](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)
-- [Top tab](/docs/dashboards-and-charts/top-tab.md)
-- [Logs tab](/docs/dashboards-and-charts/logs-tab.md)
-- [Dashboards tab](/docs/dashboards-and-charts/dashboards-tab.md)
-- [Alerts tab](/docs/dashboards-and-charts/alerts-tab.md)
-- [Events tab](/docs/dashboards-and-charts/events-feed.md)
+- [Home Tab](/docs/dashboards-and-charts/home-tab.md)
+- [Nodes Tab](/docs/dashboards-and-charts/nodes-tab.md)
+- [Netdata Charts](/docs/dashboards-and-charts/netdata-charts.md)
+- [Metrics Tab and Single Node Tabs](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)
+- [Top Tab](/docs/dashboards-and-charts/top-tab.md)
+- [Logs Tab](/docs/dashboards-and-charts/logs-tab.md)
+- [Dashboards Tab](/docs/dashboards-and-charts/dashboards-tab.md)
+- [Alerts Tab](/docs/dashboards-and-charts/alerts-tab.md)
+- [Events Tab](/docs/dashboards-and-charts/events-feed.md)
 
-> **Note**
->
-> Some dashboard sections may require the user to be signed in and have the Agent connected to Netdata Cloud for their full functionality when accessed through the Agent. Examples include saving visualization settings on charts or custom dashboards, connecting a node to Netdata Cloud, or executing functions on an Agent.
+:::tip
+Some dashboard features require a Netdata Cloud login and a connected Agent — such as saving chart preferences, accessing custom dashboards, or executing node Functions.
+:::
 
-## How to access the dashboards?
+---
 
-### Netdata Cloud
+## **How to Access the Dashboards**
 
-You can access the dashboard at <https://app.netdata.cloud/> and [sign-in with an account or sign-up](/docs/netdata-cloud/authentication-and-authorization/README.md) if you don't have an account yet.
+### **Netdata Cloud**
 
-### Netdata Agent
+Access the Cloud dashboard at:  
+**<https://app.netdata.cloud/>**
 
-To view your Netdata dashboard, open a web browser and enter the address `http://NODE:19999`  - replace `NODE` with your Agent's IP address or hostname. If the Agent is on the same machine, use `http://localhost:19999`.
+[Sign in or sign up](/docs/netdata-cloud/authentication-and-authorization/README.md) if you don’t have an account yet.
+
+---
+
+### **Netdata Agent**
+
+To view your local Netdata Agent dashboard:
+
+- Open a browser and go to:  
+  `http://NODE:19999`  
+  Replace `NODE` with your Agent’s IP address or hostname.
+- If viewing from the same machine where the Agent is installed, use:  
+  `http://localhost:19999`

@@ -1,74 +1,91 @@
-# Events tab
+# **Events Tab**
 
-The Events tab provides a feed which is a powerful feature that tracks events that happen on your infrastructure, or in your Space. The feed lets you investigate events that occurred in the past, which is invaluable for troubleshooting. Common use cases are ones like when a node goes offline, and you want to understand what events happened before that. A detailed event history can also assist in attributing sudden pattern changes in a time series to specific changes in your environment.
+The **Events tab** provides a powerful feed that tracks key activities across your infrastructure and Space. It helps you investigate historical events, making it easier to correlate changes with anomalies or node behavior.
 
-## What are the available events?
+Use the Events feed to:
+- Quickly identify what happened before or after a node went offline.
+- Attribute sudden metric changes to specific environment events.
+- Access a detailed history of alert transitions and node state changes.
 
-At a high-level view, these are the domains from which the Events feed will provide visibility into.
+:::note
+Based on your Space plan, the time range available for querying past events may vary.
+:::
 
-> **Note**
->
-> Based on your space's plan, different allowances are defined to query past data.
+---
 
-| **Domains of events**                                                                                                                           | **Community** | **Homelab** | **Business** | **Enterprise On-Premise** |
-|:------------------------------------------------------------------------------------------------------------------------------------------------|:--------------|:------------|:-------------|:--------------------------|
-| **[Auditing events](#auditing-events)** <p>Events related to actions done on your Space, e.g. invite user, change user role or change plan.</p> | 4 hours       | 90 days     | 90 days      | User dependent            |
-| **[Topology events](#topology-events)** <p>Node state transition events, e.g. live or offline.</p>                                              | 4 hours       | 14 days     | 14 days      | User dependent            |
-| **[Alert events](#alert-events)** <p>Alert state transition events, can be seen as an alert history log.</p>                                    | 4 hours       | 90 days     | 90 days      | User dependent            |
+## **Available Event Domains**
 
-### Auditing events
+The Events feed provides visibility into the following event types:
 
-| **Event name**                | **Description**                                                                  | **Example**                                                                                                          |
-|:------------------------------|:---------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------|
-| Space Created                 | The space was created.                                                           | Space `Acme Space` was **created**                                                                                   |
-| Room Created                  | A Room was created on the Space.                                                 | Room `DB Servers` was **created** by `John Doe`                                                                      |
-| Room Deleted                  | A Room was deleted from the Space.                                               | Room `DB servers` was **deleted** by `John Doe`                                                                      |
-| User Invited to Space         | A user was invited to join the Space.                                            | User `John Smith` was **invited** to this space by `Alan Doe`                                                        |
-| User Uninvited from Space     | An invitation for a user to join the space was revoked.                          | User `John Smith` was **uninvited** from this space                                                                  |
-| User Added to Space           | A user was added to the Space from an invitation (user accepted the invitation). | User `John Smith` was **added** to this space by invite of `Alan Doe`                                                |
-| User Removed from Space       | A user was added to the Space from an invitation.                                | User `John Smith` was **removed** from this space by `Alan Doe`                                                      |
-| User Added to Room            | A user was added to a Room on the Space.                                         | User `John Smith` was **added** to Room `DB servers`                                                                 |
-| User Removed from Room        | A user was removed from a Room on the Space.                                     | User `John Smith` was **removed** from Room `DB Servers` by `Alan Doe`                                               |
-| User Space Properties Changed | The properties of a user on the Space have changed, e.g. change user role        | User role for `John Smith` was **changed** to `troubleshooter` by `Alan Doe`                                         |
-| Node Added To Room            | The node was added to a Room on the Space.                                       | Node `ip-xyz.ec2.internal` was **added** to Room `DB Servers` by `John Doe`                                          |
-| Node Removed To Room          | The node was removed from a Room on the Space.                                   | Node `ip-xyz.ec2.internal` was **removed** from Room `DB Servers` by `John Doe`                                      |
-| Silencing Rule Created        | A new alert notification silencing rule was created on the Space.                | Silencing rule `DB Servers schedule silencing` on Rooms `All nodes` and `DB Servers` was **created** by `John Smith` |
-| Silencing Rule Changed        | An existing alert notification silencing rule was modified on the Space.         | Silencing rule `DB Servers schedule silencing` on Rooms `All nodes` and `DB Servers` was **changed** by `John Doe`   |
-| Silencing Rule Deleted        | An existing alert notifications silencing rule was removed from the Space.       | Silencing rule `DB Servers schedule silencing` on Rooms `All nodes` and `DB Servers` was **changed** by `Alan Smith` |
-| Space Claiming Token Created  | A Space Claiming Token was created.                                              | Claiming Token was created by user `John Doe`                                                                        |
-| Space Claiming Token Revoked  | A Space Claiming Token was revoked.                                              | Claiming Token `_OtF2ssjrv` was revoked by user `John Doe`                                                           |
+| **Event Domain**                             | **Community** | **Homelab** | **Business** | **Enterprise On-Premise**           |
+|-----------------------------------------------|---------------|-------------|-------------|-------------------------------------|
+| **[Auditing events](#auditing-events)**      | 4 hours       | 90 days     | 90 days     | User-dependent                     |
+| **[Topology events](#topology-events)**      | 4 hours       | 14 days     | 14 days     | User-dependent                     |
+| **[Alert events](#alert-events)**            | 4 hours       | 90 days     | 90 days     | User-dependent                     |
 
-### Topology events
+---
 
-| **Event name**      | **Description**                                                                                                                                                                                                                                                                                                        | **Example**                                                                                                     |
-|:--------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------------------------------------------------------|
-| Node Became Live    | The node is collecting and streaming metrics to Cloud.                                                                                                                                                                                                                                                                 | Node `netdata-k8s-state-xyz` was **live**                                                                       |
-| Node Became Stale   | The node is offline and not streaming metrics to Cloud. It can show historical data from a parent node.                                                                                                                                                                                                                | Node `ip-xyz.ec2.internal` was **stale**                                                                        |
-| Node Became Offline | The node is offline, not streaming metrics to Cloud and not available in any parent node.                                                                                                                                                                                                                              | Node `ip-xyz.ec2.internal` was **offline**                                                                      |
-| Node Created        | The node is created but it is still `Unseen` on Cloud, didn't establish a successful connection yet.                                                                                                                                                                                                                   | Node `ip-xyz.ec2.internal` was **created**                                                                      |
-| Node Removed        | The node was removed from the Space, for example by using the `Delete` action on the node. This is a soft delete in that the node gets marked as deleted, but retains the association with this space. If it becomes live again, it will be restored (see `Node Restored` below) and reappear in this space as before. | Node `ip-xyz.ec2.internal` was **deleted (soft)**                                                               |
-| Node Restored       | The node was restored. See `Node Removed` above.                                                                                                                                                                                                                                                                       | Node `ip-xyz.ec2.internal` was **restored**                                                                     |
-| Node Deleted        | The node was deleted from the Space. This is a hard delete and no information on the node is retained.                                                                                                                                                                                                                 | Node `ip-xyz.ec2.internal` was **deleted (hard)**                                                               |
-| Agent Connected     | The Agent connected to the Cloud MQTT server (Agent-Cloud Link established).<br/>These events can only be seen on _All nodes_  Room.                                                                                                                                                                                   | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` has connected to Cloud.                              |
-| Agent Disconnected  | The Agent disconnected from the Cloud MQTT server (Agent-Cloud Link severed).<br/>These events can only be seen on _All nodes_ Room.                                                                                                                                                                                   | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` has disconnected from Cloud: **Connection Timeout**. |
-| Space Statistics    | Daily snapshot of space node statistics.<br/>These events can only be seen on _All nodes_ Room.                                                                                                                                                                                                                        | Space statistics. Nodes: **22 live**, **21 stale**, **18 removed**, **61 total**.                               |
+## **Auditing Events**
 
-### Alert events
+These events log user actions and Space configuration changes:
 
-| **Event name**           | **Description**                                                                                                                                                                                                 | **Example**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-|:-------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Node Alert State Changed | These are node alert state transition events and can be seen as an alert history log. You will be able to see transitions to or from any of these states: Cleared, Warning, Critical, Removed, Error or Unknown | Transition to Cleared:<br/>`httpcheck_web_service_bad_status` for `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` recovered with value **8.33%**<br/><br/>Transition from Cleared to Warning or Critical:<br/>`httpcheck_web_service_bad_status` for `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` was raised to **WARNING** with value **10%**<br/><br/>Transition from Warning to Critical:<br/>`httpcheck_web_service_bad_status` for `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` escalated to **CRITICAL** with value **25%**<br/><br/>Transition from Critical to Warning:<br/>`httpcheck_web_service_bad_status` for `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` was demoted to **WARNING** with value **10%**<br/><br/>Transition to Removed:<br/>Alert `httpcheck_web_service_bad_status` for `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` is no longer available, state can't be assessed.<br/><br/>Transition to Error:<br/>For this alert `httpcheck_web_service_bad_status` related to `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` we couldn't calculate the current value ⓘ |
+| **Event Name**              | **Description**                                       | **Example**                                     |
+|----------------------------|-------------------------------------------------------|-------------------------------------------------|
+| Space Created               | A new Space was created.                             | Space `Acme Space` was **created**.             |
+| Room Created                | A Room was added to the Space.                       | Room `DB Servers` was **created** by `John Doe`.|
+| Room Deleted                | A Room was removed from the Space.                   | Room `DB Servers` was **deleted** by `John Doe`.|
+| User Invited to Space       | A user was invited to join the Space.                | User `John Smith` was **invited** by `Alan Doe`.|
+| User Removed from Space     | A user was removed from the Space.                   | User `John Smith` was **removed** by `Alan Doe`.|
+| Silencing Rule Created      | A new silencing rule was added.                      | Silencing rule `DB Servers schedule silencing` was **created** by `John Smith`.|
+| Silencing Rule Changed      | An existing silencing rule was modified.             | Silencing rule was **changed** by `John Doe`.   |
+| Silencing Rule Deleted      | A silencing rule was removed.                        | Silencing rule was **deleted** by `Alan Smith`. |
 
-## Who can access the events?
+---
 
-All users will be able to see events from the Topology and Alerts domain, but Auditing events, once these are added, will only be accessible to administrators. For more details, check the [Netdata Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+## **Topology Events**
 
-## How to use the events feed
+These events track changes to node connectivity and state:
 
-1. Click on the **Events** tab (located near the top of your screen)
-2. You will be presented with a table listing the events that occurred from the timeframe defined on the [date time picker](/docs/dashboards-and-charts/visualization-date-and-time-controls.md#date-and-time-selector)
-3. You can use the filtering capabilities available on the right-hand bar to slice through the results provided
+| **Event Name**          | **Description**                                       | **Example**                                        |
+|------------------------|-------------------------------------------------------|----------------------------------------------------|
+| Node Became Live        | Node started streaming metrics to Cloud.             | Node `netdata-k8s-state-xyz` is **live**.          |
+| Node Became Offline     | Node stopped streaming metrics, fully offline.       | Node `ip-xyz.ec2.internal` is **offline**.         |
+| Node Created            | Node was created but not yet seen by Cloud.          | Node `ip-xyz.ec2.internal` was **created**.        |
+| Node Deleted            | Node was hard deleted from the Space.                | Node `ip-xyz.ec2.internal` was **deleted (hard)**. |
+| Agent Connected         | Agent connected to the Cloud server (MQTT link).     | Agent `7d87bqs9-cv42-4823-8sd4-3614548850c7` connected. |
+| Agent Disconnected      | Agent disconnected from the Cloud server.           | Agent disconnected due to **Connection Timeout**. |
 
-> **Note**
->
-> When you try to query a longer period than what your space allows, you will see an error message highlighting that you are querying data outside your plan.
+---
+
+## **Alert Events**
+
+These events log alert state transitions for node metrics:
+
+| **Event Name**                  | **Description**                                      | **Example**                                                                                   |
+|----------------------------------|------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| Node Alert State Changed        | Records state changes such as Cleared, Warning, Critical, Removed, Error, or Unknown. | Alert `httpcheck_web_service_bad_status` on node `netdata-parent-xyz` escalated to **CRITICAL** with value **25%**. |
+
+---
+
+## **Who Can Access Events?**
+
+| **User Role**        | **Event Domains Accessible**               |
+|----------------------|---------------------------------------------|
+| Administrators       | All event domains (Auditing, Topology, Alerts). |
+| Non-administrators   | Topology and Alerts only.                  |
+
+:::note
+See the [Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for details.
+:::
+
+---
+
+## **How to Use the Events Feed**
+
+1. Click the **Events** tab.
+2. Define the timeframe using the [Date and Time selector](/docs/dashboards-and-charts/visualization-date-and-time-controls.md#date-and-time-selector).
+3. Apply filters from the right-hand bar, such as **event domain**, **node**, **alert severity**, or **time range**, to focus on the data you need.
+
+:::note
+If your query exceeds the retention limits of your plan, an error will indicate that the requested data is outside your allowed timeframe.
+:::

@@ -1,57 +1,19 @@
 # Nodes tab
 
-The Nodes tab provides a summarized view of your [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms), allowing you to view quick information per node.
+The **Nodes tab** provides a live, centralized view of every node in your [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms), allowing you to filter, sort, and interact with key node information.
 
-> **Tip**  
->
-> Keep in mind that all configurations mentioned below are persistent and visible across all users.
 
-## Center information view
+:::tip
+All configurations on this page are persistent and visible to all users in the Room.
+:::
 
-The center information view consists of one row per node, and can be configured and filtered by the user.
-
-### Filtering and adjusting the view
-
-In the top right-hand corner, you can:
-
-- Order the nodes per status or per alert status
-- Select which charts you want to be displayed as quick reference points
-
-### Node row
-
-Each node row allows you to:
-
-- View the node's status
-- Go to a single node dashboard by clicking the node name
-- View information about the node, along with a button to display more in the right-hand sidebar
-- View active alerts for the node
-- View Machine Learning status
-- View Functions capability status
-- Add configuration (beta)
-- [Add alert silencing rules](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md)
-- View a set of key attributes collected on your node
-
-## Right bar
-
-The bar on the right-hand side provides additional information about the nodes in the Room and allows you to filter what is displayed in the [center information view](#center-information-view).
-
-### Node hierarchy
-
-The first tab displays a hierarchy of the nodes displayed, making it easy to find a specific node by name. It follows the ordering that the user has selected.
-
-### Filters sub-tab
-
-The second tab allows you to filter which nodes are displayed, you can filter by:
-
-- Host labels
-- Node status
-- Netdata version
-- Individual nodes
-
-### Alerts sub-tab
-
-The third tab displays Room alerts and allows you to see additional information about each alert.
-
-### Info sub-tab
-
-The last tab presents information about a node, by clicking the `i` icon from a node's row, right next to its name.
+| Section                      | Description                                                                                                                                                        |
+|--------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Center information view**   | Displays one row per node. You can configure and filter the view to focus on the information that matters most.                                                    |
+| **Filtering and adjusting the view** | Use the top right-hand corner options to: <br>• Order nodes by **status** or **alert status** <br>• Select which charts to display as quick reference points      |
+| **Node row actions**          | For each node, you can: <br>• View status <br>• Open the single node dashboard <br>• Access node details via the sidebar <br>• View active alerts <br>• Check Machine Learning status <br>• Check Functions capability status <br>• Add configuration (beta) <br>• [Add alert silencing rules](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md) <br>• View key collected attributes |
+| **Right-hand bar**            | Offers additional filtering and information options for the nodes displayed in the center view.                                                                   |
+| **Node hierarchy (right bar)**| Displays a hierarchy of the nodes based on the selected ordering, making it easier to locate specific nodes by name.                                               |
+| **Filters sub-tab**           | Allows filtering of nodes by: <br>• Host labels <br>• Node status <br>• Netdata version <br>• Individual nodes                                                     |
+| **Alerts sub-tab**            | Displays Room alerts and additional details for each alert.                                                                                                       |
+| **Info sub-tab**              | Shows detailed node information when you click the info (`i`) icon next to a node's name.                                                                          |
