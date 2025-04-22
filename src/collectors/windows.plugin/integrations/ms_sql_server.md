@@ -137,13 +137,26 @@ Configuration for this specific integration is located in the `[plugin:windows]`
 The file format is a modified INI syntax. The general structure is:
 
 ```ini
-[section1]
-    option1 = some value
-    option2 = some other value
+[plugin:windows]
+    PerflibMSSQL = yes
 
-[section2]
-    option3 = some third value
+[plugin:windows:PerflibMSSQL]
+    driver = SQL Server
+    server = 127.0.0.1\\Dev, 1433
+    uid = netdata_user
+    pwd = AStrongPasswordH3re
+    additional instances = 1
+    # windows authentication = yes
+
+[plugin:windows:PerflibMSSQL1]
+    driver = SQL Server
+    server = 127.0.0.1\\Production, 1434
+    uid = netdata_user
+    pwd = AnotherStrongPasswordH3re
 ```
+
+For details about these option read [the plugin documentation](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/README.md).
+
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
@@ -153,13 +166,6 @@ sudo ./edit-config netdata.conf
 ```
 #### Options
 
-
-
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | PerflibMSSQL | An option to enable or disable the data collection. | yes | no |
-
-#### Examples
-There are no configuration examples.
-
-

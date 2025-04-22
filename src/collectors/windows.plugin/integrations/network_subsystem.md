@@ -142,13 +142,10 @@ Configuration for this specific integration is located in the `[plugin:windows]`
 The file format is a modified INI syntax. The general structure is:
 
 ```ini
-[section1]
-    option1 = some value
-    option2 = some other value
-
-[section2]
-    option3 = some third value
+[plugin:windows]
+    PerflibNetwork = yes
 ```
+
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
@@ -158,13 +155,6 @@ sudo ./edit-config netdata.conf
 ```
 #### Options
 
-
-
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | PerflibNetwork | An option to enable or disable the data collection. | yes | no |
-
-#### Examples
-There are no configuration examples.
-
-
