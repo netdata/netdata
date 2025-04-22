@@ -187,3 +187,13 @@ these steps:
 - Access `ODBC Data Sources`.
 - Go to `Drivers` tab.
 - Look for `Name` of the `ODBC` or `SQL Server` driver .
+
+#### Database Metrics Not Visible
+
+If you have created a database but it is not appearing on the NetData dashboard, this may indicate that statistics
+collection is not enabled for your database. To resolve this, follow these steps:
+
+1. Open `SQL Server Configuration Manager`.
+2. Right-click the database for which you want to enable statistics and select `Properties`.
+3. In the left pane, select `Options`.
+4. Set `Auto Create Statistics` to `True`.
