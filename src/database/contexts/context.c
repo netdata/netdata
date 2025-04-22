@@ -96,6 +96,12 @@ static void rrdcontext_delete_callback(const DICTIONARY_ITEM *item __maybe_unuse
     // update the count of contexts
     __atomic_sub_fetch(&rc->rrdhost->rrdctx.contexts_count, 1, __ATOMIC_RELAXED);
 
+    if(rc->rrdhost->rrdctx.hub_queue)
+        dictionary_del(rc->rrdhost->rrdctx.hub_queue, string2str(rc->id));
+
+    if(rc->rrdhost->rrdctx.pp_queue)
+        dictionary_del(rc->rrdhost->rrdctx.pp_queue, string2str(rc->id));
+
     rrdinstances_destroy_from_rrdcontext(rc);
     rrdcontext_freez(rc);
 }
@@ -315,34 +321,27 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
     if(unlikely(!host)) return;
     if(unlikely(!host->rrdctx.contexts)) return;
 
-    DICTIONARY *old;
-
     if(host->rrdctx.hub_queue) {
-        old = host->rrdctx.hub_queue;
-        host->rrdctx.hub_queue = NULL;
-
         RRDCONTEXT *rc;
-        dfe_start_write(old, rc) {
-                    dictionary_del(old, string2str(rc->id));
-                }
+        dfe_start_write(host->rrdctx.hub_queue, rc) {
+            dictionary_del(host->rrdctx.hub_queue, string2str(rc->id));
+        }
         dfe_done(rc);
-        dictionary_destroy(old);
+        dictionary_destroy(host->rrdctx.hub_queue);
+        host->rrdctx.hub_queue = NULL;
     }
 
     if(host->rrdctx.pp_queue) {
-        old = host->rrdctx.pp_queue;
-        host->rrdctx.pp_queue = NULL;
-
         RRDCONTEXT *rc;
-        dfe_start_write(old, rc) {
-                    dictionary_del(old, string2str(rc->id));
-                }
+        dfe_start_write(host->rrdctx.pp_queue, rc) {
+            dictionary_del(host->rrdctx.pp_queue, string2str(rc->id));
+        }
         dfe_done(rc);
-        dictionary_destroy(old);
+        dictionary_destroy(host->rrdctx.pp_queue);
+        host->rrdctx.pp_queue = NULL;
     }
 
-    old = host->rrdctx.contexts;
+    dictionary_destroy(host->rrdctx.contexts);
     host->rrdctx.contexts = NULL;
-    dictionary_destroy(old);
 }
 
