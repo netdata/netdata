@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "internal.h"
+#include "rrdcontext-internal.h"
 
 ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
                                   foreach_host_cb_t cb, void *data,
@@ -50,7 +50,7 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
         bool queryable_host = (match == SP_MATCHED_POSITIVE);
 
         v_hash += dictionary_version(host->rrdctx.contexts);
-        h_hash += dictionary_version(host->rrdctx.hub_queue);
+        h_hash += rrdcontext_queue_version(&host->rrdctx.hub_queue);
         a_hash += dictionary_version(host->rrdcalc_root_index);
         t_hash += __atomic_load_n(&host->health_transitions, __ATOMIC_RELAXED);
         ssize_t ret = cb(data, host, queryable_host);

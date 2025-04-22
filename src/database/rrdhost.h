@@ -25,6 +25,14 @@ typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
 #include "rrdlabels.h"
 #include "health/health-alert-log.h"
 
+struct rrdcontext;
+DEFINE_JUDYL_TYPED_ADVANCED(RRDCONTEXT_QUEUE, struct rrdcontext *, JUDYL_TYPED_NO_CONVERSION, JUDYL_TYPED_NO_CONVERSION, \
+                            SPINLOCK spinlock; \
+                            Word_t id; \
+                            uint32_t version; \
+                            int32_t entries; \
+                            );
+
 // ----------------------------------------------------------------------------
 // RRDHOST flags
 // use this for configuration flags, not for state control
@@ -304,8 +312,8 @@ struct rrdhost {
 
     struct {
         DICTIONARY *contexts;
-        DICTIONARY *hub_queue;
-        DICTIONARY *pp_queue;
+        RRDCONTEXT_QUEUE_JudyLSet pp_queue;
+        RRDCONTEXT_QUEUE_JudyLSet hub_queue;
         uint32_t metrics_count;                     // atomic
         uint32_t instances_count;                   // atomic
         uint32_t contexts_count;                    // atomic

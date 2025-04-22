@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "internal.h"
+#include "rrdcontext-internal.h"
 
 static void rrd_flags_to_buffer_json_array_items(RRD_FLAGS flags, BUFFER *wb) {
     if(flags & RRD_FLAG_QUEUED_FOR_HUB)

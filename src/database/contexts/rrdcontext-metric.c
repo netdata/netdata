@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "internal.h"
+#include "rrdcontext-internal.h"
 
 void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
 
