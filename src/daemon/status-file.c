@@ -764,7 +764,12 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         cs == CLOUD_STATUS_INDIRECT)                                // this is a final state
         session_status.cloud_status = cs;
 
+
+#ifdef ENABLE_DBENGINE
     session_status.oom_protection = dbengine_out_of_memory_protection;
+#else
+    session_status.oom_protection = 0;
+#endif
     
     OS_PROCESS_MEMORY proc_mem = os_process_memory(0);
     if(OS_PROCESS_MEMORY_OK(proc_mem))
