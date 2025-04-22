@@ -159,7 +159,7 @@
                 "items": {
                   "oneOf": [
                     { "const":  "unaligned", "title": "Do not shift the time-frame for visual presentation" },
-                    { "const":  "abs", "title": "Make all values positive before using them" },
+                    { "const":  "absolute", "title": "Make all values positive before using them" },
                     { "const":  "null2zero", "title": "Treat gaps in the time-series as a zero value" },
                     { "const":  "match_ids", "title": "Match only dimension IDs, not Names" },
                     { "const":  "match_names", "title": "Match only dimension Names, not IDs" }
