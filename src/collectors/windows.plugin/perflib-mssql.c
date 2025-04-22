@@ -29,6 +29,7 @@ struct netdata_mssql_conn {
     SQLHDBC netdataSQLHDBc;
 
     SQLHSTMT checkPermSTMT;
+    SQLHSTMT backupSTMT;
     SQLHSTMT databaseListSTMT;
     SQLHSTMT dataFileSizeSTMT;
     SQLHSTMT dataActiveTransactionSTMT;
@@ -145,7 +146,6 @@ struct mssql_lock_instance {
 };
 
 enum db_instance_idx {
-    NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP,
     NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED,
     NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES,
     NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS,
@@ -286,6 +286,10 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 #define NETDATA_QUERY_ACT_TRANSACTION_MASK                                                                             \
     "SELECT sum(open_tran) FROM %s.sys.sysprocesses WHERE spid > 50 AND (open_tran != 0 OR cmd != 'AWAITING_COMMAND');"
 
+// https://www.sqlbackuprestore.com/measuringbackupspeed.htm
+#define NETDATA_QUERY_BACKUP_TROUGHPUT                                                                                 \
+    "SELECT database_name, CAST((backup_size / (DATEDIFF(ss, backup_start_date, backup_finish_date))) / (1024 * 1024) AS BIGINT) FROM msdb..backupset ORDER BY database_name, backup_start_date;"
+
 int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
@@ -303,8 +307,10 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     return 0;
 }
 
-#define NETDATA_QUERY_CHECK_PERM "SELECT CASE WHEN IS_SRVROLEMEMBER('sysadmin') = 1 OR HAS_PERMS_BY_NAME(null, null, 'VIEW SERVER STATE') = 1 THEN 1 ELSE 0 END AS has_permission;"
-long metdata_mssql_check_permission(struct mssql_instance *mi) {
+#define NETDATA_QUERY_CHECK_PERM                                                                                       \
+    "SELECT CASE WHEN IS_SRVROLEMEMBER('sysadmin') = 1 OR HAS_PERMS_BY_NAME(null, null, 'VIEW SERVER STATE') = 1 THEN 1 ELSE 0 END AS has_permission;"
+long metdata_mssql_check_permission(struct mssql_instance *mi)
+{
     static long perm = 0;
     static SQLLEN col_data_len = 0;
 
@@ -334,7 +340,8 @@ endperm:
     return perm;
 }
 
-void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi) {
+void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
+{
 // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
 #define SQLSERVER_MAX_NAME_LENGTH (128)
     static char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
@@ -373,6 +380,51 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi) {
 
 enddblist:
     SQLFreeStmt(mi->conn.databaseListSTMT, SQL_CLOSE);
+}
+
+void metdata_mssql_fill_backup_troughput(struct mssql_instance *mi)
+{
+    // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
+#define SQLSERVER_MAX_NAME_LENGTH (128)
+    static char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
+    static long backup = 0;
+    SQLLEN col_dbname_len = 0, col_backup_len = 0;
+
+    SQLRETURN ret;
+
+    ret = SQLExecDirect(mi->conn.backupSTMT, (SQLCHAR *)NETDATA_QUERY_BACKUP_TROUGHPUT, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.backupSTMT, NETDATA_MSSQL_ODBC_QUERY);
+        goto endbackup;
+    }
+
+    ret = SQLBindCol(mi->conn.backupSTMT, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_dbname_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.backupSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        goto endbackup;
+    }
+
+    ret = SQLBindCol(mi->conn.backupSTMT, 1, SQL_C_LONG, &backup, sizeof(backup), &col_backup_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.backupSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        goto endbackup;
+    }
+
+    do {
+        ret = SQLFetch(mi->conn.backupSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            goto endbackup;
+        }
+
+        struct mssql_db_instance *mdi = dictionary_set(mi->databases, dbname, NULL, sizeof(*mdi));
+        if (!mdi)
+            continue;
+
+        mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = backup;
+    } while (true);
+
+endbackup:
+    SQLFreeStmt(mi->conn.backupSTMT, SQL_CLOSE);
 }
 
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
@@ -425,6 +477,10 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
 
     if (retConn) {
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->checkPermSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->backupSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
 
@@ -537,7 +593,6 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     struct mssql_db_instance *ptr = value;
 
     // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-databases-object
-    ptr->MSSQLDatabaseBackupRestoreOperations.key = "Backup/Restore Throughput/sec";
     ptr->MSSQLDatabaseLogFlushed.key = "Log Bytes Flushed/sec";
     ptr->MSSQLDatabaseLogFlushes.key = "Log Flushes/sec";
     ptr->MSSQLDatabaseTransactions.key = "Transactions/sec";
@@ -595,6 +650,7 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
     dbconn->netdataSQLEnv = NULL;
     dbconn->netdataSQLHDBc = NULL;
     dbconn->checkPermSTMT = NULL;
+    dbconn->backupSTMT = NULL;
     dbconn->databaseListSTMT = NULL;
     dbconn->dataFileSizeSTMT = NULL;
     dbconn->dataActiveTransactionSTMT = NULL;
@@ -1273,6 +1329,10 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected) ||
+        mli->MSSQLDatabaseBackupRestoreOperations.current.Data == ULONG_LONG_MAX)
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_backup_restore_operations) {
@@ -1305,12 +1365,10 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, c
             rrddim_add(mli->st_db_backup_restore_operations, "backup", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP)) {
-        rrddim_set_by_pointer(
-            mli->st_db_backup_restore_operations,
-            mli->rd_db_backup_restore_operations,
-            (collected_number)mli->MSSQLDatabaseBackupRestoreOperations.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_backup_restore_operations,
+        mli->rd_db_backup_restore_operations,
+        (collected_number)mli->MSSQLDatabaseBackupRestoreOperations.current.Data);
 
     rrdset_done(mli->st_db_backup_restore_operations);
 }
@@ -1610,9 +1668,6 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
             mdi->parent = mi;
         }
 
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseBackupRestoreOperations))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP);
-
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushed))
             mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED);
 
@@ -1761,12 +1816,13 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
     }
 }
 
-int netdata_mssql_set_error_value(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
 
     mdi->MSSQLDatabaseActiveTransactions.current.Data = ULONG_LONG_MAX;
-    mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = ULONG_LONG_MAX;
+    // Backup is set as zero, instead ULONG_LONG_MAX, because its collection has direct relationship with available data
+    mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = 0;
     mdi->MSSQLDatabaseDataFileSize.current.Data = ULONG_LONG_MAX;
     mdi->MSSQLDatabaseLogFlushed.current.Data = ULONG_LONG_MAX;
     mdi->MSSQLDatabaseLogFlushes.current.Data = ULONG_LONG_MAX;
@@ -1781,19 +1837,22 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     int *update_every = data;
 
     if (mi->conn.is_connected && have_perm) {
+        dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_reset_value, NULL);
         have_perm = metdata_mssql_check_permission(mi);
         if (!have_perm) {
             nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "User %s does not have permission to run queries on %s", mi->conn.username, mi->instanceID);
-            dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_set_error_value, NULL);
+                "User %s does not have permission to run queries on %s",
+                mi->conn.username,
+                mi->instanceID);
         } else {
             metdata_mssql_fill_dictionary_from_db(mi);
+            metdata_mssql_fill_backup_troughput(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
     } else {
-        dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_set_error_value, NULL);
+        dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_reset_value, NULL);
     }
 
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
