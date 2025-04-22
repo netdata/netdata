@@ -338,6 +338,8 @@ void read_cgroup_plugin_configuration() {
 
                        // ----------------------------------------------------------------
 
+                       "!/machine.slice/*/payload*"
+                       "!/machine.slice/*/supervisor*"
                        " /machine.slice/*.service "           // #3367 systemd-nspawn
 
                        // ----------------------------------------------------------------
