@@ -216,6 +216,7 @@ int unittest_stream_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
+int eval_unittest(void);
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
@@ -402,6 +403,7 @@ int netdata_main(int argc, char **argv) {
                             if (ctx_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
+                            if (eval_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
                             if (stacktrace_unittest()) return 1;
@@ -500,6 +502,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "progresstest") == 0) {
                             unittest_running = true;
                             return progress_unittest();
+                        }
+                        else if(strcmp(optarg, "evaltest") == 0) {
+                            unittest_running = true;
+                            return eval_unittest();
                         }
                         else if(strcmp(optarg, "dyncfgtest") == 0) {
                             unittest_running = true;
@@ -1140,7 +1146,9 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("mrg cleanup");
 
+#ifdef ENABLE_DBENGINE
     mrg_metric_prepopulate_cleanup(main_mrg);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("done");

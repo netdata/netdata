@@ -288,8 +288,9 @@ struct extent_io_descriptor {
     struct rrdengine_instance *ctx;
     void *buf;
     uint64_t pos;
-    unsigned descr_count;
-    unsigned bytes;
+    uint32_t descr_count;
+    uint32_t bytes;
+    uint32_t real_io_size;
     struct wal *wal;
     uv_file file;
     struct page_descr_with_data *descr_array[MAX_PAGES_PER_EXTENT];

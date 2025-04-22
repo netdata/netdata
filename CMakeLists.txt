@@ -846,8 +846,15 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-debug.c
         src/libnetdata/dictionary/dictionary-debug.h
         src/libnetdata/dictionary/dictionary.h
-        src/libnetdata/eval/eval.c
+        src/libnetdata/eval/eval-parser-legacy.c
+        src/libnetdata/eval/eval-evaluate.c
+        src/libnetdata/eval/eval-utils.c
         src/libnetdata/eval/eval.h
+        src/libnetdata/eval/eval-internal.h
+        src/libnetdata/eval/eval-unittest.c
+        src/libnetdata/eval/re2c_lemon/lexer.c
+        src/libnetdata/eval/re2c_lemon/parser.c
+        src/libnetdata/eval/re2c_lemon/parser_wrapper.c
         src/libnetdata/facets/facets.c
         src/libnetdata/facets/facets.h
         src/libnetdata/functions_evloop/functions_evloop.c
@@ -2983,8 +2990,7 @@ if(OS_WINDOWS)
 
         configure_file(packaging/windows/netdata.wxs.in netdata.wxs @ONLY)
         configure_file(packaging/windows/NetdataWhite.ico NetdataWhite.ico COPYONLY)
-        configure_file(packaging/windows/gpl-3.0.rtf gpl-3.0.rtf COPYONLY)
-        configure_file(packaging/windows/ncul1.rtf ncul1.rtf COPYONLY)
+        configure_file(packaging/windows/eula.rtf eula.rtf COPYONLY)
         configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
         configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
 endif()
@@ -3031,6 +3037,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
+        "$<$<BOOL:${OS_WINDOWS}>:odbc32>"
 )
 
 netdata_add_protobuf(netdata)

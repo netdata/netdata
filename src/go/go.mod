@@ -17,10 +17,10 @@ require (
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/docker/docker v28.0.4+incompatible
+	github.com/docker/docker v28.1.1+incompatible
 	github.com/facebook/time v0.0.0-20250211113239-e3e1421a0980
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/go-ldap/ldap/v3 v3.4.10
+	github.com/go-ldap/ldap/v3 v3.4.11
 	github.com/go-sql-driver/mysql v1.9.2
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gofrs/flock v0.12.1
@@ -28,8 +28,8 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
-	github.com/gosnmp/gosnmp v1.39.0
-	github.com/invopop/jsonschema v0.12.0
+	github.com/gosnmp/gosnmp v1.40.0
+	github.com/invopop/jsonschema v0.13.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/jessevdk/go-flags v1.6.1
@@ -88,7 +88,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
-	github.com/go-asn1-ber/asn1-ber v1.5.7 // indirect
+	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
@@ -126,6 +126,8 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
+	github.com/moby/sys/atomicwriter v0.1.0 // indirect
+	github.com/moby/sys/sequential v0.6.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
