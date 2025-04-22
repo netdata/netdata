@@ -43,9 +43,12 @@ void health_alarm_entry_destroy(ALARM_ENTRY *ae) {
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
 {
+    bool saved = false;
     if (async)
-        metadata_queue_ae_save(host, ae);
-    else
+        saved = metadata_queue_ae_save(host, ae);
+
+    // if not async or async failed to queue, do it now
+    if (false == saved)
         sql_health_alarm_log_save(host, ae);
 }
 

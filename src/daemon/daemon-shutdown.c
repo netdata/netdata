@@ -265,9 +265,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     cancel_main_threads();
     watcher_step_complete(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
 
-    metadata_sync_shutdown_background();
-    watcher_step_complete(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
-
     if (abnormal) {
         watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
         watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
@@ -310,7 +307,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
 #endif
 
-        metadata_sync_shutdown_background_wait();
+        metadata_sync_shutdown();
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
