@@ -9,8 +9,9 @@
 
 #define MEGA_FACTOR (1048576) // 1024 * 1024
 // https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
-#define NETDATA_MAX_INSTANCE_NAME 32
-#define NETDATA_MAX_INSTANCE_OBJECT 128
+#define NETDATA_MAX_INSTANCE_NAME (32)
+#define NETDATA_MAX_INSTANCE_OBJECT (128)
+#define NETDATA_MSSQL_NEXT_TRY (60)
 
 BOOL is_sqlexpress = FALSE;
 
@@ -244,8 +245,8 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_ms
 
 static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask, const char *dbname)
 {
-    static long db_size = 0;
-    static SQLLEN col_data_len = 0;
+    long db_size = 0;
+    SQLLEN col_data_len = 0;
 
     SQLCHAR query[512];
     snprintfz((char *)query, 511, mask, dbname);
@@ -311,8 +312,14 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     "SELECT CASE WHEN IS_SRVROLEMEMBER('sysadmin') = 1 OR HAS_PERMS_BY_NAME(null, null, 'VIEW SERVER STATE') = 1 THEN 1 ELSE 0 END AS has_permission;"
 long metdata_mssql_check_permission(struct mssql_instance *mi)
 {
-    static long perm = 0;
-    static SQLLEN col_data_len = 0;
+    static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
+    long perm = 0;
+    SQLLEN col_data_len = 0;
+
+    if (++next_try != NETDATA_MSSQL_NEXT_TRY)
+        return 1;
+
+    next_try = 0;
 
     SQLRETURN ret;
 
@@ -344,8 +351,15 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
 // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
 #define SQLSERVER_MAX_NAME_LENGTH (128)
-    static char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
-    static SQLLEN col_data_len = 0;
+    char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
+    SQLLEN col_data_len = 0;
+
+    static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
+
+    if (++next_try != NETDATA_MSSQL_NEXT_TRY)
+        return;
+
+    next_try = 0;
 
     SQLRETURN ret;
 
@@ -386,8 +400,8 @@ void metdata_mssql_fill_backup_troughput(struct mssql_instance *mi)
 {
     // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
 #define SQLSERVER_MAX_NAME_LENGTH (128)
-    static char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
-    static long backup = 0;
+    char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
+    long backup = 0;
     SQLLEN col_dbname_len = 0, col_backup_len = 0;
 
     SQLRETURN ret;
