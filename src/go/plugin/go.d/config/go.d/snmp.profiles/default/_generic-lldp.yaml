@@ -6,12 +6,12 @@ metrics:
     symbols:
       - name: lldpRem
         constant_value_one: true
+        description: "lldpRem metric with OID 1.0.8802.1.1.2.1.4.1 represents a constant value one"
+        unit: "{one}"
     metric_tags:
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.6
           name: lldpRemPortIdSubtype
-        description: The port identifier subtype of the LLDP remote system.
-        unit: "{port_id_subtype}"
         tag: lldp_rem_port_id_subtype
         mapping:
           1: interface_alias
@@ -21,15 +21,17 @@ metrics:
           5: interface_name
           6: agent_circuit_id
           7: local
+        description: "lldpRemPortIdSubtype metric with OID 1.0.8802.1.1.2.1.4.1.1.6 represents the subtype of the port identifier"
+        unit: "{subtype}"
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.7
           name: lldpRemPortId
-        description: The port identifier of the LLDP remote system.
-        unit: "{port_id}"
         tag: lldp_rem_port_id
+        description: "lldpRemPortId metric with OID 1.0.8802.1.1.2.1.4.1.1.7 represents the port identifier"
+        unit: "{identifier}"
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.9
           name: lldpRemSysName
-        description: The system name of the LLDP remote system.
-        unit: "{system_name}"
         tag: lldp_rem_sys_name
+        description: "lldpRemSysName metric with OID 1.0.8802.1.1.2.1.4.1.1.9 represents the system name"
+        unit: "{name}"

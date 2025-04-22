@@ -8,72 +8,72 @@ metrics:
     symbols:
       - name: peerConnectionByState
         constant_value_one: true
-        description: The presence of a BGP peer connection by state.
-        unit: "{connection}"
+        description: TBD
+        unit: "TBD"
       - OID: 1.3.6.1.2.1.15.3.1.3
         name: bgpPeerAdminStatus
-        description: The BGP peer's administrative status.
-        unit: "{status}"
+        description: administrative status of the BGP peer connection
+        unit: "{access_point}"
       - OID: 1.3.6.1.2.1.15.3.1.4
         name: bgpPeerNegotiatedVersion
-        description: The BGP peer's negotiated version.
+        description: negotiated BGP version with the peer
         unit: "{version}"
       - OID: 1.3.6.1.2.1.15.3.1.9
         name: bgpPeerRemoteAs
-        description: The BGP peer's remote autonomous system number.
-        unit: "{AS_number}"
+        description: autonomous system number of the remote BGP peer
+        unit: "{autonomous_system}"
       - OID: 1.3.6.1.2.1.15.3.1.2
         name: bgpPeerState
-        description: The BGP peer's current state.
+        description: current state of the BGP peer connection
         unit: "{state}"
       - OID: 1.3.6.1.2.1.15.3.1.10
         name: bgpPeerInUpdates
-        description: The number of BGP updates received from the peer.
-        unit: update
+        description: number of inbound BGP update messages received
+        unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.11
         name: bgpPeerOutUpdates
-        description: The number of BGP updates sent to the peer.
-        unit: update
+        description: number of outbound BGP update messages sent
+        unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.12
         name: bgpPeerInTotalMessages
-        description: The total number of BGP messages received from the peer.
-        unit: message
+        description: total number of inbound BGP messages received
+        unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.13
         name: bgpPeerOutTotalMessages
-        description: The total number of BGP messages sent to the peer.
-        unit: message
+        description: total number of outbound BGP messages sent
+        unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.15
         name: bgpPeerFsmEstablishedTransitions
-        description: The number of times the BGP peer's FSM has transitioned to the Established state.
-        unit: transition
+        description: number of times the BGP FSM entered the established state
+        unit: "{transition}"
       - OID: 1.3.6.1.2.1.15.3.1.16
         name: bgpPeerFsmEstablishedTime
-        description: The time since the BGP peer's FSM entered the Established state.
-        unit: s
+        description: time duration the BGP FSM has been in the established state
+        unit: "{second}"
       - OID: 1.3.6.1.2.1.15.3.1.17
         name: bgpPeerConnectRetryInterval
-        description: The interval between connection retry attempts for the BGP peer.
-        unit: s
+        description: interval between connection retry attempts in seconds
+        unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.18
         name: bgpPeerHoldTime
-        description: The hold time for the BGP peer.
-        unit: s
+        description: hold time value for the BGP peer connection in seconds
+        unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.19
         name: bgpPeerKeepAlive
-        description: The keep-alive interval for the BGP peer.
-        unit: s
+        description: keepalive interval for the BGP peer connection in seconds
+        unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.20
         name: bgpPeerHoldTimeConfigured
-        description: The configured hold time for the BGP peer.
-        unit: s
+        description: configured hold time for the BGP peer connection in seconds
+        unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.21
         name: bgpPeerKeepAliveConfigured
-        description: The configured keep-alive interval for the BGP peer.
-        unit: s
+        description: configured keepalive interval for the BGP peer connection in seconds
+        unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.22
         name: bgpPeerMinASOriginationInterval
-        description: The minimum interval between AS origination attempts for the BGP peer.
-        unit: s
+        description: minimum interval between AS origination messages in seconds
+        unit: "s"
     metric_tags:
       - tag: remote_as
         symbol:

@@ -18,16 +18,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.1
         name: cefcFRUPowerAdminStatus
-        description: The power admin status of the FRU.
-        unit: '{power_admin_status}'
+        description: "administrative power status of the FRU"
+        unit: "{access_point}"
       - OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.2
         name: cefcFRUPowerOperStatus
-        description: The power operational status of the FRU.
-        unit: '{power_oper_status}'
+        description: "operational power status of the FRU"
+        unit: "{access_point}"
       - OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.3
         name: cefcFRUCurrent
-        description: The current of the FRU.
-        unit: A
+        description: "current of the FRU"
+        unit: "{A}"
     metric_tags:
       - index: 1
         tag: fru
@@ -38,8 +38,8 @@ metrics:
     symbols:
       - name: cefcFRUPowerStatus
         constant_value_one: true
-        description: The power status of the FRU.
-        unit: '{power_status}'
+        description: "power status of the FRU"
+        unit: "{access_point}"
     metric_tags:
       - index: 1
         tag: fru
@@ -77,20 +77,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.10
         name: cpmCPUTotalMonIntervalValue
-        description: The CPU usage during the last monitoring interval.
-        unit: '%'
+        description: "monitoring interval value for CPU total"
+        unit: "{s}"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.12
         name: cpmCPUMemoryUsed
-        description: The amount of memory used by the CPU.
-        unit: byte
+        description: "amount of CPU memory used"
+        unit: "{By}"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.13
         name: cpmCPUMemoryFree
-        description: The amount of free memory available to the CPU.
-        unit: byte
+        description: "amount of CPU memory free"
+        unit: "{By}"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7
         name: cpmCPUTotal1minRev
-        description: The CPU usage in the last 1 minute.
-        unit: '%'
+        description: "CPU total 1 minute average"
+        unit: "{%}"
     metric_tags:
       - index: 1
         tag: cpu
@@ -102,8 +102,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.276.1.1.2.1.1
         name: cieIfResetCount
-        description: The number of interface resets.
-        unit: resets
+        description: "count of interface resets"
+        unit: "{reset}"
     metric_tags:
       - MIB: IF-MIB
         symbol:
@@ -118,8 +118,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.13.1.3.1.3
         name: ciscoEnvMonTemperatureStatusValue
-        description: The temperature status value.
-        unit: degC
+        description: "temperature status value"
+        unit: "{Cel}"
     metric_tags:
       - tag: temp_state
         symbol:
@@ -141,8 +141,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.13.1.5.1.3
         name: ciscoEnvMonSupplyState
-        description: The state of the power supply.
-        unit: '{supply_state}'
+        description: "power supply state"
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.13.1.5.1.4
@@ -166,8 +166,8 @@ metrics:
     symbols:
       - name: ciscoEnvMonSupplyStatus
         constant_value_one: true
-        description: The power supply status.
-        unit: '{supply_status}'
+        description: "power supply status"
+        unit: "{access_point}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.13.1.5.1.3
@@ -202,8 +202,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.13.1.4.1.3
         name: ciscoEnvMonFanState
-        description: The state of the fan.
-        unit: '{fan_state}'
+        description: "fan state"
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.13.1.4.1.1
@@ -217,8 +217,8 @@ metrics:
     symbols:
       - name: ciscoEnvMonFanStatus
         constant_value_one: true
-        description: The status of the fan.
-        unit: '{fan_status}'
+        description: "fan status"
+        unit: "{access_point}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.13.1.4.1.3
@@ -248,8 +248,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.500.1.2.2.1.1
         name: cswStackPortOperStatus
-        description: The operational status of the stack port.
-        unit: '{stack_port_oper_status}'
+        description: "operational status of the stack port"
+        unit: "{state}"
     metric_tags:
       - MIB: IF-MIB
         symbol:
@@ -266,8 +266,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.6
         name: cswSwitchState
-        description: The state of the switch.
-        unit: '{switch_state}'
+        description: "state of the switch"
+        unit: "{state}"
     metric_tags:
       - tag: mac_addr
         symbol:
@@ -288,8 +288,8 @@ metrics:
     symbols:
       - name: cswSwitchInfo
         constant_value_one: true
-        description: The switch information.
-        unit: '{switch_info}'
+        description: "switch info status"
+        unit: "{access_point}"
     metric_tags:
       - tag: mac_addr
         symbol:
@@ -325,8 +325,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.117.1.4.1.1.1
         name: cefcFanTrayOperStatus
-        description: The operational status of the fan tray.
-        unit: '{fan_tray_oper_status}'
+        description: "operational status of the fan tray"
+        unit: "{state}"
     metric_tags:
       - index: 1
         tag: fru
@@ -338,8 +338,8 @@ metrics:
     symbols:
       - name: cefcFanTrayStatus
         constant_value_one: true
-        description: The status of the fan tray.
-        unit: '{fan_tray_status}'
+        description: "fan tray status"
+        unit: "{access_point}"
     metric_tags:
       - index: 1
         tag: fru
@@ -367,16 +367,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.5
         name: ciscoMemoryPoolUsed
-        description: The amount of memory used in the memory pool.
-        unit: byte
+        description: "amount of memory pool used"
+        unit: "{By}"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.6
         name: ciscoMemoryPoolFree
-        description: The amount of free memory in the memory pool.
-        unit: byte
+        description: "amount of memory pool free"
+        unit: "{By}"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.7
         name: ciscoMemoryPoolLargestFree
-        description: The size of the largest free memory block in the memory pool.
-        unit: byte
+        description: "largest free block in memory pool"
+        unit: "{By}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.48.1.1.1.2
@@ -390,8 +390,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.4
         name: cfwConnectionStatCount
-        description: The number of connections of a given type.
-        unit: connection
+        description: "count of firewall connections"
+        unit: "{connection}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.2
@@ -412,8 +412,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.147.1.2.1.1.1.3
         name: cfwHardwareStatusValue
-        description: The status value of the hardware component.
-        unit: '{hardware_status}'
+        description: "hardware status value"
+        unit: "{state}"
     metric_tags:
       - index: 1
         tag: hardware_type
@@ -429,8 +429,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.388.1.2.2.1.3
         name: cvsChassisUpTime
-        description: The uptime of the chassis.
-        unit: s
+        description: "uptime of the chassis"
+        unit: "{s}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.388.1.2.2.1.1
@@ -445,12 +445,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.42.1.2.10.1.1
         name: rttMonLatestRttOperCompletionTime
-        description: The completion time of the latest RTT operation.
-        unit: s
+        description: "completion time of the latest RTT operation"
+        unit: "{ms}"
       - OID: 1.3.6.1.4.1.9.9.42.1.2.10.1.2
         name: rttMonLatestRttOperSense
-        description: The sense of the latest RTT operation.
-        unit: '{rtt_oper_sense}'
+        description: "sense of the latest RTT operation"
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.10
@@ -542,8 +542,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.6
         name: rttMonCtrlOperTimeoutOccurred
-        description: Number of RTT operations that timed out.
-        unit: count
+        description: "timeout occurrence status for RTT control operation"
+        unit: "{boolean}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.10

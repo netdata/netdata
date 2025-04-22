@@ -8,34 +8,28 @@ metadata:
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
-        description: Interface name.
       description:
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.2
           name: ifDescr
-        description: Interface description.
       mac_address:
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.6
           name: ifPhysAddress
           format: mac_address
-        description: Interface MAC address.
       admin_status:
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.7
           name: ifAdminStatus
-        description: Interface administrative status.
       oper_status:
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.8
           name: ifOperStatus
-        description: Interface operational status.
       # TODO: Impl ip_address
       alias: # from another table
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.18
           name: ifAlias
-        description: Interface alias.
     id_tags:
       - symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
@@ -47,9 +41,8 @@ metrics:
   symbol:
     OID: 1.3.6.1.2.1.2.1.0
     name: ifNumber
-  description: The number of network interfaces.
-  unit: '{interface}'
-
+    description: number of network interfaces
+    unit: "{interface}"
 - MIB: IF-MIB
   table:
     OID: 1.3.6.1.2.1.2.2
@@ -58,20 +51,20 @@ metrics:
   symbols:
   - OID: 1.3.6.1.2.1.2.2.1.14
     name: ifInErrors
-    description: The number of inbound packets that contained errors.
-    unit: packet
+    description: number of inbound errors
+    unit: "{error}"
   - OID: 1.3.6.1.2.1.2.2.1.13
     name: ifInDiscards
-    description: The number of inbound packets that were discarded.
-    unit: packet
+    description: number of inbound discards
+    unit: "{discard}"
   - OID: 1.3.6.1.2.1.2.2.1.20
     name: ifOutErrors
-    description: The number of outbound packets that contained errors.
-    unit: packet
+    description: number of outbound errors
+    unit: "{error}"
   - OID: 1.3.6.1.2.1.2.2.1.19
     name: ifOutDiscards
-    description: The number of outbound packets that were discarded.
-    unit: packet
+    description: number of outbound discards
+    unit: "{discard}"
   metric_tags:
   - symbol:
       OID: 1.3.6.1.2.1.31.1.1.1.1
@@ -92,16 +85,16 @@ metrics:
   symbols:
   - OID: 1.3.6.1.2.1.2.2.1.7
     name: ifAdminStatus
-    description: The desired state of the interface.
-    unit: '{interface_status}'
+    description: administrative status of the interface
+    unit: "{status}"
   - OID: 1.3.6.1.2.1.2.2.1.8
     name: ifOperStatus
-    description: The current operational state of the interface.
-    unit: '{interface_status}'
+    description: operational status of the interface
+    unit: "{status}"
   - OID: 1.3.6.1.2.1.2.2.1.5
     name: ifSpeed
-    description: An estimate of the interface's current bandwidth in bits per second.
-    unit: bit/s
+    description: interface speed
+    unit: "{bit_per_second}"
   metric_tags:
   - symbol:
       OID: 1.3.6.1.2.1.31.1.1.1.1
@@ -123,28 +116,28 @@ metrics:
   symbols:
   - OID: 1.3.6.1.2.1.31.1.1.1.7
     name: ifHCInUcastPkts
-    description: The number of unicast packets received on the interface.
-    unit: packet
+    description: number of inbound unicast packets
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.31.1.1.1.8
     name: ifHCInMulticastPkts
-    description: The number of multicast packets received on the interface.
-    unit: packet
+    description: number of inbound multicast packets
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.31.1.1.1.9
     name: ifHCInBroadcastPkts
-    description: The number of broadcast packets received on the interface.
-    unit: packet
+    description: number of inbound broadcast packets
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.31.1.1.1.11
     name: ifHCOutUcastPkts
-    description: The number of unicast packets transmitted on the interface.
-    unit: packet
+    description: number of outbound unicast packets
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.31.1.1.1.12
     name: ifHCOutMulticastPkts
-    description: The number of multicast packets transmitted on the interface.
-    unit: packet
+    description: number of outbound multicast packets
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.31.1.1.1.13
     name: ifHCOutBroadcastPkts
-    description: The number of broadcast packets transmitted on the interface.
-    unit: packet
+    description: number of outbound broadcast packets
+    unit: "{packet}"
   metric_tags:
   - symbol:
       OID: 1.3.6.1.2.1.31.1.1.1.1
@@ -165,12 +158,12 @@ metrics:
   symbols:
   - OID: 1.3.6.1.2.1.31.1.1.1.6
     name: ifHCInOctets
-    description: The total number of octets received on the interface, including framing characters.
-    unit: byte
+    description: number of inbound octets
+    unit: "{octet}"
   - OID: 1.3.6.1.2.1.31.1.1.1.10
     name: ifHCOutOctets
-    description: The total number of octets transmitted out of the interface, including framing characters.
-    unit: byte
+    description: number of outbound octets
+    unit: "{octet}"
   metric_tags:
   - symbol:
       OID: 1.3.6.1.2.1.31.1.1.1.1
@@ -190,8 +183,8 @@ metrics:
   symbols:
   - OID: 1.3.6.1.2.1.31.1.1.1.15
     name: ifHighSpeed
-    description: The interface's current bandwidth in Mbps.
-    unit: Mbit/s
+    description: interface high speed
+    unit: "{mega_bit_per_second}"
   metric_tags:
   - symbol:
       OID: 1.3.6.1.2.1.31.1.1.1.1

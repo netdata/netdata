@@ -18,7 +18,6 @@ metadata:
           MIB: CISCO-STACK-MIB
           OID: 1.3.6.1.4.1.9.5.1.2.19.0
           name: chassisSerialNumberString
-          description: "Chassis Serial Number"
 
 metrics:
   - MIB: CISCO-ENTITY-SENSOR-MIB
@@ -27,20 +26,16 @@ metrics:
       name: entSensorValueTable
     symbols:
       - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.4
-        # The current value of the sensor.
         name: entSensorValue
-        description: "The current value of the sensor."
-        unit: TBD
+        description: sensor value
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.1
-          # Indicates the type of data provided by the sensor.
           name: entSensorType
         tag: sensor_type
-        description: "Indicates the type of data provided by the sensor."
       - index: 1
         tag: sensor_id
-        description: "Sensor ID"
   - MIB: CISCO-IF-EXTENSION-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.276.1.1.1
@@ -49,20 +44,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.1
         name: cieIfLastInTime
-        description: "Time of the last input packet"
-        unit: s
+        description: last inbound time
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.2
         name: cieIfLastOutTime
-        description: "Time of the last output packet"
-        unit: s
+        description: last outbound time
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.10
         name: cieIfInputQueueDrops
-        description: "Number of dropped packets in the input queue"
-        unit: packets
+        description: number of input queue drops
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.11
         name: cieIfOutputQueueDrops
-        description: "Number of dropped packets in the output queue"
-        unit: packets
+        description: number of output queue drops
+        unit: "{packet}"
     metric_tags:
       - MIB: IF-MIB
         symbol:
@@ -70,4 +65,3 @@ metrics:
           name: ifName
         table: ifXTable
         tag: interface
-        description: "Interface Name"

@@ -8,12 +8,12 @@ metrics:
     symbols:
       - name: hrSWRunPerfMem
         OID: 1.3.6.1.2.1.25.5.1.1.2
-        description: Memory usage of a software process.
-        unit: byte
+        description: memory usage of the software run
+        unit: "{byte}"
       - name: hrSWRunPerfCPU
         OID: 1.3.6.1.2.1.25.5.1.1.1
-        description: CPU usage of a software process.
-        unit: '%'
+        description: cpu usage of the software run
+        unit: "%"
     metric_tags:
       - symbol:
           name: hrSWRunIndex
@@ -27,8 +27,8 @@ metrics:
     symbols:
       - name: hrSWRunStatus
         OID: 1.3.6.1.2.1.25.4.2.1.7
-        description: The execution state of the software.
-        unit: '{execution_state}'
+        description: status of the software run
+        unit: "TBD"
     metric_tags:
       - symbol:
           name: hrSWRunIndex
@@ -42,28 +42,28 @@ metrics:
     symbols:
       - name: ccvpSipIntAvgLatency1
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.5
-        description: Average SIP interface latency 1.
-        unit: s
+        description: average latency interval 1
+        unit: "{millisecond}"
       - name: ccvpSipIntAvgLatency2
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.6
-        description: Average SIP interface latency 2.
-        unit: s
+        description: average latency interval 2
+        unit: "{millisecond}"
       - name: ccvpSipIntConnectsRcv
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.4
-        description: Number of SIP interface connects received.
-        unit: connection
+        description: number of connects received
+        unit: "{connection}"
       - name: ccvpSipIntNewCalls
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.3
-        description: Number of new SIP interface calls.
-        unit: call
+        description: number of new calls
+        unit: "{call}"
       - name: ccvpSipRtActiveCalls
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.1
-        description: Number of active SIP calls.
-        unit: call
+        description: number of active calls
+        unit: "{call}"
       - name: ccvpSipRtTotalCallLegs
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.2
-        description: Number of total SIP call legs.
-        unit: call_leg
+        description: total number of call legs
+        unit: "{call_leg}"
     metric_tags:
       - symbol:
           name: ccvpServiceIndex
@@ -76,43 +76,43 @@ metrics:
     symbol:
       name: ccvpLicAggMaxPortsInUse
       OID: 1.3.6.1.4.1.9.9.590.1.2.12.0
-      description: Maximum number of CVP license ports in use.
-      unit: port
+      description: maximum number of ports in use aggregated
+      unit: "{port}"
   - MIB: CISCO-CVP-MIB
     symbol:
       name: ccvpLicRtPortsInUse
       OID: 1.3.6.1.4.1.9.9.590.1.2.2.0
-      description: Number of CVP license ports in use.
-      unit: port
+      description: current number of ports in use
+      unit: "{port}"
 
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
     symbol:
       name: ccmRegisteredGateways
       OID: 1.3.6.1.4.1.9.9.156.1.5.8.0
-      description: Number of registered gateways.
-      unit: gateway
+      description: number of registered gateways
+      unit: "{gateway}"
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
     symbol:
       name: ccmRegisteredPhones
       OID: 1.3.6.1.4.1.9.9.156.1.5.5.0
-      description: Number of registered phones.
-      unit: phone
+      description: number of registered phones
+      unit: "{phone}"
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
     symbol:
       name: ccmRejectedPhones
       OID: 1.3.6.1.4.1.9.9.156.1.5.7.0
-      description: Number of rejected phones.
-      unit: phone
+      description: number of rejected phones
+      unit: "{phone}"
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
     symbol:
       name: ccmUnregisteredPhones
       OID: 1.3.6.1.4.1.9.9.156.1.5.6.0
-      description: Number of unregistered phones.
-      unit: phone
+      description: number of unregistered phones
+      unit: "{phone}"
 
   - MIB: CISCO-VOICE-DIAL-CONTROL-MIB
     table:
@@ -121,12 +121,12 @@ metrics:
     symbols:
       - name: cvCallVolMediaIncomingCalls
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.5.1.1
-        description: Number of incoming calls on a media interface.
-        unit: call
+        description: number of media incoming calls
+        unit: "{call}"
       - name: cvCallVolMediaOutgoingCalls
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.5.1.2
-        description: Number of outgoing calls on a media interface.
-        unit: call
+        description: number of media outgoing calls
+        unit: "{call}"
     metric_tags:
       - MIB: IF-MIB
         symbol:
@@ -142,12 +142,12 @@ metrics:
     symbols:
       - name: cvCallVolPeerIncomingCalls
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.4.1.1
-        description: Number of incoming calls on a peer.
-        unit: call
+        description: number of peer incoming calls
+        unit: "{call}"
       - name: cvCallVolPeerOutgoingCalls
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.4.1.2
-        description: Number of outgoing calls on a peer.
-        unit: call
+        description: number of peer outgoing calls
+        unit: "{call}"
     metric_tags:
       - index: 1
         tag: peer_index
@@ -160,20 +160,20 @@ metrics:
     symbols:
       - name: dialCtlPeerStatsAcceptCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.5
-        description: Number of accepted calls on a peer.
-        unit: call
+        description: number of accepted calls
+        unit: "{call}"
       - name: dialCtlPeerStatsFailCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.4
-        description: Number of failed calls on a peer.
-        unit: call
+        description: number of failed calls
+        unit: "{call}"
       - name: dialCtlPeerStatsRefuseCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.6
-        description: Number of refused calls on a peer.
-        unit: call
+        description: number of refused calls
+        unit: "{call}"
       - name: dialCtlPeerStatsSuccessCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.3
-        description: Number of successful calls on a peer.
-        unit: call
+        description: number of successful calls
+        unit: "{call}"
     metric_tags:
       - index: 1
         tag: peer_index
@@ -185,8 +185,8 @@ metrics:
     symbols:
       - name: cccaPimStatus
         OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.4
-        description: The status of the PIM.
-        unit: '{PIM_status}'
+        description: status of the pim
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.1
@@ -208,16 +208,16 @@ metrics:
     symbols:
       - name: cccaRouterAgentsLoggedOn
         OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.3
-        description: Number of agents logged on to the router.
-        unit: agent
+        description: number of agents logged on
+        unit: "{agent}"
       - name: cccaRouterCallsInProgress
         OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.4
-        description: Number of calls in progress on the router.
-        unit: call
+        description: number of calls in progress
+        unit: "{call}"
       - name: cccaRouterCallsInQueue
         OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.8
-        description: Number of calls in queue on the router.
-        unit: call
+        description: number of calls in queue
+        unit: "{call}"
     metric_tags:
       - tag: instance_number
         index: 1  # Index of cccaRouterTable is (cccaInstanceNumber, cccaComponentIndex)

@@ -14,51 +14,51 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.2.0
       name: upsSecondsOnBattery
-    description: The time in seconds the UPS has been running on battery power.
-    unit: s
+      description: time in seconds the UPS has been on battery
+      unit: "{s}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.3.0
       name: upsEstimatedMinutesRemaining
-    description: The UPS's best estimate of the time remaining on battery power, in minutes.
-    unit: min
+      description: estimated minutes of battery time remaining
+      unit: "{min}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.4.0
       name: upsEstimatedChargeRemaining
-    description: The UPS's best estimate of the percentage of full battery charge remaining.
-    unit: '%'
+      description: estimated percentage of battery charge remaining
+      unit: "{%}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.5.0
       name: upsBatteryVoltage
-    description: The magnitude of the present battery voltage.
-    unit: V
+      description: battery voltage
+      unit: "{V}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.6.0
       name: upsBatteryCurrent
-    description: The magnitude of the present battery current.
-    unit: A
+      description: battery current
+      unit: "{A}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.7.0
       name: upsBatteryTemperature
-    description: The present battery temperature.
-    unit: K
+      description: battery temperature
+      unit: "{Cel}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.3.1.0
       name: upsInputLineBads
-    metric_type: monotonic_count
-    description: The number of input line failures detected by the UPS.
-    unit: bad_line
+      metric_type: monotonic_count
+      description: number of bad input line events
+      unit: "{event}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.3.2.0
       name: upsInputNumLines
-    description: The number of input lines the UPS is configured to support.
-    unit: '{input_line}'
+      description: number of input lines
+      unit: "{line}"
 #  - MIB: UPS-MIB
 #    symbol:
 #      OID: 1.3.6.1.2.1.33.1.4.1.0
@@ -77,32 +77,32 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.33.1.4.2.0
       name: upsOutputFrequency
-    description: The present output frequency.
-    unit: Hz
+      description: output frequency
+      unit: "{Hz}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.4.3.0
       name: upsOutputNumLines
-    description: The number of output lines the UPS is configured to support.
-    unit: '{output_line}'
+      description: number of output lines
+      unit: "{line}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.5.1.0
       name: upsBypassFrequency
-    description: The present bypass frequency.
-    unit: Hz
+      description: bypass frequency
+      unit: "{Hz}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.5.2.0
       name: upsBypassNumLines
-    description: The number of bypass lines the UPS is configured to support.
-    unit: '{bypass_line}'
+      description: number of bypass lines
+      unit: "{line}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.6.1.0
       name: upsAlarmsPresent
-    description: A bit map of alarms present.
-    unit: '{alarm}'
+      description: number of alarms present
+      unit: "{alarm}"
 #  - MIB: UPS-MIB
 #    symbol:
 #      OID: 1.3.6.1.2.1.33.1.7.3.0
@@ -120,8 +120,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.33.1.7.5.0
       name: upsTestStartTime
-    description: The date and time at which the most recent UPS test was started.
-    unit: s
+      description: test start time
+      unit: "TBD"
   - MIB: UPS-MIB
     table:
       OID: 1.3.6.1.2.1.33.1.4.4
@@ -129,26 +129,25 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.33.1.4.4.1.2
         name: upsOutputVoltage
-        description: The present output voltage.
-        unit: V
+        description: output voltage
+        unit: "{V}"
       - OID: 1.3.6.1.2.1.33.1.4.4.1.3
         name: upsOutputCurrent
-        description: The present output current.
-        unit: A
+        description: output current
+        unit: "{A}"
       - OID: 1.3.6.1.2.1.33.1.4.4.1.4
         name: upsOutputPower
-        description: The present output power.
-        unit: W
+        description: output power
+        unit: "{W}"
       - OID: 1.3.6.1.2.1.33.1.4.4.1.5
         name: upsOutputPercentLoad
-        description: The percentage of the total output power capacity presently in use.
-        unit: '%'
+        description: output percent load
+        unit: "{%}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.4.4.1.1
           name: upsOutputLineIndex
         tag: ups_output_line_index
-        description: Index value that uniquely identifies an output line.
   - MIB: UPS-MIB
     table:
       OID: 1.3.6.1.2.1.33.1.3.3
@@ -156,26 +155,25 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.33.1.3.3.1.2
         name: upsInputFrequency
-        description: The present input frequency.
-        unit: Hz
+        description: input frequency
+        unit: "{Hz}"
       - OID: 1.3.6.1.2.1.33.1.3.3.1.3
         name: upsInputVoltage
-        description: The present input voltage.
-        unit: V
+        description: input voltage
+        unit: "{V}"
       - OID: 1.3.6.1.2.1.33.1.3.3.1.4
         name: upsInputCurrent
-        description: The present input current.
-        unit: A
+        description: input current
+        unit: "{A}"
       - OID: 1.3.6.1.2.1.33.1.3.3.1.5
         name: upsInputTruePower
-        description: The true power of the input.
-        unit: W
+        description: input true power
+        unit: "{W}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.3.3.1.1
           name: upsInputLineIndex
         tag: ups_input_line_index
-        description: Index value that uniquely identifies an input line.
   - MIB: UPS-MIB
     table:
       OID: 1.3.6.1.2.1.33.1.5.3
@@ -183,22 +181,21 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.33.1.5.3.1.2
         name: upsBypassVoltage
-        description: The present bypass voltage.
-        unit: V
+        description: bypass voltage
+        unit: "{V}"
       - OID: 1.3.6.1.2.1.33.1.5.3.1.3
         name: upsBypassCurrent
-        description: The present bypass current.
-        unit: A
+        description: bypass current
+        unit: "{A}"
       - OID: 1.3.6.1.2.1.33.1.5.3.1.4
         name: upsBypassPower
-        description: The power of the bypass.
-        unit: W
+        description: bypass power
+        unit: "{W}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.5.3.1.1
           name: upsBypassLineIndex
         tag: ups_bypass_line_index
-        description: Index value that uniquely identifies a bypass line.
   - MIB: UPS-MIB
     table:
       OID: 1.3.6.1.2.1.33.1.6.2
@@ -206,25 +203,21 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.33.1.6.2.1.3
         name: upsAlarmTime
-        description: The elapsed time (in seconds) since the alarm condition occurred.
-        unit: s
+        description: alarm time
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.6.2.1.2
           name: upsAlarmDescr
         tag: ups_alarm_descr
-        description: Textual description of the alarm.
 
 metric_tags:
   - OID: 1.3.6.1.2.1.33.1.1.1
     symbol: upsIdentManufacturer
     tag: ups_ident_manufacturer
-    description: The manufacturer of the UPS.
   - OID: 1.3.6.1.2.1.33.1.1.2
     symbol: upsIdentModel
     tag: ups_ident_model
-    description: The model name of the UPS.
   - OID: 1.3.6.1.2.1.33.1.1.5
     symbol: upsIdentName
     tag: ups_ident_name
-    description: The user-assigned name of this UPS.

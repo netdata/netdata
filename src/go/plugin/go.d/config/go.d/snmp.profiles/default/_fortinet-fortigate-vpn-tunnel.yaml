@@ -6,19 +6,18 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.18
         name: fgVpnTunEntInOctets
-        description: Number of octets received on this tunnel
-        unit: octet
+        description: number of octets received on the VPN tunnel
+        unit: "{octet}"
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.19
         name: fgVpnTunEntOutOctets
-        description: Number of octets transmitted out of this tunnel
-        unit: octet
+        description: number of octets sent on the VPN tunnel
+        unit: "{octet}"
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.20
         name: fgVpnTunEntStatus
-        description: The current status of the tunnel
-        unit: {vpn_tunnel_status}
+        description: status of the VPN tunnel entry
+        unit: "TBD"
     metric_tags:
       - tag: vpn_tunnel
         symbol:
           OID: 1.3.6.1.4.1.12356.101.12.2.2.1.2
           name: fgVpnTunEntPhase1Name
-          description: Tunnel name

@@ -7,33 +7,30 @@ metrics:
   #
   # General System Information
   #
-  #
-  # General System Information
-  #
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.1.0
       name: hrSystemUptime
-    description: General System Information
-    unit: s
+      description: system uptime
+      unit: "{s}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.5.0
       name: hrSystemNumUsers
-    description: Number of current users
-    unit: user
+      description: number of users currently logged in
+      unit: "{access_point}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.6.0
       name: hrSystemProcesses
-    description: Number of system processes
-    unit: process
+      description: number of active processes
+      unit: "{access_point}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.7.0
       name: hrSystemMaxProcesses
-    description: Maximum number of system processes
-    unit: process
+      description: maximum number of processes allowed
+      unit: "{access_point}"
 
   #
   # Storage Devices
@@ -45,33 +42,29 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.25.2.3.1.4
         name: hrStorageAllocationUnits
-        description: Size of the allocation units in bytes
-        unit: B
+        description: size of storage allocation units
+        unit: "{octet}"
       - OID: 1.3.6.1.2.1.25.2.3.1.5
         name: hrStorageSize
-        description: Total size of the storage
-        unit: B
+        description: total number of allocation units
+        unit: "{access_point}"
       - OID: 1.3.6.1.2.1.25.2.3.1.6
         name: hrStorageUsed
-        description: Used storage space
-        unit: B
+        description: number of allocation units used
+        unit: "{access_point}"
       - OID: 1.3.6.1.2.1.25.2.3.1.7
         name: hrStorageAllocationFailures
-        description: Number of storage allocation failures
-        unit: failure
+        description: number of allocation failures
+        unit: "{access_point}"
     metric_tags:
       - tag: storagedesc
         symbol:
           OID: 1.3.6.1.2.1.25.2.3.1.3
           name: hrStorageDescr
-        description: Storage description
-        unit: "{storage_description}"
       - tag: storagetype
         symbol:
           OID: 1.3.6.1.2.1.25.2.3.1.2
           name: hrStorageType
-        description: Storage type
-        unit: "{storage_type}"
 
   #
   # Processor Load
@@ -83,16 +76,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.25.3.3.1.2
         name: hrProcessorLoad
-        description: Processor load
-        unit: '%'
+        description: processor load percentage
+        unit: "%"
     metric_tags:
       - index: 1  # hrDeviceIndex
         tag: hr_device_index
-        description: hrDeviceIndex
-        unit: "{device_index}"
       - tag: processorid
         symbol:
           OID: 1.3.6.1.2.1.25.3.3.1.1
           name: hrProcessorFrwID
-        description: Processor firmware ID
-        unit: "{firmware_id}"

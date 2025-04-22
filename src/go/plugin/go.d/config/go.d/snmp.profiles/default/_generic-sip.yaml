@@ -6,8 +6,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.149.1.1.1.1.2
         name: sipCommonCfgServiceOperStatus
-        description: The current operational status of the service.
-        unit: "{service}"
+        description: operational status of the SIP common configuration service
+        unit: "{access_point}"
     metric_tags:
     - index: 1
       tag: applIndex
@@ -18,24 +18,24 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.149.1.3.1.1.1
         name: sipCommonSummaryInRequests
-        description: The total number of incoming requests.
-        unit: request
+        description: number of incoming SIP requests
+        unit: "{request}"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.2
         name: sipCommonSummaryOutRequests
-        description: The total number of outgoing requests.
-        unit: request
+        description: number of outgoing SIP requests
+        unit: "{request}"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.3
         name: sipCommonSummaryInResponses
-        description: The total number of incoming responses.
-        unit: response
+        description: number of incoming SIP responses
+        unit: "{response}"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.4
         name: sipCommonSummaryOutResponses
-        description: The total number of outgoing responses.
-        unit: response
+        description: number of outgoing SIP responses
+        unit: "{response}"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.5
         name: sipCommonSummaryTotalTransactions
-        description: The total number of transactions.
-        unit: transaction
+        description: total number of SIP transactions
+        unit: "{transaction}"
     metric_tags:
     - index: 1
       tag: applIndex
@@ -46,12 +46,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.149.1.5.1.1.3
         name: sipCommonStatusCodeIns
-        description: The number of incoming status codes.
-        unit: code
+        description: number of incoming SIP status codes
+        unit: "{status_code}"
       - OID: 1.3.6.1.2.1.149.1.5.1.1.4
         name: sipCommonStatusCodeOuts
-        description: The number of outgoing status codes.
-        unit: code
+        description: number of outgoing SIP status codes
+        unit: "{status_code}"
     metric_tags:
     - index: 1
       tag: applIndex
@@ -66,8 +66,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.149.1.6.1.1.1
         name: sipCommonTransCurrentactions
-        description: The current number of transactions.
-        unit: transaction
+        description: current number of SIP transaction actions
+        unit: "{action}"
     metric_tags:
     - index: 1
       tag: applIndex

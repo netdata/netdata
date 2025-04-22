@@ -6,15 +6,13 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.99.1.1.1.4
         name: entPhySensorValue
-        description: The current value of the physical sensor.
-        unit: TBD
+        description: sensor value reading
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.1
           name: entPhySensorType
         tag: ent_phy_sensor_type
-        description: The type of the physical sensor.
-        unit: '{sensor_type}'
         mapping:
           1: other
           2: unknown
@@ -32,8 +30,6 @@ metrics:
           OID: 1.3.6.1.2.1.99.1.1.1.2
           name: entPhySensorScale
         tag: ent_phy_sensor_scale
-        description: The scale of the physical sensor.
-        unit: '{sensor_scale}'
         mapping:
           1: yocto
           2: zepto
@@ -56,26 +52,24 @@ metrics:
           OID: 1.3.6.1.2.1.99.1.1.1.3
           name: entPhySensorPrecision
         tag: ent_phy_sensor_precision
-        description: The precision of the physical sensor.
-        unit: '{sensor_precision}'
+        description: sensor precision level
+        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.6
           name: entPhySensorUnitsDisplay
         tag: ent_phy_sensor_units_display
-        description: The units of display for the physical sensor.
-        unit: '{sensor_units_display}'
+        description: sensor units display string
+        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.2
           name: entPhysicalDescr
         tag: ent_physical_descr
-        description: The description of the physical entity.
-        unit: '{physical_description}'
+        description: physical entity description
+        unit: "{access_point}"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
           name: entPhysicalClass
         tag: ent_physical_class
-        description: The class of the physical entity.
-        unit: '{physical_class}'
         mapping:
           1: other
           2: unknown
@@ -92,31 +86,33 @@ metrics:
           13: energy_object
           14: battery
           15: storage_drive
+        description: physical entity class type
+        unit: "{access_point}"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
           name: entPhysicalName
         tag: ent_physical_name
-        description: The name of the physical entity.
-        unit: '{physical_name}'
+        description: physical entity name
+        unit: "{access_point}"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
           name: entPhysicalSerialNum
         tag: ent_physical_serial_num
-        description: The serial number of the physical entity.
-        unit: '{physical_serial_number}'
+        description: physical entity serial number
+        unit: "{access_point}"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
           name: entPhysicalModelName
         tag: ent_physical_model_name
-        description: The model name of the physical entity.
-        unit: '{physical_model_name}'
+        description: physical entity model name
+        unit: "{access_point}"
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.5
           name: entPhySensorOperStatus
         tag: ent_phy_sensor_oper_status
-        description: The operational status of the physical sensor.
-        unit: '{sensor_operational_status}'
         mapping:
           1: ok
           2: unavailable
           3: nonoperational
+        description: sensor operational status
+        unit: "TBD"

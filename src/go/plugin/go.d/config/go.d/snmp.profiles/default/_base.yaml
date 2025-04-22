@@ -15,19 +15,15 @@ metadata:
         symbol:
           OID: 1.3.6.1.2.1.1.5.0
           name: sysName
-        description: The device's system name.
       description:
         symbol:
           OID: 1.3.6.1.2.1.1.1.0
           name: sysDescr
-        description: The device's system description.
       sys_object_id:
         symbol:
           OID: 1.3.6.1.2.1.1.2.0
           name: sysObjectID
-        description: The device's system object ID.
       location:
         symbol:
           OID: 1.3.6.1.2.1.1.6.0
           name: sysLocation
-        description: The device's system location.

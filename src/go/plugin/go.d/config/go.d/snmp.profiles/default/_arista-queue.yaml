@@ -1,4 +1,4 @@
-metrics:
+zmetrics:
   ### Interface
 
   - # This table contains statistical information of the ingress queue in an interface.
@@ -10,21 +10,17 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.30065.3.6.1.1.1.3
         name: aristaIngressQueuePktsDropped
-        description: This table contains statistical information of the ingress queue in an interface.
-        unit: packets
+        description: number of packets dropped in the ingress queue
+        unit: "{packet}"
     metric_tags:
       - tag: interface_index
         symbol:
           OID: 1.3.6.1.4.1.30065.3.6.1.1.1.1
           name: aristaIngressIfIndex
-        description: Index value that uniquely identifies the interface.
-        unit: "{interface}"
       - tag: queue_index
         symbol:
           OID: 1.3.6.1.4.1.30065.3.6.1.1.1.2
           name: aristaIngressQueueIndex
-        description: Index value that uniquely identifies the queue.
-        unit: "{queue}"
 
   - # This table contains statistical objects for the egress queues of an interface.
     MIB: ARISTA-QUEUE-MIB
@@ -35,18 +31,14 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.30065.3.6.1.2.1.6
         name: aristaEgressQueuePktsDropped
-        description: This table contains statistical objects for the egress queues of an interface.
-        unit: packets
+        description: number of packets dropped in the egress queue
+        unit: "{packet}"
     metric_tags:
       - tag: interface_index
         symbol:
           OID: 1.3.6.1.4.1.30065.3.6.1.2.1.1
           name: aristaEgressIfIndex
-        description: Index value that uniquely identifies the interface.
-        unit: "{interface}"
       - tag: queue_index
         symbol:
           OID: 1.3.6.1.4.1.30065.3.6.1.2.1.2
           name: aristaEgressQueueIndex
-        description: Index value that uniquely identifies the queue.
-        unit: "{queue}"
