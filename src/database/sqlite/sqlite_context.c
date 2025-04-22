@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_context.h"
 #include "sqlite_db_migration.h"
-#include "database/contexts/internal.h"
+#include "database/contexts/rrdcontext-internal.h"
 
 #define DB_CONTEXT_METADATA_VERSION 1
 

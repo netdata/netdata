@@ -3,7 +3,7 @@
 #ifndef NETDATA_API_V2_CONTEXTS_H
 #define NETDATA_API_V2_CONTEXTS_H
 
-#include "internal.h"
+#include "rrdcontext-internal.h"
 
 typedef enum __attribute__ ((__packed__)) {
     FTS_MATCHED_NONE = 0,
