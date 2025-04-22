@@ -519,21 +519,17 @@ static inline bool queue_maintenance_cmd(enum maintenance_opcode opcode, const v
 void maintenance_enable() {
     struct completion compl;
     completion_init(&compl);
-    nd_log_daemon(NDLP_INFO, "MAINTENANCE: Enabling maintenance");
     if (queue_maintenance_cmd(MAINTENANCE_ENABLE, &compl, NULL))
         completion_wait_for(&compl);
     completion_destroy(&compl);
-    nd_log_daemon(NDLP_INFO, "MAINTENANCE: Enabling maintenance -- done");
 }
 
 void maintenance_disable() {
     struct completion compl;
     completion_init(&compl);
-    nd_log_daemon(NDLP_INFO, "MAINTENANCE: Disabling maintenance");
     if (queue_maintenance_cmd(MAINTENANCE_DISABLE, &compl, NULL))
         completion_wait_for(&compl);
     completion_destroy(&compl);
-    nd_log_daemon(NDLP_INFO, "MAINTENANCE: Disabling maintenance -- done");
 }
 
 void maintenance_initialize(void)
