@@ -25,7 +25,7 @@ NOT_INLINE_HOT bool backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, ti
 #ifdef ENABLE_DBENGINE
     if(default_backfill == RRD_BACKFILL_NEW && latest_time_s <= 0) return false;
 #else
-    return;
+    return false;
 #endif
 
     // there is really nothing we can do

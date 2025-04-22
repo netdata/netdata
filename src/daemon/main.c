@@ -1140,7 +1140,9 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("mrg cleanup");
 
+#ifdef ENABLE_DBENGINE
     mrg_metric_prepopulate_cleanup(main_mrg);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("done");
