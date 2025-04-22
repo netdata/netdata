@@ -20,8 +20,19 @@ typedef struct health {
     STRING *default_recipient;                      // the default recipient for all alarms
     bool enabled;                                   // 1 when this host has health enabled
     bool use_summary_for_notifications;             // whether to use the summary field as a subject for notifications
-    int32_t pending_transitions;                    // pending alert transitions to store
     uint64_t evloop_iteration;                      // the last health iteration that evaluated this host
+    uv_timer_t timer;                               // Timer for host jobs
+    bool timer_initialized;
+    bool apply_hibernation_delay;
+    bool rrdcalc_cleanup_running;
+    bool alert_processing_running;
+    bool job_running;
+    time_t last_maintenance;
+    uint32_t last_runtime;
+    Word_t count;
+    Word_t delete_count;
+    Pvoid_t JudyL_ae;                               // Pending ae to save
+    Pvoid_t JudyL_del_ae;                           // Pending ae to delete
 } HEALTH;
 
 #endif //NETDATA_HEALTH_ALERT_LOG_H
