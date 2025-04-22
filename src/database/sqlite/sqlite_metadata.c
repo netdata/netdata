@@ -2064,6 +2064,7 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     freez(data);
 }
 
+#ifdef ENABLE_DBENGINE
 #define GET_UUID_LIST  "SELECT dim_id FROM dimension"
 size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid))
 {
@@ -2109,6 +2110,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     nd_log_daemon(NDLP_INFO, "MRG: Loaded %zu metrics from database in %s", count, report_duration);
     return count;
 }
+#endif
 
 static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool shutting_down)
 {
