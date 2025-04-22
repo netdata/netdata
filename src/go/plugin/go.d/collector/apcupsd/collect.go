@@ -26,6 +26,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.Cleanup(context.Background())
 		return nil, err
 	}
+	c.Debugf("apcupsd response: %s", string(resp))
 
 	mx := make(map[string]int64)
 
