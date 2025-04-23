@@ -1233,6 +1233,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     else
         cd->serial_failures++;
 
+    // mark all charts of this plugin as obsolete
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost) {
+        if(st->collector_tid == gettid_cached())
+            rrdset_is_obsolete___safe_from_collector_thread(st);
+    }
+    rrdset_foreach_done(st);
+
     pluginsd_process_cleanup(parser);
     rrd_collector_finished();
 
