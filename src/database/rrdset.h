@@ -223,6 +223,8 @@ struct rrdset {
         time_t before;
     } replay;
 #endif // NETDATA_LOG_REPLICATION_REQUESTS
+
+    SPINLOCK destroy_lock;
 };
 
 // --------------------------------------------------------------------------------------------------------------------

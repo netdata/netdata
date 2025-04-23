@@ -382,10 +382,8 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
             else
                 rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
         }
-        else {
-            rrdset_isnot_obsolete___safe_from_collector_thread(st);
+        else
             rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
-        }
 
         if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_CHART))
             return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -735,8 +733,13 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2))
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
+        if(!spinlock_trylock(&st->destroy_lock))
+            fatal("PLUGINSD: chart '%s' of host '%s' is being collected while is being destroyed.", rrdset_id(st), rrdhost_hostname(st->rrdhost));
+
         rrdset_isnot_obsolete___safe_from_collector_thread(st);
+        spinlock_unlock(&st->destroy_lock);
+    }
 
     timing_step(TIMING_STEP_BEGIN2_FIND_CHART);
 

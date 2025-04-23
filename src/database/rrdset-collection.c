@@ -542,7 +542,11 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     if (unlikely(rrdset_flags & RRDSET_FLAG_OBSOLETE)) {
         netdata_log_error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
+        if(!spinlock_trylock(&st->destroy_lock))
+            fatal("RRDSET: chart '%s' of host '%s' is being collected while is being destroyed.", rrdset_id(st), rrdhost_hostname(st->rrdhost));
+
         rrdset_isnot_obsolete___safe_from_collector_thread(st);
+        spinlock_unlock(&st->destroy_lock);
     }
 
     // check if the chart has a long time to be updated

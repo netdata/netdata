@@ -703,6 +703,14 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(stream_receiver_send_first_response(rpt)) {
         // we are the receiver of the node
 
+        // mark all charts as obsolete
+        RRDSET *st;
+        RRDHOST *host = rpt->host;
+        rrdset_foreach_read(st, host) {
+            rrdset_is_obsolete___safe_from_collector_thread(st);
+        }
+        rrdset_foreach_done(st);
+
         char msg[256];
         stream_receiver_connected_msg(rpt->host, msg, sizeof(msg));
         stream_receiver_log_status(rpt, msg, 0, NDLP_INFO);
