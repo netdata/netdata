@@ -60,7 +60,7 @@ The **Functions bar**, located on the right-hand side of the Top tab, lets you s
 |---------------------------------|----------------------------------------------------------|
 | **Select Function**          | Choose the Function to run from the available routines.   |
 | **Select Node**              | Select the node where the Function will execute.          |
-| **Apply Filtering**        | Narrow down results using the available filters.  <br> Example for the `Block-devices` Function: <br> - Device <br> - Type <br> - ID <br> - Model <br> - Serial number |
+| **Apply Filtering**        | Narrow down results using the available filters.  <br/> Example for the `Block-devices` Function: <br/> - Device <br/> - Type <br/> - ID <br/> - Model <br/> - Serial number |
 
 :::tip  
 The available filters depend on the Function you select. After choosing the Function, use the filters provided to narrow down the results and focus on the data you need.  
