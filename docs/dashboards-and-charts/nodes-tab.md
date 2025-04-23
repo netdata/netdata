@@ -4,7 +4,9 @@ The **Nodes tab** provides a live, centralized view of every node in your [Room]
 
 
 :::tip
+
 All configurations on this page are persistent and visible to all users in the Room.
+
 :::
 
 | Section                      | Description                                                                                                                                                        |

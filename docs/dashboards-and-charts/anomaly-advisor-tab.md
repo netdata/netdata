@@ -1,4 +1,4 @@
-# **Anomaly Advisor Tab**
+# Anomaly Advisor Tab
 
 The **Anomaly Advisor** tab helps you identify potentially anomalous metrics and charts by focusing on a highlighted timeframe of interest. This feature uses Netdata's **Anomaly Rate ML scoring** to rank metrics based on unusual behavior.
 
@@ -8,7 +8,7 @@ For configuration details, see the [ML documentation](/src/ml/README.md).
 
 ---
 
-## **How Anomaly Advisor Works**
+## How Anomaly Advisor Works
 
 The Anomaly Advisor leverages Netdata’s machine learning to evaluate anomaly rates across your nodes. It provides three key visualizations:
 
@@ -19,12 +19,14 @@ The Anomaly Advisor leverages Netdata’s machine learning to evaluate anomaly r
 | **Anomaly Events Detected**     | Indicates when the anomaly rate has triggered a node-level event.    | Focuses your attention on meaningful spikes, not just noise. |
 
 :::note
+
 **Anomaly Events Detected** appear slightly after anomaly rates rise, as they require a significant portion of metrics on the node to show anomalous behavior.
+
 :::
 
 ---
 
-## **Workflow Overview**
+## Workflow Overview
 
 1. **Highlight a timeframe of interest** on the anomaly charts.
 2. An ordered list of related charts appears, ranked by anomaly level.
@@ -33,12 +35,14 @@ The Anomaly Advisor leverages Netdata’s machine learning to evaluate anomaly r
 5. Click an entry in the index to navigate directly to the corresponding chart.
 
 :::tip
+
 Use the [node filter](/docs/dashboards-and-charts/node-filter.md) to focus on specific nodes before highlighting a timeframe.
+
 :::
 
 ---
 
-## **Usage Tips**
+## Usage Tips
 
 | Tip                                                    | Why It Matters                                              |
 |---------------------------------------------------------|-------------------------------------------------------------|
@@ -47,7 +51,7 @@ Use the [node filter](/docs/dashboards-and-charts/node-filter.md) to focus on sp
 
 ---
 
-## **Anomaly Advisor Diagram**
+## Anomaly Advisor Diagram
 
 ```mermaid
 graph TD
@@ -58,5 +62,7 @@ graph TD
 ```
 
 :::tip
+
 This diagram shows the Anomaly Advisor flow: highlight, rank, and explore. Use the ranking to prioritize which charts to investigate.
+
 :::

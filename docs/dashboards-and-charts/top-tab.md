@@ -1,4 +1,4 @@
-# **Top Tab**
+# Top Tab
 
 The **Top tab** gives you access to [Netdata Functions](/docs/top-monitoring-netdata-functions.md) that can be executed on any node running the Netdata Agent. These specialized routines, provided by various collectors, offer enhanced insights and allow you to trigger specific actions directly on the monitored node.
 
@@ -6,17 +6,21 @@ You can **use these Functions to**:
 - **Retrieve** extra diagnostic **information** 
 - Perform actions to support **troubleshooting directly on the node** 
 
-:::tip  
-You can also execute a Function from the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md) by pressing the `f(x)` button next to the node.  
+:::tip
+
+You can also execute a Function from the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md) by pressing the `f(x)` button next to the node.
+
 :::
 
-:::note  
-If you receive an error saying that your node can’t execute Functions, check the [prerequisites](/docs/top-monitoring-netdata-functions.md) to ensure your node is configured properly.  
+:::note
+
+If you receive an error saying that your node can’t execute Functions, check the [prerequisites](/docs/top-monitoring-netdata-functions.md) to ensure your node is configured properly.
+
 :::
 
 ---
 
-## **Top Tab Structure Overview**
+## Top Tab Structure Overview
 
 ```mermaid
 graph TD
@@ -26,13 +30,15 @@ graph TD
     C --> D[Results Table]
 ```
 
-:::tip  
-The diagram above shows how Function selection and execution work in the Top tab, helping you visualize the flow from choosing a Function to viewing the results.  
+:::tip
+
+The diagram above shows how Function selection and execution work in the Top tab, helping you visualize the flow from choosing a Function to viewing the results.
+
 :::
 
 ---
 
-## **Top Tab View**
+## Top Tab View
 
 The main view of the Top tab provides two elements, depending on the selected Function:
 
@@ -52,7 +58,7 @@ You can control the data refresh and update settings in the top right-hand corne
 
 ---
 
-## **Functions Bar**
+## Functions Bar
 
 The **Functions bar**, located on the right-hand side of the Top tab, lets you select which Function to run, on which node, and apply filtering where available.
 
@@ -62,6 +68,8 @@ The **Functions bar**, located on the right-hand side of the Top tab, lets you s
 | **Select Node**              | Select the node where the Function will execute.          |
 | **Apply Filtering**        | Narrow down results using the available filters.  <br/> Example for the `Block-devices` Function: <br/> - Device <br/> - Type <br/> - ID <br/> - Model <br/> - Serial number |
 
-:::tip  
-The available filters depend on the Function you select. After choosing the Function, use the filters provided to narrow down the results and focus on the data you need.  
+:::tip
+
+The available filters depend on the Function you select. After choosing the Function, use the filters provided to narrow down the results and focus on the data you need.
+
 :::

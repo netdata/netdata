@@ -1,4 +1,4 @@
-# **Dashboards and Charts**
+# Dashboards and Charts
 
 This guide explains how to access both **Agent** and **Cloud** dashboards in Netdata, with direct links to explore each section in more detail.
 
@@ -13,7 +13,7 @@ By default, the **Agent dashboard** also shows the latest version (matching Netd
 
 ---
 
-## **Main Sections**
+## Main Sections
 
 The Netdata dashboard consists of the following main sections:
 
@@ -35,18 +35,18 @@ Some dashboard features require a Netdata Cloud login and a connected Agent — 
 
 ---
 
-## **How to Access the Dashboards**
+## How to Access the Dashboards
 
-### **Netdata Cloud**
+### Netdata Cloud
 
 Access the Cloud dashboard at:  
 **<https://app.netdata.cloud/>**
 
-[Sign in or sign up](/docs/netdata-cloud/authentication-and-authorization/README.md) if you don’t have an account yet.
+[Sign in or sign up](https://app.netdata.cloud/sign-in) if you don’t have an account yet.
 
 ---
 
-### **Netdata Agent**
+### Netdata Agent
 
 To view your local Netdata Agent dashboard:
 

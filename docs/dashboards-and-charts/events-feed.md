@@ -1,4 +1,4 @@
-# **Events Tab**
+# Events Tab
 
 The **Events tab** provides a powerful feed that tracks key activities across your infrastructure and Space. It helps you investigate historical events, making it easier to correlate changes with anomalies or node behavior.
 
@@ -8,12 +8,14 @@ Use the Events feed to:
 - Access a detailed history of alert transitions and node state changes.
 
 :::note
+
 Based on your Space plan, the time range available for querying past events may vary.
+
 :::
 
 ---
 
-## **Available Event Domains**
+## Available Event Domains
 
 The Events feed provides visibility into the following event types:
 
@@ -25,7 +27,7 @@ The Events feed provides visibility into the following event types:
 
 ---
 
-## **Auditing Events**
+## Auditing Events
 
 These events log user actions and Space configuration changes:
 
@@ -42,7 +44,7 @@ These events log user actions and Space configuration changes:
 
 ---
 
-## **Topology Events**
+## Topology Events
 
 These events track changes to node connectivity and state:
 
@@ -57,7 +59,7 @@ These events track changes to node connectivity and state:
 
 ---
 
-## **Alert Events**
+## Alert Events
 
 These events log alert state transitions for node metrics:
 
@@ -67,7 +69,7 @@ These events log alert state transitions for node metrics:
 
 ---
 
-## **Who Can Access Events?**
+## Who Can Access Events?
 
 | **User Role**        | **Event Domains Accessible**               |
 |----------------------|---------------------------------------------|
@@ -75,17 +77,21 @@ These events log alert state transitions for node metrics:
 | Non-administrators   | Topology and Alerts only.                  |
 
 :::note
+
 See the [Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for details.
+
 :::
 
 ---
 
-## **How to Use the Events Feed**
+## How to Use the Events Feed
 
 1. Click the **Events** tab.
 2. Define the timeframe using the [Date and Time selector](/docs/dashboards-and-charts/visualization-date-and-time-controls.md#date-and-time-selector).
 3. Apply filters from the right-hand bar, such as **event domain**, **node**, **alert severity**, or **time range**, to focus on the data you need.
 
 :::note
+
 If your query exceeds the retention limits of your plan, an error will indicate that the requested data is outside your allowed timeframe.
+
 :::

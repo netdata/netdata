@@ -1,4 +1,4 @@
-# **Dashboards Tab**
+# Dashboards Tab
 
 With **Netdata Cloud**, you can build **custom dashboards** that target your infrastructure’s unique needs. Dashboards help you centralize key metrics from any number of distributed systems, offering a clear, interactive overview of your infrastructure.
 
@@ -6,7 +6,7 @@ Click the **Dashboards** tab in any Room to get started.
 
 ---
 
-## **Create Your First Dashboard**
+## Create Your First Dashboard
 
 To create a new dashboard:
 
@@ -15,7 +15,7 @@ To create a new dashboard:
 
 You can now add elements to your dashboard:
 
-### **Add a Chart**
+### Add a Chart
 
 Click the **Add Chart** button at the top right of the dashboard.
 
@@ -27,7 +27,7 @@ Click the **Add Chart** button at the top right of the dashboard.
 | **Chart Type**         | Change the chart type using the [Title bar](/docs/dashboards-and-charts/netdata-charts.md#title-bar). |
 | **Dimension Visibility** | Select which dimensions to display and set their order via the [Dimensions bar](/docs/dashboards-and-charts/netdata-charts.md#dimensions-bar). |
 
-### **Add Text Cards**
+### Add Text Cards
 
 Click the **Add Text** button at the top right to add a text card.
 
@@ -36,16 +36,20 @@ Use text cards to:
 - Add notes for your team members.
 
 :::tip
+
 Click the **T** icon in the text box to switch between font sizes.
+
 :::
 
 :::important
+
 Always click the **Save** button after making changes to your dashboard.
+
 :::
 
 ---
 
-## **Dashboard Layout Overview**
+## Dashboard Layout Overview
 
 ```mermaid
 graph TD
@@ -60,34 +64,38 @@ graph TD
 ```
 
 :::tip
-The diagram above shows how charts and text cards interact within the dashboard layout. Use **drag & drop to move elements and resize** them as needed. Save your layout to keep changes. Remove elements using the delete option.  
+
+The diagram above shows how charts and text cards interact within the dashboard layout. Use **drag & drop to move elements and resize** them as needed. Save your layout to keep changes. Remove elements using the delete option.
+
 :::
 
 :::tip
+
 Keep related charts close together to improve visual correlation between metrics.
+
 :::
 
 ---
 
-## **Using Your Dashboard**
+## Using Your Dashboard
 
 Dashboards are interactive and flexible. You can design them to fit your needs using any combination of charts and text cards.
 
-### **Chart Interaction**
+### Chart Interaction
 
 Charts on custom dashboards are [fully interactive](/docs/dashboards-and-charts/netdata-charts.md):
 - Zoom, pan, and highlight timeframes.
 - Synchronize charts across contexts and nodes.
 
-### **Text Cards**
+### Text Cards
 
 Text cards allow you to explain the arrangement or intent behind the dashboard. Share insights with your team directly on the dashboard.
 
 ---
 
-## **Organizing Dashboard Elements**
+## Organizing Dashboard Elements
 
-### **Move Elements**
+### Move Elements
 
 | Action            | How to Do It                            |
 |--------------------|--------------------------------------------|
@@ -95,12 +103,14 @@ Text cards allow you to explain the arrangement or intent behind the dashboard. 
 | **Resize an element**    | Click and drag from the bottom-right corner of the element. |
 
 :::tip
+
 Elements automatically align to the grid system after moving or resizing.
+
 :::
 
 ---
 
-## **Chart Management Actions**
+## Chart Management Actions
 
 | Action                        | How to Perform                                         |
 |--------------------------------|--------------------------------------------------------|
@@ -110,7 +120,7 @@ Elements automatically align to the grid system after moving or resizing.
 
 ---
 
-## **Managing Your Dashboard**
+## Managing Your Dashboard
 
 | Action                       | How to Perform                                         |
 |------------------------------|--------------------------------------------------------|
@@ -119,17 +129,19 @@ Elements automatically align to the grid system after moving or resizing.
 | **Save changes**              | Click the **Save** button after making any edits.       |
 
 :::note
+
 If multiple users edit the same dashboard at once, the second user who clicks **Save** will be prompted to either overwrite or reload the dashboard to see the latest changes.
+
 :::
 
 ---
 
-## **Minimum Browser Viewport Requirement**
+## Minimum Browser Viewport Requirement
 
 Due to the visual complexity of individual charts, dashboards require a **minimum browser viewport width of 800px**.
 
 ---
 
-## **Next Steps**
+## Next Steps
 
 After designing your dashboards, [invite your team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#team-collaboration) to collaborate. Add new users to the same Room so they can view and interact with your dashboards effortlessly.

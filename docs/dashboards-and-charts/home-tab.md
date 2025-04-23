@@ -14,5 +14,7 @@ The **Home tab** offers a **real-time overview of your Room** in Netdata Cloud. 
 | **Data retention per node**  | Bar chart showing the number of nodes grouped by retention period.                                                                                                |
 
 :::tip
+
 Use the Home tab regularly to stay ahead of infrastructure issues and monitor alert trends at a glance.
+
 :::

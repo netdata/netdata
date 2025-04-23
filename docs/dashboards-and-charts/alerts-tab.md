@@ -1,14 +1,14 @@
-# **Alerts Tab**
+# Alerts Tab
 
 Netdata provides hundreds of pre-configured health alerts to notify you when an anomaly or performance issue affects your node or its applications.
 
 ---
 
-## **Active Alerts Tab**
+## Raised Alerts Tab
 
-The **Active Alerts** tab shows all current alerts in your Room that are in a **warning** or **critical** state.
+The **Raised Alerts** tab shows all current alerts in your Room that are in a **warning** or **critical** state.
 
-### **Alert Table Overview**
+### Alert Table Overview
 
 The table provides key details about each active alert:
 
@@ -27,7 +27,7 @@ Use the **gear icon** (top right) to control which columns are visible. Sort ale
 
 ---
 
-## **Filtering Alerts**
+## Filtering Alerts
 
 Filter the alert list using the right-hand bar:
 
@@ -44,7 +44,7 @@ Filter the alert list using the right-hand bar:
 
 ---
 
-## **Viewing Alert Details**
+## Viewing Alert Details
 
 Click on an alert name to open the **alert details page**, which provides:
 
@@ -64,9 +64,9 @@ At the bottom of this page, click **View alert page** to open a dynamic view whe
 
 ---
 
-## **Silencing Alerts**
+## Silencing Alerts
 
-In the **Active Alerts** tab:
+In the **Raised Alerts** tab:
 
 - The **Silencing column** shows whether a silencing rule exists for an alert.
 - The **Actions column** allows you to:
@@ -75,15 +75,17 @@ In the **Active Alerts** tab:
 
 ---
 
-## **Alert Configurations Tab**
+## Alert Configurations Tab
 
 The **Alert Configurations** tab shows the configuration of all running alerts in your Room.
 
 :::note
+
 "Running alerts" are alerts attached to metrics that are actively being collected. Pre-configured alerts that do not match your setup may not appear here.
+
 :::
 
-### **Configuration Table Overview**
+### Configuration Table Overview
 
 | Column                     | Description                                         |
 |----------------------------|-----------------------------------------------------|
@@ -97,7 +99,7 @@ Use the **gear icon** to adjust which columns are displayed.
 
 ---
 
-## **Viewing Alert Configuration**
+## Viewing Alert Configuration
 
 From the **Actions column**, click **Show Configuration** to:
 
@@ -112,21 +114,23 @@ This allows you to investigate:
 
 ---
 
-## **Alert Lifecycle Diagram**
+## Alert Lifecycle Diagram
 
 ```mermaid
 graph TD
     A[Metric Collection] --> B[Alert Evaluation]
     B --> C{Condition Met}
     C -- Yes --> D[Trigger Alert]
-    D --> E[Alert Appears in Active Alerts Tab]
-    E --> F[View Details and Chart Snapshot]
+    D --> E[Alert in Raised Alerts Tab]
+    E --> F[Details and Chart Snapshot]
     E --> G[Apply Silencing Rule]
-    F --> H[Investigate Metrics or Run Correlations]
-    G --> I[Alert Silenced - No Notification Sent]
+    F --> H[Explore Metrics<br/>Run Correlations]
+    G --> I[No Notification Sent]
     C -- No --> J[No Alert Triggered]
 ```
 
 :::tip
+
 The diagram above illustrates the flow of alert detection and management, from metric collection to alert evaluation, triggering, and optional silencing.
+
 :::

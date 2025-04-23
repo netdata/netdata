@@ -1,8 +1,8 @@
-# **Netdata Charts**
+# Netdata Charts
 
 Netdata charts provide **real-time, per-second metrics** to help you troubleshoot and explore your infrastructure with high-resolution insights.
 
-## **What Makes Netdata Charts Special**
+## What Makes Netdata Charts Special
 
 Netdata excels at collecting, storing, and presenting metrics in ready-to-use dashboards. Its enhanced charts update every second and offer:
 
@@ -21,17 +21,19 @@ You can view these charts in Netdata Cloud’s **Metrics tab**, **individual nod
 
 ---
 
-## **Metric Correlations**
+## Metric Correlations
 
 Netdata charts allow you to quickly identify related metrics using the Metric Correlations feature. When you highlight an area of interest on a chart (such as a spike or anomaly), Netdata suggests other metrics that display similar behavior during the same timeframe.
 
 This helps you find root causes or related system activity without manually searching through all metrics.
 
 :::note
+
 Learn more: [Metric Correlations documentation](/docs/metric-correlations.md)
+
 :::
 
-## **Chart Anatomy**
+## Chart Anatomy
 
 Each Netdata chart is designed to provide quick insights and interactive exploration:
 
@@ -48,11 +50,11 @@ Each Netdata chart is designed to provide quick insights and interactive explora
 
 ---
 
-## **Core Concepts**
+## Core Concepts
 
 Understanding how Netdata organizes and presents metrics helps you make the most of its charts.
 
-### **Dimensions**
+### Dimensions
 
 A **dimension** is a value shown on a chart. Dimensions can represent:
 
@@ -64,7 +66,7 @@ Each chart’s legend lists its dimensions. You can hide or show specific dimens
 
 ---
 
-### **Contexts**
+### Contexts
 
 A **context** groups charts by metric type and displayed dimensions. Contexts define how charts are organized and where they appear in the Netdata menu.
 
@@ -78,7 +80,7 @@ Contexts are also used for alert configurations.
 
 ---
 
-### **Families**
+### Families
 
 A **family** represents a specific instance of a hardware or software resource that needs its own chart.
 
@@ -96,7 +98,7 @@ The combination of **context** and **family** forms the `[context].[family]` nam
 
 ---
 
-## **Title Bar**
+## Title Bar
 
 The Title bar provides essential information and quick actions for each chart:
 
@@ -121,7 +123,7 @@ Quick actions available from the Title bar:
 | User settings        | Save chart preferences across dashboard reloads    |
 | Drag and Drop        | Add the chart to an existing or new dashboard       |
 
-## **User Settings Priority**
+## User Settings Priority
 
 When configuring chart preferences using the User Settings action in the Title Bar, Netdata applies the following priority order:
 
@@ -135,7 +137,7 @@ This hierarchy ensures that your personal preferences always take precedence, wh
 
 ---
 
-## **Definition Bar**
+## Definition Bar
 
 The Definition bar provides powerful filtering and grouping options, helping you explore your metrics more effectively:
 
@@ -154,16 +156,18 @@ The Definition bar provides powerful filtering and grouping options, helping you
 
 ---
 
-## **NIDL Framework**
+## NIDL Framework
 
 The **NIDL (Nodes, Instances, Dimensions, Labels)** framework helps you filter, group, and understand chart data at a glance.
 
 :::tip
+
 For a detailed explanation, click the image below to open it in a new tab where you can zoom in.
 
 <a href="https://user-images.githubusercontent.com/2662304/235475061-44628011-3b1f-4c44-9528-34452018eb89.png" target="_blank">
  <img src="https://user-images.githubusercontent.com/2662304/235475061-44628011-3b1f-4c44-9528-34452018eb89.png" width="400" alt="Netdata NIDL Framework"/>
 </a>
+
 :::
 
 These dropdown menus serve two main functions:
@@ -180,7 +184,7 @@ These dropdown menus serve two main functions:
 
 ---
 
-## **Group By Dropdown**
+## Group By Dropdown
 
 The **Group by** dropdown allows you to apply different grouping strategies on the same dataset:
 
@@ -194,16 +198,20 @@ The **Group by** dropdown allows you to apply different grouping strategies on t
 | Group by Label         | Summarize data based on label values                |
 
 :::tip
+
 When working with cgroups (VMs and containers), using **Group by Instance** shows data from all contributing cgroups. Apply additional filters to focus on specific instances and save these views to your dashboards.
+
 :::
 
 :::tip
+
 Use **Group by Instance, Dimension** to visualize the time series for each individual collected metric in the chart.
+
 :::
 
 ---
 
-## **Aggregate Functions Dropdown**
+## Aggregate Functions Dropdown
 
 Each chart has a default aggregation function, which you can adjust as needed:
 
@@ -232,7 +240,7 @@ These options let you control how outliers and edge cases are handled during tim
 
 ---
 
-## **Nodes Dropdown**
+## Nodes Dropdown
 
 Filter and explore the contribution of each node to your chart:
 
@@ -246,7 +254,7 @@ Filter and explore the contribution of each node to your chart:
 
 ---
 
-## **Instances Dropdown**
+## Instances Dropdown
 
 Use the **Instances** dropdown to filter or view the contribution of specific instances within your data:
 
@@ -259,7 +267,7 @@ Use the **Instances** dropdown to filter or view the contribution of specific in
 
 ---
 
-## **Dimensions Dropdown**
+## Dimensions Dropdown
 
 The **Dimensions** dropdown allows you to filter by or focus on particular dimensions within your chart:
 
@@ -272,7 +280,7 @@ The **Dimensions** dropdown allows you to filter by or focus on particular dimen
 
 ---
 
-## **Labels Dropdown**
+## Labels Dropdown
 
 Filter or view your data by **labels**, giving you flexibility to isolate metrics by their tags:
 
@@ -285,7 +293,7 @@ Filter or view your data by **labels**, giving you flexibility to isolate metric
 
 ---
 
-## **Aggregate Functions Over Time**
+## Aggregate Functions Over Time
 
 When data resolution exceeds the chart’s granularity, **time-based aggregation** is applied. The aggregation function over time ensures that large amounts of data are still readable and insightful.
 
@@ -302,17 +310,21 @@ When data resolution exceeds the chart’s granularity, **time-based aggregation
 | Delta                        | Display the change between data points         |
 | Exponential smoothing        | Apply weighted averaging to recent points      |
 
-> For more details, see [Data Queries - Data Grouping](/src/web/api/queries/README.md#data-grouping).
+:::tip
+
+For more details, see [Data Queries - Data Grouping](/src/web/api/queries/README.md#data-grouping).
+
+:::
 
 ---
 
-## **Reset to Defaults**
+## Reset to Defaults
 
 Click the green **Reset** button at the end of the Definition bar to restore the chart’s filtering and grouping options to their defaults.
 
 ---
 
-## **Anomaly Rate Ribbon**
+## Anomaly Rate Ribbon
 
 Netdata uses machine learning models trained on past data to predict expected metric values. These models identify anomalies in real time as soon as outliers occur.
 
@@ -329,7 +341,7 @@ This feature enables you to catch issues quickly across large volumes of metrics
 
 ---
 
-## **Hover Over the Chart**
+## Hover Over the Chart
 
 Hovering over any point on a chart reveals a detailed information overlay, making it easy to explore your metrics interactively:
 
@@ -346,7 +358,7 @@ When you hover over the **Anomaly Rate ribbon**, the dimensions are sorted by an
 
 ---
 
-### **Info Column**
+### Info Column
 
 The **Info Column** appears during hover and provides detailed data collection insights:
 
@@ -360,7 +372,7 @@ The **Info Column** appears during hover and provides detailed data collection i
 
 ---
 
-## **Play, Pause, and Reset Controls**
+## Play, Pause, and Reset Controls
 
 Control chart playback and interact with time using the **Time Controls**. These controls help you pause or reset the charts while exploring metrics.
 
@@ -374,7 +386,7 @@ These controls work when the **default “Pan” action** is selected in the too
 
 ---
 
-## **Toolbar**
+## Toolbar
 
 The chart **Toolbar** provides interactive tools for manipulating the chart view:
 
@@ -390,7 +402,7 @@ The chart **Toolbar** provides interactive tools for manipulating the chart view
 
 ---
 
-### **Pan**
+### Pan
 
 Use the **Pan Tool** to navigate through time on the chart:
 
@@ -402,7 +414,7 @@ Drag right to move backward in time and left to move forward.
 
 ---
 
-### **Highlight**
+### Highlight
 
 The **Highlight Tool** allows you to select timeframes for deeper analysis:
 
@@ -414,7 +426,7 @@ Use highlighting to investigate spikes, anomalies, or unusual behavior. Click on
 
 ---
 
-### **Select and Zoom**
+### Select and Zoom
 
 Zoom into specific timeframes for maximum data granularity:
 
@@ -425,7 +437,7 @@ Zoom into specific timeframes for maximum data granularity:
 
 ---
 
-### **Zoom In and Out**
+### Zoom In and Out
 
 The **Chart Zoom** tool allows you to zoom in and out to view different time ranges:
 
@@ -437,11 +449,11 @@ Zooming in helps you analyze recent events in detail, while zooming out provides
 
 ---
 
-## **Dimensions Bar**
+## Dimensions Bar
 
 The **Dimensions Bar** allows you to manage how dimensions are displayed within the chart. Sorting and hiding dimensions helps you focus on the most relevant data.
 
-### **Order Dimensions Legend**
+### Order Dimensions Legend
 
 You can sort the dimensions legend using various criteria:
 
@@ -455,7 +467,7 @@ You can sort the dimensions legend using various criteria:
 
 ---
 
-### **Show and Hide Dimensions**
+### Show and Hide Dimensions
 
 Simplify your charts by showing only the dimensions you want to focus on:
 
@@ -468,7 +480,7 @@ This feature is especially useful for identifying unusual behavior by isolating 
 
 ---
 
-## **Resize a Chart**
+## Resize a Chart
 
 Adjust the height of a chart to fit your analysis needs:
 
