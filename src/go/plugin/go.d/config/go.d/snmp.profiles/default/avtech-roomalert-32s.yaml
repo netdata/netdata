@@ -12,20 +12,14 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.1.1.0
       name: roomalert.32s.internal_tempf
-    description: Internal temperature in Fahrenheit
-    unit: degF
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.1.2.0
       name: roomalert.32s.internal_tempc
-    description: Internal temperature in Celsius
-    unit: degC
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.2.1.0
       name: roomalert.32s.internal_humidity
-    description: Internal humidity
-    unit: "%"
 #  - MIB: ROOMALERT32S-MIB
 #    symbol:
 #      OID: 1.3.6.1.4.1.20916.1.11.1.1.3.1.0
@@ -39,386 +33,258 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.4.1.0
       name: roomalert.32s.internal_heat_index
-    description: Internal heat index
-    unit: degF
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.4.2.0
       name: roomalert.32s.internal_heat_indexC
-    description: Internal heat index in Celsius
-    unit: degC
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.5.1.0
       name: roomalert.32s.internal_analog1
-    description: Internal analog 1 value
-    unit: TBD
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.5.2.0
       name: roomalert.32s.internal_analog2
-    description: Internal analog 2 value
-    unit: TBD
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.6.1.0
       name: roomalert.32s.internal_relay1
-    description: Internal relay 1 state
-    unit: "{relay}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.6.2.0
       name: roomalert.32s.internal_relay2
-    description: Internal relay 2 state
-    unit: "{relay}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.7.1.0
       name: roomalert.32s.internal_dew_point_c
-    description: Internal dew point in Celsius
-    unit: degC
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.7.2.0
       name: roomalert.32s.internal_dew_point_f
-    description: Internal dew point in Fahrenheit
-    unit: degF
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.1.1.0
       name: roomalert.32s.digital_sen1_1
-    description: Digital sensor 1-1 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.1.2.0
       name: roomalert.32s.digital_sen1_2
-    description: Digital sensor 1-2 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.1.3.0
       name: roomalert.32s.digital_sen1_3
-    description: Digital sensor 1-3 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.1.4.0
       name: roomalert.32s.digital_sen1_4
-    description: Digital sensor 1-4 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.1.5.0
       name: roomalert.32s.digital_sen1_5
-    description: Digital sensor 1-5 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.1.6.0
       name: roomalert.32s.digital_sen1_6
-    description: Digital sensor 1-6 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.1.7.0
       name: roomalert.32s.digital_sen1_7
-    description: Digital sensor 1-7 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.2.1.0
       name: roomalert.32s.digital_sen2_1
-    description: Digital sensor 2-1 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.2.2.0
       name: roomalert.32s.digital_sen2_2
-    description: Digital sensor 2-2 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.2.3.0
       name: roomalert.32s.digital_sen2_3
-    description: Digital sensor 2-3 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.2.4.0
       name: roomalert.32s.digital_sen2_4
-    description: Digital sensor 2-4 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.2.5.0
       name: roomalert.32s.digital_sen2_5
-    description: Digital sensor 2-5 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.2.6.0
       name: roomalert.32s.digital_sen2_6
-    description: Digital sensor 2-6 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.2.7.0
       name: roomalert.32s.digital_sen2_7
-    description: Digital sensor 2-7 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.3.1.0
       name: roomalert.32s.digital_sen3_1
-    description: Digital sensor 3-1 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.3.2.0
       name: roomalert.32s.digital_sen3_2
-    description: Digital sensor 3-2 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.3.3.0
       name: roomalert.32s.digital_sen3_3
-    description: Digital sensor 3-3 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.3.4.0
       name: roomalert.32s.digital_sen3_4
-    description: Digital sensor 3-4 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.3.5.0
       name: roomalert.32s.digital_sen3_5
-    description: Digital sensor 3-5 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.3.6.0
       name: roomalert.32s.digital_sen3_6
-    description: Digital sensor 3-6 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.3.7.0
       name: roomalert.32s.digital_sen3_7
-    description: Digital sensor 3-7 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.4.1.0
       name: roomalert.32s.digital_sen4_1
-    description: Digital sensor 4-1 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.4.2.0
       name: roomalert.32s.digital_sen4_2
-    description: Digital sensor 4-2 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.4.3.0
       name: roomalert.32s.digital_sen4_3
-    description: Digital sensor 4-3 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.4.4.0
       name: roomalert.32s.digital_sen4_4
-    description: Digital sensor 4-4 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.4.5.0
       name: roomalert.32s.digital_sen4_5
-    description: Digital sensor 4-5 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.4.6.0
       name: roomalert.32s.digital_sen4_6
-    description: Digital sensor 4-6 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.4.7.0
       name: roomalert.32s.digital_sen4_7
-    description: Digital sensor 4-7 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.5.1.0
       name: roomalert.32s.digital_sen5_1
-    description: Digital sensor 5-1 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.5.2.0
       name: roomalert.32s.digital_sen5_2
-    description: Digital sensor 5-2 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.5.3.0
       name: roomalert.32s.digital_sen5_3
-    description: Digital sensor 5-3 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.5.4.0
       name: roomalert.32s.digital_sen5_4
-    description: Digital sensor 5-4 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.5.5.0
       name: roomalert.32s.digital_sen5_5
-    description: Digital sensor 5-5 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.5.6.0
       name: roomalert.32s.digital_sen5_6
-    description: Digital sensor 5-6 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.5.7.0
       name: roomalert.32s.digital_sen5_7
-    description: Digital sensor 5-7 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.6.1.0
       name: roomalert.32s.digital_sen6_1
-    description: Digital sensor 6-1 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.6.2.0
       name: roomalert.32s.digital_sen6_2
-    description: Digital sensor 6-2 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.6.3.0
       name: roomalert.32s.digital_sen6_3
-    description: Digital sensor 6-3 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.6.4.0
       name: roomalert.32s.digital_sen6_4
-    description: Digital sensor 6-4 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.6.5.0
       name: roomalert.32s.digital_sen6_5
-    description: Digital sensor 6-5 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.6.6.0
       name: roomalert.32s.digital_sen6_6
-    description: Digital sensor 6-6 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.6.7.0
       name: roomalert.32s.digital_sen6_7
-    description: Digital sensor 6-7 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.7.1.0
       name: roomalert.32s.digital_sen7_1
-    description: Digital sensor 7-1 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.7.2.0
       name: roomalert.32s.digital_sen7_2
-    description: Digital sensor 7-2 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.7.3.0
       name: roomalert.32s.digital_sen7_3
-    description: Digital sensor 7-3 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.7.4.0
       name: roomalert.32s.digital_sen7_4
-    description: Digital sensor 7-4 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.7.5.0
       name: roomalert.32s.digital_sen7_5
-    description: Digital sensor 7-5 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.7.6.0
       name: roomalert.32s.digital_sen7_6
-    description: Digital sensor 7-6 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.7.7.0
       name: roomalert.32s.digital_sen7_7
-    description: Digital sensor 7-7 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.8.1.0
       name: roomalert.32s.digital_sen8_1
-    description: Digital sensor 8-1 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.8.2.0
       name: roomalert.32s.digital_sen8_2
-    description: Digital sensor 8-2 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.8.3.0
       name: roomalert.32s.digital_sen8_3
-    description: Digital sensor 8-3 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.8.4.0
       name: roomalert.32s.digital_sen8_4
-    description: Digital sensor 8-4 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.8.5.0
       name: roomalert.32s.digital_sen8_5
-    description: Digital sensor 8-5 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.8.6.0
       name: roomalert.32s.digital_sen8_6
-    description: Digital sensor 8-6 state
-    unit: "{sensor}"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.2.8.7.0
       name: roomalert.32s.digital_sen8_7
-    description: Digital sensor 8-7 state
-    unit: "{sensor}"
 #  - MIB: ROOMALERT32S-MIB
 #    symbol:
 #      OID: 1.3.6.1.4.1.20916.1.11.1.3.1.0

@@ -17,26 +17,18 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.5.3.10.0 # s5ChasUtilCPUUsageLast1Minute.3.10.0
-    description: CPU Usage
-    unit: '%'
   - MIB: S5-CHASSIS-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.12.3.10.0 # s5ChasUtilMemoryTotalMB.3.10.0
-    description: Total Memory
-    unit: MB
   - MIB: S5-CHASSIS-MIB
     symbol:
       name: memory.free
       OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.13.3.10.0 # s5ChasUtilMemoryAvailableMB.3.10.0
-    description: Free Memory
-    unit: MB
   - MIB: S5-CHASSIS-MIB
     symbol:
       name: avaya.s5ChasTmpSnrTmpValue
       OID: 1.3.6.1.4.1.45.1.6.3.7.1.1.5.5.10.0 # s5ChasTmpSnrTmpValue.5.10.0
-    description: s5ChasTmpSnrTmpValue
-    unit: 'K'
   - MIB: S5-CHASSIS-MIB
     table:
       name: s5ChasComTable
@@ -44,8 +36,6 @@ metrics:
     symbols:
       - name: avaya.s5ChasCom
         constant_value_one: true
-        description: avaya.s5ChasCom
-        unit: '{chassis}'
     metric_tags:
       - symbol:
           name: avaya.s5ChasComDescr

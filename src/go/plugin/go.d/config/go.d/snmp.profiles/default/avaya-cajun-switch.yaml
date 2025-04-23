@@ -17,14 +17,10 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.6.1  # genCpuCurrentUtilization.1
-      description: CPU usage
-      unit: '%'
   - MIB: UTILIZATION-MANAGEMENT-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.2.6.1.3.1  # genMemUtilizationPercentUsed.1
-      description: Memory usage
-      unit: '%'
   - MIB: CONFIG-MIB
     table:
       name: genPortTable
@@ -32,13 +28,11 @@ metrics:
     symbols:
       - name: avaya.genPort
         constant_value_one: true
-        description: avaya.genPort
     metric_tags:
       - symbol:
           name: avaya.genPortId
           OID: 1.3.6.1.4.1.81.9.1.1.2
         tag: avaya_gen_port_id
-        description: avaya.genPortId
       - symbol:
           name: avaya.genPortFunctionality
           OID: 1.3.6.1.4.1.81.9.1.1.3
@@ -96,7 +90,6 @@ metrics:
           56: s_fp_not_supported
           57: eth10_base_tw_in_pwr
           58: eth100_base_t_xw_in_pwr
-        description: avaya.genPortFunctionality
       - symbol:
           name: avaya.genPortType
           OID: 1.3.6.1.4.1.81.9.1.1.4
@@ -431,12 +424,10 @@ metrics:
           name: avaya.genPortDescr
           OID: 1.3.6.1.4.1.81.9.1.1.5
         tag: avaya_gen_port_descr
-        description: avaya.genPortDescr
       - symbol:
           name: avaya.genPortName
           OID: 1.3.6.1.4.1.81.9.1.1.21
         tag: avaya_gen_port_name
-        description: avaya.genPortName
       - symbol:
           name: avaya.genPortClassification
           OID: 1.3.6.1.4.1.81.9.1.1.22
@@ -445,7 +436,6 @@ metrics:
           1: regular
           2: valuable
           255: not_supported
-        description: avaya.genPortClassification
       - symbol:
           name: avaya.scEthPortMode
           OID: 1.3.6.1.4.1.81.28.2.1.1.1.28
@@ -460,7 +450,6 @@ metrics:
           7: full_duplex_sym_pause
           8: full_duplex_asym_rx_pause
           255: not_supported
-        description: avaya.scEthPortMode
       - symbol:
           name: avaya.scEthPortSpeed
           OID: 1.3.6.1.4.1.81.28.2.1.1.1.29
@@ -472,7 +461,6 @@ metrics:
           4: a155_mbps
           5: a622_mbps
           255: not_supported
-        description: avaya.scEthPortSpeed
       - symbol:
           OID: 1.3.6.1.4.1.81.9.1.1.10
           name: avaya.genPortAdminStatus
@@ -480,7 +468,6 @@ metrics:
         mapping:
           1: enabled
           2: disabled
-        description: avaya.genPortAdminStatus
       - symbol:
           OID: 1.3.6.1.4.1.81.28.2.1.1.1.27
           name: avaya.scEthPortFunctionalStatus
@@ -493,7 +480,6 @@ metrics:
           10: remote_fault
           11: rsp_error
           255: not_supported
-        description: avaya.scEthPortFunctionalStatus
 metric_tags:
   - tag: avaya_gen_cpu_utilization_enable_monitoring
     OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.2
@@ -501,4 +487,3 @@ metric_tags:
     mapping:
       1: disabled
       2: enabled
-    description: genCpuUtilizationEnableMonitoring

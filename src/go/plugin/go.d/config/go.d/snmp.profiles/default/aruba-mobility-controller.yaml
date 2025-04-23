@@ -14,5 +14,3 @@ metadata:
     fields:
       type:
         value: "WLC"
-
-metrics:

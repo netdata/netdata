@@ -6,5 +6,4 @@ metadata:
   device:
     fields:
       vendor:
-        description: "Vendor"
         value: "alcatel-lucent"

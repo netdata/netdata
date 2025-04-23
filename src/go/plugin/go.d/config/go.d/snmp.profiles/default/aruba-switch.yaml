@@ -34,14 +34,12 @@ metadata:
           OID: 1.3.6.1.4.1.14823.2.2.1.2.1.29.0
           name: wlsxSysExtSerialNumber
           # Examples: `CV0009287`
-        description: Serial number of the device.
       version:
         # wlsxSysExtSwVersion used for both version and os_version
         symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.2.1.28.0
           name: wlsxSysExtSwVersion
           # Examples: `8.6.0.4`
-        description: Software version of the device.
       product_name:
         symbol:
           OID: 1.3.6.1.2.1.1.1.0
@@ -49,30 +47,25 @@ metadata:
           match_pattern: '\bMODEL:\s+([\w-]+)'
           match_value: '$1'
           # Examples: ArubaOS (MODEL: Aruba7010-US), Version 6.5.1.4 (58698)
-        description: Product name of the device.
       model:
         symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.1.1.2.0
           name: wlsxModelName
           # Example: A7210
-        description: Model name of the device.
       os_name:
         symbol:
           OID: 1.3.6.1.2.1.1.1.0
           name: sysDescr
           match_pattern: '\bArubaOS\b'
           match_value: 'ArubaOS'
-        description: Operating system name of the device.
       os_version:
         # wlsxSysExtSwVersion used for both version and os_version
         symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.2.1.28.0
           name: wlsxSysExtSwVersion
           # Examples: `8.6.0.4`
-        description: Operating system version of the device.
       type:
         value: "switch"
-        description: Device type.
 
 metrics:
   ### Sensor
@@ -87,15 +80,11 @@ metrics:
       - # NOTE: active(1), inactive(2)
         OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17.1.2
         name: sysExtFanStatus
-        description: Status of the fan.
-        unit: '{fan_status}'
     metric_tags:
       - tag: fan_index
         symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17.1.1
           name: sysExtFanIndex
-          description: Index of the fan.
-          unit: '{fan}'
 
   - MIB: WLSX-SYSTEMEXT-MIB
     table:
@@ -104,21 +93,15 @@ metrics:
     symbols:
       - name: wlsxSysExtFan
         constant_value_one: true
-        description: Presence of the fan.
-        unit: '{fan}'
     metric_tags:
       - tag: fan_index
         symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17.1.1
           name: sysExtFanIndex
-          description: Index of the fan.
-          unit: '{fan}'
       - tag: fan_status
         symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17.1.2
           name: sysExtFanStatus
-          description: Status of the fan.
-          unit: '{fan_status}'
         mapping:
           1: active
           2: inactive
@@ -135,15 +118,11 @@ metrics:
       # NOTE: active(1), inactive(2)
       - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.18.1.2
         name: sysExtPowerSupplyStatus
-        description: Status of the power supply.
-        unit: '{power_supply_status}'
     metric_tags:
       - tag: powersupply_index
         symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.2.1.18.1.1
           name: sysExtPowerSupplyIndex
-          description: Index of the power supply.
-          unit: '{power_supply}'
 
   ### Processor
 
@@ -156,15 +135,11 @@ metrics:
       # The average, over the last minute, of the percentage of time that this processor was not idle.
       - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.13.1.3
         name: sysExtProcessorLoad
-        description: Average processor load over the last minute.
-        unit: '%'
     metric_tags:
       - tag: processor_index
         symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.2.1.13.1.1
           name: sysExtProcessorID
-          description: Index of the processor.
-          unit: '{processor}'
 
   ### Memory
 
@@ -176,23 +151,15 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.2
         name: sysExtMemorySize
-        description: Total memory size.
-        unit: kB
       - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.3
         name: sysExtMemoryUsed
-        description: Used memory size.
-        unit: kB
       - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.4
         name: sysExtMemoryFree
-        description: Free memory size.
-        unit: kB
     metric_tags:
       - tag: memory_index
         symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.1
           name: sysExtMemoryIndex
-          description: Index of the memory.
-          unit: '{memory}'
 
 
   ### Interface
@@ -202,5 +169,3 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.14823.2.2.1.2.1.32.0
       name: wlsxSysExtPacketLossPercent
-      description: Packet loss percentage.
-      unit: '%'

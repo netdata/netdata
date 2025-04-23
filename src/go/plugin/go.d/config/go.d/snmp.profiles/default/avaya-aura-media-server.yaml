@@ -17,17 +17,11 @@ metrics:
     symbol:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.5.1
-    description: Total physical memory.
-    unit: byte
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.1
-    description: Total used memory.
-    unit: byte
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.2.1.25.3.3.1.2.196608
-    description: CPU usage.
-    unit: '%'

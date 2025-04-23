@@ -54,20 +54,14 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.14823.2.2.1.2.1.30.0
-      description: CPU usage
-      unit: '%'
   - MIB: WLSX-SYSTEMEXT-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.14823.2.2.1.2.1.31.0
-      description: Memory usage
-      unit: '%'
   - MIB: WLSX-SYSTEMEXT-MIB
     symbol:
       name: wlsxSysExtPacketLossPercent
       OID: 1.3.6.1.4.1.14823.2.2.1.2.1.32.0
-      description: wlsxSysExtPacketLossPercent
-      unit: '%'
   - MIB: WLSX-SWITCH-MIB
     table:
       name: wlsxSysXStorageTable
@@ -75,12 +69,8 @@ metrics:
     symbols:
       - name: sysXStorageSize
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.3
-        description: sysXStorageSize
-        unit: By
       - name: sysXStorageUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
-        description: sysXStorageUsed
-        unit: By
     metric_tags:
       - symbol:
           name: sysXStorageType
@@ -100,12 +90,8 @@ metrics:
     symbols:
       - name: apChannelNoise
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.13
-        description: apChannelNoise
-        unit: dBm
       - name: apSignalToNoiseRatio
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.14
-        description: apSignalToNoiseRatio
-        unit: dB
     metric_tags:
       - symbol:
           name: apESSID
@@ -144,72 +130,40 @@ metrics:
     symbols:
       - name: apChannelBwRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.2
-        description: apChannelBwRate
-        unit: 'bit/s'
       - name: apChannelFrameRetryRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.3
-        description: apChannelFrameRetryRate
-        unit: rate/s
       - name: apChannelFrameLowSpeedRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.4
-        description: apChannelFrameLowSpeedRate
-        unit: rate/s
       - name: apChannelFrameNonUnicastRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.5
-        description: apChannelFrameNonUnicastRate
-        unit: rate/s
       - name: apChannelFrameFragmentationRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.6
-        description: apChannelFrameFragmentationRate
-        unit: rate/s
       - name: apChannelFrameReceiveErrorRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.7
-        description: apChannelFrameReceiveErrorRate
-        unit: rate/s
       - name: apBSSTxPackets
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.8
         metric_type: monotonic_count
-        description: apBSSTxPackets
-        unit: packet
       - name: apBSSTxBytes
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.9
         metric_type: monotonic_count
-        description: apBSSTxBytes
-        unit: By
       - name: apBSSRxPackets
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.10
         metric_type: monotonic_count
-        description: apBSSRxPackets
-        unit: packet
       - name: apBSSRxBytes
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.11
         metric_type: monotonic_count
-        description: apBSSRxBytes
-        unit: By
       - name: apBSSBwRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.12
-        description: apBSSBwRate
-        unit: 'bit/s'
       - name: apBSSFrameRetryRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.13
-        description: apBSSFrameRetryRate
-        unit: rate/s
       - name: apBSSFrameLowSpeedRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.14
-        description: apBSSFrameLowSpeedRate
-        unit: rate/s
       - name: apBSSFrameNonUnicastRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.15
-        description: apBSSFrameNonUnicastRate
-        unit: rate/s
       - name: apBSSFrameFragmentationRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.16
-        description: apBSSFrameFragmentationRate
-        unit: rate/s
       - name: apBSSFrameReceiveErrorRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.17
-        description: apBSSFrameReceiveErrorRate
-        unit: rate/s
     metric_tags:
       - symbol:
           name: apStatsChannel
@@ -219,50 +173,34 @@ metrics:
     symbol:
       name: wlsxNumOfUsers8021x
       OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.1.0
-      description: wlsxNumOfUsers8021x
-      unit: user
   - MIB: WLSX-USER-MIB
     symbol:
       name: wlsxNumOfUsersVPN
       OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.2.0
-      description: wlsxNumOfUsersVPN
-      unit: user
   - MIB: WLSX-USER-MIB
     symbol:
       name: wlsxNumOfUsersCP
       OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.3.0
-      description: wlsxNumOfUsersCP
-      unit: user
   - MIB: WLSX-USER-MIB
     symbol:
       name: wlsxNumOfUsersMAC
       OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.4.0
-      description: wlsxNumOfUsersMAC
-      unit: user
   - MIB: WLSX-USER-MIB
     symbol:
       name: wlsxNumOfUsersStateful8021x
       OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.5.0
-      description: wlsxNumOfUsersStateful8021x
-      unit: user
   - MIB: WLSX-HA-MIB
     symbol:
       name: haActiveAPs
       OID: 1.3.6.1.4.1.14823.2.2.1.20.1.2.1.1.0
-      description: haActiveAPs
-      unit: '{access_point}'
   - MIB: WLSX-HA-MIB
     symbol:
       name: haStandbyAPs
       OID: 1.3.6.1.4.1.14823.2.2.1.20.1.2.1.2.0
-      description: haStandbyAPs
-      unit: '{access_point}'
   - MIB: WLSX-HA-MIB
     symbol:
       name: haTotalAPs
       OID: 1.3.6.1.4.1.14823.2.2.1.20.1.2.1.3.0
-      description: haTotalAPs
-      unit: '{access_point}'
   - MIB: WLSX-HA-MIB
     table:
       name: wlsxHighAvalabilityTunnelTable
@@ -270,20 +208,12 @@ metrics:
     symbols:
       - name: haActiveVapTunnels
         OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.1
-        description: haActiveVapTunnels
-        unit: tunnel
       - name: haStandbyVapTunnels
         OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.2
-        description: haStandbyVapTunnels
-        unit: tunnel
       - name: haTotalVapTunnels
         OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.3
-        description: haTotalVapTunnels
-        unit: tunnel
       - name: haAPHbtTunnels
         OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.4
-        description: haAPHbtTunnels
-        unit: tunnel
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.20.1.1.1.2
@@ -299,20 +229,12 @@ metrics:
     symbols:
       - name: wlanStaTransmitRate
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.10
-        description: wlanStaTransmitRate
-        unit: 'bit/s'
       - name: wlanStaRSSI
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.14
-        description: wlanStaRSSI
-        unit: dBm
       - name: wlanStaUpTime
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.15
-        description: wlanStaUpTime
-        unit: s
       - name: wlanStaTransmitRateCode
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.17
-        description: wlanStaTransmitRateCode
-        unit: TBD
     metric_tags:
       - symbol:
           name: wlanStaPhyType
@@ -375,12 +297,8 @@ metrics:
     symbols:
       - name: wlanStaTxBytes64
         OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1.1.25
-        description: wlanStaTxBytes64
-        unit: By
       - name: wlanStaRxBytes64
         OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1.1.26
-        description: wlanStaRxBytes64
-        unit: By
     metric_tags:
       - symbol:
           name: wlanStaChannelNum

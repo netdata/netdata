@@ -7,20 +7,14 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.14.0  # healthDeviceCpu1MinAvg
-      description: CPU Usage
-      unit: '%'
   - MIB: ALCATEL-IND1-HEALTH-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.10.0  # healthDeviceMemory1MinAvg
-      description: Memory Usage
-      unit: '%'
   - MIB: ALCATEL-IND1-HEALTH-MIB
     symbol:
       name: alcatel.ind.healthDeviceTemperatureChas1MinAvg
       OID: 1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.18.0
-      description: alcatel.ind.healthDeviceTemperatureChas1MinAvg
-      unit: 'Cel'
   - MIB: ALCATEL-IND1-CHASSIS-MIB
     table:
       name: chasEntPhysicalTable
@@ -28,8 +22,6 @@ metrics:
     symbols:
       - name: alcatel.ind.chasEntPhysical
         constant_value_one: true
-        description: Alcatel Chassis Entity Physical
-        unit: '{chassis}'
     metric_tags:
       - # MIB: ENTITY-MIB
         # table: entPhysicalTable
@@ -37,7 +29,6 @@ metrics:
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
           name: alcatel.ind.entPhysicalClass
         tag: ent_physical_class
-        description: Entity Physical Class
         mapping:
           1: other
           2: unknown
@@ -60,26 +51,22 @@ metrics:
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
           name: alcatel.ind.entPhysicalName
         tag: ent_physical_name
-        description: Entity Physical Name
       - # MIB: ENTITY-MIB
         # table: entPhysicalTable
         symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
           name: alcatel.ind.entPhysicalSerialNum
         tag: ent_physical_serial_num
-        description: Entity Physical Serial Number
       - # MIB: ENTITY-MIB
         # table: entPhysicalTable
         symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
           name: alcatel.ind.entPhysicalModelName
         tag: ent_physical_model_name
-        description: Entity Physical Model Name
       - symbol:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.1
           name: alcatel.ind.chasEntPhysAdminStatus
         tag: chas_ent_phys_admin_status
-        description: Chassis Entity Physical Admin Status
         mapping:
           1: unknown
           2: power_off
@@ -94,7 +81,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.2
           name: alcatel.ind.chasEntPhysOperStatus
         tag: chas_ent_phys_oper_status
-        description: Chassis Entity Physical Oper Status
         mapping:
           1: up
           2: down
@@ -108,7 +94,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.8
           name: alcatel.ind.chasEntPhysLedStatusOk1
         tag: chas_ent_phys_led_status_ok1
-        description: Chassis Entity Physical Led Status Ok1
         mapping:
           0: not_applicable
           1: off
@@ -120,7 +105,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.9
           name: alcatel.ind.chasEntPhysLedStatusOk2
         tag: chas_ent_phys_led_status_ok2
-        description: Chassis Entity Physical Led Status Ok2
         mapping:
           0: not_applicable
           1: off
@@ -132,7 +116,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.10
           name: alcatel.ind.chasEntPhysLedStatusPrimaryCMM
         tag: chas_ent_phys_led_status_primary_cmm
-        description: Chassis Entity Physical Led Status Primary CMM
         mapping:
           0: not_applicable
           1: off
@@ -144,7 +127,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.11
           name: alcatel.ind.chasEntPhysLedStatusSecondaryCMM
         tag: chas_ent_phys_led_status_secondary_cmm
-        description: Chassis Entity Physical Led Status Secondary CMM
         mapping:
           0: not_applicable
           1: off
@@ -156,7 +138,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.12
           name: alcatel.ind.chasEntPhysLedStatusTemperature
         tag: chas_ent_phys_led_status_temperature
-        description: Chassis Entity Physical Led Status Temperature
         mapping:
           0: not_applicable
           1: off
@@ -168,7 +149,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.13
           name: alcatel.ind.chasEntPhysLedStatusFan
         tag: chas_ent_phys_led_status_fan
-        description: Chassis Entity Physical Led Status Fan
         mapping:
           0: not_applicable
           1: off
@@ -180,7 +160,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.14
           name: alcatel.ind.chasEntPhysLedStatusFan1
         tag: chas_ent_phys_led_status_fan1
-        description: Chassis Entity Physical Led Status Fan1
         mapping:
           0: not_applicable
           1: off
@@ -192,7 +171,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.15
           name: alcatel.ind.chasEntPhysLedStatusFan2
         tag: chas_ent_phys_led_status_fan2
-        description: Chassis Entity Physical Led Status Fan2
         mapping:
           0: not_applicable
           1: off
@@ -204,7 +182,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.16
           name: alcatel.ind.chasEntPhysLedStatusFan3
         tag: chas_ent_phys_led_status_fan3
-        description: Chassis Entity Physical Led Status Fan3
         mapping:
           0: not_applicable
           1: off
@@ -216,7 +193,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.17
           name: alcatel.ind.chasEntPhysLedStatusBackupPS
         tag: chas_ent_phys_led_status_backup_ps
-        description: Chassis Entity Physical Led Status Backup PS
         mapping:
           0: not_applicable
           1: off
@@ -228,7 +204,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.18
           name: alcatel.ind.chasEntPhysLedStatusInternalPS
         tag: chas_ent_phys_led_status_internal_ps
-        description: Chassis Entity Physical Led Status Internal PS
         mapping:
           0: not_applicable
           1: off
@@ -240,7 +215,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.19
           name: alcatel.ind.chasEntPhysLedStatusControl
         tag: chas_ent_phys_led_status_control
-        description: Chassis Entity Physical Led Status Control
         mapping:
           0: not_applicable
           1: off
@@ -252,7 +226,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.20
           name: alcatel.ind.chasEntPhysLedStatusFabric
         tag: chas_ent_phys_led_status_fabric
-        description: Chassis Entity Physical Led Status Fabric
         mapping:
           0: not_applicable
           1: off
@@ -264,7 +237,6 @@ metrics:
           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.21
           name: alcatel.ind.chasEntPhysLedStatusPSU
         tag: chas_ent_phys_led_status_psu
-        description: Chassis Entity Physical Led Status PSU
         mapping:
           0: not_applicable
           1: off
