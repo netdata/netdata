@@ -130,5 +130,5 @@ If the script is valid, this command will return `OK, VALID`. We recommend verif
 
 - [Connect to Netdata Cloud](/docs/netdata-cloud/connect-agent-to-cloud)
 - [Release Channels & Versions](/docs/netdata-agent/versions-and-platforms.md)
-- [Uninstall Guide](/docs/netdata-agent/installation/uninstall)
+- [Uninstall Guide](/docs/netdata-agent/maintenance/uninstall)
 - [Offline Installation Guide](/packaging/installer/methods/offline.md)
