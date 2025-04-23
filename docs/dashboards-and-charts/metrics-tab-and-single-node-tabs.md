@@ -50,7 +50,7 @@ The **Chart Navigation Menu**, located on the right-hand side of the dashboard, 
 | Feature                        | Description                                                           |
 |----------------------------------|-----------------------------------------------------------------------|
 | **Section Navigation**          | Navigate quickly through the dashboard sections.                     |
-| **Chart Filtering Options**     | Filter charts by:  <br> - Host labels  <br> - Node status  <br> - Netdata version  <br> - Individual nodes |
+| **Chart Filtering Options**     | Filter charts by:  <br/> - Host labels  <br/> - Node status  <br/> - Netdata version  <br/> - Individual nodes |
 | **Active Alerts Display**       | View active alerts for the Room.                                      |
 | **Anomaly Rate (AR%) Button**   | Check the maximum chart anomaly rate for each section by clicking the `AR%` button. |
 
