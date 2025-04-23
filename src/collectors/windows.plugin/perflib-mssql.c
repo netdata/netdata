@@ -32,10 +32,9 @@ struct netdata_mssql_conn {
     SQLHDBC netdataSQLHDBc;
 
     SQLHSTMT checkPermSTMT;
-    SQLHSTMT backupSTMT;
     SQLHSTMT databaseListSTMT;
     SQLHSTMT dataFileSizeSTMT;
-    SQLHSTMT dataActiveTransactionSTMT;
+    SQLHSTMT dbTransactionSTMT;
 
     BOOL is_connected;
 };
@@ -146,15 +145,6 @@ struct mssql_lock_instance {
 
     RRDDIM *rd_lockWait;
     RRDDIM *rd_deadLocks;
-};
-
-enum db_instance_idx {
-    NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED,
-    NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES,
-    NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS,
-    NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS,
-
-    NETDATA_MSSQL_ENUM_MDI_IDX_END
 };
 
 struct mssql_db_instance {
@@ -287,13 +277,14 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 // SQL SERVER BEFORE 2008 DOES NOT HAVE DATA IN THIS TABLE
 // https://github.com/influxdata/telegraf/blob/081dfa26e80d8764fb7f9aac5230e81584b62b56/plugins/inputs/sqlserver/sqlqueriesV2.go#L1259
 #define NETDATA_QUERY_TRANSACTIONS_MASK                                                                                \
-    "select counter_name, cntr_value from %s.sys.dm_os_performance_counters where instance_name = '%s' and counter_name in ('Transactions/sec');"
+    "select counter_name, cntr_value from %s.sys.dm_os_performance_counters where instance_name = '%s' and counter_name in ('Active Transactions', 'Transactions/sec', 'Write Transactions/sec', 'Backup/Restore Throughput/sec', 'Log Bytes Flushed/sec', 'Log Flushes/sec');"
 
+#define NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC "Active Transactions"
 #define NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC "Transactions/sec"
-
-// https://www.sqlbackuprestore.com/measuringbackupspeed.htm
-#define NETDATA_QUERY_BACKUP_TROUGHPUT                                                                                 \
-    "SELECT database_name, CAST((backup_size / (DATEDIFF(ss, backup_start_date, backup_finish_date))) / (1024 * 1024) AS BIGINT) FROM msdb..backupset ORDER BY database_name, backup_start_date;"
+#define NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC "Write Transactions/sec"
+#define NETDATA_MSSQL_BACKUP_RESTORE_METRIC "Backup/Restore Throughput/sec"
+#define NETDATA_MSSQL_LOG_FLUSHED_METRIC "Log Bytes Flushed/sec"
+#define NETDATA_MSSQL_LOG_FLUSHES_METRIC "Log Flushes/sec"
 
 void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbname)
 {
@@ -309,38 +300,59 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
         dbname,
         dbname);
 
-    SQLRETURN ret = SQLExecDirect(mdi->parent->conn.dataActiveTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
+    SQLRETURN ret = SQLExecDirect(mdi->parent->conn.dbTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dataActiveTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY);
         goto endtransactions;
     }
 
-    ret = SQLBindCol(mdi->parent->conn.dataActiveTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
+    ret = SQLBindCol(
+        mdi->parent->conn.dbTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dataActiveTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE);
         goto endtransactions;
     }
 
-    ret = SQLBindCol(mdi->parent->conn.dataActiveTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
+    ret = SQLBindCol(mdi->parent->conn.dbTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dataActiveTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE);
         goto endtransactions;
     }
 
     do {
-        ret = SQLFetch(mdi->parent->conn.dataActiveTransactionSTMT);
+        ret = SQLFetch(mdi->parent->conn.dbTransactionSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             goto endtransactions;
         }
 
         // We cannot use strcmp, because buffer is filled with spaces instead NULL.
-        if (!strncmp(object_name,
-                NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC, sizeof(NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC) -1))
+        if (!strncmp(
+                object_name,
+                NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC,
+                sizeof(NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC) - 1))
             mdi->MSSQLDatabaseActiveTransactions.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                     object_name,
+                     NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC,
+                     sizeof(NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC) - 1))
+            mdi->MSSQLDatabaseTransactions.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                     object_name,
+                     NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC,
+                     sizeof(NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC) - 1))
+            mdi->MSSQLDatabaseWriteTransactions.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                     object_name, NETDATA_MSSQL_BACKUP_RESTORE_METRIC, sizeof(NETDATA_MSSQL_BACKUP_RESTORE_METRIC) - 1))
+            mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = (ULONGLONG)value;
+        else if (!strncmp(object_name, NETDATA_MSSQL_LOG_FLUSHED_METRIC, sizeof(NETDATA_MSSQL_LOG_FLUSHED_METRIC) - 1))
+            mdi->MSSQLDatabaseLogFlushed.current.Data = (ULONGLONG)value;
+        else if (!strncmp(object_name, NETDATA_MSSQL_LOG_FLUSHES_METRIC, sizeof(NETDATA_MSSQL_LOG_FLUSHES_METRIC) - 1))
+            mdi->MSSQLDatabaseLogFlushes.current.Data = (ULONGLONG)value;
+
     } while (true);
 
 endtransactions:
-    SQLFreeStmt(mdi->parent->conn.dataActiveTransactionSTMT, SQL_CLOSE);
+    SQLFreeStmt(mdi->parent->conn.dbTransactionSTMT, SQL_CLOSE);
 }
 
 int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -357,7 +369,7 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     /*
     if (mdi->MSSQLDatabaseActiveTransactions.current.Data != ULONG_LONG_MAX)
         mdi->MSSQLDatabaseActiveTransactions.current.Data = netdata_MSSQL_fill_long_value(
-            mdi->parent->conn.dataActiveTransactionSTMT, NETDATA_QUERY_TRANSACTIONS_MASK, dbname);
+            mdi->parent->conn.dbTransactionSTMT, NETDATA_QUERY_TRANSACTIONS_MASK, dbname);
             */
 
     return 0;
@@ -449,49 +461,6 @@ enddblist:
     SQLFreeStmt(mi->conn.databaseListSTMT, SQL_CLOSE);
 }
 
-void metdata_mssql_fill_backup_troughput(struct mssql_instance *mi)
-{
-    char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
-    long backup = 0;
-    SQLLEN col_dbname_len = 0, col_backup_len = 0;
-
-    SQLRETURN ret;
-
-    ret = SQLExecDirect(mi->conn.backupSTMT, (SQLCHAR *)NETDATA_QUERY_BACKUP_TROUGHPUT, SQL_NTS);
-    if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.backupSTMT, NETDATA_MSSQL_ODBC_QUERY);
-        goto endbackup;
-    }
-
-    ret = SQLBindCol(mi->conn.backupSTMT, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_dbname_len);
-    if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.backupSTMT, NETDATA_MSSQL_ODBC_PREPARE);
-        goto endbackup;
-    }
-
-    ret = SQLBindCol(mi->conn.backupSTMT, 1, SQL_C_LONG, &backup, sizeof(backup), &col_backup_len);
-    if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.backupSTMT, NETDATA_MSSQL_ODBC_PREPARE);
-        goto endbackup;
-    }
-
-    do {
-        ret = SQLFetch(mi->conn.backupSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
-            goto endbackup;
-        }
-
-        struct mssql_db_instance *mdi = dictionary_set(mi->databases, dbname, NULL, sizeof(*mdi));
-        if (!mdi)
-            continue;
-
-        mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = backup;
-    } while (true);
-
-endbackup:
-    SQLFreeStmt(mi->conn.backupSTMT, SQL_CLOSE);
-}
-
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
 {
     SQLRETURN ret;
@@ -545,10 +514,6 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
 
-        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->backupSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
-            retConn = FALSE;
-
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->databaseListSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
@@ -557,7 +522,7 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
 
-        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dataActiveTransactionSTMT);
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbTransactionSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
     }
@@ -714,10 +679,9 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
     dbconn->netdataSQLEnv = NULL;
     dbconn->netdataSQLHDBc = NULL;
     dbconn->checkPermSTMT = NULL;
-    dbconn->backupSTMT = NULL;
     dbconn->databaseListSTMT = NULL;
     dbconn->dataFileSizeSTMT = NULL;
-    dbconn->dataActiveTransactionSTMT = NULL;
+    dbconn->dbTransactionSTMT = NULL;
 
     dbconn->is_connected = FALSE;
 
@@ -1466,12 +1430,10 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, cons
         mli->rd_db_log_flushes = rrddim_add(mli->st_db_log_flushes, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES)) {
-        rrddim_set_by_pointer(
-            mli->st_db_log_flushes,
-            mli->rd_db_log_flushes,
-            (collected_number)mli->MSSQLDatabaseLogFlushes.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_log_flushes,
+        mli->rd_db_log_flushes,
+        (collected_number)mli->MSSQLDatabaseLogFlushes.current.Data);
 
     rrdset_done(mli->st_db_log_flushes);
 }
@@ -1505,12 +1467,10 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, cons
         mli->rd_db_log_flushed = rrddim_add(mli->st_db_log_flushed, "flushed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED)) {
-        rrddim_set_by_pointer(
-            mli->st_db_log_flushed,
-            mli->rd_db_log_flushed,
-            (collected_number)mli->MSSQLDatabaseLogFlushed.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_log_flushed,
+        mli->rd_db_log_flushed,
+        (collected_number)mli->MSSQLDatabaseLogFlushed.current.Data);
 
     rrdset_done(mli->st_db_log_flushed);
 }
@@ -1545,12 +1505,10 @@ static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *
             rrddim_add(mli->st_db_transactions, "transactions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS)) {
-        rrddim_set_by_pointer(
-            mli->st_db_transactions,
-            mli->rd_db_transactions,
-            (collected_number)mli->MSSQLDatabaseTransactions.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_transactions,
+        mli->rd_db_transactions,
+        (collected_number)mli->MSSQLDatabaseTransactions.current.Data);
 
     rrdset_done(mli->st_db_transactions);
 }
@@ -1586,12 +1544,10 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const 
             rrddim_add(mli->st_db_write_transactions, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS)) {
-        rrddim_set_by_pointer(
-            mli->st_db_write_transactions,
-            mli->rd_db_write_transactions,
-            (collected_number)mli->MSSQLDatabaseWriteTransactions.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_write_transactions,
+        mli->rd_db_write_transactions,
+        (collected_number)mli->MSSQLDatabaseWriteTransactions.current.Data);
 
     rrdset_done(mli->st_db_write_transactions);
 }
@@ -1727,22 +1683,9 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
         if (!mdi)
             continue;
 
-        mdi->updated = 0;
         if (!mdi->parent) {
             mdi->parent = mi;
         }
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushed))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushes))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseTransactions))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseWriteTransactions))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS);
     }
 
     dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_charts_cb, &update_every);
@@ -1912,7 +1855,6 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
                 mi->instanceID);
         } else {
             metdata_mssql_fill_dictionary_from_db(mi);
-            metdata_mssql_fill_backup_troughput(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
     } else {
