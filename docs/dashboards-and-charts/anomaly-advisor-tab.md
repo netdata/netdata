@@ -19,7 +19,7 @@ The Anomaly Advisor leverages Netdata’s machine learning to evaluate anomaly r
 | **Anomaly Events Detected**     | Indicates when the anomaly rate has triggered a node-level event.    | Focuses your attention on meaningful spikes, not just noise. |
 
 :::note
-**Anomaly Events Detected** appear slightly after anomaly rates begin to rise, as they require a significant portion of metrics on the node to show anomalous behavior.
+**Anomaly Events Detected** appear slightly after anomaly rates rise, as they require a significant portion of metrics on the node to show anomalous behavior.
 :::
 
 ---
