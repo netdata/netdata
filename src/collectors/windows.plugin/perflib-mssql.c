@@ -226,7 +226,7 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_ms
         char *str_type = netdata_MSSQL_type_text(type);
         nd_log(
             NDLS_COLLECTORS,
-            NDLP_ERR,
+            NDLP_INFO,
             "MSSQL server error using the handle %s running %s :  %s, %s",
             str_type,
             str_step,
