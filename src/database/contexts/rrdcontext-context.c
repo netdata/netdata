@@ -260,4 +260,7 @@ void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
 
     dictionary_destroy(host->rrdctx.contexts);
     host->rrdctx.contexts = NULL;
+
+    RRDCONTEXT_QUEUE_FREE(&host->rrdctx.pp_queue, NULL, NULL);
+    RRDCONTEXT_QUEUE_FREE(&host->rrdctx.hub_queue, NULL, NULL);
 }
