@@ -58,5 +58,5 @@ graph TD
 ```
 
 :::tip
-This diagram shows the Anomaly Advisor flow: highlight, rank, explore. Use the ranking to prioritize which charts to investigate.
+This diagram shows the Anomaly Advisor flow: highlight, rank, and explore. Use the ranking to prioritize which charts to investigate.
 :::
