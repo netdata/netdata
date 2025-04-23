@@ -48,7 +48,7 @@ The main view of the Top tab provides two elements, depending on the selected Fu
 | **Visualization** | Located at the top of the page. The type of visualization depends on the selected Function and may allow user customization. |
 | **Data Table**    | Located below the visualization. Displays detailed results from the executed Function.                                       |
 
-### **View Controls**
+### View Controls
 
 You can control the data refresh and update settings in the top right-hand corner of the view:
 
