@@ -63,6 +63,8 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     RRDHOST *host = ctr->host;
     RRDSET *st = rrdset;
 
+    spinlock_init(&st->destroy_lock);
+
     const char *chart_full_id = dictionary_acquired_item_name(item);
 
     st->id = string_strdupz(chart_full_id);
@@ -191,8 +193,6 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
 
     struct rrdset_constructor *ctr = constructor_data;
     RRDSET *st = rrdset;
-
-    rrdset_isnot_obsolete___safe_from_collector_thread(st);
 
     ctr->react_action = RRDSET_REACT_NONE;
 
@@ -428,25 +428,43 @@ RRDSET *rrdset_create_custom(
 
     netdata_log_debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
-    struct rrdset_constructor ctr = {
-        .host = host,
-        .type = type,
-        .id = id,
-        .name = name,
-        .family = family,
-        .context = context,
-        .title = title,
-        .units = units,
-        .plugin = plugin,
-        .module = module,
-        .priority = priority,
-        .update_every = update_every,
-        .chart_type = chart_type,
-        .memory_mode = memory_mode,
-        .history_entries = history_entries,
-    };
+    struct rrdset_constructor ctr;
 
-    RRDSET *st = rrdset_index_add(host, chart_full_id, &ctr);
+    RRDSET *st = NULL;
+    while(!st) {
+        st = rrdset_index_find(host, chart_full_id);
+        if(st) {
+            if(spinlock_trylock(&st->destroy_lock)) {
+                rrdset_isnot_obsolete___safe_from_collector_thread(st);
+                spinlock_unlock(&st->destroy_lock);
+            }
+            else {
+                st = NULL;
+                microsleep(1 * USEC_PER_MS);
+                continue;
+            }
+        }
+
+        ctr = (struct rrdset_constructor){
+            .host = host,
+            .type = type,
+            .id = id,
+            .name = name,
+            .family = family,
+            .context = context,
+            .title = title,
+            .units = units,
+            .plugin = plugin,
+            .module = module,
+            .priority = priority,
+            .update_every = update_every,
+            .chart_type = chart_type,
+            .memory_mode = memory_mode,
+            .history_entries = history_entries,
+        };
+
+        st = rrdset_index_add(host, chart_full_id, &ctr);
+    }
 
     bool name_updated = false;
     if(!st->name) {

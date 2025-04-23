@@ -94,18 +94,19 @@ static inline bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_d
     return true;
 }
 
-static void svc_rrdset_obsolete_to_free(RRDSET *st) {
-    if(!svc_rrdset_archive_obsolete_dimensions(st, true))
-        return;
+static bool svc_rrdset_lock_for_deletion(RRDSET *st, time_t now) {
+    if(st->last_accessed_time_s + rrdset_free_obsolete_time_s < now &&
+        st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now &&
+        st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now &&
+        spinlock_trylock(&st->destroy_lock)) {
 
-    worker_is_busy(WORKER_JOB_FREE_CHART);
+        if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
+            return true;
 
-    rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
+        spinlock_unlock(&st->destroy_lock);
+    }
 
-    // has to be run after all dimensions are archived - or use-after-free will occur
-    rrdvar_delete_all(st->rrdvars);
-
-    rrdset_free(st);
+    return false;
 }
 
 static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
@@ -128,25 +129,26 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
             continue;
 
         RRDSET_FLAGS flags = rrdset_flag_get(st);
-        bool obsolete_chart = flags & RRDSET_FLAG_OBSOLETE;
-        bool obsolete_dims = flags & RRDSET_FLAG_OBSOLETE_DIMENSIONS;
 
-        if(obsolete_dims) {
+        if(flags & RRDSET_FLAG_OBSOLETE_DIMENSIONS) {
             partial_candidates++;
 
             if(svc_rrdset_archive_obsolete_dimensions(st, false))
                 partial_archives++;
         }
 
-        if(obsolete_chart) {
+        if(flags & RRDSET_FLAG_OBSOLETE) {
             full_candidates++;
 
-            if(unlikely(   st->last_accessed_time_s + rrdset_free_obsolete_time_s < now
-                        && st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now
-                        && st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now
-                       )) {
-                svc_rrdset_obsolete_to_free(st);
-                full_archives++;
+            if(svc_rrdset_lock_for_deletion(st, now)) {
+                if(svc_rrdset_archive_obsolete_dimensions(st, true)) {
+                    full_archives++;
+
+                    worker_is_busy(WORKER_JOB_FREE_CHART);
+                    rrdset_free(st);
+                }
+                else
+                    spinlock_unlock(&st->destroy_lock);
             }
         }
     }
@@ -159,31 +161,6 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
 
     if(full_archives != full_candidates)
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
-}
-
-static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host) {
-    worker_is_busy(WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK);
-
-    time_t now = now_realtime_sec();
-    time_t last_entry_t;
-    RRDSET *st;
-
-    time_t child_connect_time = host->stream.rcv.status.last_connected;
-
-    rrdset_foreach_read(st, host) {
-        if(rrdset_is_replicating(st))
-            continue;
-
-        last_entry_t = rrdset_last_entry_s(st);
-
-        if (last_entry_t && last_entry_t < child_connect_time &&
-            child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT +
-                    (ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every) <
-                now)
-
-            rrdset_is_obsolete___safe_from_collector_thread(st);
-    }
-    rrdset_foreach_done(st);
 }
 
 static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
@@ -202,22 +179,6 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
         svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
-        if (host == localhost)
-            continue;
-
-        rrdhost_receiver_lock(host);
-
-        time_t now = now_realtime_sec();
-
-        if (host->stream.rcv.status.check_obsolete &&
-            ((host->stream.rcv.status.last_chart &&
-              host->stream.rcv.status.last_chart + host->health.delay_up_to < now) ||
-             (host->stream.rcv.status.last_connected + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now))) {
-            svc_rrdhost_detect_obsolete_charts(host);
-            host->stream.rcv.status.check_obsolete = false;
-        }
-
-        rrdhost_receiver_unlock(host);
     }
 
     rrd_rdunlock();
