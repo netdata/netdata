@@ -28,7 +28,9 @@ The Netdata dashboard consists of the following main sections:
 - [Events Tab](/docs/dashboards-and-charts/events-feed.md)
 
 :::tip
+
 Some dashboard features require a Netdata Cloud login and a connected Agent — such as saving chart preferences, accessing custom dashboards, or executing node Functions.
+
 :::
 
 ---
