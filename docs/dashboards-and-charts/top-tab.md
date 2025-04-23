@@ -1,6 +1,6 @@
 # **Top Tab**
 
-The **Top tab** allows you to run [Netdata Functions](/docs/top-monitoring-netdata-functions.md) on a node where a Netdata Agent is running. These routines are exposed by specific collectors and provide additional insights or the ability to trigger actions directly on the node.
+The **Top tab** gives you access to [Netdata Functions](/docs/top-monitoring-netdata-functions.md) that can be executed on any node running the Netdata Agent. These specialized routines, provided by various collectors, offer enhanced insights and allow you to trigger specific actions directly on the monitored node.
 
 You can **use these Functions to**:
 - **Retrieve** extra diagnostic **information** 
