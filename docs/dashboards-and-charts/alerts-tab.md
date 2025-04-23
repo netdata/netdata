@@ -1,6 +1,6 @@
 # **Alerts Tab**
 
-Netdata provides hundreds of pre-configured health alerts designed to notify you when an anomaly or performance issue affects your node or its applications.
+Netdata provides hundreds of pre-configured health alerts to notify you when an anomaly or performance issue affects your node or its applications.
 
 ---
 
