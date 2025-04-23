@@ -1,4 +1,4 @@
-zmetrics:
+metrics:
   ### Interface
 
   - # This table contains statistical information of the ingress queue in an interface.
