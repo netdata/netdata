@@ -5,9 +5,6 @@
 /* Run service jobs every X seconds */
 #define SERVICE_HEARTBEAT 10
 
-#define TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT (3600 / 2)
-#define ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT 60
-
 #define WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK     1
 #define WORKER_JOB_CLEANUP_OBSOLETE_CHARTS          2
 #define WORKER_JOB_ARCHIVE_CHART                    3
@@ -163,6 +160,14 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 }
 
+void svc_rrdhost_obsolete_all_charts(RRDHOST *host) {
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        rrdset_is_obsolete___safe_from_collector_thread(st);
+    }
+    rrdset_foreach_done(st);
+}
+
 static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
     worker_is_busy(WORKER_JOB_CLEANUP_OBSOLETE_CHARTS_ON_HOSTS);
 
@@ -179,6 +184,19 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
         svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
+        if (host == localhost)
+            continue;
+
+        rrdhost_receiver_lock(host);
+
+        time_t now = now_realtime_sec();
+
+        if (host->stream.rcv.status.last_connected == 0 &&
+            (host->stream.rcv.status.last_disconnected + rrdset_free_obsolete_time_s < now)) {
+            svc_rrdhost_obsolete_all_charts(host);
+        }
+
+        rrdhost_receiver_unlock(host);
     }
 
     rrd_rdunlock();

@@ -182,6 +182,9 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     freez(st->exporting_flags);
 
+    if(st->destroy_lock.locked)
+        spinlock_unlock(&st->destroy_lock);
+
     memset(st, 0, sizeof(RRDSET));
 }
 
@@ -390,9 +393,6 @@ RRDSET *rrdset_create_custom(
     RRD_DB_MODE memory_mode
     , long history_entries
 ) {
-    if (host != localhost)
-        host->stream.rcv.status.last_chart = now_realtime_sec();
-
     if(!type || !type[0])
         fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
               , (id && *id)?id:"<unset>"
