@@ -6,11 +6,20 @@
 
 **Merged pull requests:**
 
+- fix\(dyncfg/health\): correct db lookup absolute option name [\#20161](https://github.com/netdata/netdata/pull/20161) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/apcupsd\): log UPS response in debug mode [\#20157](https://github.com/netdata/netdata/pull/20157) ([ilyam8](https://github.com/ilyam8))
+- improvement\(cgroups\): filter systemd-nspawn payload by default [\#20155](https://github.com/netdata/netdata/pull/20155) ([ilyam8](https://github.com/ilyam8))
+- Fix compilation with DBENGINE disabled [\#20154](https://github.com/netdata/netdata/pull/20154) ([stelfrag](https://github.com/stelfrag))
+- build\(deps\): bump github.com/docker/docker from 28.0.4+incompatible to 28.1.1+incompatible in /src/go [\#20153](https://github.com/netdata/netdata/pull/20153) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/invopop/jsonschema from 0.12.0 to 0.13.0 in /src/go [\#20152](https://github.com/netdata/netdata/pull/20152) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/go-ldap/ldap/v3 from 3.4.10 to 3.4.11 in /src/go [\#20151](https://github.com/netdata/netdata/pull/20151) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/gosnmp/gosnmp from 1.39.0 to 1.40.0 in /src/go [\#20149](https://github.com/netdata/netdata/pull/20149) ([dependabot[bot]](https://github.com/apps/dependabot))
 - docs: cleanup language and fix minor grammar issues [\#20144](https://github.com/netdata/netdata/pull/20144) ([luiizaferreirafonseca](https://github.com/luiizaferreirafonseca))
 - chore\(otel/journaldexporter\): improve remote tests [\#20143](https://github.com/netdata/netdata/pull/20143) ([ilyam8](https://github.com/ilyam8))
 - Install fix admonition docs [\#20136](https://github.com/netdata/netdata/pull/20136) ([kanelatechnical](https://github.com/kanelatechnical))
 - Update MSI to use a single unified EULA instead of multiple license pages. [\#20134](https://github.com/netdata/netdata/pull/20134) ([Ferroin](https://github.com/Ferroin))
 - Update README.md [\#20133](https://github.com/netdata/netdata/pull/20133) ([kanelatechnical](https://github.com/kanelatechnical))
+- Improve metadata event loop shutdown [\#20132](https://github.com/netdata/netdata/pull/20132) ([stelfrag](https://github.com/stelfrag))
 - Fix Locks \(Windows Locks\) [\#20131](https://github.com/netdata/netdata/pull/20131) ([thiagoftsm](https://github.com/thiagoftsm))
 - Make sure pattern array items are added and evaluated in order [\#20130](https://github.com/netdata/netdata/pull/20130) ([stelfrag](https://github.com/stelfrag))
 - Fix compilation when using FSANITIZE\_ADDRESS [\#20129](https://github.com/netdata/netdata/pull/20129) ([stelfrag](https://github.com/stelfrag))
@@ -459,17 +468,6 @@
 - silence new alerts [\#19610](https://github.com/netdata/netdata/pull/19610) ([ktsaou](https://github.com/ktsaou))
 - Do not register removed node on agent restart [\#19609](https://github.com/netdata/netdata/pull/19609) ([stelfrag](https://github.com/stelfrag))
 - Add sentry fatal message breadcrumb. [\#19608](https://github.com/netdata/netdata/pull/19608) ([vkalintiris](https://github.com/vkalintiris))
-- Disable LTO for openSUSE package builds. [\#19607](https://github.com/netdata/netdata/pull/19607) ([Ferroin](https://github.com/Ferroin))
-- add interpolation to median and percentile [\#19606](https://github.com/netdata/netdata/pull/19606) ([ktsaou](https://github.com/ktsaou))
-- docs: reword nodes-ephemerality for clarity [\#19604](https://github.com/netdata/netdata/pull/19604) ([ilyam8](https://github.com/ilyam8))
-- cleanup hosts - leftover code [\#19603](https://github.com/netdata/netdata/pull/19603) ([ktsaou](https://github.com/ktsaou))
-- make remove-stale-node remove also ephemeral nodes [\#19602](https://github.com/netdata/netdata/pull/19602) ([ktsaou](https://github.com/ktsaou))
-- Update manage-notification-methods.md [\#19601](https://github.com/netdata/netdata/pull/19601) ([Ancairon](https://github.com/Ancairon))
-- Close database if we encounter error during startup [\#19600](https://github.com/netdata/netdata/pull/19600) ([stelfrag](https://github.com/stelfrag))
-- dequeue from hub before deleting contexts [\#19599](https://github.com/netdata/netdata/pull/19599) ([ktsaou](https://github.com/ktsaou))
-- build\(deps\): bump github.com/gohugoio/hashstructure from 0.3.0 to 0.5.0 in /src/go [\#19598](https://github.com/netdata/netdata/pull/19598) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump golang.org/x/text from 0.21.0 to 0.22.0 in /src/go [\#19597](https://github.com/netdata/netdata/pull/19597) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Cleanup code that writes extents to the database [\#19596](https://github.com/netdata/netdata/pull/19596) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
