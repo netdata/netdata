@@ -13,7 +13,7 @@ metrics:
       - name: hrSWRunPerfCPU
         OID: 1.3.6.1.2.1.25.5.1.1.1
         description: cpu usage of the software run process
-        unit: "c/s"
+        unit: "cs"
     metric_tags:
       - symbol:
           name: hrSWRunIndex
