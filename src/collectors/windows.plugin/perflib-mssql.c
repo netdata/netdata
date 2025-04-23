@@ -11,6 +11,8 @@
 // https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
 #define NETDATA_MAX_INSTANCE_NAME (32)
 #define NETDATA_MAX_INSTANCE_OBJECT (128)
+// https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
+#define SQLSERVER_MAX_NAME_LENGTH NETDATA_MAX_INSTANCE_OBJECT
 #define NETDATA_MSSQL_NEXT_TRY (60)
 
 BOOL is_sqlexpress = FALSE;
@@ -284,12 +286,62 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-compatibility-views/sys-sysprocesses-transact-sql?view=sql-server-ver16
 // SQL SERVER BEFORE 2008 DOES NOT HAVE DATA IN THIS TABLE
 // https://github.com/influxdata/telegraf/blob/081dfa26e80d8764fb7f9aac5230e81584b62b56/plugins/inputs/sqlserver/sqlqueriesV2.go#L1259
-#define NETDATA_QUERY_ACT_TRANSACTION_MASK                                                                             \
-    "SELECT sum(open_tran) FROM %s.sys.sysprocesses WHERE spid > 50 AND (open_tran != 0 OR cmd != 'AWAITING_COMMAND');"
+#define NETDATA_QUERY_TRANSACTIONS_MASK                                                                                \
+    "select counter_name, cntr_value from %s.sys.dm_os_performance_counters where instance_name = '%s' and counter_name in ('Transactions/sec');"
+
+#define NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC "Transactions/sec"
 
 // https://www.sqlbackuprestore.com/measuringbackupspeed.htm
 #define NETDATA_QUERY_BACKUP_TROUGHPUT                                                                                 \
     "SELECT database_name, CAST((backup_size / (DATEDIFF(ss, backup_start_date, backup_finish_date))) / (1024 * 1024) AS BIGINT) FROM msdb..backupset ORDER BY database_name, backup_start_date;"
+
+void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbname)
+{
+    char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1];
+    long value;
+    SQLLEN col_object_len = 0, col_value_len = 0;
+
+    SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
+    snprintfz(
+        (char *)query,
+        sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT,
+        NETDATA_QUERY_TRANSACTIONS_MASK,
+        dbname,
+        dbname);
+
+    SQLRETURN ret = SQLExecDirect(mdi->parent->conn.dataActiveTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dataActiveTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY);
+        goto endtransactions;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn.dataActiveTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dataActiveTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        goto endtransactions;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn.dataActiveTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dataActiveTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        goto endtransactions;
+    }
+
+    do {
+        ret = SQLFetch(mdi->parent->conn.dataActiveTransactionSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            goto endtransactions;
+        }
+
+        // We cannot use strcmp, because buffer is filled with spaces instead NULL.
+        if (!strncmp(object_name,
+                NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC, sizeof(NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC) -1))
+            mdi->MSSQLDatabaseActiveTransactions.current.Data = (ULONGLONG)value;
+    } while (true);
+
+endtransactions:
+    SQLFreeStmt(mdi->parent->conn.dataActiveTransactionSTMT, SQL_CLOSE);
+}
 
 int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
@@ -301,9 +353,12 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
         mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
             mdi->parent->conn.dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname);
 
+    dict_mssql_fill_transactions(mdi, dbname);
+    /*
     if (mdi->MSSQLDatabaseActiveTransactions.current.Data != ULONG_LONG_MAX)
         mdi->MSSQLDatabaseActiveTransactions.current.Data = netdata_MSSQL_fill_long_value(
-            mdi->parent->conn.dataActiveTransactionSTMT, NETDATA_QUERY_ACT_TRANSACTION_MASK, dbname);
+            mdi->parent->conn.dataActiveTransactionSTMT, NETDATA_QUERY_TRANSACTIONS_MASK, dbname);
+            */
 
     return 0;
 }
@@ -349,8 +404,6 @@ endperm:
 
 void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
-// https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
-#define SQLSERVER_MAX_NAME_LENGTH (128)
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
     SQLLEN col_data_len = 0;
 
@@ -398,8 +451,6 @@ enddblist:
 
 void metdata_mssql_fill_backup_troughput(struct mssql_instance *mi)
 {
-    // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
-#define SQLSERVER_MAX_NAME_LENGTH (128)
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
     long backup = 0;
     SQLLEN col_dbname_len = 0, col_backup_len = 0;
@@ -604,13 +655,12 @@ void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void
 
 void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
-    struct mssql_db_instance *ptr = value;
+    struct mssql_db_instance *mdi = value;
 
-    // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-databases-object
-    ptr->MSSQLDatabaseLogFlushed.key = "Log Bytes Flushed/sec";
-    ptr->MSSQLDatabaseLogFlushes.key = "Log Flushes/sec";
-    ptr->MSSQLDatabaseTransactions.key = "Transactions/sec";
-    ptr->MSSQLDatabaseWriteTransactions.key = "Write Transactions/sec";
+    mdi->MSSQLDatabaseLogFlushed.key = "Log Bytes Flushed/sec";
+    mdi->MSSQLDatabaseLogFlushes.key = "Log Flushes/sec";
+    mdi->MSSQLDatabaseTransactions.key = "Transactions/sec";
+    mdi->MSSQLDatabaseWriteTransactions.key = "Write Transactions/sec";
 }
 
 // Options
