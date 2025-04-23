@@ -879,8 +879,13 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
 
     st->pluginsd.set = true;
 
-    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED)))
+    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
+        if(!spinlock_trylock(&rd->destroy_lock))
+            fatal("PLUGINSD: dimension '%s' of chart '%s' is being collected while is being destroyed.", rrddim_id(rd), rrdset_id(st));
+
         rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
+        spinlock_unlock(&rd->destroy_lock);
+    }
 
     timing_step(TIMING_STEP_SET2_LOOKUP_DIMENSION);
 

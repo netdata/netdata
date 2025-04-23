@@ -20,31 +20,30 @@
 #define WORKER_JOB_PGC_OPEN_EVICT                   18
 #define WORKER_JOB_PGC_OPEN_FLUSH                   19
 
-static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
+static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
 
-    if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED) || !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
-        return;
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && spinlock_trylock(&rd->destroy_lock)) {
+        if(!rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+            spinlock_unlock(&rd->destroy_lock);
+            return false;
+        }
+    }
+    else
+        return false;
 
     worker_is_busy(WORKER_JOB_ARCHIVE_DIMENSION);
 
-    rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
-    rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
-
     if (rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
-        /* only a collector can mark a chart as obsolete, so we must remove the reference */
         if (!rrddim_finalize_collection_and_check_retention(rd)) {
             /* This metric has no data and no references */
             metaqueue_delete_dimension_uuid(uuidmap_uuid_ptr(rd->uuid));
-        }
-        else {
-            /* Do not delete this dimension */
-            return;
         }
     }
 
     worker_is_busy(WORKER_JOB_FREE_DIMENSION);
     rrddim_free(st, rd);
+    return true;
 }
 
 static inline bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
@@ -72,8 +71,8 @@ static inline bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_d
                 if(references == 1) {
 //                    netdata_log_info("Removing obsolete dimension 'host:%s/chart:%s/dim:%s'",
 //                                     rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
-                    svc_rrddim_obsolete_to_archive(rd);
-                    dim_archives++;
+                    if(svc_rrddim_obsolete_to_archive(rd))
+                        dim_archives++;
                 }
 //                else
 //                    netdata_log_info("Cannot remove obsolete dimension 'host:%s/chart:%s/dim:%s'",
