@@ -12,7 +12,6 @@ metrics:
           name: lldpRemPortIdSubtype
         tag: lldp_rem_port_id_subtype
         description: subtype of the remote port identifier
-        unit: "{access_point}"
         mapping:
           1: interface_alias
           2: port_component
@@ -26,10 +25,8 @@ metrics:
           name: lldpRemPortId
         tag: lldp_rem_port_id
         description: identifier of the remote port
-        unit: "{access_point}"
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.9
           name: lldpRemSysName
         tag: lldp_rem_sys_name
         description: system name of the remote device
-        unit: "{access_point}"
