@@ -3,8 +3,9 @@
 The **Top tab** gives you access to [Netdata Functions](/docs/top-monitoring-netdata-functions.md) that can be executed on any node running the Netdata Agent. These specialized routines, provided by various collectors, offer enhanced insights and allow you to trigger specific actions directly on the monitored node.
 
 You can **use these Functions to**:
-- **Retrieve** extra diagnostic **information** 
-- Perform actions to support **troubleshooting directly on the node** 
+
+- **Retrieve** extra diagnostic **information**
+- Perform actions to support **troubleshooting directly on the node**
 
 :::tip
 
@@ -42,19 +43,19 @@ The diagram above shows how Function selection and execution work in the Top tab
 
 The main view of the Top tab provides two elements, depending on the selected Function:
 
-| Element              | Description                                                    |
-|----------------------|----------------------------------------------------------------|
-| **Visualization**    | Located at the top of the page. The type of visualization depends on the selected Function and may allow user customization. |
-| **Data Table**       | Located below the visualization. Displays detailed results from the executed Function. |
+| Element           | Description                                                                                                                  |
+|-------------------|------------------------------------------------------------------------------------------------------------------------------|
+| **Visualization** | Located at the top of the page. The type of visualization depends on the selected Function and may allow user customization. |
+| **Data Table**    | Located below the visualization. Displays detailed results from the executed Function.                                       |
 
 ### **View Controls**
 
 You can control the data refresh and update settings in the top right-hand corner of the view:
 
-| Control                  | Description                                        |
-|--------------------------|----------------------------------------------------|
-| **Refresh results**       | Manually refresh results (works when the dashboard is in `Paused` mode). |
-| **Set update interval**   | Configure how often the results should refresh.    |
+| Control                 | Description                                                              |
+|-------------------------|--------------------------------------------------------------------------|
+| **Refresh results**     | Manually refresh results (works when the dashboard is in `Paused` mode). |
+| **Set update interval** | Configure how often the results should refresh.                          |
 
 ---
 
@@ -62,11 +63,11 @@ You can control the data refresh and update settings in the top right-hand corne
 
 The **Functions bar**, located on the right-hand side of the Top tab, lets you select which Function to run, on which node, and apply filtering where available.
 
-| Option                        | Description                                              |
-|---------------------------------|----------------------------------------------------------|
-| **Select Function**          | Choose the Function to run from the available routines.   |
-| **Select Node**              | Select the node where the Function will execute.          |
-| **Apply Filtering**        | Narrow down results using the available filters.  <br/> Example for the `Block-devices` Function: <br/> - Device <br/> - Type <br/> - ID <br/> - Model <br/> - Serial number |
+| Option              | Description                                                                                                                                                                  |
+|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Select Function** | Choose the Function to run from the available routines.                                                                                                                      |
+| **Select Node**     | Select the node where the Function will execute.                                                                                                                             |
+| **Apply Filtering** | Narrow down results using the available filters.  <br/> Example for the `Block-devices` Function: <br/> - Device <br/> - Type <br/> - ID <br/> - Model <br/> - Serial number |
 
 :::tip
 

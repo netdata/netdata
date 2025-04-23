@@ -6,16 +6,16 @@ Netdata charts provide **real-time, per-second metrics** to help you troubleshoo
 
 Netdata excels at collecting, storing, and presenting metrics in ready-to-use dashboards. Its enhanced charts update every second and offer:
 
-- High-resolution, granular metrics  
-- Interactive data exploration through metric hover overlays  
-- Customizable filtering using the Definition bar  
-- Anomaly detection via the Anomaly Rate ribbon  
-- Intuitive tools for panning, zooming, and highlighting areas of interest  
-- Quick access to **Metric Correlations** for finding patterns across metrics  
-- Flexible dimension sorting by name, value, or anomaly rate  
-- Detailed chart information including plugin, context, and type  
-- Real-time status of metric collection  
-- Access to the underlying data via the **Data Queries API** for advanced use cases  
+- High-resolution, granular metrics
+- Interactive data exploration through metric hover overlays
+- Customizable filtering using the Definition bar
+- Anomaly detection via the Anomaly Rate ribbon
+- Intuitive tools for panning, zooming, and highlighting areas of interest
+- Quick access to **Metric Correlations** for finding patterns across metrics
+- Flexible dimension sorting by name, value, or anomaly rate
+- Detailed chart information including plugin, context, and type
+- Real-time status of metric collection
+- Access to the underlying data via the **Data Queries API** for advanced use cases
 
 You can view these charts in Netdata Cloud’s **Metrics tab**, **individual node views**, and **Custom Dashboards**.
 
@@ -39,14 +39,14 @@ Each Netdata chart is designed to provide quick insights and interactive explora
 
 ![A Netdata Chart](https://user-images.githubusercontent.com/70198089/236133212-353c102f-a6ed-45b7-9251-34e004c7a10a.png)
 
-| Chart Element            | Description                                          |
-|--------------------------|------------------------------------------------------|
-| Title bar                | Shows the chart title and units of measurement       |
-| Anomaly Rate ribbon      | Displays the combined anomaly rate of all data       |
-| Definition bar           | Provides filtering and grouping options              |
-| Toolbar                  | Offers tools for interacting with the chart          |
-| Chart area               | Displays the metrics data                            |
-| Legend with dimensions   | Lists all metric dimensions with color coding        |
+| Chart Element          | Description                                    |
+|------------------------|------------------------------------------------|
+| Title bar              | Shows the chart title and units of measurement |
+| Anomaly Rate ribbon    | Displays the combined anomaly rate of all data |
+| Definition bar         | Provides filtering and grouping options        |
+| Toolbar                | Offers tools for interacting with the chart    |
+| Chart area             | Displays the metrics data                      |
+| Legend with dimensions | Lists all metric dimensions with color coding  |
 
 ---
 
@@ -58,9 +58,9 @@ Understanding how Netdata organizes and presents metrics helps you make the most
 
 A **dimension** is a value shown on a chart. Dimensions can represent:
 
-- Raw collected data  
-- Calculated values (such as average, minimum, or maximum)  
-- Various units (such as percentages, MiB/s, GiB)  
+- Raw collected data
+- Calculated values (such as average, minimum, or maximum)
+- Various units (such as percentages, MiB/s, GiB)
 
 Each chart’s legend lists its dimensions. You can hide or show specific dimensions to focus on what matters most.
 
@@ -71,8 +71,9 @@ Each chart’s legend lists its dimensions. You can hide or show specific dimens
 A **context** groups charts by metric type and displayed dimensions. Contexts define how charts are organized and where they appear in the Netdata menu.
 
 **Examples:**
-- `apps.cpu` for **Apps CPU Time**  
-- `apps.mem` for **Apps Real Memory**  
+
+- `apps.cpu` for **Apps CPU Time**
+- `apps.mem` for **Apps Real Memory**
 
 The part before the dot (`.`) is the **type**, while the part after is defined by the chart’s developer or its family.
 
@@ -85,6 +86,7 @@ Contexts are also used for alert configurations.
 A **family** represents a specific instance of a hardware or software resource that needs its own chart.
 
 For example, in disk monitoring:
+
 - Disk drives like `sda` and `sdb` each have their own family.
 
 The combination of **context** and **family** forms the `[context].[family]` naming scheme:
@@ -104,24 +106,24 @@ The Title bar provides essential information and quick actions for each chart:
 
 ![Netdata Chart Title bar](https://github.com/netdata/netdata/assets/70198089/75d700de-bc7d-4b96-b73d-7b248b83afea)
 
-| Title Bar Element    | Description                                         |
-|----------------------|-----------------------------------------------------|
-| Netdata icon         | Indicates live data updates (when time is playing)  |
-| Chart title          | Shows the title, metric, and unit of measurement    |
-| Chart status icon    | Displays loading, timeout, error, or no-data status |
+| Title Bar Element | Description                                         |
+|-------------------|-----------------------------------------------------|
+| Netdata icon      | Indicates live data updates (when time is playing)  |
+| Chart title       | Shows the title, metric, and unit of measurement    |
+| Chart status icon | Displays loading, timeout, error, or no-data status |
 
 Quick actions available from the Title bar:
 
 ![Title bar actions](https://github.com/netdata/netdata/assets/70198089/d21f326e-065c-4a08-bee9-69ad23736e38)
 
-| Action               | Description                                        |
-|----------------------|----------------------------------------------------|
-| Manage Alerts        | Configure alerts for this chart                    |
-| Chart info           | View detailed chart metadata                       |
-| Chart type           | Switch between line, stacked, area, bar, and multi-bar views |
-| Enter fullscreen     | Expand the chart for full-screen analysis          |
-| User settings        | Save chart preferences across dashboard reloads    |
-| Drag and Drop        | Add the chart to an existing or new dashboard       |
+| Action           | Description                                                  |
+|------------------|--------------------------------------------------------------|
+| Manage Alerts    | Configure alerts for this chart                              |
+| Chart info       | View detailed chart metadata                                 |
+| Chart type       | Switch between line, stacked, area, bar, and multi-bar views |
+| Enter fullscreen | Expand the chart for full-screen analysis                    |
+| User settings    | Save chart preferences across dashboard reloads              |
+| Drag and Drop    | Add the chart to an existing or new dashboard                |
 
 ## User Settings Priority
 
@@ -143,16 +145,16 @@ The Definition bar provides powerful filtering and grouping options, helping you
 
 ![Definition bar](https://user-images.githubusercontent.com/70198089/236134615-e53a1d68-8a0f-466b-b2ef-1974085f0e8d.png)
 
-| Definition Bar Element | Description                                      |
-|------------------------|--------------------------------------------------|
-| Group by option        | Choose how to group your data visualization      |
+| Definition Bar Element | Description                                        |
+|------------------------|----------------------------------------------------|
+| Group by option        | Choose how to group your data visualization        |
 | Aggregate function     | Select how to aggregate data from multiple sources |
-| Nodes filter           | Filter data from specific nodes                  |
-| Instances filter       | Filter specific instances of data                |
-| Dimensions filter      | Filter particular dimensions                     |
-| Labels filter          | Filter by specific labels                        |
-| Time aggregation       | Control how data points are aggregated over time |
-| Reset button           | Return to default filtering and grouping settings |
+| Nodes filter           | Filter data from specific nodes                    |
+| Instances filter       | Filter specific instances of data                  |
+| Dimensions filter      | Filter particular dimensions                       |
+| Labels filter          | Filter by specific labels                          |
+| Time aggregation       | Control how data points are aggregated over time   |
+| Reset button           | Return to default filtering and grouping settings  |
 
 ---
 
@@ -171,16 +173,17 @@ For a detailed explanation, click the image below to open it in a new tab where 
 :::
 
 These dropdown menus serve two main functions:
+
 1. Provide context about the metrics being visualized.
 2. Enable flexible grouping and filtering for tailored views.
 
 ![NIDL Dropdown menus](https://user-images.githubusercontent.com/43294513/235470150-62a3b9ac-51ca-4c0d-81de-8804e3d733eb.png)
 
-| Metric Information     | Description                                         |
-|------------------------|-----------------------------------------------------|
-| Volume contribution    | Shows how much each metric contributes to the total |
-| Anomaly rate           | Displays anomaly rate for the selected timeframe    |
-| Value statistics       | Shows minimum, average, and maximum values          |
+| Metric Information  | Description                                         |
+|---------------------|-----------------------------------------------------|
+| Volume contribution | Shows how much each metric contributes to the total |
+| Anomaly rate        | Displays anomaly rate for the selected timeframe    |
+| Value statistics    | Shows minimum, average, and maximum values          |
 
 ---
 
@@ -190,12 +193,12 @@ The **Group by** dropdown allows you to apply different grouping strategies on t
 
 ![Group by dropdown](https://user-images.githubusercontent.com/43294513/235468819-3af5a1d3-8619-48fb-a8b7-8e8b4cf6a8ff.png)
 
-| Grouping Option        | Description                                         |
-|------------------------|-----------------------------------------------------|
-| Group by Node          | Summarize data by node with one dimension per node  |
-| Group by Instance      | Summarize data by instance with one dimension per instance |
-| Group by Dimension     | Aggregate data across all nodes by dimension        |
-| Group by Label         | Summarize data based on label values                |
+| Grouping Option    | Description                                                |
+|--------------------|------------------------------------------------------------|
+| Group by Node      | Summarize data by node with one dimension per node         |
+| Group by Instance  | Summarize data by instance with one dimension per instance |
+| Group by Dimension | Aggregate data across all nodes by dimension               |
+| Group by Label     | Summarize data based on label values                       |
 
 :::tip
 
@@ -217,12 +220,12 @@ Each chart has a default aggregation function, which you can adjust as needed:
 
 ![Aggregate functions](https://user-images.githubusercontent.com/70198089/236136725-778670b4-7e81-44a8-8d3d-f38ded823c94.png)
 
-| Function   | Description                                           |
-|------------|-------------------------------------------------------|
-| Average    | Displays the average value across sources             |
-| Sum        | Shows the sum of all contributed values               |
-| Min        | Displays the minimum value (closest to zero or largest magnitude for negative values) |
-| Max        | Displays the maximum value (largest magnitude for positive values or closest to zero for negatives) |
+| Function | Description                                                                                         |
+|----------|-----------------------------------------------------------------------------------------------------|
+| Average  | Displays the average value across sources                                                           |
+| Sum      | Shows the sum of all contributed values                                                             |
+| Min      | Displays the minimum value (closest to zero or largest magnitude for negative values)               |
+| Max      | Displays the maximum value (largest magnitude for positive values or closest to zero for negatives) |
 
 ## Aggregate Functions Over Time – Additional Dropdown Examples
 
@@ -246,10 +249,10 @@ Filter and explore the contribution of each node to your chart:
 
 ![Nodes dropdown](https://user-images.githubusercontent.com/70198089/236137765-b57d5443-3d4b-42f4-9e3d-db1eb606626f.png)
 
-| Node Information        | Description                                        |
-|-------------------------|----------------------------------------------------|
-| Contribution percentage | Shows each node’s share of the total data volume   |
-| Anomaly rate            | Displays anomaly rate per node                     |
+| Node Information        | Description                                              |
+|-------------------------|----------------------------------------------------------|
+| Contribution percentage | Shows each node’s share of the total data volume         |
+| Anomaly rate            | Displays anomaly rate per node                           |
 | Error messages          | Lists any errors preventing nodes from contributing data |
 
 ---
@@ -260,10 +263,10 @@ Use the **Instances** dropdown to filter or view the contribution of specific in
 
 ![Instances dropdown](https://user-images.githubusercontent.com/70198089/236138302-4dd4072e-3a0d-43bb-a9d8-4dde79c65e92.png)
 
-| Instance Information     | Description                                       |
-|--------------------------|---------------------------------------------------|
-| Contribution percentage  | Shows how much each instance contributes to the chart volume |
-| Anomaly rate             | Displays the anomaly rate for each instance       |
+| Instance Information    | Description                                                  |
+|-------------------------|--------------------------------------------------------------|
+| Contribution percentage | Shows how much each instance contributes to the chart volume |
+| Anomaly rate            | Displays the anomaly rate for each instance                  |
 
 ---
 
@@ -273,10 +276,10 @@ The **Dimensions** dropdown allows you to filter by or focus on particular dimen
 
 ![Dimensions dropdown](https://user-images.githubusercontent.com/70198089/236138796-08dc6ac6-9a50-4913-a46d-d9bbcedd48f6.png)
 
-| Dimension Information    | Description                                        |
-|--------------------------|----------------------------------------------------|
-| Contribution percentage  | Shows how much each dimension contributes to the chart volume |
-| Anomaly rate             | Displays the anomaly rate for each dimension       |
+| Dimension Information   | Description                                                   |
+|-------------------------|---------------------------------------------------------------|
+| Contribution percentage | Shows how much each dimension contributes to the chart volume |
+| Anomaly rate            | Displays the anomaly rate for each dimension                  |
 
 ---
 
@@ -286,10 +289,10 @@ Filter or view your data by **labels**, giving you flexibility to isolate metric
 
 ![Labels dropdown](https://user-images.githubusercontent.com/70198089/236139027-8a51a958-2074-4675-a41b-efff30d8f51a.png)
 
-| Label Information        | Description                                        |
-|--------------------------|----------------------------------------------------|
-| Contribution percentage  | Shows each label’s contribution to chart volume    |
-| Anomaly rate             | Displays the anomaly rate breakdown by label       |
+| Label Information       | Description                                     |
+|-------------------------|-------------------------------------------------|
+| Contribution percentage | Shows each label’s contribution to chart volume |
+| Anomaly rate            | Displays the anomaly rate breakdown by label    |
 
 ---
 
@@ -299,16 +302,16 @@ When data resolution exceeds the chart’s granularity, **time-based aggregation
 
 ![Aggregate functions over time](https://user-images.githubusercontent.com/70198089/236411297-e123db06-0117-4e24-a5ac-955b980a8f55.png)
 
-| Aggregation Function        | Description                                      |
-|-----------------------------|--------------------------------------------------|
-| Min, Max, Average, Sum       | Basic statistical aggregations                  |
-| Percentile (25th–99th)       | Show specific percentiles of the data points    |
-| Trimmed Mean/Median (1%–25%) | Remove outliers before calculating averages     |
-| Median                       | Display the middle value of the data set        |
-| Standard deviation           | Measure data variability                       |
-| Coefficient of variation     | Show relative variability                      |
-| Delta                        | Display the change between data points         |
-| Exponential smoothing        | Apply weighted averaging to recent points      |
+| Aggregation Function         | Description                                  |
+|------------------------------|----------------------------------------------|
+| Min, Max, Average, Sum       | Basic statistical aggregations               |
+| Percentile (25th–99th)       | Show specific percentiles of the data points |
+| Trimmed Mean/Median (1%–25%) | Remove outliers before calculating averages  |
+| Median                       | Display the middle value of the data set     |
+| Standard deviation           | Measure data variability                     |
+| Coefficient of variation     | Show relative variability                    |
+| Delta                        | Display the change between data points       |
+| Exponential smoothing        | Apply weighted averaging to recent points    |
 
 :::tip
 
@@ -328,14 +331,13 @@ Click the green **Reset** button at the end of the Definition bar to restore the
 
 Netdata uses machine learning models trained on past data to predict expected metric values. These models identify anomalies in real time as soon as outliers occur.
 
-
 ![Anomaly Rate Ribbon](https://user-images.githubusercontent.com/70198089/236139886-79d63cf6-61ed-4aa7-842c-b5a1728c870d.png)
 
-| Anomaly Ribbon Feature | Description                                          |
-|------------------------|------------------------------------------------------|
-| Visual indicator        | Shows the combined anomaly rate across all data     |
-| Hover information       | Displays a histogram of anomaly rates per dimension |
-| Real-time detection     | Flags anomalies within seconds of occurrence        |
+| Anomaly Ribbon Feature | Description                                         |
+|------------------------|-----------------------------------------------------|
+| Visual indicator       | Shows the combined anomaly rate across all data     |
+| Hover information      | Displays a histogram of anomaly rates per dimension |
+| Real-time detection    | Flags anomalies within seconds of occurrence        |
 
 This feature enables you to catch issues quickly across large volumes of metrics.
 
@@ -347,12 +349,12 @@ Hovering over any point on a chart reveals a detailed information overlay, makin
 
 ![Chart hover overlay](https://user-images.githubusercontent.com/70198089/236141460-bfa66b99-d63c-4a2c-84b1-2509ed94857f.png)
 
-| Hover Information       | Description                                             |
-|-------------------------|---------------------------------------------------------|
-| Volume percentage        | Shows the contribution of each time series compared to the total |
-| Anomaly rate             | Displays the anomaly rate for each dimension             |
-| Collection issues        | Indicates any data collection problems                  |
-| Value histogram          | Visualizes the distribution of dimension values         |
+| Hover Information | Description                                                      |
+|-------------------|------------------------------------------------------------------|
+| Volume percentage | Shows the contribution of each time series compared to the total |
+| Anomaly rate      | Displays the anomaly rate for each dimension                     |
+| Collection issues | Indicates any data collection problems                           |
+| Value histogram   | Visualizes the distribution of dimension values                  |
 
 When you hover over the **Anomaly Rate ribbon**, the dimensions are sorted by anomaly rate, and a histogram displays these rates to help you quickly identify problematic metrics.
 
@@ -364,11 +366,11 @@ The **Info Column** appears during hover and provides detailed data collection i
 
 ![Info Column](https://user-images.githubusercontent.com/70198089/236145768-8ffadd02-93a4-4e9e-b4ae-c1367f614a7e.png)
 
-| Indicator     | Description                                                        |
-|---------------|--------------------------------------------------------------------|
-| Partial Data  | At least one dimension has partial data (not all instances contributed fully) |
-| Overflown     | At least one data source has a counter that overflowed             |
-| Empty Data    | At least one dimension has no data for the selected points         |
+| Indicator    | Description                                                                   |
+|--------------|-------------------------------------------------------------------------------|
+| Partial Data | At least one dimension has partial data (not all instances contributed fully) |
+| Overflown    | At least one data source has a counter that overflowed                        |
+| Empty Data   | At least one dimension has no data for the selected points                    |
 
 ---
 
@@ -376,11 +378,11 @@ The **Info Column** appears during hover and provides detailed data collection i
 
 Control chart playback and interact with time using the **Time Controls**. These controls help you pause or reset the charts while exploring metrics.
 
-| Interaction               | Keyboard / Mouse                     | Touchpad / Touchscreen       | Time Control Effect                |
-|---------------------------|---------------------------------------|-----------------------------|------------------------------------|
-| Pause chart (temporary)    | Hover over the chart                 | n/a                         | Temporarily pauses playback       |
-| Stop chart (lock pause)    | Click on the chart                   | Tap                         | Locks playback at selected time   |
-| Reset playback             | Double-click on the chart            | n/a                         | Resumes playback (returns to Play mode) |
+| Interaction             | Keyboard / Mouse          | Touchpad / Touchscreen | Time Control Effect                     |
+|-------------------------|---------------------------|------------------------|-----------------------------------------|
+| Pause chart (temporary) | Hover over the chart      | n/a                    | Temporarily pauses playback             |
+| Stop chart (lock pause) | Click on the chart        | Tap                    | Locks playback at selected time         |
+| Reset playback          | Double-click on the chart | n/a                    | Resumes playback (returns to Play mode) |
 
 These controls work when the **default “Pan” action** is selected in the toolbar.
 
@@ -392,13 +394,13 @@ The chart **Toolbar** provides interactive tools for manipulating the chart view
 
 ![Chart Toolbar](https://user-images.githubusercontent.com/70198089/236143292-c1d75528-263d-4ddd-9db8-b8d6a31cb83e.png)
 
-| Tool                | Description                                 |
-|---------------------|---------------------------------------------|
-| Pan                 | Move through the timeline                  |
-| Highlight           | Select specific timeframes for analysis    |
-| Select and Zoom     | Zoom into selected timeframes               |
-| Chart Zoom          | Zoom in or out on the chart                 |
-| Reset Zoom          | Return to the original view                |
+| Tool            | Description                             |
+|-----------------|-----------------------------------------|
+| Pan             | Move through the timeline               |
+| Highlight       | Select specific timeframes for analysis |
+| Select and Zoom | Zoom into selected timeframes           |
+| Chart Zoom      | Zoom in or out on the chart             |
+| Reset Zoom      | Return to the original view             |
 
 ---
 
@@ -406,9 +408,9 @@ The chart **Toolbar** provides interactive tools for manipulating the chart view
 
 Use the **Pan Tool** to navigate through time on the chart:
 
-| Pan Interaction       | Keyboard        | Mouse           | Touchpad/Touchscreen      |
-|-----------------------|-----------------|-----------------|--------------------------|
-| Pan through time       | n/a              | Click and drag   | Touch drag               |
+| Pan Interaction  | Keyboard | Mouse          | Touchpad/Touchscreen |
+|------------------|----------|----------------|----------------------|
+| Pan through time | n/a      | Click and drag | Touch drag           |
 
 Drag right to move backward in time and left to move forward.
 
@@ -418,9 +420,9 @@ Drag right to move backward in time and left to move forward.
 
 The **Highlight Tool** allows you to select timeframes for deeper analysis:
 
-| Highlight Interaction      | Keyboard/Mouse                               | Touchpad/Touchscreen      |
-|----------------------------|-----------------------------------------------|--------------------------|
-| Highlight timeframe         | Alt + mouse selection or ⌘ + mouse selection (macOS) | n/a               |
+| Highlight Interaction | Keyboard/Mouse                                       | Touchpad/Touchscreen |
+|-----------------------|------------------------------------------------------|----------------------|
+| Highlight timeframe   | Alt + mouse selection or ⌘ + mouse selection (macOS) | n/a                  |
 
 Use highlighting to investigate spikes, anomalies, or unusual behavior. Click on the chart area to clear the highlight selection.
 
@@ -430,10 +432,10 @@ Use highlighting to investigate spikes, anomalies, or unusual behavior. Click on
 
 Zoom into specific timeframes for maximum data granularity:
 
-| Zoom Interaction        | Keyboard/Mouse                       | Touchpad/Touchscreen    |
-|-------------------------|---------------------------------------|------------------------|
-| Zoom to timeframe        | Shift + mouse vertical selection     | n/a                    |
-| Horizontal Y-axis zoom   | Shift + mouse horizontal selection   | n/a                    |
+| Zoom Interaction       | Keyboard/Mouse                     | Touchpad/Touchscreen |
+|------------------------|------------------------------------|----------------------|
+| Zoom to timeframe      | Shift + mouse vertical selection   | n/a                  |
+| Horizontal Y-axis zoom | Shift + mouse horizontal selection | n/a                  |
 
 ---
 
@@ -441,9 +443,9 @@ Zoom into specific timeframes for maximum data granularity:
 
 The **Chart Zoom** tool allows you to zoom in and out to view different time ranges:
 
-| Zoom Interaction        | Keyboard/Mouse                | Touchpad/Touchscreen                  |
-|-------------------------|------------------------------|----------------------------------------|
-| Zoom in/out             | Shift + mouse scrollwheel    | Two-finger pinch or Shift + two-finger scroll |
+| Zoom Interaction | Keyboard/Mouse            | Touchpad/Touchscreen                          |
+|------------------|---------------------------|-----------------------------------------------|
+| Zoom in/out      | Shift + mouse scrollwheel | Two-finger pinch or Shift + two-finger scroll |
 
 Zooming in helps you analyze recent events in detail, while zooming out provides an overview of longer-term trends.
 
@@ -459,11 +461,11 @@ You can sort the dimensions legend using various criteria:
 
 ![Order dimensions](https://user-images.githubusercontent.com/70198089/236144658-6c3d0e31-9bcb-45f3-bb95-4eafdcbb0a58.png)
 
-| Sorting Option           | Description                                         |
-|--------------------------|-----------------------------------------------------|
-| Dimension name           | Sort alphabetically (ascending or descending)       |
-| Dimension value          | Sort by current metric values (ascending or descending) |
-| Dimension anomaly rate   | Sort by anomaly rate (ascending or descending)      |
+| Sorting Option         | Description                                             |
+|------------------------|---------------------------------------------------------|
+| Dimension name         | Sort alphabetically (ascending or descending)           |
+| Dimension value        | Sort by current metric values (ascending or descending) |
+| Dimension anomaly rate | Sort by anomaly rate (ascending or descending)          |
 
 ---
 
@@ -471,10 +473,10 @@ You can sort the dimensions legend using various criteria:
 
 Simplify your charts by showing only the dimensions you want to focus on:
 
-| Dimension Interaction      | Keyboard/Mouse                   | Touchpad/Touchscreen    |
-|----------------------------|-----------------------------------|------------------------|
-| Show one dimension only     | Click on the dimension           | Tap                    |
-| Toggle individual dimensions| Shift + click                    | n/a                    |
+| Dimension Interaction        | Keyboard/Mouse         | Touchpad/Touchscreen |
+|------------------------------|------------------------|----------------------|
+| Show one dimension only      | Click on the dimension | Tap                  |
+| Toggle individual dimensions | Shift + click          | n/a                  |
 
 This feature is especially useful for identifying unusual behavior by isolating specific metrics.
 

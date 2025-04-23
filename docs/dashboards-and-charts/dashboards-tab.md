@@ -19,19 +19,20 @@ You can now add elements to your dashboard:
 
 Click the **Add Chart** button at the top right of the dashboard.
 
-| Step                  | Action                                                    |
-|------------------------|------------------------------------------------------------|
-| **Select Source**      | Choose **All Nodes** or a specific node.                    |
-| **Choose Context**     | Select the metric context. A preview of the chart will appear. |
-| **Configure Chart**    | Adjust settings using the [NIDL framework](/docs/dashboards-and-charts/netdata-charts.md#nidl-framework):  <br>- Group by method  <br>- Aggregation function over the data source  <br>- Nodes  <br>- Instances  <br>- Dimensions  <br>- Labels  <br>- Aggregation function over time |
-| **Chart Type**         | Change the chart type using the [Title bar](/docs/dashboards-and-charts/netdata-charts.md#title-bar). |
-| **Dimension Visibility** | Select which dimensions to display and set their order via the [Dimensions bar](/docs/dashboards-and-charts/netdata-charts.md#dimensions-bar). |
+| Step                     | Action                                                                                                                                                                                                                                                                                |
+|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Select Source**        | Choose **All Nodes** or a specific node.                                                                                                                                                                                                                                              |
+| **Choose Context**       | Select the metric context. A preview of the chart will appear.                                                                                                                                                                                                                        |
+| **Configure Chart**      | Adjust settings using the [NIDL framework](/docs/dashboards-and-charts/netdata-charts.md#nidl-framework):  <br>- Group by method  <br>- Aggregation function over the data source  <br>- Nodes  <br>- Instances  <br>- Dimensions  <br>- Labels  <br>- Aggregation function over time |
+| **Chart Type**           | Change the chart type using the [Title bar](/docs/dashboards-and-charts/netdata-charts.md#title-bar).                                                                                                                                                                                 |
+| **Dimension Visibility** | Select which dimensions to display and set their order via the [Dimensions bar](/docs/dashboards-and-charts/netdata-charts.md#dimensions-bar).                                                                                                                                        |
 
 ### Add Text Cards
 
 Click the **Add Text** button at the top right to add a text card.
 
 Use text cards to:
+
 - Document the purpose of the dashboard.
 - Add notes for your team members.
 
@@ -84,6 +85,7 @@ Dashboards are interactive and flexible. You can design them to fit your needs u
 ### Chart Interaction
 
 Charts on custom dashboards are [fully interactive](/docs/dashboards-and-charts/netdata-charts.md):
+
 - Zoom, pan, and highlight timeframes.
 - Synchronize charts across contexts and nodes.
 
@@ -97,10 +99,10 @@ Text cards allow you to explain the arrangement or intent behind the dashboard. 
 
 ### Move Elements
 
-| Action            | How to Do It                            |
-|--------------------|--------------------------------------------|
+| Action                   | How to Do It                                                                                    |
+|--------------------------|-------------------------------------------------------------------------------------------------|
 | **Move a chart or card** | Click and hold **Drag & drop** at the top right of the element, then move it to a new location. |
-| **Resize an element**    | Click and drag from the bottom-right corner of the element. |
+| **Resize an element**    | Click and drag from the bottom-right corner of the element.                                     |
 
 :::tip
 
@@ -112,21 +114,21 @@ Elements automatically align to the grid system after moving or resizing.
 
 ## Chart Management Actions
 
-| Action                        | How to Perform                                         |
-|--------------------------------|--------------------------------------------------------|
-| **Go to chart**                | Use the 3-dot icon on any chart → click **Go-to-Chart**. Navigate directly to the chart in the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) or the single-node dashboard. |
-| **Rename a chart**             | Use the 3-dot icon on any chart → click **Rename**.     |
-| **Remove a chart or card**     | Use the 3-dot icon on the element → click **Remove**.   |
+| Action                     | How to Perform                                                                                                                                                                                              |
+|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Go to chart**            | Use the 3-dot icon on any chart → click **Go-to-Chart**. Navigate directly to the chart in the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) or the single-node dashboard. |
+| **Rename a chart**         | Use the 3-dot icon on any chart → click **Rename**.                                                                                                                                                         |
+| **Remove a chart or card** | Use the 3-dot icon on the element → click **Remove**.                                                                                                                                                       |
 
 ---
 
 ## Managing Your Dashboard
 
-| Action                       | How to Perform                                         |
-|------------------------------|--------------------------------------------------------|
-| **View dashboards**          | Click the **Dashboards** tab in any Room.               |
-| **Delete a dashboard**        | Select the dashboard → click the 🗑️ icon or **Delete** button. |
-| **Save changes**              | Click the **Save** button after making any edits.       |
+| Action                 | How to Perform                                                  |
+|------------------------|-----------------------------------------------------------------|
+| **View dashboards**    | Click the **Dashboards** tab in any Room.                       |
+| **Delete a dashboard** | Select the dashboard → click the 🗑️ icon or **Delete** button. |
+| **Save changes**       | Click the **Save** button after making any edits.               |
 
 :::note
 

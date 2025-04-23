@@ -5,6 +5,7 @@ The **Metrics tab** provides real-time, per-second time series charts for all no
 You can also view **single-node dashboards**, which offer the same charts but are focused on a single node. You can access these dashboards from most places in the Netdata UI, often by clicking the name of a node.
 
 From the Metrics tab, you can also access:
+
 - The **Integrations tab**
 - **Metric Correlations** to identify related metrics and uncover patterns across your infrastructure
 
@@ -53,12 +54,12 @@ Use the chart arrangement at the start of each section to quickly identify patte
 
 The **Chart Navigation Menu**, located on the right-hand side of the dashboard, helps you navigate through sections, filter charts, and view active alerts.
 
-| Feature                        | Description                                                           |
-|----------------------------------|-----------------------------------------------------------------------|
-| **Section Navigation**          | Navigate quickly through the dashboard sections.                     |
-| **Chart Filtering Options**     | Filter charts by:  <br/> - Host labels  <br/> - Node status  <br/> - Netdata version  <br/> - Individual nodes |
-| **Active Alerts Display**       | View active alerts for the Room.                                      |
-| **Anomaly Rate (AR%) Button**   | Check the maximum chart anomaly rate for each section by clicking the `AR%` button. |
+| Feature                       | Description                                                                                                    |
+|-------------------------------|----------------------------------------------------------------------------------------------------------------|
+| **Section Navigation**        | Navigate quickly through the dashboard sections.                                                               |
+| **Chart Filtering Options**   | Filter charts by:  <br/> - Host labels  <br/> - Node status  <br/> - Netdata version  <br/> - Individual nodes |
+| **Active Alerts Display**     | View active alerts for the Room.                                                                               |
+| **Anomaly Rate (AR%) Button** | Check the maximum chart anomaly rate for each section by clicking the `AR%` button.                            |
 
 :::tip
 
