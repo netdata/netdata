@@ -278,6 +278,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDSET *st = rrdset;
     RRDHOST *host = st->rrdhost;
 
+    st->collector_tid = gettid_cached();
     st->last_accessed_time_s = now_realtime_sec();
 
     if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
@@ -439,6 +440,10 @@ RRDSET *rrdset_create_custom(
                 spinlock_unlock(&st->destroy_lock);
             }
             else {
+#ifdef FSANITIZE_ADDRESS
+                fprintf(stderr, "rrdset_create_custom() - chart '%s' of host '%s' is being deleted but we need it. Retrying...\n",
+                        chart_full_id, rrdhost_hostname(host));
+#endif
                 st = NULL;
                 microsleep(1 * USEC_PER_MS);
                 continue;
