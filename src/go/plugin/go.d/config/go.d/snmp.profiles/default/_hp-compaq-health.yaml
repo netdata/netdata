@@ -11,7 +11,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.8.1.0
       name: cpqHeSysUtilLifeTime
     description: total time the system has been in full operation
-    unit: "{s}"
+    unit: "s"
 
   - # EISA bus utilization as percentage of theoretical maximum during last minute.
     MIB: CPQHLTH-MIB
@@ -19,7 +19,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.8.2.0
       name: cpqHeSysUtilEisaBusMin
     description: eisa bus utilization as percentage of theoretical maximum during last minute
-    unit: "{%}"
+    unit: "%"
 
   # Critical errors.
 
@@ -30,7 +30,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.2.2.0
       name: cpqHeCritLogCondition
     description: overall condition of the critical error log feature
-    unit: "TBD"
+    unit: "CURLY_BRACKET access_point CURLY_BRACKET"
 
   # Correctable memory errors tracking.
 
@@ -41,7 +41,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.3.1.0
       name: cpqHeCorrMemLogStatus
     description: overall status of the correctable memory error log feature
-    unit: "TBD"
+    unit: "CURLY_BRACKET access_point CURLY_BRACKET"
 
   - # Overall condition of the correctable memory error log feature.
     # NOTE: other(1), ok(2), degraded(3), failed(4)
@@ -50,7 +50,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.3.2.0
       name: cpqHeCorrMemLogCondition
     description: overall condition of the correctable memory error log feature
-    unit: "TBD"
+    unit: "CURLY_BRACKET access_point CURLY_BRACKET"
 
   - # Number of correctable memory errors that have occurred.
     MIB: CPQHLTH-MIB
@@ -59,7 +59,7 @@ metrics:
       name: cpqHeCorrMemTotalErrs
     metric_type: monotonic_count
     description: number of correctable memory errors that have occurred
-    unit: "{correctable_memory_error}"
+    unit: "CURLY_BRACKET error CURLY_BRACKET"
 
   # ASR (Automatic Server Recovery)
 
@@ -70,7 +70,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.1.0
       name: cpqHeAsrStatus
     description: overall status of the asr feature
-    unit: "TBD"
+    unit: "CURLY_BRACKET access_point CURLY_BRACKET"
 
   - # Whether the ASR timer passed the server Power-On Self-Test (POST).
     # NOTE: other(1), failed(2), ok(3)
@@ -78,8 +78,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.5.6.0
       name: cpqHeAsrPost
-    description: whether the asr timer passed the server power-on self-test post
-    unit: "TBD"
+    description: whether the asr timer passed the server power-on self-test
+    unit: "CURLY_BRACKET access_point CURLY_BRACKET"
 
   - # Number of ASR reboots that occurred on the server since last manual reboot.
     # NOTE: -1 if not supported.
@@ -89,7 +89,7 @@ metrics:
       name: cpqHeAsrRebootCount
     metric_type: monotonic_count
     description: number of asr reboots that occurred on the server since last manual reboot
-    unit: "{asr_reboot}"
+    unit: "CURLY_BRACKET reboot CURLY_BRACKET"
 
   - # Overall condition of the ASR feature.
     # NOTE: other(1), notAvailable(2), disabled(3), enabled(4)
@@ -98,7 +98,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.17.0
       name: cpqHeAsrCondition
     description: overall condition of the asr feature
-    unit: "TBD"
+    unit: "CURLY_BRACKET access_point CURLY_BRACKET"
 
   - # Status of the ASR network access feature.
     # NOTE: other(1), disabled(2), enabled(3)
@@ -107,7 +107,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.21.0
       name: cpqHeAsrNetworkAccessStatus
     description: status of the asr network access feature
-    unit: "TBD"
+    unit: "CURLY_BRACKET access_point CURLY_BRACKET"
 
   # Temperature and fans.
 
@@ -118,7 +118,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.6.3.0
       name: cpqHeThermalTempStatus
     description: status of temperature sensors
-    unit: "TBD"
+    unit: "CURLY_BRACKET sensor CURLY_BRACKET"
 
   - # Status of fan(s).
     # NOTE: other(1), ok(2), degraded(3), failed(4)
@@ -126,8 +126,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.6.4.0
       name: cpqHeThermalSystemFanStatus
-    description: status of fan
-    unit: "TBD"
+    description: status of fans
+    unit: "CURLY_BRACKET fan CURLY_BRACKET"
 
   - # Status of processor fan(s).
     # NOTE: other(1), ok(2), failed(4)
@@ -135,8 +135,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.6.5.0
       name: cpqHeThermalCpuFanStatus
-    description: status of processor fan
-    unit: "TBD"
+    description: status of processor fans
+    unit: "CURLY_BRACKET fan CURLY_BRACKET"
 
   - # Temperator sensors.
     MIB: CPQHLTH-MIB
@@ -146,13 +146,13 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.6.2.6.8.1.4
         name: cpqHeTemperatureCelsius
-        description: temperature sensors in celsius
-        unit: "{Cel}"
+        description: temperature in celsius
+        unit: "Cel"
       - # NOTE: other(1), ok(2), degraded(3), failed(4)
         OID: 1.3.6.1.4.1.232.6.2.6.8.1.6
         name: cpqHeTemperatureCondition
-        description: temperature sensor condition
-        unit: "TBD"
+        description: condition of the temperature sensor
+        unit: "CURLY_BRACKET sensor CURLY_BRACKET"
     metric_tags:
       - tag: temperature_index
         symbol:
@@ -167,7 +167,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.15.3.0
       name: cpqHePowerMeterCurrReading
     description: current power meter reading in watts
-    unit: "{W}"
+    unit: "W"
 
   - # A table of battery entries.
     MIB: CPQHLTH-MIB
@@ -178,13 +178,13 @@ metrics:
       - # NOTE: other(1), ok(2), degraded(3), failed(4)
         OID: 1.3.6.1.4.1.232.6.2.17.2.1.4
         name: cpqHeSysBatteryCondition
-        description: battery condition
-        unit: "TBD"
+        description: overall condition of the battery
+        unit: "CURLY_BRACKET battery CURLY_BRACKET"
       - # NOTE: 15 different statuses are possible -- not listed here, see MIB.
         OID: 1.3.6.1.4.1.232.6.2.17.2.1.5
         name: cpqHeSysBatteryStatus
-        description: battery status
-        unit: "TBD"
+        description: status of the battery
+        unit: "CURLY_BRACKET battery CURLY_BRACKET"
     metric_tags:
       - tag: battery_index
         symbol:
@@ -198,14 +198,14 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.6.1.0
       name: cpqHeThermalCondition
     description: overall condition of the thermal environment
-    unit: "TBD"
+    unit: "CURLY_BRACKET environment CURLY_BRACKET"
   - # NOTE: other(1), notSupported(2), notInstalled(3), installed(4)
     MIB: CPQHLTH-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.9.2.0
       name: cpqHeFltTolPwrSupplyStatus
-    description: fault tolerant power supply status
-    unit: "TBD"
+    description: status of the fault tolerant power supply
+    unit: "CURLY_BRACKET power_supply CURLY_BRACKET"
 
   - MIB: CPQHLTH-MIB
     table:
@@ -214,8 +214,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.6.2.14.13.1.20
         name: cpqHeResMem2ModuleCondition
-        description: reserved memory module condition
-        unit: "TBD"
+        description: condition of the reserved memory module
+        unit: "CURLY_BRACKET memory_module CURLY_BRACKET"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.6.2.14.13.1.15
@@ -230,8 +230,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.5
         name: cpqHeFltTolPowerSupplyStatus
-        description: fault tolerant power supply status
-        unit: "TBD"
+        description: status of the fault tolerant power supply
+        unit: "CURLY_BRACKET power_supply CURLY_BRACKET"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.6.2.9.3.1.1
@@ -249,12 +249,12 @@ metrics:
         unit: "TBD"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.7
         name: cpqHeFltTolPowerSupplyCapacityUsed
-        description: fault tolerant power supply capacity used
-        unit: "{W}"
+        description: capacity used of the fault tolerant power supply
+        unit: "W"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.8
         name: cpqHeFltTolPowerSupplyCapacityMaximum
-        description: fault tolerant power supply capacity maximum
-        unit: "{W}"
+        description: maximum capacity of the fault tolerant power supply
+        unit: "W"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.6.2.9.3.1.5

@@ -23,12 +23,12 @@ metrics:
     - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.7
       name: jnxVirtualChassisPortInOctets
       description: total number of octets received on the virtual-chassis port
-      unit: "{octet}"
+      unit: "By"
     # Indicates the total number of octets sent on the virtual-chassis port.
     - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.8
       name: jnxVirtualChassisPortOutOctets
       description: total number of octets sent on the virtual-chassis port
-      unit: "{octet}"
+      unit: "By"
     # Indicates the total number of multicast packets received on the virtual-chassis port.
     - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.9
       name: jnxVirtualChassisPortInMcasts
@@ -75,23 +75,23 @@ metrics:
     # Indicates the total number of packets received per second on the virtual-chassis port.
     - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.11
       name: jnxVirtualChassisPortInPkts1secRate
-      description: total number of packets received per second on the virtual-chassis port
-      unit: "{packet}/s"
+      description: number of packets received per second on the virtual-chassis port
+      unit: "packet/s"
     # Indicates the total number of packets sent per second from the virtual-chassis port.
     - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.12
       name: jnxVirtualChassisPortOutPkts1secRate
-      description: total number of packets sent per second from the virtual-chassis port
-      unit: "{packet}/s"
+      description: number of packets sent per second from the virtual-chassis port
+      unit: "packet/s"
     # Indicates the total number of octets received per second on the virtual-chassis port.
     - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.13
       name: jnxVirtualChassisPortInOctets1secRate
-      description: total number of octets received per second on the virtual-chassis port
-      unit: "{octet}/s"
+      description: number of octets received per second on the virtual-chassis port
+      unit: "By/s"
     # Indicates the total number of octets sent per second on the virtual-chassis port.
     - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.14
       name: jnxVirtualChassisPortOutOctets1secRate
-      description: total number of octets sent per second on the virtual-chassis port
-      unit: "{octet}/s"
+      description: number of octets sent per second on the virtual-chassis port
+      unit: "By/s"
     metric_tags:
     - symbol:
         OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.2

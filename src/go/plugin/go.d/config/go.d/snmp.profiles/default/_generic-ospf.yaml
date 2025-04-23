@@ -7,15 +7,15 @@ metrics:
       - OID: 1.3.6.1.2.1.14.10.1.6
         name: ospfNbrState
         description: state of the OSPF neighbor
-        unit: "{state}"
+        unit: "CURLY_BRACKET access_point CURLY_BRACKET"
       - OID: 1.3.6.1.2.1.14.10.1.7
         name: ospfNbrEvents
         description: number of events for the OSPF neighbor
-        unit: "{event}"
+        unit: "CURLY_BRACKET event CURLY_BRACKET"
       - OID: 1.3.6.1.2.1.14.10.1.8
         name: ospfNbrLsRetransQLen
-        description: length of the OSPF neighbor's link-state retransmission queue
-        unit: "{queue}"
+        description: length of the OSPF neighbor's link state retransmission queue
+        unit: "CURLY_BRACKET packet CURLY_BRACKET"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.10.1.3
@@ -46,7 +46,7 @@ metrics:
       - name: ospfNbr
         constant_value_one: true
         description: constant value one for OSPF neighbor
-        unit: "1"
+        unit: "CURLY_BRACKET neighbor CURLY_BRACKET"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.10.1.3
@@ -76,16 +76,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.14.11.1.5
         name: ospfVirtNbrState
-        description: state of the OSPF virtual neighbor
-        unit: "{state}"
+        description: state of the virtual OSPF neighbor
+        unit: "CURLY_BRACKET access_point CURLY_BRACKET"
       - OID: 1.3.6.1.2.1.14.11.1.6
         name: ospfVirtNbrEvents
-        description: number of events for the OSPF virtual neighbor
-        unit: "{event}"
+        description: number of events for the virtual OSPF neighbor
+        unit: "CURLY_BRACKET event CURLY_BRACKET"
       - OID: 1.3.6.1.2.1.14.11.1.7
         name: ospfVirtNbrLsRetransQLen
-        description: length of the OSPF virtual neighbor's link-state retransmission queue
-        unit: "{queue}"
+        description: length of the virtual OSPF neighbor's link state retransmission queue
+        unit: "CURLY_BRACKET packet CURLY_BRACKET"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.3
@@ -115,8 +115,8 @@ metrics:
     symbols:
       - name: ospfVirtNbr
         constant_value_one: true
-        description: constant value one for OSPF virtual neighbor
-        unit: "1"
+        description: constant value one for virtual OSPF neighbor
+        unit: "CURLY_BRACKET neighbor CURLY_BRACKET"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.3
@@ -147,15 +147,15 @@ metrics:
       - OID: 1.3.6.1.2.1.14.7.1.8
         name: ospfIfRetransInterval
         description: retransmission interval for the OSPF interface
-        unit: "ms"
+        unit: "s"
       - OID: 1.3.6.1.2.1.14.7.1.12
         name: ospfIfState
         description: state of the OSPF interface
-        unit: "{state}"
+        unit: "CURLY_BRACKET interface CURLY_BRACKET"
       - OID: 1.3.6.1.2.1.14.7.1.21
         name: ospfIfLsaCount
-        description: number of LSAs on the OSPF interface
-        unit: "{LSA}"
+        description: count of link state advertisements on the OSPF interface
+        unit: "CURLY_BRACKET LSA CURLY_BRACKET"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.7.1.1
@@ -187,7 +187,7 @@ metrics:
       - name: ospfIf
         constant_value_one: true
         description: constant value one for OSPF interface
-        unit: "1"
+        unit: "CURLY_BRACKET interface CURLY_BRACKET"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.7.1.1
@@ -218,16 +218,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.14.9.1.4
         name: ospfVirtIfRetransInterval
-        description: retransmission interval for the OSPF virtual interface
-        unit: "ms"
+        description: retransmission interval for the virtual OSPF interface
+        unit: "s"
       - OID: 1.3.6.1.2.1.14.9.1.7
         name: ospfVirtIfState
-        description: state of the OSPF virtual interface
-        unit: "{state}"
+        description: state of the virtual OSPF interface
+        unit: "CURLY_BRACKET interface CURLY_BRACKET"
       - OID: 1.3.6.1.2.1.14.9.1.12
         name: ospfVirtIfLsaCount
-        description: number of LSAs on the OSPF virtual interface
-        unit: "{LSA}"
+        description: count of link state advertisements on the virtual OSPF interface
+        unit: "CURLY_BRACKET LSA CURLY_BRACKET"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.2
@@ -249,8 +249,8 @@ metrics:
     symbols:
       - name: ospfVirtIf
         constant_value_one: true
-        description: constant value one for OSPF virtual interface
-        unit: "1"
+        description: constant value one for virtual OSPF interface
+        unit: "CURLY_BRACKET interface CURLY_BRACKET"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.2

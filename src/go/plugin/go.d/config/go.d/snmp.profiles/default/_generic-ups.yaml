@@ -14,51 +14,51 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.2.0
       name: upsSecondsOnBattery
-      description: time in seconds the UPS has been on battery
-      unit: "{s}"
+      description: number of seconds on battery
+      unit: "s"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.3.0
       name: upsEstimatedMinutesRemaining
-      description: estimated minutes of battery time remaining
-      unit: "{min}"
+      description: estimated minutes remaining
+      unit: "min"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.4.0
       name: upsEstimatedChargeRemaining
-      description: estimated percentage of battery charge remaining
-      unit: "{%}"
+      description: estimated charge remaining
+      unit: "%"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.5.0
       name: upsBatteryVoltage
       description: battery voltage
-      unit: "{V}"
+      unit: "V"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.6.0
       name: upsBatteryCurrent
       description: battery current
-      unit: "{A}"
+      unit: "A"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.7.0
       name: upsBatteryTemperature
       description: battery temperature
-      unit: "{Cel}"
+      unit: "{temperature}_Cel"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.3.1.0
       name: upsInputLineBads
       metric_type: monotonic_count
-      description: number of bad input line events
-      unit: "{event}"
+      description: number of input line bad events
+      unit: "{event}_count"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.3.2.0
       name: upsInputNumLines
       description: number of input lines
-      unit: "{line}"
+      unit: "{input_line}_count"
 #  - MIB: UPS-MIB
 #    symbol:
 #      OID: 1.3.6.1.2.1.33.1.4.1.0
@@ -78,31 +78,31 @@ metrics:
       OID: 1.3.6.1.2.1.33.1.4.2.0
       name: upsOutputFrequency
       description: output frequency
-      unit: "{Hz}"
+      unit: "Hz"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.4.3.0
       name: upsOutputNumLines
       description: number of output lines
-      unit: "{line}"
+      unit: "{output_line}_count"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.5.1.0
       name: upsBypassFrequency
       description: bypass frequency
-      unit: "{Hz}"
+      unit: "Hz"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.5.2.0
       name: upsBypassNumLines
       description: number of bypass lines
-      unit: "{line}"
+      unit: "{bypass_line}_count"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.6.1.0
       name: upsAlarmsPresent
       description: number of alarms present
-      unit: "{alarm}"
+      unit: "{alarm}_count"
 #  - MIB: UPS-MIB
 #    symbol:
 #      OID: 1.3.6.1.2.1.33.1.7.3.0
@@ -121,7 +121,7 @@ metrics:
       OID: 1.3.6.1.2.1.33.1.7.5.0
       name: upsTestStartTime
       description: test start time
-      unit: "TBD"
+      unit: "s"
   - MIB: UPS-MIB
     table:
       OID: 1.3.6.1.2.1.33.1.4.4
@@ -130,19 +130,19 @@ metrics:
       - OID: 1.3.6.1.2.1.33.1.4.4.1.2
         name: upsOutputVoltage
         description: output voltage
-        unit: "{V}"
+        unit: "V"
       - OID: 1.3.6.1.2.1.33.1.4.4.1.3
         name: upsOutputCurrent
         description: output current
-        unit: "{A}"
+        unit: "A"
       - OID: 1.3.6.1.2.1.33.1.4.4.1.4
         name: upsOutputPower
         description: output power
-        unit: "{W}"
+        unit: "W"
       - OID: 1.3.6.1.2.1.33.1.4.4.1.5
         name: upsOutputPercentLoad
         description: output percent load
-        unit: "{%}"
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.4.4.1.1
@@ -156,19 +156,19 @@ metrics:
       - OID: 1.3.6.1.2.1.33.1.3.3.1.2
         name: upsInputFrequency
         description: input frequency
-        unit: "{Hz}"
+        unit: "Hz"
       - OID: 1.3.6.1.2.1.33.1.3.3.1.3
         name: upsInputVoltage
         description: input voltage
-        unit: "{V}"
+        unit: "V"
       - OID: 1.3.6.1.2.1.33.1.3.3.1.4
         name: upsInputCurrent
         description: input current
-        unit: "{A}"
+        unit: "A"
       - OID: 1.3.6.1.2.1.33.1.3.3.1.5
         name: upsInputTruePower
         description: input true power
-        unit: "{W}"
+        unit: "W"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.3.3.1.1
@@ -182,15 +182,15 @@ metrics:
       - OID: 1.3.6.1.2.1.33.1.5.3.1.2
         name: upsBypassVoltage
         description: bypass voltage
-        unit: "{V}"
+        unit: "V"
       - OID: 1.3.6.1.2.1.33.1.5.3.1.3
         name: upsBypassCurrent
         description: bypass current
-        unit: "{A}"
+        unit: "A"
       - OID: 1.3.6.1.2.1.33.1.5.3.1.4
         name: upsBypassPower
         description: bypass power
-        unit: "{W}"
+        unit: "W"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.5.3.1.1
@@ -204,7 +204,7 @@ metrics:
       - OID: 1.3.6.1.2.1.33.1.6.2.1.3
         name: upsAlarmTime
         description: alarm time
-        unit: "TBD"
+        unit: "s"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.6.2.1.2

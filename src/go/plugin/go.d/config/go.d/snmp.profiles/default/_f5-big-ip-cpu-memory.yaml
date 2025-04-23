@@ -9,7 +9,7 @@ metrics:
         # core check only
       name: memory.total
       description: total memory available
-      unit: "{byte}"
+      unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
@@ -17,7 +17,7 @@ metrics:
         # core check only
       name: memory.used
       description: memory currently used
-      unit: "{byte}"
+      unit: "By"
   # CPU
   - MIB: F5-BIGIP-SYSTEM-MIB
     table:

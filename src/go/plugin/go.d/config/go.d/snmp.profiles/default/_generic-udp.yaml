@@ -6,26 +6,26 @@ metrics:
   symbol:
     OID: 1.3.6.1.2.1.7.8.0
     name: udpHCInDatagrams
-  description: number of received UDP datagrams including those received in error
-  unit: "{datagram}"
+  description: number of received UDP datagrams
+  unit: "{packet}"
 - MIB: UDP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.7.2.0
     name: udpNoPorts
-  description: number of received UDP datagrams for which there was no application at the destination port
-  unit: "{datagram}"
+  description: number of UDP datagrams received with no application at destination port
+  unit: "{packet}"
 - MIB: UDP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.7.3.0
     name: udpInErrors
-  description: number of UDP datagrams that could not be delivered for reasons other than the absence of an application at the destination port
-  unit: "{datagram}"
+  description: number of UDP datagrams received with errors
+  unit: "{packet}"
 - MIB: UDP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.7.9.0
     name: udpHCOutDatagrams
-  description: number of UDP datagrams sent from this entity including those sent in error
-  unit: "{datagram}"
+  description: number of UDP datagrams sent
+  unit: "{packet}"

@@ -8,56 +8,56 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.4
         name: systemStateChassisStatus
-        description: chassis status
-        unit: "{access_point}"
+        description: chassis status of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.6
         name: systemStatePowerUnitStatusRedundancy
-        description: power unit status redundancy
-        unit: "{access_point}"
+        description: power unit status redundancy of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.9
         name: systemStatePowerSupplyStatusCombined
-        description: combined power supply status
-        unit: "{access_point}"
+        description: combined power supply status of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.15
         name: systemStateAmperageStatusCombined
-        description: combined amperage status
-        unit: "{access_point}"
+        description: combined amperage status of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.18
         name: systemStateCoolingUnitStatusRedundancy
-        description: cooling unit status redundancy
-        unit: "{access_point}"
+        description: cooling unit status redundancy of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.21
         name: systemStateCoolingDeviceStatusCombined
-        description: combined cooling device status
-        unit: "{access_point}"
+        description: combined cooling device status of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.24
         name: systemStateTemperatureStatusCombined
-        description: combined temperature status
-        unit: "{access_point}"
+        description: combined temperature status of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.27
         name: systemStateMemoryDeviceStatusCombined
-        description: combined memory device status
-        unit: "{access_point}"
+        description: combined memory device status of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.30
         name: systemStateChassisIntrusionStatusCombined
-        description: combined chassis intrusion status
-        unit: "{access_point}"
+        description: combined chassis intrusion status of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.42
         name: systemStatePowerUnitStatusCombined
-        description: combined power unit status
-        unit: "{access_point}"
+        description: combined power unit status of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.44
         name: systemStateCoolingUnitStatusCombined
-        description: combined cooling unit status
-        unit: "{access_point}"
+        description: combined cooling unit status of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.50
         name: systemStateProcessorDeviceStatusCombined
-        description: combined processor device status
-        unit: "{access_point}"
+        description: combined processor device status of the system state
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.63
         name: systemStateTemperatureStatisticsStatusCombined
-        description: combined temperature statistics status
-        unit: "{access_point}"
+        description: combined temperature statistics status of the system state
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.1
@@ -70,8 +70,6 @@ metrics:
     symbols:
       - name: dell.systemState
         constant_value_one: true
-        description: constant metric representing system state
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.1
@@ -229,20 +227,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.4
         name: physicalDiskState
-        description: physical disk state
-        unit: "{access_point}"
+        description: state of the physical disk
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.11
         name: physicalDiskCapacityInMB
-        description: physical disk capacity in megabytes
-        unit: "{mega_By}"
+        description: capacity of the physical disk in megabytes
+        unit: "MB"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.17
         name: physicalDiskUsedSpaceInMB
-        description: physical disk used space in megabytes
-        unit: "{mega_By}"
+        description: used space of the physical disk in megabytes
+        unit: "MB"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.19
         name: physicalDiskFreeSpaceInMB
-        description: physical disk free space in megabytes
-        unit: "{mega_By}"
+        description: free space of the physical disk in megabytes
+        unit: "MB"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.2
@@ -255,8 +253,6 @@ metrics:
     symbols:
       - name: dell.physicalDisk
         constant_value_one: true
-        description: constant metric representing physical disk
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.4
@@ -288,8 +284,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.4
         name: enclosurePowerSupplyState
-        description: enclosure power supply state
-        unit: "{access_point}"
+        description: state of the enclosure power supply
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.2
@@ -310,8 +306,6 @@ metrics:
     symbols:
       - name: enclosurePowerSupply
         constant_value_one: true
-        description: constant metric representing enclosure power supply
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.4
@@ -342,8 +336,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.4
         name: batteryState
-        description: battery state
-        unit: "{access_point}"
+        description: state of the battery
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.20
@@ -360,8 +354,6 @@ metrics:
     symbols:
       - name: dell.battery
         constant_value_one: true
-        description: constant metric representing battery
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.4
@@ -390,8 +382,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.37
         name: controllerRollUpStatus
-        description: controller roll up status
-        unit: "{access_point}"
+        description: roll up status of the controller
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.1
@@ -416,8 +408,6 @@ metrics:
     symbols:
       - name: dell.controller
         constant_value_one: true
-        description: constant metric representing controller
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.37
@@ -453,8 +443,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.5
         name: pCIDeviceStatus
-        description: PCI device status
-        unit: "{access_point}"
+        description: status of the PCI device
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.9
@@ -471,8 +461,6 @@ metrics:
     symbols:
       - name: dell.pCIDevice
         constant_value_one: true
-        description: constant metric representing PCI device
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.5
@@ -500,8 +488,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.5
         name: systemSlotStatus
-        description: system slot status
-        unit: "{access_point}"
+        description: status of the system slot
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.8
@@ -518,8 +506,6 @@ metrics:
     symbols:
       - name: dell.systemSlot
         constant_value_one: true
-        description: constant metric representing system slot
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.5
@@ -547,8 +533,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.3
         name: networkDeviceStatus
-        description: network device status
-        unit: "{access_point}"
+        description: status of the network device
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.1
@@ -569,8 +555,6 @@ metrics:
     symbols:
       - name: dell.networkDevice
         constant_value_one: true
-        description: constant metric representing network device
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.3
@@ -606,8 +590,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.5
         name: systemBIOSStatus
-        description: system BIOS status
-        unit: "{access_point}"
+        description: status of the system BIOS
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.1
@@ -624,8 +608,6 @@ metrics:
     symbols:
       - name: dell.systemBIOS
         constant_value_one: true
-        description: constant metric representing system BIOS
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.1
@@ -653,11 +635,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.5
         name: intrusionStatus
-        description: intrusion status
-        unit: "{access_point}"
+        description: status of the intrusion
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.6
         name: intrusionReading
-        description: intrusion reading
+        description: reading of the intrusion
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -679,16 +661,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.6
         name: powerSupplyOutputWatts
-        description: power supply output in watts
-        unit: "{W}"
+        description: output power of the power supply in watts
+        unit: "W"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.9
         name: powerSupplyMaximumInputVoltage
-        description: power supply maximum input voltage
-        unit: "{V}"
+        description: maximum input voltage of the power supply
+        unit: "V"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.16
         name: powerSupplyCurrentInputVoltage
-        description: power supply current input voltage
-        unit: "{V}"
+        description: current input voltage of the power supply
+        unit: "V"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.1
@@ -709,12 +691,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.5
         name: amperageProbeStatus
-        description: amperage probe status
-        unit: "{access_point}"
+        description: status of the amperage probe
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.6
         name: amperageProbeReading
-        description: amperage probe reading
-        unit: "{A}"
+        description: reading of the amperage probe in amperes
+        unit: "A"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.7
@@ -756,8 +738,6 @@ metrics:
     symbols:
       - name: dell.amperageProbe
         constant_value_one: true
-        description: constant metric representing amperage probe
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.7
@@ -814,8 +794,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.5
         name: powerUsageStatus
-        description: power usage status
-        unit: "{access_point}"
+        description: status of the power usage
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.1
@@ -836,12 +816,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.5
         name: voltageProbeStatus
-        description: voltage probe status
-        unit: "{access_point}"
+        description: status of the voltage probe
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.6
         name: voltageProbeReading
-        description: voltage probe reading
-        unit: "{V}"
+        description: reading of the voltage probe in volts
+        unit: "V"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.1
@@ -882,8 +862,6 @@ metrics:
     symbols:
       - name: dell.voltageProbe
         constant_value_one: true
-        description: constant metric representing voltage probe
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.1
@@ -939,11 +917,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.5
         name: systemBatteryStatus
-        description: system battery status
-        unit: "{access_point}"
+        description: status of the system battery
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.6
         name: systemBatteryReading
-        description: system battery reading
+        description: reading of the system battery
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -965,12 +943,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.5
         name: coolingUnitRedundancyStatus
-        description: cooling unit redundancy status
-        unit: "{access_point}"
+        description: redundancy status of the cooling unit
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.8
         name: coolingUnitStatus
-        description: cooling unit status
-        unit: "{access_point}"
+        description: status of the cooling unit
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.1
@@ -991,15 +969,15 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.5
         name: coolingDeviceStatus
-        description: cooling device status
-        unit: "{access_point}"
+        description: status of the cooling device
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.6
         name: coolingDeviceReading
-        description: cooling device reading
+        description: reading of the cooling device
         unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.18
         name: coolingDeviceDiscreteReading
-        description: cooling device discrete reading
+        description: discrete reading of the cooling device
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -1041,15 +1019,15 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.5
         name: temperatureProbeStatus
-        description: temperature probe status
-        unit: "{access_point}"
+        description: status of the temperature probe
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.6
         name: temperatureProbeReading
-        description: temperature probe reading
-        unit: "{Cel}"
+        description: reading of the temperature probe in degrees Celsius
+        unit: "Cel"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.16
         name: temperatureProbeDiscreteReading
-        description: temperature probe discrete reading
+        description: discrete reading of the temperature probe
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -1080,20 +1058,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.5
         name: processorDeviceStatus
-        description: processor device status
-        unit: "{access_point}"
+        description: status of the processor device
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.11
         name: processorDeviceMaximumSpeed
-        description: processor device maximum speed
-        unit: "{MHz}"
+        description: maximum speed of the processor device in megahertz
+        unit: "MHz"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.12
         name: processorDeviceCurrentSpeed
-        description: processor device current speed
-        unit: "{MHz}"
+        description: current speed of the processor device in megahertz
+        unit: "MHz"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.14
         name: processorDeviceVoltage
-        description: processor device voltage
-        unit: "{V}"
+        description: voltage of the processor device in volts
+        unit: "V"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.1
@@ -1118,11 +1096,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.5
         name: processorDeviceStatusStatus
-        description: processor device status status
-        unit: "{access_point}"
+        description: status of the processor device status
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.6
         name: processorDeviceStatusReading
-        description: processor device status reading
+        description: reading of the processor device status
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -1144,8 +1122,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.5
         name: memoryDeviceStatus
-        description: memory device status
-        unit: "{access_point}"
+        description: status of the memory device
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7
@@ -1166,8 +1144,6 @@ metrics:
     symbols:
       - name: dell.memoryDevice
         constant_value_one: true
-        description: constant metric representing memory device
-        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7
@@ -1223,8 +1199,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.3
         name: fruInformationStatus
-        description: FRU information status
-        unit: "{access_point}"
+        description: status of the FRU information
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.1
@@ -1245,20 +1221,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.4
         name: virtualDiskState
-        description: virtual disk state
-        unit: "{access_point}"
+        description: state of the virtual disk
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.6
         name: virtualDiskSizeInMB
-        description: virtual disk size in megabytes
-        unit: "{mega_By}"
+        description: size of the virtual disk in megabytes
+        unit: "MB"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.20
         name: virtualDiskComponentStatus
-        description: virtual disk component status
-        unit: "{access_point}"
+        description: component status of the virtual disk
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.37
         name: virtualDiskT10PIStatus
-        description: virtual disk T10 PI status
-        unit: "{access_point}"
+        description: T10 PI status of the virtual disk
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.1
@@ -1299,12 +1275,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.13
         name: drsWattsReading
-        description: drs watts reading
-        unit: "{W}"
+        description: watts reading of the DRS CMC power
+        unit: "W"
       - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.14
         name: drsAmpsReading
-        description: drs amps reading
-        unit: "{A}"
+        description: amps reading of the DRS CMC power
+        unit: "A"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.2.4.1.1.1
@@ -1322,8 +1298,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.6
         name: drsKWhCumulative
-        description: drs cumulative kilowatt hours
-        unit: "{kW.h}"
+        description: cumulative kilowatt hours of the DRS CMC power
+        unit: "kW.h"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.2.4.1.1.1

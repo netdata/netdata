@@ -6,31 +6,31 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.15
         name: cikeTunLifeTime
-        description: lifetime of the tunnel in seconds
-        unit: "{s}"
+        description: lifetime of the tunnel
+        unit: "s"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.19
         name: cikeTunInOctets
         description: number of octets received in the tunnel
-        unit: "{By}"
+        unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.20
         name: cikeTunInPkts
         description: number of packets received in the tunnel
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.21
         name: cikeTunInDropPkts
-        description: number of packets dropped in the tunnel on ingress
+        description: number of packets dropped on input in the tunnel
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.27
         name: cikeTunOutOctets
-        description: number of octets sent out of the tunnel
-        unit: "{By}"
+        description: number of octets sent out the tunnel
+        unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.28
         name: cikeTunOutPkts
-        description: number of packets sent out of the tunnel
+        description: number of packets sent out the tunnel
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.29
         name: cikeTunOutDropPkts
-        description: number of packets dropped in the tunnel on egress
+        description: number of packets dropped on output in the tunnel
         unit: "{packet}"
     metric_tags:
       - index: 1
@@ -57,47 +57,47 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.9
         name: cipSecTunLifeTime
-        description: lifetime of the tunnel in seconds
-        unit: "{s}"
+        description: lifetime of the tunnel
+        unit: "s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.26
         name: cipSecTunInOctets
         description: number of octets received in the tunnel
-        unit: "{By}"
+        unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.27
         name: cipSecTunHcInOctets
         description: high capacity number of octets received in the tunnel
-        unit: "{By}"
+        unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.32
         name: cipSecTunInPkts
         description: number of packets received in the tunnel
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.36
         name: cipSecTunInAuthFails
-        description: number of authentication failures on ingress
+        description: number of authentication failures on input in the tunnel
         unit: "{failure}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.38
         name: cipSecTunInDecryptFails
-        description: number of decryption failures on ingress
+        description: number of decryption failures on input in the tunnel
         unit: "{failure}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.39
         name: cipSecTunOutOctets
-        description: number of octets sent out of the tunnel
-        unit: "{By}"
+        description: number of octets sent out the tunnel
+        unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.40
         name: cipSecTunHcOutOctets
-        description: high capacity number of octets sent out of the tunnel
-        unit: "{By}"
+        description: high capacity number of octets sent out the tunnel
+        unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.45
         name: cipSecTunOutPkts
-        description: number of packets sent out of the tunnel
+        description: number of packets sent out the tunnel
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.48
         name: cipSecTunOutAuthFails
-        description: number of authentication failures on egress
+        description: number of authentication failures on output in the tunnel
         unit: "{failure}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.50
         name: cipSecTunOutEncryptFails
-        description: number of encryption failures on egress
+        description: number of encryption failures on output in the tunnel
         unit: "{failure}"
     metric_tags:
       - index: 1

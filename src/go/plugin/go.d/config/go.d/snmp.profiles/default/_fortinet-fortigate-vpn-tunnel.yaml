@@ -6,12 +6,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.18
         name: fgVpnTunEntInOctets
-        description: number of octets received on the VPN tunnel
-        unit: "{octet}"
+        description: number of incoming octets in the VPN tunnel
+        unit: "By"
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.19
         name: fgVpnTunEntOutOctets
-        description: number of octets sent on the VPN tunnel
-        unit: "{octet}"
+        description: number of outgoing octets in the VPN tunnel
+        unit: "By"
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.20
         name: fgVpnTunEntStatus
         description: status of the VPN tunnel entry

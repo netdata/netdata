@@ -15,7 +15,7 @@ metrics:
         # core check only
         name: cpu.usage
         description: cpu usage percentage
-        unit: "{%}"
+        unit: "%"
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.5
       name: multiProcTable
@@ -26,13 +26,13 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.3.0
         # core check only
       name: memory.total
-      description: total memory size
-      unit: "{By}"
+      description: total memory available
+      unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.4.0
         # core check only
       name: memory.used
-      description: used memory size
-      unit: "{By}"
+      description: memory currently used
+      unit: "By"

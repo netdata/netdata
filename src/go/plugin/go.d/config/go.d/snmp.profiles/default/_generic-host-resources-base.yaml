@@ -11,26 +11,26 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.25.1.1.0
       name: hrSystemUptime
-      description: system uptime
-      unit: "{s}"
+      description: system uptime in hundredths of a second
+      unit: "c"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.5.0
       name: hrSystemNumUsers
       description: number of users currently logged in
-      unit: "{access_point}"
+      unit: "{user}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.6.0
       name: hrSystemProcesses
       description: number of active processes
-      unit: "{access_point}"
+      unit: "{process}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.7.0
       name: hrSystemMaxProcesses
       description: maximum number of processes allowed
-      unit: "{access_point}"
+      unit: "{process}"
 
   #
   # Storage Devices
@@ -42,20 +42,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.25.2.3.1.4
         name: hrStorageAllocationUnits
-        description: size of storage allocation units
-        unit: "{octet}"
+        description: size of storage allocation units in bytes
+        unit: "By"
       - OID: 1.3.6.1.2.1.25.2.3.1.5
         name: hrStorageSize
         description: total number of allocation units
-        unit: "{access_point}"
+        unit: "{allocation_unit}"
       - OID: 1.3.6.1.2.1.25.2.3.1.6
         name: hrStorageUsed
         description: number of allocation units used
-        unit: "{access_point}"
+        unit: "{allocation_unit}"
       - OID: 1.3.6.1.2.1.25.2.3.1.7
         name: hrStorageAllocationFailures
-        description: number of allocation failures
-        unit: "{access_point}"
+        description: count of storage allocation failures
+        unit: "{failure}"
     metric_tags:
       - tag: storagedesc
         symbol:
@@ -76,7 +76,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.25.3.3.1.2
         name: hrProcessorLoad
-        description: processor load percentage
+        description: average processor load as a percentage
         unit: "%"
     metric_tags:
       - index: 1  # hrDeviceIndex

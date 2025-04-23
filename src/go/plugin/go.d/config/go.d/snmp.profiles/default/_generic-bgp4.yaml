@@ -8,71 +8,71 @@ metrics:
     symbols:
       - name: peerConnectionByState
         constant_value_one: true
-        description: TBD
+        description: "TBD"
         unit: "TBD"
       - OID: 1.3.6.1.2.1.15.3.1.3
         name: bgpPeerAdminStatus
-        description: administrative status of the BGP peer connection
-        unit: "{access_point}"
+        description: "administrative status of the BGP peer connection"
+        unit: "TBD"
       - OID: 1.3.6.1.2.1.15.3.1.4
         name: bgpPeerNegotiatedVersion
-        description: negotiated BGP version with the peer
-        unit: "{version}"
+        description: "negotiated BGP version number"
+        unit: "1"
       - OID: 1.3.6.1.2.1.15.3.1.9
         name: bgpPeerRemoteAs
-        description: autonomous system number of the remote BGP peer
-        unit: "{autonomous_system}"
+        description: "remote autonomous system number of the BGP peer"
+        unit: "1"
       - OID: 1.3.6.1.2.1.15.3.1.2
         name: bgpPeerState
-        description: current state of the BGP peer connection
-        unit: "{state}"
+        description: "state of the BGP peer connection"
+        unit: "TBD"
       - OID: 1.3.6.1.2.1.15.3.1.10
         name: bgpPeerInUpdates
-        description: number of inbound BGP update messages received
+        description: "number of BGP update messages received from the peer"
         unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.11
         name: bgpPeerOutUpdates
-        description: number of outbound BGP update messages sent
+        description: "number of BGP update messages sent to the peer"
         unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.12
         name: bgpPeerInTotalMessages
-        description: total number of inbound BGP messages received
+        description: "total number of BGP messages received from the peer"
         unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.13
         name: bgpPeerOutTotalMessages
-        description: total number of outbound BGP messages sent
+        description: "total number of BGP messages sent to the peer"
         unit: "{message}"
       - OID: 1.3.6.1.2.1.15.3.1.15
         name: bgpPeerFsmEstablishedTransitions
-        description: number of times the BGP FSM entered the established state
+        description: "number of times the BGP FSM entered the established state"
         unit: "{transition}"
       - OID: 1.3.6.1.2.1.15.3.1.16
         name: bgpPeerFsmEstablishedTime
-        description: time duration the BGP FSM has been in the established state
-        unit: "{second}"
+        description: "time duration the BGP FSM has been in the established state"
+        unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.17
         name: bgpPeerConnectRetryInterval
-        description: interval between connection retry attempts in seconds
+        description: "interval between connection retry attempts"
         unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.18
         name: bgpPeerHoldTime
-        description: hold time value for the BGP peer connection in seconds
+        description: "hold time for the BGP peer connection"
         unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.19
         name: bgpPeerKeepAlive
-        description: keepalive interval for the BGP peer connection in seconds
+        description: "keepalive interval for the BGP peer connection"
         unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.20
         name: bgpPeerHoldTimeConfigured
-        description: configured hold time for the BGP peer connection in seconds
+        description: "configured hold time for the BGP peer connection"
         unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.21
         name: bgpPeerKeepAliveConfigured
-        description: configured keepalive interval for the BGP peer connection in seconds
+        description: "configured keepalive interval for the BGP peer connection"
         unit: "s"
       - OID: 1.3.6.1.2.1.15.3.1.22
         name: bgpPeerMinASOriginationInterval
-        description: minimum interval between AS origination messages in seconds
+        description: "minimum interval between AS origination messages"
         unit: "s"
     metric_tags:
       - tag: remote_as

@@ -7,7 +7,7 @@ metrics:
       - OID: 1.3.6.1.2.1.149.1.1.1.1.2
         name: sipCommonCfgServiceOperStatus
         description: operational status of the SIP common configuration service
-        unit: "{access_point}"
+        unit: "TBD"
     metric_tags:
     - index: 1
       tag: applIndex

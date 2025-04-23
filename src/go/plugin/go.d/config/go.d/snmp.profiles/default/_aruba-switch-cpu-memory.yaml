@@ -13,8 +13,7 @@ metrics:
         # core check only
         name: cpu.usage
         description: percentage of time that this processor was not idle
-        unit: "{%}"
-
+        unit: "%"
     metric_tags:
       - tag: cpu
         index: 1
@@ -32,13 +31,13 @@ metrics:
         name: memory.total
         scale_factor: 1000
         description: total memory in kilobytes
-        unit: "{kBy}"
+        unit: "kBy"
       - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.3
         # core check only
         name: memory.used
         scale_factor: 1000
         description: used memory in kilobytes
-        unit: "{kBy}"
+        unit: "kBy"
     metric_tags:
       - tag: mem
         index: 1

@@ -18,11 +18,11 @@ metrics:
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.3
         name: adapterRxBytes
         description: number of received bytes
-        unit: "{By}"
+        unit: "By"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.4
         name: adapterTxBytes
         description: number of transmitted bytes
-        unit: "{By}"
+        unit: "By"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.5
         name: adapterRxErrors
         description: number of receive errors
@@ -45,7 +45,7 @@ metrics:
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.10
         name: adapterCollisions
-        description: number of collisions
+        description: number of collisions detected
         unit: "{collision}"
     metric_tags:
       - symbol:

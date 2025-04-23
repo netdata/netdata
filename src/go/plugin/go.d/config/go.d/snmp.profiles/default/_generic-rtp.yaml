@@ -15,7 +15,7 @@ metrics:
       - OID: 1.3.6.1.2.1.87.1.3.1.8
         name: rtpSessionByes
         description: number of byes in the RTP session
-        unit: "{session}"
+        unit: "{access_point}"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
@@ -39,7 +39,7 @@ metrics:
       - OID: 1.3.6.1.2.1.87.1.5.1.5
         name: rtpSenderOctets
         description: number of octets sent by the RTP sender
-        unit: "{By}"
+        unit: "By"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
@@ -57,7 +57,7 @@ metrics:
       - OID: 1.3.6.1.2.1.87.1.7.1.13
         name: rtpRcvrOctets
         description: number of octets received by the RTP receiver
-        unit: "{By}"
+        unit: "By"
       - OID: 1.3.6.1.2.1.87.1.7.1.6
         name: rtpRcvrLostPackets
         description: number of lost packets at the RTP receiver
@@ -65,7 +65,7 @@ metrics:
       - OID: 1.3.6.1.2.1.87.1.7.1.7
         name: rtpRcvrJitter
         description: jitter measured at the RTP receiver
-        unit: "TBD"
+        unit: "ms"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex

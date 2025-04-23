@@ -6,67 +6,67 @@ metrics:
   symbol:
     OID: 1.3.6.1.2.1.6.5.0
     name: tcpActiveOpens
-  description: number of active TCP connection openings
-  unit: "{count}"
+  description: number of times TCP connections have made active opens
+  unit: "{access_point}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.6.0
     name: tcpPassiveOpens
-  description: number of passive TCP connection openings
-  unit: "{count}"
+  description: number of times TCP connections have made passive opens
+  unit: "{access_point}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.7.0
     name: tcpAttemptFails
-  description: number of failed TCP connection attempts
-  unit: "{count}"
+  description: number of failed attempts to open TCP connections
+  unit: "{access_point}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.8.0
     name: tcpEstabResets
-  description: number of TCP connections reset while established
-  unit: "{count}"
+  description: number of established TCP connections that have been reset
+  unit: "{access_point}"
 - MIB: TCP-MIB
   symbol:
     OID: 1.3.6.1.2.1.6.9.0
     name: tcpCurrEstab
   description: current number of established TCP connections
-  unit: "{count}"
+  unit: "{access_point}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.17.0
     name: tcpHCInSegs
-  description: number of TCP segments received
-  unit: "{count}"
+  description: number of TCP segments received including those received in error
+  unit: "{segment}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.18.0
     name: tcpHCOutSegs
-  description: number of TCP segments sent
-  unit: "{count}"
+  description: number of TCP segments sent including those retransmitted
+  unit: "{segment}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.12.0
     name: tcpRetransSegs
   description: number of TCP segments retransmitted
-  unit: "{count}"
+  unit: "{segment}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.14.0
     name: tcpInErrs
-  description: number of erroneous incoming TCP segments
-  unit: "{count}"
+  description: number of TCP segments received in error
+  unit: "{segment}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.15.0
     name: tcpOutRsts
-  description: number of TCP reset segments sent
-  unit: "{count}"
+  description: number of TCP segments sent containing reset flag
+  unit: "{segment}"

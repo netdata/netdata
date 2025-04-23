@@ -9,119 +9,119 @@ metrics:
   symbols:
   - OID: 1.3.6.1.2.1.4.31.1.1.4
     name: ipSystemStatsHCInReceives
-    description: number of received packets
+    description: number of input datagrams received including errors
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.6
     name: ipSystemStatsHCInOctets
-    description: number of received octets
-    unit: "{octet}"
+    description: number of octets received on input including header
+    unit: "By"
   - OID: 1.3.6.1.2.1.4.31.1.1.7
     name: ipSystemStatsInHdrErrors
-    description: number of header errors in received packets
+    description: number of input datagrams discarded due to header errors
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.8
     name: ipSystemStatsInNoRoutes
-    description: number of received packets with no route
+    description: number of input datagrams discarded due to no route
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.9
     name: ipSystemStatsInAddrErrors
-    description: number of received packets with address errors
+    description: number of input datagrams discarded due to address errors
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.10
     name: ipSystemStatsInUnknownProtos
-    description: number of received packets with unknown protocols
+    description: number of input datagrams discarded due to unknown protocol
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.11
     name: ipSystemStatsInTruncatedPkts
-    description: number of truncated received packets
+    description: number of input datagrams discarded due to truncation
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.13
     name: ipSystemStatsHCInForwDatagrams
-    description: number of forwarded datagrams received
+    description: number of input datagrams forwarded
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.14
     name: ipSystemStatsReasmReqds
-    description: number of reassembly requests
-    unit: "{request}"
+    description: number of datagram reassembly requests
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.15
     name: ipSystemStatsReasmOKs
-    description: number of successful reassemblies
-    unit: "{reassembly}"
+    description: number of datagrams successfully reassembled
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.16
     name: ipSystemStatsReasmFails
-    description: number of failed reassemblies
-    unit: "{reassembly}"
+    description: number of datagram reassembly failures
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.17
     name: ipSystemStatsInDiscards
-    description: number of discarded incoming packets
+    description: number of input datagrams discarded for other reasons
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.19
     name: ipSystemStatsHCInDelivers
-    description: number of delivered incoming packets
+    description: number of input datagrams delivered to upper layers
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.21
     name: ipSystemStatsHCOutRequests
-    description: number of outgoing requests
-    unit: "{request}"
+    description: number of output datagram requests
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.22
     name: ipSystemStatsOutNoRoutes
-    description: number of outgoing packets with no route
+    description: number of output datagrams discarded due to no route
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.24
     name: ipSystemStatsHCOutForwDatagrams
-    description: number of forwarded outgoing datagrams
+    description: number of output datagrams forwarded
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.25
     name: ipSystemStatsOutDiscards
-    description: number of discarded outgoing packets
+    description: number of output datagrams discarded for other reasons
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.26
     name: ipSystemStatsOutFragReqds
-    description: number of fragmentation requests
-    unit: "{request}"
+    description: number of datagram fragmentation requests
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.27
     name: ipSystemStatsOutFragOKs
-    description: number of successful fragmentations
-    unit: "{fragmentation}"
+    description: number of datagrams successfully fragmented
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.28
     name: ipSystemStatsOutFragFails
-    description: number of failed fragmentations
-    unit: "{fragmentation}"
+    description: number of datagram fragmentation failures
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.29
     name: ipSystemStatsOutFragCreates
-    description: number of created fragments
-    unit: "{fragment}"
+    description: number of datagram fragments created
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.31
     name: ipSystemStatsHCOutTransmits
-    description: number of transmitted packets
+    description: number of output datagrams transmitted
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.33
     name: ipSystemStatsHCOutOctets
-    description: number of transmitted octets
-    unit: "{octet}"
+    description: number of octets transmitted on output including header
+    unit: "By"
   - OID: 1.3.6.1.2.1.4.31.1.1.35
     name: ipSystemStatsHCInMcastPkts
-    description: number of received multicast packets
+    description: number of input multicast datagrams received
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.37
     name: ipSystemStatsHCInMcastOctets
-    description: number of received multicast octets
-    unit: "{octet}"
+    description: number of octets in input multicast datagrams
+    unit: "By"
   - OID: 1.3.6.1.2.1.4.31.1.1.39
     name: ipSystemStatsHCOutMcastPkts
-    description: number of transmitted multicast packets
+    description: number of output multicast datagrams transmitted
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.41
     name: ipSystemStatsHCOutMcastOctets
-    description: number of transmitted multicast octets
-    unit: "{octet}"
+    description: number of octets in output multicast datagrams
+    unit: "By"
   - OID: 1.3.6.1.2.1.4.31.1.1.43
     name: ipSystemStatsHCInBcastPkts
-    description: number of received broadcast packets
+    description: number of input broadcast datagrams received
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.1.1.45
     name: ipSystemStatsHCOutBcastPkts
-    description: number of transmitted broadcast packets
+    description: number of output broadcast datagrams transmitted
     unit: "{packet}"
   metric_tags:
   - index: 1
@@ -141,111 +141,111 @@ metrics:
   symbols:
   - OID: 1.3.6.1.2.1.4.31.3.1.6
     name: ipIfStatsHCInOctets
-    description: number of received octets on interface
-    unit: "{octet}"
+    description: number of octets received on input interface including header
+    unit: "By"
   - OID: 1.3.6.1.2.1.4.31.3.1.7
     name: ipIfStatsInHdrErrors
-    description: number of header errors on interface
+    description: number of input datagrams discarded due to header errors on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.8
     name: ipIfStatsInNoRoutes
-    description: number of packets with no route on interface
+    description: number of input datagrams discarded due to no route on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.9
     name: ipIfStatsInAddrErrors
-    description: number of address errors on interface
+    description: number of input datagrams discarded due to address errors on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.10
     name: ipIfStatsInUnknownProtos
-    description: number of unknown protocol packets on interface
+    description: number of input datagrams discarded due to unknown protocol on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.11
     name: ipIfStatsInTruncatedPkts
-    description: number of truncated packets on interface
+    description: number of input datagrams discarded due to truncation on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.13
     name: ipIfStatsHCInForwDatagrams
-    description: number of forwarded datagrams received on interface
+    description: number of input datagrams forwarded on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.14
     name: ipIfStatsReasmReqds
-    description: number of reassembly requests on interface
-    unit: "{request}"
+    description: number of datagram reassembly requests on interface
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.15
     name: ipIfStatsReasmOKs
-    description: number of successful reassemblies on interface
-    unit: "{reassembly}"
+    description: number of datagrams successfully reassembled on interface
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.16
     name: ipIfStatsReasmFails
-    description: number of failed reassemblies on interface
-    unit: "{reassembly}"
+    description: number of datagram reassembly failures on interface
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.17
     name: ipIfStatsInDiscards
-    description: number of discarded incoming packets on interface
+    description: number of input datagrams discarded for other reasons on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.19
     name: ipIfStatsHCInDelivers
-    description: number of delivered incoming packets on interface
+    description: number of input datagrams delivered to upper layers on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.21
     name: ipIfStatsHCOutRequests
-    description: number of outgoing requests on interface
-    unit: "{request}"
+    description: number of output datagram requests on interface
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.24
     name: ipIfStatsHCOutForwDatagrams
-    description: number of forwarded outgoing datagrams on interface
+    description: number of output datagrams forwarded on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.25
     name: ipIfStatsOutDiscards
-    description: number of discarded outgoing packets on interface
+    description: number of output datagrams discarded for other reasons on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.26
     name: ipIfStatsOutFragReqds
-    description: number of fragmentation requests on interface
-    unit: "{request}"
+    description: number of datagram fragmentation requests on interface
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.27
     name: ipIfStatsOutFragOKs
-    description: number of successful fragmentations on interface
-    unit: "{fragmentation}"
+    description: number of datagrams successfully fragmented on interface
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.28
     name: ipIfStatsOutFragFails
-    description: number of failed fragmentations on interface
-    unit: "{fragmentation}"
+    description: number of datagram fragmentation failures on interface
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.29
     name: ipIfStatsOutFragCreates
-    description: number of created fragments on interface
-    unit: "{fragment}"
+    description: number of datagram fragments created on interface
+    unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.31
     name: ipIfStatsHCOutTransmits
-    description: number of transmitted packets on interface
+    description: number of output datagrams transmitted on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.33
     name: ipIfStatsHCOutOctets
-    description: number of transmitted octets on interface
-    unit: "{octet}"
+    description: number of octets transmitted on output interface including header
+    unit: "By"
   - OID: 1.3.6.1.2.1.4.31.3.1.35
     name: ipIfStatsHCInMcastPkts
-    description: number of received multicast packets on interface
+    description: number of input multicast datagrams received on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.37
     name: ipIfStatsHCInMcastOctets
-    description: number of received multicast octets on interface
-    unit: "{octet}"
+    description: number of octets in input multicast datagrams on interface
+    unit: "By"
   - OID: 1.3.6.1.2.1.4.31.3.1.39
     name: ipIfStatsHCOutMcastPkts
-    description: number of transmitted multicast packets on interface
+    description: number of output multicast datagrams transmitted on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.41
     name: ipIfStatsHCOutMcastOctets
-    description: number of transmitted multicast octets on interface
-    unit: "{octet}"
+    description: number of octets in output multicast datagrams on interface
+    unit: "By"
   - OID: 1.3.6.1.2.1.4.31.3.1.43
     name: ipIfStatsHCInBcastPkts
-    description: number of received broadcast packets on interface
+    description: number of input broadcast datagrams received on interface
     unit: "{packet}"
   - OID: 1.3.6.1.2.1.4.31.3.1.45
     name: ipIfStatsHCOutBcastPkts
-    description: number of transmitted broadcast packets on interface
+    description: number of output broadcast datagrams transmitted on interface
     unit: "{packet}"
   metric_tags:
   - index: 1

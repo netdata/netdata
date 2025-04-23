@@ -14,8 +14,6 @@ metrics:
     symbols:
       - name: accessPoint
         constant_value_one: true
-        description: "TBD"
-        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.1
@@ -58,8 +56,6 @@ metrics:
     symbols:
       - name: accessPointInterface
         constant_value_one: true
-        description: "TBD"
-        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
@@ -120,8 +116,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.15
         name: bsnApIfNoOfUsers
-        description: "number of users on the access point interface"
-        unit: "{access_point_interface}"
+        description: number of users connected to the access point interface
+        unit: "{access_point}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
@@ -169,19 +165,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.1
         name: bsnAPIfLoadRxUtilization
-        description: "receive utilization of the access point interface"
+        description: receive utilization of the access point interface
         unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.2
         name: bsnAPIfLoadTxUtilization
-        description: "transmit utilization of the access point interface"
+        description: transmit utilization of the access point interface
         unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.24
         name: bsnAPIfPoorSNRClients
-        description: "number of clients with poor signal-to-noise ratio on the access point interface"
+        description: number of clients with poor signal-to-noise ratio on the access point interface
         unit: "{client}"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.3
         name: bsnAPIfLoadChannelUtilization
-        description: "channel utilization of the access point interface"
+        description: channel utilization of the access point interface
         unit: "%"
     metric_tags:
       - symbol:
@@ -231,8 +227,6 @@ metrics:
     symbols:
       - name: wlan
         constant_value_one: true
-        description: "TBD"
-        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.1
@@ -269,7 +263,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.38
         name: bsnDot11EssNumberOfMobileStations
-        description: "number of mobile stations connected to the WLAN"
+        description: number of mobile stations connected to the WLAN
         unit: "{mobile_station}"
     metric_tags:
       - symbol:
