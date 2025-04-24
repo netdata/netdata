@@ -43,7 +43,7 @@ jobs:
               ${{ github.event.inputs.type }} \
               ${{ github.event.inputs.version }} \
               ${{ secrets.NETDATA_RELEASE_TEST }}
-      - name: Generate Nightly Changleog (attempt 1)
+      - name: Generate Nightly Changelog (attempt 1)
         id: nightly-changelog1
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly'
         continue-on-error: true
@@ -61,7 +61,7 @@ jobs:
         id: delay1
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly' && steps.nightly-changelog1.outcome == 'failure'
         run: sleep 300
-      - name: Generate Nightly Changleog (attempt 2)
+      - name: Generate Nightly Changelog (attempt 2)
         id: nightly-changelog2
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly' && steps.nightly-changelog1.outcome == 'failure'
         continue-on-error: true
@@ -79,7 +79,7 @@ jobs:
         id: delay2
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly' && steps.nightly-changelog2.outcome == 'failure'
         run: sleep 300
-      - name: Generate Nightly Changleog (attempt 3)
+      - name: Generate Nightly Changelog (attempt 3)
         id: nightly-changelog3
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly' && steps.nightly-changelog2.outcome == 'failure'
         uses: heinrichreimer/github-changelog-generator-action@v2.4
