@@ -80,6 +80,8 @@ go.opentelemetry.io/collector/exporter/xexporter v0.124.0 h1:Itfn2+F4ki8hObOtPCe
 go.opentelemetry.io/collector/exporter/xexporter v0.124.0/go.mod h1:dNK/PPY02gA9BawIKHyVk8kIFdYvqVZ2A+LlMZucIPY=
 go.opentelemetry.io/collector/extension v1.30.0 h1:AJqntAp1p40Q1az2Vze3OHiMURq56KWnUxaLzs1ghaA=
 go.opentelemetry.io/collector/extension v1.30.0/go.mod h1:a21WpypFQp9x0Go7yMOknYmIKvdIoWGzjz+h1WMjzLk=
+go.opentelemetry.io/collector/extension/extensiontest v0.124.0 h1:pWfKxEqvq5vVdQy+UIerw5j7ZrXezxsfQfuUe8g/xVo=
+go.opentelemetry.io/collector/extension/extensiontest v0.124.0/go.mod h1:DLVRyW7tJt8TtYq0Wr5BUsM494YqDiIjN8YCmbVKqjs=
 go.opentelemetry.io/collector/extension/xextension v0.124.0 h1:Yzf11HXaiMHfS50Zy/CYKfJjoi+/w/tgRZdDQ2VIdW0=
 go.opentelemetry.io/collector/extension/xextension v0.124.0/go.mod h1:GeM0aSgwVSba3Bvvspuy1E+1aa/Q1CDxoK+e/xcJFVg=
 go.opentelemetry.io/collector/featuregate v1.30.0 h1:mx7+iP/FQnY7KO8qw/xE3Qd1MQkWcU8VgcqLNrJ8EU8=
