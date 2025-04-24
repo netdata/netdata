@@ -190,8 +190,9 @@ these steps:
 
 #### Database Metrics Not Visible
 
-If you have created a database but it is not appearing on the NetData dashboard, this may indicate that statistics
-collection is not enabled for your database. To resolve this, follow these steps:
+If you have created a database but it is not appearing on the Netdata dashboard,
+this may indicate that statistics collection is not enabled for your database.
+To resolve this, follow these steps:
 
 1. Open `SQL Server Configuration Manager`.
 2. Right-click the database for which you want to enable statistics and select `Properties`.
