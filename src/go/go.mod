@@ -6,7 +6,6 @@ replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/DataDog/datadog-agent/pkg/networkdevice/profile v0.66.0-devel
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/Wing924/ltsv v0.4.0
 	github.com/apparentlymart/go-cidr v1.1.0
@@ -45,14 +44,12 @@ require (
 	github.com/prometheus/common v0.63.0
 	github.com/prometheus/prometheus v2.55.1+incompatible
 	github.com/redis/go-redis/v9 v9.7.3
-	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/sijms/go-ora/v2 v2.8.24
 	github.com/sourcegraph/conc v0.3.0
-	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	github.com/valyala/fastjson v1.6.4
-	github.com/vmware/govmomi v0.49.0
+	github.com/vmware/govmomi v0.50.0
 	go.mongodb.org/mongo-driver v1.17.3
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/net v0.39.0
@@ -104,7 +101,6 @@ require (
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.14.3 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect

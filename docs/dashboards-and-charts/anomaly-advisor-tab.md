@@ -1,26 +1,68 @@
-# Anomaly Advisor tab
+# Anomaly Advisor Tab
 
-The Anomaly Advisor tab lets you focus on potentially anomalous metrics and charts related to a particular highlighted window of interest. In addition to this tab, each chart in the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) also has an [Anomaly Rate ribbon](/docs/dashboards-and-charts/netdata-charts.md#anomaly-rate-ribbon).
+The **Anomaly Advisor** tab helps you identify potentially anomalous metrics and charts by focusing on a highlighted timeframe of interest. This feature uses Netdata's **Anomaly Rate ML scoring** to rank metrics based on unusual behavior.
 
-More details about configuration can be found in the [ML documentation](/src/ml/README.md).
+Each chart in the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) also features an [Anomaly Rate ribbon](/docs/dashboards-and-charts/netdata-charts.md#anomaly-rate-ribbon) for anomaly visibility.
 
-This tab uses our [Anomaly Rate ML feature](/src/ml/README.md#anomaly-bit) to score metrics in terms of anomalous behavior.
+For configuration details, see the [ML documentation](/src/ml/README.md).
 
-- The "Anomaly Rate" chart shows the percentage of anomalous metrics over time per node.
+---
 
-- The "Count of Anomalous Metrics" chart shows raw counts of anomalous metrics per node so may often be similar to the Anomaly Rate chart, apart from where nodes may have different numbers of metrics.
+## How Anomaly Advisor Works
 
-- The "Anomaly Events Detected" chart shows whether the anomaly rate per node has increased enough to cause a node-level anomaly. Anomaly events will appear slightly after the anomaly rate starts to increase in the timeline, this is because a significant number of metrics in the node need to be anomalous before an anomaly event is triggered.
+The Anomaly Advisor leverages Netdata’s machine learning to evaluate anomaly rates across your nodes. It provides three key visualizations:
 
-Once you have highlighted a window of interest, you should see an ordered list of charts, with the Anomaly Rate being displayed as a purple ribbon in the chart.
+| Chart Name                     | Purpose                                                           | Why It Matters                                                 |
+|--------------------------------|-------------------------------------------------------------------|----------------------------------------------------------------|
+| **Anomaly Rate**               | Shows the percentage of anomalous metrics over time per node.     | Helps you quickly spot nodes behaving abnormally.              |
+| **Count of Anomalous Metrics** | Displays raw counts of anomalous metrics per node.                | Useful when nodes have different numbers of collected metrics. |
+| **Anomaly Events Detected**    | Indicates when the anomaly rate has triggered a node-level event. | Focuses your attention on meaningful spikes, not just noise.   |
 
-> **Tip**
->
-> You can also use the [node filter](/docs/dashboards-and-charts/node-filter.md) to select which nodes you want to include or exclude.
+:::note
 
-The right side of the page displays an anomaly index for the highlighted timeline of interest. The index is sorted from most anomalous (highest level of anomaly) to least (lowest level of anomaly). Clicking on an entry in the index will get you to the corresponding chart for the anomalous metric.
+**Anomaly Events Detected** appear slightly after anomaly rates rise, as they require a significant portion of metrics on the node to show anomalous behavior.
+
+:::
+
+---
+
+## Workflow Overview
+
+1. **Highlight a timeframe of interest** on the anomaly charts.
+2. An ordered list of related charts appears, ranked by anomaly level.
+3. The **Anomaly Rate ribbon** (purple) is visible on each chart.
+4. Use the right-hand anomaly index to sort metrics from most to least anomalous.
+5. Click an entry in the index to navigate directly to the corresponding chart.
+
+:::tip
+
+Use the [node filter](/docs/dashboards-and-charts/node-filter.md) to focus on specific nodes before highlighting a timeframe.
+
+:::
+
+---
 
 ## Usage Tips
 
-- If you are interested in a subset of specific nodes, then filtering to just those nodes before highlighting is recommended to get better results. When you highlight a timeframe, Netdata will ask the Agents for a ranking across all metrics, so if there is a subset of nodes, there will be less "averaging" going on, and you'll get a less noisy ranking.
-- Ideally, try and highlight close to a spike or window of interest so that the resulting ranking can narrow-in more easily on the timeline you are interested in.
+| Tip                                           | Why It Matters                                                   |
+|-----------------------------------------------|------------------------------------------------------------------|
+| Filter to specific nodes before highlighting. | Reduces noise by limiting averaging across unrelated nodes.      |
+| Highlight close to the anomaly spike.         | Improves ranking accuracy by focusing on the relevant timeframe. |
+
+---
+
+## Anomaly Advisor Diagram
+
+```mermaid
+graph TD
+    A[Highlight **Timeframe**] --> B[**Rank** Metrics by Score]
+    B --> C[Show Ordered Charts]
+    C --> D[**Pick** from Anomaly Index]
+    D --> E[**Investigate** Metrics]
+```
+
+:::tip
+
+This diagram shows the Anomaly Advisor flow: highlight, rank, and explore. Use the ranking to prioritize which charts to investigate.
+
+:::
