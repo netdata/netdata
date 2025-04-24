@@ -544,6 +544,7 @@ ml_dimension_deserialize_kmeans(const char *json_str)
     ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
     if (!Dim) {
         pulse_ml_models_ignored();
+        json_object_put(root);
         return true;
     }
 
