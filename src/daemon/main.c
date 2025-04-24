@@ -1108,6 +1108,7 @@ int netdata_main(int argc, char **argv) {
 
     cleanup_agent_event_log();
     netdata_ready = true;
+    maintenance_initialize();
 
     // ----------------------------------------------------------------------------------------------------------------
 

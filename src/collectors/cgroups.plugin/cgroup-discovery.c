@@ -1325,7 +1325,9 @@ void cgroup_discovery_worker(void *ptr)
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
+        maintenance_disable();
         discovery_find_all_cgroups();
+        maintenance_enable();
     }
 
     // free all cgroups

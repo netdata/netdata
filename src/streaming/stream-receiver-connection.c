@@ -308,7 +308,6 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
         }
 #endif
     }
-
     return true;
 }
 
@@ -700,6 +699,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     // read the configuration for this receiver
     stream_conf_receiver_config(rpt, &rpt->config, rpt->key, rpt->machine_guid);
 
+    maintenance_disable();
     if(stream_receiver_send_first_response(rpt)) {
         // we are the receiver of the node
 
@@ -722,6 +722,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         // the child has been notified (or we couldn't send a message to it)
         stream_receiver_free(rpt);
     }
+    maintenance_enable();
 
     return HTTP_RESP_OK;
 }
