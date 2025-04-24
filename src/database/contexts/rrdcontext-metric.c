@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "internal.h"
+#include "rrdcontext-internal.h"
 
 void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
 
@@ -300,7 +300,7 @@ inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
     if(unlikely(!rm)) return;
 
-    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED|RRDDIM_FLAG_OBSOLETE))) {
+    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
         if(unlikely(rrd_flag_is_collected(rm)))
             rrdmetric_set_archived(rm);
     }

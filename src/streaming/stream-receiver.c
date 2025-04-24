@@ -1125,8 +1125,6 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         __atomic_store_n(&rpt->exit.shutdown, false, __ATOMIC_RELEASE);
         host->stream.rcv.status.last_connected = now_realtime_sec();
         host->stream.rcv.status.last_disconnected = 0;
-        host->stream.rcv.status.last_chart = 0;
-        host->stream.rcv.status.check_obsolete = true;
 
         if (rpt->config.health.enabled != CONFIG_BOOLEAN_NO) {
             if (rpt->config.health.delay > 0) {
@@ -1206,7 +1204,6 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
             host->stream.rcv.status.reason = rpt->exit.reason;
             rpt->exit.reason = 0;
             __atomic_store_n(&rpt->exit.shutdown, false, __ATOMIC_RELEASE);
-            host->stream.rcv.status.check_obsolete = false;
             host->stream.rcv.status.last_connected = 0;
             host->stream.rcv.status.last_disconnected = now_realtime_sec();
             host->health.enabled = false;
