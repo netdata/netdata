@@ -1,19 +1,23 @@
 module github.com/netdata/netdata/otel-collector/exporter/netdataexporter
 
-go 1.24.2
+go 1.23.4
 
 require (
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/collector/component v1.30.0
 	go.opentelemetry.io/collector/component/componenttest v0.124.0
 	go.opentelemetry.io/collector/confmap v1.30.0
+	go.opentelemetry.io/collector/consumer v1.30.0
 	go.opentelemetry.io/collector/exporter v0.124.0
 	go.opentelemetry.io/collector/exporter/exportertest v0.124.0
+	go.opentelemetry.io/collector/exporter/xexporter v0.124.0
 	go.opentelemetry.io/collector/pdata v1.30.0
 	go.uber.org/goleak v1.3.0
+	go.uber.org/zap v1.27.0
 )
 
 require (
+	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -31,11 +35,12 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	go.opentelemetry.io/collector/consumer v1.30.0 // indirect
+	go.opentelemetry.io/collector/config/configretry v1.30.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror v0.124.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumertest v0.124.0 // indirect
 	go.opentelemetry.io/collector/consumer/xconsumer v0.124.0 // indirect
-	go.opentelemetry.io/collector/exporter/xexporter v0.124.0 // indirect
+	go.opentelemetry.io/collector/extension v1.30.0 // indirect
+	go.opentelemetry.io/collector/extension/xextension v0.124.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.30.0 // indirect
 	go.opentelemetry.io/collector/internal/telemetry v0.124.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.124.0 // indirect
@@ -51,7 +56,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/net v0.37.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
