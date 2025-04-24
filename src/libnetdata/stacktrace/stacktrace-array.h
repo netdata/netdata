@@ -8,7 +8,7 @@
 
 // Default maximum number of stacktraces to track per array
 #ifndef STACKTRACE_ARRAY_MAX_TRACES
-#define STACKTRACE_ARRAY_MAX_TRACES 20
+#define STACKTRACE_ARRAY_MAX_TRACES 100
 #endif
 
 // Structure to track multiple stacktraces
