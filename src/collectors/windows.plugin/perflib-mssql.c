@@ -1406,6 +1406,9 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, c
 
 static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_log_flushes) {
@@ -1441,6 +1444,9 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, cons
 
 static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_log_flushed) {
@@ -1476,6 +1482,9 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, cons
 
 static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_transactions) {
@@ -1514,6 +1523,9 @@ static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *
 
 static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_write_transactions) {
@@ -1634,7 +1646,6 @@ static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, con
 
 int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
-    /*
     struct mssql_db_instance *mli = value;
     const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
@@ -1656,7 +1667,6 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     for (i = 0; transaction_chart[i]; i++) {
         transaction_chart[i](mli, db, *update_every);
     }
-     */
 
     return 1;
 }
