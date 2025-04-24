@@ -103,7 +103,7 @@ on each database you wish to monitor.
 
 ```tsql
 DECLARE @dbname NVARCHAR(max)
-DECLARE nd_user_cursor CURSOR FOR SELECT name FROM master.dbo.sysdatabases
+DECLARE nd_user_cursor CURSOR FOR SELECT name FROM master.dbo.sysdatabases WHERE name NOT IN ('master', 'tempdb')
 
 OPEN nd_user_cursor
 FETCH NEXT FROM nd_user_cursor INTO @dbname WHILE @@FETCH_STATUS = 0
