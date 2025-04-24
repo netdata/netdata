@@ -1,6 +1,6 @@
 module github.com/netdata/netdata/go/plugins
 
-go 1.23.4
+go 1.24.0
 
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
