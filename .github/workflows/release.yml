@@ -43,9 +43,45 @@ jobs:
               ${{ github.event.inputs.type }} \
               ${{ github.event.inputs.version }} \
               ${{ secrets.NETDATA_RELEASE_TEST }}
-      - name: Generate Nightly Changleog
-        id: nightly-changelog
+      - name: Generate Nightly Changleog (attempt 1)
+        id: nightly-changelog1
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly'
+        continue-on-error: true
+        uses: heinrichreimer/github-changelog-generator-action@v2.4
+        with:
+          bugLabels: IGNOREBUGS
+          excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
+          issues: false
+          sinceTag: v1.10.0
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          unreleasedLabel: "**Next release**"
+          verbose: true
+          maxIssues: 500
+      - name: Delay Retry
+        id: delay1
+        if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly' && steps.nightly-changelog1.outcome == 'failure'
+        run: sleep 300
+      - name: Generate Nightly Changleog (attempt 2)
+        id: nightly-changelog2
+        if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly' && steps.nightly-changelog1.outcome == 'failure'
+        continue-on-error: true
+        uses: heinrichreimer/github-changelog-generator-action@v2.4
+        with:
+          bugLabels: IGNOREBUGS
+          excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
+          issues: false
+          sinceTag: v1.10.0
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          unreleasedLabel: "**Next release**"
+          verbose: true
+          maxIssues: 500
+      - name: Delay Retry
+        id: delay2
+        if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly' && steps.nightly-changelog2.outcome == 'failure'
+        run: sleep 300
+      - name: Generate Nightly Changleog (attempt 3)
+        id: nightly-changelog3
+        if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly' && steps.nightly-changelog2.outcome == 'failure'
         uses: heinrichreimer/github-changelog-generator-action@v2.4
         with:
           bugLabels: IGNOREBUGS
@@ -102,7 +138,9 @@ jobs:
               ${{ github.repository }}: Failed to prepare changelog.
               Checkout: ${{ steps.checkout.outcome }}
               Prepare base ref: ${{ steps.target.outcome }}
-              Generate nightly changelog: ${{ steps.nightly-changelog.outcome }}
+              Generate nightly changelog (attempt 1): ${{ steps.nightly-changelog1.outcome }}
+              Generate nightly changelog (attempt 2): ${{ steps.nightly-changelog2.outcome }}
+              Generate nightly changelog (attempt 3): ${{ steps.nightly-changelog3.outcome }}
               Generate release changelog: ${{ steps.release-changelog.outcome }}
               Commit changes: ${{ steps.commit.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
