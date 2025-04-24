@@ -219,17 +219,19 @@ static char *netdata_MSSQL_type_text(uint32_t type)
 }
 
 // Connection and SQL
-static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_mssql_odbc_errors step)
+static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_mssql_odbc_errors step, char *instance)
 {
     SQLCHAR state[1024];
     SQLCHAR message[1024];
     if (SQL_SUCCESS == SQLGetDiagRec((short)type, handle, 1, state, NULL, message, 1024, NULL)) {
         char *str_step = netdata_MSSQL_error_text(step);
         char *str_type = netdata_MSSQL_type_text(type);
+        char *use_instance = (!instance) ? "no instance": instance;
         nd_log(
             NDLS_COLLECTORS,
             NDLP_INFO,
-            "MSSQL server error using the handle %s running %s :  %s, %s",
+            "MSSQL server error on %s using the handle %s running %s :  %s, %s",
+            use_instance,
             str_type,
             str_step,
             message,
@@ -237,7 +239,7 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_ms
     }
 }
 
-static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask, const char *dbname)
+static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask, const char *dbname, char *instance)
 {
     long db_size = 0;
     SQLLEN col_data_len = 0;
@@ -249,20 +251,20 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 
     ret = SQLExecDirect(stmt, query, SQL_NTS);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_QUERY);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_QUERY, instance);
         return (ULONGLONG)ULONG_LONG_MAX;
     }
 
     ret = SQLBindCol(stmt, 1, SQL_C_LONG, &db_size, sizeof(long), &col_data_len);
 
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_PREPARE);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_PREPARE, instance);
         return (ULONGLONG)ULONG_LONG_MAX;
     }
 
     ret = SQLFetch(stmt);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_FETCH);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_FETCH, instance);
         return (ULONGLONG)ULONG_LONG_MAX;
     }
 
@@ -307,20 +309,23 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn.dbTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY);
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
         goto endtransactions;
     }
 
     ret = SQLBindCol(
         mdi->parent->conn.dbTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endtransactions;
     }
 
     ret = SQLBindCol(mdi->parent->conn.dbTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endtransactions;
     }
 
@@ -337,22 +342,22 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
 
         // We cannot use strcmp, because buffer is filled with spaces instead NULL.
         if (!strncmp(
-            object_name,
-            NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC,
-            sizeof(NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC) - 1))
+                object_name,
+                NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC,
+                sizeof(NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC) - 1))
             mdi->MSSQLDatabaseActiveTransactions.current.Data = (ULONGLONG)value;
         else if (!strncmp(
-            object_name,
-            NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC,
-            sizeof(NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC) - 1))
+                     object_name,
+                     NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC,
+                     sizeof(NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC) - 1))
             mdi->MSSQLDatabaseTransactions.current.Data = (ULONGLONG)value;
         else if (!strncmp(
-            object_name,
-            NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC,
-            sizeof(NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC) - 1))
+                     object_name,
+                     NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC,
+                     sizeof(NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC) - 1))
             mdi->MSSQLDatabaseWriteTransactions.current.Data = (ULONGLONG)value;
         else if (!strncmp(
-            object_name, NETDATA_MSSQL_BACKUP_RESTORE_METRIC, sizeof(NETDATA_MSSQL_BACKUP_RESTORE_METRIC) - 1))
+                     object_name, NETDATA_MSSQL_BACKUP_RESTORE_METRIC, sizeof(NETDATA_MSSQL_BACKUP_RESTORE_METRIC) - 1))
             mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = (ULONGLONG)value;
         else if (!strncmp(object_name, NETDATA_MSSQL_LOG_FLUSHED_METRIC, sizeof(NETDATA_MSSQL_LOG_FLUSHED_METRIC) - 1))
             mdi->MSSQLDatabaseLogFlushed.current.Data = (ULONGLONG)value;
@@ -360,7 +365,7 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
             mdi->MSSQLDatabaseLogFlushes.current.Data = (ULONGLONG)value;
     } while (true);
 
-    endtransactions:
+endtransactions:
     if (ret != SQL_NO_DATA)
         mdi->collect_data = false;
 
@@ -375,7 +380,7 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     // We failed to collect this for the database, so we are not going to try again
     if (mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)
         mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
-            mdi->parent->conn.dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname);
+            mdi->parent->conn.dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname, mdi->parent->instanceID);
 
     dict_mssql_fill_transactions(mdi, dbname);
 
@@ -399,20 +404,21 @@ long metdata_mssql_check_permission(struct mssql_instance *mi)
 
     ret = SQLExecDirect(mi->conn.checkPermSTMT, (SQLCHAR *)NETDATA_QUERY_CHECK_PERM, SQL_NTS);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_QUERY);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto endperm;
     }
 
     ret = SQLBindCol(mi->conn.checkPermSTMT, 1, SQL_C_LONG, &perm, sizeof(perm), &col_data_len);
 
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endperm;
     }
 
     ret = SQLFetch(mi->conn.checkPermSTMT);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_FETCH);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_FETCH, mi->instanceID);
         return (ULONGLONG)ULONG_LONG_MAX;
     }
 
@@ -437,14 +443,16 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 
     ret = SQLExecDirect(mi->conn.databaseListSTMT, (SQLCHAR *)NETDATA_QUERY_LIST_DB, SQL_NTS);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseListSTMT, NETDATA_MSSQL_ODBC_QUERY);
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mi->conn.databaseListSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto enddblist;
     }
 
     ret = SQLBindCol(mi->conn.databaseListSTMT, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_data_len);
 
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseListSTMT, NETDATA_MSSQL_ODBC_PREPARE);
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mi->conn.databaseListSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddblist;
     }
 
@@ -507,7 +515,7 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
         case SQL_INVALID_HANDLE:
         case SQL_ERROR:
         default:
-            netdata_MSSQL_error(SQL_HANDLE_DBC, nmc->netdataSQLHDBc, NETDATA_MSSQL_ODBC_CONNECT);
+            netdata_MSSQL_error(SQL_HANDLE_DBC, nmc->netdataSQLHDBc, NETDATA_MSSQL_ODBC_CONNECT, NULL);
             retConn = FALSE;
             break;
         case SQL_SUCCESS:
