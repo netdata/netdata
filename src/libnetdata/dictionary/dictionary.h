@@ -289,14 +289,22 @@ typedef DICTFE_CONST struct dictionary_foreach {
 #define dfe_start_write(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_WRITE)
 #define dfe_start_reentrant(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_REENTRANT)
 
-#define dfe_start_rw(dict, value, mode)                                                             \
+#define dfe_start_rw(dictionary, ptr, mode)                                                         \
         do {                                                                                        \
             /* automatically cleanup DFE, to allow using return from within the loop */             \
-            DICTFE _cleanup_(dictionary_foreach_done) value ## _dfe = {};                           \
-            (void)(value); /* needed to avoid warning when looping without using this */            \
-            for((value) = dictionary_foreach_start_rw(&value ## _dfe, (dict), (mode));              \
-                (value ## _dfe.item) || (value) ;                                                   \
-                (value) = dictionary_foreach_next(&value ## _dfe))                                  \
+            DICTFE _cleanup_(dictionary_foreach_done) ptr ## _dfe = (DICTFE){                       \
+                .dict = (dictionary),                                                               \
+                .item = NULL,                                                                       \
+                .name = NULL,                                                                       \
+                .value = NULL,                                                                      \
+                .counter = 0,                                                                       \
+                .rw = (mode),                                                                       \
+                .locked = false,                                                                    \
+            };                                                                                      \
+            (void)(ptr); /* needed to avoid warning when looping without using this */              \
+            for((ptr) = dictionary_foreach_start_rw(&ptr ## _dfe);                                  \
+                (ptr ## _dfe.item) || (ptr) ;                                                       \
+                (ptr) = dictionary_foreach_next(&ptr ## _dfe))                                      \
             {
 
 #define dfe_done(value)                                                                             \
@@ -305,7 +313,7 @@ typedef DICTFE_CONST struct dictionary_foreach {
 
 #define dfe_unlock(value) dictionary_foreach_unlock(&value ## _dfe)
 
-void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw);
+void *dictionary_foreach_start_rw(DICTFE *dfe);
 void *dictionary_foreach_next(DICTFE *dfe);
 void  dictionary_foreach_done(DICTFE *dfe);
 void  dictionary_foreach_unlock(DICTFE *dfe);
