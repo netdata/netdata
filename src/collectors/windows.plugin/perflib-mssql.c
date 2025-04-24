@@ -150,6 +150,8 @@ struct mssql_lock_instance {
 struct mssql_db_instance {
     struct mssql_instance *parent;
 
+    bool collect_data;
+
     RRDSET *st_db_data_file_size;
     RRDSET *st_db_active_transactions;
     RRDSET *st_db_backup_restore_operations;
@@ -292,6 +294,9 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
     long value;
     SQLLEN col_object_len = 0, col_value_len = 0;
 
+    if (!mdi->collect_data)
+        return;
+
     SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
     snprintfz(
         (char *)query,
@@ -321,37 +326,44 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
 
     do {
         ret = SQLFetch(mdi->parent->conn.dbTransactionSTMT);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
-            goto endtransactions;
+        switch (ret) {
+            case SQL_SUCCESS:
+            case SQL_SUCCESS_WITH_INFO:
+                break;
+            case SQL_NO_DATA:
+            default:
+                goto endtransactions;
         }
 
         // We cannot use strcmp, because buffer is filled with spaces instead NULL.
         if (!strncmp(
-                object_name,
-                NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC,
-                sizeof(NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC) - 1))
+            object_name,
+            NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC,
+            sizeof(NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC) - 1))
             mdi->MSSQLDatabaseActiveTransactions.current.Data = (ULONGLONG)value;
         else if (!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC,
-                     sizeof(NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC) - 1))
+            object_name,
+            NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC,
+            sizeof(NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC) - 1))
             mdi->MSSQLDatabaseTransactions.current.Data = (ULONGLONG)value;
         else if (!strncmp(
-                     object_name,
-                     NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC,
-                     sizeof(NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC) - 1))
+            object_name,
+            NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC,
+            sizeof(NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC) - 1))
             mdi->MSSQLDatabaseWriteTransactions.current.Data = (ULONGLONG)value;
         else if (!strncmp(
-                     object_name, NETDATA_MSSQL_BACKUP_RESTORE_METRIC, sizeof(NETDATA_MSSQL_BACKUP_RESTORE_METRIC) - 1))
+            object_name, NETDATA_MSSQL_BACKUP_RESTORE_METRIC, sizeof(NETDATA_MSSQL_BACKUP_RESTORE_METRIC) - 1))
             mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = (ULONGLONG)value;
         else if (!strncmp(object_name, NETDATA_MSSQL_LOG_FLUSHED_METRIC, sizeof(NETDATA_MSSQL_LOG_FLUSHED_METRIC) - 1))
             mdi->MSSQLDatabaseLogFlushed.current.Data = (ULONGLONG)value;
         else if (!strncmp(object_name, NETDATA_MSSQL_LOG_FLUSHES_METRIC, sizeof(NETDATA_MSSQL_LOG_FLUSHES_METRIC) - 1))
             mdi->MSSQLDatabaseLogFlushes.current.Data = (ULONGLONG)value;
-
     } while (true);
 
-endtransactions:
+    endtransactions:
+    if (ret != SQL_NO_DATA)
+        mdi->collect_data = false;
+
     SQLFreeStmt(mdi->parent->conn.dbTransactionSTMT, SQL_CLOSE);
 }
 
@@ -366,11 +378,6 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
             mdi->parent->conn.dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname);
 
     dict_mssql_fill_transactions(mdi, dbname);
-    /*
-    if (mdi->MSSQLDatabaseActiveTransactions.current.Data != ULONG_LONG_MAX)
-        mdi->MSSQLDatabaseActiveTransactions.current.Data = netdata_MSSQL_fill_long_value(
-            mdi->parent->conn.dbTransactionSTMT, NETDATA_QUERY_TRANSACTIONS_MASK, dbname);
-            */
 
     return 0;
 }
@@ -622,10 +629,7 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
 {
     struct mssql_db_instance *mdi = value;
 
-    mdi->MSSQLDatabaseLogFlushed.key = "Log Bytes Flushed/sec";
-    mdi->MSSQLDatabaseLogFlushes.key = "Log Flushes/sec";
-    mdi->MSSQLDatabaseTransactions.key = "Transactions/sec";
-    mdi->MSSQLDatabaseWriteTransactions.key = "Write Transactions/sec";
+    mdi->collect_data = true;
 }
 
 // Options
@@ -1357,8 +1361,7 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) ||
-        mli->MSSQLDatabaseBackupRestoreOperations.current.Data == ULONG_LONG_MAX)
+    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1431,9 +1434,7 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, cons
     }
 
     rrddim_set_by_pointer(
-        mli->st_db_log_flushes,
-        mli->rd_db_log_flushes,
-        (collected_number)mli->MSSQLDatabaseLogFlushes.current.Data);
+        mli->st_db_log_flushes, mli->rd_db_log_flushes, (collected_number)mli->MSSQLDatabaseLogFlushes.current.Data);
 
     rrdset_done(mli->st_db_log_flushes);
 }
@@ -1468,9 +1469,7 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, cons
     }
 
     rrddim_set_by_pointer(
-        mli->st_db_log_flushed,
-        mli->rd_db_log_flushed,
-        (collected_number)mli->MSSQLDatabaseLogFlushed.current.Data);
+        mli->st_db_log_flushed, mli->rd_db_log_flushed, (collected_number)mli->MSSQLDatabaseLogFlushed.current.Data);
 
     rrdset_done(mli->st_db_log_flushed);
 }
@@ -1554,8 +1553,7 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const 
 
 static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) ||
-        mli->MSSQLDatabaseActiveTransactions.current.Data == ULONG_LONG_MAX)
+    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1597,7 +1595,7 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || mli->MSSQLDatabaseDataFileSize.current.Data == ULONG_LONG_MAX)
+    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1636,6 +1634,7 @@ static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, con
 
 int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
+    /*
     struct mssql_db_instance *mli = value;
     const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
@@ -1657,6 +1656,7 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     for (i = 0; transaction_chart[i]; i++) {
         transaction_chart[i](mli, db, *update_every);
     }
+     */
 
     return 1;
 }
@@ -1827,14 +1827,7 @@ int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *
 {
     struct mssql_db_instance *mdi = value;
 
-    mdi->MSSQLDatabaseActiveTransactions.current.Data = ULONG_LONG_MAX;
-    // Backup is set as zero, instead ULONG_LONG_MAX, because its collection has direct relationship with available data
-    mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = 0;
-    mdi->MSSQLDatabaseDataFileSize.current.Data = ULONG_LONG_MAX;
-    mdi->MSSQLDatabaseLogFlushed.current.Data = ULONG_LONG_MAX;
-    mdi->MSSQLDatabaseLogFlushes.current.Data = ULONG_LONG_MAX;
-    mdi->MSSQLDatabaseTransactions.current.Data = ULONG_LONG_MAX;
-    mdi->MSSQLDatabaseWriteTransactions.current.Data = ULONG_LONG_MAX;
+    mdi->collect_data = false;
 }
 
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1844,7 +1837,6 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     int *update_every = data;
 
     if (mi->conn.is_connected && have_perm) {
-        dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_reset_value, NULL);
         have_perm = metdata_mssql_check_permission(mi);
         if (!have_perm) {
             nd_log(
