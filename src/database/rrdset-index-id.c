@@ -63,6 +63,8 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     RRDHOST *host = ctr->host;
     RRDSET *st = rrdset;
 
+    spinlock_init(&st->destroy_lock);
+
     const char *chart_full_id = dictionary_acquired_item_name(item);
 
     st->id = string_strdupz(chart_full_id);
@@ -180,6 +182,9 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     freez(st->exporting_flags);
 
+    if(st->destroy_lock.locked)
+        spinlock_unlock(&st->destroy_lock);
+
     memset(st, 0, sizeof(RRDSET));
 }
 
@@ -191,8 +196,6 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
 
     struct rrdset_constructor *ctr = constructor_data;
     RRDSET *st = rrdset;
-
-    rrdset_isnot_obsolete___safe_from_collector_thread(st);
 
     ctr->react_action = RRDSET_REACT_NONE;
 
@@ -275,6 +278,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDSET *st = rrdset;
     RRDHOST *host = st->rrdhost;
 
+    st->collector_tid = gettid_cached();
     st->last_accessed_time_s = now_realtime_sec();
 
     if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
@@ -390,9 +394,6 @@ RRDSET *rrdset_create_custom(
     RRD_DB_MODE memory_mode
     , long history_entries
 ) {
-    if (host != localhost)
-        host->stream.rcv.status.last_chart = now_realtime_sec();
-
     if(!type || !type[0])
         fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
               , (id && *id)?id:"<unset>"
@@ -428,25 +429,47 @@ RRDSET *rrdset_create_custom(
 
     netdata_log_debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
-    struct rrdset_constructor ctr = {
-        .host = host,
-        .type = type,
-        .id = id,
-        .name = name,
-        .family = family,
-        .context = context,
-        .title = title,
-        .units = units,
-        .plugin = plugin,
-        .module = module,
-        .priority = priority,
-        .update_every = update_every,
-        .chart_type = chart_type,
-        .memory_mode = memory_mode,
-        .history_entries = history_entries,
-    };
+    struct rrdset_constructor ctr;
 
-    RRDSET *st = rrdset_index_add(host, chart_full_id, &ctr);
+    RRDSET *st = NULL;
+    while(!st) {
+        st = rrdset_index_find(host, chart_full_id);
+        if(st) {
+            if(spinlock_trylock(&st->destroy_lock)) {
+                rrdset_isnot_obsolete___safe_from_collector_thread(st);
+                spinlock_unlock(&st->destroy_lock);
+            }
+            else {
+#ifdef FSANITIZE_ADDRESS
+                fprintf(stderr, "rrdset_create_custom() - chart '%s' of host '%s' is being deleted but we need it. Retrying...\n",
+                        chart_full_id, rrdhost_hostname(host));
+#endif
+                st = NULL;
+                microsleep(1 * USEC_PER_MS);
+                continue;
+            }
+        }
+
+        ctr = (struct rrdset_constructor){
+            .host = host,
+            .type = type,
+            .id = id,
+            .name = name,
+            .family = family,
+            .context = context,
+            .title = title,
+            .units = units,
+            .plugin = plugin,
+            .module = module,
+            .priority = priority,
+            .update_every = update_every,
+            .chart_type = chart_type,
+            .memory_mode = memory_mode,
+            .history_entries = history_entries,
+        };
+
+        st = rrdset_index_add(host, chart_full_id, &ctr);
+    }
 
     bool name_updated = false;
     if(!st->name) {

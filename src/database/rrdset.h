@@ -111,9 +111,11 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // operational state members
 
-    RRDSET_FLAGS flags;                             // flags
     RRD_DB_MODE rrd_memory_mode;                    // the db mode of this rrdset
     uint16_t collection_modulo;                     // tier1/2 spread over time
+    RRDSET_FLAGS flags;                             // flags
+
+    pid_t collector_tid;
 
     DICTIONARY *rrddim_root_index;                  // dimensions index
 
@@ -223,6 +225,8 @@ struct rrdset {
         time_t before;
     } replay;
 #endif // NETDATA_LOG_REPLICATION_REQUESTS
+
+    SPINLOCK destroy_lock;
 };
 
 // --------------------------------------------------------------------------------------------------------------------

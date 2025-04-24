@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "internal.h"
+#include "rrdcontext-internal.h"
 
 #define QUERY_TARGET_MAX_REALLOC_INCREASE 500
 #define query_target_realloc_size(size, start) \
@@ -1128,7 +1128,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
         // single host query
         qt->versions.contexts_hard_hash = dictionary_version(host->rrdctx.contexts);
-        qt->versions.contexts_soft_hash = dictionary_version(host->rrdctx.hub_queue);
+        qt->versions.contexts_soft_hash = rrdcontext_queue_version(&host->rrdctx.hub_queue);
         qt->versions.alerts_hard_hash = dictionary_version(host->rrdcalc_root_index);
         qt->versions.alerts_soft_hash = __atomic_load_n(&host->health_transitions, __ATOMIC_RELAXED);
         query_node_add(&qtl, host, true);

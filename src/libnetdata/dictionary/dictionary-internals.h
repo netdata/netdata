@@ -247,6 +247,8 @@ static inline void pointer_del(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM 
 extern ARAL *dict_items_aral;
 extern ARAL *dict_shared_items_aral;
 
+size_t dictionary_destroy_delayed_count(void);
+
 #include "dictionary-debug.h"
 #include "dictionary-statistics.h"
 #include "dictionary-locks.h"

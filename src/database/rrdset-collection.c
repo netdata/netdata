@@ -81,10 +81,8 @@ static void rrdset_collection_reset(RRDSET *st) {
         rd->collector.last_collected_time.tv_usec = 0;
         rd->collector.counter = 0;
 
-        if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++)
-                storage_engine_store_flush(rd->tiers[tier].sch);
-        }
+        for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++)
+            storage_engine_store_flush(rd->tiers[tier].sch);
     }
     rrddim_foreach_done(rd);
 }
@@ -542,7 +540,11 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     if (unlikely(rrdset_flags & RRDSET_FLAG_OBSOLETE)) {
         netdata_log_error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
+        if(!spinlock_trylock(&st->destroy_lock))
+            fatal("RRDSET: chart '%s' of host '%s' is being collected while is being destroyed.", rrdset_id(st), rrdhost_hostname(st->rrdhost));
+
         rrdset_isnot_obsolete___safe_from_collector_thread(st);
+        spinlock_unlock(&st->destroy_lock);
     }
 
     // check if the chart has a long time to be updated
@@ -653,13 +655,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
         rda = &rda_base[dimensions++];
 
-        if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            rda->item = NULL;
-            rda->rd = NULL;
-            rda->reset_or_overflow = false;
-            continue;
-        }
-
         // store the dimension in the array
         rda->item = dictionary_acquired_item_dup(st->rrddim_root_index, rd_dfe.item);
         rda->rd = dictionary_acquired_item_value(rda->item);
@@ -686,9 +681,13 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             last_collected_total += rd->collector.last_collected_value;
             collected_total += rd->collector.collected_value;
 
-            if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED))) {
+            if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
                 netdata_log_error("Dimension %s in chart '%s' has the OBSOLETE or ARCHIVED flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
+                if(!spinlock_trylock(&rd->destroy_lock))
+                    fatal("RRDSET: dimension '%s' of chart '%s' of host '%s' is being collected while is being destroyed.", rrddim_id(rd), rrdset_id(st), rrdhost_hostname(st->rrdhost));
+
                 rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
+                spinlock_unlock(&rd->destroy_lock);
             }
         }
     }

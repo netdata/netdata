@@ -483,10 +483,7 @@ static inline void metric_update_counters_and_obsoletion(STATSD_METRIC *m) {
     m->events++;
     m->count++;
     m->last_collected = now_realtime_sec();
-    if (m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE))) {
-        rrdset_isnot_obsolete___safe_from_collector_thread(m->st);
-        m->options &= ~STATSD_METRIC_OPTION_OBSOLETE;
-    }
+    m->options &= ~STATSD_METRIC_OPTION_OBSOLETE;
 }
 
 static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
@@ -1637,8 +1634,8 @@ static inline RRDSET *statsd_private_rrdset_create(
 static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
     netdata_log_debug(D_STATSD, "updating private chart for gauge metric '%s'", m->name);
 
-    if(m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE)))
-       return;
+    if(m->options & STATSD_METRIC_OPTION_OBSOLETE)
+        return;
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1680,7 +1677,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
 static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const char *dim, const char *family) {
     netdata_log_debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
-    if(m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE)))
+    if(m->options & STATSD_METRIC_OPTION_OBSOLETE)
        return;
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
@@ -1723,8 +1720,8 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
 static inline void statsd_private_chart_set(STATSD_METRIC *m) {
     netdata_log_debug(D_STATSD, "updating private chart for set metric '%s'", m->name);
 
-    if(m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE)))
-       return;
+    if(m->options & STATSD_METRIC_OPTION_OBSOLETE)
+        return;
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1766,8 +1763,8 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
 static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
     netdata_log_debug(D_STATSD, "updating private chart for dictionary metric '%s'", m->name);
 
-    if(m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE)))
-       return;
+    if(m->options & STATSD_METRIC_OPTION_OBSOLETE)
+        return;
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1812,8 +1809,8 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
 static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
     netdata_log_debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
-    if(m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE)))
-       return;
+    if(m->options & STATSD_METRIC_OPTION_OBSOLETE)
+        return;
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1868,11 +1865,16 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
 // statsd flush metrics
 
 static inline void metric_check_obsoletion(STATSD_METRIC *m) {
-    if(statsd.set_obsolete_after &&
-       !rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE) &&
-       m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED &&
-       m->last_collected + (time_t)statsd.set_obsolete_after < now_realtime_sec()) {
-        rrdset_is_obsolete___safe_from_collector_thread(m->st);
+    if(!(m->options & STATSD_METRIC_OPTION_OBSOLETE) &&
+        statsd.set_obsolete_after &&
+        (m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED) &&
+        m->last_collected + (time_t)statsd.set_obsolete_after < now_realtime_sec()) {
+
+        if(m->st) {
+            rrdset_is_obsolete___safe_from_collector_thread(m->st);
+            m->st = NULL;
+        }
+
         m->options |= STATSD_METRIC_OPTION_OBSOLETE;
     }
 }
@@ -2365,7 +2367,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
     }
     dfe_done(m);
 
-    // flush all the useful metrics
+    // flush all the unuseful metrics
     STATSD_METRIC *m_prev;
     for(m_prev = m = index->first_useful; m ; m = m->next_useful) {
         flush_metric(m);

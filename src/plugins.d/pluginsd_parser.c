@@ -382,10 +382,8 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
             else
                 rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
         }
-        else {
-            rrdset_isnot_obsolete___safe_from_collector_thread(st);
+        else
             rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
-        }
 
         if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_CHART))
             return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -735,8 +733,13 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2))
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
+        if(!spinlock_trylock(&st->destroy_lock))
+            fatal("PLUGINSD: chart '%s' of host '%s' is being collected while is being destroyed.", rrdset_id(st), rrdhost_hostname(st->rrdhost));
+
         rrdset_isnot_obsolete___safe_from_collector_thread(st);
+        spinlock_unlock(&st->destroy_lock);
+    }
 
     timing_step(TIMING_STEP_BEGIN2_FIND_CHART);
 
@@ -876,8 +879,13 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
 
     st->pluginsd.set = true;
 
-    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED)))
+    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
+        if(!spinlock_trylock(&rd->destroy_lock))
+            fatal("PLUGINSD: dimension '%s' of chart '%s' is being collected while is being destroyed.", rrddim_id(rd), rrdset_id(st));
+
         rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
+        spinlock_unlock(&rd->destroy_lock);
+    }
 
     timing_step(TIMING_STEP_SET2_LOOKUP_DIMENSION);
 
@@ -1229,6 +1237,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     }
     else
         cd->serial_failures++;
+
+    // mark all charts of this plugin as obsolete
+    RRDSET *st;
+    rrdset_foreach_read(st, localhost) {
+        if(st->collector_tid == gettid_cached())
+            rrdset_is_obsolete___safe_from_collector_thread(st);
+    }
+    rrdset_foreach_done(st);
 
     pluginsd_process_cleanup(parser);
     rrd_collector_finished();

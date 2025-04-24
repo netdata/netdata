@@ -1591,15 +1591,15 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/api_v2_contexts_alerts.h
         src/database/contexts/api_v2_contexts_alert_transitions.c
         src/database/contexts/api_v2_contexts_alert_config.c
-        src/database/contexts/context.c
-        src/database/contexts/instance.c
-        src/database/contexts/internal.h
-        src/database/contexts/metric.c
+        src/database/contexts/rrdcontext-context.c
+        src/database/contexts/rrdcontext-instance.c
+        src/database/contexts/rrdcontext-internal.h
+        src/database/contexts/rrdcontext-metric.c
         src/database/contexts/query_scope.c
         src/database/contexts/query_target.c
         src/database/contexts/rrdcontext.c
         src/database/contexts/rrdcontext.h
-        src/database/contexts/worker.c
+        src/database/contexts/rrdcontext-worker.c
         src/database/rrdcollector.c
         src/database/rrdcollector.h
         src/database/rrddim.c
@@ -1651,7 +1651,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrd-database-mode.c
         src/database/rrdhost-system-info.c
         src/database/rrdhost-system-info.h
-        src/database/contexts/contexts-loading.c
+        src/database/contexts/rrdcontext-loading.c
         src/database/rrdset-index-id.c
         src/database/rrdset-index-id.h
         src/database/rrdset-index-name.c
@@ -1681,6 +1681,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdhost-collection.h
         src/database/pattern-array.c
         src/database/pattern-array.h
+        src/database/contexts/rrdcontext-queues.c
 )
 
 if(ENABLE_DBENGINE)
@@ -2127,7 +2128,7 @@ set(ACLK_FILES
         src/aclk/schema-wrappers/context_stream.cc
         src/aclk/schema-wrappers/context_stream.h
         src/aclk/schema-wrappers/context.cc
-        src/aclk/schema-wrappers/context.h
+        src/aclk/schema-wrappers/rrdcontext-context.h
         src/aclk/schema-wrappers/schema_wrappers.h
         src/aclk/schema-wrappers/schema_wrapper_utils.cc
         src/aclk/schema-wrappers/schema_wrapper_utils.h

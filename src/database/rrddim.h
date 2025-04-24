@@ -36,11 +36,10 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
 
-    RRDDIM_FLAG_ARCHIVED                        = (1 << 1),
-    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 2),  // Metadata needs to go to the database
+    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 1),  // Metadata needs to go to the database
 
-    RRDDIM_FLAG_META_HIDDEN                     = (1 << 3),  // Status of hidden option in the metadata database
-    RRDDIM_FLAG_ML_MODEL_LOAD                   = (1 << 4),  // Do ML LOAD for this dimension
+    RRDDIM_FLAG_META_HIDDEN                     = (1 << 2),  // Status of hidden option in the metadata database
+    RRDDIM_FLAG_ML_MODEL_LOAD                   = (1 << 3),  // Do ML LOAD for this dimension
 
     // this is 8 bit
 } RRDDIM_FLAGS;
@@ -61,9 +60,10 @@ struct rrddim {
     STRING *name;                                   // the name of this dimension (as presented to user)
 
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
-    RRD_DB_MODE rrd_memory_mode;                // the memory mode for this dimension
+    RRD_DB_MODE rrd_memory_mode;                    // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // run time changing status flags
 
+    SPINLOCK destroy_lock;
     int32_t multiplier;                             // the multiplier of the collected values
     int32_t divisor;                                // the divider of the collected values
 

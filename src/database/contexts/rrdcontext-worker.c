@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "internal.h"
+#include "rrdcontext-internal.h"
 
 static struct {
     bool enabled;
@@ -14,16 +14,7 @@ static struct {
     .active_vs_archived_percentage = 50,
 };
 
-static void rrdcontext_dequeue_from_hub_queue(RRDCONTEXT *rc);
-
 static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
-
-static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused);
-
-static void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
-
-static void rrdcontext_dequeue_from_post_processing(RRDCONTEXT *rc);
-static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
 
 static void rrdcontext_garbage_collect_for_all_hosts(void);
 
@@ -260,7 +251,7 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
     return true;
 }
 
-static inline bool rrdcontext_should_be_deleted(RRDCONTEXT *rc) {
+bool rrdcontext_should_be_deleted(RRDCONTEXT *rc) {
     if(likely(!rrd_flag_check(rc, RRD_FLAGS_REQUIRED_FOR_DELETIONS)))
         return false;
 
@@ -620,7 +611,7 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count,
     return false;
 }
 
-static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs) {
+bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs) {
     bool ret = false;
 
     if(reason != RRD_FLAG_NONE)
@@ -804,11 +795,10 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
         }
     }
 
-    if(unlikely(rrd_flag_is_updated(rc) && rc->rrdhost->rrdctx.hub_queue)) {
+    if(unlikely(rrd_flag_is_updated(rc))) {
         if(check_if_cloud_version_changed_unsafe(rc, false)) {
             rc->version = rrdcontext_get_next_version(rc);
-            dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx.hub_queue,
-                           string2str(rc->id), rc, sizeof(*rc));
+            rrdcontext_add_to_hub_queue(rc);
         }
     }
 
@@ -819,8 +809,6 @@ static bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 }
 
 void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function __maybe_unused, RRD_FLAGS flags __maybe_unused) {
-    if(unlikely(!rc->rrdhost->rrdctx.pp_queue)) return;
-
 #if 0
     if(string_strcmp(rc->id, "system.cpu") == 0) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -837,15 +825,7 @@ void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function _
     }
 #endif
 
-    dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx.pp_queue,
-                   string2str(rc->id),
-                   rc,
-                   sizeof(*rc));
-}
-
-static void rrdcontext_dequeue_from_post_processing(RRDCONTEXT *rc) {
-    if(unlikely(!rc->rrdhost->rrdctx.pp_queue)) return;
-    dictionary_del(rc->rrdhost->rrdctx.pp_queue, string2str(rc->id));
+    rrdcontext_add_to_pp_queue(rc);
 }
 
 void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc) {
@@ -854,22 +834,9 @@ void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc) {
 }
 
 void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc) {
-    rrdcontext_dequeue_from_hub_queue(rc);
+    rrdcontext_del_from_hub_queue(rc, false);
     rrdcontext_dequeue_from_post_processing(rc);
     dictionary_del(host->rrdctx.contexts, string2str(rc->id));
-}
-
-static void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
-    if(unlikely(!host->rrdctx.pp_queue)) return;
-
-    RRDCONTEXT *rc;
-    dfe_start_reentrant(host->rrdctx.pp_queue, rc) {
-                if(unlikely(!service_running(SERVICE_CONTEXT))) break;
-
-                rrdcontext_dequeue_from_post_processing(rc);
-                rrdcontext_post_process_updates(rc, false, RRD_FLAG_NONE, true);
-            }
-    dfe_done(rc);
 }
 
 // ----------------------------------------------------------------------------
@@ -933,7 +900,7 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
     }
 }
 
-static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused) {
+bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused) {
     bool id_changed = false,
             title_changed = false,
             units_changed = false,
@@ -1004,7 +971,7 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending _
     return false;
 }
 
-static inline usec_t rrdcontext_calculate_queued_dispatch_time_ut(RRDCONTEXT *rc, usec_t now_ut) {
+usec_t rrdcontext_calculate_queued_dispatch_time_ut(RRDCONTEXT *rc, usec_t now_ut) {
 
     if(likely(rc->queue.delay_calc_ut >= rc->queue.queued_ut))
         return rc->queue.scheduled_dispatch_ut;
@@ -1029,102 +996,6 @@ static inline usec_t rrdcontext_calculate_queued_dispatch_time_ut(RRDCONTEXT *rc
     rc->queue.delay_calc_ut = now_ut;
     usec_t dispatch_ut = rc->queue.scheduled_dispatch_ut = rc->queue.queued_ut + delay;
     return dispatch_ut;
-}
-
-static void rrdcontext_dequeue_from_hub_queue(RRDCONTEXT *rc) {
-    dictionary_del(rc->rrdhost->rrdctx.hub_queue, string2str(rc->id));
-}
-
-static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
-
-    // check if we have received a streaming command for this host
-    if(UUIDiszero(host->node_id) || !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_online_for_contexts() || !host->rrdctx.hub_queue)
-        return;
-
-    // check if there are queued items to send
-    if(!dictionary_entries(host->rrdctx.hub_queue))
-        return;
-
-    size_t messages_added = 0;
-    contexts_updated_t bundle = NULL;
-
-    RRDCONTEXT *rc;
-    dfe_start_reentrant(host->rrdctx.hub_queue, rc) {
-                if(unlikely(!service_running(SERVICE_CONTEXT))) break;
-
-                if(unlikely(messages_added >= MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST))
-                    break;
-
-                worker_is_busy(WORKER_JOB_QUEUED);
-                usec_t dispatch_ut = rrdcontext_calculate_queued_dispatch_time_ut(rc, now_ut);
-                CLAIM_ID claim_id = claim_id_get();
-
-                if(unlikely(now_ut >= dispatch_ut) && claim_id_is_set(claim_id)) {
-                    worker_is_busy(WORKER_JOB_CHECK);
-
-                    rrdcontext_lock(rc);
-
-                    if(check_if_cloud_version_changed_unsafe(rc, true)) {
-                        worker_is_busy(WORKER_JOB_SEND);
-
-                        if(!bundle) {
-                            // prepare the bundle to send the messages
-                            char uuid_str[UUID_STR_LEN];
-                            uuid_unparse_lower(host->node_id.uuid, uuid_str);
-
-                            bundle = contexts_updated_new(claim_id.str, uuid_str, 0, now_ut);
-                        }
-                        // update the hub data of the context, give a new version, pack the message
-                        // and save an update to SQL
-                        rrdcontext_message_send_unsafe(rc, false, bundle);
-                        messages_added++;
-
-                        rc->queue.dispatches++;
-                        rc->queue.dequeued_ut = now_ut;
-                    }
-                    else
-                        rc->version = rc->hub.version;
-
-                    // remove it from the queue
-                    worker_is_busy(WORKER_JOB_DEQUEUE);
-                    rrdcontext_dequeue_from_hub_queue(rc);
-
-                    if(unlikely(rrdcontext_should_be_deleted(rc))) {
-                        // this is a deleted context - delete it forever...
-
-                        worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
-
-                        rrdcontext_dequeue_from_post_processing(rc);
-                        rrdcontext_delete_from_sql_unsafe(rc);
-
-                        STRING *id = string_dup(rc->id);
-                        rrdcontext_unlock(rc);
-
-                        // delete it from the master dictionary
-                        if(!dictionary_del(host->rrdctx.contexts, string2str(rc->id)))
-                            netdata_log_error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
-                                              string2str(id), rrdhost_hostname(host));
-
-                        string_freez(id);
-                    }
-                    else
-                        rrdcontext_unlock(rc);
-                }
-            }
-    dfe_done(rc);
-
-    if(service_running(SERVICE_CONTEXT) && bundle) {
-        // we have a bundle to send messages
-
-        // update the version hash
-        contexts_updated_update_version_hash(bundle, rrdcontext_version_hash(host));
-
-        // send it
-        aclk_send_contexts_updated(bundle);
-    }
-    else if(bundle)
-        contexts_updated_delete(bundle);
-
 }
 
 // ----------------------------------------------------------------------------
@@ -1209,17 +1080,11 @@ void *rrdcontext_main(void *ptr) {
 
             worker_is_busy(WORKER_JOB_HOSTS);
 
-            if(host->rrdctx.pp_queue) {
-                pp_queued_contexts_for_all_hosts += dictionary_entries(host->rrdctx.pp_queue);
-                rrdcontext_post_process_queued_contexts(host);
-                dictionary_garbage_collect(host->rrdctx.pp_queue);
-            }
+            pp_queued_contexts_for_all_hosts += rrdcontext_queue_entries(&host->rrdctx.pp_queue);
+            rrdcontext_post_process_queued_contexts(host);
 
-            if(host->rrdctx.hub_queue) {
-                hub_queued_contexts_for_all_hosts += dictionary_entries(host->rrdctx.hub_queue);
-                rrdcontext_dispatch_queued_contexts_to_hub(host, now_ut);
-                dictionary_garbage_collect(host->rrdctx.hub_queue);
-            }
+            hub_queued_contexts_for_all_hosts += rrdcontext_queue_entries(&host->rrdctx.hub_queue);
+            rrdcontext_dispatch_queued_contexts_to_hub(host, now_ut);
 
             if (host->rrdctx.contexts)
                 dictionary_garbage_collect(host->rrdctx.contexts);

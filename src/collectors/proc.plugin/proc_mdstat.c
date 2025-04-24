@@ -408,8 +408,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 NETDATA_CHART_PRIO_MDSTAT_HEALTH,
                 update_every,
                 RRDSET_TYPE_LINE);
-
-            rrdset_isnot_obsolete___safe_from_collector_thread(st_mdstat_health);
         }
 
         if (!redundant_num) {
@@ -457,8 +455,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         update_every,
                         RRDSET_TYPE_STACKED);
 
-                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_disks);
-
                     add_labels_to_mdstat(raid, raid->st_disks);
                 }
 
@@ -492,8 +488,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         update_every,
                         RRDSET_TYPE_LINE);
 
-                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_mismatch_cnt);
-
                     add_labels_to_mdstat(raid, raid->st_mismatch_cnt);
                 }
 
@@ -523,8 +517,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         NETDATA_CHART_PRIO_MDSTAT_OPERATION + raid_idx * 10,
                         update_every,
                         RRDSET_TYPE_LINE);
-
-                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_operation);
 
                     add_labels_to_mdstat(raid, raid->st_operation);
                 }
@@ -561,8 +553,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         NETDATA_CHART_PRIO_MDSTAT_FINISH + raid_idx * 10,
                         update_every, RRDSET_TYPE_LINE);
 
-                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_finish);
-
                     add_labels_to_mdstat(raid, raid->st_finish);
                 }
 
@@ -589,8 +579,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         NETDATA_CHART_PRIO_MDSTAT_SPEED + raid_idx * 10,
                         update_every,
                         RRDSET_TYPE_LINE);
-
-                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_speed);
 
                     add_labels_to_mdstat(raid, raid->st_speed);
                 }
@@ -621,8 +609,6 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         NETDATA_CHART_PRIO_MDSTAT_NONREDUNDANT + raid_idx * 10,
                         update_every,
                         RRDSET_TYPE_LINE);
-
-                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_nonredundant);
 
                     add_labels_to_mdstat(raid, raid->st_nonredundant);
                 }
