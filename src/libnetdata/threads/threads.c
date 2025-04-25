@@ -449,7 +449,7 @@ int nd_thread_join(ND_THREAD *nti) {
 
         spinlock_lock(&threads_globals.exited.spinlock);
         if(nti->prev)
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
         spinlock_unlock(&threads_globals.exited.spinlock);
 
         freez(nti);
