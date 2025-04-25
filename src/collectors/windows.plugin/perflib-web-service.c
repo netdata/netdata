@@ -639,7 +639,6 @@ static inline void netdata_webservice_requests(
     struct web_service *p,
     int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsOptions) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsGet) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsPost) &&
@@ -656,6 +655,7 @@ static inline void netdata_webservice_requests(
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsLock) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsUnlock) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsOther)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         if (!p->st_request_rate) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_requests_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
