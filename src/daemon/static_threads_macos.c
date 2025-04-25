@@ -2,10 +2,16 @@
 
 #include "common.h"
 
+#include <AvailabilityMacros.h>
+
 void *macos_main(void *ptr);
-void *timex_main(void *ptr);
+
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
+    void *timex_main(void *ptr);
+#endif
 
 static const struct netdata_static_thread static_threads_macos[] = {
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
     {
         .name = "P[timex]",
         .config_section = CONFIG_SECTION_PLUGINS,
@@ -15,6 +21,7 @@ static const struct netdata_static_thread static_threads_macos[] = {
         .init_routine = NULL,
         .start_routine = timex_main
     },
+#endif
     {
         .name = "P[macos]",
         .config_section = CONFIG_SECTION_PLUGINS,

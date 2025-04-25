@@ -136,6 +136,7 @@ bool apps_os_get_pid_cmdline_macos(struct pid_stat *p, char *cmdline, size_t max
     return true;
 }
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 110000
 bool apps_os_read_pid_io_macos(struct pid_stat *p, void *ptr) {
     struct pid_info *pi = ptr;
 
@@ -146,6 +147,11 @@ bool apps_os_read_pid_io_macos(struct pid_stat *p, void *ptr) {
 
     return true;
 }
+#else
+bool apps_os_read_pid_io_macos(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+    return false;
+}
+#endif
 
 bool apps_os_read_pid_limits_macos(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
     return false;
@@ -319,11 +325,13 @@ bool apps_os_collect_all_pids_macos(void) {
             continue;
         }
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 110000
         st = proc_pid_rusage(pid, RUSAGE_INFO_V4, (rusage_info_t *)&pi.rusageinfo);
         if (st < 0) {
             netdata_log_error("Failed to get resource usage info for PID %d", pid);
             continue;
         }
+#endif
 
         incrementally_collect_data_for_pid(pid, &pi);
     }

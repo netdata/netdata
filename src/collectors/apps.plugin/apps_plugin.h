@@ -47,12 +47,15 @@
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
 #include <mach/mach_time.h> // For mach_timebase_info_data_t and mach_timebase_info
+#include <AvailabilityMacros.h>
 
 struct pid_info {
     struct kinfo_proc proc;
     struct proc_taskinfo taskinfo;
     struct proc_bsdinfo bsdinfo;
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 110000
     struct rusage_info_v4 rusageinfo;
+#endif
 };
 
 #define OS_INIT_PID                          1
