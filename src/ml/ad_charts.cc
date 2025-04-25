@@ -260,55 +260,55 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
     }
 
     /*
-     * Type anomaly rate
+     * Context anomaly rate
     */
     {
-        if (!host->type_anomaly_rate_rs) {
+        if (!host->context_anomaly_rate_rs) {
             char id_buf[1024];
             char name_buf[1024];
 
-            snprintfz(id_buf, 1024, "type_anomaly_rate_on_%s", localhost->machine_guid);
-            snprintfz(name_buf, 1024, "type_anomaly_rate_on_%s", rrdhost_hostname(localhost));
+            snprintfz(id_buf, 1024, "context_anomaly_rate_on_%s", localhost->machine_guid);
+            snprintfz(name_buf, 1024, "context_anomaly_rate_on_%s", rrdhost_hostname(localhost));
 
-            host->type_anomaly_rate_rs = rrdset_create(
+            host->context_anomaly_rate_rs = rrdset_create(
                     host->rh,
-                    "anomaly_detection", // type
-                    id_buf, // id
-                    name_buf, // name
-                    "anomaly_rate", // family
-                    "anomaly_detection.type_anomaly_rate", // ctx
-                    "Percentage of anomalous dimensions by type", // title
-                    "percentage", // units
-                    NETDATA_ML_PLUGIN, // plugin
-                    NETDATA_ML_MODULE_DETECTION, // module
-                    ML_CHART_PRIO_TYPE_ANOMALY_RATE, // priority
-                    localhost->rrd_update_every, // update_every
-                    RRDSET_TYPE_STACKED // chart_type
+                    "anomaly_detection",
+                    id_buf,
+                    name_buf,
+                    "anomaly_rate",
+                    "anomaly_detection.context_anomaly_rate",
+                    "Percentage of anomalous dimensions by context",
+                    "percentage",
+                    NETDATA_ML_PLUGIN,
+                    NETDATA_ML_MODULE_DETECTION,
+                    ML_CHART_PRIO_CONTEXT_ANOMALY_RATE,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED
             );
 
-            rrdset_flag_set(host->type_anomaly_rate_rs, RRDSET_FLAG_ANOMALY_DETECTION);
+            rrdset_flag_set(host->context_anomaly_rate_rs, RRDSET_FLAG_ANOMALY_DETECTION);
         }
 
-        spinlock_lock(&host->type_anomaly_rate_spinlock);
-        for (auto &entry : host->type_anomaly_rate) {
-            ml_type_anomaly_rate_t &type_anomaly_rate = entry.second;
+        spinlock_lock(&host->context_anomaly_rate_spinlock);
+        for (auto &entry : host->context_anomaly_rate) {
+            ml_context_anomaly_rate_t &context_anomaly_rate = entry.second;
 
-            if (!type_anomaly_rate.rd)
-                type_anomaly_rate.rd = rrddim_add(host->type_anomaly_rate_rs, string2str(entry.first), NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+            if (!context_anomaly_rate.rd)
+                context_anomaly_rate.rd = rrddim_add(host->context_anomaly_rate_rs, string2str(entry.first), NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
             double ar = 0.0;
-            size_t n = type_anomaly_rate.anomalous_dimensions + type_anomaly_rate.normal_dimensions;
+            size_t n = context_anomaly_rate.anomalous_dimensions + context_anomaly_rate.normal_dimensions;
             if (n)
-                ar = static_cast<double>(type_anomaly_rate.anomalous_dimensions) / n;
+                ar = static_cast<double>(context_anomaly_rate.anomalous_dimensions) / n;
 
-            rrddim_set_by_pointer(host->type_anomaly_rate_rs, type_anomaly_rate.rd, ar * 10000.0);
+            rrddim_set_by_pointer(host->context_anomaly_rate_rs, context_anomaly_rate.rd, ar * 10000.0);
 
-            type_anomaly_rate.anomalous_dimensions = 0;
-            type_anomaly_rate.normal_dimensions = 0;
+            context_anomaly_rate.anomalous_dimensions = 0;
+            context_anomaly_rate.normal_dimensions = 0;
         }
-        spinlock_unlock(&host->type_anomaly_rate_spinlock);
+        spinlock_unlock(&host->context_anomaly_rate_spinlock);
 
-        rrdset_done(host->type_anomaly_rate_rs);
+        rrdset_done(host->context_anomaly_rate_rs);
     }
 
     /*

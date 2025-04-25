@@ -48,7 +48,7 @@ void ml_host_new(RRDHOST *rh)
     host->queue = Cfg.workers[times_called++ % Cfg.num_worker_threads].queue;
 
     netdata_mutex_init(&host->mutex);
-    spinlock_init(&host->type_anomaly_rate_spinlock);
+    spinlock_init(&host->context_anomaly_rate_spinlock);
 
     host->ml_running = false;
     rh->ml_host = (rrd_ml_host_t *) host;
