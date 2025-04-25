@@ -235,6 +235,7 @@ static inline void netdata_webservice_traffic(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISReceivedBytesTotal) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISSentBytesTotal)) {
         if (!p->st_traffic) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_traffic", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_traffic = rrdset_create_localhost(
@@ -273,6 +274,7 @@ static inline void netdata_webservice_file_transfer_rate(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesReceivedTotal) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesSentTotal)) {
         if (!p->st_file_transfer) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_ftp_file_transfer_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_file_transfer = rrdset_create_localhost(
@@ -311,6 +313,7 @@ static inline void netdata_webservice_active_connection(
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentConnections)) {
         if (!p->st_curr_connections) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_active_connections_count", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_curr_connections = rrdset_create_localhost(
@@ -346,6 +349,7 @@ static inline void netdata_webservice_connection_attemp_rate(
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISConnAttemptsAllInstancesTotal)) {
         if (!p->st_connections_attemps) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_connection_attempts_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_connections_attemps = rrdset_create_localhost(
@@ -386,6 +390,7 @@ static inline void netdata_webservice_user_count(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentAnonymousUser) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentNonAnonymousUsers)) {
         if (!p->st_user_count) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_users_count", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_user_count = rrdset_create_localhost(
@@ -426,6 +431,7 @@ static inline void netdata_webservice_isapi_extension_request_count(
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentISAPIExtRequests)) {
         if (!p->st_isapi_extension_request_count) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_isapi_extension_requests_count", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_isapi_extension_request_count = rrdset_create_localhost(
@@ -466,6 +472,7 @@ static inline void netdata_webservice_isapi_extension_request_rate(
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISIPAPIExtRequestsTotal)) {
         if (!p->st_isapi_extension_request_rate) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_isapi_extension_requests_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_isapi_extension_request_rate = rrdset_create_localhost(
@@ -507,6 +514,7 @@ static inline void netdata_webservice_errors_rate(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISLockedErrorsTotal) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISNotFoundErrorsTotal)) {
         if (!p->st_error_rate) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_errors_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_error_rate = rrdset_create_localhost(
@@ -549,6 +557,7 @@ static inline void netdata_webservice_logon_attemp_rate(
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISLogonAttemptsTotal)) {
         if (!p->st_logon_attemps) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_logon_attempts_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_logon_attemps = rrdset_create_localhost(
@@ -585,6 +594,7 @@ static inline void netdata_webservice_uptime(
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISUptime)) {
         if (!p->st_service_uptime) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_uptime", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_service_uptime = rrdset_create_localhost(
@@ -635,6 +645,7 @@ static inline void netdata_webservice_requests(
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsUnlock) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsOther)) {
         if (!p->st_request_rate) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_requests_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_request_rate = rrdset_create_localhost(
@@ -766,7 +777,6 @@ static inline void netdata_webservice_requests(
 
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Web Service");
     if (!pObjectType)
         return false;
