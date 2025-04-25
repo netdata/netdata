@@ -342,6 +342,46 @@ static inline void netdata_webservice_active_connection(
     }
 }
 
+static inline void netdata_webservice_connection_attemp_rate(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_INSTANCE_DEFINITION *pi,
+    struct web_service *p,
+    int update_every)
+{
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISConnAttemptsAllInstancesTotal)) {
+        if (!p->st_connections_attemps) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_connection_attempts_rate", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_connections_attemps = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "connections",
+                "iis.website_connection_attempts_rate",
+                "Website connections attempts",
+                "attempts/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_CONNECTIONS_ATTEMP,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_connections_attemps =
+                rrddim_add(p->st_connections_attemps, "connection", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(
+                p->st_connections_attemps->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_connections_attemps,
+            p->rd_connections_attemps,
+            (collected_number)p->IISCurrentConnections.current.Data);
+
+        rrdset_done(p->st_connections_attemps);
+    }
+}
+
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -368,39 +408,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
         netdata_webservice_traffic(pDataBlock, pi, p, update_every);
         netdata_webservice_file_transfer_rate(pDataBlock, pi, p, update_every);
         netdata_webservice_active_connection(pDataBlock, pi, p, update_every);
-
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISConnAttemptsAllInstancesTotal)) {
-            if (!p->st_connections_attemps) {
-                snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_connection_attempts_rate", windows_shared_buffer);
-                netdata_fix_chart_name(id);
-                p->st_connections_attemps = rrdset_create_localhost(
-                    "iis",
-                    id,
-                    NULL,
-                    "connections",
-                    "iis.website_connection_attempts_rate",
-                    "Website connections attempts",
-                    "attempts/s",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibWebService",
-                    PRIO_WEBSITE_IIS_CONNECTIONS_ATTEMP,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-                p->rd_connections_attemps =
-                    rrddim_add(p->st_connections_attemps, "connection", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-                rrdlabels_add(
-                    p->st_connections_attemps->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            }
-
-            rrddim_set_by_pointer(
-                p->st_connections_attemps,
-                p->rd_connections_attemps,
-                (collected_number)p->IISCurrentConnections.current.Data);
-
-            rrdset_done(p->st_connections_attemps);
-        }
+        netdata_webservice_connection_attemp_rate(pDataBlock, pi, p, update_every);
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentAnonymousUser) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentNonAnonymousUsers)) {
