@@ -264,6 +264,46 @@ static inline void netdata_webservice_traffic(
     }
 }
 
+static inline void netdata_webservice_file_transfer_rate(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_INSTANCE_DEFINITION *pi,
+    struct web_service *p,
+    int update_every)
+{
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesReceivedTotal) &&
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesSentTotal)) {
+        if (!p->st_file_transfer) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_ftp_file_transfer_rate", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_file_transfer = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "traffic",
+                "iis.website_ftp_file_transfer_rate",
+                "Website FTP file transfer rate",
+                "files/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_FTP_FILE_TRANSFER_RATE,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_files_received =
+                rrddim_add(p->st_file_transfer, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_files_sent = rrddim_add(p->st_file_transfer, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_file_transfer->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_file_transfer, p->rd_files_received, (collected_number)p->IISFilesReceivedTotal.current.Data);
+        rrddim_set_by_pointer(
+            p->st_file_transfer, p->rd_files_sent, (collected_number)p->IISFilesSentTotal.current.Data);
+
+        rrdset_done(p->st_file_transfer);
+    }
+}
+
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -288,39 +328,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
         struct web_service *p = dictionary_set(web_services, windows_shared_buffer, NULL, sizeof(*p));
 
         netdata_webservice_traffic(pDataBlock, pi, p, update_every);
-
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesReceivedTotal) &&
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesSentTotal)) {
-            if (!p->st_file_transfer) {
-                snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_ftp_file_transfer_rate", windows_shared_buffer);
-                netdata_fix_chart_name(id);
-                p->st_file_transfer = rrdset_create_localhost(
-                    "iis",
-                    id,
-                    NULL,
-                    "traffic",
-                    "iis.website_ftp_file_transfer_rate",
-                    "Website FTP file transfer rate",
-                    "files/s",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibWebService",
-                    PRIO_WEBSITE_IIS_FTP_FILE_TRANSFER_RATE,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-                p->rd_files_received =
-                    rrddim_add(p->st_file_transfer, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_files_sent = rrddim_add(p->st_file_transfer, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrdlabels_add(p->st_file_transfer->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            }
-
-            rrddim_set_by_pointer(
-                p->st_file_transfer, p->rd_files_received, (collected_number)p->IISFilesReceivedTotal.current.Data);
-            rrddim_set_by_pointer(
-                p->st_file_transfer, p->rd_files_sent, (collected_number)p->IISFilesSentTotal.current.Data);
-
-            rrdset_done(p->st_file_transfer);
-        }
+        netdata_webservice_file_transfer_rate(pDataBlock, pi, p, update_every);
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentConnections)) {
             if (!p->st_curr_connections) {
