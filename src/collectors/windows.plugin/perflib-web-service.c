@@ -228,6 +228,7 @@ static void initialize(void)
 
 static inline void netdata_webservice_traffic(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
@@ -267,6 +268,7 @@ static inline void netdata_webservice_traffic(
 
 static inline void netdata_webservice_file_transfer_rate(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
@@ -307,6 +309,7 @@ static inline void netdata_webservice_file_transfer_rate(
 
 static inline void netdata_webservice_active_connection(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
@@ -343,6 +346,7 @@ static inline void netdata_webservice_active_connection(
 
 static inline void netdata_webservice_connection_attemp_rate(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
@@ -383,6 +387,7 @@ static inline void netdata_webservice_connection_attemp_rate(
 
 static inline void netdata_webservice_user_count(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
@@ -425,6 +430,7 @@ static inline void netdata_webservice_user_count(
 
 static inline void netdata_webservice_isapi_extension_request_count(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
@@ -466,6 +472,7 @@ static inline void netdata_webservice_isapi_extension_request_count(
 
 static inline void netdata_webservice_isapi_extension_request_rate(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
@@ -507,6 +514,7 @@ static inline void netdata_webservice_isapi_extension_request_rate(
 
 static inline void netdata_webservice_errors_rate(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
@@ -551,6 +559,7 @@ static inline void netdata_webservice_errors_rate(
 
 static inline void netdata_webservice_logon_attemp_rate(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
@@ -588,6 +597,7 @@ static inline void netdata_webservice_logon_attemp_rate(
 
 static inline void netdata_webservice_uptime(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
@@ -624,10 +634,12 @@ static inline void netdata_webservice_uptime(
 
 static inline void netdata_webservice_requests(
     PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
     struct web_service *p,
     int update_every)
 {
+    char id[RRD_ID_LENGTH_MAX + 1];
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsOptions) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsGet) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsPost) &&
@@ -645,7 +657,6 @@ static inline void netdata_webservice_requests(
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsUnlock) &&
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsOther)) {
         if (!p->st_request_rate) {
-            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_requests_rate", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_request_rate = rrdset_create_localhost(
@@ -797,17 +808,17 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         struct web_service *p = dictionary_set(web_services, windows_shared_buffer, NULL, sizeof(*p));
 
-        netdata_webservice_traffic(pDataBlock, pi, p, update_every);
-        netdata_webservice_file_transfer_rate(pDataBlock, pi, p, update_every);
-        netdata_webservice_active_connection(pDataBlock, pi, p, update_every);
-        netdata_webservice_connection_attemp_rate(pDataBlock, pi, p, update_every);
-        netdata_webservice_user_count(pDataBlock, pi, p, update_every);
-        netdata_webservice_isapi_extension_request_count(pDataBlock, pi, p, update_every);
-        netdata_webservice_isapi_extension_request_rate(pDataBlock, pi, p, update_every);
-        netdata_webservice_errors_rate(pDataBlock, pi, p, update_every);
-        netdata_webservice_logon_attemp_rate(pDataBlock, pi, p, update_every);
-        netdata_webservice_uptime(pDataBlock, pi, p, update_every);
-        netdata_webservice_requests(pDataBlock, pi, p, update_every);
+        netdata_webservice_traffic(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_file_transfer_rate(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_active_connection(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_connection_attemp_rate(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_user_count(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_isapi_extension_request_count(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_isapi_extension_request_rate(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_errors_rate(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_logon_attemp_rate(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_uptime(pDataBlock, pObjectType, pi, p, update_every);
+        netdata_webservice_requests(pDataBlock, pObjectType, pi, p, update_every);
     }
 
     return true;
