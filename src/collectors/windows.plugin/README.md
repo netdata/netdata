@@ -1,18 +1,16 @@
 # Windows.plugin
 
-This internal plugin is only available for Microsoft Windows operating systems.
+This internal plugin is exclusively available for Microsoft Windows operating systems.
 
-## The Collector
+## Overview
 
-This plugin primarily collects metrics from Microsoft Windows [Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new). All detected metrics are automatically displayed without requiring additional configuration.
-Most of the metrics collected by this plugin originate from Microsoft Windows
-[Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new).
+The Windows plugin primarily collects metrics from Microsoft Windows [Performance Counters](https://learn.microsoft.com/en-us/windows/win32/perfctrs/performance-counters-what-s-new). All detected metrics are automatically displayed in the Netdata dashboard without requiring additional configuration.
 
-These metrics are always displayed when detected, requiring no additional configuration.
+## Default Configuration
 
-By default, all collector threads are enabled except for `PerflibThermalZone` and `PerflibServices`. You can enable these or disable others by modifying options in the `[plugin:windows]` section of the configuration file.
+By default, all collector threads are enabled except for `PerflibThermalZone` and `PerflibServices`. You can enable these disabled collectors or disable any of the currently active ones by modifying the `[plugin:windows]` section in your configuration file.
 
-To change a setting, remove the comment symbol (`#`) from the beginning of the line and set the value to either `yes` or `no`:
+To change a setting, remove the comment symbol (`#`) from the beginning of the line and set the value to either `yes` or `no`.
 
 ```text
 [plugin:windows]
@@ -35,58 +33,55 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibADFS = yes
 ```
 
-## Configuration
+## Microsoft SQL Server Integration
 
-To collect certain metrics for [Microsoft SQL Server](https://www.microsoft.com/en-us/sql-server),
-Netdata needs access to internal server data. To collect this data, you need to configure both your server and Netdata.
+To collect metrics from [Microsoft SQL Server](https://www.microsoft.com/en-us/sql-server), Netdata needs access to internal server data. This requires configuration on both the Windows system and Netdata sides.
 
-### Windows Defender Firewall with Advanced Security
+## Configuring
 
-To connect to your SQL Server, Netdata uses TCP port 1433 (or any other configured port).
-This port is typically blocked by Windows Defender, so you must allow access before proceeding:
+### Step 1: Configure Windows Defender Firewall
 
-1. Open `Windows Defender Firewall with Advanced Security` as an Adminstrator.
-2. Right-click `Inbound Rules` and select `New Rule...`.
-3. Select `Port`, then click `Next`.
-4. Choose `TCP`, then enter `1433` in the `Specific local ports:`. Click `Next`.
-5. Select an appropriate action based on your network policy. For example, `Allow the connection`.
-   Click `Next`.
-6. Choose where the rule will be applied (Domain, Private, or Public).
-7. Finally, provide a `Name` and an optional `Description` for the new rule,
-   then click `Finish`.
+Netdata connects to SQL Server using TCP port 1433 (or your custom-configured port). You'll need to create a firewall rule to allow this connection:
 
-You can use the same rule to allow connections to other instances. To do this,
-specify the ports for each instance in the `Port` field separated by commas.
+1. Open `Windows Defender Firewall with Advanced Security` as an Administrator
+2. Right-click `Inbound Rules` and select `New Rule...`
+3. Select `Port`, then click `Next`
+4. Choose `TCP`, enter `1433` in the `Specific local ports:` field, then click `Next`
+5. Select an appropriate action (typically `Allow the connection`), then click `Next`
+6. Choose where the rule applies (Domain, Private, or Public networks), then click `Next`
+7. Provide a name and optional description for the rule, then click `Finish`
 
-### Microsoft SQL Server (Configuration)
+For multiple SQL Server instances, you can specify multiple ports in the same rule by separating them with commas.
 
-After enabling access through the firewall, you will need to configure your SQL Server instance to accept TCP
-connections:
+### Step 2: Configure SQL Server Network Settings
 
-1. Open `SQL Server Configuration Manager`.
-2. Expand `SQL Server Network Configuration`.
-3. In the console panel, select `Protocols for <instance name>.`.
-4. In the details panel, double-click the `TCP` protocol, and set `Yes` for `Enabled`.
-5. Go to the `IP Address` tab, locate the section labeled`IPAII`.
-   - Remove any value from the `TCP Dynamic Ports` field.
-   - Enter a value in the `TCP Port` field. By default, SQL Server uses `1433`.
-6. Finally, select `SQL Server Services`, and restart your SQL Server instance.
+Enable SQL Server to accept TCP connections:
 
-You need to apply this configuration to every instance.
+1. Open `SQL Server Configuration Manager`
+2. Expand `SQL Server Network Configuration`
+3. Select `Protocols for <instance name>` in the console panel
+4. Double-click the `TCP` protocol in the details panel and set `Enabled` to `Yes`
+5. Go to the `IP Address` tab and locate the `IPAII` section:
+    - Clear any value from the `TCP Dynamic Ports` field
+    - Enter a port number in the `TCP Port` field (default is `1433`)
+6. Select `SQL Server Services` and restart your SQL Server instance
 
-### Microsoft SQL Server (User)
+These steps must be performed for each SQL Server instance you want to monitor.
 
-If you want to allow connections using SQL Server authentication, you must modify the server configuration:
+### Step 3: Configure SQL Server Authentication
 
-1. Open `Microsoft Server Management Studio`.
-2. Right-click your server, and select `Properties`.
-3. In the left panel, select `Security`.
-4. Under `Server authentication`, choose `SQL Server and Windows Authentication mode`.
-5. Click `OK`.
-6. Finally, right-click your server, and select`Restart`.
+If you're using SQL Server authentication (rather than Windows authentication):
 
-After that, you need to create a user with the `VIEW SERVER STATE` permission to collect data from the server.
-Once the user is created, it must also be granted access to the databases.
+1. Open `Microsoft Server Management Studio`
+2. Right-click your server and select `Properties`
+3. Select `Security` in the left panel
+4. Choose `SQL Server and Windows Authentication mode` under `Server authentication`
+5. Click `OK`
+6. Right-click your server and select `Restart`
+
+### Step 4: Create a Monitoring User
+
+Create an SQL Server user with the necessary permissions to collect monitoring data:
 
 ```tsql
 USE master;
@@ -97,32 +92,33 @@ GRANT VIEW SERVER STATE TO netdata_user;
 GO
 ```
 
-In addition to creating the user, you must enable the
-[query store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16),
-on each database you wish to monitor.
+Additionally, enable the [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16) on each database you want to monitor:
 
 ```tsql
 DECLARE @dbname NVARCHAR(max)
-DECLARE nd_user_cursor CURSOR FOR SELECT name FROM master.dbo.sysdatabases WHERE name NOT IN ('master', 'tempdb')
+DECLARE nd_user_cursor CURSOR FOR SELECT name
+                                  FROM master.dbo.sysdatabases
+                                  WHERE name NOT IN ('master', 'tempdb')
 
 OPEN nd_user_cursor
-FETCH NEXT FROM nd_user_cursor INTO @dbname WHILE @@FETCH_STATUS = 0
-BEGIN
+FETCH NEXT FROM nd_user_cursor INTO @dbname
+WHILE @@FETCH_STATUS = 0
+    BEGIN
         EXECUTE ("USE "+ @dbname+"; CREATE USER netdata_user FOR LOGIN netdata_user; ALTER DATABASE "+@dbname+" SET QUERY_STORE = ON ( QUERY_CAPTURE_MODE = ALL, DATA_FLUSH_INTERVAL_SECONDS = 900 )");
         FETCH next FROM nd_user_cursor INTO @dbname;
-END
+    END
 CLOSE nd_user_cursor
 DEALLOCATE nd_user_cursor
 GO
 ```
 
-You need to apply this configuration to every instance.
+Apply this configuration to each SQL Server instance you wish to monitor.
 
-### Netdata Configuration
+### Step 5: Configure Netdata
 
-Now that the user has been created inside your server, update `netdata.conf` by adding the following section:
+Add the SQL Server connection details to your `netdata.conf` file:
 
-```text
+```
 [plugin:windows:PerflibMSSQL]
         driver = SQL Server
         server = 127.0.0.1\\Dev, 1433
@@ -133,79 +129,68 @@ Now that the user has been created inside your server, update `netdata.conf` by 
         #windows authentication = no
 ```
 
-In next table, we give a short description about them:
+Configuration options:
 
-| Option                   | Description                                                                       |
-|--------------------------|-----------------------------------------------------------------------------------|
-|`driver`                  | ODBC driver used to connect to the MSSQL server.                                  |
-|`server`                  | Server address or instance name to connect to.                                    |
-|`address`                 | Similar to `server`. You can also use named pipes if your server supports them.   |
-|`uid`                     | User identifier (`uid`) created on your server.                                   |
-|`pwd`                     | Password for the specified user.                                                  |
-|`additional instances`    | Number of additional MSSQL instances to monitor.                                  |
-|`windows authentications` | Use Windows credentials to connect to the MSSQL server.                           |
+| Option                   | Description                                                                  |
+|--------------------------|------------------------------------------------------------------------------|
+| `driver`                 | ODBC driver used to connect to the SQL Server                                |
+| `server`                 | Server address or instance name                                              |
+| `address`                | Alternative to `server`; supports named pipes if the server supports them    |
+| `uid`                    | SQL Server user identifier                                                   |
+| `pwd`                    | Password for the specified user                                              |
+| `additional instances`   | Number of additional SQL Server instances to monitor                         |
+| `windows authentication` | Set to `yes` to use Windows credentials instead of SQL Server authentication |
 
-For additional information on how to set these parameters, refer to the
-[Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16)
+For more information on connection parameters, see the [Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16).
 
-#### Additional Instance
+## Monitoring Multiple SQL Server Instances
 
-Microsoft SQL Server can host multiple instances. To connect to them, you need to create additional sections in your
-`netdata.conf` file, specifying their respective connection options.
+SQL Server can host multiple instances on the same machine. To monitor additional instances:
 
-Let’s suppose you have an additional instance named `Production`. To enable Netdata to monitor both the `Production`
-and `Dev` instances, you’ll need to add the following configuration section:
-
-```text
-[plugin:windows:PerflibMSSQL1]
+1. Update the main section to specify the number of additional instances:
+   ```text
+   [plugin:windows:PerflibMSSQL]
+        additional instances = 1
+   ```
+2. Add a new configuration section for each additional instance, using sequential numbering:
+   ```text
+   [plugin:windows:PerflibMSSQL1]
         driver = SQL Server
         server = 127.0.0.1\\Production, 1434
         uid = netdata_user
         pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2$
+   ```
+
+Each additional instance section must follow the naming pattern `plugin:windows:PerflibMSSQL` with a sequential number from 1 to 65535.
+
+## Troubleshooting Common Issues
+
+### Data source name is not found and no default driver
+
+This error occurs when the specified ODBC driver is incorrect. To check available drivers:
+
+1. Open `ODBC Data Sources`
+2. Go to the `Drivers` tab
+3. Look for the correct name of the `ODBC` or SQL `Server driver`
+
+### Database Metrics Not Visible
+
+If a database isn't appearing on the Netdata dashboard, statistics collection might not be enabled:
+
+1. Open `SQL Server Configuration Manager`
+2. Right-click the database and select `Properties`
+3. Select `Options` in the left pane
+4. Set `Auto Create Statistics` to `True`
+
+### Login Failed
+
+If authentication fails, check the SQL Server error log at:
+
+```
+C:\Program Files\Microsoft SQL Server\VERSION\MSSQL\Log\ERRORLOG
 ```
 
-You must also update the main section to indicate how many additional instances you want to monitor:
+Where `VERSION` corresponds to your SQL Server version.
 
-```text
-[plugin:windows:PerflibMSSQL]
-        additional instances = 1
-```
+You can also check Windows Event Viewer for entries beginning with `MSSQL server error using the handle`.
 
-Each additional instance section must follow the naming pattern `plugin:windows:PerflibMSSQL`, with a sequential number
-from 1 to 65535, based on the number of instances you want to monitor.
-
-### Errors
-
-When configuring Netdata to access SQL Server, some errors may occur. You can check your configuration using the
-Microsoft Event Viewer by looking for entries that begin with `MSSQL server error using the handle`.
-
-#### Data source name not found and no default driver
-
-This error occurs when the driver is not specified correctly. You can check the available drivers by following
-these steps:
-
-- Access `ODBC Data Sources`.
-- Go to `Drivers` tab.
-- Look for `Name` of the `ODBC` or `SQL Server` driver .
-
-#### Database Metrics Not Visible
-
-If you have created a database but it is not appearing on the Netdata dashboard,
-this may indicate that statistics collection is not enabled for your database.
-To resolve this, follow these steps:
-
-1. Open `SQL Server Configuration Manager`.
-2. Right-click the database for which you want to enable statistics and select `Properties`.
-3. In the left pane, select `Options`.
-4. Set `Auto Create Statistics` to `True`.
-
-#### Login Failed
-
-Another possible reason for the lack of available data is that an incorrect username or password was provided
-in your configuration file. You can verify this by checking the `ERRORLOG` in the SQL Server log located at:
-
-```text
-C:\Program Files\Microsoft SQL Server\VERSION\MSSQL\Log,
-```
-
-where `VERSION` corresponds to the Microsoft SQL Server version installed on the host.
