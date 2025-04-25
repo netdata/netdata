@@ -226,6 +226,44 @@ static void initialize(void)
     dictionary_register_insert_callback(app_pools, dict_app_pool_insert_cb, NULL);
 }
 
+static inline void netdata_webservice_traffic(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_INSTANCE_DEFINITION *pi,
+    struct web_service *p,
+    int update_every)
+{
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISReceivedBytesTotal) &&
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISSentBytesTotal)) {
+        if (!p->st_traffic) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_traffic", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_traffic = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "traffic",
+                "iis.website_traffic",
+                "Website traffic",
+                "bytes/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_WEBSITE_IIS_TRAFFIC,
+                update_every,
+                RRDSET_TYPE_AREA);
+
+            p->rd_traffic_received = rrddim_add(p->st_traffic, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_traffic_sent = rrddim_add(p->st_traffic, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_traffic->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_traffic, p->rd_traffic_received, (collected_number)p->IISReceivedBytesTotal.current.Data);
+        rrddim_set_by_pointer(p->st_traffic, p->rd_traffic_sent, (collected_number)p->IISSentBytesTotal.current.Data);
+
+        rrdset_done(p->st_traffic);
+    }
+}
+
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -249,37 +287,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         struct web_service *p = dictionary_set(web_services, windows_shared_buffer, NULL, sizeof(*p));
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISReceivedBytesTotal) &&
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISSentBytesTotal)) {
-            if (!p->st_traffic) {
-                snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_traffic", windows_shared_buffer);
-                netdata_fix_chart_name(id);
-                p->st_traffic = rrdset_create_localhost(
-                    "iis",
-                    id,
-                    NULL,
-                    "traffic",
-                    "iis.website_traffic",
-                    "Website traffic",
-                    "bytes/s",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibWebService",
-                    PRIO_WEBSITE_IIS_TRAFFIC,
-                    update_every,
-                    RRDSET_TYPE_AREA);
-
-                p->rd_traffic_received = rrddim_add(p->st_traffic, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                p->rd_traffic_sent = rrddim_add(p->st_traffic, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrdlabels_add(p->st_traffic->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            }
-
-            rrddim_set_by_pointer(
-                p->st_traffic, p->rd_traffic_received, (collected_number)p->IISReceivedBytesTotal.current.Data);
-            rrddim_set_by_pointer(
-                p->st_traffic, p->rd_traffic_sent, (collected_number)p->IISSentBytesTotal.current.Data);
-
-            rrdset_done(p->st_traffic);
-        }
+        netdata_webservice_traffic(pDataBlock, pi, p, update_every);
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesReceivedTotal) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesSentTotal)) {
